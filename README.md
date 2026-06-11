@@ -1,59 +1,134 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# SIMPEG LLDIKTI Wilayah XVI
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Sistem Informasi Kepegawaian (employee information system) untuk LLDIKTI Wilayah XVI.
 
-## About Laravel
+Repo ini berisi **Fase 1 / Core** dari SIMPEG. SAKIP dan modul lanjutan lain BUKAN bagian dari fase ini, dan akan dikerjakan pada fase berikutnya.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+> Catatan: repo ini hanya berisi aplikasi Laravel (`simpeg-app`). Dokumen perencanaan proyek (PRD, user stories, standar engineering, dll) disimpan di tempat terpisah, di luar repo ini.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Dikerjakan oleh tim beranggotakan 5 orang dengan metodologi Scrum. Target Go-Live: **sebelum 1 September 2026**.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Tech Stack
 
-## Learning Laravel
+- **Backend**: Laravel 12 (PHP 8.2+), arsitektur monolith
+- **Frontend**: Blade + CSS (server-side rendering, responsive). Bukan React/SPA
+- **Database**: PostgreSQL 15+ (saat ini scaffold masih jalan di SQLite default; koneksi PostgreSQL akan dikonfigurasi pada fase migrasi)
+- **Queue/Worker**: Redis + Laravel Horizon (rencana, untuk email, CSV import, dan scheduler EWS). Belum dipasang
+- **Auth**: Keycloak SSO (OpenID Connect / OAuth 2.0), memakai instance LLDIKTI yang sudah ada
+- **Timezone**: `Asia/Makassar` (WITA). Penting: scheduler harian EWS berjalan pada 07:00 WITA
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+### Paket utama yang direncanakan untuk Fase 1
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Paket berikut belum dipasang, tapi sudah direncanakan:
 
-## Laravel Sponsors
+- `owen-it/laravel-auditing` (audit log)
+- `maatwebsite/excel` (ekspor Excel)
+- `barryvdh/laravel-dompdf` (ekspor PDF)
+- Keycloak socialite / web-guard (integrasi SSO)
+- `laravel/horizon` (monitoring queue)
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## Prerequisites
 
-### Premium Partners
+Pastikan tools berikut sudah terpasang sebelum mulai:
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+- **PHP >= 8.2** dengan ekstensi: `zip`, `pdo_pgsql`, `pgsql`, `mbstring`, `openssl`, `curl`
+- **Composer 2.x**
+- **Node.js 18+** dan **npm** (untuk Vite/asset frontend)
+- **PostgreSQL 15+** (untuk nanti; SQLite cukup untuk run awal)
+- **Git**
 
-## Contributing
+## Local Setup
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Ikuti langkah berikut secara berurutan untuk menjalankan aplikasi di mesin lokal.
 
-## Code of Conduct
+1. Clone repo lalu masuk ke direktori proyek.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+git clone <repo>
+cd simpeg-app
+```
 
-## Security Vulnerabilities
+2. Pasang dependency PHP.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```bash
+composer install
+```
 
-## License
+3. Salin file environment.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```bash
+# Windows
+copy .env.example .env
+
+# Unix / macOS / Linux
+cp .env.example .env
+```
+
+4. Generate application key.
+
+```bash
+php artisan key:generate
+```
+
+5. Konfigurasi database. Secara default sudah memakai SQLite, jadi langkah ini bisa dilewati untuk run awal. Untuk memakai PostgreSQL nanti, atur variabel `DB_*` di file `.env`.
+
+6. Jalankan migrasi database.
+
+```bash
+php artisan migrate
+```
+
+7. Pasang dependency frontend.
+
+```bash
+npm install
+```
+
+8. Jalankan dev server untuk asset frontend (gunakan terminal terpisah).
+
+```bash
+npm run dev
+```
+
+9. Jalankan aplikasi Laravel, lalu akses `http://localhost:8000`.
+
+```bash
+php artisan serve
+```
+
+## Git / Branch Workflow
+
+Bagian ini wajib dibaca semua anggota tim. Alur kerja Git kita ketat agar `main` selalu stabil.
+
+**Model branch:**
+
+```
+main (stabil / release)
+  └── develop (integrasi)
+        └── feature/* atau chore/* (cabang kerja)
+```
+
+**Aturan:**
+
+- Buat cabang kerja dari `develop`, kerjakan fiturnya, push, lalu buka **Pull Request ke `develop`**.
+- **JANGAN push langsung ke `main` atau `develop`.** Semua perubahan masuk lewat PR.
+- Setiap PR **wajib melalui code review** sebelum di-merge.
+
+**Contoh memulai cabang fitur baru:**
+
+```bash
+git checkout develop
+git checkout -b feature/nama-fitur
+```
+
+## Testing
+
+Jalankan test suite dengan:
+
+```bash
+php artisan test
+```
+
+## Struktur Tim
+
+Tim memakai model **fullstack-per-feature** di atas Laravel: satu orang memiliki satu fitur dari ujung ke ujung (migration, model, controller, hingga Blade view).
