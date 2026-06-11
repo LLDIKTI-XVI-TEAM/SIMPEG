@@ -104,20 +104,20 @@ Bagian ini wajib dibaca semua anggota tim. Alur kerja Git kita ketat agar `main`
 
 ```
 main (stabil / release)
-  └── develop (integrasi)
+  └── development (integrasi)
         └── feature/* atau chore/* (cabang kerja)
 ```
 
 **Aturan:**
 
-- Buat cabang kerja dari `develop`, kerjakan fiturnya, push, lalu buka **Pull Request ke `develop`**.
-- **JANGAN push langsung ke `main` atau `develop`.** Semua perubahan masuk lewat PR.
+- Buat cabang kerja dari `development`, kerjakan fiturnya, push, lalu buka **Pull Request ke `development`**.
+- **JANGAN push langsung ke `main` atau `development`.** Semua perubahan masuk lewat PR.
 - Setiap PR **wajib melalui code review** sebelum di-merge.
 
 **Contoh memulai cabang fitur baru:**
 
 ```bash
-git checkout develop
+git checkout development
 git checkout -b feature/nama-fitur
 ```
 
