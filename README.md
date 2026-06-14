@@ -1,59 +1,300 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# SIMPEG — Sistem Informasi Manajemen Kepegawaian
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+> Aplikasi manajemen kepegawaian LLDIKTI berbasis **Laravel 12**, **PostgreSQL 17**, dan **Tailwind CSS 4**, di-containerize menggunakan **Podman**.
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Tech Stack
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+| Komponen   | Teknologi                |
+| ---------- | ------------------------ |
+| Framework  | Laravel 12 (PHP 8.4)    |
+| Database   | PostgreSQL 17            |
+| CSS        | Tailwind CSS 4           |
+| Bundler    | Vite 7                   |
+| Web Server | Nginx (Alpine)           |
+| Container  | Podman + Compose         |
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+---
 
-## Learning Laravel
+## Prasyarat
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+Pastikan sudah terinstall di sistem anda:
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+- **[Podman Desktop](https://podman-desktop.io/)** atau **[Podman CLI](https://podman.io/)** (v4.0+)
+- **[Git](https://git-scm.com/)**
+- **Node.js** (v18+) & **npm** — _hanya jika ingin develop frontend di luar container_
 
-## Laravel Sponsors
+> **Catatan Windows:** Podman membutuhkan Hyper-V dan beberapa perintah `podman machine` perlu dijalankan sebagai **Administrator**.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+---
 
-### Premium Partners
+## Instalasi & Setup
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+### 1. Clone Repository
 
-## Contributing
+```bash
+git clone <repository-url>
+cd SIMPEG
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### 2. Konfigurasi Environment
 
-## Code of Conduct
+Salin file environment lalu sesuaikan jika diperlukan:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+cp .env.example .env
+```
 
-## Security Vulnerabilities
+Konfigurasi database default (sudah sesuai dengan `compose.yml`):
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```env
+DB_CONNECTION=pgsql
+DB_HOST=db
+DB_PORT=5432
+DB_DATABASE=simpeg
+DB_USERNAME=simpeg
+DB_PASSWORD=secret
+```
+
+> **Penting:** `DB_HOST=db` merujuk ke nama service PostgreSQL di `compose.yml`. Jangan diubah ke `localhost` atau `127.0.0.1` saat menggunakan container.
+
+### 3. Build & Jalankan Containers
+
+**Cara cepat** — menggunakan helper script (PowerShell):
+
+```powershell
+.\podman-up.ps1
+```
+
+Script ini otomatis: build image → start containers → install dependencies → generate key → jalankan migrasi.
+
+**Cara manual:**
+
+```bash
+# Build image PHP
+podman compose build
+
+# Jalankan semua containers (background)
+podman compose up -d
+
+# Install dependencies PHP
+podman compose exec app composer install
+
+# Generate application key
+podman compose exec app php artisan key:generate
+
+# Jalankan database migration
+podman compose exec app php artisan migrate
+
+# Buat symbolic link storage
+podman compose exec app php artisan storage:link
+```
+
+### 4. Install Frontend Dependencies (Opsional)
+
+Jika ingin develop frontend dengan hot-reload:
+
+```bash
+npm install
+npm run dev
+```
+
+### 5. Akses Aplikasi
+
+Buka browser dan akses:
+
+```
+http://localhost:8000
+```
+
+---
+
+## Perintah yang Sering Digunakan
+
+### Container Management
+
+```bash
+# Start semua containers
+podman compose up -d
+
+# Stop semua containers
+podman compose down
+
+# Restart containers
+podman compose restart
+
+# Lihat status containers
+podman compose ps
+
+# Lihat logs (follow mode)
+podman compose logs -f
+
+# Lihat logs service tertentu
+podman compose logs -f app
+podman compose logs -f db
+podman compose logs -f nginx
+```
+
+### Laravel Artisan (di dalam container)
+
+```bash
+# Jalankan migration
+podman compose exec app php artisan migrate
+
+# Rollback migration
+podman compose exec app php artisan migrate:rollback
+
+# Fresh migration + seed
+podman compose exec app php artisan migrate:fresh --seed
+
+# Buat model + migration + controller
+podman compose exec app php artisan make:model NamaModel -mc
+
+# Buat controller
+podman compose exec app php artisan make:controller NamaController
+
+# Clear semua cache
+podman compose exec app php artisan optimize:clear
+
+# Masuk ke Tinker (REPL)
+podman compose exec app php artisan tinker
+
+# Jalankan tests
+podman compose exec app php artisan test
+```
+
+### Masuk ke Shell Container
+
+```bash
+# Shell ke container app (PHP)
+podman compose exec app bash
+
+# Shell ke container database (psql)
+podman compose exec db psql -U simpeg -d simpeg
+```
+
+### Helper Script (PowerShell)
+
+```powershell
+.\podman-up.ps1 up        # Build & start (default)
+.\podman-up.ps1 down      # Stop containers
+.\podman-up.ps1 restart   # Restart containers
+.\podman-up.ps1 logs      # Lihat logs
+.\podman-up.ps1 shell     # Masuk ke shell container app
+.\podman-up.ps1 artisan migrate   # Jalankan artisan command
+```
+
+---
+
+## Struktur Project
+
+```
+SIMPEG/
+├── app/                    # Kode aplikasi Laravel (Models, Controllers, dll)
+├── bootstrap/              # Bootstrap framework
+├── config/                 # File konfigurasi Laravel
+├── database/
+│   ├── factories/          # Model factories
+│   ├── migrations/         # Database migrations
+│   └── seeders/            # Database seeders
+├── docker/
+│   ├── nginx/
+│   │   └── default.conf    # Konfigurasi Nginx
+│   └── php/
+│       └── Dockerfile      # PHP 8.4-FPM + extensions
+├── public/                 # Document root (index.php, assets)
+├── resources/
+│   ├── css/                # Stylesheet (Tailwind CSS)
+│   ├── js/                 # JavaScript
+│   └── views/              # Blade templates
+├── routes/                 # Route definitions
+├── storage/                # Logs, cache, uploads
+├── tests/                  # Unit & feature tests
+├── .env.example            # Template environment variables
+├── compose.yml             # Podman Compose configuration
+├── composer.json           # PHP dependencies
+├── package.json            # Node.js dependencies
+├── podman-up.ps1           # Helper script (PowerShell)
+└── vite.config.js          # Vite bundler configuration
+```
+
+---
+
+## Arsitektur Container
+
+```
+┌─────────────────────────────────────────────────┐
+│                  Podman Network                  │
+│                 (simpeg_net)                      │
+│                                                  │
+│  ┌──────────┐   ┌──────────┐   ┌──────────────┐ │
+│  │  Nginx   │──▶│ PHP-FPM  │──▶│ PostgreSQL   │ │
+│  │ :80→8000 │   │  (app)   │   │   17 (db)    │ │
+│  │  Alpine  │   │ PHP 8.4  │   │  :5432       │ │
+│  └──────────┘   └──────────┘   └──────────────┘ │
+│                                                  │
+└─────────────────────────────────────────────────┘
+```
+
+| Container        | Image                | Port          |
+| ---------------- | -------------------- | ------------- |
+| `simpeg_nginx`   | nginx:alpine         | 8000 → 80    |
+| `simpeg_app`     | php:8.4-fpm (custom) | 9000 (internal) |
+| `simpeg_postgres` | postgres:17         | 5432          |
+
+---
+
+## Troubleshooting
+
+### Podman tidak ditemukan di PATH (Windows)
+
+Tambahkan Podman ke PATH secara manual:
+
+```powershell
+$env:Path = "C:\Program Files\RedHat\Podman;" + $env:Path
+```
+
+Atau tambahkan secara permanen melalui **System Environment Variables**.
+
+### `podman machine` membutuhkan admin authority
+
+Jalankan PowerShell sebagai **Administrator** untuk perintah `podman machine`:
+
+```powershell
+podman machine init
+podman machine start
+```
+
+### Error: could not find driver (pgsql)
+
+Container belum di-rebuild setelah perubahan Dockerfile:
+
+```bash
+podman compose down
+podman compose build --no-cache app
+podman compose up -d
+```
+
+### Permission denied pada storage/
+
+```bash
+podman compose exec app chmod -R 777 storage bootstrap/cache
+```
+
+### Database connection refused
+
+Pastikan container PostgreSQL sudah running:
+
+```bash
+podman compose ps
+podman compose logs db
+```
+
+Tunggu beberapa detik setelah `podman compose up` agar PostgreSQL selesai inisialisasi.
+
+---
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Aplikasi ini dibangun menggunakan framework [Laravel](https://laravel.com) yang dilisensikan di bawah [MIT License](https://opensource.org/licenses/MIT).
