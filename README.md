@@ -1,132 +1,300 @@
-# SIMPEG LLDIKTI Wilayah XVI
+# SIMPEG — Sistem Informasi Manajemen Kepegawaian
 
-Sistem Informasi Kepegawaian (employee information system) untuk LLDIKTI Wilayah XVI.
+> Aplikasi manajemen kepegawaian LLDIKTI berbasis **Laravel 12**, **PostgreSQL 17**, dan **Tailwind CSS 4**, di-containerize menggunakan **Podman**.
 
-Repo ini berisi **Fase 1 / Core** dari SIMPEG. SAKIP dan modul lanjutan lain BUKAN bagian dari fase ini, dan akan dikerjakan pada fase berikutnya.
-
-Dikerjakan oleh tim beranggotakan 5 orang dengan metodologi Scrum. Target Go-Live: **sebelum 1 September 2026**.
+---
 
 ## Tech Stack
 
-- **Backend**: Laravel 12 (PHP 8.2+), arsitektur monolith
-- **Frontend**: Blade + CSS (server-side rendering, responsive). Bukan React/SPA
-- **Database**: PostgreSQL 15+ (saat ini scaffold masih jalan di SQLite default; koneksi PostgreSQL akan dikonfigurasi pada fase migrasi)
-- **Queue/Worker**: Redis + Laravel Horizon (rencana, untuk email, CSV import, dan scheduler EWS). Belum dipasang
-- **Auth**: Keycloak SSO (OpenID Connect / OAuth 2.0), memakai instance LLDIKTI yang sudah ada
-- **Timezone**: `Asia/Makassar` (WITA). Penting: scheduler harian EWS berjalan pada 07:00 WITA
+| Komponen   | Teknologi                |
+| ---------- | ------------------------ |
+| Framework  | Laravel 12 (PHP 8.4)    |
+| Database   | PostgreSQL 17            |
+| CSS        | Tailwind CSS 4           |
+| Bundler    | Vite 7                   |
+| Web Server | Nginx (Alpine)           |
+| Container  | Podman + Compose         |
 
-### Paket utama yang direncanakan untuk Fase 1
+---
 
-Paket berikut belum dipasang, tapi sudah direncanakan:
+## Prasyarat
 
-- `owen-it/laravel-auditing` (audit log)
-- `maatwebsite/excel` (ekspor Excel)
-- `barryvdh/laravel-dompdf` (ekspor PDF)
-- Keycloak socialite / web-guard (integrasi SSO)
-- `laravel/horizon` (monitoring queue)
+Pastikan sudah terinstall di sistem anda:
 
-## Prerequisites
+- **[Podman Desktop](https://podman-desktop.io/)** atau **[Podman CLI](https://podman.io/)** (v4.0+)
+- **[Git](https://git-scm.com/)**
+- **Node.js** (v18+) & **npm** — _hanya jika ingin develop frontend di luar container_
 
-Pastikan tools berikut sudah terpasang sebelum mulai:
+> **Catatan Windows:** Podman membutuhkan Hyper-V dan beberapa perintah `podman machine` perlu dijalankan sebagai **Administrator**.
 
-- **PHP >= 8.2** dengan ekstensi: `zip`, `pdo_sqlite`, `sqlite3` (untuk run awal), `pdo_pgsql`, `pgsql` (untuk PostgreSQL), `mbstring`, `openssl`, `curl`
-- **Composer 2.x**
-- **Node.js 18+** dan **npm** (untuk Vite/asset frontend)
-- **PostgreSQL 15+** (untuk nanti; SQLite cukup untuk run awal)
-- **Git**
+---
 
-## Local Setup
+## Instalasi & Setup
 
-Ikuti langkah berikut secara berurutan untuk menjalankan aplikasi di mesin lokal.
-
-1. Clone repo lalu masuk ke direktori proyek.
+### 1. Clone Repository
 
 ```bash
-git clone <repo-url>
-cd <nama-folder-hasil-clone>
+git clone <repository-url>
+cd SIMPEG
 ```
 
-2. Pasang dependency PHP.
+### 2. Konfigurasi Environment
+
+Salin file environment lalu sesuaikan jika diperlukan:
 
 ```bash
-composer install
-```
-
-3. Salin file environment.
-
-```bash
-# Windows
-copy .env.example .env
-
-# Unix / macOS / Linux
 cp .env.example .env
 ```
 
-4. Generate application key.
+Konfigurasi database default (sudah sesuai dengan `compose.yml`):
 
-```bash
-php artisan key:generate
+```env
+DB_CONNECTION=pgsql
+DB_HOST=db
+DB_PORT=5432
+DB_DATABASE=simpeg
+DB_USERNAME=simpeg
+DB_PASSWORD=secret
 ```
 
-5. Konfigurasi database. Secara default sudah memakai SQLite, jadi langkah ini bisa dilewati untuk run awal. Untuk memakai PostgreSQL nanti, atur variabel `DB_*` di file `.env`.
+> **Penting:** `DB_HOST=db` merujuk ke nama service PostgreSQL di `compose.yml`. Jangan diubah ke `localhost` atau `127.0.0.1` saat menggunakan container.
 
-6. Jalankan migrasi database.
+### 3. Build & Jalankan Containers
 
-```bash
-php artisan migrate
+**Cara cepat** — menggunakan helper script (PowerShell):
+
+```powershell
+.\podman-up.ps1
 ```
 
-7. Pasang dependency frontend.
+Script ini otomatis: build image → start containers → install dependencies → generate key → jalankan migrasi.
+
+**Cara manual:**
+
+```bash
+# Build image PHP
+podman compose build
+
+# Jalankan semua containers (background)
+podman compose up -d
+
+# Install dependencies PHP
+podman compose exec app composer install
+
+# Generate application key
+podman compose exec app php artisan key:generate
+
+# Jalankan database migration
+podman compose exec app php artisan migrate
+
+# Buat symbolic link storage
+podman compose exec app php artisan storage:link
+```
+
+### 4. Install Frontend Dependencies (Opsional)
+
+Jika ingin develop frontend dengan hot-reload:
 
 ```bash
 npm install
-```
-
-8. Jalankan dev server untuk asset frontend (gunakan terminal terpisah).
-
-```bash
 npm run dev
 ```
 
-9. Jalankan aplikasi Laravel, lalu akses `http://localhost:8000`.
+### 5. Akses Aplikasi
+
+Buka browser dan akses:
+
+```
+http://localhost:8000
+```
+
+---
+
+## Perintah yang Sering Digunakan
+
+### Container Management
 
 ```bash
-php artisan serve
+# Start semua containers
+podman compose up -d
+
+# Stop semua containers
+podman compose down
+
+# Restart containers
+podman compose restart
+
+# Lihat status containers
+podman compose ps
+
+# Lihat logs (follow mode)
+podman compose logs -f
+
+# Lihat logs service tertentu
+podman compose logs -f app
+podman compose logs -f db
+podman compose logs -f nginx
 ```
 
-## Git / Branch Workflow
-
-Bagian ini wajib dibaca semua anggota tim. Alur kerja Git kita ketat agar `main` selalu stabil.
-
-**Model branch:**
-
-```
-main (stabil / release)
-  └── development (integrasi)
-        └── feature/* atau chore/* (cabang kerja)
-```
-
-**Aturan:**
-
-- Buat cabang kerja dari `development`, kerjakan fiturnya, push, lalu buka **Pull Request ke `development`**.
-- **JANGAN push langsung ke `main` atau `development`.** Semua perubahan masuk lewat PR.
-- Setiap PR **wajib melalui code review** sebelum di-merge.
-
-**Contoh memulai cabang fitur baru:**
+### Laravel Artisan (di dalam container)
 
 ```bash
-git checkout development
-git checkout -b feature/nama-fitur
+# Jalankan migration
+podman compose exec app php artisan migrate
+
+# Rollback migration
+podman compose exec app php artisan migrate:rollback
+
+# Fresh migration + seed
+podman compose exec app php artisan migrate:fresh --seed
+
+# Buat model + migration + controller
+podman compose exec app php artisan make:model NamaModel -mc
+
+# Buat controller
+podman compose exec app php artisan make:controller NamaController
+
+# Clear semua cache
+podman compose exec app php artisan optimize:clear
+
+# Masuk ke Tinker (REPL)
+podman compose exec app php artisan tinker
+
+# Jalankan tests
+podman compose exec app php artisan test
 ```
 
-## Testing
-
-Jalankan test suite dengan:
+### Masuk ke Shell Container
 
 ```bash
-php artisan test
+# Shell ke container app (PHP)
+podman compose exec app bash
+
+# Shell ke container database (psql)
+podman compose exec db psql -U simpeg -d simpeg
 ```
 
-## Struktur Tim
+### Helper Script (PowerShell)
 
-Tim memakai model **fullstack-per-feature** di atas Laravel: satu orang memiliki satu fitur dari ujung ke ujung (migration, model, controller, hingga Blade view).
+```powershell
+.\podman-up.ps1 up        # Build & start (default)
+.\podman-up.ps1 down      # Stop containers
+.\podman-up.ps1 restart   # Restart containers
+.\podman-up.ps1 logs      # Lihat logs
+.\podman-up.ps1 shell     # Masuk ke shell container app
+.\podman-up.ps1 artisan migrate   # Jalankan artisan command
+```
+
+---
+
+## Struktur Project
+
+```
+SIMPEG/
+├── app/                    # Kode aplikasi Laravel (Models, Controllers, dll)
+├── bootstrap/              # Bootstrap framework
+├── config/                 # File konfigurasi Laravel
+├── database/
+│   ├── factories/          # Model factories
+│   ├── migrations/         # Database migrations
+│   └── seeders/            # Database seeders
+├── docker/
+│   ├── nginx/
+│   │   └── default.conf    # Konfigurasi Nginx
+│   └── php/
+│       └── Dockerfile      # PHP 8.4-FPM + extensions
+├── public/                 # Document root (index.php, assets)
+├── resources/
+│   ├── css/                # Stylesheet (Tailwind CSS)
+│   ├── js/                 # JavaScript
+│   └── views/              # Blade templates
+├── routes/                 # Route definitions
+├── storage/                # Logs, cache, uploads
+├── tests/                  # Unit & feature tests
+├── .env.example            # Template environment variables
+├── compose.yml             # Podman Compose configuration
+├── composer.json           # PHP dependencies
+├── package.json            # Node.js dependencies
+├── podman-up.ps1           # Helper script (PowerShell)
+└── vite.config.js          # Vite bundler configuration
+```
+
+---
+
+## Arsitektur Container
+
+```
+┌─────────────────────────────────────────────────┐
+│                  Podman Network                  │
+│                 (simpeg_net)                      │
+│                                                  │
+│  ┌──────────┐   ┌──────────┐   ┌──────────────┐ │
+│  │  Nginx   │──▶│ PHP-FPM  │──▶│ PostgreSQL   │ │
+│  │ :80→8000 │   │  (app)   │   │   17 (db)    │ │
+│  │  Alpine  │   │ PHP 8.4  │   │  :5432       │ │
+│  └──────────┘   └──────────┘   └──────────────┘ │
+│                                                  │
+└─────────────────────────────────────────────────┘
+```
+
+| Container        | Image                | Port          |
+| ---------------- | -------------------- | ------------- |
+| `simpeg_nginx`   | nginx:alpine         | 8000 → 80    |
+| `simpeg_app`     | php:8.4-fpm (custom) | 9000 (internal) |
+| `simpeg_postgres` | postgres:17         | 5432          |
+
+---
+
+## Troubleshooting
+
+### Podman tidak ditemukan di PATH (Windows)
+
+Tambahkan Podman ke PATH secara manual:
+
+```powershell
+$env:Path = "C:\Program Files\RedHat\Podman;" + $env:Path
+```
+
+Atau tambahkan secara permanen melalui **System Environment Variables**.
+
+### `podman machine` membutuhkan admin authority
+
+Jalankan PowerShell sebagai **Administrator** untuk perintah `podman machine`:
+
+```powershell
+podman machine init
+podman machine start
+```
+
+### Error: could not find driver (pgsql)
+
+Container belum di-rebuild setelah perubahan Dockerfile:
+
+```bash
+podman compose down
+podman compose build --no-cache app
+podman compose up -d
+```
+
+### Permission denied pada storage/
+
+```bash
+podman compose exec app chmod -R 777 storage bootstrap/cache
+```
+
+### Database connection refused
+
+Pastikan container PostgreSQL sudah running:
+
+```bash
+podman compose ps
+podman compose logs db
+```
+
+Tunggu beberapa detik setelah `podman compose up` agar PostgreSQL selesai inisialisasi.
+
+---
+
+## License
+
+Aplikasi ini dibangun menggunakan framework [Laravel](https://laravel.com) yang dilisensikan di bawah [MIT License](https://opensource.org/licenses/MIT).
