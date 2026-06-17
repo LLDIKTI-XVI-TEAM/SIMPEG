@@ -2,18 +2,40 @@
 
 namespace Tests\Feature;
 
-// use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
 {
-    /**
-     * A basic test example.
-     */
-    public function test_the_application_returns_a_successful_response(): void
+    use RefreshDatabase;
+
+    public function test_guest_home_redirects_to_login(): void
     {
         $response = $this->get('/');
 
-        $response->assertStatus(200);
+        $response->assertRedirect('/login');
+    }
+
+    public function test_login_redirects_to_keycloak(): void
+    {
+        $response = $this->get('/login');
+
+        $response->assertStatus(302);
+        $this->assertStringStartsWith(
+            'https://sso-lldikti16.kemdiktisaintek.go.id/realms/sso/protocol/openid-connect/auth',
+            $response->headers->get('Location'),
+        );
+    }
+
+    public function test_authenticated_dashboard_renders(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/dashboard');
+
+        $response->assertOk();
+        $response->assertSee('Login aktif');
+        $response->assertSee($user->email);
     }
 }
