@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureKeycloakAuthenticated;
+use App\Http\Middleware\EnsureRole;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -15,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'keycloak.auth' => EnsureKeycloakAuthenticated::class,
+            'role' => EnsureRole::class,
         ]);
 
         $middleware->validateCsrfTokens(except: [

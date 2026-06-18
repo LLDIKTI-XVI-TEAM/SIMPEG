@@ -11,22 +11,40 @@ class EmployeeFactory extends Factory
 {
     public function definition(): array
     {
+        $jenisPegawai = fake()->randomElement(['PNS', 'PPPK']);
+
         return [
-            'nama_pegawai' => fake()->name(),
-            'email_pegawai' => fake()->unique()->safeEmail(),
-            'golongan' => 'III/a',
-            'jabatan' => 'Analis Kepegawaian',
-            'kelas_jabatan' => '7',
+            'nama_lengkap' => fake()->name(),
             'nip' => fake()->unique()->numerify('##################'),
-            'nomor_telepon' => fake()->phoneNumber(),
-            'pangkat' => 'Penata Muda',
-            'pendidikan_terakhir' => 'S1',
-            'pensiun' => fake()->dateTimeBetween('+5 years', '+20 years')->format('Y-m-d'),
-            'person' => fake()->firstName(),
-            'person_formula' => fake()->firstName(),
-            'prodi_pendidikan_terakhir' => 'Manajemen',
-            'status_kepegawaian' => 'PNS',
+            'tempat_lahir' => fake()->city(),
             'tanggal_lahir' => fake()->dateTimeBetween('-60 years', '-25 years')->format('Y-m-d'),
+            'jenis_kelamin' => fake()->randomElement(['L', 'P']),
+            'jenis_pegawai' => $jenisPegawai,
+            'status_aktif' => 'Aktif',
+            'golongan_terakhir' => fake()->randomElement(['III/a', 'III/b', 'III/c', 'III/d', 'IV/a']),
+            'pangkat_terakhir' => fake()->randomElement(['Penata Muda', 'Penata Muda Tingkat 1', 'Penata', 'Pembina']),
+            'jabatan_terakhir' => fake()->randomElement(['Analis Kepegawaian', 'Pengelola Data', 'Perencana', 'Arsiparis']),
+            'kelas_jabatan' => (string) fake()->numberBetween(5, 12),
+            'pendidikan_terakhir' => fake()->randomElement(['D3', 'S1', 'S2']),
+            'prodi_pendidikan_terakhir' => fake()->randomElement(['Manajemen', 'Administrasi Negara', 'Hukum', 'Akuntansi']),
+            'tanggal_pensiun' => fake()->dateTimeBetween('+5 years', '+20 years')->format('Y-m-d'),
+            'profil_status' => 'belum_lengkap',
+            'no_hp' => fake()->phoneNumber(),
+            'email_pribadi' => fake()->unique()->safeEmail(),
+            'is_kinerja_baik' => true,
+            'role' => 'pegawai',
         ];
+    }
+
+    /**
+     * Full profile state.
+     */
+    public function lengkap(): static
+    {
+        return $this->state(fn () => [
+            'nik' => fake()->numerify('################'),
+            'alamat' => fake()->address(),
+            'profil_status' => 'lengkap',
+        ]);
     }
 }

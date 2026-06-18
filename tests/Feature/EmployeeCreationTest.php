@@ -20,7 +20,7 @@ class EmployeeCreationTest extends TestCase
 
     public function test_authenticated_user_can_create_employee(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->adminKepegawaian()->create();
 
         $response = $this->actingAs($user)->postJson('/api/employees', $this->validPayload());
 
@@ -33,9 +33,18 @@ class EmployeeCreationTest extends TestCase
         ]);
     }
 
+    public function test_pegawai_cannot_create_employee(): void
+    {
+        $user = User::factory()->pegawai()->create();
+
+        $response = $this->actingAs($user)->postJson('/api/employees', $this->validPayload());
+
+        $response->assertForbidden();
+    }
+
     public function test_name_is_required(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->adminKepegawaian()->create();
         $payload = $this->validPayload();
         unset($payload['nama_pegawai']);
 
@@ -47,7 +56,7 @@ class EmployeeCreationTest extends TestCase
 
     public function test_duplicate_email_and_nip_are_rejected(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->adminKepegawaian()->create();
         Employee::factory()->create([
             'email_pegawai' => 'budi@example.com',
             'nip' => '198001012006041001',
@@ -61,7 +70,7 @@ class EmployeeCreationTest extends TestCase
 
     public function test_future_birth_date_is_rejected(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->adminKepegawaian()->create();
         $payload = $this->validPayload();
         $payload['tanggal_lahir'] = now()->addDay()->format('Y-m-d');
 

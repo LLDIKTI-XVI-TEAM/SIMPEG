@@ -30,7 +30,43 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
+            'role' => 'pegawai',
         ];
+    }
+
+    public function superAdmin(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => 'super_admin',
+        ]);
+    }
+
+    public function adminKepegawaian(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => 'admin_kepegawaian',
+        ]);
+    }
+
+    public function pimpinan(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => 'pimpinan',
+        ]);
+    }
+
+    public function atasanLangsung(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => 'atasan_langsung',
+        ]);
+    }
+
+    public function pegawai(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => 'pegawai',
+        ]);
     }
 
     /**

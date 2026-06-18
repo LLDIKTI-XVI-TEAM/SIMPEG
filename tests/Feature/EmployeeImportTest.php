@@ -23,7 +23,7 @@ class EmployeeImportTest extends TestCase
 
     public function test_authenticated_user_can_import_valid_csv(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->adminKepegawaian()->create();
 
         $response = $this->actingAs($user)->postJson('/api/employees/import', [
             'file' => $this->csvFile($this->validCsv()),
@@ -40,9 +40,20 @@ class EmployeeImportTest extends TestCase
         $this->assertSame('1985-02-12', Employee::where('nama_pegawai', 'Siti Aminah')->firstOrFail()->tanggal_lahir->format('Y-m-d'));
     }
 
+    public function test_pegawai_cannot_import_employees(): void
+    {
+        $user = User::factory()->pegawai()->create();
+
+        $response = $this->actingAs($user)->postJson('/api/employees/import', [
+            'file' => $this->csvFile($this->validCsv()),
+        ]);
+
+        $response->assertForbidden();
+    }
+
     public function test_import_rejects_missing_header(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->adminKepegawaian()->create();
         $csv = "Nama Pegawai,Email Pegawai\nBudi,budi@example.com\n";
 
         $response = $this->actingAs($user)->postJson('/api/employees/import', [
@@ -55,7 +66,7 @@ class EmployeeImportTest extends TestCase
 
     public function test_import_reports_row_errors_and_keeps_valid_rows(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->adminKepegawaian()->create();
         Employee::factory()->create(['nip' => '198001012006041001']);
 
         $response = $this->actingAs($user)->postJson('/api/employees/import', [
@@ -71,7 +82,7 @@ class EmployeeImportTest extends TestCase
 
     public function test_import_rejects_xlsx_file(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->adminKepegawaian()->create();
 
         $response = $this->actingAs($user)->postJson('/api/employees/import', [
             'file' => UploadedFile::fake()->create('pegawai.xlsx', 10, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),

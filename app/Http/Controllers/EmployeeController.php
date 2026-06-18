@@ -11,9 +11,7 @@ class EmployeeController extends Controller
 {
     public function store(StoreEmployeeRequest $request): JsonResponse|RedirectResponse
     {
-        $employee = Employee::create($request->validated() + [
-            'created_by' => $request->user()?->id,
-        ]);
+        $employee = Employee::create($request->validated());
 
         if ($request->expectsJson()) {
             return response()->json([
