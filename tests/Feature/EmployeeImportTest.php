@@ -14,7 +14,7 @@ class EmployeeImportTest extends TestCase
 
     public function test_guest_cannot_import_employees(): void
     {
-        $response = $this->postJson('/api/employees/import', [
+        $response = $this->postJsonWithCsrf('/api/employees/import', [
             'file' => $this->csvFile($this->validCsv()),
         ]);
 
@@ -25,7 +25,8 @@ class EmployeeImportTest extends TestCase
     {
         $user = User::factory()->adminKepegawaian()->create();
 
-        $response = $this->actingAs($user)->postJson('/api/employees/import', [
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf('/api/employees/import', [
             'file' => $this->csvFile($this->validCsv()),
         ]);
 
@@ -33,18 +34,19 @@ class EmployeeImportTest extends TestCase
         $response->assertJsonPath('inserted', 2);
         $response->assertJsonPath('failed', 0);
         $this->assertDatabaseHas('employees', [
-            'nama_pegawai' => 'Budi Santoso',
-            'email_pegawai' => 'budi@example.com',
-            'created_by' => $user->id,
+            'nama_lengkap' => 'Budi Santoso',
+            'email_pribadi' => 'budi@example.com',
+            'nip' => '198001012006041001',
         ]);
-        $this->assertSame('1985-02-12', Employee::where('nama_pegawai', 'Siti Aminah')->firstOrFail()->tanggal_lahir->format('Y-m-d'));
+        $this->assertSame('1985-02-12', Employee::where('nama_lengkap', 'Siti Aminah')->firstOrFail()->tanggal_lahir->format('Y-m-d'));
     }
 
     public function test_pegawai_cannot_import_employees(): void
     {
         $user = User::factory()->pegawai()->create();
 
-        $response = $this->actingAs($user)->postJson('/api/employees/import', [
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf('/api/employees/import', [
             'file' => $this->csvFile($this->validCsv()),
         ]);
 
@@ -56,7 +58,8 @@ class EmployeeImportTest extends TestCase
         $user = User::factory()->adminKepegawaian()->create();
         $csv = "Nama Pegawai,Email Pegawai\nBudi,budi@example.com\n";
 
-        $response = $this->actingAs($user)->postJson('/api/employees/import', [
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf('/api/employees/import', [
             'file' => $this->csvFile($csv),
         ]);
 
@@ -64,27 +67,62 @@ class EmployeeImportTest extends TestCase
         $response->assertJsonValidationErrors('file');
     }
 
-    public function test_import_reports_row_errors_and_keeps_valid_rows(): void
+    public function test_import_rejects_row_errors_without_creating_any_rows(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
         Employee::factory()->create(['nip' => '198001012006041001']);
 
-        $response = $this->actingAs($user)->postJson('/api/employees/import', [
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf('/api/employees/import', [
             'file' => $this->csvFile($this->validCsv()),
         ]);
 
-        $response->assertOk();
-        $response->assertJsonPath('inserted', 1);
+        $response->assertUnprocessable();
+        $response->assertJsonPath('inserted', 0);
         $response->assertJsonPath('failed', 1);
         $response->assertJsonPath('errors.0.row', 2);
-        $this->assertDatabaseHas('employees', ['nama_pegawai' => 'Siti Aminah']);
+        $this->assertDatabaseMissing('employees', ['nama_lengkap' => 'Siti Aminah']);
+    }
+
+    public function test_import_rejects_duplicate_rows_without_creating_any_rows(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $csv = $this->validCsv().implode(',', [
+            'Siti Duplikat',
+            'siti@example.com',
+            'III/c',
+            'Analis Kepegawaian',
+            '8',
+            '198602122010042003',
+            '081200000000',
+            'Penata',
+            'S2',
+            '2044-02-12',
+            'Siti',
+            'Siti',
+            'Teknik Informatika',
+            'PNS',
+            '1986-02-12',
+        ])."\n";
+
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf('/api/employees/import', [
+            'file' => $this->csvFile($csv),
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonPath('inserted', 0);
+        $response->assertJsonPath('failed', 1);
+        $response->assertJsonPath('errors.0.row', 4);
+        $this->assertDatabaseCount('employees', 0);
     }
 
     public function test_import_rejects_xlsx_file(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
 
-        $response = $this->actingAs($user)->postJson('/api/employees/import', [
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf('/api/employees/import', [
             'file' => UploadedFile::fake()->create('pegawai.xlsx', 10, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
         ]);
 
@@ -153,5 +191,11 @@ class EmployeeImportTest extends TestCase
         file_put_contents($path, $content);
 
         return new UploadedFile($path, 'employees.csv', 'text/csv', null, true);
+    }
+
+    private function postJsonWithCsrf(string $uri, array $data)
+    {
+        return $this->withSession(['_token' => 'test-token'])
+            ->postJson($uri, $data, ['X-CSRF-TOKEN' => 'test-token']);
     }
 }

@@ -10,7 +10,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('rank_histories', function (Blueprint $table): void {
-            $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('employee_id')->constrained('employees')->cascadeOnDelete();
             $table->foreignUuid('golongan_id')->constrained('ref_golongan')->restrictOnDelete();
             $table->date('tmt_pangkat');

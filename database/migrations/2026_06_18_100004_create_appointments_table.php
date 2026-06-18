@@ -10,7 +10,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('appointments', function (Blueprint $table): void {
-            $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('employee_id')->constrained('employees')->cascadeOnDelete();
             $table->enum('jenis_pengangkatan', ['CPNS', 'PNS', 'PPPK']);
             $table->date('tmt_pengangkatan');

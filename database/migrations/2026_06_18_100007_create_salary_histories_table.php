@@ -10,7 +10,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('salary_histories', function (Blueprint $table): void {
-            $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('employee_id')->constrained('employees')->cascadeOnDelete();
             $table->date('tmt_kgb');
             $table->decimal('gaji_pokok', 15, 2);

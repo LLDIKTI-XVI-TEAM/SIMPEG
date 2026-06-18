@@ -10,7 +10,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('employee_families', function (Blueprint $table): void {
-            $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('employee_id')->constrained('employees')->cascadeOnDelete();
             $table->string('nama_anggota', 255);
             $table->enum('hubungan', ['Suami', 'Istri', 'Anak']);

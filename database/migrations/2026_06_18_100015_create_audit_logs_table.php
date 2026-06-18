@@ -10,7 +10,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('audit_logs', function (Blueprint $table): void {
-            $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->uuid('user_id')->nullable();
             $table->string('user_name', 255)->nullable();
             $table->enum('event', [

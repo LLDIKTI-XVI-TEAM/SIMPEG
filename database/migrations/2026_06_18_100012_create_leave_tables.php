@@ -10,7 +10,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('leave_requests', function (Blueprint $table): void {
-            $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('employee_id')->constrained('employees')->cascadeOnDelete();
             $table->foreignUuid('jenis_cuti_id')->constrained('ref_jenis_cuti')->restrictOnDelete();
             $table->date('tanggal_mulai');
@@ -33,7 +33,7 @@ return new class extends Migration
         });
 
         Schema::create('leave_approvals', function (Blueprint $table): void {
-            $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('leave_request_id')->constrained('leave_requests')->cascadeOnDelete();
             $table->foreignUuid('approver_id')->constrained('employees')->cascadeOnDelete();
             $table->unsignedTinyInteger('stage');
@@ -46,7 +46,7 @@ return new class extends Migration
         });
 
         Schema::create('leave_balances', function (Blueprint $table): void {
-            $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('employee_id')->constrained('employees')->cascadeOnDelete();
             $table->year('tahun');
             $table->unsignedSmallInteger('jatah_awal')->default(12);

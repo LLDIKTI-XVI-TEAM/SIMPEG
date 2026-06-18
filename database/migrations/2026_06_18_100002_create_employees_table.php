@@ -10,7 +10,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('employees', function (Blueprint $table): void {
-            $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
 
             // --- Data Pribadi (PRD §7.3) ---
             $table->string('nama_lengkap', 255);

@@ -18,11 +18,6 @@ return Application::configure(basePath: dirname(__DIR__))
             'keycloak.auth' => EnsureKeycloakAuthenticated::class,
             'role' => EnsureRole::class,
         ]);
-
-        $middleware->validateCsrfTokens(except: [
-            'api/employees',
-            'api/employees/import',
-        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

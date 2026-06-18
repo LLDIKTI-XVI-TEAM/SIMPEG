@@ -13,7 +13,7 @@ class EmployeeCreationTest extends TestCase
 
     public function test_guest_cannot_create_employee(): void
     {
-        $response = $this->postJson('/api/employees', $this->validPayload());
+        $response = $this->postJsonWithCsrf('/api/employees', $this->validPayload());
 
         $response->assertRedirect('/login');
     }
@@ -22,14 +22,15 @@ class EmployeeCreationTest extends TestCase
     {
         $user = User::factory()->adminKepegawaian()->create();
 
-        $response = $this->actingAs($user)->postJson('/api/employees', $this->validPayload());
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf('/api/employees', $this->validPayload());
 
         $response->assertCreated();
-        $response->assertJsonPath('employee.nama_pegawai', 'Budi Santoso');
+        $response->assertJsonPath('employee.nama_lengkap', 'Budi Santoso');
         $this->assertDatabaseHas('employees', [
-            'nama_pegawai' => 'Budi Santoso',
-            'email_pegawai' => 'budi@example.com',
-            'created_by' => $user->id,
+            'nama_lengkap' => 'Budi Santoso',
+            'email_pribadi' => 'budi@example.com',
+            'nip' => '198001012006041001',
         ]);
     }
 
@@ -37,7 +38,8 @@ class EmployeeCreationTest extends TestCase
     {
         $user = User::factory()->pegawai()->create();
 
-        $response = $this->actingAs($user)->postJson('/api/employees', $this->validPayload());
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf('/api/employees', $this->validPayload());
 
         $response->assertForbidden();
     }
@@ -46,26 +48,28 @@ class EmployeeCreationTest extends TestCase
     {
         $user = User::factory()->adminKepegawaian()->create();
         $payload = $this->validPayload();
-        unset($payload['nama_pegawai']);
+        unset($payload['nama_lengkap']);
 
-        $response = $this->actingAs($user)->postJson('/api/employees', $payload);
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf('/api/employees', $payload);
 
         $response->assertUnprocessable();
-        $response->assertJsonValidationErrors('nama_pegawai');
+        $response->assertJsonValidationErrors('nama_lengkap');
     }
 
     public function test_duplicate_email_and_nip_are_rejected(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
         Employee::factory()->create([
-            'email_pegawai' => 'budi@example.com',
+            'email_pribadi' => 'budi@example.com',
             'nip' => '198001012006041001',
         ]);
 
-        $response = $this->actingAs($user)->postJson('/api/employees', $this->validPayload());
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf('/api/employees', $this->validPayload());
 
         $response->assertUnprocessable();
-        $response->assertJsonValidationErrors(['email_pegawai', 'nip']);
+        $response->assertJsonValidationErrors(['email_pribadi', 'nip']);
     }
 
     public function test_future_birth_date_is_rejected(): void
@@ -74,29 +78,34 @@ class EmployeeCreationTest extends TestCase
         $payload = $this->validPayload();
         $payload['tanggal_lahir'] = now()->addDay()->format('Y-m-d');
 
-        $response = $this->actingAs($user)->postJson('/api/employees', $payload);
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf('/api/employees', $payload);
 
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors('tanggal_lahir');
     }
 
+    private function postJsonWithCsrf(string $uri, array $data)
+    {
+        return $this->withSession(['_token' => 'test-token'])
+            ->postJson($uri, $data, ['X-CSRF-TOKEN' => 'test-token']);
+    }
+
     private function validPayload(): array
     {
         return [
-            'nama_pegawai' => 'Budi Santoso',
-            'email_pegawai' => 'budi@example.com',
-            'golongan' => 'III/a',
-            'jabatan' => 'Analis Kepegawaian',
+            'nama_lengkap' => 'Budi Santoso',
+            'email_pribadi' => 'budi@example.com',
+            'golongan_terakhir' => 'III/a',
+            'jabatan_terakhir' => 'Analis Kepegawaian',
             'kelas_jabatan' => '7',
             'nip' => '198001012006041001',
-            'nomor_telepon' => '081234567890',
-            'pangkat' => 'Penata Muda',
+            'no_hp' => '081234567890',
+            'pangkat_terakhir' => 'Penata Muda',
             'pendidikan_terakhir' => 'S1',
-            'pensiun' => '2038-01-01',
-            'person' => 'Budi',
-            'person_formula' => 'Budi',
+            'tanggal_pensiun' => '2038-01-01',
             'prodi_pendidikan_terakhir' => 'Manajemen',
-            'status_kepegawaian' => 'PNS',
+            'jenis_pegawai' => 'PNS',
             'tanggal_lahir' => '1980-01-01',
         ];
     }

@@ -10,7 +10,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('position_histories', function (Blueprint $table): void {
-            $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
+            $table->uuid('id')->primary();
             $table->foreignUuid('employee_id')->constrained('employees')->cascadeOnDelete();
             $table->string('nama_jabatan', 255);
             $table->foreignUuid('jenis_jabatan_id')->constrained('ref_jenis_jabatan')->restrictOnDelete();
