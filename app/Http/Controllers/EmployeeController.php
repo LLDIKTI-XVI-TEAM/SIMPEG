@@ -1,0 +1,27 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Requests\StoreEmployeeRequest;
+use App\Models\Employee;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+
+class EmployeeController extends Controller
+{
+    public function store(StoreEmployeeRequest $request): JsonResponse|RedirectResponse
+    {
+        $employee = Employee::create($request->validated() + [
+            'created_by' => $request->user()?->id,
+        ]);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Data pegawai berhasil ditambahkan.',
+                'employee' => $employee,
+            ], 201);
+        }
+
+        return back()->with('success', 'Data pegawai berhasil ditambahkan.');
+    }
+}
