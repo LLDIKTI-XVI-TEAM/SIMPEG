@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -24,7 +23,7 @@ return new class extends Migration
             $table->foreignUuid('status_kawin_id')->nullable()->constrained('ref_status_perkawinan')->nullOnDelete();
             $table->enum('golongan_darah', ['A', 'B', 'AB', 'O'])->nullable();
             $table->string('foto', 255)->nullable();
-            $table->enum('jenis_pegawai', ['PNS', 'PPPK', 'CPNS']);
+            $table->foreignUuid('jenis_pegawai_id')->constrained('ref_jenis_pegawai')->restrictOnDelete();
             $table->enum('status_aktif', ['Aktif', 'Non-Aktif', 'Pensiun', 'Mutasi'])->default('Aktif');
 
             // --- Snapshot fields (dari import Excel) ---
@@ -61,7 +60,6 @@ return new class extends Migration
             $table->timestamps();
 
             // --- Indexes ---
-            $table->index('jenis_pegawai');
             $table->index('status_aktif');
             $table->index('golongan_terakhir');
             $table->index('tanggal_lahir');

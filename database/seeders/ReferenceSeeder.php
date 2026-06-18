@@ -9,6 +9,7 @@ use App\Models\RefGolongan;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenisKelamin;
+use App\Models\RefJenisPegawai;
 use App\Models\RefJenjangPendidikan;
 use App\Models\RefStatusPerkawinan;
 use App\Models\RefUnitKerja;
@@ -125,13 +126,18 @@ class ReferenceSeeder extends Seeder
             RefJenjangPendidikan::firstOrCreate(['nama' => $item['nama']], $item);
         }
 
-        // §16.9 ref_unit_kerja (placeholder — perlu konfirmasi LLDIKTI)
+        // §16.9 ref_jenis_pegawai
+        foreach (['PNS', 'CPNS', 'PPPK'] as $nama) {
+            RefJenisPegawai::firstOrCreate(['nama' => $nama]);
+        }
+
+        // §16.10 ref_unit_kerja (placeholder — perlu konfirmasi LLDIKTI)
         RefUnitKerja::firstOrCreate(
             ['nama' => 'Bagian Umum'],
             ['nama' => 'Bagian Umum', 'keterangan' => 'Placeholder — perlu konfirmasi dari LLDIKTI XVI']
         );
 
-        // §16.11 ref_bup
+        // §16.12 ref_bup
         $bup = [
             ['jenis_jabatan' => 'Pelaksana / Fungsional Umum', 'bup_tahun' => 58],
             ['jenis_jabatan' => 'Fungsional Ahli Pertama', 'bup_tahun' => 58],

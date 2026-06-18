@@ -28,7 +28,7 @@ class Employee extends Model
         'status_kawin_id',
         'golongan_darah',
         'foto',
-        'jenis_pegawai',
+        'jenis_pegawai_id',
         'status_aktif',
 
         // Snapshot fields
@@ -82,6 +82,11 @@ class Employee extends Model
     public function statusKawin(): BelongsTo
     {
         return $this->belongsTo(RefStatusPerkawinan::class, 'status_kawin_id');
+    }
+
+    public function jenisPegawai(): BelongsTo
+    {
+        return $this->belongsTo(RefJenisPegawai::class, 'jenis_pegawai_id');
     }
 
     // --- Child Relations ---

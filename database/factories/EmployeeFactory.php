@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\RefJenisPegawai;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -11,7 +12,9 @@ class EmployeeFactory extends Factory
 {
     public function definition(): array
     {
-        $jenisPegawai = fake()->randomElement(['PNS', 'PPPK']);
+        $jenisPegawai = RefJenisPegawai::firstOrCreate([
+            'nama' => fake()->randomElement(['PNS', 'PPPK']),
+        ]);
 
         return [
             'nama_lengkap' => fake()->name(),
@@ -19,7 +22,7 @@ class EmployeeFactory extends Factory
             'tempat_lahir' => fake()->city(),
             'tanggal_lahir' => fake()->dateTimeBetween('-60 years', '-25 years')->format('Y-m-d'),
             'jenis_kelamin' => fake()->randomElement(['L', 'P']),
-            'jenis_pegawai' => $jenisPegawai,
+            'jenis_pegawai_id' => $jenisPegawai->id,
             'status_aktif' => 'Aktif',
             'golongan_terakhir' => fake()->randomElement(['III/a', 'III/b', 'III/c', 'III/d', 'IV/a']),
             'pangkat_terakhir' => fake()->randomElement(['Penata Muda', 'Penata Muda Tingkat 1', 'Penata', 'Pembina']),

@@ -3,13 +3,22 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\RefJenisPegawai;
 use App\Models\User;
+use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class EmployeeCreationTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(ReferenceSeeder::class);
+    }
 
     public function test_guest_cannot_create_employee(): void
     {
@@ -31,6 +40,7 @@ class EmployeeCreationTest extends TestCase
             'nama_lengkap' => 'Budi Santoso',
             'email_pribadi' => 'budi@example.com',
             'nip' => '198001012006041001',
+            'jenis_pegawai_id' => RefJenisPegawai::where('nama', 'PNS')->firstOrFail()->id,
         ]);
     }
 
@@ -105,7 +115,7 @@ class EmployeeCreationTest extends TestCase
             'pendidikan_terakhir' => 'S1',
             'tanggal_pensiun' => '2038-01-01',
             'prodi_pendidikan_terakhir' => 'Manajemen',
-            'jenis_pegawai' => 'PNS',
+            'jenis_pegawai_id' => RefJenisPegawai::where('nama', 'PNS')->firstOrFail()->id,
             'tanggal_lahir' => '1980-01-01',
         ];
     }

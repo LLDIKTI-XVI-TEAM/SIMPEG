@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\RefJenisPegawai;
 use App\Models\User;
+use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
@@ -11,6 +13,13 @@ use Tests\TestCase;
 class EmployeeImportTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(ReferenceSeeder::class);
+    }
 
     public function test_guest_cannot_import_employees(): void
     {
@@ -37,6 +46,7 @@ class EmployeeImportTest extends TestCase
             'nama_lengkap' => 'Budi Santoso',
             'email_pribadi' => 'budi@example.com',
             'nip' => '198001012006041001',
+            'jenis_pegawai_id' => RefJenisPegawai::where('nama', 'PNS')->firstOrFail()->id,
         ]);
         $this->assertSame('1985-02-12', Employee::where('nama_lengkap', 'Siti Aminah')->firstOrFail()->tanggal_lahir->format('Y-m-d'));
     }
@@ -65,6 +75,23 @@ class EmployeeImportTest extends TestCase
 
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors('file');
+    }
+
+    public function test_import_rejects_unknown_jenis_pegawai_without_creating_rows(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $csv = str_replace(',PNS,1980-01-01', ',HONORER,1980-01-01', $this->validCsv());
+
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf('/api/employees/import', [
+            'file' => $this->csvFile($csv),
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonPath('inserted', 0);
+        $response->assertJsonPath('failed', 1);
+        $response->assertJsonPath('errors.0.row', 2);
+        $this->assertDatabaseCount('employees', 0);
     }
 
     public function test_import_rejects_row_errors_without_creating_any_rows(): void

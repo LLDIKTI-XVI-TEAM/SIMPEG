@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ImportEmployeesRequest;
 use App\Models\Employee;
+use App\Models\RefJenisPegawai;
 use App\Support\EmployeeImport\CsvEmployeeReader;
 use App\Support\EmployeeValidationRules;
 use Illuminate\Http\JsonResponse;
@@ -25,6 +26,10 @@ class EmployeeImportController extends Controller
             ]);
         }
 
+        $jenisPegawaiIds = RefJenisPegawai::query()
+            ->pluck('id', 'nama')
+            ->all();
+
         $validatedRows = [];
         $errors = [];
         $seenNips = [];
@@ -43,12 +48,14 @@ class EmployeeImportController extends Controller
             }
 
             $data = $validator->validated();
+            $referenceErrors = $this->resolveReferences($data, $jenisPegawaiIds);
             $duplicateErrors = $this->duplicateErrors($data, $row['row'], $seenNips, $seenEmails);
+            $rowErrors = array_merge_recursive($referenceErrors, $duplicateErrors);
 
-            if ($duplicateErrors !== []) {
+            if ($rowErrors !== []) {
                 $errors[] = [
                     'row' => $row['row'],
-                    'errors' => $duplicateErrors,
+                    'errors' => $rowErrors,
                 ];
 
                 continue;
@@ -83,6 +90,29 @@ class EmployeeImportController extends Controller
         }
 
         return back()->with('import_summary', $summary);
+    }
+
+    private function resolveReferences(array &$data, array $jenisPegawaiIds): array
+    {
+        $errors = [];
+        $jenisPegawai = $data['jenis_pegawai'] ?? null;
+        unset($data['jenis_pegawai']);
+
+        if ($jenisPegawai === null) {
+            $errors['jenis_pegawai'][] = 'Jenis pegawai wajib diisi.';
+
+            return $errors;
+        }
+
+        if (! isset($jenisPegawaiIds[$jenisPegawai])) {
+            $errors['jenis_pegawai'][] = 'Jenis pegawai tidak ditemukan di tabel referensi.';
+
+            return $errors;
+        }
+
+        $data['jenis_pegawai_id'] = $jenisPegawaiIds[$jenisPegawai];
+
+        return $errors;
     }
 
     private function duplicateErrors(array $data, int $row, array &$seenNips, array &$seenEmails): array

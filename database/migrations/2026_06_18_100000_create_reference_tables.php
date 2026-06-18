@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -73,7 +72,14 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // 16.9 ref_unit_kerja
+        // 16.9 ref_jenis_pegawai
+        Schema::create('ref_jenis_pegawai', function (Blueprint $table): void {
+            $table->uuid('id')->primary();
+            $table->string('nama', 50)->unique();
+            $table->timestamps();
+        });
+
+        // 16.10 ref_unit_kerja
         Schema::create('ref_unit_kerja', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->string('nama', 100);
@@ -81,7 +87,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // 16.10 ref_hari_libur
+        // 16.11 ref_hari_libur
         Schema::create('ref_hari_libur', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->date('tanggal');
@@ -93,7 +99,7 @@ return new class extends Migration
             $table->unique(['tanggal']);
         });
 
-        // 16.11 ref_bup (Batas Usia Pensiun)
+        // 16.12 ref_bup (Batas Usia Pensiun)
         Schema::create('ref_bup', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->string('jenis_jabatan', 100);
@@ -107,6 +113,7 @@ return new class extends Migration
         Schema::dropIfExists('ref_bup');
         Schema::dropIfExists('ref_hari_libur');
         Schema::dropIfExists('ref_unit_kerja');
+        Schema::dropIfExists('ref_jenis_pegawai');
         Schema::dropIfExists('ref_jenjang_pendidikan');
         Schema::dropIfExists('ref_status_perkawinan');
         Schema::dropIfExists('ref_jenis_kelamin');

@@ -21,7 +21,7 @@ class EmployeeValidationRules
             'status_kawin_id' => ['nullable', 'uuid', 'exists:ref_status_perkawinan,id'],
             'golongan_darah' => ['nullable', 'in:A,B,AB,O'],
             'foto' => ['nullable', 'string', 'max:255'],
-            'jenis_pegawai' => ['required', 'in:PNS,PPPK,CPNS'],
+            'jenis_pegawai_id' => ['required', 'uuid', 'exists:ref_jenis_pegawai,id'],
             'status_aktif' => ['nullable', 'in:Aktif,Non-Aktif,Pensiun,Mutasi'],
 
             // Snapshot
@@ -82,6 +82,7 @@ class EmployeeValidationRules
             'status_kawin_id' => 'Status Perkawinan',
             'golongan_darah' => 'Golongan Darah',
             'foto' => 'Foto',
+            'jenis_pegawai_id' => 'Jenis Pegawai',
             'jenis_pegawai' => 'Jenis Pegawai',
             'status_aktif' => 'Status Aktif',
             'golongan_terakhir' => 'Golongan',
