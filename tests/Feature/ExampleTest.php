@@ -17,15 +17,12 @@ class ExampleTest extends TestCase
         $response->assertRedirect('/login');
     }
 
-    public function test_login_redirects_to_keycloak(): void
+    public function test_login_renders_login_page(): void
     {
         $response = $this->get('/login');
-
-        $response->assertStatus(302);
-        $this->assertStringStartsWith(
-            'https://sso-lldikti16.kemdiktisaintek.go.id/realms/sso/protocol/openid-connect/auth',
-            $response->headers->get('Location'),
-        );
+        
+        $response->assertStatus(200);
+        $response->assertSee('Masuk dengan SSO LLDIKTI');
     }
 
     public function test_authenticated_dashboard_renders(): void
@@ -35,7 +32,29 @@ class ExampleTest extends TestCase
         $response = $this->actingAs($user)->get('/dashboard');
 
         $response->assertOk();
-        $response->assertSee('Login aktif');
-        $response->assertSee($user->email);
+        $response->assertSee('Total Pegawai');
+        $response->assertSee($user->name);
+    }
+
+    public function test_authenticated_settings_renders(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/dashboard/pengaturan');
+
+        $response->assertOk();
+        $response->assertSee('Umum & Instansi', false);
+        $response->assertSee('Alur Approval Cuti');
+    }
+
+    public function test_settings_redirects(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/pengaturan');
+        $response->assertRedirect('/dashboard/pengaturan');
+
+        $responseCap = $this->actingAs($user)->get('/dashboard/Pengaturan');
+        $responseCap->assertRedirect('/dashboard/pengaturan');
     }
 }
