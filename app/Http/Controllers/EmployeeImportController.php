@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ImportEmployeesRequest;
 use App\Models\Employee;
+use App\Services\AuditService;
 use App\Models\RefJenisPegawai;
 use App\Support\EmployeeImport\CsvEmployeeReader;
 use App\Support\EmployeeValidationRules;
@@ -16,6 +17,16 @@ use RuntimeException;
 
 class EmployeeImportController extends Controller
 {
+    private ?array $jenisPegawaiCache = null;
+
+    private function getJenisPegawaiCache(): array
+    {
+        if ($this->jenisPegawaiCache === null) {
+            $this->jenisPegawaiCache = RefJenisPegawai::pluck('id', 'nama')->all();
+        }
+        return $this->jenisPegawaiCache;
+    }
+
     public function store(ImportEmployeesRequest $request, CsvEmployeeReader $reader): JsonResponse|RedirectResponse
     {
         try {
@@ -26,9 +37,6 @@ class EmployeeImportController extends Controller
             ]);
         }
 
-        $jenisPegawaiIds = RefJenisPegawai::query()
-            ->pluck('id', 'nama')
-            ->all();
 
         $validatedRows = [];
         $errors = [];
@@ -48,7 +56,7 @@ class EmployeeImportController extends Controller
             }
 
             $data = $validator->validated();
-            $referenceErrors = $this->resolveReferences($data, $jenisPegawaiIds);
+            $referenceErrors = $this->resolveReferences($data);
             $duplicateErrors = $this->duplicateErrors($data, $row['row'], $seenNips, $seenEmails);
             $rowErrors = array_merge_recursive($referenceErrors, $duplicateErrors);
 
@@ -78,6 +86,11 @@ class EmployeeImportController extends Controller
             }
         });
 
+        AuditService::log('IMPORT', 'Employee', null, null, [
+            'total_inserted' => count($validatedRows),
+            'filename' => $request->file('file')->getClientOriginalName(),
+        ], $request);
+
         $summary = [
             'message' => 'Import selesai.',
             'inserted' => count($validatedRows),
@@ -92,25 +105,23 @@ class EmployeeImportController extends Controller
         return back()->with('import_summary', $summary);
     }
 
-    private function resolveReferences(array &$data, array $jenisPegawaiIds): array
+    private function resolveReferences(array &$data): array
     {
         $errors = [];
         $jenisPegawai = $data['jenis_pegawai'] ?? null;
-        unset($data['jenis_pegawai']);
 
-        if ($jenisPegawai === null) {
-            $errors['jenis_pegawai'][] = 'Jenis pegawai wajib diisi.';
+        if ($jenisPegawai !== null) {
+            $cache = $this->getJenisPegawaiCache();
+            $cacheNormalized = array_change_key_case($cache, CASE_UPPER);
+            $key = strtoupper(trim($jenisPegawai));
 
-            return $errors;
+            if (isset($cacheNormalized[$key])) {
+                $data['jenis_pegawai_id'] = $cacheNormalized[$key];
+            } else {
+                $errors['jenis_pegawai'][] = 'Jenis pegawai harus salah satu dari: ' . implode(', ', array_keys($cache)) . '.';
+            }
+            unset($data['jenis_pegawai']);
         }
-
-        if (! isset($jenisPegawaiIds[$jenisPegawai])) {
-            $errors['jenis_pegawai'][] = 'Jenis pegawai tidak ditemukan di tabel referensi.';
-
-            return $errors;
-        }
-
-        $data['jenis_pegawai_id'] = $jenisPegawaiIds[$jenisPegawai];
 
         return $errors;
     }

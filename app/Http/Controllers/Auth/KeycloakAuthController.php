@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\AuditService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -71,11 +72,17 @@ class KeycloakAuthController extends Controller
         Auth::login($user);
         request()->session()->regenerate();
 
+        AuditService::logAs($user->id, $user->name, 'LOGIN', 'User', $user->id, null, null, request());
+
         return redirect()->intended(route('dashboard'));
     }
 
     public function logout(): RedirectResponse
     {
+        $user = Auth::user();
+
+        AuditService::logAs($user?->id, $user?->name ?? 'unknown', 'LOGOUT', 'User', $user?->id, null, null, request());
+
         Auth::logout();
         request()->session()->invalidate();
         request()->session()->regenerateToken();
