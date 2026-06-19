@@ -36,6 +36,36 @@ class EmployeeRowMapperTest extends TestCase
         $this->assertSame('1980-01-01', $mapped['tanggal_lahir']);
     }
 
+    public function test_parses_english_long_month_dates(): void
+    {
+        $mapper = new EmployeeRowMapper();
+
+        $mapped = $mapper->map([
+            'Nama Pegawai' => 'Andi',
+            'Tanggal Lahir' => 'June 25, 1979',
+            'Pensiun' => 'July 1, 2037',
+            'Status Kepegawaian' => 'PNS',
+        ]);
+
+        $this->assertSame('1979-06-25', $mapped['tanggal_lahir']);
+        $this->assertSame('2037-07-01', $mapped['tanggal_pensiun']);
+    }
+
+    public function test_parses_short_month_and_iso_dates(): void
+    {
+        $mapper = new EmployeeRowMapper();
+
+        $mapped = $mapper->map([
+            'Nama Pegawai' => 'Budi',
+            'Tanggal Lahir' => 'Jun 5, 1979',
+            'Pensiun' => '2037-07-01',
+            'Status Kepegawaian' => 'PNS',
+        ]);
+
+        $this->assertSame('1979-06-05', $mapped['tanggal_lahir']);
+        $this->assertSame('2037-07-01', $mapped['tanggal_pensiun']);
+    }
+
     public function test_validates_missing_headers(): void
     {
         $mapper = new EmployeeRowMapper();

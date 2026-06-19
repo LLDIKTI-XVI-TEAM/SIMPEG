@@ -14,7 +14,7 @@ class CsvEmployeeReader
     {
         $csv = new SplFileObject($file->getRealPath());
         $csv->setFlags(SplFileObject::READ_CSV | SplFileObject::SKIP_EMPTY);
-        $csv->setCsvControl($this->detectDelimiter($file));
+        $csv->setCsvControl($this->detectDelimiter($file), '"', '');
 
         $headers = null;
         $rows = [];
@@ -66,7 +66,7 @@ class CsvEmployeeReader
         $delimiters = [',' => 0, ';' => 0, "\t" => 0];
 
         foreach ($delimiters as $delimiter => $count) {
-            $delimiters[$delimiter] = count(str_getcsv($firstLine, $delimiter));
+            $delimiters[$delimiter] = count(str_getcsv($firstLine, $delimiter, '"', ''));
         }
 
         arsort($delimiters);
