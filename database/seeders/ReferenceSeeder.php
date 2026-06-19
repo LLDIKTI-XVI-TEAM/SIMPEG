@@ -14,6 +14,8 @@ use App\Models\RefJenjangPendidikan;
 use App\Models\RefStatusPerkawinan;
 use App\Models\RefUnitKerja;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class ReferenceSeeder extends Seeder
 {
@@ -129,6 +131,27 @@ class ReferenceSeeder extends Seeder
         // §16.9 ref_jenis_pegawai
         foreach (['PNS', 'CPNS', 'PPPK'] as $nama) {
             RefJenisPegawai::firstOrCreate(['nama' => $nama]);
+        }
+
+        // ref_hari_libur — subset awal 2026 untuk baseline kalkulasi hari kerja; data mengikuti kalender libur nasional/SKB yang berlaku
+        $hariLibur = [
+            ['tanggal' => '2026-01-01', 'nama' => 'Tahun Baru Masehi', 'tahun' => 2026, 'is_cuti_bersama' => false],
+            ['tanggal' => '2026-03-20', 'nama' => 'Hari Raya Idul Fitri', 'tahun' => 2026, 'is_cuti_bersama' => false],
+            ['tanggal' => '2026-03-21', 'nama' => 'Hari Raya Idul Fitri', 'tahun' => 2026, 'is_cuti_bersama' => false],
+            ['tanggal' => '2026-05-27', 'nama' => 'Hari Raya Idul Adha', 'tahun' => 2026, 'is_cuti_bersama' => false],
+            ['tanggal' => '2026-08-17', 'nama' => 'Hari Kemerdekaan Republik Indonesia', 'tahun' => 2026, 'is_cuti_bersama' => false],
+            ['tanggal' => '2026-12-25', 'nama' => 'Hari Raya Natal', 'tahun' => 2026, 'is_cuti_bersama' => false],
+        ];
+
+        foreach ($hariLibur as $item) {
+            if (! DB::table('ref_hari_libur')->where('tanggal', $item['tanggal'])->exists()) {
+                DB::table('ref_hari_libur')->insert([
+                    ...$item,
+                    'id' => (string) Str::uuid(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
         }
 
         // §16.10 ref_unit_kerja (placeholder — perlu konfirmasi LLDIKTI)
