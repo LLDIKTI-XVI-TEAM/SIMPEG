@@ -157,6 +157,38 @@ class EmployeeImportTest extends TestCase
         $response->assertJsonValidationErrors('file');
     }
 
+    public function test_import_rejects_row_without_nip(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $csv = str_replace(',198001012006041001,', ',,', $this->validCsv());
+
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf('/api/employees/import', [
+            'file' => $this->csvFile($csv),
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonPath('inserted', 0);
+        $response->assertJsonPath('errors.0.row', 2);
+        $this->assertDatabaseCount('employees', 0);
+    }
+
+    public function test_import_rejects_row_without_status_kepegawaian(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $csv = str_replace(',PNS,1980-01-01', ',,1980-01-01', $this->validCsv());
+
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf('/api/employees/import', [
+            'file' => $this->csvFile($csv),
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonPath('inserted', 0);
+        $response->assertJsonPath('errors.0.row', 2);
+        $this->assertDatabaseCount('employees', 0);
+    }
+
     private function validCsv(): string
     {
         return implode(',', [

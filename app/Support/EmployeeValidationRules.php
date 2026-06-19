@@ -53,10 +53,10 @@ class EmployeeValidationRules
     {
         return [
             'nama_lengkap' => ['required', 'string', 'max:255'],
-            'nip' => ['nullable', 'string', 'max:18', 'unique:employees,nip'],
+            'nip' => ['required', 'string', 'size:18', 'unique:employees,nip'],
             'email_pribadi' => ['nullable', 'email', 'max:255', 'unique:employees,email_pribadi'],
             'tanggal_lahir' => ['nullable', 'date', 'before:today'],
-            'jenis_pegawai' => ['nullable', 'in:PNS,PPPK,CPNS'],
+            'jenis_pegawai' => ['required', 'in:PNS,PPPK,CPNS'],
             'golongan_terakhir' => ['nullable', 'string', 'max:20'],
             'pangkat_terakhir' => ['nullable', 'string', 'max:100'],
             'jabatan_terakhir' => ['nullable', 'string', 'max:255'],
