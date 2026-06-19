@@ -123,7 +123,7 @@ class EmployeeRowMapper
 
         $value = trim((string) $value);
 
-        foreach (['Y-m-d', 'd/m/Y', 'd-m-Y'] as $format) {
+        foreach (['Y-m-d', 'd/m/Y', 'd-m-Y', 'F j, Y', 'F d, Y', 'M j, Y', 'M d, Y'] as $format) {
             try {
                 $date = Carbon::createFromFormat($format, $value);
 
