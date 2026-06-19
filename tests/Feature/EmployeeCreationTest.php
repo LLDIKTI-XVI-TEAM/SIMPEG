@@ -1,0 +1,122 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Employee;
+use App\Models\RefJenisPegawai;
+use App\Models\User;
+use Database\Seeders\ReferenceSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class EmployeeCreationTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(ReferenceSeeder::class);
+    }
+
+    public function test_guest_cannot_create_employee(): void
+    {
+        $response = $this->postJsonWithCsrf('/api/employees', $this->validPayload());
+
+        $response->assertRedirect('/login');
+    }
+
+    public function test_authenticated_user_can_create_employee(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf('/api/employees', $this->validPayload());
+
+        $response->assertCreated();
+        $response->assertJsonPath('employee.nama_lengkap', 'Budi Santoso');
+        $this->assertDatabaseHas('employees', [
+            'nama_lengkap' => 'Budi Santoso',
+            'email_pribadi' => 'budi@example.com',
+            'nip' => '198001012006041001',
+            'jenis_pegawai_id' => RefJenisPegawai::where('nama', 'PNS')->firstOrFail()->id,
+        ]);
+    }
+
+    public function test_pegawai_cannot_create_employee(): void
+    {
+        $user = User::factory()->pegawai()->create();
+
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf('/api/employees', $this->validPayload());
+
+        $response->assertForbidden();
+    }
+
+    public function test_name_is_required(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $payload = $this->validPayload();
+        unset($payload['nama_lengkap']);
+
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf('/api/employees', $payload);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors('nama_lengkap');
+    }
+
+    public function test_duplicate_email_and_nip_are_rejected(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        Employee::factory()->create([
+            'email_pribadi' => 'budi@example.com',
+            'nip' => '198001012006041001',
+        ]);
+
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf('/api/employees', $this->validPayload());
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['email_pribadi', 'nip']);
+    }
+
+    public function test_future_birth_date_is_rejected(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $payload = $this->validPayload();
+        $payload['tanggal_lahir'] = now()->addDay()->format('Y-m-d');
+
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf('/api/employees', $payload);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors('tanggal_lahir');
+    }
+
+    private function postJsonWithCsrf(string $uri, array $data)
+    {
+        return $this->withSession(['_token' => 'test-token'])
+            ->postJson($uri, $data, ['X-CSRF-TOKEN' => 'test-token']);
+    }
+
+    private function validPayload(): array
+    {
+        return [
+            'nama_lengkap' => 'Budi Santoso',
+            'email_pribadi' => 'budi@example.com',
+            'golongan_terakhir' => 'III/a',
+            'jabatan_terakhir' => 'Analis Kepegawaian',
+            'kelas_jabatan' => '7',
+            'nip' => '198001012006041001',
+            'no_hp' => '081234567890',
+            'pangkat_terakhir' => 'Penata Muda',
+            'pendidikan_terakhir' => 'S1',
+            'tanggal_pensiun' => '2038-01-01',
+            'prodi_pendidikan_terakhir' => 'Manajemen',
+            'jenis_pegawai_id' => RefJenisPegawai::where('nama', 'PNS')->firstOrFail()->id,
+            'tanggal_lahir' => '1980-01-01',
+        ];
+    }
+}

@@ -17,4 +17,5 @@ Route::middleware('keycloak.auth')->group(function (): void {
     Route::get('/dashboard', function () {
         return view('dashboard');
     })->name('dashboard');
+
 });
