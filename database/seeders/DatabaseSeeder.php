@@ -24,5 +24,16 @@ class DatabaseSeeder extends Seeder
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
+
+        User::firstOrCreate(
+            ['keycloak_username' => 'demo-klabat'],
+            [
+                'name' => 'Demo Klabat',
+                'email' => 'demo-klabat@dev.local',
+                'role' => 'super_admin',
+                'password' => null,
+                'email_verified_at' => now(),
+            ],
+        );
     }
 }

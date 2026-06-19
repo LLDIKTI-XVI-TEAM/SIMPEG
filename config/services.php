@@ -42,6 +42,9 @@ return [
         'client_id' => env('KEYCLOAK_CLIENT_ID'),
         'client_secret' => env('KEYCLOAK_CLIENT_SECRET'),
         'redirect' => env('KEYCLOAK_REDIRECT_URI'),
+        'employee_match_claim' => env('SSO_EMPLOYEE_MATCH_CLAIM', 'email'),
+        'employee_match_field' => env('SSO_EMPLOYEE_MATCH_FIELD', 'email_pribadi'),
+        'dev_usernames' => array_filter(array_map('trim', explode(',', env('SSO_DEV_USERNAMES', 'demo-klabat')))),
     ],
 
 ];
