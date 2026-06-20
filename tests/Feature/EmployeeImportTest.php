@@ -14,6 +14,8 @@ class EmployeeImportTest extends TestCase
 {
     use RefreshDatabase;
 
+    private const EMPLOYEE_IMPORT_ENDPOINT = '/api/v1/employees/import';
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -23,7 +25,7 @@ class EmployeeImportTest extends TestCase
 
     public function test_guest_cannot_import_employees(): void
     {
-        $response = $this->postJsonWithCsrf('/api/employees/import', [
+        $response = $this->postJsonWithCsrf(self::EMPLOYEE_IMPORT_ENDPOINT, [
             'file' => $this->csvFile($this->validCsv()),
         ]);
 
@@ -35,7 +37,7 @@ class EmployeeImportTest extends TestCase
         $user = User::factory()->adminKepegawaian()->create();
 
         $this->actingAs($user);
-        $response = $this->postJsonWithCsrf('/api/employees/import', [
+        $response = $this->postJsonWithCsrf(self::EMPLOYEE_IMPORT_ENDPOINT, [
             'file' => $this->csvFile($this->validCsv()),
         ]);
 
@@ -56,7 +58,7 @@ class EmployeeImportTest extends TestCase
         $user = User::factory()->pegawai()->create();
 
         $this->actingAs($user);
-        $response = $this->postJsonWithCsrf('/api/employees/import', [
+        $response = $this->postJsonWithCsrf(self::EMPLOYEE_IMPORT_ENDPOINT, [
             'file' => $this->csvFile($this->validCsv()),
         ]);
 
@@ -69,7 +71,7 @@ class EmployeeImportTest extends TestCase
         $csv = "Nama Pegawai,Email Pegawai\nBudi,budi@example.com\n";
 
         $this->actingAs($user);
-        $response = $this->postJsonWithCsrf('/api/employees/import', [
+        $response = $this->postJsonWithCsrf(self::EMPLOYEE_IMPORT_ENDPOINT, [
             'file' => $this->csvFile($csv),
         ]);
 
@@ -83,7 +85,7 @@ class EmployeeImportTest extends TestCase
         $csv = str_replace(',PNS,1980-01-01', ',HONORER,1980-01-01', $this->validCsv());
 
         $this->actingAs($user);
-        $response = $this->postJsonWithCsrf('/api/employees/import', [
+        $response = $this->postJsonWithCsrf(self::EMPLOYEE_IMPORT_ENDPOINT, [
             'file' => $this->csvFile($csv),
         ]);
 
@@ -100,7 +102,7 @@ class EmployeeImportTest extends TestCase
         Employee::factory()->create(['nip' => '198001012006041001']);
 
         $this->actingAs($user);
-        $response = $this->postJsonWithCsrf('/api/employees/import', [
+        $response = $this->postJsonWithCsrf(self::EMPLOYEE_IMPORT_ENDPOINT, [
             'file' => $this->csvFile($this->validCsv()),
         ]);
 
@@ -133,7 +135,7 @@ class EmployeeImportTest extends TestCase
         ])."\n";
 
         $this->actingAs($user);
-        $response = $this->postJsonWithCsrf('/api/employees/import', [
+        $response = $this->postJsonWithCsrf(self::EMPLOYEE_IMPORT_ENDPOINT, [
             'file' => $this->csvFile($csv),
         ]);
 
@@ -149,7 +151,7 @@ class EmployeeImportTest extends TestCase
         $user = User::factory()->adminKepegawaian()->create();
 
         $this->actingAs($user);
-        $response = $this->postJsonWithCsrf('/api/employees/import', [
+        $response = $this->postJsonWithCsrf(self::EMPLOYEE_IMPORT_ENDPOINT, [
             'file' => UploadedFile::fake()->create('pegawai.xlsx', 10, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
         ]);
 
@@ -163,7 +165,7 @@ class EmployeeImportTest extends TestCase
         $csv = str_replace(',198001012006041001,', ',,', $this->validCsv());
 
         $this->actingAs($user);
-        $response = $this->postJsonWithCsrf('/api/employees/import', [
+        $response = $this->postJsonWithCsrf(self::EMPLOYEE_IMPORT_ENDPOINT, [
             'file' => $this->csvFile($csv),
         ]);
 
@@ -179,7 +181,7 @@ class EmployeeImportTest extends TestCase
         $csv = str_replace(',PNS,1980-01-01', ',,1980-01-01', $this->validCsv());
 
         $this->actingAs($user);
-        $response = $this->postJsonWithCsrf('/api/employees/import', [
+        $response = $this->postJsonWithCsrf(self::EMPLOYEE_IMPORT_ENDPOINT, [
             'file' => $this->csvFile($csv),
         ]);
 
