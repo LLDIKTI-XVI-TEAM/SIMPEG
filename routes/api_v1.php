@@ -32,19 +32,3 @@ Route::middleware(['web', 'keycloak.auth', 'role:super_admin'])
 Route::middleware(['web', 'keycloak.auth', 'role:super_admin,admin_kepegawaian'])
     ->get('/audit-logs', [AuditLogController::class, 'index'])
     ->name('audit-logs.index');
-
-/*
-|--------------------------------------------------------------------------
-| Development Test Routes (HAPUS DI PRODUCTION!)
-|--------------------------------------------------------------------------
-*/
-if (app()->environment('local', 'testing')) {
-    Route::prefix('test/employees')
-        ->name('test.employees.')
-        ->group(function (): void {
-            Route::post('/', [EmployeeController::class, 'store'])->name('store');
-            Route::post('/import', [EmployeeImportController::class, 'store'])->name('import.store');
-        });
-
-    Route::get('test/audit-logs', [AuditLogController::class, 'index'])->name('test.audit-logs.index');
-}
