@@ -20,4 +20,29 @@ class RefHariLibur extends Model
             'is_cuti_bersama' => 'boolean',
         ];
     }
+
+    public function tipe(): string
+    {
+        return $this->is_cuti_bersama ? 'cuti_bersama' : 'libur_nasional';
+    }
+
+    public function labelTipe(): string
+    {
+        return $this->is_cuti_bersama ? 'Cuti Bersama' : 'Libur Nasional';
+    }
+
+    public function toApiArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'tanggal' => $this->tanggal?->format('Y-m-d'),
+            'nama' => $this->nama,
+            'tahun' => $this->tahun,
+            'is_cuti_bersama' => (bool) $this->is_cuti_bersama,
+            'tipe' => $this->tipe(),
+            'label_tipe' => $this->labelTipe(),
+            'created_at' => $this->created_at?->toISOString(),
+            'updated_at' => $this->updated_at?->toISOString(),
+        ];
+    }
 }
