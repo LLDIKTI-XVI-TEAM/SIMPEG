@@ -13,6 +13,8 @@ class EmployeeCreationTest extends TestCase
 {
     use RefreshDatabase;
 
+    private const EMPLOYEES_ENDPOINT = '/api/v1/employees';
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -22,7 +24,7 @@ class EmployeeCreationTest extends TestCase
 
     public function test_guest_cannot_create_employee(): void
     {
-        $response = $this->postJsonWithCsrf('/api/employees', $this->validPayload());
+        $response = $this->postJsonWithCsrf(self::EMPLOYEES_ENDPOINT, $this->validPayload());
 
         $response->assertRedirect('/login');
     }
@@ -32,7 +34,7 @@ class EmployeeCreationTest extends TestCase
         $user = User::factory()->adminKepegawaian()->create();
 
         $this->actingAs($user);
-        $response = $this->postJsonWithCsrf('/api/employees', $this->validPayload());
+        $response = $this->postJsonWithCsrf(self::EMPLOYEES_ENDPOINT, $this->validPayload());
 
         $response->assertCreated();
         $response->assertJsonPath('employee.nama_lengkap', 'Budi Santoso');
@@ -49,7 +51,7 @@ class EmployeeCreationTest extends TestCase
         $user = User::factory()->pegawai()->create();
 
         $this->actingAs($user);
-        $response = $this->postJsonWithCsrf('/api/employees', $this->validPayload());
+        $response = $this->postJsonWithCsrf(self::EMPLOYEES_ENDPOINT, $this->validPayload());
 
         $response->assertForbidden();
     }
@@ -61,7 +63,7 @@ class EmployeeCreationTest extends TestCase
         unset($payload['nama_lengkap']);
 
         $this->actingAs($user);
-        $response = $this->postJsonWithCsrf('/api/employees', $payload);
+        $response = $this->postJsonWithCsrf(self::EMPLOYEES_ENDPOINT, $payload);
 
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors('nama_lengkap');
@@ -76,7 +78,7 @@ class EmployeeCreationTest extends TestCase
         ]);
 
         $this->actingAs($user);
-        $response = $this->postJsonWithCsrf('/api/employees', $this->validPayload());
+        $response = $this->postJsonWithCsrf(self::EMPLOYEES_ENDPOINT, $this->validPayload());
 
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors(['email_pribadi', 'nip']);
@@ -89,7 +91,7 @@ class EmployeeCreationTest extends TestCase
         $payload['tanggal_lahir'] = now()->addDay()->format('Y-m-d');
 
         $this->actingAs($user);
-        $response = $this->postJsonWithCsrf('/api/employees', $payload);
+        $response = $this->postJsonWithCsrf(self::EMPLOYEES_ENDPOINT, $payload);
 
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors('tanggal_lahir');

@@ -9,12 +9,11 @@ class StoreEmployeeRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Test routes (no auth middleware) — allow in local/testing
-        if ($this->user() === null) {
-            return app()->environment('local', 'testing');
-        }
+        // Otorisasi gagal-tertutup: tanpa user terautentikasi, tolak (tidak ada bypass dev/test).
+        $user = $this->user();
 
-        return in_array($this->user()->role, ['super_admin', 'admin_kepegawaian'], true);
+        return $user !== null
+            && in_array($user->role, ['super_admin', 'admin_kepegawaian'], true);
     }
 
     public function rules(): array

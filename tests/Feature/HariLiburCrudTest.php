@@ -11,6 +11,8 @@ class HariLiburCrudTest extends TestCase
 {
     use RefreshDatabase;
 
+    private const HARI_LIBUR_ENDPOINT = '/api/v1/hari-libur';
+
     public function test_super_admin_can_list_hari_libur_with_tipe_label_and_year_filter(): void
     {
         $user = User::factory()->superAdmin()->create();
@@ -34,7 +36,7 @@ class HariLiburCrudTest extends TestCase
         ]);
 
         $this->actingAs($user);
-        $response = $this->getJson('/api/hari-libur?tahun=2026');
+        $response = $this->getJson(self::HARI_LIBUR_ENDPOINT.'?tahun=2026');
 
         $response->assertOk();
         $response->assertJsonCount(2, 'data');
@@ -55,14 +57,14 @@ class HariLiburCrudTest extends TestCase
         $user = User::factory()->adminKepegawaian()->create();
 
         $this->actingAs($user);
-        $response = $this->getJson('/api/hari-libur?tahun=2026');
+        $response = $this->getJson(self::HARI_LIBUR_ENDPOINT.'?tahun=2026');
 
         $response->assertForbidden();
     }
 
     public function test_guest_cannot_create_hari_libur(): void
     {
-        $response = $this->postJsonWithCsrf('/api/hari-libur', [
+        $response = $this->postJsonWithCsrf(self::HARI_LIBUR_ENDPOINT, [
             'tanggal' => '2026-01-01',
             'nama' => 'Tahun Baru Masehi',
             'tipe' => 'libur_nasional',
@@ -76,7 +78,7 @@ class HariLiburCrudTest extends TestCase
         $user = User::factory()->adminKepegawaian()->create();
 
         $this->actingAs($user);
-        $response = $this->postJsonWithCsrf('/api/hari-libur', [
+        $response = $this->postJsonWithCsrf(self::HARI_LIBUR_ENDPOINT, [
             'tanggal' => '2026-01-01',
             'nama' => 'Tahun Baru Masehi',
             'tipe' => 'libur_nasional',
@@ -90,7 +92,7 @@ class HariLiburCrudTest extends TestCase
         $user = User::factory()->superAdmin()->create();
 
         $this->actingAs($user);
-        $response = $this->postJsonWithCsrf('/api/hari-libur', [
+        $response = $this->postJsonWithCsrf(self::HARI_LIBUR_ENDPOINT, [
             'tanggal' => '2026-03-20',
             'nama' => 'Cuti Bersama Idul Fitri',
             'tipe' => 'cuti_bersama',
@@ -118,7 +120,7 @@ class HariLiburCrudTest extends TestCase
         $user = User::factory()->superAdmin()->create();
 
         $this->actingAs($user);
-        $response = $this->postJsonWithCsrf('/api/hari-libur', [
+        $response = $this->postJsonWithCsrf(self::HARI_LIBUR_ENDPOINT, [
             'tanggal' => '2026-01-01',
             'nama' => 'Tahun Baru Masehi',
             'tipe' => 'hari_libur_daerah',
@@ -139,7 +141,7 @@ class HariLiburCrudTest extends TestCase
         ]);
 
         $this->actingAs($user);
-        $response = $this->postJsonWithCsrf('/api/hari-libur', [
+        $response = $this->postJsonWithCsrf(self::HARI_LIBUR_ENDPOINT, [
             'tanggal' => '2026-01-01',
             'nama' => 'Tahun Baru Masehi Duplikat',
             'tipe' => 'libur_nasional',
@@ -154,7 +156,7 @@ class HariLiburCrudTest extends TestCase
         $user = User::factory()->superAdmin()->create();
 
         $this->actingAs($user);
-        $response = $this->postJsonWithCsrf('/api/hari-libur', [
+        $response = $this->postJsonWithCsrf(self::HARI_LIBUR_ENDPOINT, [
             'tanggal' => '2026-01-01',
             'nama' => '',
             'tipe' => 'libur_nasional',
@@ -169,7 +171,7 @@ class HariLiburCrudTest extends TestCase
         $user = User::factory()->superAdmin()->create();
 
         $this->actingAs($user);
-        $response = $this->postJsonWithCsrf('/api/hari-libur', [
+        $response = $this->postJsonWithCsrf(self::HARI_LIBUR_ENDPOINT, [
             'tanggal' => '01/01/2026',
             'nama' => 'Tahun Baru Masehi',
             'tipe' => 'libur_nasional',
@@ -184,7 +186,7 @@ class HariLiburCrudTest extends TestCase
         $user = User::factory()->superAdmin()->create();
 
         $this->actingAs($user);
-        $response = $this->postJsonWithCsrf('/api/hari-libur', [
+        $response = $this->postJsonWithCsrf(self::HARI_LIBUR_ENDPOINT, [
             'tanggal' => '01-01-2026',
             'nama' => '',
             'tipe' => 'invalid_type',
@@ -205,7 +207,7 @@ class HariLiburCrudTest extends TestCase
         ]);
 
         $this->actingAs($user);
-        $response = $this->putJsonWithCsrf("/api/hari-libur/{$hariLibur->id}", [
+        $response = $this->putJsonWithCsrf(self::HARI_LIBUR_ENDPOINT."/{$hariLibur->id}", [
             'tanggal' => '2026-01-02',
             'nama' => 'Cuti Bersama Tahun Baru',
             'tipe' => 'cuti_bersama',
@@ -248,7 +250,7 @@ class HariLiburCrudTest extends TestCase
         ]);
 
         $this->actingAs($user);
-        $response = $this->putJsonWithCsrf("/api/hari-libur/{$hariLibur->id}", [
+        $response = $this->putJsonWithCsrf(self::HARI_LIBUR_ENDPOINT."/{$hariLibur->id}", [
             'tanggal' => '2026-01-01',
             'nama' => 'Duplikat Tanggal',
             'tipe' => 'libur_nasional',
@@ -269,7 +271,7 @@ class HariLiburCrudTest extends TestCase
         ]);
 
         $this->actingAs($user);
-        $response = $this->deleteJsonWithCsrf("/api/hari-libur/{$hariLibur->id}");
+        $response = $this->deleteJsonWithCsrf(self::HARI_LIBUR_ENDPOINT."/{$hariLibur->id}");
 
         $response->assertOk();
         $response->assertJsonPath('message', 'Hari libur berhasil dihapus.');
@@ -294,7 +296,7 @@ class HariLiburCrudTest extends TestCase
         ]);
 
         $this->actingAs($user);
-        $response = $this->deleteJsonWithCsrf("/api/hari-libur/{$hariLibur->id}");
+        $response = $this->deleteJsonWithCsrf(self::HARI_LIBUR_ENDPOINT."/{$hariLibur->id}");
 
         $response->assertForbidden();
         $this->assertDatabaseHas('ref_hari_libur', [
@@ -311,7 +313,7 @@ class HariLiburCrudTest extends TestCase
             'is_cuti_bersama' => false,
         ]);
 
-        $response = $this->putJsonWithCsrf("/api/hari-libur/{$hariLibur->id}", [
+        $response = $this->putJsonWithCsrf(self::HARI_LIBUR_ENDPOINT."/{$hariLibur->id}", [
             'tanggal' => '2026-01-02',
             'nama' => 'Tahun Baru Diubah',
             'tipe' => 'libur_nasional',
@@ -335,7 +337,7 @@ class HariLiburCrudTest extends TestCase
         ]);
 
         $this->actingAs($user);
-        $response = $this->putJsonWithCsrf("/api/hari-libur/{$hariLibur->id}", [
+        $response = $this->putJsonWithCsrf(self::HARI_LIBUR_ENDPOINT."/{$hariLibur->id}", [
             'tanggal' => '2026-01-02',
             'nama' => 'Tahun Baru Diubah',
             'tipe' => 'libur_nasional',
@@ -353,7 +355,7 @@ class HariLiburCrudTest extends TestCase
         $user = User::factory()->superAdmin()->create();
 
         $this->actingAs($user);
-        $response = $this->putJsonWithCsrf('/api/hari-libur/01HZZZZZZZZZZZZZZZZZZZZZZZZ', [
+        $response = $this->putJsonWithCsrf(self::HARI_LIBUR_ENDPOINT.'/01HZZZZZZZZZZZZZZZZZZZZZZZZ', [
             'tanggal' => '2026-01-02',
             'nama' => 'Tahun Baru Diubah',
             'tipe' => 'libur_nasional',
@@ -371,7 +373,7 @@ class HariLiburCrudTest extends TestCase
             'is_cuti_bersama' => false,
         ]);
 
-        $response = $this->deleteJsonWithCsrf("/api/hari-libur/{$hariLibur->id}");
+        $response = $this->deleteJsonWithCsrf(self::HARI_LIBUR_ENDPOINT."/{$hariLibur->id}");
 
         $response->assertRedirect('/login');
         $this->assertDatabaseHas('ref_hari_libur', [
@@ -384,7 +386,7 @@ class HariLiburCrudTest extends TestCase
         $user = User::factory()->superAdmin()->create();
 
         $this->actingAs($user);
-        $response = $this->deleteJsonWithCsrf('/api/hari-libur/01HZZZZZZZZZZZZZZZZZZZZZZZZ');
+        $response = $this->deleteJsonWithCsrf(self::HARI_LIBUR_ENDPOINT.'/01HZZZZZZZZZZZZZZZZZZZZZZZZ');
 
         $response->assertNotFound();
     }
