@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Employee;
 use App\Models\RefJenisPegawai;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -21,6 +22,8 @@ class EmployeeImportTest extends TestCase
         parent::setUp();
 
         $this->seed(ReferenceSeeder::class);
+        // Seed RBAC agar permission employees.import tersedia untuk middleware permission.
+        $this->seed(RbacSeeder::class);
     }
 
     public function test_guest_cannot_import_employees(): void

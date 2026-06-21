@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\RefHariLibur;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -12,6 +13,14 @@ class HariLiburCrudTest extends TestCase
     use RefreshDatabase;
 
     private const HARI_LIBUR_ENDPOINT = '/api/v1/hari-libur';
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Seed RBAC agar permission hari_libur.* tersedia untuk middleware permission.
+        $this->seed(RbacSeeder::class);
+    }
 
     public function test_super_admin_can_list_hari_libur_with_tipe_label_and_year_filter(): void
     {
