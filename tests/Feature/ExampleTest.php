@@ -201,5 +201,190 @@ class ExampleTest extends TestCase
         $this->assertNotEmpty($dynamicLogs);
         $this->assertEquals('UPDATE_RBAC', $dynamicLogs[0]['event']);
     }
+
+    public function test_unauthorized_access_to_cuti_config_aborts(): void
+    {
+        $user = User::factory()->create(['role' => 'Pegawai']);
+        session(['active_role' => 'Pegawai']);
+
+        $response = $this->actingAs($user)->get('/cuti/konfigurasi');
+        $response->assertStatus(403);
+
+        $responsePost = $this->actingAs($user)->post('/cuti/konfigurasi/update', [
+            'stage2_approver_id' => 1,
+            'stage3_approver_id' => 2,
+            'reason' => 'mencoba meretas',
+        ]);
+        $responsePost->assertStatus(403);
+    }
+
+    public function test_authorized_super_admin_can_view_cuti_config(): void
+    {
+        $admin = User::factory()->create(['role' => 'Super Admin']);
+        session(['active_role' => 'Super Admin']);
+
+        $response = $this->actingAs($admin)->get('/cuti/konfigurasi');
+        $response->assertOk();
+        $response->assertSee('Konfigurasi Approval Cuti');
+        $response->assertSee('Dra. Merlina Rahman');
+    }
+
+    public function test_super_admin_can_update_cuti_config(): void
+    {
+        $admin = User::factory()->create(['role' => 'Super Admin']);
+        session(['active_role' => 'Super Admin']);
+
+        // Find some eligible users (already seeded in migration)
+        $merlina = User::where('email', 'merlina.rahman@example.com')->first();
+        $riza = User::where('email', 'riza.hamzah@example.com')->first();
+        $kadir = User::where('email', 'abdul.kadir@example.com')->first();
+
+        $this->assertNotNull($merlina);
+        $this->assertNotNull($riza);
+        $this->assertNotNull($kadir);
+
+        // Update Stage 2 from Merlina to Riza
+        $response = $this->actingAs($admin)
+            ->from('/cuti/konfigurasi')
+            ->post('/cuti/konfigurasi/update', [
+                'stage2_approver_id' => $riza->id,
+                'stage3_approver_id' => $kadir->id,
+                'reason' => 'Perubahan untuk testing sistem',
+            ]);
+
+        $response->assertRedirect('/cuti/konfigurasi');
+        $response->assertSessionHas('success', 'Konfigurasi Approval Cuti berhasil diperbarui.');
+
+        $this->assertDatabaseHas('approval_configs', [
+            'key' => 'stage2_approver_id',
+            'value' => (string) $riza->id,
+        ]);
+
+        $dynamicLogs = session('dynamic_audit_logs', []);
+        $this->assertNotEmpty($dynamicLogs);
+        
+        // Find UPDATE_CONFIG_STAGE2 event
+        $foundStage2Log = false;
+        foreach ($dynamicLogs as $log) {
+            if ($log['event'] === 'UPDATE_CONFIG_STAGE2') {
+                $foundStage2Log = true;
+                $this->assertEquals('Dra. Merlina Rahman', $log['old_values']['value']);
+                $this->assertEquals('Riza Hamzah', $log['new_values']['value']);
+                $this->assertEquals('Perubahan untuk testing sistem', $log['new_values']['reason']);
+            }
+        }
+        $this->assertTrue($foundStage2Log);
+    }
+
+    public function test_unauthorized_access_to_ews_config_aborts(): void
+    {
+        $user = User::factory()->create(['role' => 'Pegawai']);
+        session(['active_role' => 'Pegawai']);
+
+        $response = $this->actingAs($user)->get('/konfigurasi');
+        $response->assertStatus(403);
+
+        $responsePost = $this->actingAs($user)->post('/konfigurasi/update', [
+            'ews_scheduler_time' => '07:30',
+            'reason' => 'mencoba meretas',
+        ]);
+        $responsePost->assertStatus(403);
+    }
+
+    public function test_authorized_super_admin_can_view_ews_config(): void
+    {
+        $admin = User::factory()->create(['role' => 'Super Admin']);
+        session(['active_role' => 'Super Admin']);
+
+        $response = $this->actingAs($admin)->get('/konfigurasi');
+        $response->assertOk();
+        $response->assertSee('Konfigurasi Early Warning System (EWS)');
+        $response->assertSee('07:00');
+    }
+
+    public function test_super_admin_can_update_ews_config(): void
+    {
+        $admin = User::factory()->create(['role' => 'Super Admin']);
+        session(['active_role' => 'Super Admin']);
+
+        $response = $this->actingAs($admin)
+            ->from('/konfigurasi')
+            ->post('/konfigurasi/update', [
+                'ews_scheduler_time' => '08:30',
+                'pangkat_h90' => '95',
+                'pangkat_h60' => '65',
+                'pangkat_h30' => '35',
+                'kgb_h60' => '60',
+                'kgb_h30' => '30',
+                'kgb_h14' => '14',
+                'pensiun_y1' => '365',
+                'pensiun_m6' => '180',
+                'pensiun_m3' => '90',
+                'pppk_m6' => '180',
+                'pppk_m3' => '90',
+                'pppk_m1' => '30',
+                'reason' => 'Testing update konfigurasi EWS harian',
+            ]);
+
+        $response->assertRedirect('/konfigurasi');
+        $response->assertSessionHas('success', 'Konfigurasi EWS berhasil diperbarui.');
+
+        $this->assertDatabaseHas('ews_configs', [
+            'key' => 'ews_scheduler_time',
+            'value' => '08:30',
+        ]);
+        $this->assertDatabaseHas('ews_configs', [
+            'key' => 'pangkat_h90',
+            'value' => '95',
+        ]);
+
+        $dynamicLogs = session('dynamic_audit_logs', []);
+        $this->assertNotEmpty($dynamicLogs);
+
+        // Find UPDATE_EWS_CONFIG event
+        $foundEwsLog = false;
+        foreach ($dynamicLogs as $log) {
+            if ($log['event'] === 'UPDATE_EWS_CONFIG' && $log['record_id'] === 'Scheduler Time') {
+                $foundEwsLog = true;
+                $this->assertEquals('07:00', $log['old_values']['value']);
+                $this->assertEquals('08:30', $log['new_values']['value']);
+                $this->assertEquals('Testing update konfigurasi EWS harian', $log['new_values']['reason']);
+            }
+        }
+        $this->assertTrue($foundEwsLog);
+    }
+
+    public function test_unauthorized_access_to_ews_active_aborts(): void
+    {
+        $user = User::factory()->create(['role' => 'Pegawai']);
+        session(['active_role' => 'Pegawai']);
+
+        $response = $this->actingAs($user)->get('/ews');
+        $response->assertStatus(403);
+    }
+
+    public function test_authorized_user_can_view_ews_active(): void
+    {
+        $admin = User::factory()->create(['role' => 'Admin Kepegawaian']);
+        session(['active_role' => 'Admin Kepegawaian']);
+
+        $response = $this->actingAs($admin)->get('/ews');
+        $response->assertOk();
+        $response->assertSee('Daftar EWS Aktif');
+        $response->assertSee('Ahmad Fauzi');
+        $response->assertSee('Cimma Sari Oktariani Di Silapu');
+    }
+
+    public function test_ews_active_filtering(): void
+    {
+        $admin = User::factory()->create(['role' => 'Admin Kepegawaian']);
+        session(['active_role' => 'Admin Kepegawaian']);
+
+        // Filter for KGB
+        $response = $this->actingAs($admin)->get('/ews?event=KGB');
+        $response->assertOk();
+        $response->assertSee('Ahmad Fauzi'); // Ahmad Fauzi has a KGB alert
+        $response->assertDontSee('Cimma Sari Oktariani Di Silapu'); // Cimma has a Kenaikan Pangkat alert
+    }
 }
 

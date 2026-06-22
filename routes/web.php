@@ -4,6 +4,9 @@ use App\Http\Controllers\Auth\KeycloakAuthController;
 use App\Http\Controllers\Admin\PegawaiController;
 use App\Http\Controllers\Admin\HariLiburController;
 use App\Http\Controllers\Admin\CutiController;
+use App\Http\Controllers\Admin\CutiConfigController;
+use App\Http\Controllers\Admin\EwsController;
+use App\Http\Controllers\Admin\EwsConfigController;
 use App\Http\Controllers\Admin\DokumenController;
 use App\Http\Controllers\Admin\AuditController;
 use App\Http\Controllers\Admin\ProfileController;
@@ -133,9 +136,7 @@ Route::middleware('keycloak.auth')->group(function (): void {
         ]);
     })->name('pegawai.import-template');
 
-    Route::get('/ews-warning', function () {
-        return redirect()->route('data-pegawai', ['filter' => 'ews']);
-    })->name('ews');
+    Route::get('/ews', [EwsController::class, 'index'])->name('ews');
 
     Route::get('/laporan-export', function () {
         return view('dummy', ['title' => 'Laporan / Export']);
@@ -151,9 +152,8 @@ Route::middleware('keycloak.auth')->group(function (): void {
         return view('dummy', ['title' => 'Reference Tables / Data Master']);
     })->name('data-master');
 
-    Route::get('/cuti/konfigurasi', function () {
-        return view('admin.cuti.konfigurasi');
-    })->name('cuti.config');
+    Route::get('/cuti/konfigurasi', [CutiConfigController::class, 'index'])->name('cuti.config');
+    Route::post('/cuti/konfigurasi/update', [CutiConfigController::class, 'update'])->name('cuti.config.update');
 
     Route::get('/pegawai/nonaktif-list', function () {
         return view('admin.pegawai.nonaktif');
@@ -163,9 +163,8 @@ Route::middleware('keycloak.auth')->group(function (): void {
         return view('admin.cuti.rekap');
     })->name('cuti.rekap');
 
-    Route::get('/ews/konfigurasi', function () {
-        return view('dummy', ['title' => 'Konfigurasi EWS']);
-    })->name('ews.config');
+    Route::get('/konfigurasi', [EwsConfigController::class, 'index'])->name('ews.config');
+    Route::post('/konfigurasi/update', [EwsConfigController::class, 'update'])->name('ews.config.update');
 
      Route::get('/laporan/export-pegawai', function () {
          $pegawai = PegawaiController::$pegawaiList;
@@ -570,6 +569,9 @@ Route::middleware('keycloak.auth')->group(function (): void {
 
     Route::get('/dashboard/cuti', [CutiController::class, 'index'])->name('cuti');
     Route::post('/dashboard/cuti', [CutiController::class, 'store'])->name('cuti.store');
+    Route::get('/cuti/approval', [CutiController::class, 'approval'])->name('cuti.approval');
+    Route::post('/cuti/{id}/approve', [CutiController::class, 'approve'])->name('cuti.approve');
+    Route::post('/cuti/{id}/postpone', [CutiController::class, 'postpone'])->name('cuti.postpone');
     Route::get('/dashboard/cuti/{id}', [CutiController::class, 'show'])->name('cuti.show');
 
     Route::get('/dashboard/cuti/legacy', function () {

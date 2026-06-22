@@ -228,7 +228,7 @@
                     <h3 class="text-sm font-bold text-ink font-sans">Daftar EWS Aktif</h3>
                     <p class="text-[10px] text-muted font-sans mt-0.5">Peringatan otomatis masa berlaku dokumen & kepegawaian</p>
                 </div>
-                <a href="{{ route('data-pegawai', ['filter' => 'ews']) }}" class="text-xs font-semibold text-primary hover:underline font-sans">
+                <a href="{{ route('ews') }}" class="text-xs font-semibold text-primary hover:underline font-sans">
                     Lihat Semua
                 </a>
             </div>

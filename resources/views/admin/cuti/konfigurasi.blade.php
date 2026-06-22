@@ -1,18 +1,5 @@
 <x-layouts.app title="Konfigurasi Approval Cuti">
     @php
-        $approvers = [
-            ['name' => 'Dra. Merlina Rahman',       'role' => 'Kabag Tata Usaha',        'unit' => 'Bagian Umum'],
-            ['name' => 'Riza Hamzah',                'role' => 'Verifikator Kepegawaian', 'unit' => 'Bagian SDM'],
-            ['name' => 'Dr. Abdul Kadir',            'role' => 'Pimpinan / PYBMC',        'unit' => 'LLDIKTI Wilayah XVI'],
-            ['name' => 'Nurarningsih Dumbea, S.P.', 'role' => 'Koordinator Kepegawaian', 'unit' => 'Bagian SDM'],
-        ];
-
-        $auditRows = [
-            ['time' => '22 Jun 2026, 16:12', 'actor' => 'Super Admin', 'field' => 'Stage 2',       'before' => 'Riza Hamzah',     'after' => 'Dra. Merlina Rahman'],
-            ['time' => '20 Jun 2026, 09:40', 'actor' => 'Super Admin', 'field' => 'Stage 3',       'before' => 'Dr. Abdul Kadir', 'after' => 'Dr. Abdul Kadir'],
-            ['time' => '18 Jun 2026, 14:25', 'actor' => 'Super Admin', 'field' => 'Skip duplikat', 'before' => 'Tidak aktif',     'after' => 'Aktif'],
-        ];
-
         $badgeClass = [
             'Read-only'    => 'bg-info/10 text-info',
             'Configurable' => 'bg-primary/10 text-primary',
@@ -26,21 +13,28 @@
     <div
         class="space-y-6"
         x-data="{
-            kabag:       'Dra. Merlina Rahman',
-            pimpinan:    'Dr. Abdul Kadir',
-            reason:      '',
+            usersMap: {{ json_encode($eligibleUsers->keyBy('id')->map(fn($u) => ['name' => $u->name, 'role' => $u->role])) }},
+            kabag_id: '{{ $stage2Id }}',
+            pimpinan_id: '{{ $stage3Id }}',
+            reason: '',
             showConfirm: false,
-            saved:       false,
 
-            get isDuplikat() { return this.kabag === this.pimpinan; },
+            get kabag_name() {
+                return this.usersMap[this.kabag_id] ? this.usersMap[this.kabag_id].name : 'Pilih...';
+            },
+            get pimpinan_name() {
+                return this.usersMap[this.pimpinan_id] ? this.usersMap[this.pimpinan_id].name : 'Pilih...';
+            },
+            get isDuplikat() { 
+                return this.kabag_id && this.pimpinan_id && this.kabag_id === this.pimpinan_id; 
+            },
 
             openConfirm() {
                 if (this.reason.trim() === '') return;
                 this.showConfirm = true;
             },
-            confirmSave() {
-                this.showConfirm = false;
-                this.saved = true;
+            submitForm() {
+                this.$refs.configForm.submit();
             }
         }"
     >
@@ -63,13 +57,6 @@
                     Perubahan berlaku untuk pengajuan cuti baru dan wajib tercatat sebagai audit trail.
                 </p>
             </div>
-            <span class="inline-flex h-fit shrink-0 items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary">
-                {{-- heroicon: shield-check --}}
-                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.57-.598-3.75h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
-                </svg>
-                Super Admin only
-            </span>
         </div>
 
         {{-- ================================================================ --}}
@@ -114,7 +101,7 @@
                         </div>
                         <div class="text-center">
                             <p class="text-xs font-semibold text-primary">Stage 2</p>
-                            <p class="text-sm font-semibold text-ink" x-text="kabag"></p>
+                            <p class="text-sm font-semibold text-ink" x-text="kabag_name"></p>
                             <p class="text-xs text-muted">Kabag / Verifikator</p>
                         </div>
                     </div>
@@ -127,7 +114,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                             </svg>
                         </div>
-                        <p x-show="isDuplikat" class="text-[10px] font-bold text-warning" x-transition>Skip</p>
+                        <p x-show="isDuplikat" class="text-[10px] font-bold text-warning" x-transition style="display: none;">Skip</p>
                     </div>
 
                     {{-- Stage 3 --}}
@@ -144,7 +131,7 @@
                         </div>
                         <div class="text-center" :class="isDuplikat ? 'opacity-60' : ''">
                             <p class="text-xs font-semibold" :class="isDuplikat ? 'text-warning' : 'text-primary'">Stage 3</p>
-                            <p class="text-sm font-semibold text-ink" x-text="pimpinan"></p>
+                            <p class="text-sm font-semibold text-ink" x-text="isDuplikat ? pimpinan_name + ' (akan diskip)' : pimpinan_name"></p>
                             <p class="text-xs text-muted">Pimpinan / PYBMC</p>
                         </div>
                     </div>
@@ -180,6 +167,7 @@
                 x-transition:enter-start="opacity-0 -translate-y-1"
                 x-transition:enter-end="opacity-100 translate-y-0"
                 class="border-t border-warning/20 bg-warning/5 px-6 py-3"
+                style="display: none;"
             >
                 <div class="flex items-start gap-2">
                     <svg class="mt-0.5 h-4 w-4 shrink-0 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -210,7 +198,7 @@
                             <h3 class="text-base font-semibold text-ink">Approval Config Aktif</h3>
                             <p class="mt-0.5 text-sm text-muted">
                                 Stage 1 bersumber dari data pegawai. Stage 2 & 3 disimpan di
-                                <code class="rounded bg-soft px-1 py-0.5 font-mono text-xs">approval_config</code>.
+                                <code class="rounded bg-soft px-1 py-0.5 font-mono text-xs">approval_configs</code>.
                             </p>
                         </div>
                         <span class="inline-flex w-fit items-center gap-1.5 rounded-full bg-success/10 px-3 py-1 text-xs font-semibold text-success">
@@ -244,9 +232,9 @@
                                 <tr class="transition-colors hover:bg-soft/60">
                                     <td class="px-4 py-4 font-mono text-sm font-semibold text-muted">2</td>
                                     <td class="px-4 py-4 text-sm font-semibold text-ink">Kabag / Verifikator</td>
-                                    <td class="px-4 py-4 text-sm font-semibold text-ink" x-text="kabag">Dra. Merlina Rahman</td>
+                                    <td class="px-4 py-4 text-sm font-semibold text-ink" x-text="kabag_name"></td>
                                     <td class="px-4 py-4">
-                                        <code class="rounded bg-soft px-2 py-0.5 font-mono text-xs text-muted">approval_config.approver_id</code>
+                                        <code class="rounded bg-soft px-2 py-0.5 font-mono text-xs text-muted">approval_configs.value</code>
                                     </td>
                                     <td class="px-4 py-4">
                                         <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $badgeClass['Aktif'] }}">Aktif</span>
@@ -255,9 +243,9 @@
                                 <tr class="transition-colors hover:bg-soft/60" :class="isDuplikat ? 'opacity-50' : ''">
                                     <td class="px-4 py-4 font-mono text-sm font-semibold text-muted">3</td>
                                     <td class="px-4 py-4 text-sm font-semibold text-ink">Pimpinan / PYBMC</td>
-                                    <td class="px-4 py-4 text-sm font-semibold text-ink" x-text="isDuplikat ? pimpinan + ' (akan diskip)' : pimpinan">Dr. Abdul Kadir</td>
+                                    <td class="px-4 py-4 text-sm font-semibold text-ink" x-text="isDuplikat ? pimpinan_name + ' (akan diskip)' : pimpinan_name"></td>
                                     <td class="px-4 py-4">
-                                        <code class="rounded bg-soft px-2 py-0.5 font-mono text-xs text-muted">approval_config.approver_id</code>
+                                        <code class="rounded bg-soft px-2 py-0.5 font-mono text-xs text-muted">approval_configs.value</code>
                                     </td>
                                     <td class="px-4 py-4">
                                         <span
@@ -355,100 +343,94 @@
                     <h3 class="text-base font-semibold text-ink">Edit Konfigurasi Default</h3>
                     <p class="mt-1 text-sm text-muted">Perubahan berlaku untuk pengajuan cuti baru.</p>
 
-                    <div class="mt-5 space-y-5">
+                    <form method="POST" action="{{ route('cuti.config.update') }}" x-ref="configForm">
+                        @csrf
+                        <div class="mt-5 space-y-5">
 
-                        {{-- Dropdown 1: Kabag / Verifikator --}}
-                        <div class="space-y-1.5">
-                            <label class="text-sm font-semibold text-ink" for="cfg-kabag">
-                                Approver Default — Kabag / Verifikator
-                            </label>
-                            <p class="text-xs text-muted">Stage 2: approver verifikasi awal pengajuan cuti.</p>
-                            <select
-                                id="cfg-kabag"
-                                x-model="kabag"
-                                class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                            >
-                                @foreach($approvers as $ap)
-                                    <option value="{{ $ap['name'] }}">{{ $ap['name'] }} — {{ $ap['unit'] }}</option>
-                                @endforeach
-                            </select>
+                            {{-- Dropdown 1: Kabag / Verifikator --}}
+                            <div class="space-y-1.5">
+                                <label class="text-sm font-semibold text-ink" for="cfg-kabag">
+                                    Approver Default — Kabag / Verifikator
+                                </label>
+                                <p class="text-xs text-muted">Stage 2: approver verifikasi awal pengajuan cuti.</p>
+                                <select
+                                    id="cfg-kabag"
+                                    name="stage2_approver_id"
+                                    x-model="kabag_id"
+                                    class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                >
+                                    @foreach($eligibleUsers as $u)
+                                        <option value="{{ $u->id }}">{{ $u->name }} — {{ $u->role }}</option>
+                                    @endforeach
+                                </select>
+                                @error('stage2_approver_id')
+                                    <p class="text-xs text-danger mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            {{-- Dropdown 2: Pimpinan / PYBMC --}}
+                            <div class="space-y-1.5">
+                                <label class="text-sm font-semibold text-ink" for="cfg-pimpinan">
+                                    Approver Default — Pimpinan / PYBMC
+                                </label>
+                                <p class="text-xs text-muted">Stage 3: approver final pemberi keputusan akhir.</p>
+                                <select
+                                    id="cfg-pimpinan"
+                                    name="stage3_approver_id"
+                                    x-model="pimpinan_id"
+                                    class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                    :class="isDuplikat ? 'border-warning ring-1 ring-warning/30' : ''"
+                                >
+                                    @foreach($eligibleUsers as $u)
+                                        <option value="{{ $u->id }}">{{ $u->name }} — {{ $u->role }}</option>
+                                    @endforeach
+                                </select>
+                                {{-- Inline warning duplikat --}}
+                                <p
+                                    x-show="isDuplikat"
+                                    x-transition
+                                    class="text-xs font-semibold text-warning mt-1"
+                                    style="display: none;"
+                                >
+                                    ⚠ Sama dengan Stage 2 — Stage 3 akan diskip otomatis.
+                                </p>
+                                @error('stage3_approver_id')
+                                    <p class="text-xs text-danger mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            {{-- Alasan --}}
+                            <div class="space-y-1.5">
+                                <label class="text-sm font-semibold text-ink" for="cfg-reason">
+                                    Alasan Perubahan <span class="text-danger">*</span>
+                                </label>
+                                <textarea
+                                    id="cfg-reason"
+                                    name="reason"
+                                    x-model="reason"
+                                    rows="4"
+                                    placeholder="Contoh: penyesuaian struktur verifikator cuti tahun anggaran baru"
+                                    class="w-full resize-y rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                ></textarea>
+                                @error('reason')
+                                    <p class="text-xs text-danger mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
                         </div>
 
-                        {{-- Dropdown 2: Pimpinan / PYBMC --}}
-                        <div class="space-y-1.5">
-                            <label class="text-sm font-semibold text-ink" for="cfg-pimpinan">
-                                Approver Default — Pimpinan / PYBMC
-                            </label>
-                            <p class="text-xs text-muted">Stage 3: approver final pemberi keputusan akhir.</p>
-                            <select
-                                id="cfg-pimpinan"
-                                x-model="pimpinan"
-                                class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                :class="isDuplikat ? 'border-warning ring-1 ring-warning/30' : ''"
-                            >
-                                @foreach($approvers as $ap)
-                                    <option value="{{ $ap['name'] }}">{{ $ap['name'] }} — {{ $ap['unit'] }}</option>
-                                @endforeach
-                            </select>
-                            {{-- Inline warning duplikat --}}
-                            <p
-                                x-show="isDuplikat"
-                                x-transition
-                                class="text-xs font-semibold text-warning"
-                            >
-                                ⚠ Sama dengan Stage 2 — Stage 3 akan diskip otomatis.
-                            </p>
-                        </div>
-
-                        {{-- Alasan --}}
-                        <div class="space-y-1.5">
-                            <label class="text-sm font-semibold text-ink" for="cfg-reason">
-                                Alasan Perubahan <span class="text-danger">*</span>
-                            </label>
-                            <textarea
-                                id="cfg-reason"
-                                x-model="reason"
-                                rows="4"
-                                placeholder="Contoh: penyesuaian struktur verifikator cuti tahun anggaran baru"
-                                class="w-full resize-y rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                :class="saved && reason.trim() === '' ? 'border-danger ring-1 ring-danger/30' : ''"
-                            ></textarea>
-                            <p
-                                x-show="saved && reason.trim() === ''"
-                                x-transition
-                                class="text-xs font-semibold text-danger"
-                            >
-                                Alasan wajib diisi agar perubahan tercatat di audit log.
-                            </p>
-                        </div>
-                    </div>
-
-                    {{-- Success state --}}
-                    <div
-                        x-show="saved && reason.trim() !== ''"
-                        x-transition
-                        class="mt-5 rounded-lg border border-success/20 bg-success/10 px-4 py-3"
-                    >
-                        <div class="flex items-center gap-2">
-                            <svg class="h-4 w-4 shrink-0 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                        {{-- Tombol simpan --}}
+                        <button
+                            type="button"
+                            @click="openConfirm()"
+                            class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 active:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
+                            :disabled="reason.trim() === ''"
+                        >
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                             </svg>
-                            <p class="text-sm font-semibold text-success">Konfigurasi tersimpan dan tercatat di audit log.</p>
-                        </div>
-                    </div>
-
-                    {{-- Tombol simpan --}}
-                    <button
-                        type="button"
-                        @click="openConfirm()"
-                        class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 active:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
-                        :disabled="reason.trim() === ''"
-                    >
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                        </svg>
-                        Simpan Konfigurasi
-                    </button>
+                            Simpan Konfigurasi
+                        </button>
+                    </form>
                     <p class="mt-2 text-center text-xs text-muted">Akan muncul konfirmasi sebelum perubahan diterapkan.</p>
                 </div>
 
@@ -481,7 +463,7 @@
                             <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-warning"></span>
                             <div>
                                 <p class="text-sm font-semibold text-ink">Skip duplikat otomatis</p>
-                                <p class="text-xs text-muted">Jika Stage 2 dan 3 sama, Stage final dilewati sistem.</p>
+                                <p class="text-xs text-muted">Jika Stage 2 and 3 sama, Stage final dilewati sistem.</p>
                             </div>
                         </li>
                         <li class="flex items-start gap-3">
@@ -537,11 +519,11 @@
                     <dl class="mt-3 space-y-2">
                         <div class="flex items-center justify-between gap-4">
                             <dt class="text-sm text-muted">Kabag / Verifikator</dt>
-                            <dd class="text-sm font-semibold text-ink" x-text="kabag"></dd>
+                            <dd class="text-sm font-semibold text-ink" x-text="kabag_name"></dd>
                         </div>
                         <div class="flex items-center justify-between gap-4">
                             <dt class="text-sm text-muted">Pimpinan / PYBMC</dt>
-                            <dd class="text-sm font-semibold text-ink" x-text="isDuplikat ? pimpinan + ' (diskip)' : pimpinan"></dd>
+                            <dd class="text-sm font-semibold text-ink" x-text="isDuplikat ? pimpinan_name + ' (diskip)' : pimpinan_name"></dd>
                         </div>
                         <div class="border-t border-border pt-2">
                             <dt class="text-xs font-semibold text-muted">Alasan</dt>
@@ -561,7 +543,7 @@
                     </button>
                     <button
                         type="button"
-                        @click="confirmSave()"
+                        @click="submitForm()"
                         class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
                     >
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
