@@ -49,7 +49,7 @@ class EmployeeImportTest extends TestCase
         $response->assertJsonPath('failed', 0);
         $this->assertDatabaseHas('employees', [
             'nama_lengkap' => 'Budi Santoso',
-            'email_pribadi' => 'budi@example.com',
+            'email' => 'budi@example.com',
             'nip' => '198001012006041001',
             'jenis_pegawai_id' => RefJenisPegawai::where('nama', 'PNS')->firstOrFail()->id,
         ]);

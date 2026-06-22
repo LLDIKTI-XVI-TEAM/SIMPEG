@@ -33,7 +33,7 @@ class EmployeeFactory extends Factory
             'tanggal_pensiun' => fake()->dateTimeBetween('+5 years', '+20 years')->format('Y-m-d'),
             'profil_status' => 'belum_lengkap',
             'no_hp' => fake()->phoneNumber(),
-            'email_pribadi' => fake()->unique()->safeEmail(),
+            'email' => fake()->unique()->safeEmail(),
             'is_kinerja_baik' => true,
             'role' => 'pegawai',
         ];

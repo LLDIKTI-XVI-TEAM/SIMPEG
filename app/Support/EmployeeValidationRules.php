@@ -40,7 +40,7 @@ class EmployeeValidationRules
             // Kontak
             'alamat' => ['nullable', 'string'],
             'no_hp' => ['nullable', 'string', 'max:20'],
-            'email_pribadi' => ['nullable', 'email', 'max:255', 'unique:employees,email_pribadi'],
+            'email' => ['nullable', 'email', 'max:255', 'unique:employees,email'],
             'no_telepon_rumah' => ['nullable', 'string', 'max:20'],
         ];
     }
@@ -54,7 +54,7 @@ class EmployeeValidationRules
         return [
             'nama_lengkap' => ['required', 'string', 'max:255'],
             'nip' => ['required', 'string', 'size:18', 'unique:employees,nip'],
-            'email_pribadi' => ['nullable', 'email', 'max:255', 'unique:employees,email_pribadi'],
+            'email' => ['nullable', 'email', 'max:255', 'unique:employees,email'],
             'tanggal_lahir' => ['nullable', 'date', 'before:today'],
             'jenis_pegawai' => ['required', 'in:PNS,PPPK,CPNS'],
             'golongan_terakhir' => ['nullable', 'string', 'max:20'],
@@ -94,7 +94,7 @@ class EmployeeValidationRules
             'tanggal_pensiun' => 'Tanggal Pensiun',
             'alamat' => 'Alamat',
             'no_hp' => 'Nomor HP',
-            'email_pribadi' => 'Email Pribadi',
+            'email' => 'Email Pegawai',
             'no_telepon_rumah' => 'No. Telepon Rumah',
         ];
     }
