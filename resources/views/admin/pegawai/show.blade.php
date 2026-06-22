@@ -43,12 +43,18 @@
         $estimasiPangkatNext = $tmtPangkatTerakhir ? $tmtPangkatTerakhir->copy()->addYears(4)->format('d-m-Y') : '-';
         $estimasiKgbNext = $tmtPangkatTerakhir ? $tmtPangkatTerakhir->copy()->addYears(2)->format('d-m-Y') : '-';
         
+        // Logika BUP dinamis berdasarkan jabatan
+        $bup = 58;
+        if (isset($p['jabatan']) && (str_contains(strtolower($p['jabatan']), 'madya') || str_contains(strtolower($p['jabatan']), 'utama') || str_contains(strtolower($p['jabatan']), 'pimpinan tinggi'))) {
+            $bup = 60;
+        }
+
         $tglLahir = isset($p['tanggal_lahir']) ? \Carbon\Carbon::parse($p['tanggal_lahir']) : null;
-        $estimasiPensiun = $tglLahir ? $tglLahir->copy()->addYears(58)->format('d-m-Y') : '-';
+        $estimasiPensiun = $tglLahir ? $tglLahir->copy()->addYears($bup)->format('d-m-Y') : '-';
         
         $sisaPensiunStr = '-';
         if ($tglLahir) {
-            $pensiunDate = $tglLahir->copy()->addYears(58);
+            $pensiunDate = $tglLahir->copy()->addYears($bup);
             $now = \Carbon\Carbon::now();
             if ($pensiunDate->isFuture()) {
                 $diff = $now->diff($pensiunDate);
@@ -283,6 +289,10 @@
                         <h3 class="text-xs font-bold text-ink uppercase tracking-wider font-sans border-b border-border pb-1.5">Kontak & Rumah</h3>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                             <div class="space-y-0.5">
+                                <span class="font-semibold text-muted font-sans">Email Dinas</span>
+                                <p class="text-ink font-sans font-mono">{{ $p['email_dinas'] ?? '-' }}</p>
+                            </div>
+                            <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Email Pribadi</span>
                                 <p class="text-ink font-sans font-mono">{{ $p['email'] ?? '-' }}</p>
                             </div>
@@ -305,7 +315,7 @@
                 {{-- Jabatan Kerja --}}
                 <div class="space-y-4 border-t border-border pt-4">
                     <h3 class="text-xs font-bold text-ink uppercase tracking-wider font-sans border-b border-border pb-1.5">Informasi Pekerjaan Utama</h3>
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-xs">
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">Jabatan Sekarang</span>
                             <p class="text-ink font-sans font-bold">{{ $p['jabatan'] }}</p>
@@ -315,8 +325,16 @@
                             <p class="text-ink font-sans">{{ $p['unit'] }}</p>
                         </div>
                         <div class="space-y-0.5">
+                            <span class="font-semibold text-muted font-sans">Pangkat</span>
+                            <p class="text-ink font-sans font-bold">{{ $p['pangkat'] ?? 'Penata Tkt. I' }}</p>
+                        </div>
+                        <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">Golongan Saat Ini</span>
                             <p class="text-ink font-sans font-bold">{{ $p['golongan'] }}</p>
+                        </div>
+                        <div class="space-y-0.5">
+                            <span class="font-semibold text-muted font-sans">Kelas Jabatan</span>
+                            <p class="text-ink font-sans font-bold">{{ $p['kelas_jabatan'] ?? '8' }}</p>
                         </div>
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">TMT Golongan</span>
