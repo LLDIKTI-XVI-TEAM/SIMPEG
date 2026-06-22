@@ -115,7 +115,7 @@ Route::middleware('keycloak.auth')->group(function (): void {
     Route::post('/dashboard/cuti', [CutiController::class, 'store'])->name('cuti.store');
     Route::get('/dashboard/cuti/approval', [CutiController::class, 'approval'])->name('cuti.approval');
     Route::post('/dashboard/cuti/approval/{id}/approve', [CutiController::class, 'approve'])->name('cuti.approve');
-    Route::post('/dashboard/cuti/approval/{id}/reject', [CutiController::class, 'reject'])->name('cuti.reject');
+    Route::post('/dashboard/cuti/approval/{id}/postpone', [CutiController::class, 'postpone'])->name('cuti.postpone');
     Route::get('/dashboard/cuti/{id}', [CutiController::class, 'show'])->name('cuti.show');
 
     Route::get('/dashboard/cuti/legacy', function () {

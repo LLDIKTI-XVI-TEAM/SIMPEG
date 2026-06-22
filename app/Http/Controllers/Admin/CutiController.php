@@ -56,11 +56,11 @@ class CutiController extends Controller
             ->with('success', 'Pengajuan cuti ' . $nama . ' telah disetujui.');
     }
 
-    public function reject($id)
+    public function postpone($id)
     {
         $c = collect(self::$riwayatCuti)->firstWhere('id', (int)$id);
         $nama = $c ? $c['nama'] : 'Pegawai';
         return redirect()->route('cuti.approval')
-            ->with('success', 'Pengajuan cuti ' . $nama . ' telah ditolak.');
+            ->with('success', 'Pengajuan cuti ' . $nama . ' telah ditunda.');
     }
 }
