@@ -108,11 +108,11 @@
 
                 @php
                 $pegawaiList = [
-                    ['id' => 1, 'nama' => 'Ahmad Fauzi',   'nip' => '19850312 201001 1 001', 'jabatan' => 'Analis Kepegawaian', 'unit' => 'Bag. Umum',     'jenis' => 'PNS',   'golongan' => 'III/c', 'status' => 'aktif'],
-                    ['id' => 2, 'nama' => 'Siti Rahayu',   'nip' => '19901120 201501 2 003', 'jabatan' => 'Staf Administrasi',  'unit' => 'Bag. Keuangan', 'jenis' => 'PNS',   'golongan' => 'II/d',  'status' => 'aktif'],
-                    ['id' => 3, 'nama' => 'Budi Santoso',  'nip' => '19780601 200312 1 002', 'jabatan' => 'Kepala Subbagian',  'unit' => 'Bag. SDM',      'jenis' => 'PNS',   'golongan' => 'III/d', 'status' => 'cuti'],
-                    ['id' => 4, 'nama' => 'Dewi Pertiwi',  'nip' => '19931205 201901 2 001', 'jabatan' => 'Pranata Komputer',  'unit' => 'Bag. IT',       'jenis' => 'PPPK',  'golongan' => 'III/a', 'status' => 'aktif'],
-                    ['id' => 5, 'nama' => 'Rudi Hermawan', 'nip' => '19751010 199903 1 004', 'jabatan' => 'Arsiparis',         'unit' => 'Bag. Umum',     'jenis' => 'PPNPN', 'golongan' => 'II/b',  'status' => 'nonaktif'],
+                    ['id' => 1, 'nama' => 'Ahmad Fauzi',                  'nip' => '19850312 201001 1 001', 'jabatan' => 'Analis Kepegawaian',             'unit' => 'Bag. Umum',     'jenis' => 'PNS',   'golongan' => 'III/c', 'status' => 'aktif'],
+                    ['id' => 2, 'nama' => 'Siti Rahayu',                  'nip' => '19901120 201501 2 003', 'jabatan' => 'Analis Ahli Madya',              'unit' => 'Bag. Keuangan', 'jenis' => 'PNS',   'golongan' => 'II/d',  'status' => 'aktif'],
+                    ['id' => 3, 'nama' => 'Sabrina Rossa Adriani Wibowo', 'nip' => '20261210 820500 0 04',  'jabatan' => 'Analis SDM Aparatur Ahli Pertama', 'unit' => 'Bag. SDM',      'jenis' => 'CPNS',  'golongan' => 'III/a', 'status' => 'aktif'],
+                    ['id' => 4, 'nama' => 'Cimma Sari Oktariani Di',      'nip' => '26110820 520600 0 04',  'jabatan' => 'Pranata SDM Terampil',           'unit' => 'Bag. IT',       'jenis' => 'CPNS',  'golongan' => 'III/c', 'status' => 'aktif'],
+                    ['id' => 5, 'nama' => 'Nurarningsih Dumbea, S.P.',    'nip' => '19880123 202001 1 005', 'jabatan' => 'Pejabat Lelang Operational',     'unit' => 'Bag. Umum',     'jenis' => 'PPPK',  'golongan' => 'III/b', 'status' => 'aktif'],
                 ];
                 $badge = [
                     'aktif'    => 'text-success',
@@ -208,15 +208,22 @@
                 <div class="divide-y divide-border">
                     @php
                     $auditLog = [
-                        ['user' => 'Admin HR',   'aksi' => 'Menambahkan data pegawai baru', 'target' => 'Ahmad Fauzi',  'waktu' => '2 menit lalu',  'color' => 'bg-success/10 text-success'],
-                        ['user' => 'Admin HR',   'aksi' => 'Menyetujui pengajuan cuti',     'target' => 'Siti Rahayu',  'waktu' => '15 menit lalu', 'color' => 'bg-info/10 text-info'],
-                        ['user' => 'Supervisor', 'aksi' => 'Mengunggah dokumen SK',         'target' => 'Budi Santoso', 'waktu' => '1 jam lalu',    'color' => 'bg-primary/10 text-primary'],
-                        ['user' => 'Admin HR',   'aksi' => 'Memperbarui data jabatan',      'target' => 'Dewi Pertiwi', 'waktu' => '3 jam lalu',    'color' => 'bg-warning/10 text-warning'],
+                        ['user' => 'Admin HR',   'aksi' => 'Menambahkan data pegawai baru',           'target' => 'Sabrina Rossa Adriani Wibowo', 'waktu' => '2 menit lalu',  'type' => 'tambah'],
+                        ['user' => 'Admin HR',   'aksi' => 'Menyetujui pengajuan cuti',               'target' => 'Siti Rahayu',                 'waktu' => '15 menit lalu', 'type' => 'setujui'],
+                        ['user' => 'Supervisor', 'aksi' => 'Mengunggah dokumen SK Pengangkatan',      'target' => 'Ahmad Fauzi',                 'waktu' => '1 jam lalu',    'type' => 'unggah'],
+                        ['user' => 'Admin HR',   'aksi' => 'Memperbarui data jabatan pegawai',        'target' => 'Nurarningsih Dumbea, S.P.',   'waktu' => '3 jam lalu',    'type' => 'perbarui'],
+                    ];
+                    $auditColorMap = [
+                        'tambah'   => 'bg-success/10 text-success',
+                        'setujui'  => 'bg-info/10 text-info',
+                        'unggah'   => 'bg-primary/10 text-primary',
+                        'perbarui' => 'bg-warning/10 text-warning',
                     ];
                     @endphp
                     @foreach($auditLog as $log)
+                    @php $auditColor = $auditColorMap[$log['type']] ?? 'bg-soft text-muted'; @endphp
                     <div class="flex items-center gap-4 px-6 py-4 transition-colors hover:bg-soft/30 cursor-pointer">
-                        <div class="shrink-0 rounded-full {{ $log['color'] }} p-2">
+                        <div class="shrink-0 rounded-full {{ $auditColor }} p-2">
                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="m4.5 12.75 6 6 9-13.5" /></svg>
                         </div>
                         <div class="min-w-0 flex-1">
@@ -306,9 +313,9 @@
                                 Setuju
                             </button>
                             <button
-                                onclick="this.closest('div.flex').innerHTML = '<div class=\'w-full text-center py-1\'><span class=\'text-xs font-bold text-danger font-sans\'>✗ Ditolak</span></div>'"
-                                class="text-xs font-semibold text-danger hover:underline transition-colors font-sans cursor-pointer focus:outline-none">
-                                Tolak
+                                onclick="this.closest('div.flex').innerHTML = '<div class=\'w-full text-center py-1\'><span class=\'text-xs font-bold text-warning font-sans\'>⏸ Ditunda</span></div>'"
+                                class="text-xs font-semibold text-warning hover:underline transition-colors font-sans cursor-pointer focus:outline-none">
+                                Tunda
                             </button>
                         </div>
                     </div>

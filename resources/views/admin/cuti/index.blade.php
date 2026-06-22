@@ -2,9 +2,9 @@
 
     @php
     $riwayatCuti = [
-        ['id' => 1, 'jenis' => 'Cuti Tahunan', 'mulai' => '2026-06-20', 'selesai' => '2026-06-24', 'hari' => 5, 'status' => 'menunggu', 'tgl_pengajuan' => '2026-06-18', 'alasan' => 'Acara keluarga di luar kota'],
-        ['id' => 2, 'jenis' => 'Cuti Sakit', 'mulai' => '2026-04-10', 'selesai' => '2026-04-12', 'hari' => 3, 'status' => 'disetujui', 'tgl_pengajuan' => '2026-04-09', 'alasan' => 'Sakit demam berdarah'],
-        ['id' => 3, 'jenis' => 'Cuti Tahunan', 'mulai' => '2026-02-01', 'selesai' => '2026-02-05', 'hari' => 5, 'status' => 'disetujui', 'tgl_pengajuan' => '2026-01-28', 'alasan' => 'Urusan keluarga mendesak'],
+        ['id' => 1, 'jenis' => 'Cuti Tahunan',   'mulai' => '2026-06-20', 'selesai' => '2026-06-24', 'hari' => 5,  'status' => 'menunggu', 'tgl_pengajuan' => '2026-06-18', 'alasan' => 'Acara keluarga di luar kota'],
+        ['id' => 2, 'jenis' => 'Cuti Sakit',      'mulai' => '2026-04-10', 'selesai' => '2026-04-12', 'hari' => 3,  'status' => 'disetujui', 'tgl_pengajuan' => '2026-04-09', 'alasan' => 'Sakit demam berdarah'],
+        ['id' => 3, 'jenis' => 'Cuti Tahunan',   'mulai' => '2026-02-01', 'selesai' => '2026-02-05', 'hari' => 5,  'status' => 'ditunda',   'tgl_pengajuan' => '2026-01-28', 'alasan' => 'Menunggu konfirmasi pengganti tugas'],
         ['id' => 4, 'jenis' => 'Cuti Melahirkan', 'mulai' => '2025-10-01', 'selesai' => '2025-12-29', 'hari' => 90, 'status' => 'disetujui', 'tgl_pengajuan' => '2025-09-15', 'alasan' => 'Persalinan anak pertama'],
     ];
 
@@ -16,21 +16,21 @@
     }
 
     $statusClass = [
-        'menunggu' => 'bg-warning/10 text-warning',
+        'menunggu'  => 'bg-warning/10 text-warning',
         'disetujui' => 'bg-success/10 text-success',
-        'ditolak' => 'bg-danger/10 text-danger'
+        'ditunda'   => 'bg-warning/10 text-warning',
     ];
 
     $statusDot = [
-        'menunggu' => 'bg-warning',
+        'menunggu'  => 'bg-warning',
         'disetujui' => 'bg-success',
-        'ditolak' => 'bg-danger'
+        'ditunda'   => 'bg-warning',
     ];
 
     $statusLabel = [
-        'menunggu' => 'Menunggu Persetujuan',
+        'menunggu'  => 'Menunggu Persetujuan',
         'disetujui' => 'Disetujui',
-        'ditolak' => 'Ditolak'
+        'ditunda'   => 'Ditunda',
     ];
     @endphp
 

@@ -10,19 +10,18 @@ class ExampleTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_guest_home_redirects_to_login(): void
+    public function test_guest_home_redirects_to_keycloak(): void
     {
         $response = $this->get('/');
 
-        $response->assertRedirect('/login');
+        $response->assertRedirect('/auth/keycloak/redirect');
     }
 
-    public function test_login_renders_login_page(): void
+    public function test_login_redirects_to_keycloak(): void
     {
         $response = $this->get('/login');
         
-        $response->assertStatus(200);
-        $response->assertSee('Masuk dengan SSO LLDIKTI');
+        $response->assertRedirect('/auth/keycloak/redirect');
     }
 
     public function test_authenticated_dashboard_renders(): void

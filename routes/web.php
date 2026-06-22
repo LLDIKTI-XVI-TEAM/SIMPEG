@@ -14,13 +14,13 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return auth()->check()
         ? redirect()->route('dashboard')
-        : redirect()->route('login');
+        : redirect()->route('auth.keycloak.redirect');
 })->name('home');
 
 Route::get('/login', function () {
     return auth()->check()
         ? redirect()->route('dashboard')
-        : view('auth.login');
+        : redirect()->route('auth.keycloak.redirect');
 })->name('login');
 
 Route::get('/auth/keycloak/redirect', [KeycloakAuthController::class, 'redirectToKeycloak'])->name('auth.keycloak.redirect');
