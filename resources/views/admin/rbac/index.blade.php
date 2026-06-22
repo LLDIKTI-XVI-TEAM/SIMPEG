@@ -1,5 +1,28 @@
 <x-layouts.app title="Role & Permission - Kelola Otorisasi Fitur">
 
+@php
+$permissionPaths = [
+    'manage_reference_tables' => 'Data Master',
+    'configure_ews'           => 'Konfigurasi EWS',
+    'manage_holidays'         => 'Hari Libur',
+    'manage_user_mapping'     => 'User Management',
+    'manage_rbac'             => 'Role & Permission',
+    'view_audit_log'          => 'Audit Log',
+    'view_all_pegawai'        => 'Data Pegawai (Lihat)',
+    'manage_pegawai'          => 'Data Pegawai (Kelola)',
+    'manage_riwayat'          => 'Data Pegawai (Riwayat)',
+    'import_pegawai'          => 'Import Pegawai',
+    'manage_supervisor'       => 'Data Pegawai (Supervisor)',
+    'manage_documents'        => 'Dokumen & SK',
+    'apply_cuti'              => 'Pengajuan Cuti',
+    'view_all_cuti'           => 'Rekap Cuti',
+    'approve_cuti_stage1'     => 'Approval Cuti (Stage 1)',
+    'approve_cuti_stage3'     => 'Approval Cuti (Stage 3)',
+    'view_all_ews'            => 'EWS Aktif',
+    'generate_reports'        => 'Laporan (Export)',
+];
+@endphp
+
     <div x-data="{
         searchQuery: '',
         originalData: {},
@@ -145,11 +168,17 @@
                             @php $globalIndex = 1; @endphp
                             @foreach($permissionsByModule as $moduleName => $perms)
                                 @php
-                                    $permsJson = json_encode($perms->map(fn($p) => ['name' => $p->name, 'description' => $p->description])->toArray());
+                                    $permsJson = json_encode($perms->map(function($p) use ($permissionPaths) {
+                                        return [
+                                            'name' => $p->name,
+                                            'display' => $permissionPaths[$p->name] ?? $p->name,
+                                            'description' => $p->description
+                                        ];
+                                    })->toArray());
                                 @endphp
                                 <tbody class="divide-y divide-border border-b border-border" x-data="{ perms: {{ $permsJson }} }">
                                     {{-- Module Header Row --}}
-                                    <tr x-show="searchQuery === '' || perms.some(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || (p.description || '').toLowerCase().includes(searchQuery.toLowerCase()))" 
+                                    <tr x-show="searchQuery === '' || perms.some(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.display.toLowerCase().includes(searchQuery.toLowerCase()) || (p.description || '').toLowerCase().includes(searchQuery.toLowerCase()))" 
                                         class="bg-soft/50 font-semibold">
                                         <td class="px-4 py-2 text-xs font-bold text-ink uppercase tracking-wider font-sans border-b border-border" colspan="2">
                                             📁 &nbsp;{{ $moduleName }}
@@ -161,11 +190,14 @@
                                     
                                     {{-- Permission Rows --}}
                                     @foreach($perms as $permission)
-                                        <tr x-show="searchQuery === '' || '{{ strtolower($permission->name) }}'.includes(searchQuery.toLowerCase()) || '{{ strtolower($permission->description) }}'.includes(searchQuery.toLowerCase())"
+                                        @php
+                                            $displayPath = $permissionPaths[$permission->name] ?? $permission->name;
+                                        @endphp
+                                        <tr x-show="searchQuery === '' || '{{ strtolower($permission->name) }}'.includes(searchQuery.toLowerCase()) || '{{ strtolower($displayPath) }}'.includes(searchQuery.toLowerCase()) || '{{ strtolower($permission->description) }}'.includes(searchQuery.toLowerCase())"
                                             class="hover:bg-soft/30 transition-colors">
                                             <td class="px-4 py-3.5 text-xs font-mono text-muted">{{ $globalIndex++ }}</td>
                                             <td class="px-4 py-3.5 text-xs font-sans">
-                                                <div class="font-bold text-primary font-mono text-[11px]">{{ $permission->name }}</div>
+                                                <div class="font-bold text-primary font-mono text-[11px]">{{ $displayPath }}</div>
                                                 <div class="text-[10px] text-muted mt-0.5 leading-relaxed">{{ $permission->description }}</div>
                                             </td>
                                             @foreach($roles as $role)
