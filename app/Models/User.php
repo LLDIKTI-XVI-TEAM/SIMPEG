@@ -57,4 +57,20 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Employee::class);
     }
+
+    /**
+     * Mengecek apakah role pengguna memiliki permission tertentu.
+     * Fail-closed: role kosong atau tidak terdaftar selalu mengembalikan false.
+     */
+    public function hasPermission(string $permission): bool
+    {
+        if ($this->role === null || $this->role === '') {
+            return false;
+        }
+
+        return Role::query()
+            ->where('name', $this->role)
+            ->whereHas('permissions', fn ($query) => $query->where('name', $permission))
+            ->exists();
+    }
 }

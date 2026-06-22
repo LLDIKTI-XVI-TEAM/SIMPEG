@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Employee;
 use App\Models\RefJenisPegawai;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -20,6 +21,8 @@ class EmployeeCreationTest extends TestCase
         parent::setUp();
 
         $this->seed(ReferenceSeeder::class);
+        // Seed RBAC agar permission employees.create tersedia untuk middleware permission.
+        $this->seed(RbacSeeder::class);
     }
 
     public function test_guest_cannot_create_employee(): void
