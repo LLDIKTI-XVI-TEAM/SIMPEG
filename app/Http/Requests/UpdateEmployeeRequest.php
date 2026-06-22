@@ -10,6 +10,11 @@ class UpdateEmployeeRequest extends FormRequest
 {
     public function authorize(): bool
     {
+        if (app()->environment('local')
+            && filter_var(env('SIMPEG_DISABLE_EMPLOYEE_API_AUTH', false), FILTER_VALIDATE_BOOLEAN)) {
+            return true;
+        }
+
         $user = $this->user();
 
         return $user !== null
