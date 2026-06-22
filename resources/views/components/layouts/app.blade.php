@@ -131,7 +131,7 @@
                     'items' => [
                         ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users'],
                         ['label' => 'Import Pegawai', 'route' => 'pegawai.import', 'icon' => 'arrow-up-tray'],
-                        ['label' => 'Data Nonaktif / Restore', 'route' => 'data-nonaktif', 'icon' => 'user-minus'],
+                        ['label' => 'Data Nonaktif', 'route' => 'data-nonaktif', 'icon' => 'user-minus'],
                         ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open'],
                     ]
                 ],
@@ -164,7 +164,7 @@
                     'items' => [
                         ['label' => 'User Management', 'route' => 'user-management', 'icon' => 'shield-check'],
                         ['label' => 'Role & Permission', 'route' => 'rbac', 'icon' => 'key'],
-                        ['label' => 'Data Master / Reference Tables', 'route' => 'data-master', 'icon' => 'table-cells'],
+                        ['label' => 'Data Master', 'route' => 'data-master', 'icon' => 'table-cells'],
                         ['label' => 'Hari Libur', 'route' => 'hari-libur', 'icon' => 'calendar-days'],
                         ['label' => 'Pengaturan Sistem', 'route' => 'pengaturan', 'icon' => 'cog-6-tooth'],
                         ['label' => 'Audit Log', 'route' => 'audit-log', 'icon' => 'clipboard-document-list'],

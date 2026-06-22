@@ -61,6 +61,71 @@ Route::middleware('keycloak.auth')->group(function (): void {
         return view('admin.pegawai.import');
     })->name('pegawai.import');
 
+    Route::get('/pegawai/import/template/{type}', function ($type) {
+        $headers = [];
+        $filename = 'template_' . $type . '.xlsx';
+        
+        if ($type === 'utama') {
+            $headers = ['No', 'Nama Pegawai', 'Email Pegawai', 'Golongan', 'Jabatan', 'Kelas Jabatan', 'NIP', 'Nomor Telepon', 'Pangkat', 'Pendidikan Terakhir', 'Pensiun', 'Person', 'Person Formula', 'Prodi Pendidikan Terakhir', 'Status Kepegawaian', 'Tanggal Lahir'];
+        } elseif ($type === 'pelengkap') {
+            $headers = ['NIP', 'NIK', 'No KK', 'Tempat Lahir', 'Jenis Kelamin', 'Agama', 'Status Kawin', 'Golongan Darah'];
+        } elseif ($type === 'kepangkatan') {
+            $headers = ['NIP', 'Golongan', 'TMT Pangkat', 'No SK', 'Tanggal SK'];
+        } elseif ($type === 'jabatan') {
+            $headers = ['NIP', 'Nama Jabatan', 'Jenis Jabatan', 'Unit Kerja', 'TMT Jabatan', 'No SK', 'Tanggal SK'];
+        } elseif ($type === 'kgb') {
+            $headers = ['NIP', 'TMT KGB', 'Gaji Pokok', 'No SK', 'Tanggal SK'];
+        } else {
+            abort(404);
+        }
+        
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Template ' . ucfirst($type));
+        
+        // Write headers
+        foreach ($headers as $index => $header) {
+            $colLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($index + 1);
+            $sheet->setCellValue($colLetter . '1', $header);
+            
+            // Set header style (Primary Blue background, white bold text, centered, borders)
+            $sheet->getStyle($colLetter . '1')->applyFromArray([
+                'font'      => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 10, 'name' => 'Calibri'],
+                'fill'      => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '122E92']],
+                'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER, 'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER, 'wrapText' => true],
+                'borders'   => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['rgb' => 'CACFE0']]],
+            ]);
+            
+            // Auto fit column width
+            $sheet->getColumnDimension($colLetter)->setAutoSize(true);
+        }
+        
+        $sheet->getRowDimension(1)->setRowHeight(30);
+        
+        // Add styled blank rows (e.g. 15 blank rows) with borders for a structured layout
+        $lastColLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count($headers));
+        for ($r = 2; $r <= 16; $r++) {
+            $sheet->getRowDimension($r)->setRowHeight(20);
+            
+            // Set border
+            $sheet->getStyle('A' . $r . ':' . $lastColLetter . $r)->applyFromArray([
+                'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['rgb' => 'E5E7EB']]],
+            ]);
+        }
+        
+        // Stream download
+        return response()->streamDownload(function () use ($spreadsheet) {
+            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+            $writer->save('php://output');
+        }, $filename, [
+            'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Cache-Control'       => 'no-cache, no-store, must-revalidate',
+            'Pragma'              => 'no-cache',
+            'Expires'             => '0',
+        ]);
+    })->name('pegawai.import-template');
+
     Route::get('/ews-warning', function () {
         return redirect()->route('data-pegawai', ['filter' => 'ews']);
     })->name('ews');
