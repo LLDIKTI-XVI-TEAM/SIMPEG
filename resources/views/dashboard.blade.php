@@ -552,8 +552,8 @@
                         $pegawaiList = [
                             ['id' => 1, 'nama' => 'Ahmad Fauzi',                  'nip' => '19850312 201001 1 001', 'jabatan' => 'Analis Kepegawaian',             'unit' => 'Bag. Umum',     'jenis' => 'PNS',   'golongan' => 'III/c', 'status' => 'aktif'],
                             ['id' => 2, 'nama' => 'Siti Rahayu',                  'nip' => '19901120 201501 2 003', 'jabatan' => 'Analis Ahli Madya',              'unit' => 'Bag. Keuangan', 'jenis' => 'PNS',   'golongan' => 'II/d',  'status' => 'aktif'],
-                            ['id' => 3, 'nama' => 'Sabrina Rossa Adriani Wibowo', 'nip' => '20261210 820500 0 04',  'jabatan' => 'Analis SDM Aparatur Ahli Pertama', 'unit' => 'Bag. SDM',      'jenis' => 'CPNS',  'golongan' => 'III/a', 'status' => 'aktif'],
-                            ['id' => 4, 'nama' => 'Cimma Sari Oktariani Di Silapu', 'nip' => '26110820 520600 0 04',  'jabatan' => 'Pranata SDM Terampil',           'unit' => 'Bag. IT',       'jenis' => 'CPNS',  'golongan' => 'III/c', 'status' => 'aktif'],
+                            ['id' => 3, 'nama' => 'Sabrina Rossa Adriani Wibowo', 'nip' => '20261210 820500 0 04',  'jabatan' => 'Analis SDM Aparatur Ahli Pertama', 'unit' => 'Bag. SDM',      'jenis' => 'PNS',  'golongan' => 'III/a', 'status' => 'aktif'],
+                            ['id' => 4, 'nama' => 'Cimma Sari Oktariani Di Silapu', 'nip' => '26110820 520600 0 04',  'jabatan' => 'Pranata SDM Terampil',           'unit' => 'Bag. IT',       'jenis' => 'PNS',  'golongan' => 'III/c', 'status' => 'aktif'],
                             ['id' => 5, 'nama' => 'Nurarningsih Dumbea, S.P.',    'nip' => '19930315 201903 2 002', 'jabatan' => 'Pejabat Lelang Operational',     'unit' => 'Bag. Umum',     'jenis' => 'PPPK',  'golongan' => 'II/b',  'status' => 'aktif'],
                         ];
                         @endphp

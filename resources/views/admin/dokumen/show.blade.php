@@ -36,6 +36,15 @@
             {{-- Metadata --}}
             <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 <div class="space-y-0.5">
+                    <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Pemilik Dokumen (Pegawai)</span>
+                    <p class="text-sm font-semibold text-ink font-sans">{{ $doc['nama_pegawai'] ?? '-' }}</p>
+                    <p class="text-xs text-muted font-mono">{{ $doc['nip_pegawai'] ?? '-' }}</p>
+                </div>
+                <div class="space-y-0.5">
+                    <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Unit Kerja</span>
+                    <p class="text-sm font-semibold text-ink font-sans">{{ $doc['unit_pegawai'] ?? '-' }}</p>
+                </div>
+                <div class="space-y-0.5">
                     <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Nomor Dokumen</span>
                     <p class="text-sm font-semibold text-ink font-mono">{{ $doc['nomor'] }}</p>
                 </div>

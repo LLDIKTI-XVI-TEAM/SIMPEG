@@ -32,12 +32,12 @@
                     $statusClass = [
                         'menunggu' => 'bg-warning/10 text-warning border border-warning/20',
                         'disetujui' => 'bg-success/10 text-success border border-success/20',
-                        'ditolak' => 'bg-danger/10 text-danger border border-danger/20'
+                        'ditunda' => 'bg-warning/10 text-warning border border-warning/20'
                     ];
                     $statusLabel = [
                         'menunggu' => 'Menunggu Persetujuan',
                         'disetujui' => 'Disetujui',
-                        'ditolak' => 'Ditolak'
+                        'ditunda' => 'Ditunda'
                     ];
                     $stClass = $statusClass[$c['status']] ?? 'bg-soft text-muted';
                     $stLabel = $statusLabel[$c['status']] ?? $c['status'];
@@ -99,12 +99,12 @@
                                 <p class="text-xs font-bold text-ink font-sans">Disetujui oleh Atasan Langsung</p>
                                 <p class="text-[10px] text-muted font-sans mt-0.5">Siti Rahayu — Kepala Subbagian Keuangan</p>
                             </div>
-                        @elseif($c['status'] === 'ditolak')
-                            <div class="absolute -left-[22px] top-1.5 h-3 w-3 rounded-full border-2 border-danger bg-surface flex items-center justify-center">
-                                <div class="h-1 w-1 rounded-full bg-danger"></div>
+                        @elseif($c['status'] === 'ditunda')
+                            <div class="absolute -left-[22px] top-1.5 h-3 w-3 rounded-full border-2 border-warning bg-surface flex items-center justify-center">
+                                <div class="h-1 w-1 rounded-full bg-warning"></div>
                             </div>
                             <div class="pl-3">
-                                <p class="text-xs font-bold text-danger font-sans">Ditolak oleh Atasan Langsung</p>
+                                <p class="text-xs font-bold text-warning font-sans">Ditunda oleh Atasan Langsung</p>
                                 <p class="text-[10px] text-muted font-sans mt-0.5">Siti Rahayu — Kepala Subbagian Keuangan</p>
                             </div>
                         @else
