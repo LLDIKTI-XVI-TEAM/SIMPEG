@@ -148,7 +148,10 @@ Route::middleware('keycloak.auth')->group(function (): void {
     Route::post('/rbac/update', [RbacController::class, 'update'])->name('rbac.update');
 
     Route::get('/data-master', function () {
-        return view('dummy', ['title' => 'Reference Tables / Data Master']);
+        if (session('active_role') !== 'Super Admin') {
+            abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
+        }
+        return view('admin.data-master.index');
     })->name('data-master');
 
     Route::get('/cuti/konfigurasi', function () {
