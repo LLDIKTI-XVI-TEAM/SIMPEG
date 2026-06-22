@@ -76,7 +76,6 @@
                     'user-management',
                     'rbac',
                     'data-nonaktif',
-                    'cuti.config',
                     'ews.config',
                 ],
                 'Atasan Langsung' => [
@@ -89,7 +88,6 @@
                     'rbac',
                     'data-nonaktif',
                     'data-master',
-                    'cuti.config',
                     'laporan',
                     'laporan.pegawai',
                     'laporan.cuti',
@@ -102,7 +100,6 @@
                     'dokumen',
                     'cuti.approval',
                     'cuti.rekap',
-                    'cuti.config',
                     'ews',
                     'ews.config',
                     'laporan',
@@ -140,7 +137,6 @@
                     'items' => [
                         ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
                         ['label' => 'Rekap Cuti', 'route' => 'cuti.rekap', 'icon' => 'document-text'],
-                        ['label' => 'Konfigurasi Approval', 'route' => 'cuti.config', 'icon' => 'adjustments-horizontal'],
                     ]
                 ],
                 [

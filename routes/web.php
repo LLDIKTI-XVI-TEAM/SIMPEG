@@ -154,10 +154,6 @@ Route::middleware('keycloak.auth')->group(function (): void {
         return view('admin.data-master.index');
     })->name('data-master');
 
-    Route::get('/cuti/konfigurasi', function () {
-        return view('admin.cuti.konfigurasi');
-    })->name('cuti.config');
-
     Route::get('/pegawai/nonaktif-list', function () {
         return view('admin.pegawai.nonaktif');
     })->name('data-nonaktif');
