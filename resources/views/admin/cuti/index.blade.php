@@ -126,13 +126,13 @@
     $statusClass = [
         'menunggu'  => 'bg-warning/10 text-warning',
         'disetujui' => 'bg-success/10 text-success',
-        'ditunda'   => 'bg-warning/10 text-warning',
+        'ditunda'   => 'bg-danger/10 text-danger',
     ];
 
     $statusDot = [
         'menunggu'  => 'bg-warning',
         'disetujui' => 'bg-success',
-        'ditunda'   => 'bg-warning',
+        'ditunda'   => 'bg-danger',
     ];
 
     $statusLabel = [
@@ -144,7 +144,7 @@
     $stageClass = [
         'menunggu' => 'bg-soft text-muted',
         'disetujui' => 'bg-success/10 text-success',
-        'ditunda' => 'bg-warning/10 text-warning',
+        'ditunda' => 'bg-danger/10 text-danger',
     ];
 
     $stageLabel = [
@@ -180,7 +180,7 @@
         </div>
 
         {{-- METRICS SUMMARY CARD (GLOBAL MONITORING) --}}
-        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
             {{-- Pending --}}
             <div class="rounded-lg border border-border bg-surface p-5 shadow-sm flex flex-col justify-between">
                 <div class="flex items-center justify-between">
@@ -212,10 +212,10 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Ditunda</p>
-                        <p class="mt-1.5 text-2xl font-extrabold text-warning leading-none font-mono">2</p>
+                        <p class="mt-1.5 text-2xl font-extrabold text-danger leading-none font-mono">2</p>
                     </div>
-                    <div class="rounded-lg bg-warning/10 p-2.5 shrink-0">
-                        <svg class="w-6 h-6 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" /></svg>
+                    <div class="rounded-lg bg-danger/10 p-2.5 shrink-0">
+                        <svg class="w-6 h-6 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" /></svg>
                     </div>
                 </div>
             </div>
@@ -359,14 +359,14 @@
                                 <div class="flex flex-col gap-1 text-[11px] font-medium text-ink font-sans">
                                     <div class="flex items-center gap-1.5">
                                         @php
-                                        $dotAtasan = $r['stage_atasan'] === 'disetujui' ? 'bg-success' : ($r['stage_atasan'] === 'ditunda' ? 'bg-warning' : 'bg-muted');
+                                        $dotAtasan = $r['stage_atasan'] === 'disetujui' ? 'bg-success' : ($r['stage_atasan'] === 'ditunda' ? 'bg-danger' : 'bg-muted');
                                         @endphp
                                         <span class="h-1.5 w-1.5 rounded-full {{ $dotAtasan }}"></span>
                                         <span>Atasan: <strong class="capitalize">{{ $r['stage_atasan'] }}</strong></span>
                                     </div>
                                     <div class="flex items-center gap-1.5">
                                         @php
-                                        $dotKepala = $r['stage_kepala'] === 'disetujui' ? 'bg-success' : ($r['stage_kepala'] === 'ditunda' ? 'bg-warning' : 'bg-muted');
+                                        $dotKepala = $r['stage_kepala'] === 'disetujui' ? 'bg-success' : ($r['stage_kepala'] === 'ditunda' ? 'bg-danger' : 'bg-muted');
                                         @endphp
                                         <span class="h-1.5 w-1.5 rounded-full {{ $dotKepala }}"></span>
                                         <span>Kepala: <strong class="capitalize">{{ $r['stage_kepala'] }}</strong></span>

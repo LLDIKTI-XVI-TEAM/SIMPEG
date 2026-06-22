@@ -32,7 +32,7 @@
                     $statusClass = [
                         'menunggu' => 'bg-warning/10 text-warning border border-warning/20',
                         'disetujui' => 'bg-success/10 text-success border border-success/20',
-                        'ditunda' => 'bg-warning/10 text-warning border border-warning/20'
+                        'ditunda' => 'bg-danger/10 text-danger border border-danger/20'
                     ];
                     $statusLabel = [
                         'menunggu' => 'Menunggu Persetujuan',
@@ -100,11 +100,11 @@
                                 <p class="text-[10px] text-muted font-sans mt-0.5">Siti Rahayu — Kepala Subbagian Keuangan</p>
                             </div>
                         @elseif($c['status'] === 'ditunda')
-                            <div class="absolute -left-[22px] top-1.5 h-3 w-3 rounded-full border-2 border-warning bg-surface flex items-center justify-center">
-                                <div class="h-1 w-1 rounded-full bg-warning"></div>
+                            <div class="absolute -left-[22px] top-1.5 h-3 w-3 rounded-full border-2 border-danger bg-surface flex items-center justify-center">
+                                <div class="h-1 w-1 rounded-full bg-danger"></div>
                             </div>
                             <div class="pl-3">
-                                <p class="text-xs font-bold text-warning font-sans">Ditunda oleh Atasan Langsung</p>
+                                <p class="text-xs font-bold text-danger font-sans">Ditunda oleh Atasan Langsung</p>
                                 <p class="text-[10px] text-muted font-sans mt-0.5">Siti Rahayu — Kepala Subbagian Keuangan</p>
                             </div>
                         @else
@@ -145,11 +145,6 @@
                 <a href="{{ route('cuti') }}" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-5 py-2.5 text-sm font-semibold text-primary transition hover:bg-soft">
                     Kembali ke Daftar
                 </a>
-                @if($c['status'] === 'menunggu')
-                    <a href="{{ route('cuti.approval') }}" class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
-                        Otorisasi Persetujuan
-                    </a>
-                @endif
             </div>
         </div>
     </div>

@@ -76,7 +76,6 @@
                     'user-management',
                     'rbac',
                     'data-nonaktif',
-                    'cuti.config',
                     'ews.config',
                 ],
                 'Atasan Langsung' => [
@@ -89,7 +88,6 @@
                     'rbac',
                     'data-nonaktif',
                     'data-master',
-                    'cuti.config',
                     'laporan',
                     'laporan.pegawai',
                     'laporan.cuti',
@@ -100,9 +98,7 @@
                     'pegawai.import',
                     'data-nonaktif',
                     'dokumen',
-                    'cuti.approval',
                     'cuti.rekap',
-                    'cuti.config',
                     'ews',
                     'ews.config',
                     'laporan',
@@ -139,9 +135,7 @@
                     'group' => 'Cuti',
                     'items' => [
                         ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
-                        ['label' => 'Approval Cuti', 'route' => 'cuti.approval', 'icon' => 'check-badge'],
                         ['label' => 'Rekap Cuti', 'route' => 'cuti.rekap', 'icon' => 'document-text'],
-                        ['label' => 'Konfigurasi Approval', 'route' => 'cuti.config', 'icon' => 'adjustments-horizontal'],
                     ]
                 ],
                 [
@@ -173,8 +167,8 @@
             ];
 
             $allMenuRoutes = [];
-            foreach ($menuGroups as $group) {
-                foreach ($group['items'] as $item) {
+            foreach ($menuGroups as $g) {
+                foreach ($g['items'] as $item) {
                     $allMenuRoutes[] = $item['route'];
                 }
             }
@@ -194,20 +188,20 @@
                             
                             $isActive = false;
                             if ($routeExists && !$isLocked) {
-                                if (request()->routeIs($menu['route'])) {
+                                $currentRoute = request()->route() ? request()->route()->getName() : null;
+                                if ($currentRoute === $menu['route']) {
                                     $isActive = true;
-                                } elseif (request()->routeIs($menu['route'] . '*')) {
-                                    $currentRouteName = request()->route() ? request()->route()->getName() : '';
-                                    $isAnotherMenuRoute = false;
+                                } elseif ($currentRoute && str_starts_with($currentRoute, $menu['route'] . '.')) {
+                                    $hasMoreSpecific = false;
                                     foreach ($allMenuRoutes as $otherRoute) {
-                                        if ($otherRoute !== $menu['route'] && str_starts_with($otherRoute, $menu['route'] . '.')) {
-                                            if ($currentRouteName === $otherRoute || str_starts_with($currentRouteName, $otherRoute . '.')) {
-                                                $isAnotherMenuRoute = true;
-                                                break;
-                                            }
+                                        if ($otherRoute !== $menu['route'] && 
+                                            str_starts_with($otherRoute, $menu['route'] . '.') && 
+                                            ($currentRoute === $otherRoute || str_starts_with($currentRoute, $otherRoute . '.'))) {
+                                            $hasMoreSpecific = true;
+                                            break;
                                         }
                                     }
-                                    if (!$isAnotherMenuRoute) {
+                                    if (!$hasMoreSpecific) {
                                         $isActive = true;
                                     }
                                 }
