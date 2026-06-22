@@ -136,51 +136,79 @@
                         {{-- Tanggal Lahir --}}
                         <div class="space-y-1">
                             <label for="tanggal_lahir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Lahir <span class="text-danger">*</span></label>
-                            <input id="tanggal_lahir" name="tanggal_lahir" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <input id="tanggal_lahir" name="tanggal_lahir" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
                         </div>
 
                         {{-- Jenis Kelamin --}}
                         <div class="space-y-1">
                             <label for="jenis_kelamin" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Kelamin</label>
-                            <select id="jenis_kelamin" name="jenis_kelamin" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                <option value="Laki-laki">Laki-laki</option>
-                                <option value="Perempuan">Perempuan</option>
-                            </select>
+                            <div class="relative">
+                                <select id="jenis_kelamin" name="jenis_kelamin" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="Laki-laki">Laki-laki</option>
+                                    <option value="Perempuan">Perempuan</option>
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                                    </svg>
+                                </div>
+                            </div>
                         </div>
 
                         {{-- Agama --}}
                         <div class="space-y-1">
                             <label for="agama" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Agama</label>
-                            <select id="agama" name="agama" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                <option value="Islam">Islam</option>
-                                <option value="Kristen">Kristen</option>
-                                <option value="Katolik">Katolik</option>
-                                <option value="Hindu">Hindu</option>
-                                <option value="Buddha">Buddha</option>
-                                <option value="Khonghucu">Khonghucu</option>
-                            </select>
+                            <div class="relative">
+                                <select id="agama" name="agama" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="Islam">Islam</option>
+                                    <option value="Kristen">Kristen</option>
+                                    <option value="Katolik">Katolik</option>
+                                    <option value="Hindu">Hindu</option>
+                                    <option value="Buddha">Buddha</option>
+                                    <option value="Khonghucu">Khonghucu</option>
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                                    </svg>
+                                </div>
+                            </div>
                         </div>
 
                         {{-- Status Pernikahan --}}
                         <div class="space-y-1">
                             <label for="status_kawin" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Status Kawin</label>
-                            <select id="status_kawin" name="status_kawin" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                <option value="Belum Kawin">Belum Kawin</option>
-                                <option value="Kawin">Kawin</option>
-                                <option value="Cerai Hidup">Cerai Hidup</option>
-                                <option value="Cerai Mati">Cerai Mati</option>
-                            </select>
+                            <div class="relative">
+                                <select id="status_kawin" name="status_kawin" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="Belum Kawin">Belum Kawin</option>
+                                    <option value="Kawin">Kawin</option>
+                                    <option value="Cerai Hidup">Cerai Hidup</option>
+                                    <option value="Cerai Mati">Cerai Mati</option>
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                                    </svg>
+                                </div>
+                            </div>
                         </div>
 
                         {{-- Golongan Darah --}}
                         <div class="space-y-1">
                             <label for="golongan_darah" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Golongan Darah</label>
-                            <select id="golongan_darah" name="golongan_darah" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                <option value="A">A</option>
-                                <option value="B">B</option>
-                                <option value="AB">AB</option>
-                                <option value="O">O</option>
-                            </select>
+                            <div class="relative">
+                                <select id="golongan_darah" name="golongan_darah" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="A">A</option>
+                                    <option value="B">B</option>
+                                    <option value="AB">AB</option>
+                                    <option value="O">O</option>
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                                    </svg>
+                                </div>
+                            </div>
                         </div>
 
                         {{-- Email --}}
@@ -242,68 +270,96 @@
                         {{-- Unit Kerja --}}
                         <div class="space-y-1">
                             <label for="unit" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Unit Kerja <span class="text-danger">*</span></label>
-                            <select id="unit" name="unit" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                <option value="Bag. Umum">Bag. Umum</option>
-                                <option value="Bag. Keuangan">Bag. Keuangan</option>
-                                <option value="Bag. SDM">Bag. SDM</option>
-                                <option value="Bag. IT">Bag. IT</option>
-                            </select>
+                            <div class="relative">
+                                <select id="unit" name="unit" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="Bag. Umum">Bag. Umum</option>
+                                    <option value="Bag. Keuangan">Bag. Keuangan</option>
+                                    <option value="Bag. SDM">Bag. SDM</option>
+                                    <option value="Bag. IT">Bag. IT</option>
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                                    </svg>
+                                </div>
+                            </div>
                         </div>
 
                         {{-- Golongan --}}
                         <div class="space-y-1">
                             <label for="golongan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Golongan <span class="text-danger">*</span></label>
-                            <select id="golongan" name="golongan" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                <option value="I/a">I/a</option>
-                                <option value="I/b">I/b</option>
-                                <option value="I/c">I/c</option>
-                                <option value="I/d">I/d</option>
-                                <option value="II/a">II/a</option>
-                                <option value="II/b">II/b</option>
-                                <option value="II/c">II/c</option>
-                                <option value="II/d">II/d</option>
-                                <option value="III/a">III/a</option>
-                                <option value="III/b">III/b</option>
-                                <option value="III/c">III/c</option>
-                                <option value="III/d">III/d</option>
-                                <option value="IV/a">IV/a</option>
-                                <option value="IV/b">IV/b</option>
-                                <option value="IV/c">IV/c</option>
-                                <option value="IV/d">IV/d</option>
-                                <option value="IV/e">IV/e</option>
-                            </select>
+                            <div class="relative">
+                                <select id="golongan" name="golongan" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="I/a">I/a</option>
+                                    <option value="I/b">I/b</option>
+                                    <option value="I/c">I/c</option>
+                                    <option value="I/d">I/d</option>
+                                    <option value="II/a">II/a</option>
+                                    <option value="II/b">II/b</option>
+                                    <option value="II/c">II/c</option>
+                                    <option value="II/d">II/d</option>
+                                    <option value="III/a">III/a</option>
+                                    <option value="III/b">III/b</option>
+                                    <option value="III/c">III/c</option>
+                                    <option value="III/d">III/d</option>
+                                    <option value="IV/a">IV/a</option>
+                                    <option value="IV/b">IV/b</option>
+                                    <option value="IV/c">IV/c</option>
+                                    <option value="IV/d">IV/d</option>
+                                    <option value="IV/e">IV/e</option>
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                                    </svg>
+                                </div>
+                            </div>
                         </div>
 
                         {{-- Jenis Kepegawaian --}}
                         <div class="space-y-1">
                             <label for="jenis" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Status Kepegawaian <span class="text-danger">*</span></label>
-                            <select id="jenis" name="jenis" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                <option value="PNS">PNS</option>
-                                <option value="PPPK">PPPK</option>
-                            </select>
+                            <div class="relative">
+                                <select id="jenis" name="jenis" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="PNS">PNS</option>
+                                    <option value="PPPK">PPPK</option>
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                                    </svg>
+                                </div>
+                            </div>
                         </div>
 
                         {{-- TMT --}}
                         <div class="space-y-1">
                             <label for="tmt" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Kepegawaian <span class="text-danger">*</span></label>
-                            <input id="tmt" name="tmt" type="date" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <input id="tmt" name="tmt" type="date" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
                         </div>
 
                         {{-- Jenis Pengangkatan --}}
                         <div class="space-y-1">
                             <label for="jenis_pengangkatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Pengangkatan</label>
-                            <select id="jenis_pengangkatan" name="jenis_pengangkatan" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                <option value="PNS Formasi Umum">PNS Formasi Umum</option>
-                                <option value="PPPK Tahap I">PPPK Tahap I</option>
-                                <option value="PPPK Tahap II">PPPK Tahap II</option>
-                                <option value="Pengangkatan Khusus">Pengangkatan Khusus</option>
-                            </select>
+                            <div class="relative">
+                                <select id="jenis_pengangkatan" name="jenis_pengangkatan" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="PNS Formasi Umum">PNS Formasi Umum</option>
+                                    <option value="PPPK Tahap I">PPPK Tahap I</option>
+                                    <option value="PPPK Tahap II">PPPK Tahap II</option>
+                                    <option value="Pengangkatan Khusus">Pengangkatan Khusus</option>
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                                    </svg>
+                                </div>
+                            </div>
                         </div>
 
                         {{-- Tanggal Pensiun --}}
                         <div class="space-y-1">
                             <label for="tanggal_pensiun" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Pensiun</label>
-                            <input id="tanggal_pensiun" name="tanggal_pensiun" type="date" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <input id="tanggal_pensiun" name="tanggal_pensiun" type="date" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
                         </div>
                     </div>
                 </div>
@@ -320,7 +376,7 @@
                         {{-- Tanggal SK --}}
                         <div class="space-y-1">
                             <label for="tanggal_sk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK Terbit</label>
-                            <input id="tanggal_sk" name="tanggal_sk" type="date" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <input id="tanggal_sk" name="tanggal_sk" type="date" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
                         </div>
 
                         {{-- Upload File SK --}}
@@ -354,13 +410,20 @@
                         {{-- Pendidikan Terakhir --}}
                         <div class="space-y-1">
                             <label for="pendidikan_terakhir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Pendidikan Terakhir</label>
-                            <select id="pendidikan_terakhir" name="pendidikan_terakhir" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                <option value="Diploma III (D3)">Diploma III (D3)</option>
-                                <option value="Sarjana (S1)">Sarjana (S1)</option>
-                                <option value="Magister (S2)">Magister (S2)</option>
-                                <option value="Doktor (S3)">Doktor (S3)</option>
-                                <option value="SMA / Sederajat">SMA / Sederajat</option>
-                            </select>
+                            <div class="relative">
+                                <select id="pendidikan_terakhir" name="pendidikan_terakhir" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="Diploma III (D3)">Diploma III (D3)</option>
+                                    <option value="Sarjana (S1)">Sarjana (S1)</option>
+                                    <option value="Magister (S2)">Magister (S2)</option>
+                                    <option value="Doktor (S3)">Doktor (S3)</option>
+                                    <option value="SMA / Sederajat">SMA / Sederajat</option>
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                                    </svg>
+                                </div>
+                            </div>
                         </div>
 
                         {{-- Program Studi --}}
@@ -383,7 +446,7 @@
                         <button type="button" 
                                 x-show="activeTab !== 'diri'" 
                                 @click="activeTab = activeTab === 'pendidikan' ? 'sk' : (activeTab === 'sk' ? 'kepegawaian' : 'diri')" 
-                                class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-semibold text-ink transition hover:bg-soft shadow-sm font-sans">
+                                class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-semibold text-ink transition hover:bg-soft shadow-sm font-sans cursor-pointer">
                             Sebelumnya
                         </button>
                         
@@ -391,14 +454,14 @@
                         <button type="button" 
                                 x-show="activeTab !== 'pendidikan'" 
                                 @click="activeTab = activeTab === 'diri' ? 'kepegawaian' : (activeTab === 'kepegawaian' ? 'sk' : 'pendidikan')" 
-                                class="inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm font-sans">
+                                class="inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm font-sans cursor-pointer">
                             Selanjutnya
                         </button>
 
                         {{-- Tombol Simpan --}}
                         <button type="submit" 
                                 x-show="activeTab === 'pendidikan'" 
-                                class="inline-flex items-center justify-center rounded-lg bg-success px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 font-sans">
+                                class="inline-flex items-center justify-center rounded-lg bg-success px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 font-sans cursor-pointer">
                             Simpan Pegawai
                         </button>
                     </div>
