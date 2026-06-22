@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasUuid;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -34,5 +35,29 @@ class SimpegNotification extends Model
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'user_id');
+    }
+
+    public function scopeUnread(Builder $query): Builder
+    {
+        return $query->where('is_read', false);
+    }
+
+    /**
+     * Bentuk respons API inbox; hanya memuat data notifikasi milik penerima.
+     *
+     * @return array<string, mixed>
+     */
+    public function toApiArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'type' => $this->type,
+            'title' => $this->title,
+            'body' => $this->body,
+            'data' => $this->data,
+            'is_read' => $this->is_read,
+            'read_at' => $this->read_at?->toISOString(),
+            'created_at' => $this->created_at?->toISOString(),
+        ];
     }
 }

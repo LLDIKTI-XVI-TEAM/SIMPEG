@@ -29,6 +29,8 @@ class RbacSeeder extends Seeder
             'hari_libur.update' => ['module' => 'hari_libur', 'description' => 'Mengubah hari libur dan cuti bersama'],
             'hari_libur.delete' => ['module' => 'hari_libur', 'description' => 'Menghapus hari libur dan cuti bersama'],
             'audit_logs.read' => ['module' => 'audit_logs', 'description' => 'Melihat audit log sistem'],
+            'notifications.read' => ['module' => 'notifications', 'description' => 'Melihat notifikasi milik sendiri'],
+            'notifications.update' => ['module' => 'notifications', 'description' => 'Menandai notifikasi milik sendiri sudah dibaca'],
         ];
 
         foreach ($roles as $name => $description) {
@@ -51,10 +53,12 @@ class RbacSeeder extends Seeder
                 'employees.update',
                 'employees.import',
                 'audit_logs.read',
+                'notifications.read',
+                'notifications.update',
             ],
-            'pimpinan' => [],
-            'atasan_langsung' => [],
-            'pegawai' => [],
+            'pimpinan' => ['notifications.read', 'notifications.update'],
+            'atasan_langsung' => ['notifications.read', 'notifications.update'],
+            'pegawai' => ['notifications.read', 'notifications.update'],
         ]);
     }
 

@@ -153,7 +153,7 @@ class Employee extends Model
 
     public function notifications(): HasMany
     {
-        return $this->hasMany(Notification::class, 'user_id');
+        return $this->hasMany(SimpegNotification::class, 'user_id');
     }
 
     // --- Helpers ---

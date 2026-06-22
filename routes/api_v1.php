@@ -4,6 +4,7 @@ use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\EmployeeImportController;
 use App\Http\Controllers\HariLiburController;
+use App\Http\Controllers\NotificationController;
 use Illuminate\Support\Facades\Route;
 
 $disableEmployeeApiAuth = app()->environment('local')
@@ -56,3 +57,22 @@ Route::middleware(['web', 'keycloak.auth', 'role:super_admin'])
 Route::middleware(['web', 'keycloak.auth', 'role:super_admin,admin_kepegawaian', 'permission:audit_logs.read'])
     ->get('/audit-logs', [AuditLogController::class, 'index'])
     ->name('audit-logs.index');
+
+Route::middleware(['web', 'keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan,atasan_langsung,pegawai'])
+    ->prefix('notifications')
+    ->name('notifications.')
+    ->group(function (): void {
+        Route::get('/', [NotificationController::class, 'index'])
+            ->middleware('permission:notifications.read')
+            ->name('index');
+        Route::get('/unread-count', [NotificationController::class, 'unreadCount'])
+            ->middleware('permission:notifications.read')
+            ->name('unread-count');
+        Route::patch('/read-all', [NotificationController::class, 'markAllAsRead'])
+            ->middleware('permission:notifications.update')
+            ->name('read-all');
+        Route::patch('/{notificationId}/read', [NotificationController::class, 'markAsRead'])
+            ->middleware('permission:notifications.update')
+            ->whereUuid('notificationId')
+            ->name('read');
+    });
