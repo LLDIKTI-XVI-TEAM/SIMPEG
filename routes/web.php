@@ -147,7 +147,7 @@ Route::middleware('keycloak.auth')->group(function (): void {
     })->name('data-master');
 
     Route::get('/cuti/konfigurasi', function () {
-        return view('dummy', ['title' => 'Konfigurasi Approval Cuti']);
+        return view('admin.cuti.konfigurasi');
     })->name('cuti.config');
 
     Route::get('/pegawai/nonaktif-list', function () {
@@ -155,7 +155,7 @@ Route::middleware('keycloak.auth')->group(function (): void {
     })->name('data-nonaktif');
 
     Route::get('/cuti/rekap', function () {
-        return view('dummy', ['title' => 'Rekap Cuti']);
+        return view('admin.cuti.rekap');
     })->name('cuti.rekap');
 
     Route::get('/ews/konfigurasi', function () {
@@ -194,9 +194,6 @@ Route::middleware('keycloak.auth')->group(function (): void {
 
     Route::get('/dashboard/cuti', [CutiController::class, 'index'])->name('cuti');
     Route::post('/dashboard/cuti', [CutiController::class, 'store'])->name('cuti.store');
-    Route::get('/dashboard/cuti/approval', [CutiController::class, 'approval'])->name('cuti.approval');
-    Route::post('/dashboard/cuti/approval/{id}/approve', [CutiController::class, 'approve'])->name('cuti.approve');
-    Route::post('/dashboard/cuti/approval/{id}/postpone', [CutiController::class, 'postpone'])->name('cuti.postpone');
     Route::get('/dashboard/cuti/{id}', [CutiController::class, 'show'])->name('cuti.show');
 
     Route::get('/dashboard/cuti/legacy', function () {
