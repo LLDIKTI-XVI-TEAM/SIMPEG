@@ -139,7 +139,6 @@
                     'group' => 'Cuti',
                     'items' => [
                         ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
-                        ['label' => 'Approval Cuti', 'route' => 'cuti.approval', 'icon' => 'check-badge'],
                         ['label' => 'Rekap Cuti', 'route' => 'cuti.rekap', 'icon' => 'document-text'],
                         ['label' => 'Konfigurasi Approval', 'route' => 'cuti.config', 'icon' => 'adjustments-horizontal'],
                     ]
