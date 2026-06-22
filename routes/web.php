@@ -49,6 +49,46 @@ Route::middleware('keycloak.auth')->group(function (): void {
         return view('dashboard');
     })->name('dashboard');
 
+    Route::get('/change-role/{role}', function ($role) {
+        $allowedRoles = ['Super Admin', 'Admin Kepegawaian', 'Pimpinan', 'Atasan Langsung', 'Pegawai'];
+        if (in_array($role, $allowedRoles)) {
+            session(['active_role' => $role]);
+        }
+        return back();
+    })->name('change-role');
+
+    Route::get('/pegawai/import-data', function () {
+        return view('dummy', ['title' => 'Import Data Pegawai']);
+    })->name('pegawai.import');
+
+    Route::get('/ews-warning', function () {
+        return redirect()->route('data-pegawai', ['filter' => 'ews']);
+    })->name('ews');
+
+    Route::get('/laporan-export', function () {
+        return view('dummy', ['title' => 'Laporan / Export']);
+    })->name('laporan');
+
+    Route::get('/user-management', function () {
+        return view('dummy', ['title' => 'User Management / Kelola Akses User']);
+    })->name('user-management');
+
+    Route::get('/rbac', function () {
+        return view('dummy', ['title' => 'Role & Permission / RBAC']);
+    })->name('rbac');
+
+    Route::get('/data-master', function () {
+        return view('dummy', ['title' => 'Reference Tables / Data Master']);
+    })->name('data-master');
+
+    Route::get('/cuti/konfigurasi', function () {
+        return view('dummy', ['title' => 'Konfigurasi Approval Cuti']);
+    })->name('cuti.config');
+
+    Route::get('/pegawai/nonaktif-list', function () {
+        return view('dummy', ['title' => 'Data Nonaktif / Restore Pegawai']);
+    })->name('data-nonaktif');
+
     Route::get('/pegawai', [PegawaiController::class, 'index'])->name('data-pegawai');
     Route::get('/pegawai/create', [PegawaiController::class, 'create'])->name('pegawai.create');
     Route::post('/pegawai', [PegawaiController::class, 'store'])->name('pegawai.store');
