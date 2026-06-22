@@ -156,8 +156,10 @@
             
             {{-- TAB: UMUM & INSTANSI --}}
             <div x-show="activeTab === 'umum'" class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6">
-                <div class="border-b border-border pb-4">
-                    <h2 class="text-base font-bold text-ink font-sans leading-tight">Pengaturan Umum & Instansi</h2>
+                <form action="{{ route('settings.update') }}" method="POST" class="space-y-6">
+                    @csrf
+                    <div class="border-b border-border pb-4">
+                        <h2 class="text-base font-bold text-ink font-sans leading-tight">Pengaturan Umum & Instansi</h2>
                     <p class="text-[11px] text-muted mt-0.5 font-sans leading-normal">Kelola profil lembaga LLDIKTI XVI dan parameter dasar server.</p>
                 </div>
 
@@ -198,17 +200,20 @@
                     </div>
                 </div>
 
-                <div class="border-t border-border pt-6 flex justify-end">
-                    <button class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 cursor-pointer focus:outline-none font-sans">
-                        Simpan Perubahan
-                    </button>
-                </div>
+                    <div class="border-t border-border pt-6 flex justify-end">
+                        <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 cursor-pointer focus:outline-none font-sans">
+                            Simpan Perubahan
+                        </button>
+                    </div>
+                </form>
             </div>
 
             {{-- TAB: ALUR APPROVAL CUTI --}}
             <div x-show="activeTab === 'cuti'" class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6" style="display: none;">
-                <div class="border-b border-border pb-4">
-                    <h2 class="text-base font-bold text-ink font-sans leading-tight">Alur Persetujuan Cuti</h2>
+                <form action="{{ route('settings.update') }}" method="POST" class="space-y-6">
+                    @csrf
+                    <div class="border-b border-border pb-4">
+                        <h2 class="text-base font-bold text-ink font-sans leading-tight">Alur Persetujuan Cuti</h2>
                     <p class="text-[11px] text-muted mt-0.5 font-sans leading-normal">Konfigurasi rantai otorisasi bertingkat (3 Stage) untuk pengajuan cuti pegawai.</p>
                 </div>
 
@@ -291,11 +296,12 @@
 
                 </div>
 
-                <div class="border-t border-border pt-6 flex justify-end">
-                    <button class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 cursor-pointer focus:outline-none font-sans">
-                        Simpan Kebijakan Cuti
-                    </button>
-                </div>
+                    <div class="border-t border-border pt-6 flex justify-end">
+                        <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 cursor-pointer focus:outline-none font-sans">
+                            Simpan Kebijakan Cuti
+                        </button>
+                    </div>
+                </form>
             </div>
 
             {{-- TAB: PEMETAAN SSO & RBAC --}}

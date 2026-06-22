@@ -1,6 +1,14 @@
 <?php
 
 use App\Http\Controllers\Auth\KeycloakAuthController;
+use App\Http\Controllers\Admin\PegawaiController;
+use App\Http\Controllers\Admin\HariLiburController;
+use App\Http\Controllers\Admin\CutiController;
+use App\Http\Controllers\Admin\DokumenController;
+use App\Http\Controllers\Admin\AuditController;
+use App\Http\Controllers\Admin\ProfileController;
+use App\Http\Controllers\Admin\SettingsController;
+use App\Http\Controllers\Admin\NotificationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -23,10 +31,13 @@ Route::get('/dev-login', function () {
     $user = \App\Models\User::first();
     if (!$user) {
         $user = \App\Models\User::create([
-            'name' => 'Demo User',
+            'name' => 'Demo Klabat',
             'email' => 'demo@example.com',
             'password' => bcrypt('password'),
         ]);
+    } else {
+        $user->name = 'Demo Klabat';
+        $user->save();
     }
     Auth::login($user);
     return redirect()->route('dashboard');
@@ -38,53 +49,89 @@ Route::middleware('keycloak.auth')->group(function (): void {
         return view('dashboard');
     })->name('dashboard');
 
-    Route::get('/pegawai', function () {
-        return view('pegawai.index');
+    Route::get('/pegawai', [PegawaiController::class, 'index'])->name('data-pegawai');
+    Route::get('/pegawai/create', [PegawaiController::class, 'create'])->name('pegawai.create');
+    Route::post('/pegawai', [PegawaiController::class, 'store'])->name('pegawai.store');
+    Route::get('/pegawai/{id}', [PegawaiController::class, 'show'])->name('pegawai.show');
+    Route::get('/pegawai/{id}/edit', [PegawaiController::class, 'edit'])->name('pegawai.edit');
+    Route::post('/pegawai/{id}', [PegawaiController::class, 'update'])->name('pegawai.update');
+    Route::post('/pegawai/{id}/delete', [PegawaiController::class, 'destroy'])->name('pegawai.destroy');
+
+    Route::get('/pegawai/legacy', function () {
+        return redirect()->route('data-pegawai');
     })->name('pegawai.index');
 
-    Route::get('/hari-libur', function () {
-        return view('hari-libur.index');
+    Route::get('/hari-libur', [HariLiburController::class, 'index'])->name('hari-libur');
+    Route::post('/hari-libur', [HariLiburController::class, 'store'])->name('hari-libur.store');
+    Route::get('/hari-libur/{id}/edit', [HariLiburController::class, 'edit'])->name('hari-libur.edit');
+    Route::post('/hari-libur/{id}', [HariLiburController::class, 'update'])->name('hari-libur.update');
+    Route::post('/hari-libur/{id}/delete', [HariLiburController::class, 'destroy'])->name('hari-libur.destroy');
+
+    Route::get('/hari-libur/legacy', function () {
+        return redirect()->route('hari-libur');
     })->name('hari-libur.index');
 
-    Route::get('/dashboard/cuti', function () {
-        return view('cuti.index');
+    Route::get('/dashboard/cuti', [CutiController::class, 'index'])->name('cuti');
+    Route::post('/dashboard/cuti', [CutiController::class, 'store'])->name('cuti.store');
+    Route::get('/dashboard/cuti/approval', [CutiController::class, 'approval'])->name('cuti.approval');
+    Route::post('/dashboard/cuti/approval/{id}/approve', [CutiController::class, 'approve'])->name('cuti.approve');
+    Route::post('/dashboard/cuti/approval/{id}/reject', [CutiController::class, 'reject'])->name('cuti.reject');
+    Route::get('/dashboard/cuti/{id}', [CutiController::class, 'show'])->name('cuti.show');
+
+    Route::get('/dashboard/cuti/legacy', function () {
+        return redirect()->route('cuti');
     })->name('cuti.index');
 
     Route::get('/cuti', function () {
-        return redirect()->route('cuti.index');
+        return redirect()->route('cuti');
     });
 
-    Route::get('/dashboard/dokumen', function () {
-        return view('dokumen.index');
+    Route::get('/dashboard/dokumen', [DokumenController::class, 'index'])->name('dokumen');
+    Route::post('/dashboard/dokumen/upload', [DokumenController::class, 'store'])->name('dokumen.store');
+    Route::get('/dashboard/dokumen/{id}', [DokumenController::class, 'show'])->name('dokumen.show');
+    Route::get('/dashboard/dokumen/{id}/download', [DokumenController::class, 'download'])->name('dokumen.download');
+
+    Route::get('/dashboard/dokumen/legacy', function () {
+        return redirect()->route('dokumen');
     })->name('dokumen.index');
 
     Route::get('/dokumen', function () {
-        return redirect()->route('dokumen.index');
+        return redirect()->route('dokumen');
     });
 
-    Route::get('/dashboard/audit', function () {
-        return view('audit.index');
+    Route::get('/dashboard/audit', [AuditController::class, 'index'])->name('audit-log');
+    Route::get('/dashboard/audit/{id}', [AuditController::class, 'show'])->name('audit-log.show');
+
+    Route::get('/dashboard/audit/legacy', function () {
+        return redirect()->route('audit-log');
     })->name('audit.index');
 
     Route::get('/audit', function () {
-        return redirect()->route('audit.index');
+        return redirect()->route('audit-log');
     });
 
-    Route::get('/dashboard/pengaturan', function () {
-        return view('settings.index');
+    Route::get('/dashboard/profil', [ProfileController::class, 'index'])->name('profil');
+    Route::post('/dashboard/profil/password', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
+
+    Route::get('/dashboard/pengaturan', [SettingsController::class, 'index'])->name('pengaturan');
+    Route::post('/dashboard/pengaturan', [SettingsController::class, 'update'])->name('settings.update');
+
+    Route::get('/dashboard/pengaturan/legacy', function () {
+        return redirect()->route('pengaturan');
     })->name('settings.index');
 
     Route::get('/pengaturan', function () {
-        return redirect()->route('settings.index');
+        return redirect()->route('pengaturan');
     });
 
     Route::get('/dashboard/Pengaturan', function () {
-        return redirect()->route('settings.index');
+        return redirect()->route('pengaturan');
     });
+
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
 
     // ── Export Data Pegawai (.xlsx — PhpSpreadsheet) ─────────────────────────
     Route::get('/pegawai/export', function () {
-
         $pegawaiData = [
             ['nama'=>'Ahmad Fauzi',                   'email'=>'ahmadfauzi@gmail.com',      'golongan'=>'III/c', 'jabatan'=>'Analis Kepegawaian',                  'kelas_jabatan'=>'8', 'nip'=>'19850312201001 1 001', 'telepon'=>'081234567890', 'pangkat'=>'Penata Tkt. I',  'pendidikan'=>'S1', 'tgl_lahir'=>'March 12, 1985',     'pensiun'=>'Abd Rahim Har',           'atasan'=>'Abd Rahim Har',           'person_familia'=>'Abd Rahim Har',           'prodi'=>'Manajemen',                  'jenis'=>'PNS'],
             ['nama'=>'Siti Rahayu',                   'email'=>'sitirahayu@gmail.com',       'golongan'=>'II/d',  'jabatan'=>'Analis Ahli Madya',                       'kelas_jabatan'=>'8', 'nip'=>'19901120201501 2 003', 'telepon'=>'085298765432', 'pangkat'=>'Pemula Tkt. I', 'pendidikan'=>'S2', 'tgl_lahir'=>'November 20, 1990',  'pensiun'=>'Riza Hamzah',             'atasan'=>'Riza Hamzah',             'person_familia'=>'Riza Hamzah',             'prodi'=>'Administrasi Pemerintahan',  'jenis'=>'PNS'],

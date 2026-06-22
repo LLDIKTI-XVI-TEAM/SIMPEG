@@ -117,95 +117,129 @@
         }
     }" class="space-y-6">
 
-        {{-- Navigation Flat Tabs --}}
-        <div class="flex items-center gap-6 px-6 py-4 bg-surface border border-border rounded-lg shadow-sm">
-            <button
-                @click="activeFilter = 'all'"
-                :class="activeFilter === 'all' ? 'text-primary font-semibold border-b-2 border-primary -mb-[18px]' : 'text-muted hover:text-ink font-medium'"
-                class="pb-3 text-sm transition-colors relative font-sans cursor-pointer focus:outline-none"
-            >
-                Semua
-            </button>
-            <button
-                @click="activeFilter = 'data_pegawai'"
-                :class="activeFilter === 'data_pegawai' ? 'text-primary font-semibold border-b-2 border-primary -mb-[18px]' : 'text-muted hover:text-ink font-medium'"
-                class="pb-3 text-sm transition-colors relative font-sans cursor-pointer focus:outline-none"
-            >
-                Data Pegawai
-            </button>
-            <button
-                @click="activeFilter = 'autentikasi'"
-                :class="activeFilter === 'autentikasi' ? 'text-primary font-semibold border-b-2 border-primary -mb-[18px]' : 'text-muted hover:text-ink font-medium'"
-                class="pb-3 text-sm transition-colors relative font-sans cursor-pointer focus:outline-none"
-            >
-                Autentikasi
-            </button>
-            <button
-                @click="activeFilter = 'transaksi_cuti'"
-                :class="activeFilter === 'transaksi_cuti' ? 'text-primary font-semibold border-b-2 border-primary -mb-[18px]' : 'text-muted hover:text-ink font-medium'"
-                class="pb-3 text-sm transition-colors relative font-sans cursor-pointer focus:outline-none"
-            >
-                Transaksi Cuti
-            </button>
-            <button
-                @click="activeFilter = 'system_import'"
-                :class="activeFilter === 'system_import' ? 'text-primary font-semibold border-b-2 border-primary -mb-[18px]' : 'text-muted hover:text-ink font-medium'"
-                class="pb-3 text-sm transition-colors relative font-sans cursor-pointer focus:outline-none"
-            >
-                System Import
-            </button>
+        {{-- PAGE HEADER --}}
+        <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+                <h2 class="text-2xl font-semibold text-ink font-sans">Audit Log</h2>
+                <nav class="mt-1 flex items-center gap-1.5 text-xs text-muted">
+                    <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
+                    <span>/</span>
+                    <span class="font-medium text-ink">Audit Log</span>
+                </nav>
+            </div>
         </div>
 
-        {{-- Table --}}
+        {{-- FILTER / NAVIGATION TABS --}}
+        <div class="rounded-lg border border-border bg-surface p-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between shadow-sm mb-6">
+            <div class="flex items-center gap-6 overflow-x-auto shrink-0">
+                <button
+                    @click="activeFilter = 'all'"
+                    :class="activeFilter === 'all' ? 'text-primary font-semibold border-b-2 border-primary pb-1' : 'text-muted hover:text-ink font-medium pb-1'"
+                    class="text-sm transition-colors relative font-sans cursor-pointer focus:outline-none"
+                >
+                    Semua
+                </button>
+                <button
+                    @click="activeFilter = 'data_pegawai'"
+                    :class="activeFilter === 'data_pegawai' ? 'text-primary font-semibold border-b-2 border-primary pb-1' : 'text-muted hover:text-ink font-medium pb-1'"
+                    class="text-sm transition-colors relative font-sans cursor-pointer focus:outline-none"
+                >
+                    Data Pegawai
+                </button>
+                <button
+                    @click="activeFilter = 'autentikasi'"
+                    :class="activeFilter === 'autentikasi' ? 'text-primary font-semibold border-b-2 border-primary pb-1' : 'text-muted hover:text-ink font-medium pb-1'"
+                    class="text-sm transition-colors relative font-sans cursor-pointer focus:outline-none"
+                >
+                    Autentikasi
+                </button>
+                <button
+                    @click="activeFilter = 'transaksi_cuti'"
+                    :class="activeFilter === 'transaksi_cuti' ? 'text-primary font-semibold border-b-2 border-primary pb-1' : 'text-muted hover:text-ink font-medium pb-1'"
+                    class="text-sm transition-colors relative font-sans cursor-pointer focus:outline-none"
+                >
+                    Transaksi Cuti
+                </button>
+                <button
+                    @click="activeFilter = 'system_import'"
+                    :class="activeFilter === 'system_import' ? 'text-primary font-semibold border-b-2 border-primary pb-1' : 'text-muted hover:text-ink font-medium pb-1'"
+                    class="text-sm transition-colors relative font-sans cursor-pointer focus:outline-none"
+                >
+                    System Import
+                </button>
+            </div>
+
+            {{-- Inputs --}}
+            <div class="flex flex-1 flex-wrap items-center justify-end gap-3 lg:flex-initial">
+                {{-- Search Input with Glass Icon --}}
+                <div class="relative flex items-center w-full lg:w-72 rounded-lg border border-border bg-surface px-3 py-1.5 shadow-sm focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
+                    <svg class="w-4 h-4 text-muted shrink-0 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                    </svg>
+                    <input
+                        type="text"
+                        x-model="searchQuery"
+                        placeholder="Cari pegawai/aktivitas/modul..."
+                        class="w-full bg-transparent text-xs text-ink placeholder:text-muted focus:outline-none font-sans"
+                    >
+                </div>
+            </div>
+        </div>
+
+        {{-- Table Card --}}
         <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
             
             {{-- Toolbar --}}
             <div class="px-6 py-4 border-b border-border flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-surface">
                 <div>
-                    <h2 class="text-base font-bold text-ink font-sans leading-tight">Rekam Jejak Aktivitas (Audit Log)</h2>
-                    <p class="text-[11px] text-muted mt-0.5 font-sans leading-normal">Catatan mutasi data dan otentikasi sistem kepegawaian secara kronologis.</p>
-                </div>
-                <div class="relative">
-                    <input
-                        type="text"
-                        x-model="searchQuery"
-                        placeholder="Cari pelaku/aktivitas/modul..."
-                        class="h-[44px] w-72 rounded-lg border border-border bg-soft px-3 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans"
-                    >
+                    <h3 class="text-sm font-semibold text-ink font-sans">Rekam Jejak Aktivitas (Audit Log)</h3>
+                    <p class="text-[10px] text-muted font-sans mt-0.5">Catatan mutasi data dan otentikasi sistem kepegawaian secara kronologis.</p>
                 </div>
             </div>
 
             {{-- Table render --}}
             <div class="overflow-x-auto">
                 <table class="w-full">
-                    <thead class="bg-soft">
+                    <thead class="bg-soft border-b border-border">
                         <tr>
-                            <th class="px-6 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Waktu</th>
-                            <th class="px-6 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Pelaku</th>
-                            <th class="px-6 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Aktivitas</th>
-                            <th class="px-6 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Modul</th>
-                            <th class="px-6 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">IP Address</th>
-                            <th class="px-6 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Aksi</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans">Waktu</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans">Pegawai</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans">Aktivitas</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans">Modul</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans">IP Address</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans">Aksi</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-border">
                         <template x-for="log in filteredLogs" :key="log.id">
-                            <tr class="transition-colors hover:bg-soft/30">
-                                <td class="px-6 py-2.5 text-xs font-mono text-ink" x-text="log.timestamp"></td>
-                                <td class="px-6 py-2.5 text-sm font-semibold text-ink font-sans" x-text="log.operator"></td>
-                                <td class="px-6 py-2.5 text-xs font-bold font-sans" 
-                                    :class="log.event === 'CREATE' || log.event === 'IMPORT' ? 'text-success' : (log.event === 'LOGIN' ? 'text-primary' : 'text-warning')"
-                                    x-text="log.event"
-                                ></td>
-                                <td class="px-6 py-2.5 text-xs text-muted font-sans" x-text="log.modul"></td>
-                                <td class="px-6 py-2.5 text-xs font-mono text-muted" x-text="log.ip_address"></td>
-                                <td class="px-6 py-2.5">
-                                    <button 
-                                        @click="selectedLogId = log.id; showDrawer = true" 
-                                        class="text-xs font-semibold text-primary hover:underline font-sans cursor-pointer focus:outline-none"
+                            <tr class="transition-colors hover:bg-soft/50">
+                                <td class="px-4 py-3.5 text-xs font-mono text-ink" x-text="log.timestamp"></td>
+                                <td class="px-4 py-3.5 text-sm font-semibold text-ink font-sans" x-text="log.operator"></td>
+                                <td class="px-4 py-3.5">
+                                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold font-sans"
+                                        :class="log.event === 'CREATE' || log.event === 'IMPORT' ? 'bg-success/10 text-success' : (log.event === 'LOGIN' ? 'bg-primary/10 text-primary' : 'bg-warning/10 text-warning')"
                                     >
-                                        Detail
-                                    </button>
+                                        <span class="h-1.5 w-1.5 rounded-full"
+                                            :class="log.event === 'CREATE' || log.event === 'IMPORT' ? 'bg-success' : (log.event === 'LOGIN' ? 'bg-primary' : 'bg-warning')"
+                                        ></span>
+                                        <span x-text="log.event"></span>
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3.5 text-xs text-muted font-sans" x-text="log.modul"></td>
+                                <td class="px-4 py-3.5 text-xs font-mono text-muted" x-text="log.ip_address"></td>
+                                <td class="px-4 py-3.5">
+                                    <div class="flex items-center gap-1.5">
+                                        <button 
+                                            @click="selectedLogId = log.id; showDrawer = true" 
+                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" 
+                                            title="Detail"
+                                        >
+                                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         </template>
@@ -218,22 +252,58 @@
                 </table>
             </div>
 
+            {{-- TABLE FOOTER --}}
+            <div class="flex flex-col gap-3 border-t border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between bg-surface">
+                <div class="flex items-center gap-3">
+                    <p class="text-sm text-muted font-sans">Menampilkan 1 - 5 dari 5 data</p>
+                    <div class="relative">
+                        <select id="per-page" class="appearance-none rounded-lg border border-border bg-surface pl-3 pr-8 py-1 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                            <option>10 / halaman</option>
+                            <option>25 / halaman</option>
+                            <option>50 / halaman</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    {{-- Prev --}}
+                    <button class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted transition hover:bg-soft hover:text-ink">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                        </svg>
+                    </button>
+                    <button class="flex h-8 w-8 items-center justify-center rounded-lg border border-primary bg-primary text-sm font-semibold text-white transition hover:opacity-90 font-sans">1</button>
+                    {{-- Next --}}
+                    <button class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted transition hover:bg-soft hover:text-ink">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
         </div>
 
         {{-- Slide-over Drawer --}}
         <div x-show="showDrawer" class="fixed inset-0 z-50 overflow-hidden" style="display: none;" x-transition>
             <div class="absolute inset-0 bg-ink/30 transition-opacity" @click="showDrawer = false"></div>
             <div class="fixed inset-y-0 right-0 pl-10 max-w-full flex">
-                <div class="w-screen max-w-md bg-surface border-l border-border shadow-xl flex flex-col justify-between">
+                <div class="w-screen max-w-md bg-surface border-l border-border shadow-xl flex flex-col justify-between" x-transition:enter="transform transition ease-in-out duration-300 sm:duration-300" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0" x-transition:leave="transform transition ease-in-out duration-300 sm:duration-300" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full">
                     
                     {{-- Drawer Header --}}
-                    <div class="px-6 py-5 border-b border-border flex items-center justify-between">
+                    <div class="px-6 py-5 border-b border-border flex items-center justify-between bg-surface">
                         <div>
                             <h3 class="text-sm font-bold text-ink font-sans">Detail Log Aktivitas</h3>
-                            <p class="text-[11px] text-muted font-sans mt-0.5">Metadata operasional dan perubahan database.</p>
+                            <p class="text-[10px] text-muted font-sans mt-0.5">Metadata operasional dan perubahan database.</p>
                         </div>
-                        <button @click="showDrawer = false" class="text-xs font-semibold text-muted hover:text-ink font-sans cursor-pointer focus:outline-none">
-                            Tutup
+                        <button @click="showDrawer = false" class="rounded-lg p-1.5 text-muted hover:bg-soft hover:text-ink transition-colors cursor-pointer focus:outline-none" aria-label="Close panel">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
                         </button>
                     </div>
 
@@ -251,7 +321,7 @@
                                 <p class="text-ink font-mono" x-text="selectedLog.timestamp"></p>
                             </div>
                             <div class="space-y-0.5">
-                                <p class="font-semibold text-muted font-sans">Pelaku</p>
+                                <p class="font-semibold text-muted font-sans">Pegawai</p>
                                 <p class="text-ink font-sans" x-text="selectedLog.operator"></p>
                             </div>
                             <div class="space-y-0.5">
@@ -284,7 +354,7 @@
                                         <span x-text="JSON.stringify(selectedLog.old_values, null, 2)"></span>
                                     </template>
                                     <template x-if="!selectedLog.old_values">
-                                        <span class="text-muted">Tidak ada perubahan/data lama kosong</span>
+                                        <span class="text-muted font-sans">Tidak ada perubahan/data lama kosong</span>
                                     </template>
                                 </div>
                             </div>
@@ -297,7 +367,7 @@
                                         <span x-text="JSON.stringify(selectedLog.new_values, null, 2)"></span>
                                     </template>
                                     <template x-if="!selectedLog.new_values">
-                                        <span class="text-muted">Tidak ada data baru</span>
+                                        <span class="text-muted font-sans">Tidak ada data baru</span>
                                     </template>
                                 </div>
                             </div>
