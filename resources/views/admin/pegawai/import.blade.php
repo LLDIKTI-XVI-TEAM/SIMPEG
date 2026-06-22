@@ -72,43 +72,21 @@
         progress: 0,
         progressText: 'Memulai proses impor...',
         
-        // Download Template CSV/Excel
         downloadTemplate(type) {
             let headers = [];
-            let rows = [];
             if (type === 'utama') {
                 headers = this.mainHeaders;
-                rows = [
-                    ['1', 'Ahmad Fauzi', 'ahmadfauzi@lldikti16.go.id', 'III/c', 'Analis Kepegawaian', '8', '198503122010011001', '081234567890', 'Penata Tkt. I', 'Sarjana (S1)', '2043-03-12', 'Ahmad Fauzi', 'PF-1', 'Manajemen', 'PNS', '1985-03-12'],
-                    ['2', 'Siti Rahayu', 'sitirahayu@lldikti16.go.id', 'II/d', 'Analis Ahli Madya', '8', '199011202015012003', '085298765432', 'Pemula Tkt. I', 'Magister (S2)', '2050-11-20', 'Siti Rahayu', 'PF-2', 'Akuntansi', 'PNS', '1990-11-20']
-                ];
             } else if (type === 'pelengkap') {
                 headers = ['NIP', 'NIK', 'No KK', 'Tempat Lahir', 'Jenis Kelamin', 'Agama', 'Status Kawin', 'Golongan Darah'];
-                rows = [
-                    ['198503122010011001', '3273251203850002', '3273250102120045', 'Bandung', 'Laki-laki', 'Islam', 'Kawin', 'O'],
-                    ['199011202015012003', '3171052011900003', '3171050204160012', 'Jakarta', 'Perempuan', 'Islam', 'Kawin', 'A']
-                ];
             } else if (type === 'kepangkatan') {
                 headers = ['NIP', 'Golongan', 'TMT Pangkat', 'No SK', 'Tanggal SK'];
-                rows = [
-                    ['198503122010011001', 'III/b', '2020-04-01', 'SK-442-KP-2020', '2020-03-10'],
-                    ['198503122010011001', 'III/c', '2024-04-01', 'SK-882-KP-2024', '2024-03-15']
-                ];
             } else if (type === 'jabatan') {
                 headers = ['NIP', 'Nama Jabatan', 'Jenis Jabatan', 'Unit Kerja', 'TMT Jabatan', 'No SK', 'Tanggal SK'];
-                rows = [
-                    ['198503122010011001', 'Analis Kepegawaian Ahli Pertama', 'Fungsional Tertentu', 'Bag. Umum', '2010-10-01', 'SK-121-JAB-2010', '2010-09-20'],
-                    ['198503122010011001', 'Analis Kepegawaian', 'Fungsional Umum', 'Bag. Umum', '2020-10-01', 'SK-883-JAB-2020', '2020-09-15']
-                ];
             } else if (type === 'kgb') {
                 headers = ['NIP', 'TMT KGB', 'Gaji Pokok', 'No SK', 'Tanggal SK'];
-                rows = [
-                    ['198503122010011001', '2022-10-01', '3500000', 'KGB-102-2022', '2022-09-01'],
-                    ['198503122010011001', '2024-10-01', '3800000', 'KGB-334-2024', '2024-09-01']
-                ];
             }
             
-            let csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.map(val => String.fromCharCode(34) + val + String.fromCharCode(34)).join(','))].join('\n');
+            let csvContent = '\uFEFF' + headers.join(',');
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
