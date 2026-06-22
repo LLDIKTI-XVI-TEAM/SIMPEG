@@ -58,7 +58,7 @@
         </div>
 
         {{-- Navigation --}}
-        <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+        <nav id="sidebar-nav" class="flex-1 overflow-y-auto px-3 py-4 space-y-1">
             @php
             $activeRole = session('active_role', 'Super Admin');
             
@@ -471,5 +471,32 @@
 </div>
 
 @stack('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const sidebarNav = document.getElementById('sidebar-nav');
+        if (sidebarNav) {
+            // Restore scroll position
+            const savedScrollPos = sessionStorage.getItem('sidebarScrollPos');
+            if (savedScrollPos !== null) {
+                sidebarNav.scrollTop = parseInt(savedScrollPos, 10);
+            } else {
+                // First load: scroll active item into view if exists and out of view
+                const activeLink = sidebarNav.querySelector('.bg-primary.text-white');
+                if (activeLink) {
+                    activeLink.scrollIntoView({ behavior: 'auto', block: 'center' });
+                }
+            }
+
+            // Save scroll position on scroll
+            let isScrolling;
+            sidebarNav.addEventListener('scroll', () => {
+                window.clearTimeout(isScrolling);
+                isScrolling = setTimeout(() => {
+                    sessionStorage.setItem('sidebarScrollPos', sidebarNav.scrollTop);
+                }, 66);
+            });
+        }
+    });
+</script>
 </body>
 </html>

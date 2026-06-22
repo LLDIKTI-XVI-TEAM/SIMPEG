@@ -106,6 +106,81 @@
             'file_path' => 'employees/docs/20261210820500004_sk_pns.pdf',
             'file_size' => '1.5 MB',
             'deskripsi' => 'SK Pengangkatan PNS atas nama Sabrina Rossa.'
+        ],
+        [
+            'id' => 8,
+            'jenis' => 'SK KGB',
+            'nama' => 'SK Kenaikan Gaji Berkala 2026',
+            'nomor' => 'KGB-335-VIII-2026',
+            'tanggal' => '2026-08-01',
+            'kategori' => 'sk_kgb',
+            'kategori_label' => 'SK KGB',
+            'nama_pegawai' => 'Siti Rahayu',
+            'nip_pegawai' => '19901120201501 2 003',
+            'unit_pegawai' => 'Bag. Keuangan',
+            'file_path' => 'employees/docs/199011202015012003_sk_kgb.pdf',
+            'file_size' => '450 KB',
+            'deskripsi' => 'SK KGB tahun berjalan atas nama Siti Rahayu.'
+        ],
+        [
+            'id' => 9,
+            'jenis' => 'Ijazah',
+            'nama' => 'Ijazah Magister (S2) Manajemen',
+            'nomor' => 'IJZ-S2-MAN-2015',
+            'tanggal' => '2015-11-20',
+            'kategori' => 'ijazah',
+            'kategori_label' => 'Ijazah',
+            'nama_pegawai' => 'Ahmad Fauzi',
+            'nip_pegawai' => '19850312201001 1 001',
+            'unit_pegawai' => 'Bag. Umum',
+            'file_path' => 'employees/docs/198503122010011001_ijazah_s2.pdf',
+            'file_size' => '1.8 MB',
+            'deskripsi' => 'Ijazah S2 Universitas Indonesia.'
+        ],
+        [
+            'id' => 10,
+            'jenis' => 'SK Kenaikan Jabatan',
+            'nama' => 'SK Jabatan Fungsional Utama 2026',
+            'nomor' => 'SK-105-JAB-2026',
+            'tanggal' => '2026-03-01',
+            'kategori' => 'sk_jabatan',
+            'kategori_label' => 'SK Kenaikan Jabatan',
+            'nama_pegawai' => 'Sabrina Rossa Adriani Wibowo',
+            'nip_pegawai' => '20261210820500 0 04',
+            'unit_pegawai' => 'Bag. SDM',
+            'file_path' => 'employees/docs/20261210820500004_sk_jabatan_2026.pdf',
+            'file_size' => '1.1 MB',
+            'deskripsi' => 'SK Jabatan Fungsional atas nama Sabrina Rossa.'
+        ],
+        [
+            'id' => 11,
+            'jenis' => 'KTP',
+            'nama' => 'Kartu Tanda Penduduk (KTP)',
+            'nomor' => '3171-7403-8803-0003',
+            'tanggal' => '2026-02-12',
+            'kategori' => 'ktp_kk',
+            'kategori_label' => 'KTP & KK',
+            'nama_pegawai' => 'Nurarningsih Dumbea, S.P.',
+            'nip_pegawai' => '19880123202 1 005',
+            'unit_pegawai' => 'Bag. SDM',
+            'file_path' => 'employees/docs/198801232021005_ktp.pdf',
+            'file_size' => '550 KB',
+            'deskripsi' => 'KTP atas nama Nurarningsih Dumbea.'
+        ],
+        [
+            'id' => 12,
+            'jenis' => 'Ijazah',
+            'nama' => 'Ijazah Sarjana (S1) Pertanian',
+            'nomor' => 'IJZ-S1-AGR-2010',
+            'tanggal' => '2010-08-15',
+            'kategori' => 'ijazah',
+            'kategori_label' => 'Ijazah',
+            'nama_pegawai' => 'Nurarningsih Dumbea, S.P.',
+            'nip_pegawai' => '19880123202 1 005',
+            'unit_pegawai' => 'Bag. SDM',
+            'file_path' => 'employees/docs/198801232021005_ijazah.pdf',
+            'file_size' => '2.3 MB',
+            'deskripsi' => 'Ijazah S1 Universitas Sam Ratulangi.'
         ]
     ];
 
@@ -127,25 +202,37 @@
         searchQuery: '',
         showUploadModal: false,
         documents: {{ json_encode($dokumen) }},
+        currentPage: 1,
+        perPage: 5,
         init() {
             const urlParams = new URLSearchParams(window.location.search);
             const filterParam = urlParams.get('filter');
             if (filterParam === 'kadaluarsa') {
                 this.activeKategori = 'sk_pengangkatan';
             }
+            this.$watch('searchQuery', () => this.currentPage = 1);
+            this.$watch('activeKategori', () => this.currentPage = 1);
+            this.$watch('activeUnit', () => this.currentPage = 1);
+            this.$watch('activePegawai', () => this.currentPage = 1);
         },
         get filteredDocuments() {
             return this.documents.filter(doc => {
                 const matchesSearch = doc.nama.toLowerCase().includes(this.searchQuery.toLowerCase()) || 
                                        doc.nomor.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-                                       doc.jenis.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-                                       (doc.nama_pegawai && doc.nama_pegawai.toLowerCase().includes(this.searchQuery.toLowerCase())) ||
-                                       (doc.nip_pegawai && doc.nip_pegawai.toLowerCase().includes(this.searchQuery.toLowerCase()));
+                                       doc.jenis.toLowerCase().includes(this.searchQuery.toLowerCase());
                 const matchesKategori = !this.activeKategori || doc.kategori === this.activeKategori;
                 const matchesUnit = !this.activeUnit || doc.unit_pegawai === this.activeUnit;
                 const matchesPegawai = !this.activePegawai || doc.nip_pegawai === this.activePegawai;
                 return matchesSearch && matchesKategori && matchesUnit && matchesPegawai;
             });
+        },
+        get paginatedDocuments() {
+            const start = (this.currentPage - 1) * this.perPage;
+            const end = start + this.perPage;
+            return this.filteredDocuments.slice(start, end);
+        },
+        get totalPages() {
+            return Math.ceil(this.filteredDocuments.length / this.perPage) || 1;
         }
     }" class="space-y-6">
 
@@ -175,9 +262,9 @@
 
         {{-- FILTER BAR --}}
         <div class="rounded-lg border border-border bg-surface p-4 flex flex-col gap-4 shadow-sm">
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {{-- Search input --}}
-                <div class="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 col-span-1 sm:col-span-2 lg:col-span-1">
+                <div class="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 col-span-1 sm:col-span-2 lg:col-span-1 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
                     <svg class="w-4 h-4 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                     </svg>
@@ -185,7 +272,7 @@
                 </div>
 
                 {{-- Filter Pegawai --}}
-                <div class="relative">
+                <div class="relative col-span-1 sm:col-span-1 lg:col-span-1">
                     <select x-model="activePegawai" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                         <option value="">Semua Pegawai</option>
                         @foreach($pegawaiList as $p)
@@ -200,7 +287,7 @@
                 </div>
 
                 {{-- Filter Unit Kerja --}}
-                <div class="relative">
+                <div class="relative col-span-1 sm:col-span-1 lg:col-span-1">
                     <select x-model="activeUnit" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                         <option value="">Semua Unit Kerja</option>
                         <option>Bag. Umum</option>
@@ -216,7 +303,7 @@
                 </div>
 
                 {{-- Filter Kategori Dokumen --}}
-                <div class="relative col-span-1 sm:col-span-2 lg:col-span-2">
+                <div class="relative col-span-1 sm:col-span-2 lg:col-span-1">
                     <select x-model="activeKategori" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                         <option value="">Semua Kategori Dokumen</option>
                         <option value="sk_pengangkatan">SK Pengangkatan</option>
@@ -258,7 +345,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-border">
-                        <template x-for="doc in filteredDocuments" :key="doc.id">
+                        <template x-for="doc in paginatedDocuments" :key="doc.id">
                             <tr class="transition-colors hover:bg-soft/50">
                                 <td class="px-4 py-3.5">
                                     <div class="flex items-center gap-2.5">
@@ -293,20 +380,23 @@
                                 <td class="px-4 py-3.5 text-xs font-mono text-muted" x-text="doc.nomor"></td>
                                 <td class="px-4 py-3.5 text-xs font-mono text-muted" x-text="doc.tanggal"></td>
                                 <td class="px-4 py-3.5 text-xs font-mono text-muted" x-text="doc.file_size"></td>
-                                <td class="px-4 py-3.5 text-right">
-                                    <div class="flex items-center justify-end gap-2.5">
-                                        <a :href="'/dashboard/dokumen/' + doc.id" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline font-sans">
-                                            Detail
-                                        </a>
-                                        <span class="text-border">|</span>
-                                        <a :href="'/dashboard/dokumen/' + doc.id + '/download'" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline font-sans">
-                                            Unduh
-                                            <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                                            </svg>
-                                        </a>
-                                    </div>
-                                </td>
+                                 <td class="px-4 py-3.5 text-right">
+                                     <div class="flex items-center justify-end gap-1.5">
+                                         {{-- Detail --}}
+                                         <a :href="'/dashboard/dokumen/' + doc.id" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Detail">
+                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                                             </svg>
+                                         </a>
+                                         {{-- Unduh --}}
+                                         <a :href="'/dashboard/dokumen/' + doc.id + '/download'" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Unduh">
+                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                             </svg>
+                                         </a>
+                                     </div>
+                                 </td>
                             </tr>
                         </template>
                         <tr x-show="filteredDocuments.length === 0">
@@ -321,15 +411,18 @@
             {{-- TABLE FOOTER --}}
             <div class="flex flex-col gap-3 border-t border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between bg-surface">
                 <div class="flex items-center gap-3">
-                    <p class="text-sm text-muted font-sans">Menampilkan 1 - <span x-text="filteredDocuments.length"></span> dari <span x-text="filteredDocuments.length"></span> data</p>
+                    <p class="text-sm text-muted font-sans">
+                        Menampilkan <span x-text="filteredDocuments.length === 0 ? 0 : (currentPage - 1) * perPage + 1"></span> - <span x-text="Math.min(currentPage * perPage, filteredDocuments.length)"></span> dari <span x-text="filteredDocuments.length"></span> data
+                    </p>
                     <div class="relative">
-                        <select id="per-page" class="appearance-none rounded-lg border border-border bg-surface pl-3 pr-8 py-1 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                            <option>10 / halaman</option>
-                            <option>25 / halaman</option>
-                            <option>50 / halaman</option>
+                        <select id="per-page" x-model.number="perPage" @change="currentPage = 1" class="appearance-none rounded-lg border border-border bg-surface pl-3 pr-8 py-1 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                            <option value="5">5 / halaman</option>
+                            <option value="10">10 / halaman</option>
+                            <option value="25">25 / halaman</option>
+                            <option value="50">50 / halaman</option>
                         </select>
                         <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
                             </svg>
                         </div>
@@ -337,14 +430,28 @@
                 </div>
                 <div class="flex items-center gap-1.5">
                     {{-- Prev --}}
-                    <button class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted transition hover:bg-soft hover:text-ink">
+                    <button @click="if (currentPage > 1) currentPage--"
+                            :disabled="currentPage === 1"
+                            :class="currentPage === 1 ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-soft hover:text-ink text-ink cursor-pointer'"
+                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface transition">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
                         </svg>
                     </button>
-                    <button class="flex h-8 w-8 items-center justify-center rounded-lg border border-primary bg-primary text-sm font-semibold text-white transition hover:opacity-90 font-sans">1</button>
+                    
+                    <template x-for="page in totalPages" :key="page">
+                        <button @click="currentPage = page"
+                                :class="currentPage === page ? 'bg-primary text-white border-primary' : 'bg-surface text-ink hover:bg-soft border-border'"
+                                class="flex h-8 w-8 items-center justify-center rounded-lg border text-sm font-semibold transition font-sans cursor-pointer"
+                                x-text="page">
+                        </button>
+                    </template>
+                    
                     {{-- Next --}}
-                    <button class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted transition hover:bg-soft hover:text-ink">
+                    <button @click="if (currentPage < totalPages) currentPage++"
+                            :disabled="currentPage === totalPages"
+                            :class="currentPage === totalPages ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-soft hover:text-ink text-ink cursor-pointer'"
+                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface transition">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                         </svg>

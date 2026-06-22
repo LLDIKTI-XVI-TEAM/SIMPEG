@@ -3,7 +3,7 @@
         
         {{-- Breadcrumbs & Title --}}
         <div class="flex flex-col gap-1.5">
-            <h2 class="text-2xl font-bold text-ink font-sans">Edit Hari Libur</h2>
+            <h2 class="text-2xl font-bold text-primary font-sans">Edit Hari Libur</h2>
             <nav class="flex items-center gap-1.5 text-xs text-muted">
                 <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
                 <span>/</span>
@@ -43,10 +43,10 @@
 
                 {{-- Action Buttons --}}
                 <div class="border-t border-border pt-6 flex justify-end gap-3">
-                    <a href="{{ route('hari-libur') }}" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-5 py-2.5 text-sm font-semibold text-primary transition hover:bg-soft">
+                    <a href="{{ route('hari-libur') }}" class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-semibold text-primary transition hover:border-primary/30 hover:bg-primary/5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2">
                         Batal
                     </a>
-                    <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
+                    <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2">
                         Simpan Perubahan
                     </button>
                 </div>

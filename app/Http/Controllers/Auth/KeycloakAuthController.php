@@ -53,6 +53,7 @@ class KeycloakAuthController extends Controller
 
         Auth::login($user);
         request()->session()->regenerate();
+        session(['active_role' => $user->role ?? 'Pegawai']);
 
         return redirect()->intended(route('dashboard'));
     }
