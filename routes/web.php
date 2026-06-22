@@ -89,6 +89,22 @@ Route::middleware('keycloak.auth')->group(function (): void {
         return view('admin.pegawai.nonaktif');
     })->name('data-nonaktif');
 
+    Route::get('/cuti/rekap', function () {
+        return view('dummy', ['title' => 'Rekap Cuti']);
+    })->name('cuti.rekap');
+
+    Route::get('/ews/konfigurasi', function () {
+        return view('dummy', ['title' => 'Konfigurasi EWS']);
+    })->name('ews.config');
+
+    Route::get('/laporan/export-pegawai', function () {
+        return view('dummy', ['title' => 'Laporan - Export Pegawai']);
+    })->name('laporan.pegawai');
+
+    Route::get('/laporan/export-cuti', function () {
+        return view('dummy', ['title' => 'Laporan - Export Cuti']);
+    })->name('laporan.cuti');
+
     Route::get('/pegawai', [PegawaiController::class, 'index'])->name('data-pegawai');
     Route::get('/pegawai/create', [PegawaiController::class, 'create'])->name('pegawai.create');
     Route::post('/pegawai', [PegawaiController::class, 'store'])->name('pegawai.store');
