@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreEmployeeRequest;
+use App\Http\Requests\UpdateEmployeeRequest;
 use App\Models\Employee;
 use App\Services\AuditService;
 use Illuminate\Http\JsonResponse;
@@ -24,5 +25,24 @@ class EmployeeController extends Controller
         }
 
         return back()->with('success', 'Data pegawai berhasil ditambahkan.');
+    }
+
+    public function update(UpdateEmployeeRequest $request, Employee $employee): JsonResponse|RedirectResponse
+    {
+        $oldValues = $employee->toArray();
+
+        $employee->update($request->validated());
+        $employee->refresh();
+
+        AuditService::log('UPDATE', 'Employee', $employee->id, $oldValues, $employee->toArray(), $request);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Data pegawai berhasil diperbarui.',
+                'employee' => $employee,
+            ]);
+        }
+
+        return back()->with('success', 'Data pegawai berhasil diperbarui.');
     }
 }

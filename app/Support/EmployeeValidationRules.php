@@ -2,6 +2,9 @@
 
 namespace App\Support;
 
+use App\Models\Employee;
+use Illuminate\Validation\Rule;
+
 class EmployeeValidationRules
 {
     /**
@@ -43,6 +46,29 @@ class EmployeeValidationRules
             'email' => ['nullable', 'email', 'max:255', 'unique:employees,email'],
             'no_telepon_rumah' => ['nullable', 'string', 'max:20'],
         ];
+    }
+
+    /**
+     * Full validation rules for updating an employee via API/form.
+     */
+    public static function update(Employee $employee): array
+    {
+        $rules = self::create();
+
+        $rules['nip'] = [
+            'required',
+            'string',
+            'size:18',
+            Rule::unique('employees', 'nip')->ignore($employee->id),
+        ];
+        $rules['email'] = [
+            'nullable',
+            'email',
+            'max:255',
+            Rule::unique('employees', 'email')->ignore($employee->id),
+        ];
+
+        return $rules;
     }
 
     /**

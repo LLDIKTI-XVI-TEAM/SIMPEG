@@ -6,17 +6,27 @@ use App\Http\Controllers\EmployeeImportController;
 use App\Http\Controllers\HariLiburController;
 use Illuminate\Support\Facades\Route;
 
+$disableEmployeeApiAuth = app()->environment('local')
+    && filter_var(env('SIMPEG_DISABLE_EMPLOYEE_API_AUTH', false), FILTER_VALIDATE_BOOLEAN);
+
+$employeeGroupMiddleware = $disableEmployeeApiAuth
+    ? []
+    : ['web', 'keycloak.auth', 'role:super_admin,admin_kepegawaian'];
+
 // Role middleware menjadi pagar kasar Fase 1; permission middleware menjadi pagar aksi per route.
 // Keduanya dipertahankan sebagai defense-in-depth agar akses admin tidak hanya bergantung pada satu lapis kontrol.
-Route::middleware(['web', 'keycloak.auth', 'role:super_admin,admin_kepegawaian'])
+Route::middleware($employeeGroupMiddleware)
     ->prefix('employees')
     ->name('employees.')
-    ->group(function (): void {
+    ->group(function () use ($disableEmployeeApiAuth): void {
         Route::post('/', [EmployeeController::class, 'store'])
-            ->middleware('permission:employees.create')
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.create'])
             ->name('store');
+        Route::put('/{employee}', [EmployeeController::class, 'update'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.update'])
+            ->name('update');
         Route::post('/import', [EmployeeImportController::class, 'store'])
-            ->middleware('permission:employees.import')
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.import'])
             ->name('import.store');
     });
 
