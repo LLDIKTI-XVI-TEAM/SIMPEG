@@ -98,7 +98,6 @@
                     'pegawai.import',
                     'data-nonaktif',
                     'dokumen',
-                    'cuti.approval',
                     'cuti.rekap',
                     'ews',
                     'ews.config',

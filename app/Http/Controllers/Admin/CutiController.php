@@ -148,27 +148,4 @@ class CutiController extends Controller
         return redirect()->route('cuti')
             ->with('success', 'Pengajuan cuti ' . $request->input('jenis_cuti') . ' berhasil dikirim dan menunggu persetujuan.');
     }
-
-    public function approval()
-    {
-        // Lists pending requests
-        $pendingRequests = collect(self::$riwayatCuti)->where('status', 'menunggu')->all();
-        return view('admin.cuti.approval', compact('pendingRequests'));
-    }
-
-    public function approve($id)
-    {
-        $c = collect(self::$riwayatCuti)->firstWhere('id', (int)$id);
-        $nama = $c ? $c['nama'] : 'Pegawai';
-        return redirect()->route('cuti.approval')
-            ->with('success', 'Pengajuan cuti ' . $nama . ' telah disetujui.');
-    }
-
-    public function postpone($id)
-    {
-        $c = collect(self::$riwayatCuti)->firstWhere('id', (int)$id);
-        $nama = $c ? $c['nama'] : 'Pegawai';
-        return redirect()->route('cuti.approval')
-            ->with('success', 'Pengajuan cuti ' . $nama . ' telah ditunda.');
-    }
 }
