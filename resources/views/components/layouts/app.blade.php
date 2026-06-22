@@ -170,6 +170,13 @@
                     ]
                 ]
             ];
+
+            $allMenuRoutes = [];
+            foreach ($menuGroups as $g) {
+                foreach ($g['items'] as $item) {
+                    $allMenuRoutes[] = $item['route'];
+                }
+            }
             @endphp
 
             @foreach($menuGroups as $group)
@@ -183,7 +190,27 @@
                         @php
                             $routeExists = \Illuminate\Support\Facades\Route::has($menu['route']);
                             $isLocked    = in_array($menu['route'], $myLockedMenus);
-                            $isActive    = $routeExists && !$isLocked && request()->routeIs($menu['route'] . '*');
+                            
+                            $isActive = false;
+                            if ($routeExists && !$isLocked) {
+                                $currentRoute = request()->route() ? request()->route()->getName() : null;
+                                if ($currentRoute === $menu['route']) {
+                                    $isActive = true;
+                                } elseif ($currentRoute && str_starts_with($currentRoute, $menu['route'] . '.')) {
+                                    $hasMoreSpecific = false;
+                                    foreach ($allMenuRoutes as $otherRoute) {
+                                        if ($otherRoute !== $menu['route'] && 
+                                            str_starts_with($otherRoute, $menu['route'] . '.') && 
+                                            ($currentRoute === $otherRoute || str_starts_with($currentRoute, $otherRoute . '.'))) {
+                                            $hasMoreSpecific = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!$hasMoreSpecific) {
+                                        $isActive = true;
+                                    }
+                                }
+                            }
                             
                             if ($isLocked) {
                                 $href = '#';
