@@ -15,6 +15,9 @@ Route::middleware(['web', 'keycloak.auth', 'role:super_admin,admin_kepegawaian']
         Route::post('/', [EmployeeController::class, 'store'])
             ->middleware('permission:employees.create')
             ->name('store');
+        Route::put('/{employee}', [EmployeeController::class, 'update'])
+            ->middleware('permission:employees.update')
+            ->name('update');
         Route::post('/import', [EmployeeImportController::class, 'store'])
             ->middleware('permission:employees.import')
             ->name('import.store');

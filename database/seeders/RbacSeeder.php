@@ -22,6 +22,7 @@ class RbacSeeder extends Seeder
         // Permission level aksi memakai konvensi module.action agar mudah diaudit dan diperluas.
         $permissions = [
             'employees.create' => ['module' => 'employees', 'description' => 'Membuat data pegawai'],
+            'employees.update' => ['module' => 'employees', 'description' => 'Mengubah data pegawai'],
             'employees.import' => ['module' => 'employees', 'description' => 'Import data pegawai'],
             'hari_libur.read' => ['module' => 'hari_libur', 'description' => 'Melihat hari libur dan cuti bersama'],
             'hari_libur.create' => ['module' => 'hari_libur', 'description' => 'Membuat hari libur dan cuti bersama'],
@@ -47,6 +48,7 @@ class RbacSeeder extends Seeder
             'super_admin' => array_keys($permissions),
             'admin_kepegawaian' => [
                 'employees.create',
+                'employees.update',
                 'employees.import',
                 'audit_logs.read',
             ],
