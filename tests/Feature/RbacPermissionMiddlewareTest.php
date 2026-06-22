@@ -138,7 +138,7 @@ class RbacPermissionMiddlewareTest extends TestCase
     {
         return [
             'nama_lengkap' => 'Budi Santoso',
-            'email_pribadi' => 'budi.permission@example.com',
+            'email' => 'budi.permission@example.com',
             'golongan_terakhir' => 'III/a',
             'jabatan_terakhir' => 'Analis Kepegawaian',
             'kelas_jabatan' => '7',

@@ -45,7 +45,7 @@ return new class extends Migration
             // --- Data Kontak (PRD §7.3) ---
             $table->text('alamat')->nullable();
             $table->string('no_hp', 20)->nullable();
-            $table->string('email_pribadi', 255)->nullable();
+            $table->string('email', 255)->nullable();
             $table->string('no_telepon_rumah', 20)->nullable();
 
             // --- Flags ---

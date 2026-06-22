@@ -50,7 +50,7 @@ class Employee extends Model
         // Data Kontak
         'alamat',
         'no_hp',
-        'email_pribadi',
+        'email',
         'no_telepon_rumah',
 
         // Flags

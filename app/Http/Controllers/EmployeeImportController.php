@@ -140,11 +140,11 @@ class EmployeeImportController extends Controller
             }
         }
 
-        if (! empty($data['email_pribadi'])) {
-            $email = strtolower($data['email_pribadi']);
+        if (! empty($data['email'])) {
+            $email = strtolower($data['email']);
 
             if (isset($seenEmails[$email])) {
-                $errors['email_pribadi'][] = "Email pribadi sudah ada pada baris {$seenEmails[$email]}.";
+                $errors['email'][] = "Email pegawai sudah ada pada baris {$seenEmails[$email]}.";
             } else {
                 $seenEmails[$email] = $row;
             }
