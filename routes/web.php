@@ -58,7 +58,7 @@ Route::middleware('keycloak.auth')->group(function (): void {
     })->name('change-role');
 
     Route::get('/pegawai/import-data', function () {
-        return view('dummy', ['title' => 'Import Data Pegawai']);
+        return view('admin.pegawai.import');
     })->name('pegawai.import');
 
     Route::get('/ews-warning', function () {
