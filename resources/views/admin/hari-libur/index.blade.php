@@ -24,8 +24,8 @@
     ];
 
     $tipeColor = [
-        'libur_nasional' => 'bg-danger/10 text-danger',
-        'cuti_bersama' => 'bg-warning/10 text-warning'
+        'libur_nasional' => 'bg-primary/10 text-primary',
+        'cuti_bersama' => 'bg-secondary/10 text-secondary'
     ];
     @endphp
 
@@ -34,7 +34,7 @@
         {{-- Header & Filters --}}
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-surface border border-border rounded-lg p-6 shadow-sm">
             <div>
-                <h2 class="text-lg font-semibold text-ink font-sans">Daftar Hari Libur Nasional & Cuti Bersama</h2>
+                <h2 class="text-2xl font-bold text-primary font-sans">Daftar Hari Libur Nasional & Cuti Bersama</h2>
                 <p class="text-xs text-muted mt-0.5 font-sans">Kelola seluruh agenda libur institusi untuk akurasi kalkulasi cuti.</p>
             </div>
             <div class="flex items-center gap-6">
@@ -46,7 +46,7 @@
                 </div>
                 <button
                     @click="showAddForm = !showAddForm"
-                    class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm font-sans"
+                    class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:border-primary/30 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2 shadow-sm font-sans"
                 >
                     <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -60,7 +60,7 @@
         <div x-show="showAddForm" class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-4" style="display: none;">
             <form action="{{ route('hari-libur.store') }}" method="POST" class="space-y-4">
                 @csrf
-                <h3 class="text-sm font-semibold text-ink font-sans">Tambah Hari Libur Baru</h3>
+                <h3 class="text-sm font-semibold text-primary font-sans">Tambah Hari Libur Baru</h3>
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <div class="space-y-1">
                         <label class="text-xs font-semibold text-ink font-sans">Tanggal</label>
@@ -80,7 +80,7 @@
                 </div>
                 <div class="flex justify-end gap-3 pt-2">
                     <button type="button" @click="showAddForm = false" class="text-xs font-semibold text-muted hover:text-ink font-sans">Batal</button>
-                    <button type="submit" class="text-xs font-semibold text-primary hover:underline font-sans">Simpan</button>
+                    <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2 font-sans">Simpan</button>
                 </div>
             </form>
         </div>

@@ -159,7 +159,7 @@
                 <form action="{{ route('settings.update') }}" method="POST" class="space-y-6">
                     @csrf
                     <div class="border-b border-border pb-4">
-                        <h2 class="text-base font-bold text-ink font-sans leading-tight">Pengaturan Umum & Instansi</h2>
+                        <h2 class="text-2xl font-bold text-primary font-sans leading-tight">Pengaturan Umum & Instansi</h2>
                     <p class="text-[11px] text-muted mt-0.5 font-sans leading-normal">Kelola profil lembaga LLDIKTI XVI dan parameter dasar server.</p>
                 </div>
 
@@ -201,7 +201,7 @@
                 </div>
 
                     <div class="border-t border-border pt-6 flex justify-end">
-                        <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 cursor-pointer focus:outline-none font-sans">
+                        <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2 font-sans">
                             Simpan Perubahan
                         </button>
                     </div>
@@ -213,7 +213,7 @@
                 <form action="{{ route('settings.update') }}" method="POST" class="space-y-6">
                     @csrf
                     <div class="border-b border-border pb-4">
-                        <h2 class="text-base font-bold text-ink font-sans leading-tight">Alur Persetujuan Cuti</h2>
+                        <h2 class="text-2xl font-bold text-primary font-sans leading-tight">Alur Persetujuan Cuti</h2>
                     <p class="text-[11px] text-muted mt-0.5 font-sans leading-normal">Konfigurasi rantai otorisasi bertingkat (3 Stage) untuk pengajuan cuti pegawai.</p>
                 </div>
 
@@ -273,17 +273,17 @@
                     <div class="pt-4 border-t border-border space-y-4">
                         <h3 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Kebijakan Otorisasi</h3>
                         
-                        <div class="flex items-start justify-between p-3 rounded bg-soft/30 text-xs">
+                        <div class="flex items-start justify-between p-3 rounded bg-soft/40 text-xs">
                             <div class="space-y-0.5">
                                 <p class="font-semibold text-ink font-sans">Skip Approver Duplikat</p>
                                 <p class="text-muted text-[10px] font-sans leading-normal">Jika atasan langsung pengaju cuti kebetulan menjabat sebagai verifikator kepegawaian, lewati stage duplikat.</p>
                             </div>
                             <div class="flex items-center h-5">
-                                <input type="checkbox" x-model="cutiConfig.skip_duplicate" class="rounded border-border text-primary focus:ring-primary h-4.5 w-4.5 cursor-pointer">
+                                <input type="checkbox" x-model="cutiConfig.skip_duplicate" class="rounded border-primary/20 text-primary focus:ring-primary/30 h-4.5 w-4.5 cursor-pointer">
                             </div>
                         </div>
 
-                        <div class="flex items-center justify-between p-3 rounded bg-soft/30 text-xs">
+                        <div class="flex items-center justify-between p-3 rounded bg-soft/40 text-xs">
                             <div class="space-y-0.5">
                                 <p class="font-semibold text-ink font-sans">Jatah Cuti Tahunan Pegawai (Default)</p>
                                 <p class="text-muted text-[10px] font-sans leading-normal">Kuota cuti tahun berjalan yang akan dialokasikan kepada pegawai baru.</p>
@@ -297,7 +297,7 @@
                 </div>
 
                     <div class="border-t border-border pt-6 flex justify-end">
-                        <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 cursor-pointer focus:outline-none font-sans">
+                        <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2 font-sans">
                             Simpan Kebijakan Cuti
                         </button>
                     </div>
@@ -308,7 +308,7 @@
             <div x-show="activeTab === 'rbac'" class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6" style="display: none;">
                 <div class="border-b border-border pb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <h2 class="text-base font-bold text-ink font-sans leading-tight">Pemetaan Akun SSO & Otorisasi RBAC</h2>
+                        <h2 class="text-2xl font-bold text-primary font-sans leading-tight">Pemetaan Akun SSO & Otorisasi RBAC</h2>
                         <p class="text-[11px] text-muted mt-0.5 font-sans leading-normal">Hubungkan email Keycloak SSO dengan data pegawai internal serta kelola role.</p>
                     </div>
                     <div>
@@ -322,16 +322,16 @@
                 </div>
 
                 {{-- Table --}}
-                <div class="overflow-x-auto border border-border rounded-lg">
+                <div class="overflow-x-auto border border-border rounded-lg shadow-sm">
                     <table class="w-full">
-                        <thead class="bg-soft">
+                        <thead class="bg-soft/40">
                             <tr>
-                                <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Nama Pegawai</th>
-                                <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">NIP</th>
-                                <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Keycloak ID / Email SSO</th>
-                                <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Role Internal</th>
-                                <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Status</th>
-                                <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Aksi</th>
+                                <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Nama Pegawai</th>
+                                <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">NIP</th>
+                                <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Keycloak ID / Email SSO</th>
+                                <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Role Internal</th>
+                                <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Status</th>
+                                <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border">
@@ -371,13 +371,13 @@
             {{-- TAB: DATA MASTER REFERENSI --}}
             <div x-show="activeTab === 'master'" class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6" style="display: none;">
                 <div class="border-b border-border pb-4">
-                    <h2 class="text-base font-bold text-ink font-sans leading-tight">Data Master Kamus Referensi</h2>
+                    <h2 class="text-2xl font-bold text-primary font-sans leading-tight">Data Master Kamus Referensi</h2>
                     <p class="text-[11px] text-muted mt-0.5 font-sans leading-normal">Kelola record data referensi sistem (static seeder tables).</p>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <template x-for="master in dataMaster" :key="master.tabel">
-                        <div class="border border-border rounded-lg p-4 bg-soft/10 flex flex-col justify-between">
+                        <div class="border border-border rounded-lg p-4 bg-soft/40 flex flex-col justify-between shadow-sm">
                             <div class="space-y-1">
                                 <div class="flex items-center justify-between">
                                     <span class="text-xs font-mono font-bold text-primary" x-text="master.tabel"></span>
@@ -436,10 +436,10 @@
 
                     {{-- Footer --}}
                     <div class="px-6 py-4 border-t border-border bg-soft flex justify-end gap-3">
-                        <button @click="showEditModal = false" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2.5 text-xs font-semibold text-primary transition-colors hover:bg-soft cursor-pointer focus:outline-none font-sans">
+                        <button @click="showEditModal = false" class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2.5 text-xs font-semibold text-primary transition hover:border-primary/30 hover:bg-soft/40 cursor-pointer focus:outline-none font-sans">
                             Batal
                         </button>
-                        <button @click="saveUser" class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 cursor-pointer focus:outline-none font-sans">
+                        <button @click="saveUser" class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2 font-sans">
                             Simpan Pemetaan
                         </button>
                     </div>
