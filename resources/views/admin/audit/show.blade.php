@@ -1,4 +1,35 @@
 <x-layouts.app title="Detail Audit Log">
+    @php
+        $oldVals = $log['old_values'] ?? [];
+        $newVals = $log['new_values'] ?? [];
+        
+        if (!is_array($oldVals)) $oldVals = [];
+        if (!is_array($newVals)) $newVals = [];
+        
+        $allKeys = array_unique(array_merge(array_keys($oldVals), array_keys($newVals)));
+        $diffs = [];
+        
+        foreach ($allKeys as $key) {
+            $oldVal = $oldVals[$key] ?? null;
+            $newVal = $newVals[$key] ?? null;
+            
+            if ($log['event'] === 'UPDATE') {
+                if (json_encode($oldVal) !== json_encode($newVal)) {
+                    $diffs[] = [
+                        'field' => $key,
+                        'old' => $oldVal !== null ? (is_array($oldVal) ? json_encode($oldVal, JSON_UNESCAPED_SLASHES) : (is_bool($oldVal) ? ($oldVal ? 'true' : 'false') : $oldVal)) : '-',
+                        'new' => $newVal !== null ? (is_array($newVal) ? json_encode($newVal, JSON_UNESCAPED_SLASHES) : (is_bool($newVal) ? ($newVal ? 'true' : 'false') : $newVal)) : '-',
+                    ];
+                }
+            } else {
+                $diffs[] = [
+                    'field' => $key,
+                    'old' => $oldVal !== null ? (is_array($oldVal) ? json_encode($oldVal, JSON_UNESCAPED_SLASHES) : (is_bool($oldVal) ? ($oldVal ? 'true' : 'false') : $oldVal)) : '-',
+                    'new' => $newVal !== null ? (is_array($newVal) ? json_encode($newVal, JSON_UNESCAPED_SLASHES) : (is_bool($newVal) ? ($newVal ? 'true' : 'false') : $newVal)) : '-',
+                ];
+            }
+        }
+    @endphp
     <div class="mx-auto max-w-3xl space-y-6">
         
         {{-- Breadcrumbs & Title --}}
@@ -57,37 +88,43 @@
             <div class="border-t border-border pt-6 space-y-4">
                 <h4 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Perubahan Nilai Data</h4>
                 
-                <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                    
-                    {{-- Old Values --}}
-                    <div class="space-y-1.5">
-                        <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Sebelum (Data Lama)</span>
-                        <div class="rounded bg-soft p-3 text-[11px] font-mono text-danger leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto border border-border">
-                            @if($log['old_values'])
-                                {{ json_encode($log['old_values'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}
-                            @else
-                                <span class="text-muted font-sans font-medium">Tidak ada data perubahan (kosong)</span>
-                            @endif
-                        </div>
-                    </div>
-
-                    {{-- New Values --}}
-                    <div class="space-y-1.5">
-                        <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Sesudah (Data Baru)</span>
-                        <div class="rounded bg-soft p-3 text-[11px] font-mono text-success leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto border border-border">
-                            @if($log['new_values'])
-                                {{ json_encode($log['new_values'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}
-                            @else
-                                <span class="text-muted font-sans font-medium">Tidak ada data baru</span>
-                            @endif
-                        </div>
-                    </div>
-
+                <div class="overflow-hidden rounded-lg border border-border bg-soft">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-border/40 text-[10px] uppercase font-semibold text-muted font-sans border-b border-border">
+                                <th class="px-3 py-2">Nama Field</th>
+                                <th class="px-3 py-2">Sebelum</th>
+                                <th class="px-3 py-2">Sesudah</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-border text-[11px] font-sans">
+                            @forelse($diffs as $diff)
+                                <tr>
+                                    <td class="px-3 py-2 font-semibold text-ink font-mono">{{ $diff['field'] }}</td>
+                                    <td class="px-3 py-2 text-danger font-mono bg-danger/5">{{ $diff['old'] }}</td>
+                                    <td class="px-3 py-2 text-success font-mono bg-success/5">{{ $diff['new'] }}</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="3" class="px-3 py-4 text-center text-muted font-sans">
+                                        Tidak ada detail perubahan nilai data (misal: event login/logout).
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
             {{-- Footer actions --}}
-            <div class="border-t border-border pt-6 flex justify-end gap-3">
+            <div class="border-t border-border pt-6 flex justify-between items-center gap-3">
+                <div>
+                    @if($log['modul'] === 'Employee' || $log['modul'] === 'LeaveRequest')
+                        <a href="{{ $log['modul'] === 'Employee' ? '/pegawai/' . $log['record_id'] : '/dashboard/cuti/' . $log['record_id'] }}" class="inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90">
+                            Lihat Record
+                        </a>
+                    @endif
+                </div>
                 <a href="{{ route('audit-log') }}" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-5 py-2.5 text-sm font-semibold text-primary transition hover:bg-soft">
                     Kembali ke Log
                 </a>

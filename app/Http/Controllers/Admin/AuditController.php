@@ -9,7 +9,73 @@ class AuditController extends Controller
 {
     public static $auditLogs = [
         [
-            'id' => 1,
+            'id' => 8,
+            'timestamp' => '2026-06-20 11:45:00',
+            'operator' => 'Ahmad Fauzi',
+            'event' => 'POSTPONE',
+            'kategori' => 'transaksi_cuti',
+            'modul' => 'LeaveRequest',
+            'record_id' => '2',
+            'ip_address' => '192.168.1.102',
+            'user_agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/127.0',
+            'old_values' => [
+                'status' => 'menunggu'
+            ],
+            'new_values' => [
+                'status' => 'ditunda'
+            ]
+        ],
+        [
+            'id' => 7,
+            'timestamp' => '2026-06-20 10:30:00',
+            'operator' => 'Demo Klabat',
+            'event' => 'RESTORE',
+            'kategori' => 'data_pegawai',
+            'modul' => 'Employee',
+            'record_id' => '3',
+            'ip_address' => '192.168.1.1',
+            'user_agent' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15',
+            'old_values' => [
+                'status' => 'nonaktif'
+            ],
+            'new_values' => [
+                'status' => 'aktif'
+            ]
+        ],
+        [
+            'id' => 6,
+            'timestamp' => '2026-06-20 09:15:00',
+            'operator' => 'Demo Klabat',
+            'event' => 'SOFT_DELETE',
+            'kategori' => 'data_pegawai',
+            'modul' => 'Employee',
+            'record_id' => '3',
+            'ip_address' => '192.168.1.1',
+            'user_agent' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15',
+            'old_values' => [
+                'status' => 'aktif'
+            ],
+            'new_values' => [
+                'status' => 'nonaktif'
+            ]
+        ],
+        [
+            'id' => 5,
+            'timestamp' => '2026-06-19 14:00:00',
+            'operator' => 'Ahmad Fauzi',
+            'event' => 'LOGOUT',
+            'kategori' => 'autentikasi',
+            'modul' => 'User',
+            'record_id' => '1',
+            'ip_address' => '192.168.1.102',
+            'user_agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/126.0.0.0',
+            'old_values' => null,
+            'new_values' => [
+                'status' => 'logged_out'
+            ]
+        ],
+        [
+            'id' => 4,
             'timestamp' => '2026-06-19 13:42:15',
             'operator' => 'Ahmad Fauzi',
             'event' => 'LOGIN',
@@ -25,13 +91,13 @@ class AuditController extends Controller
             ]
         ],
         [
-            'id' => 2,
+            'id' => 3,
             'timestamp' => '2026-06-19 11:20:04',
             'operator' => 'Demo Klabat',
             'event' => 'CREATE',
             'kategori' => 'data_pegawai',
             'modul' => 'Employee',
-            'record_id' => 'c87f2807-ea0d-400f-bd34-f45d17da89db',
+            'record_id' => '3',
             'ip_address' => '192.168.1.1',
             'user_agent' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15',
             'old_values' => null,
@@ -43,13 +109,13 @@ class AuditController extends Controller
             ]
         ],
         [
-            'id' => 3,
+            'id' => 2,
             'timestamp' => '2026-06-19 10:15:30',
             'operator' => 'Ahmad Fauzi',
             'event' => 'APPROVE',
             'kategori' => 'transaksi_cuti',
             'modul' => 'LeaveRequest',
-            'record_id' => '23',
+            'record_id' => '2',
             'ip_address' => '192.168.1.102',
             'user_agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/127.0',
             'old_values' => [
@@ -63,13 +129,13 @@ class AuditController extends Controller
             ]
         ],
         [
-            'id' => 4,
+            'id' => 1,
             'timestamp' => '2026-06-18 16:05:00',
             'operator' => 'Demo Klabat',
             'event' => 'UPDATE',
             'kategori' => 'data_pegawai',
             'modul' => 'Employee',
-            'record_id' => 'c87f2807-ea0d-400f-bd34-f45d17da89db',
+            'record_id' => '3',
             'ip_address' => '192.168.1.1',
             'user_agent' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15',
             'old_values' => [
@@ -80,30 +146,14 @@ class AuditController extends Controller
                 'email' => 'sabrinarossa24@gmail.com',
                 'status' => 'aktif'
             ]
-        ],
-        [
-            'id' => 5,
-            'timestamp' => '2026-06-18 09:30:00',
-            'operator' => 'Demo Klabat',
-            'event' => 'IMPORT',
-            'kategori' => 'system_import',
-            'modul' => 'ExcelImport',
-            'record_id' => 'import-20260618093000',
-            'ip_address' => '127.0.0.1',
-            'user_agent' => 'Console (CLI / Queue Worker)',
-            'old_values' => null,
-            'new_values' => [
-                'file_name' => 'daftar_pegawai.xlsx',
-                'status' => 'sukses',
-                'records_imported' => 8,
-                'records_skipped' => 0
-            ]
         ]
     ];
 
     public function index()
     {
-        return view('admin.audit.index');
+        return view('admin.audit.index', [
+            'auditLogs' => self::$auditLogs
+        ]);
     }
 
     public function show($id)
