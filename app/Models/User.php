@@ -22,6 +22,7 @@ class User extends Authenticatable
         'name',
         'email',
         'keycloak_id',
+        'role',
         'email_verified_at',
         'password',
     ];

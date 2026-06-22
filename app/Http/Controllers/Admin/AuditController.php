@@ -151,14 +151,23 @@ class AuditController extends Controller
 
     public function index()
     {
+        $dynamicLogs = session('dynamic_audit_logs', []);
+        $allLogs = array_merge($dynamicLogs, self::$auditLogs);
+
+        usort($allLogs, function ($a, $b) {
+            return $b['id'] - $a['id'];
+        });
+
         return view('admin.audit.index', [
-            'auditLogs' => self::$auditLogs
+            'auditLogs' => $allLogs
         ]);
     }
 
     public function show($id)
     {
-        $log = collect(self::$auditLogs)->firstWhere('id', (int)$id);
+        $dynamicLogs = session('dynamic_audit_logs', []);
+        $allLogs = array_merge($dynamicLogs, self::$auditLogs);
+        $log = collect($allLogs)->firstWhere('id', (int)$id);
         if (!$log) {
             abort(404);
         }
