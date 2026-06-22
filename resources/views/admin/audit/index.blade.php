@@ -83,7 +83,7 @@
         {{-- PAGE HEADER --}}
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink font-sans">Audit Log</h2>
+                <h2 class="text-2xl font-bold text-primary font-sans">Audit Log</h2>
                 <nav class="mt-1 flex items-center gap-1.5 text-xs text-muted">
                     <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
                     <span>/</span>
@@ -217,12 +217,12 @@
                 <table class="w-full">
                     <thead class="bg-soft border-b border-border">
                         <tr>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans">Waktu</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans">Pegawai</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans">Aktivitas</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans">Modul</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans">IP Address</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans">Aksi</th>
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans">Waktu</th>
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans">Pegawai</th>
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans">Aktivitas</th>
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans">Modul</th>
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans">IP Address</th>
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans">Aksi</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-border">
@@ -246,7 +246,7 @@
                                     <div class="flex items-center gap-1.5">
                                         <button 
                                             @click="selectedLogId = log.id; showDrawer = true" 
-                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm cursor-pointer" 
+                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/30 shadow-sm cursor-pointer" 
                                             title="Detail Drawer"
                                         >
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -256,7 +256,7 @@
                                         </button>
                                         <a 
                                             :href="'/dashboard/audit/' + log.id" 
-                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted transition hover:bg-soft hover:text-primary shadow-sm" 
+                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted transition hover:bg-soft hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/30 shadow-sm" 
                                             title="Halaman Detail"
                                         >
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -392,7 +392,7 @@
                             <div class="overflow-hidden rounded-lg border border-border bg-soft">
                                 <table class="w-full text-left border-collapse">
                                     <thead>
-                                        <tr class="bg-border/40 text-[10px] uppercase font-semibold text-muted font-sans border-b border-border">
+                                        <tr class="bg-primary/10 text-[10px] uppercase font-semibold text-muted font-sans border-b border-border">
                                             <th class="px-3 py-2">Nama Field</th>
                                             <th class="px-3 py-2">Sebelum</th>
                                             <th class="px-3 py-2">Sesudah</th>
@@ -425,16 +425,16 @@
                         <div>
                             <template x-if="selectedLog.modul === 'Employee' || selectedLog.modul === 'LeaveRequest'">
                                 <a :href="selectedLog.modul === 'Employee' ? '/pegawai/' + selectedLog.record_id : '/dashboard/cuti/' + selectedLog.record_id"
-                                   class="inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:opacity-90 font-sans shadow-sm">
+                                   class="inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:bg-primary-700 font-sans shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
                                     Lihat Record
                                 </a>
                             </template>
                         </div>
                         <div class="flex items-center gap-2">
-                            <a :href="'/dashboard/audit/' + selectedLog.id" class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-3 py-2 text-xs font-semibold text-ink transition hover:bg-soft font-sans shadow-sm">
+                            <a :href="'/dashboard/audit/' + selectedLog.id" class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-3 py-2 text-xs font-semibold text-primary transition hover:bg-soft font-sans shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
                                 Detail Penuh
                             </a>
-                            <button @click="showDrawer = false" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-3 py-2 text-xs font-semibold text-primary transition hover:bg-soft cursor-pointer focus:outline-none font-sans shadow-sm">
+                            <button @click="showDrawer = false" class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-3 py-2 text-xs font-semibold text-primary transition hover:bg-soft cursor-pointer focus:outline-none font-sans shadow-sm focus:ring-2 focus:ring-primary/30">
                                 Tutup
                             </button>
                         </div>
