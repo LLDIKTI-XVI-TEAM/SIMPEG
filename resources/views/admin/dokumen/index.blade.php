@@ -138,7 +138,9 @@
             return this.documents.filter(doc => {
                 const matchesSearch = doc.nama.toLowerCase().includes(this.searchQuery.toLowerCase()) || 
                                        doc.nomor.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-                                       doc.jenis.toLowerCase().includes(this.searchQuery.toLowerCase());
+                                       doc.jenis.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+                                       (doc.nama_pegawai && doc.nama_pegawai.toLowerCase().includes(this.searchQuery.toLowerCase())) ||
+                                       (doc.nip_pegawai && doc.nip_pegawai.toLowerCase().includes(this.searchQuery.toLowerCase()));
                 const matchesKategori = !this.activeKategori || doc.kategori === this.activeKategori;
                 const matchesUnit = !this.activeUnit || doc.unit_pegawai === this.activeUnit;
                 const matchesPegawai = !this.activePegawai || doc.nip_pegawai === this.activePegawai;
