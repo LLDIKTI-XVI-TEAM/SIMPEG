@@ -81,9 +81,7 @@
                         <select id="jenis" name="jenis" required class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                             <option value="">Pilih Status...</option>
                             <option value="PNS">PNS</option>
-                            <option value="CPNS">CPNS</option>
                             <option value="PPPK">PPPK</option>
-                            <option value="PPNPN">PPNPN</option>
                         </select>
                     </div>
 

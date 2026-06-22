@@ -66,11 +66,11 @@
                 </div>
                 <div class="min-w-0 flex-1 space-y-1">
                     <div class="flex items-center justify-between">
-                        <span class="text-[10px] font-bold uppercase tracking-wider text-info font-sans">Kontrak PPNPN (H-90)</span>
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-info font-sans">Kontrak PPPK (H-90)</span>
                         <span class="text-[10px] text-muted font-sans font-mono shrink-0">15 Juni 2026, 09:30</span>
                     </div>
-                    <h3 class="text-sm font-bold text-ink font-sans leading-snug">Peninjauan Perpanjangan Kontrak PPNPN Dewi Pertiwi</h3>
-                    <p class="text-xs text-muted font-sans leading-relaxed">Masa berlaku kontrak kepegawaian tenaga PPNPN atas nama Dewi Pertiwi akan berakhir dalam 90 hari. Harap dilakukan peninjauan kinerja berkala sebelum penandatanganan addendum perpanjangan kontrak.</p>
+                    <h3 class="text-sm font-bold text-ink font-sans leading-snug">Peninjauan Perpanjangan Kontrak PPPK Dewi Pertiwi</h3>
+                    <p class="text-xs text-muted font-sans leading-relaxed">Masa berlaku kontrak kepegawaian tenaga PPPK atas nama Dewi Pertiwi akan berakhir dalam 90 hari. Harap dilakukan peninjauan kinerja berkala sebelum penandatanganan addendum perpanjangan kontrak.</p>
                     <div class="pt-2 flex gap-3">
                         <a href="{{ route('data-pegawai') }}" class="text-xs font-semibold text-primary hover:underline font-sans">Kelola Kontrak</a>
                     </div>
