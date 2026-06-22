@@ -15,13 +15,8 @@ use Throwable;
 
 class KeycloakAuthController extends Controller
 {
-    private const ALLOWED_EMPLOYEE_MATCH_CLAIMS = [
-        'email',
-        'preferred_username',
-    ];
-
     private const ALLOWED_EMPLOYEE_MATCH_FIELDS = [
-        'email_pribadi',
+        'email',
     ];
 
     public function redirectToKeycloak(): RedirectResponse
@@ -56,17 +51,17 @@ class KeycloakAuthController extends Controller
         }
 
         // Pegawai asli wajib cocok ke data employees; akun tanpa email hanya boleh lewat whitelist user lokal.
-        $matchedEmail = $this->claimValue($keycloakUser);
+        $employeeField = $this->employeeMatchField();
+
+        if (! $employeeField) {
+            return view('auth.unregistered', [
+                'message' => 'Konfigurasi pencocokan akun SSO belum valid.',
+            ]);
+        }
+
+        $matchedEmail = $this->verifiedEmailClaim($keycloakUser);
 
         if ($matchedEmail) {
-            $employeeField = $this->employeeMatchField();
-
-            if (! $employeeField) {
-                return view('auth.unregistered', [
-                    'message' => 'Konfigurasi pencocokan akun SSO belum valid.',
-                ]);
-            }
-
             $employees = Employee::whereRaw('lower('.$employeeField.') = ?', [$matchedEmail])->limit(2)->get();
 
             if ($employees->count() !== 1) {
@@ -76,8 +71,7 @@ class KeycloakAuthController extends Controller
             }
 
             $employee = $employees->first();
-
-            $user = User::where('email', $matchedEmail)->first();
+            $user = User::whereRaw('lower(email) = ?', [$matchedEmail])->first();
 
             if ($user && $user->employee_id !== null && $user->employee_id !== $employee->id) {
                 return view('auth.unregistered', [
@@ -164,36 +158,39 @@ class KeycloakAuthController extends Controller
         return redirect()->intended(route('dashboard'));
     }
 
-    private function claimValue(object $keycloakUser): ?string
-    {
-        $claim = config('services.keycloak.employee_match_claim', 'email');
-
-        if (! in_array($claim, self::ALLOWED_EMPLOYEE_MATCH_CLAIMS, true)) {
-            return null;
-        }
-
-        $claims = property_exists($keycloakUser, 'user') && is_array($keycloakUser->user)
-            ? $keycloakUser->user
-            : [];
-
-        $value = $claim === 'email'
-            ? $keycloakUser->getEmail()
-            : data_get($claims, $claim);
-
-        $value = is_string($value) ? trim(strtolower($value)) : null;
-
-        return $value !== '' ? $value : null;
-    }
-
     private function employeeMatchField(): ?string
     {
-        $field = config('services.keycloak.employee_match_field', 'email_pribadi');
+        $field = config('services.keycloak.employee_match_field', 'email');
 
         if (! in_array($field, self::ALLOWED_EMPLOYEE_MATCH_FIELDS, true)) {
             return null;
         }
 
         return $field;
+    }
+
+    /**
+     * Tautan pegawai hanya memakai email Keycloak yang sudah diverifikasi oleh IdP.
+     */
+    private function verifiedEmailClaim(object $keycloakUser): ?string
+    {
+        $claims = property_exists($keycloakUser, 'user') && is_array($keycloakUser->user)
+            ? $keycloakUser->user
+            : [];
+
+        if (data_get($claims, 'email_verified') !== true) {
+            return null;
+        }
+
+        $value = $keycloakUser->getEmail();
+
+        $value = is_string($value) ? trim(strtolower($value)) : null;
+
+        if ($value === '' || ! filter_var($value, FILTER_VALIDATE_EMAIL)) {
+            return null;
+        }
+
+        return $value;
     }
 
     private function isAllowedDevUsername(string $username): bool

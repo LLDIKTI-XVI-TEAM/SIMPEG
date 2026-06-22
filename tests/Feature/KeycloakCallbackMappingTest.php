@@ -15,12 +15,11 @@ class KeycloakCallbackMappingTest extends TestCase
 
     public function test_keycloak_email_matches_employee_and_creates_local_user(): void
     {
-        config()->set('services.keycloak.employee_match_claim', 'email');
-        config()->set('services.keycloak.employee_match_field', 'email_pribadi');
+        config()->set('services.keycloak.employee_match_field', 'email');
 
         $employee = Employee::factory()->create([
             'nama_lengkap' => 'Budi Santoso',
-            'email_pribadi' => 'budi@example.com',
+            'email' => 'budi@example.com',
         ]);
 
         $this->fakeKeycloakUser([
@@ -28,7 +27,7 @@ class KeycloakCallbackMappingTest extends TestCase
             'nickname' => 'budi',
             'name' => 'Budi SSO',
             'email' => 'budi@example.com',
-            'raw' => ['email' => 'budi@example.com', 'preferred_username' => 'budi'],
+            'raw' => ['email' => 'budi@example.com', 'email_verified' => true, 'preferred_username' => 'budi'],
         ]);
 
         $response = $this->get('/auth/keycloak/callback');
@@ -48,7 +47,7 @@ class KeycloakCallbackMappingTest extends TestCase
     {
         $employee = Employee::factory()->create([
             'nama_lengkap' => 'Budi Santoso',
-            'email_pribadi' => 'Budi@Example.COM',
+            'email' => 'Budi@Example.COM',
         ]);
 
         $this->fakeKeycloakUser([
@@ -56,7 +55,7 @@ class KeycloakCallbackMappingTest extends TestCase
             'nickname' => 'budi',
             'name' => 'Budi SSO',
             'email' => 'budi@example.com',
-            'raw' => ['email' => 'budi@example.com', 'preferred_username' => 'budi'],
+            'raw' => ['email' => 'budi@example.com', 'email_verified' => true, 'preferred_username' => 'budi'],
         ]);
 
         $response = $this->get('/auth/keycloak/callback');
@@ -68,9 +67,41 @@ class KeycloakCallbackMappingTest extends TestCase
         ]);
     }
 
+    public function test_existing_user_email_matching_is_case_insensitive(): void
+    {
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Budi Santoso',
+            'email' => 'budi@example.com',
+        ]);
+        $user = User::factory()->pegawai()->create([
+            'email' => 'Budi@Example.COM',
+            'employee_id' => null,
+            'keycloak_id' => null,
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-user-case',
+            'nickname' => 'budi',
+            'name' => 'Budi SSO',
+            'email' => 'budi@example.com',
+            'raw' => ['email' => 'budi@example.com', 'email_verified' => true, 'preferred_username' => 'budi'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        $response->assertRedirect(route('dashboard'));
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'email' => 'Budi@Example.COM',
+            'keycloak_id' => 'kc-user-case',
+            'employee_id' => $employee->id,
+        ]);
+        $this->assertDatabaseCount('users', 1);
+    }
+
     public function test_existing_privileged_user_with_employee_email_is_not_auto_bound(): void
     {
-        Employee::factory()->create(['email_pribadi' => 'admin@example.com']);
+        Employee::factory()->create(['email' => 'admin@example.com']);
         User::factory()->superAdmin()->create([
             'email' => 'admin@example.com',
             'employee_id' => null,
@@ -82,7 +113,7 @@ class KeycloakCallbackMappingTest extends TestCase
             'nickname' => 'admin-email',
             'name' => 'Admin Email',
             'email' => 'admin@example.com',
-            'raw' => ['email' => 'admin@example.com', 'preferred_username' => 'admin-email'],
+            'raw' => ['email' => 'admin@example.com', 'email_verified' => true, 'preferred_username' => 'admin-email'],
         ]);
 
         $response = $this->get('/auth/keycloak/callback');
@@ -100,8 +131,8 @@ class KeycloakCallbackMappingTest extends TestCase
 
     public function test_existing_keycloak_id_logs_in_without_rebinding_employee(): void
     {
-        $firstEmployee = Employee::factory()->create(['email_pribadi' => 'lama@example.com']);
-        $secondEmployee = Employee::factory()->create(['email_pribadi' => 'baru@example.com']);
+        $firstEmployee = Employee::factory()->create(['email' => 'lama@example.com']);
+        $secondEmployee = Employee::factory()->create(['email' => 'baru@example.com']);
         $user = User::factory()->create([
             'email' => 'lama@example.com',
             'keycloak_id' => 'kc-existing',
@@ -115,7 +146,7 @@ class KeycloakCallbackMappingTest extends TestCase
             'nickname' => 'pegawai-baru',
             'name' => 'Nama Baru',
             'email' => 'baru@example.com',
-            'raw' => ['email' => 'baru@example.com', 'preferred_username' => 'pegawai-baru'],
+            'raw' => ['email' => 'baru@example.com', 'email_verified' => true, 'preferred_username' => 'pegawai-baru'],
         ]);
 
         $response = $this->get('/auth/keycloak/callback');
@@ -139,6 +170,46 @@ class KeycloakCallbackMappingTest extends TestCase
             'name' => 'Outsider',
             'email' => null,
             'raw' => ['preferred_username' => 'outsider'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        $response->assertOk();
+        $response->assertSee('Akun Keycloak belum terdaftar');
+        $this->assertGuest();
+        $this->assertDatabaseCount('users', 0);
+    }
+
+    public function test_unverified_email_does_not_match_employee(): void
+    {
+        Employee::factory()->create(['email' => 'budi@example.com']);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-unverified-email',
+            'nickname' => 'budi',
+            'name' => 'Budi SSO',
+            'email' => 'budi@example.com',
+            'raw' => ['email' => 'budi@example.com', 'email_verified' => false, 'preferred_username' => 'budi'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        $response->assertOk();
+        $response->assertSee('Akun Keycloak belum terdaftar');
+        $this->assertGuest();
+        $this->assertDatabaseCount('users', 0);
+    }
+
+    public function test_preferred_username_does_not_match_employee_email(): void
+    {
+        Employee::factory()->create(['email' => 'budi@example.com']);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-preferred-email',
+            'nickname' => 'budi@example.com',
+            'name' => 'Budi SSO',
+            'email' => null,
+            'raw' => ['preferred_username' => 'budi@example.com'],
         ]);
 
         $response = $this->get('/auth/keycloak/callback');
@@ -203,15 +274,15 @@ class KeycloakCallbackMappingTest extends TestCase
 
     public function test_duplicate_employee_match_is_denied(): void
     {
-        Employee::factory()->create(['email_pribadi' => 'duplikat@example.com']);
-        Employee::factory()->create(['email_pribadi' => 'duplikat@example.com']);
+        Employee::factory()->create(['email' => 'duplikat@example.com']);
+        Employee::factory()->create(['email' => 'duplikat@example.com']);
 
         $this->fakeKeycloakUser([
             'id' => 'kc-duplicate',
             'nickname' => 'duplikat',
             'name' => 'Duplikat',
             'email' => 'duplikat@example.com',
-            'raw' => ['email' => 'duplikat@example.com', 'preferred_username' => 'duplikat'],
+            'raw' => ['email' => 'duplikat@example.com', 'email_verified' => true, 'preferred_username' => 'duplikat'],
         ]);
 
         $response = $this->get('/auth/keycloak/callback');
@@ -226,14 +297,14 @@ class KeycloakCallbackMappingTest extends TestCase
     {
         config()->set('services.keycloak.employee_match_field', 'role');
 
-        Employee::factory()->create(['email_pribadi' => 'budi@example.com']);
+        Employee::factory()->create(['email' => 'budi@example.com']);
 
         $this->fakeKeycloakUser([
             'id' => 'kc-invalid-config',
             'nickname' => 'budi',
             'name' => 'Budi',
             'email' => 'budi@example.com',
-            'raw' => ['email' => 'budi@example.com', 'preferred_username' => 'budi'],
+            'raw' => ['email' => 'budi@example.com', 'email_verified' => true, 'preferred_username' => 'budi'],
         ]);
 
         $response = $this->get('/auth/keycloak/callback');
