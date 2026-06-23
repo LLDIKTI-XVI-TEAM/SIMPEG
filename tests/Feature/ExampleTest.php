@@ -37,7 +37,8 @@ class ExampleTest extends TestCase
 
     public function test_authenticated_settings_renders(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['role' => 'Super Admin']);
+        session(['active_role' => 'Super Admin']);
 
         $response = $this->actingAs($user)->get('/dashboard/pengaturan');
 
@@ -48,13 +49,23 @@ class ExampleTest extends TestCase
 
     public function test_settings_redirects(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['role' => 'Super Admin']);
+        session(['active_role' => 'Super Admin']);
 
         $response = $this->actingAs($user)->get('/pengaturan');
         $response->assertRedirect('/dashboard/pengaturan');
 
         $responseCap = $this->actingAs($user)->get('/dashboard/Pengaturan');
         $responseCap->assertRedirect('/dashboard/pengaturan');
+    }
+
+    public function test_settings_aborts_for_non_super_admin(): void
+    {
+        $user = User::factory()->create(['role' => 'Pegawai']);
+        session(['active_role' => 'Pegawai']);
+
+        $response = $this->actingAs($user)->get('/dashboard/pengaturan');
+        $response->assertStatus(403);
     }
 
     public function test_authenticated_export_cuti_renders(): void
@@ -78,6 +89,28 @@ class ExampleTest extends TestCase
         $response->assertOk();
         $response->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         $response->assertHeader('Content-Disposition', 'attachment; filename=Rekap_Cuti_Semua_Periode_' . now()->format('Ymd') . '.xlsx');
+    }
+
+    public function test_authenticated_export_pegawai_renders(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/laporan/export-pegawai');
+
+        $response->assertOk();
+        $response->assertSee('Daftar Nominatif Pegawai');
+        $response->assertSee('Ahmad Fauzi');
+    }
+
+    public function test_authenticated_export_pegawai_excel(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/laporan/export-pegawai/excel');
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        $response->assertHeader('Content-Disposition', 'attachment; filename=Daftar_Pegawai_LLDIKTI_XVI_' . now()->format('Ymd') . '.xlsx');
     }
 
     public function test_authenticated_user_management_renders(): void
@@ -312,6 +345,101 @@ class ExampleTest extends TestCase
         $response->assertOk();
         $response->assertSee('Ahmad Fauzi'); // Ahmad Fauzi has a KGB alert
         $response->assertDontSee('Cimma Sari Oktariani Di Silapu'); // Cimma has a Kenaikan Pangkat alert
+    }
+
+    public function test_unauthorized_access_to_hari_libur_aborts(): void
+    {
+        $user = User::factory()->create(['role' => 'Pegawai']);
+        session(['active_role' => 'Pegawai']);
+
+        $response = $this->actingAs($user)->get('/hari-libur');
+        $response->assertStatus(403);
+    }
+
+    public function test_authorized_super_admin_can_view_hari_libur(): void
+    {
+        $admin = User::factory()->create(['role' => 'Super Admin']);
+        session(['active_role' => 'Super Admin']);
+
+        $response = $this->actingAs($admin)->get('/hari-libur');
+        $response->assertOk();
+        $response->assertSee('Hari Libur');
+    }
+
+    public function test_super_admin_can_create_holiday(): void
+    {
+        $admin = User::factory()->create(['role' => 'Super Admin']);
+        session(['active_role' => 'Super Admin']);
+
+        $response = $this->actingAs($admin)->post('/hari-libur', [
+            'tanggal' => '2026-08-17',
+            'nama' => 'Test Hari Kemerdekaan',
+            'tipe' => 'libur_nasional',
+        ]);
+
+        $response->assertRedirect('/hari-libur');
+        $response->assertSessionHas('success');
+
+        $dynamicLogs = session('dynamic_audit_logs', []);
+        $this->assertNotEmpty($dynamicLogs);
+        
+        $found = false;
+        foreach ($dynamicLogs as $log) {
+            if ($log['event'] === 'CREATE_HOLIDAY' && $log['record_id'] === 'Test Hari Kemerdekaan') {
+                $found = true;
+                $this->assertEquals('2026-08-17', $log['new_values']['tanggal']);
+            }
+        }
+        $this->assertTrue($found);
+    }
+
+    public function test_super_admin_can_update_holiday(): void
+    {
+        $admin = User::factory()->create(['role' => 'Super Admin']);
+        session(['active_role' => 'Super Admin']);
+
+        $response = $this->actingAs($admin)->post('/hari-libur/1', [
+            'tanggal' => '2026-01-02',
+            'nama' => 'Updated Tahun Baru',
+            'tipe' => 'libur_nasional',
+        ]);
+
+        $response->assertRedirect('/hari-libur');
+        $response->assertSessionHas('success');
+
+        $dynamicLogs = session('dynamic_audit_logs', []);
+        $this->assertNotEmpty($dynamicLogs);
+        
+        $found = false;
+        foreach ($dynamicLogs as $log) {
+            if ($log['event'] === 'UPDATE_HOLIDAY' && $log['record_id'] === 'Updated Tahun Baru') {
+                $found = true;
+                $this->assertEquals('2026-01-02', $log['new_values']['tanggal']);
+            }
+        }
+        $this->assertTrue($found);
+    }
+
+    public function test_super_admin_can_delete_holiday(): void
+    {
+        $admin = User::factory()->create(['role' => 'Super Admin']);
+        session(['active_role' => 'Super Admin']);
+
+        $response = $this->actingAs($admin)->post('/hari-libur/1/delete');
+
+        $response->assertRedirect('/hari-libur');
+        $response->assertSessionHas('success');
+
+        $dynamicLogs = session('dynamic_audit_logs', []);
+        $this->assertNotEmpty($dynamicLogs);
+        
+        $found = false;
+        foreach ($dynamicLogs as $log) {
+            if ($log['event'] === 'DELETE_HOLIDAY') {
+                $found = true;
+            }
+        }
+        $this->assertTrue($found);
     }
 }
 

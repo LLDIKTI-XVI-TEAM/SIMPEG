@@ -7,6 +7,7 @@
         fileValid: false,
         dragover: false,
         activeTemplate: 'utama',
+        templateFormat: 'xlsx',
         
         // Headers template utama
         mainHeaders: ['No', 'Nama Pegawai', 'Email Pegawai', 'Golongan', 'Jabatan', 'Kelas Jabatan', 'NIP', 'Nomor Telepon', 'Pangkat', 'Pendidikan Terakhir', 'Pensiun', 'Person', 'Person Formula', 'Prodi Pendidikan Terakhir', 'Status Kepegawaian', 'Tanggal Lahir'],
@@ -27,7 +28,7 @@
             { key: 'person', label: 'Person' },
             { key: 'person_formula', label: 'Person Formula' },
             { key: 'prodi_pendidikan', label: 'Prodi Pendidikan' },
-            { key: 'jenis', label: 'Status Kepegawaian (PNS/PPPK)' },
+            { key: 'jenis', label: 'Status Kepegawaian (PNS/CPNS/PPPK)' },
             { key: 'tanggal_lahir', label: 'Tanggal Lahir' }
         ],
         
@@ -74,7 +75,7 @@
         progressText: 'Memulai proses impor...',
         
         downloadTemplate(type) {
-            window.location.href = '/pegawai/import/template/' + type;
+            window.location.href = '/pegawai/import/template/' + type + '?format=' + this.templateFormat;
         },
         
         // Download Laporan Kesalahan
@@ -175,32 +176,39 @@
 
         {{-- STEP INDICATORS (Wizard) --}}
         <div class="rounded-lg border border-border bg-surface p-4 shadow-sm select-none">
-            <div class="flex items-center justify-between max-w-3xl mx-auto text-xs font-semibold">
+            <div class="flex items-center justify-between max-w-4xl mx-auto text-xs font-semibold overflow-x-auto pb-1">
                 
                 {{-- Step 1 --}}
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 shrink-0">
                     <span :class="step >= 1 ? 'bg-primary text-white' : 'bg-soft text-muted border border-border'" class="h-6 w-6 rounded-full flex items-center justify-center font-mono">1</span>
                     <span :class="step >= 1 ? 'text-primary font-bold' : 'text-muted'" class="font-sans">Upload Berkas</span>
                 </div>
-                <div :class="step > 1 ? 'bg-primary' : 'bg-border'" class="h-0.5 flex-1 mx-3 max-w-[80px]"></div>
+                <div :class="step > 1 ? 'bg-primary' : 'bg-border'" class="h-0.5 flex-1 mx-3 min-w-8 max-w-[72px]"></div>
 
                 {{-- Step 2 --}}
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 shrink-0">
                     <span :class="step >= 2 ? 'bg-primary text-white' : 'bg-soft text-muted border border-border'" class="h-6 w-6 rounded-full flex items-center justify-center font-mono">2</span>
                     <span :class="step >= 2 ? 'text-primary font-bold' : 'text-muted'" class="font-sans">Preview & Mapping</span>
                 </div>
-                <div :class="step > 2 ? 'bg-primary' : 'bg-border'" class="h-0.5 flex-1 mx-3 max-w-[80px]"></div>
+                <div :class="step > 2 ? 'bg-primary' : 'bg-border'" class="h-0.5 flex-1 mx-3 min-w-8 max-w-[72px]"></div>
 
                 {{-- Step 3 --}}
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 shrink-0">
                     <span :class="step >= 3 ? 'bg-primary text-white' : 'bg-soft text-muted border border-border'" class="h-6 w-6 rounded-full flex items-center justify-center font-mono">3</span>
                     <span :class="step >= 3 ? 'text-primary font-bold' : 'text-muted'" class="font-sans">Validasi Data</span>
                 </div>
-                <div :class="step > 3 ? 'bg-primary' : 'bg-border'" class="h-0.5 flex-1 mx-3 max-w-[80px]"></div>
+                <div :class="step > 3 ? 'bg-primary' : 'bg-border'" class="h-0.5 flex-1 mx-3 min-w-8 max-w-[72px]"></div>
 
-                {{-- Step 4 & 5 --}}
-                <div class="flex items-center gap-2">
-                    <span :class="step >= 5 ? 'bg-primary text-white' : 'bg-soft text-muted border border-border'" class="h-6 w-6 rounded-full flex items-center justify-center font-mono">4</span>
+                {{-- Step 4 --}}
+                <div class="flex items-center gap-2 shrink-0">
+                    <span :class="step >= 4 ? 'bg-primary text-white' : 'bg-soft text-muted border border-border'" class="h-6 w-6 rounded-full flex items-center justify-center font-mono">4</span>
+                    <span :class="step >= 4 ? 'text-primary font-bold' : 'text-muted'" class="font-sans">Proses Import</span>
+                </div>
+                <div :class="step > 4 ? 'bg-primary' : 'bg-border'" class="h-0.5 flex-1 mx-3 min-w-8 max-w-[72px]"></div>
+
+                {{-- Step 5 --}}
+                <div class="flex items-center gap-2 shrink-0">
+                    <span :class="step >= 5 ? 'bg-primary text-white' : 'bg-soft text-muted border border-border'" class="h-6 w-6 rounded-full flex items-center justify-center font-mono">5</span>
                     <span :class="step >= 5 ? 'text-primary font-bold' : 'text-muted'" class="font-sans">Hasil Akhir</span>
                 </div>
             </div>
@@ -216,6 +224,14 @@
                 <div>
                     <h3 class="text-sm font-bold text-ink uppercase tracking-wider font-sans">1. Download Template Import Pegawai</h3>
                     <p class="text-xs text-muted font-sans mt-0.5">Gunakan template di bawah agar header kolom sesuai dan data dapat terbaca dengan tepat oleh sistem.</p>
+                </div>
+                <div class="inline-flex rounded-lg border border-border bg-soft p-1 text-xs font-semibold text-muted">
+                    <button type="button" @click="templateFormat = 'xlsx'"
+                        :class="templateFormat === 'xlsx' ? 'bg-surface text-primary shadow-sm' : 'hover:text-ink'"
+                        class="rounded-md px-3 py-1.5 transition">XLSX</button>
+                    <button type="button" @click="templateFormat = 'csv'"
+                        :class="templateFormat === 'csv' ? 'bg-surface text-primary shadow-sm' : 'hover:text-ink'"
+                        class="rounded-md px-3 py-1.5 transition">CSV UTF-8</button>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
                     <button type="button" @click="activeTemplate = 'utama'; downloadTemplate('utama')"

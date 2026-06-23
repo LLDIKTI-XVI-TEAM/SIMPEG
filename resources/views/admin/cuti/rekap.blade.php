@@ -123,22 +123,14 @@
                     <option>Cuti Tahunan</option>
                     <option>Cuti Sakit</option>
                     <option>Cuti Melahirkan</option>
+                    <option>Cuti Karena Alasan Penting</option>
+                    <option>Cuti Besar</option>
+                    <option>Cuti Luar Tanggungan Negara (CLTN)</option>
                 </select>
                 <button
                     class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90">
                     Terapkan Filter
                 </button>
-            </div>
-            <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-muted">Filter Aktif</span>
-                <span class="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">Periode: <span
-                        x-text="activeFilters.periode"></span></span>
-                <span class="rounded-full bg-info/10 px-3 py-1 text-xs font-semibold text-info">Unit: <span
-                        x-text="activeFilters.unit"></span></span>
-                <span class="rounded-full bg-success/10 px-3 py-1 text-xs font-semibold text-success">Pegawai: <span
-                        x-text="activeFilters.pegawai"></span></span>
-                <span class="rounded-full bg-warning/10 px-3 py-1 text-xs font-semibold text-warning">Jenis: <span
-                        x-text="activeFilters.jenis"></span></span>
             </div>
         </div>
 

@@ -156,7 +156,7 @@
                 [
                     'group' => 'Administrasi Sistem',
                     'items' => [
-                        ['label' => 'User Management', 'route' => 'user-management', 'icon' => 'shield-check'],
+                        ['label' => 'Kelola Akses User', 'route' => 'user-management', 'icon' => 'shield-check'],
                         ['label' => 'Role & Permission', 'route' => 'rbac', 'icon' => 'key'],
                         ['label' => 'Data Master', 'route' => 'data-master', 'icon' => 'table-cells'],
                         ['label' => 'Hari Libur', 'route' => 'hari-libur', 'icon' => 'calendar-days'],

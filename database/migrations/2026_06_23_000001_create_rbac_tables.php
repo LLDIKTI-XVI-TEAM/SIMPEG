@@ -71,7 +71,7 @@ return new class extends Migration
             ['id' => 17, 'name' => 'view_all_ews', 'module' => 'EWS', 'description' => 'Melihat seluruh radar EWS dan merubah flag kinerja.', 'created_at' => now(), 'updated_at' => now()],
 
             // Laporan
-            ['id' => 18, 'name' => 'generate_reports', 'module' => 'Laporan', 'description' => 'Mengunduh/export rekap data pegawai dan cuti dalam format Excel.', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 18, 'name' => 'generate_reports', 'module' => 'Laporan', 'description' => 'Mengunduh/export rekap data pegawai dan cuti dalam format PDF dan Excel.', 'created_at' => now(), 'updated_at' => now()],
         ];
         DB::table('permissions')->insert($permissions);
 

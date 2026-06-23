@@ -151,6 +151,10 @@ class AuditController extends Controller
 
     public function index()
     {
+        if (!in_array(session('active_role'), ['Super Admin', 'Admin Kepegawaian'])) {
+            abort(403, 'Unauthorized action.');
+        }
+
         $dynamicLogs = session('dynamic_audit_logs', []);
         $allLogs = array_merge($dynamicLogs, self::$auditLogs);
 
@@ -165,6 +169,10 @@ class AuditController extends Controller
 
     public function show($id)
     {
+        if (!in_array(session('active_role'), ['Super Admin', 'Admin Kepegawaian'])) {
+            abort(403, 'Unauthorized action.');
+        }
+
         $dynamicLogs = session('dynamic_audit_logs', []);
         $allLogs = array_merge($dynamicLogs, self::$auditLogs);
         $log = collect($allLogs)->firstWhere('id', (int)$id);

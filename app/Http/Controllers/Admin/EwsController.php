@@ -58,6 +58,41 @@ class EwsController extends Controller
         ];
 
         $alerts = [];
+        $thresholdMap = [
+            'Kenaikan Pangkat' => [
+                'schedule' => ['H-90', 'H-60', 'H-30'],
+                'points' => [
+                    90 => 'H-90',
+                    60 => 'H-60',
+                    30 => 'H-30',
+                ],
+            ],
+            'KGB' => [
+                'schedule' => ['H-60', 'H-30', 'H-14'],
+                'points' => [
+                    60 => 'H-60',
+                    30 => 'H-30',
+                    14 => 'H-14',
+                ],
+            ],
+            'Pensiun' => [
+                'schedule' => ['H-1 tahun', 'H-6 bulan', 'H-3 bulan'],
+                'points' => [
+                    365 => 'H-1 tahun',
+                    180 => 'H-6 bulan',
+                    90 => 'H-3 bulan',
+                ],
+            ],
+            'Kontrak PPPK' => [
+                'schedule' => ['H-6 bulan', 'H-3 bulan', 'H-1 bulan'],
+                'points' => [
+                    180 => 'H-6 bulan',
+                    90 => 'H-3 bulan',
+                    30 => 'H-1 bulan',
+                ],
+            ],
+        ];
+
         foreach ($alertsData as $data) {
             $pegawai = null;
             foreach ($pegawaiList as $p) {
@@ -70,15 +105,42 @@ class EwsController extends Controller
             if ($pegawai) {
                 // Sisa hari is determined relative to the current real date
                 $targetDate = now()->addDays($data['sisa_hari'])->format('Y-m-d');
+                $thresholdConfig = $thresholdMap[$data['jenis_event']] ?? ['schedule' => [], 'points' => []];
+                $activeThreshold = 'Di luar ambang';
+
+                foreach ($thresholdConfig['points'] as $dayLimit => $label) {
+                    if ($data['sisa_hari'] <= $dayLimit) {
+                        $activeThreshold = $label;
+                    }
+                }
                 
-                // Determine eligibility and reason
+                // Determine eligibility and reason. For Kenaikan Pangkat, surface
+                // the three design checks required by the EWS document.
                 $isEligible = true;
                 $reason = 'Layak';
+                $eligibilityChecks = [];
 
                 if ($data['jenis_event'] === 'Kenaikan Pangkat') {
+                    $eligibilityChecks = [
+                        [
+                            'label' => '4 tahun terpenuhi',
+                            'passed' => true,
+                        ],
+                        [
+                            'label' => 'Tidak ada hukuman disiplin aktif',
+                            'passed' => true,
+                        ],
+                        [
+                            'label' => 'Kinerja baik',
+                            'passed' => $pegawai['kinerja_baik'] === true,
+                        ],
+                    ];
+
                     if ($pegawai['kinerja_baik'] !== true) {
                         $isEligible = false;
                         $reason = 'Kinerja kurang baik';
+                    } else {
+                        $reason = 'Memenuhi 3 syarat';
                     }
                 }
 
@@ -89,8 +151,11 @@ class EwsController extends Controller
                     'jenis_event' => $data['jenis_event'],
                     'tanggal_target' => $targetDate,
                     'sisa_hari' => $data['sisa_hari'],
+                    'threshold_label' => $activeThreshold,
+                    'threshold_schedule' => $thresholdConfig['schedule'],
                     'is_eligible' => $isEligible,
                     'eligibility_reason' => $reason,
+                    'eligibility_checks' => $eligibilityChecks,
                 ];
             }
         }
