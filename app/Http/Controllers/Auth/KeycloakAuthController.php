@@ -136,7 +136,10 @@ class KeycloakAuthController extends Controller
         $redirectUri = config('app.url');
         $clientId = config('services.keycloak.client_id');
 
-        return redirect(Socialite::driver('keycloak')->getLogoutUrl($redirectUri, $clientId));
+        /** @var \SocialiteProviders\Keycloak\Provider $provider */
+        $provider = Socialite::driver('keycloak');
+
+        return redirect($provider->getLogoutUrl($redirectUri, $clientId));
     }
 
     private function loginMappedUser(User $user, string $keycloakId, ?string $username, ?string $name): RedirectResponse

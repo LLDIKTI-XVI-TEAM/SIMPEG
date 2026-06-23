@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Database\Seeders\ApprovalConfigSeeder;
 
 class DatabaseSeeder extends Seeder
 {
@@ -32,7 +33,7 @@ class DatabaseSeeder extends Seeder
             [
                 'name' => 'Demo Klabat',
                 'email' => 'demo-klabat@dev.local',
-                'role' => 'super_admin',
+                'role' => 'Super Admin',
                 'password' => null,
                 'email_verified_at' => now(),
             ],

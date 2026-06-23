@@ -11,6 +11,10 @@ class UserMappingController extends Controller
 {
     public function index()
     {
+        if (session('active_role') !== 'Super Admin') {
+            abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
+        }
+
         $pegawai = PegawaiController::$pegawaiList;
         $users = User::all()->keyBy('email');
 
@@ -43,6 +47,10 @@ class UserMappingController extends Controller
 
     public function update(Request $request)
     {
+        if (session('active_role') !== 'Super Admin') {
+            abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
+        }
+
         $request->validate([
             'email' => 'required|email',
             'keycloak_id' => 'nullable|string',
