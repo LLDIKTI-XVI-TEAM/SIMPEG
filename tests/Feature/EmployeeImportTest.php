@@ -15,7 +15,7 @@ class EmployeeImportTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const EMPLOYEE_IMPORT_ENDPOINT = '/api/v1/employees/import';
+    private const EMPLOYEE_IMPORT_ENDPOINT = '/api/v1/pegawai/import';
 
     protected function setUp(): void
     {
@@ -192,6 +192,18 @@ class EmployeeImportTest extends TestCase
         $response->assertJsonPath('inserted', 0);
         $response->assertJsonPath('errors.0.row', 2);
         $this->assertDatabaseCount('employees', 0);
+    }
+
+    public function test_old_employee_import_endpoint_is_not_available(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf('/api/v1/employees/import', [
+            'file' => $this->csvFile($this->validCsv()),
+        ]);
+
+        $response->assertNotFound();
     }
 
     private function validCsv(): string

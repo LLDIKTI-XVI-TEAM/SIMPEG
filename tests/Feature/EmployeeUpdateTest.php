@@ -152,7 +152,18 @@ class EmployeeUpdateTest extends TestCase
 
     private function endpoint(Employee $employee): string
     {
-        return "/api/v1/employees/{$employee->id}";
+        return "/api/v1/pegawai/{$employee->id}";
+    }
+
+    public function test_old_employees_update_endpoint_is_not_available(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+
+        $this->actingAs($user);
+        $response = $this->putJsonWithCsrf("/api/v1/employees/{$employee->id}", $this->validPayload($employee));
+
+        $response->assertNotFound();
     }
 
     private function putJsonWithCsrf(string $uri, array $data)

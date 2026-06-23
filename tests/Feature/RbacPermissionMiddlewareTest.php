@@ -50,7 +50,7 @@ class RbacPermissionMiddlewareTest extends TestCase
         // Re-seed tidak boleh menduplikasi permission (firstOrCreate + sync).
         $this->seed(RbacSeeder::class);
 
-        $this->assertSame(10, Permission::count());
+        $this->assertSame(12, Permission::count());
         $this->assertTrue(
             Role::where('name', 'super_admin')->firstOrFail()
                 ->permissions()->where('name', 'hari_libur.delete')->exists()
@@ -62,14 +62,14 @@ class RbacPermissionMiddlewareTest extends TestCase
         $user = User::factory()->adminKepegawaian()->create();
 
         $this->actingAs($user);
-        $response = $this->postJsonWithCsrf('/api/v1/employees', $this->validEmployeePayload());
+        $response = $this->postJsonWithCsrf('/api/v1/pegawai', $this->validEmployeePayload());
 
         $response->assertCreated();
     }
 
     public function test_role_middleware_blocks_role_outside_hari_libur_allowlist(): void
     {
-        // Hari libur sengaja dibatasi super_admin pada Fase 1 sebelum cek permission aksi dijalankan.
+        // Hari libur sengaja dibatasi super_admin sebelum cek permission aksi dijalankan.
         $user = User::factory()->adminKepegawaian()->create();
 
         $this->actingAs($user);
@@ -94,7 +94,7 @@ class RbacPermissionMiddlewareTest extends TestCase
         $user = User::factory()->adminKepegawaian()->create();
 
         $this->actingAs($user);
-        $response = $this->postJsonWithCsrf('/api/v1/employees', $this->validEmployeePayload());
+        $response = $this->postJsonWithCsrf('/api/v1/pegawai', $this->validEmployeePayload());
 
         $response->assertForbidden();
     }
@@ -104,7 +104,7 @@ class RbacPermissionMiddlewareTest extends TestCase
         $user = User::factory()->adminKepegawaian()->create();
 
         $this->actingAs($user);
-        $response = $this->getJson('/api/v1/audit-logs');
+        $response = $this->getJson('/api/v1/audit-log');
 
         $response->assertOk();
     }
@@ -115,9 +115,43 @@ class RbacPermissionMiddlewareTest extends TestCase
         $user = User::factory()->pegawai()->create();
 
         $this->actingAs($user);
-        $response = $this->getJson('/api/v1/audit-logs');
+        $response = $this->getJson('/api/v1/audit-log');
 
         $response->assertForbidden();
+    }
+
+    public function test_old_audit_logs_endpoint_is_not_available(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+        $response = $this->getJson('/api/v1/audit-logs');
+
+        $response->assertNotFound();
+    }
+
+    public function test_employee_histories_permissions_exist(): void
+    {
+        // Verifikasi permission employee_histories.read dan employee_histories.create tersedia.
+        $this->assertTrue(
+            Permission::where('name', 'employee_histories.read')->exists(),
+            'Permission employee_histories.read harus ada di database'
+        );
+        $this->assertTrue(
+            Permission::where('name', 'employee_histories.create')->exists(),
+            'Permission employee_histories.create harus ada di database'
+        );
+    }
+
+    public function test_admin_kepegawaian_has_employee_histories_create_permission(): void
+    {
+        // admin_kepegawaian harus memiliki permission employee_histories.create.
+        $role = Role::where('name', 'admin_kepegawaian')->firstOrFail();
+
+        $this->assertTrue(
+            $role->permissions()->where('name', 'employee_histories.create')->exists(),
+            'admin_kepegawaian harus memiliki permission employee_histories.create'
+        );
     }
 
     /**

@@ -17,7 +17,7 @@ class NotificationInboxTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const ENDPOINT = '/api/v1/notifications';
+    private const ENDPOINT = '/api/v1/notifikasi';
 
     protected function setUp(): void
     {
@@ -58,14 +58,14 @@ class NotificationInboxTest extends TestCase
     public function test_mark_read_route_requires_uuid_notification_id(): void
     {
         [$user] = $this->pegawaiWithEmployee();
-        $route = Route::getRoutes()->getByName('api.v1.notifications.read');
+        $route = Route::getRoutes()->getByName('api.v1.notifikasi.tandai-dibaca');
 
         $this->assertNotNull($route);
         $this->assertArrayHasKey('notificationId', $route->wheres);
         $this->assertSame('[\da-fA-F]{8}-[\da-fA-F]{4}-[\da-fA-F]{4}-[\da-fA-F]{4}-[\da-fA-F]{12}', $route->wheres['notificationId']);
 
         $this->actingAs($user);
-        $response = $this->patchJsonWithCsrf(self::ENDPOINT.'/not-a-uuid/read');
+        $response = $this->patchJsonWithCsrf(self::ENDPOINT.'/not-a-uuid/tandai-dibaca');
 
         $response->assertNotFound();
     }
@@ -82,7 +82,7 @@ class NotificationInboxTest extends TestCase
         $response->assertJsonPath('data', []);
         $response->assertJsonPath('meta.unread_count', 0);
 
-        $countResponse = $this->getJson(self::ENDPOINT.'/unread-count');
+        $countResponse = $this->getJson(self::ENDPOINT.'/jumlah-belum-dibaca');
 
         $countResponse->assertOk();
         $countResponse->assertJsonPath('data.unread_count', 0);
@@ -148,7 +148,7 @@ class NotificationInboxTest extends TestCase
         $this->notificationFor($otherEmployee, 'cuti.diajukan', 'Orang lain', false);
 
         $this->actingAs($user);
-        $response = $this->getJson(self::ENDPOINT.'/unread-count');
+        $response = $this->getJson(self::ENDPOINT.'/jumlah-belum-dibaca');
 
         $response->assertOk();
         $response->assertJsonPath('data.unread_count', 2);
@@ -160,7 +160,7 @@ class NotificationInboxTest extends TestCase
         $notification = $this->notificationFor($employee, 'cuti.disetujui', 'Cuti disetujui', false);
 
         $this->actingAs($user);
-        $response = $this->patchJsonWithCsrf(self::ENDPOINT."/{$notification->id}/read");
+        $response = $this->patchJsonWithCsrf(self::ENDPOINT."/{$notification->id}/tandai-dibaca");
 
         $response->assertOk();
         $response->assertJsonPath('data.id', $notification->id);
@@ -175,7 +175,7 @@ class NotificationInboxTest extends TestCase
         $otherNotification = $this->notificationFor(Employee::factory()->create(), 'cuti.diajukan', 'Orang lain', false);
 
         $this->actingAs($user);
-        $response = $this->patchJsonWithCsrf(self::ENDPOINT."/{$otherNotification->id}/read");
+        $response = $this->patchJsonWithCsrf(self::ENDPOINT."/{$otherNotification->id}/tandai-dibaca");
 
         $response->assertNotFound();
         $this->assertFalse($otherNotification->refresh()->is_read);
@@ -191,7 +191,7 @@ class NotificationInboxTest extends TestCase
         $other = $this->notificationFor($otherEmployee, 'cuti.diajukan', 'Orang lain', false);
 
         $this->actingAs($user);
-        $response = $this->patchJsonWithCsrf(self::ENDPOINT.'/read-all');
+        $response = $this->patchJsonWithCsrf(self::ENDPOINT.'/tandai-semua-dibaca');
 
         $response->assertOk();
         $response->assertJsonPath('data.updated', 2);
@@ -210,10 +210,23 @@ class NotificationInboxTest extends TestCase
         $notification = $this->notificationFor($employee, 'cuti.disetujui', 'Cuti disetujui', false);
 
         $this->actingAs($user);
-        $response = $this->patchJsonWithCsrf(self::ENDPOINT."/{$notification->id}/read");
+        $response = $this->patchJsonWithCsrf(self::ENDPOINT."/{$notification->id}/tandai-dibaca");
 
         $response->assertForbidden();
         $this->assertFalse($notification->refresh()->is_read);
+    }
+
+    public function test_old_notification_endpoints_are_not_available(): void
+    {
+        [$user, $employee] = $this->pegawaiWithEmployee();
+        $notification = $this->notificationFor($employee, 'cuti.disetujui', 'Cuti disetujui', false);
+
+        $this->actingAs($user);
+
+        $this->getJson('/api/v1/notifications')->assertNotFound();
+        $this->getJson('/api/v1/notifications/unread-count')->assertNotFound();
+        $this->patchJsonWithCsrf('/api/v1/notifications/read-all')->assertNotFound();
+        $this->patchJsonWithCsrf("/api/v1/notifications/{$notification->id}/read")->assertNotFound();
     }
 
     /**

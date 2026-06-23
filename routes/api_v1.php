@@ -4,7 +4,10 @@ use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\EmployeeImportController;
 use App\Http\Controllers\HariLiburController;
+use App\Http\Controllers\KgbHistoryController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PositionHistoryController;
+use App\Http\Controllers\RankHistoryController;
 use Illuminate\Support\Facades\Route;
 
 $disableEmployeeApiAuth = app()->environment('local')
@@ -14,21 +17,39 @@ $employeeGroupMiddleware = $disableEmployeeApiAuth
     ? []
     : ['web', 'keycloak.auth', 'role:super_admin,admin_kepegawaian'];
 
-// Role middleware menjadi pagar kasar Fase 1; permission middleware menjadi pagar aksi per route.
+// Role middleware menjadi pagar kasar area admin pegawai; permission middleware menjadi pagar aksi per route.
 // Keduanya dipertahankan sebagai defense-in-depth agar akses admin tidak hanya bergantung pada satu lapis kontrol.
 Route::middleware($employeeGroupMiddleware)
-    ->prefix('employees')
-    ->name('employees.')
+    ->prefix('pegawai')
+    ->name('pegawai.')
     ->group(function () use ($disableEmployeeApiAuth): void {
         Route::post('/', [EmployeeController::class, 'store'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.create'])
             ->name('store');
-        Route::put('/{employee}', [EmployeeController::class, 'update'])
-            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.update'])
-            ->name('update');
         Route::post('/import', [EmployeeImportController::class, 'store'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.import'])
             ->name('import.store');
+        Route::put('/{employee}', [EmployeeController::class, 'update'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.update'])
+            ->name('update');
+        Route::get('/{employee}/riwayat-kepangkatan', [RankHistoryController::class, 'index'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_histories.read'])
+            ->name('riwayat-kepangkatan.index');
+        Route::post('/{employee}/riwayat-kepangkatan', [RankHistoryController::class, 'store'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_histories.create'])
+            ->name('riwayat-kepangkatan.store');
+        Route::get('/{employee}/riwayat-jabatan', [PositionHistoryController::class, 'index'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_histories.read'])
+            ->name('riwayat-jabatan.index');
+        Route::post('/{employee}/riwayat-jabatan', [PositionHistoryController::class, 'store'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_histories.create'])
+            ->name('riwayat-jabatan.store');
+        Route::get('/{employee}/riwayat-kgb', [KgbHistoryController::class, 'index'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_histories.read'])
+            ->name('riwayat-kgb.index');
+        Route::post('/{employee}/riwayat-kgb', [KgbHistoryController::class, 'store'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_histories.create'])
+            ->name('riwayat-kgb.store');
     });
 
 Route::middleware(['web', 'keycloak.auth', 'role:super_admin'])
@@ -51,28 +72,28 @@ Route::middleware(['web', 'keycloak.auth', 'role:super_admin'])
 
 /*
 |--------------------------------------------------------------------------
-| Audit Logs — admin only (PRD §15.3)
+| Audit Logs — hanya admin kepegawaian berizin audit
 |--------------------------------------------------------------------------
 */
 Route::middleware(['web', 'keycloak.auth', 'role:super_admin,admin_kepegawaian', 'permission:audit_logs.read'])
-    ->get('/audit-logs', [AuditLogController::class, 'index'])
-    ->name('audit-logs.index');
+    ->get('/audit-log', [AuditLogController::class, 'index'])
+    ->name('audit-log.index');
 
 Route::middleware(['web', 'keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan,atasan_langsung,pegawai'])
-    ->prefix('notifications')
-    ->name('notifications.')
+    ->prefix('notifikasi')
+    ->name('notifikasi.')
     ->group(function (): void {
         Route::get('/', [NotificationController::class, 'index'])
             ->middleware('permission:notifications.read')
             ->name('index');
-        Route::get('/unread-count', [NotificationController::class, 'unreadCount'])
+        Route::get('/jumlah-belum-dibaca', [NotificationController::class, 'unreadCount'])
             ->middleware('permission:notifications.read')
-            ->name('unread-count');
-        Route::patch('/read-all', [NotificationController::class, 'markAllAsRead'])
+            ->name('jumlah-belum-dibaca');
+        Route::patch('/tandai-semua-dibaca', [NotificationController::class, 'markAllAsRead'])
             ->middleware('permission:notifications.update')
-            ->name('read-all');
-        Route::patch('/{notificationId}/read', [NotificationController::class, 'markAsRead'])
+            ->name('tandai-semua-dibaca');
+        Route::patch('/{notificationId}/tandai-dibaca', [NotificationController::class, 'markAsRead'])
             ->middleware('permission:notifications.update')
             ->whereUuid('notificationId')
-            ->name('read');
+            ->name('tandai-dibaca');
     });
