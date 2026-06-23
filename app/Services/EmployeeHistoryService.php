@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Employee;
+use App\Models\DisciplineRecord;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\RefGolongan;
@@ -132,6 +133,44 @@ class EmployeeHistoryService
             AuditService::log('CREATE', 'SalaryHistory', $history->id, null, $history->toArray(), $request);
 
             return $history->refresh();
+        });
+    }
+
+    /**
+     * Menambah riwayat hukuman disiplin secara append-only dan menghitung status aktif dari tanggal berakhir.
+     */
+    public function createDisciplineRecord(Employee $employee, array $data, ?Request $request = null): DisciplineRecord
+    {
+        return DB::transaction(function () use ($employee, $data, $request): DisciplineRecord {
+            $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
+            $endDate = isset($data['tanggal_berakhir']) && $data['tanggal_berakhir'] !== null
+                ? Carbon::parse($data['tanggal_berakhir'])
+                : null;
+
+            $record = $employee->disciplineRecords()->create([
+                ...Arr::only($data, [
+                    'jenis_hukuman',
+                    'deskripsi',
+                    'tanggal_mulai',
+                    'tanggal_berakhir',
+                    'no_sk',
+                    'tanggal_sk',
+                    'file_sk',
+                ]),
+                'is_active' => $endDate === null || $endDate->greaterThanOrEqualTo(Carbon::today()),
+            ]);
+
+            AuditService::log('CREATE', 'DisciplineRecord', $record->id, null, Arr::only($record->toArray(), [
+                'id',
+                'employee_id',
+                'jenis_hukuman',
+                'tanggal_mulai',
+                'tanggal_berakhir',
+                'tanggal_sk',
+                'is_active',
+            ]), $request);
+
+            return $record->refresh();
         });
     }
 }
