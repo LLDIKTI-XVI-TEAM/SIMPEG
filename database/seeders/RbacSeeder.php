@@ -21,6 +21,7 @@ class RbacSeeder extends Seeder
 
         // Permission level aksi memakai konvensi module.action agar mudah diaudit dan diperluas.
         $permissions = [
+            'employees.read' => ['module' => 'employees', 'description' => 'Melihat daftar data pegawai'],
             'employees.create' => ['module' => 'employees', 'description' => 'Membuat data pegawai'],
             'employees.update' => ['module' => 'employees', 'description' => 'Mengubah data pegawai'],
             'employees.import' => ['module' => 'employees', 'description' => 'Import data pegawai'],
@@ -51,6 +52,7 @@ class RbacSeeder extends Seeder
         $this->syncRolePermissions([
             'super_admin' => array_keys($permissions),
             'admin_kepegawaian' => [
+                'employees.read',
                 'employees.create',
                 'employees.update',
                 'employees.import',

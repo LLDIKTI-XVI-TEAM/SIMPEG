@@ -19,6 +19,7 @@
 /storage/*.key
 /storage/pail
 /vendor
+postman/simpeg-local-session.postman_environment.json
 Homestead.json
 Homestead.yaml
 Thumbs.db
