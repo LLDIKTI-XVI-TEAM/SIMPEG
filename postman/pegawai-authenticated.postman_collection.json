@@ -1,0 +1,58 @@
+{
+  "info": {
+    "name": "SIMPEG Pegawai Authenticated API",
+    "description": "Test endpoint pegawai dengan cookie session Laravel hasil login Keycloak.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Lihat daftar pegawai harus berhasil dengan session SSO",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 OK', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response berisi daftar pegawai', function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.message).to.eql('Daftar pegawai berhasil diambil.');",
+              "  pm.expect(json.employees).to.have.property('data');",
+              "  pm.expect(json.employees).to.have.property('current_page');",
+              "  pm.expect(json.employees).to.have.property('per_page');",
+              "  pm.expect(json.employees).to.have.property('total');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Cookie",
+            "value": "{{cookie_header}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/pegawai",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "pegawai"
+          ]
+        }
+      }
+    }
+  ]
+}

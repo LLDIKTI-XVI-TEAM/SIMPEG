@@ -14,7 +14,7 @@ class EmployeeCreationTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const EMPLOYEES_ENDPOINT = '/api/v1/employees';
+    private const EMPLOYEES_ENDPOINT = '/api/v1/pegawai';
 
     protected function setUp(): void
     {
@@ -98,6 +98,16 @@ class EmployeeCreationTest extends TestCase
 
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors('tanggal_lahir');
+    }
+
+    public function test_old_employees_store_endpoint_is_not_available(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf('/api/v1/employees', $this->validPayload());
+
+        $response->assertNotFound();
     }
 
     private function postJsonWithCsrf(string $uri, array $data)
