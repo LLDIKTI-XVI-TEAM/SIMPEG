@@ -1,0 +1,106 @@
+{
+  "info": {
+    "name": "SIMPEG SSO Auth Smoke Test",
+    "description": "Smoke test untuk memastikan endpoint API terlindungi oleh session auth dan route login mengarah ke Keycloak SSO.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "keycloak_base_url",
+      "value": "https://sso-lldikti16.kemdiktisaintek.go.id"
+    }
+  ],
+  "item": [
+    {
+      "name": "Endpoint pegawai tanpa session harus redirect ke login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status adalah 302 redirect', function () {",
+              "  pm.response.to.have.status(302);",
+              "});",
+              "",
+              "pm.test('Redirect mengarah ke /login', function () {",
+              "  const location = pm.response.headers.get('Location') || '';",
+              "  pm.expect(location).to.include('/login');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/pegawai",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "pegawai"
+          ]
+        }
+      },
+      "protocolProfileBehavior": {
+        "followRedirects": false
+      }
+    },
+    {
+      "name": "Login harus redirect ke Keycloak",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status adalah 302 redirect', function () {",
+              "  pm.response.to.have.status(302);",
+              "});",
+              "",
+              "pm.test('Redirect mengarah ke Keycloak SSO', function () {",
+              "  const location = pm.response.headers.get('Location') || '';",
+              "  pm.expect(location).to.include(pm.variables.get('keycloak_base_url'));",
+              "  pm.expect(location).to.include('/realms/sso/protocol/openid-connect/auth');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "text/html"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/login",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "login"
+          ]
+        }
+      },
+      "protocolProfileBehavior": {
+        "followRedirects": false
+      }
+    }
+  ]
+}
