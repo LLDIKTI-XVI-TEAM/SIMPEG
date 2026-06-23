@@ -26,16 +26,48 @@ class HariLiburController extends Controller
 
     public function index()
     {
+        if (session('active_role') !== 'Super Admin') {
+            abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
+        }
+
         return view('admin.hari-libur.index');
     }
 
     public function store(Request $request)
     {
+        if (session('active_role') !== 'Super Admin') {
+            abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
+        }
+
         $request->validate([
             'tanggal' => 'required|date',
             'nama' => 'required|string|max:255',
             'tipe' => 'required|string',
         ]);
+
+        // Write Audit Log
+        $dynamicLogs = session('dynamic_audit_logs', []);
+        $newId = count($dynamicLogs) + count(\App\Http\Controllers\Admin\AuditController::$auditLogs) + 1;
+
+        $dynamicLogs[] = [
+            'id' => $newId,
+            'timestamp' => now()->format('Y-m-d H:i:s'),
+            'operator' => auth()->user()->name ?? 'Super Admin',
+            'event' => 'CREATE_HOLIDAY',
+            'kategori' => 'konfigurasi_sistem',
+            'modul' => 'Hari Libur',
+            'record_id' => $request->input('nama'),
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'old_values' => null,
+            'new_values' => [
+                'tanggal' => $request->input('tanggal'),
+                'nama' => $request->input('nama'),
+                'tipe' => $request->input('tipe'),
+            ]
+        ];
+
+        session(['dynamic_audit_logs' => $dynamicLogs]);
 
         return redirect()->route('hari-libur')
             ->with('success', 'Hari libur "' . $request->input('nama') . '" berhasil ditambahkan.');
@@ -43,6 +75,10 @@ class HariLiburController extends Controller
 
     public function edit($id)
     {
+        if (session('active_role') !== 'Super Admin') {
+            abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
+        }
+
         $hl = collect(self::$hariLiburData)->firstWhere('id', (int)$id);
         if (!$hl) {
             abort(404);
@@ -52,20 +88,83 @@ class HariLiburController extends Controller
 
     public function update(Request $request, $id)
     {
+        if (session('active_role') !== 'Super Admin') {
+            abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
+        }
+
         $request->validate([
             'tanggal' => 'required|date',
             'nama' => 'required|string|max:255',
             'tipe' => 'required|string',
         ]);
 
+        $hl = collect(self::$hariLiburData)->firstWhere('id', (int)$id);
+
+        // Write Audit Log
+        $dynamicLogs = session('dynamic_audit_logs', []);
+        $newId = count($dynamicLogs) + count(\App\Http\Controllers\Admin\AuditController::$auditLogs) + 1;
+
+        $dynamicLogs[] = [
+            'id' => $newId,
+            'timestamp' => now()->format('Y-m-d H:i:s'),
+            'operator' => auth()->user()->name ?? 'Super Admin',
+            'event' => 'UPDATE_HOLIDAY',
+            'kategori' => 'konfigurasi_sistem',
+            'modul' => 'Hari Libur',
+            'record_id' => $request->input('nama'),
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'old_values' => [
+                'tanggal' => $hl ? $hl['tanggal'] : '',
+                'nama' => $hl ? $hl['nama'] : '',
+                'tipe' => $hl ? $hl['tipe'] : '',
+            ],
+            'new_values' => [
+                'tanggal' => $request->input('tanggal'),
+                'nama' => $request->input('nama'),
+                'tipe' => $request->input('tipe'),
+            ]
+        ];
+
+        session(['dynamic_audit_logs' => $dynamicLogs]);
+
         return redirect()->route('hari-libur')
             ->with('success', 'Hari libur "' . $request->input('nama') . '" berhasil diperbarui.');
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
+        if (session('active_role') !== 'Super Admin') {
+            abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
+        }
+
         $hl = collect(self::$hariLiburData)->firstWhere('id', (int)$id);
         $nama = $hl ? $hl['nama'] : 'Hari Libur';
+
+        // Write Audit Log
+        $dynamicLogs = session('dynamic_audit_logs', []);
+        $newId = count($dynamicLogs) + count(\App\Http\Controllers\Admin\AuditController::$auditLogs) + 1;
+
+        $dynamicLogs[] = [
+            'id' => $newId,
+            'timestamp' => now()->format('Y-m-d H:i:s'),
+            'operator' => auth()->user()->name ?? 'Super Admin',
+            'event' => 'DELETE_HOLIDAY',
+            'kategori' => 'konfigurasi_sistem',
+            'modul' => 'Hari Libur',
+            'record_id' => $nama,
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'old_values' => [
+                'tanggal' => $hl ? $hl['tanggal'] : '',
+                'nama' => $hl ? $hl['nama'] : '',
+                'tipe' => $hl ? $hl['tipe'] : '',
+            ],
+            'new_values' => null
+        ];
+
+        session(['dynamic_audit_logs' => $dynamicLogs]);
+
         return redirect()->route('hari-libur')
             ->with('success', 'Hari libur "' . $nama . '" berhasil dihapus dari daftar.');
     }

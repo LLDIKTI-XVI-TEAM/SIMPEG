@@ -2,15 +2,25 @@
     <div class="mx-auto max-w-2xl space-y-6">
         
         {{-- Breadcrumbs & Title --}}
-        <div class="flex flex-col gap-1.5">
-            <h2 class="text-2xl font-bold text-primary font-sans">Edit Hari Libur</h2>
-            <nav class="flex items-center gap-1.5 text-xs text-muted">
-                <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
-                <span>/</span>
-                <a href="{{ route('hari-libur') }}" class="transition-colors hover:text-ink">Hari Libur</a>
-                <span>/</span>
-                <span class="font-medium text-ink">Edit - {{ $hl['nama'] }}</span>
-            </nav>
+        <div class="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex flex-col gap-1">
+                <h2 class="text-2xl font-bold text-primary font-sans">Edit Hari Libur</h2>
+                <nav class="flex items-center gap-1.5 text-xs text-muted font-sans">
+                    <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink font-sans">Dashboard</a>
+                    <span>/</span>
+                    <a href="{{ route('hari-libur') }}" class="transition-colors hover:text-ink font-sans">Hari Libur</a>
+                    <span>/</span>
+                    <span class="font-medium text-ink font-sans">Edit - {{ $hl['nama'] }}</span>
+                </nav>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="inline-flex items-center gap-1 rounded bg-danger/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-danger shadow-sm">
+                    ⚠️ Akses: Khusus Super Admin
+                </span>
+                <span class="inline-flex items-center gap-1 rounded bg-info/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-info shadow-sm">
+                    🔒 Audit Trail Aktif
+                </span>
+            </div>
         </div>
 
         {{-- Form Card --}}

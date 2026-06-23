@@ -1,4 +1,4 @@
-<x-layouts.app title="Laporan - Export Pegawai">
+<x-layouts.app title="Daftar Nominatif Pegawai">
 
     <div x-data="{
         searchQuery: '',
@@ -70,23 +70,30 @@
 
         {{-- PRINT ONLY HEADER (Kop Surat Resmi) --}}
         <div class="hidden print:block mb-8">
-            <div class="text-center border-b-2 border-ink pb-4">
-                <h1 class="text-xl font-bold uppercase font-sans">Kementerian Pendidikan Tinggi, Sains, dan Teknologi</h1>
-                <h2 class="text-lg font-bold uppercase font-sans text-primary">Lembaga Layanan Pendidikan Tinggi (LLDIKTI) Wilayah XVI</h2>
-                <p class="text-xs text-muted mt-1 font-sans">Jl. Prof. Dr. Aloei Saboe, Wongkaditi, Kota Gorontalo</p>
-                <div class="mt-6 font-bold uppercase font-sans tracking-wide text-sm underline">Daftar Nominatif Pegawai</div>
-                <p class="text-xs text-muted mt-1 font-sans">Tanggal Cetak: {{ now()->translatedFormat('d F Y') }}</p>
+            <div class="flex items-center justify-center border-b-2 border-black pb-4">
+                <img src="{{ asset('img/dikti16-favicon-blue-150x150.png') }}" class="h-16 w-16 mr-4" alt="Logo LLDIKTI XVI">
+                <div class="text-center">
+                    <h1 class="text-lg font-bold uppercase font-sans leading-tight">Kementerian Pendidikan Tinggi, Sains, dan Teknologi</h1>
+                    <h2 class="text-base font-bold uppercase font-sans text-primary leading-tight">Lembaga Layanan Pendidikan Tinggi (LLDIKTI) Wilayah XVI</h2>
+                    <p class="text-[10px] text-muted font-sans mt-0.5">Jl. Prof. Dr. Aloei Saboe, Wongkaditi, Kota Gorontalo</p>
+                </div>
+            </div>
+            <div class="text-center mt-6">
+                <div class="font-bold uppercase font-sans tracking-wide text-sm underline">Daftar Nominatif Pegawai</div>
+                <p class="text-[11px] text-muted mt-1 font-sans">Tanggal Cetak: {{ now()->translatedFormat('d F Y') }}</p>
             </div>
         </div>
 
         {{-- PAGE HEADER (Screen only) --}}
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between print:hidden">
             <div>
-                <h2 class="text-2xl font-semibold text-ink font-sans">Laporan & Export Pegawai</h2>
+                <h2 class="text-2xl font-semibold text-ink font-sans">Daftar Nominatif Pegawai</h2>
                 <nav class="mt-1 flex items-center gap-1.5 text-xs text-muted">
                     <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
                     <span>/</span>
-                    <span class="font-medium text-ink">Export Pegawai</span>
+                    <span class="font-medium text-ink">Daftar Nominatif Pegawai</span>
+                    <span>•</span>
+                    <span class="text-muted italic">Akses: Admin Kepegawaian & Pimpinan</span>
                 </nav>
             </div>
             
@@ -119,7 +126,7 @@
         <div class="rounded-lg border border-border bg-surface p-4 flex flex-col gap-4 shadow-sm print:hidden">
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12">
                 {{-- Search input --}}
-                <div class="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 col-span-1 sm:col-span-2 lg:col-span-3 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
+                <div class="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 col-span-1 sm:col-span-2 lg:col-span-4 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
                     <svg class="w-4 h-4 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                     </svg>
@@ -127,7 +134,7 @@
                 </div>
 
                 {{-- Filter Unit Kerja --}}
-                <div class="relative col-span-1 sm:col-span-1 lg:col-span-3">
+                <div class="relative col-span-1 sm:col-span-1 lg:col-span-4">
                     <select x-model="activeUnit" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                         <option value="">Semua Unit Kerja</option>
                         <option>Bag. Umum</option>
@@ -143,7 +150,7 @@
                 </div>
 
                 {{-- Filter Golongan --}}
-                <div class="relative col-span-1 sm:col-span-1 lg:col-span-2">
+                <div class="relative col-span-1 sm:col-span-1 lg:col-span-4">
                     <select x-model="activeGolongan" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                         <option value="">Semua Golongan</option>
                         <option>IV/a</option>
@@ -161,7 +168,7 @@
                 </div>
 
                 {{-- Filter Jenis Pegawai --}}
-                <div class="relative col-span-1 sm:col-span-1 lg:col-span-2">
+                <div class="relative col-span-1 sm:col-span-1 lg:col-span-4">
                     <select x-model="activeJenis" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                         <option value="">Semua Jenis</option>
                         <option>PNS</option>
@@ -174,8 +181,23 @@
                     </div>
                 </div>
 
+                {{-- Filter Status --}}
+                <div class="relative col-span-1 sm:col-span-1 lg:col-span-4">
+                    <select x-model="activeStatus" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                        <option value="">Semua Status</option>
+                        <option value="aktif">Aktif</option>
+                        <option value="cuti">Cuti</option>
+                        <option value="nonaktif">Nonaktif</option>
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                        </svg>
+                    </div>
+                </div>
+
                 {{-- Urutkan Berdasarkan --}}
-                <div class="relative col-span-1 sm:col-span-1 lg:col-span-2">
+                <div class="relative col-span-1 sm:col-span-1 lg:col-span-4">
                     <select x-model="sortBy" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                         <option value="nama">Urut Nama</option>
                         <option value="nip">Urut NIP</option>
@@ -224,13 +246,13 @@
                                 <td class="px-4 py-3.5 text-xs text-ink font-sans" x-text="p.jabatan"></td>
                                 <td class="px-4 py-3.5 text-xs text-muted font-sans" x-text="p.unit"></td>
                                 <td class="px-4 py-3.5 text-xs font-sans">
-                                    <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                                          :class="p.jenis === 'PNS' ? 'bg-primary/10 text-primary' : 'bg-secondary/10 text-secondary'"
+                                    <span class="font-semibold text-xs"
+                                          :class="p.jenis === 'PNS' ? 'text-primary' : 'text-secondary'"
                                           x-text="p.jenis"></span>
                                 </td>
                                 <td class="px-4 py-3.5 text-xs font-sans">
-                                    <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                                          :class="p.status === 'aktif' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'"
+                                    <span class="font-semibold text-xs capitalize"
+                                          :class="p.status === 'aktif' ? 'text-success' : 'text-warning'"
                                           x-text="p.status"></span>
                                 </td>
                             </tr>
@@ -311,6 +333,9 @@
             </div>
         </div>
 
+        {{-- PRINT ONLY FOOTER --}}
+        <div id="print-footer" class="hidden print:block"></div>
+
     </div>
 
     {{-- CUSTOM CSS PRINTING --}}
@@ -350,6 +375,21 @@
                 color: #000000 !important;
                 font-size: 11px !important;
                 background-color: transparent !important;
+            }
+            #print-footer {
+                position: fixed;
+                bottom: -0.5cm;
+                left: 0;
+                right: 0;
+                border-top: 1px solid #000000;
+                text-align: right;
+                font-size: 10px;
+                font-family: 'Poppins', sans-serif;
+                color: #6B7280;
+                padding-top: 5px;
+            }
+            #print-footer::after {
+                content: "Halaman " counter(page) " dari " counter(pages);
             }
         }
     </style>

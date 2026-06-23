@@ -61,12 +61,32 @@
         {{-- PAGE HEADER --}}
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink font-sans">User Management & Akses SSO</h2>
+                <h2 class="text-2xl font-semibold text-ink font-sans">Kelola Akses User</h2>
                 <nav class="mt-1 flex items-center gap-1.5 text-xs text-muted">
                     <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
                     <span>/</span>
-                    <span class="font-medium text-ink">User Management</span>
+                    <span class="font-medium text-ink">Kelola Akses User</span>
+                    <span>•</span>
+                    <span class="text-muted italic">Akses: Khusus Super Admin</span>
                 </nav>
+            </div>
+            <div class="flex items-center gap-3">
+                <a href="{{ route('audit-log') }}" class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-muted shadow-sm transition hover:bg-soft hover:text-ink font-sans">
+                    <svg class="w-4 h-4 mr-1.5 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
+                    </svg>
+                    Lihat Audit Log Akses
+                </a>
+            </div>
+        </div>
+
+        {{-- INFO ARCHITECTURE CARD --}}
+        <div class="rounded-lg border border-info/20 bg-info/5 p-4 text-xs text-info flex gap-3">
+            <svg class="w-5 h-5 shrink-0 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+            </svg>
+            <div>
+                <span class="font-bold">Informasi Otorisasi:</span> Sistem menggunakan Keycloak SSO murni untuk autentikasi identitas login. Seluruh hak akses, role, dan permission dibaca serta dikonfigurasi melalui database internal SIMPEG (RBAC). Perubahan peran (role) akan berlaku saat pegawai melakukan login berikutnya.
             </div>
         </div>
 
@@ -141,51 +161,50 @@
             <div class="px-6 py-4 border-b border-border bg-surface">
                 <h3 class="text-sm font-semibold text-ink font-sans">Pemetaan Akun SSO & Otorisasi RBAC</h3>
                 <p class="text-[10px] text-muted font-sans mt-0.5">Hubungkan email Keycloak SSO dengan data pegawai internal serta kelola role.</p>
-            </div>
-
-            <div class="overflow-x-auto">
+            </div>            <div class="overflow-x-auto">
                 <table class="w-full border-collapse">
                     <thead class="bg-soft border-b border-border">
                         <tr>
-                            <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">NO</th>
-                            <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">NAMA PEGAWAI</th>
-                            <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">NIP</th>
-                            <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">KEYCLOAK ID / EMAIL SSO</th>
-                            <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">ROLE INTERNAL</th>
-                            <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">STATUS SSO</th>
-                            <th class="px-4 py-2.5 text-right text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">AKSI</th>
+                            <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border whitespace-nowrap">NO</th>
+                            <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border whitespace-nowrap">NAMA PEGAWAI</th>
+                            <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border whitespace-nowrap">NIP</th>
+                            <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border whitespace-nowrap">EMAIL PEGAWAI</th>
+                            <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border whitespace-nowrap">KEYCLOAK ID</th>
+                            <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border whitespace-nowrap">ROLE</th>
+                            <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border whitespace-nowrap">STATUS SSO</th>
+                            <th class="px-4 py-2.5 text-right text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border whitespace-nowrap">AKSI</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-border">
                         <template x-for="(emp, index) in paginatedEmployees" :key="emp.nip">
                             <tr class="transition-colors hover:bg-soft/50">
-                                <td class="px-4 py-3.5 text-xs font-mono text-muted" x-text="(currentPage - 1) * perPage + index + 1"></td>
-                                <td class="px-4 py-3.5 text-xs font-bold text-ink font-sans" x-text="emp.nama"></td>
-                                <td class="px-4 py-3.5 text-xs font-mono text-muted" x-text="emp.nip"></td>
-                                <td class="px-4 py-3.5 text-xs text-ink font-sans">
-                                    <div class="font-bold font-mono text-primary" x-text="emp.keycloak_id || '-'"></div>
-                                    <div class="text-[10px] text-muted font-mono mt-0.5" x-text="emp.mapped_email"></div>
+                                <td class="px-4 py-3.5 text-xs font-mono text-muted whitespace-nowrap" x-text="(currentPage - 1) * perPage + index + 1"></td>
+                                <td class="px-4 py-3.5 text-xs font-bold text-ink font-sans whitespace-nowrap" x-text="emp.nama"></td>
+                                <td class="px-4 py-3.5 text-xs font-mono text-muted whitespace-nowrap" x-text="emp.nip"></td>
+                                <td class="px-4 py-3.5 text-xs text-ink font-mono whitespace-nowrap" x-text="emp.mapped_email"></td>
+                                <td class="px-4 py-3.5 text-xs font-mono whitespace-nowrap"
+                                    :class="emp.keycloak_id ? 'text-primary font-bold' : 'text-muted'"
+                                    x-text="emp.keycloak_id || '-'"></td>
+                                <td class="px-4 py-3.5 text-xs whitespace-nowrap">
+                                     <span class="text-[10px] font-bold uppercase tracking-wide"
+                                           :class="{
+                                               'text-danger': emp.role === 'Super Admin',
+                                               'text-primary': emp.role === 'Admin Kepegawaian',
+                                               'text-secondary': emp.role === 'Pimpinan',
+                                               'text-warning': emp.role === 'Atasan Langsung',
+                                               'text-success': emp.role === 'Pegawai'
+                                           }"
+                                           x-text="emp.role"
+                                     ></span>
                                 </td>
-                                <td class="px-4 py-3.5 text-xs">
-                                    <span class="rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-                                          :class="{
-                                              'bg-danger/10 text-danger': emp.role === 'Super Admin',
-                                              'bg-primary/10 text-primary': emp.role === 'Admin Kepegawaian',
-                                              'bg-secondary/10 text-secondary': emp.role === 'Pimpinan',
-                                              'bg-warning/10 text-warning': emp.role === 'Atasan Langsung',
-                                              'bg-success/10 text-success': emp.role === 'Pegawai'
-                                          }"
-                                          x-text="emp.role"
-                                    ></span>
-                                </td>
-                                <td class="px-4 py-3.5 text-xs font-sans">
-                                    <span class="inline-flex items-center gap-1.5 font-semibold"
+                                <td class="px-4 py-3.5 text-xs font-sans whitespace-nowrap">
+                                    <span class="inline-flex items-center gap-1 font-bold text-[10px]"
                                           :class="emp.is_connected ? 'text-success' : 'text-danger'">
-                                        <span class="h-1.5 w-1.5 rounded-full" :class="emp.is_connected ? 'bg-success' : 'bg-danger'"></span>
+                                        <span class="h-1 w-1 rounded-full" :class="emp.is_connected ? 'bg-success' : 'bg-danger'"></span>
                                         <span x-text="emp.is_connected ? 'Terhubung' : 'Belum Terhubung'"></span>
                                     </span>
                                 </td>
-                                <td class="px-4 py-3.5 text-right">
+                                <td class="px-4 py-3.5 text-right whitespace-nowrap">
                                     <div class="flex items-center justify-end">
                                         <button
                                             type="button"
@@ -203,7 +222,7 @@
                         </template>
 
                         <tr x-show="filteredEmployees.length === 0">
-                            <td colspan="7" class="px-6 py-8 text-center text-xs text-muted font-sans">
+                            <td colspan="8" class="px-6 py-8 text-center text-xs text-muted font-sans">
                                 Tidak ada pegawai yang cocok dengan filter pencarian Anda.
                             </td>
                         </tr>
@@ -292,8 +311,9 @@
                             <label class="text-xs font-semibold text-ink font-sans">Keycloak ID / Email SSO</label>
                             <input type="text" name="keycloak_id" x-model="selectedEmployee.keycloak_id" placeholder="Masukkan ID / Email SSO Keycloak..." class="h-[44px] w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                             <p class="text-[10px] text-muted font-sans">Kosongkan jika ingin memutuskan (disconnect) akun SSO pegawai.</p>
+                            <p class="text-[10px] text-danger font-semibold font-sans mt-1">⚠️ Aturan Unik: Satu Keycloak ID hanya boleh dipetakan ke satu pegawai saja.</p>
                         </div>
-
+ 
                         <div class="space-y-1">
                             <label class="text-xs font-semibold text-ink font-sans">Role Internal SIMPEG</label>
                             <select name="role" x-model="selectedEmployee.role" class="h-[44px] w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
@@ -304,6 +324,17 @@
                                 <option value="Pegawai">Pegawai</option>
                             </select>
                             <p class="text-[10px] text-muted font-sans">Pilih tingkat otorisasi internal untuk di-assign ke user ini.</p>
+                            <p class="text-[10px] text-warning font-semibold font-sans mt-1">⚠️ Catatan: Perubahan role baru akan aktif setelah user melakukan login berikutnya.</p>
+                        </div>
+
+                        {{-- WARNING SENSITIVE ROLE --}}
+                        <div x-show="selectedEmployee.role === 'Super Admin'" class="rounded-lg border border-danger/20 bg-danger/5 p-3 text-xs text-danger flex gap-2" style="display: none;">
+                            <svg class="w-4 h-4 shrink-0 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                            </svg>
+                            <div>
+                                <span class="font-bold">⚠️ PERINGATAN AKSES:</span> Anda memilih peran <strong>Super Admin</strong>. Peran ini memiliki tingkat otorisasi tertinggi dengan hak penuh atas sistem. Pastikan wewenang ini sah.
+                            </div>
                         </div>
                     </div>
 
