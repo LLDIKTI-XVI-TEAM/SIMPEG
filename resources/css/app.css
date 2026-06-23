@@ -7,49 +7,37 @@
 @source '../**/*.js';
 
 @theme {
+    /* Typography */
     --font-sans: 'Poppins', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
-    --color-primary: #122E92;
-    --color-primary-50: #EFF3FF;
-    --color-primary-100: #DDE6FF;
-    --color-primary-200: #B9C9FF;
-    --color-primary-300: #8EA4F5;
-    --color-primary-400: #5F78D8;
-    --color-primary-500: #3853B8;
-    --color-primary-600: #122E92;
-    --color-primary-700: #10287F;
-    --color-primary-800: #0E226C;
-    --color-primary-900: #0A184D;
 
+    /* Brand Colors */
+    --color-primary:   #122E92;
     --color-secondary: #D6AC48;
-    --color-secondary-50: #FCF8EC;
-    --color-secondary-100: #F7EDCF;
-    --color-secondary-200: #EDD58E;
-    --color-secondary-300: #D6AC48;
-    --color-secondary-400: #C39832;
-    --color-secondary-500: #A77D24;
-    --color-secondary-600: #855F1B;
-    --color-secondary-700: #634515;
-    --color-secondary-800: #442F10;
-    --color-secondary-900: #2B1D09;
 
-    --color-page: #F7F9FC;
+    /* Surface Colors */
+    --color-page:    #F8FAFC;
     --color-surface: #FFFFFF;
-    --color-ink: #172033;
-    --color-muted: #667085;
-   
+
+    /* Text Colors */
+    --color-ink:   #111827;
+    --color-muted: #6B7280;
+
+    /* Status Colors */
+    --color-success: #16A34A;
+    --color-warning: #F59E0B;
+    --color-danger:  #DC2626;
+    --color-info:    #0284C7;
+
+    /* Utility Colors */
+    --color-border: #E5E7EB;
+    --color-soft:   #F3F4F6;
 }
 
-@layer base {
-    html {
-        color-scheme: light;
-    }
-
-    body {
-        @apply min-h-screen bg-page font-sans text-ink antialiased;
-    }
-
-    ::selection {
-        @apply bg-secondary-200 text-primary-900;
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
     }
 }

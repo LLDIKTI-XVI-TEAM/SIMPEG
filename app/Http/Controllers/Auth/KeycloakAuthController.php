@@ -37,7 +37,7 @@ class KeycloakAuthController extends Controller
         $keycloakId = $keycloakUser->getId();
         $username = $keycloakUser->getNickname();
 
-        if (! $keycloakId) {
+        if (!$keycloakId) {
             return view('auth.unregistered', [
                 'message' => 'Akun Keycloak belum memiliki ID yang bisa dipakai SIMPEG.',
             ]);
@@ -53,7 +53,7 @@ class KeycloakAuthController extends Controller
         // Pegawai asli wajib cocok ke data employees; akun tanpa email hanya boleh lewat whitelist user lokal.
         $employeeField = $this->employeeMatchField();
 
-        if (! $employeeField) {
+        if (!$employeeField) {
             return view('auth.unregistered', [
                 'message' => 'Konfigurasi pencocokan akun SSO belum valid.',
             ]);
@@ -62,7 +62,7 @@ class KeycloakAuthController extends Controller
         $matchedEmail = $this->verifiedEmailClaim($keycloakUser);
 
         if ($matchedEmail) {
-            $employees = Employee::whereRaw('lower('.$employeeField.') = ?', [$matchedEmail])->limit(2)->get();
+            $employees = Employee::whereRaw('lower(' . $employeeField . ') = ?', [$matchedEmail])->limit(2)->get();
 
             if ($employees->count() !== 1) {
                 return view('auth.unregistered', [
@@ -100,7 +100,7 @@ class KeycloakAuthController extends Controller
                 'email_verified_at' => $user->email_verified_at ?? now(),
             ]);
 
-            if (! $user->exists) {
+            if (!$user->exists) {
                 // Role awal pegawai berasal dari SIMPEG, bukan claim role Keycloak.
                 $user->role = 'pegawai';
                 $user->password = Str::random(48);
@@ -114,7 +114,7 @@ class KeycloakAuthController extends Controller
             ? User::where('keycloak_username', $username)->first()
             : null;
 
-        if (! $devUser) {
+        if (!$devUser) {
             return view('auth.unregistered', [
                 'message' => 'Akun Keycloak belum terdaftar di SIMPEG.',
             ]);
@@ -152,6 +152,7 @@ class KeycloakAuthController extends Controller
 
         Auth::login($user);
         request()->session()->regenerate();
+        session(['active_role' => $user->role ?? 'pegawai']);
 
         AuditService::logAs($user->id, $user->name, 'LOGIN', 'User', $user->id, null, null, request());
 
@@ -162,7 +163,7 @@ class KeycloakAuthController extends Controller
     {
         $field = config('services.keycloak.employee_match_field', 'email');
 
-        if (! in_array($field, self::ALLOWED_EMPLOYEE_MATCH_FIELDS, true)) {
+        if (!in_array($field, self::ALLOWED_EMPLOYEE_MATCH_FIELDS, true)) {
             return null;
         }
 
@@ -186,7 +187,7 @@ class KeycloakAuthController extends Controller
 
         $value = is_string($value) ? trim(strtolower($value)) : null;
 
-        if ($value === '' || ! filter_var($value, FILTER_VALIDATE_EMAIL)) {
+        if ($value === '' || !filter_var($value, FILTER_VALIDATE_EMAIL)) {
             return null;
         }
 
@@ -196,7 +197,7 @@ class KeycloakAuthController extends Controller
     private function isAllowedDevUsername(string $username): bool
     {
         $allowedUsernames = array_map(
-            fn (string $value): string => strtolower(trim($value)),
+            fn(string $value): string => strtolower(trim($value)),
             config('services.keycloak.dev_usernames', []),
         );
 
