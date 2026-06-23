@@ -23,6 +23,9 @@ Route::middleware($employeeGroupMiddleware)
     ->prefix('pegawai')
     ->name('pegawai.')
     ->group(function () use ($disableEmployeeApiAuth): void {
+        Route::get('/', [EmployeeController::class, 'index'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
+            ->name('index');
         Route::post('/', [EmployeeController::class, 'store'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.create'])
             ->name('store');
