@@ -1,93 +1,6 @@
 <x-layouts.app title="Data Pegawai">
 
-    @php
-    $pegawaiData = [
-        [
-            'id'=>1,
-            'nama'=>'Ahmad Fauzi', 'email'=>'ahmadfauzi@gmail.com',
-            'golongan'=>'III/c', 'jabatan'=>'Analis Kepegawaian',
-            'kelas_jabatan'=>'8', 'nip'=>'19850312201001 1 001',
-            'telepon'=>'081234567890', 'pangkat'=>'Penata Tkt. I',
-            'pendidikan'=>'S1', 'tgl_lahir'=>'March 12, 1985',
-            'pensiun'=>'Abd Rahim Har', 'atasan'=>'Abd Rahim Har',
-            'person_familia'=>'Abd Rahim Har', 'prodi'=>'Manajemen',
-            'jenis'=>'PNS', 'status'=>'aktif', 'tmt'=>'01-10-2010',
-            'unit'=>'Bag. Umum', 'dok'=>'ok',
-        ],
-        [
-            'id'=>2,
-            'nama'=>'Siti Rahayu', 'email'=>'sitirahayu@gmail.com',
-            'golongan'=>'II/d', 'jabatan'=>'Analis Ahli Madya',
-            'kelas_jabatan'=>'8', 'nip'=>'19901120201501 2 003',
-            'telepon'=>'085298765432', 'pangkat'=>'Pemula Tkt. I',
-            'pendidikan'=>'S2', 'tgl_lahir'=>'November 20, 1990',
-            'pensiun'=>'Riza Hamzah', 'atasan'=>'Riza Hamzah',
-            'person_familia'=>'Riza Hamzah', 'prodi'=>'Administrasi Pemerintahan',
-            'jenis'=>'PNS', 'status'=>'aktif', 'tmt'=>'01-01-2015',
-            'unit'=>'Bag. Keuangan', 'dok'=>'warn',
-        ],
-        [
-            'id'=>3,
-            'nama'=>'Sabrina Rossa Adriani Wibowo', 'email'=>'sabrinarossa24@gmail.com',
-            'golongan'=>'III/a', 'jabatan'=>'Analis SDM Aparatur Ahli Pertama',
-            'kelas_jabatan'=>'8', 'nip'=>'20261210820500 0 04',
-            'telepon'=>'081285066001', 'pangkat'=>'Pemula Tkt. I',
-            'pendidikan'=>'S1', 'tgl_lahir'=>'October 12, 1998',
-            'pensiun'=>'Sabrina Rossa', 'atasan'=>'Sabrina Rossa',
-            'person_familia'=>'Sabrina Rossa', 'prodi'=>'Informatika',
-            'jenis'=>'PNS', 'status'=>'aktif', 'tmt'=>'01-01-2026',
-            'unit'=>'Bag. SDM', 'dok'=>'ok',
-        ],
-        [
-            'id'=>4,
-            'nama'=>'Cimma Sari Oktariani Di Silapu', 'email'=>'sikaemma@gmail.com',
-            'golongan'=>'III/c', 'jabatan'=>'Pranata SDM Terampil',
-            'kelas_jabatan'=>'6', 'nip'=>'26110820520600 0 04',
-            'telepon'=>'081258206006', 'pangkat'=>'Pengatur DO',
-            'pendidikan'=>'S1', 'tgl_lahir'=>'October 28, 2001',
-            'pensiun'=>'Cimma Sari Oktariani Di', 'atasan'=>'Cimma Sari Oktariani Di',
-            'person_familia'=>'Cimma Sari Oktariani Di', 'prodi'=>'Manajemen Informatika',
-            'jenis'=>'PNS', 'status'=>'aktif', 'tmt'=>'01-10-2020',
-            'unit'=>'Bag. IT', 'dok'=>'danger',
-        ],
-        [
-            'id'=>5,
-            'nama'=>'Nurarningsih Dumbea, S.P.', 'email'=>'rainingdumbea47@gmail.com',
-            'golongan'=>'III/b', 'jabatan'=>'Pejabat Lelang Operational',
-            'kelas_jabatan'=>'7', 'nip'=>'19880123202 1 005',
-            'telepon'=>'082302200526', 'pangkat'=>'Penata Tkt. I',
-            'pendidikan'=>'S1', 'tgl_lahir'=>'January 23, 1988',
-            'pensiun'=>'Naning Dumbea', 'atasan'=>'Naning Dumbea',
-            'person_familia'=>'Faria Dana Puri', 'prodi'=>'Agribisnis',
-            'jenis'=>'PPPK', 'status'=>'aktif', 'tmt'=>'01-11-2021',
-            'unit'=>'Bag. Umum', 'dok'=>'ok',
-        ],
-        [
-            'id'=>6,
-            'nama'=>'Nadia Kusuma', 'email'=>'nadiakusuma@gmail.com',
-            'golongan'=>'II/c', 'jabatan'=>'Pengelola Kepegawaian',
-            'kelas_jabatan'=>'6', 'nip'=>'19950822202001 2 002',
-            'telepon'=>'081299887766', 'pangkat'=>'Pengatur',
-            'pendidikan'=>'S1', 'tgl_lahir'=>'August 22, 1995',
-            'pensiun'=>'Nadia Kusuma', 'atasan'=>'Nadia Kusuma',
-            'person_familia'=>'Nadia Kusuma', 'prodi'=>'Ilmu Pemerintahan',
-            'jenis'=>'PPPK', 'status'=>'cuti', 'tmt'=>'01-01-2020',
-            'unit'=>'Bag. SDM', 'dok'=>'ok',
-        ],
-        [
-            'id'=>7,
-            'nama'=>'Yucna Dara, S.P., M.M.', 'email'=>'hanaryog101@gmail.com',
-            'golongan'=>'III/b', 'jabatan'=>'Analis Ahli Pertama',
-            'kelas_jabatan'=>'8', 'nip'=>'19840120099 2 002',
-            'telepon'=>'081284920002', 'pangkat'=>'Penata Tkt. I',
-            'pendidikan'=>'S2', 'tgl_lahir'=>'January 20, 1984',
-            'pensiun'=>'Yucna Dara', 'atasan'=>'Ingat Gobel',
-            'person_familia'=>'Ingat Gobel', 'prodi'=>'Teknik Informatika',
-            'jenis'=>'PNS', 'status'=>'aktif', 'tmt'=>'01-05-1984',
-            'unit'=>'Bag. Keuangan', 'dok'=>'warn',
-        ]
-    ];
-    @endphp
+
 
     {{-- PAGE HEADER --}}
     <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -246,59 +159,61 @@
                 </thead>
                 <tbody class="divide-y divide-border">
                     @foreach($pegawaiData as $p)
-                    <tr class="transition-colors hover:bg-soft/50" data-nama="{{ $p['nama'] }}" data-nip="{{ $p['nip'] }}" data-unit="{{ $p['unit'] }}" data-jenis="{{ $p['jenis'] }}" data-status="{{ $p['status'] }}" data-golongan="{{ $p['golongan'] }}">
+                    <tr class="transition-colors hover:bg-soft/50" data-nama="{{ $p->nama_lengkap }}" data-nip="{{ $p->nip }}" data-unit="{{ $p->jabatan_terakhir ?? '-' }}" data-jenis="{{ $p->jenisPegawai->nama_jenis ?? '-' }}" data-status="{{ strtolower($p->status_aktif) }}" data-golongan="{{ $p->golongan_terakhir ?? '-' }}">
                         <td class="px-4 py-3.5">
                             <input type="checkbox" class="row-check h-4 w-4 rounded border-border text-primary focus:ring-primary/20">
                         </td>
                         <td class="px-4 py-3.5">
                             <div class="flex items-center gap-3">
                                 <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                                    {{ strtoupper(substr($p['nama'], 0, 1)) }}
+                                    {{ strtoupper(substr($p->nama_lengkap, 0, 1)) }}
                                 </div>
                                 <div class="min-w-0">
-                                    <p class="text-sm font-semibold text-ink">{{ $p['nama'] }}</p>
-                                    <p class="font-mono text-xs text-muted">{{ $p['nip'] }}</p>
+                                    <p class="text-sm font-semibold text-ink">{{ $p->nama_lengkap }}</p>
+                                    <p class="font-mono text-xs text-muted">{{ $p->nip }}</p>
                                 </div>
                             </div>
                         </td>
                         <td class="px-4 py-3.5">
-                            <p class="text-sm font-medium text-ink">{{ $p['jabatan'] }}</p>
-                            <p class="text-xs text-muted">{{ $p['unit'] }}</p>
+                            <p class="text-sm font-medium text-ink">{{ $p->jabatan_terakhir ?? '-' }}</p>
+                            <p class="text-xs text-muted">{{ $p->jabatan_terakhir ?? '-' }}</p>
                         </td>
                         <td class="px-4 py-3.5">
-                            <p class="text-sm font-bold text-ink leading-tight">{{ $p['golongan'] }}</p>
-                            <p class="text-xs font-bold text-primary mt-0.5 leading-tight">{{ $p['jenis'] }}</p>
+                            <p class="text-sm font-bold text-ink leading-tight">{{ $p->golongan_terakhir ?? '-' }}</p>
+                            <p class="text-xs font-bold text-primary mt-0.5 leading-tight">{{ $p->jenisPegawai->nama_jenis ?? '-' }}</p>
                         </td>
                         <td class="px-4 py-3.5">
-                            <p class="text-sm text-ink font-mono">{{ $p['tmt'] }}</p>
+                            <p class="text-sm text-ink font-mono">-</p>
                         </td>
                         <td class="px-4 py-3.5">
                             @php
+                            $status_lower = strtolower($p->status_aktif);
                             $statusClasses = [
                                 'aktif' => 'bg-success/10 text-success',
                                 'cuti' => 'bg-warning/10 text-warning',
-                                'nonaktif' => 'bg-danger/10 text-danger'
+                                'non-aktif' => 'bg-danger/10 text-danger',
+                                'pensiun' => 'bg-danger/10 text-danger',
+                                'mutasi' => 'bg-warning/10 text-warning'
                             ];
                             $statusDots = [
                                 'aktif' => 'bg-success',
                                 'cuti' => 'bg-warning',
-                                'nonaktif' => 'bg-danger'
+                                'non-aktif' => 'bg-danger',
+                                'pensiun' => 'bg-danger',
+                                'mutasi' => 'bg-warning'
                             ];
-                            $statusLabel = [
-                                'aktif' => 'Aktif',
-                                'cuti' => 'Cuti',
-                                'nonaktif' => 'Nonaktif'
-                            ];
-                            $stClass = $statusClasses[$p['status']] ?? 'bg-soft text-muted';
-                            $stDot = $statusDots[$p['status']] ?? 'bg-muted';
+                            $stClass = $statusClasses[$status_lower] ?? 'bg-soft text-muted';
+                            $stDot = $statusDots[$status_lower] ?? 'bg-muted';
                             @endphp
                             <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $stClass }}">
                                 <span class="h-1.5 w-1.5 rounded-full {{ $stDot }}"></span>
-                                {{ $statusLabel[$p['status']] ?? $p['status'] }}
+                                {{ $p->status_aktif }}
                             </span>
                         </td>
                         <td class="px-4 py-3.5">
                             @php
+                            // Default mock for 'dok' since we don't have it on model
+                            $dok = 'ok';
                             $dokClasses = [
                                 'ok' => 'bg-success/10 text-success',
                                 'warn' => 'bg-warning/10 text-warning',
@@ -314,31 +229,31 @@
                                 'warn' => 'H-60',
                                 'danger' => 'H-30'
                             ];
-                            $dkClass = $dokClasses[$p['dok']] ?? 'bg-soft text-muted';
-                            $dkDot = $dokDots[$p['dok']] ?? 'bg-muted';
+                            $dkClass = $dokClasses[$dok] ?? 'bg-soft text-muted';
+                            $dkDot = $dokDots[$dok] ?? 'bg-muted';
                             @endphp
                             <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $dkClass }}">
                                 <span class="h-1.5 w-1.5 rounded-full {{ $dkDot }}"></span>
-                                {{ $dokLabels[$p['dok']] ?? $p['dok'] }}
+                                {{ $dokLabels[$dok] ?? $dok }}
                             </span>
                         </td>
                         <td class="px-4 py-3.5 text-right">
                             <div class="flex items-center justify-end gap-1.5">
                                 {{-- Detail --}}
-                                <a href="{{ route('pegawai.show', ['id' => $p['id']]) }}" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Detail">
+                                <a href="{{ route('pegawai.show', $p->id) }}" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Detail">
                                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                     </svg>
                                 </a>
                                 {{-- Edit --}}
-                                <a href="{{ route('pegawai.edit', $p['id']) }}" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Edit">
+                                <a href="{{ route('pegawai.edit', $p->id) }}" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Edit">
                                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                     </svg>
                                 </a>
                                 {{-- Nonaktifkan --}}
-                                <form action="{{ route('pegawai.destroy', $p['id']) }}" method="POST" class="inline" onsubmit="return confirm('Apakah Anda yakin ingin menonaktifkan pegawai ini?')">
+                                <form action="{{ route('pegawai.destroy', $p->id) }}" method="POST" class="inline" onsubmit="return confirm('Apakah Anda yakin ingin menonaktifkan pegawai ini?')">
                                     @csrf
                                     <button type="submit" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-danger transition hover:bg-danger/5 shadow-sm cursor-pointer" title="Nonaktifkan">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -355,37 +270,8 @@
         </div>
 
         {{-- TABLE FOOTER --}}
-        <div class="flex flex-col gap-3 border-t border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between bg-surface">
-            <div class="flex items-center gap-3">
-                <p id="pegawai-count-text" class="text-sm text-muted">Menampilkan 1 - 7 dari 7 data aktif</p>
-                <div class="relative">
-                    <select id="per-page" class="appearance-none rounded-lg border border-border bg-surface pl-3 pr-8 py-1 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                        <option>10 / halaman</option>
-                        <option>25 / halaman</option>
-                        <option>50 / halaman</option>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
-                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
-                </div>
-            </div>
-            <div class="flex items-center gap-1.5">
-                {{-- Prev --}}
-                <button class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted transition hover:bg-soft hover:text-ink">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                    </svg>
-                </button>
-                <button class="flex h-8 w-8 items-center justify-center rounded-lg border border-primary bg-primary text-sm font-semibold text-white transition hover:opacity-90">1</button>
-                {{-- Next --}}
-                <button class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted transition hover:bg-soft hover:text-ink">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                    </svg>
-                </button>
-            </div>
+        <div class="border-t border-border px-6 py-4 bg-surface">
+            {{ $pegawaiData->links() }}
         </div>
     </div>
 

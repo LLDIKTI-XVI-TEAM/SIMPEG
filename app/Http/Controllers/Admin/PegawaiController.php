@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Employee;
 use Illuminate\Http\Request;
 
 class PegawaiController extends Controller
@@ -269,9 +270,10 @@ class PegawaiController extends Controller
         ]
     ];
 
-    public function index()
+    public function index(Request $request)
     {
-        return view('admin.pegawai.index');
+        $pegawaiData = Employee::with(['jenisPegawai'])->paginate(10);
+        return view('admin.pegawai.index', compact('pegawaiData'));
     }
 
     public function create()
