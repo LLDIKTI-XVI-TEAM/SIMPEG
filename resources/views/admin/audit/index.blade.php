@@ -12,8 +12,45 @@
         logs: {{ json_encode($auditLogs) }},
         currentPage: 1,
         perPage: 25,
+        sortField: 'timestamp',
+        sortDirection: 'desc',
+        toggleSort(field) {
+            if (this.sortField === field) {
+                this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                this.sortField = field;
+                this.sortDirection = 'asc';
+            }
+            this.currentPage = 1;
+        },
+        getRingkasan(log) {
+            if (!log) return '';
+            if (log.event === 'LOGIN') return 'LOGIN: Login berhasil';
+            if (log.event === 'LOGOUT') return 'LOGOUT: Logout dari sistem';
+            if (log.event === 'APPROVE' || log.event === 'POSTPONE') {
+                return `${log.event}: Mengubah status pengajuan cuti`;
+            }
+            
+            let target = log.modul;
+            if (log.event === 'CREATE') {
+                return `CREATE: Membuat data ${target} #${log.record_id}`;
+            }
+            if (log.event === 'UPDATE') {
+                const fields = log.new_values ? Object.keys(log.new_values) : [];
+                const fieldStr = fields.length > 0 ? fields.join(', ') : 'data';
+                return `UPDATE: Mengubah ${fieldStr}`;
+            }
+            if (log.event === 'SOFT_DELETE') {
+                return `SOFT_DELETE: Menonaktifkan data ${target} #${log.record_id}`;
+            }
+            if (log.event === 'RESTORE') {
+                return `RESTORE: Mengaktifkan kembali data ${target} #${log.record_id}`;
+            }
+            
+            return `${log.event}: ${log.event} pada ${target} #${log.record_id}`;
+        },
         get filteredLogs() {
-            return this.logs.filter(log => {
+            let filtered = this.logs.filter(log => {
                 const query = this.searchQuery.toLowerCase().trim();
                 const matchesSearch = !query || 
                                       (log.operator && log.operator.toLowerCase().includes(query)) || 
@@ -35,6 +72,23 @@
                 }
                 
                 return matchesSearch && matchesEvent && matchesUser && matchesModul && matchesPeriode;
+            });
+
+            return [...filtered].sort((a, b) => {
+                let valA = a[this.sortField];
+                let valB = b[this.sortField];
+                
+                if (this.sortField === 'timestamp') {
+                    valA = new Date(valA || 0);
+                    valB = new Date(valB || 0);
+                } else if (typeof valA === 'string') {
+                    valA = valA.toLowerCase();
+                    valB = (valB || '').toLowerCase();
+                }
+                
+                if (valA < valB) return this.sortDirection === 'asc' ? -1 : 1;
+                if (valA > valB) return this.sortDirection === 'asc' ? 1 : -1;
+                return 0;
             });
         },
         get paginatedLogs() {
@@ -217,17 +271,69 @@
                 <table class="w-full">
                     <thead class="bg-soft border-b border-border">
                         <tr>
-                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans">Waktu</th>
-                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans">Pegawai</th>
-                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans">Aktivitas</th>
-                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans">Modul</th>
-                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans">IP Address</th>
-                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans">Aksi</th>
+                            <th @click="toggleSort('timestamp')" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans cursor-pointer hover:text-primary transition-colors select-none">
+                                <div class="flex items-center gap-1.5">
+                                    Waktu
+                                    <template x-if="sortField === 'timestamp'">
+                                        <span>
+                                            <svg x-show="sortDirection === 'asc'" class="w-3 h-3 text-primary inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>
+                                            <svg x-show="sortDirection === 'desc'" class="w-3 h-3 text-primary inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+                                        </span>
+                                    </template>
+                                    <template x-if="sortField !== 'timestamp'">
+                                        <svg class="w-3 h-3 text-muted/40 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
+                                    </template>
+                                </div>
+                            </th>
+                            <th @click="toggleSort('operator')" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans cursor-pointer hover:text-primary transition-colors select-none">
+                                <div class="flex items-center gap-1.5">
+                                    User
+                                    <template x-if="sortField === 'operator'">
+                                        <span>
+                                            <svg x-show="sortDirection === 'asc'" class="w-3 h-3 text-primary inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>
+                                            <svg x-show="sortDirection === 'desc'" class="w-3 h-3 text-primary inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+                                        </span>
+                                    </template>
+                                    <template x-if="sortField !== 'operator'">
+                                        <svg class="w-3 h-3 text-muted/40 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
+                                    </template>
+                                </div>
+                            </th>
+                            <th @click="toggleSort('event')" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans cursor-pointer hover:text-primary transition-colors select-none">
+                                <div class="flex items-center gap-1.5">
+                                    Jenis Event
+                                    <template x-if="sortField === 'event'">
+                                        <span>
+                                            <svg x-show="sortDirection === 'asc'" class="w-3 h-3 text-primary inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>
+                                            <svg x-show="sortDirection === 'desc'" class="w-3 h-3 text-primary inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+                                        </span>
+                                    </template>
+                                    <template x-if="sortField !== 'event'">
+                                        <svg class="w-3 h-3 text-muted/40 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
+                                    </template>
+                                </div>
+                            </th>
+                            <th @click="toggleSort('modul')" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans cursor-pointer hover:text-primary transition-colors select-none">
+                                <div class="flex items-center gap-1.5">
+                                    Modul/Tabel
+                                    <template x-if="sortField === 'modul'">
+                                        <span>
+                                            <svg x-show="sortDirection === 'asc'" class="w-3 h-3 text-primary inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>
+                                            <svg x-show="sortDirection === 'desc'" class="w-3 h-3 text-primary inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+                                        </span>
+                                    </template>
+                                    <template x-if="sortField !== 'modul'">
+                                        <svg class="w-3 h-3 text-muted/40 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
+                                    </template>
+                                </div>
+                            </th>
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans select-none">Ringkasan Perubahan</th>
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans select-none">Aksi</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-border">
                         <template x-for="log in paginatedLogs" :key="log.id">
-                            <tr class="transition-colors hover:bg-soft/50">
+                            <tr @click="selectedLogId = log.id; showDrawer = true" class="transition-colors hover:bg-soft/50 cursor-pointer">
                                 <td class="px-4 py-3.5 text-xs font-mono text-ink" x-text="log.timestamp"></td>
                                 <td class="px-4 py-3.5 text-sm font-semibold text-ink font-sans" x-text="log.operator"></td>
                                 <td class="px-4 py-3.5">
@@ -241,11 +347,11 @@
                                     </span>
                                 </td>
                                 <td class="px-4 py-3.5 text-xs text-muted font-sans" x-text="log.modul"></td>
-                                <td class="px-4 py-3.5 text-xs font-mono text-muted" x-text="log.ip_address"></td>
-                                <td class="px-4 py-3.5">
+                                <td class="px-4 py-3.5 text-xs text-ink font-sans" x-text="getRingkasan(log)"></td>
+                                <td class="px-4 py-3.5" @click.stop>
                                     <div class="flex items-center gap-1.5">
                                         <button 
-                                            @click="selectedLogId = log.id; showDrawer = true" 
+                                            @click.stop="selectedLogId = log.id; showDrawer = true" 
                                             class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/30 shadow-sm cursor-pointer" 
                                             title="Detail Drawer"
                                         >
@@ -255,6 +361,7 @@
                                             </svg>
                                         </button>
                                         <a 
+                                            @click.stop
                                             :href="'/dashboard/audit/' + log.id" 
                                             class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted transition hover:bg-soft hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/30 shadow-sm" 
                                             title="Halaman Detail"
@@ -333,9 +440,9 @@
 
         {{-- Slide-over Drawer --}}
         <div x-show="showDrawer" class="fixed inset-0 z-50 overflow-hidden" style="display: none;" x-transition>
-            <div class="absolute inset-0 bg-ink/30 transition-opacity" @click="showDrawer = false"></div>
-            <div class="fixed inset-y-0 right-0 pl-10 max-w-full flex">
-                <div class="w-screen max-w-md bg-surface border-l border-border shadow-xl flex flex-col justify-between" x-transition:enter="transform transition ease-in-out duration-300 sm:duration-300" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0" x-transition:leave="transform transition ease-in-out duration-300 sm:duration-300" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full">
+            <div class="absolute inset-0 bg-ink/30 transition-opacity z-40" @click="showDrawer = false"></div>
+            <div class="fixed inset-y-0 right-0 pl-10 max-w-full flex z-50">
+                <div class="w-screen max-w-md bg-surface border-l border-border shadow-xl flex flex-col justify-between relative z-50" x-transition:enter="transform transition ease-in-out duration-300 sm:duration-300" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0" x-transition:leave="transform transition ease-in-out duration-300 sm:duration-300" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full">
                     
                     {{-- Drawer Header --}}
                     <div class="px-6 py-5 border-b border-border flex items-center justify-between bg-surface">
