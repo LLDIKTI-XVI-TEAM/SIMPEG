@@ -266,6 +266,50 @@ class EmployeeHistoryTest extends TestCase
         $response->assertJsonValidationErrors(['golongan_id', 'tmt_pangkat', 'no_sk', 'tanggal_sk']);
     }
 
+    public function test_history_file_sk_must_be_controlled_relative_pdf_path(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $jenisJabatan = RefJenisJabatan::where('nama', 'Struktural')->firstOrFail();
+        $unitKerja = RefUnitKerja::firstOrFail();
+
+        $this->actingAs($user);
+
+        $this->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/riwayat-kepangkatan", [
+            ...$this->validRankHistoryPayload(),
+            'file_sk' => '../secret.pdf',
+        ])->assertJsonValidationErrors(['file_sk']);
+
+        $this->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/riwayat-jabatan", [
+            'nama_jabatan' => 'Kepala Bagian Umum',
+            'jenis_jabatan_id' => $jenisJabatan->id,
+            'unit_kerja_id' => $unitKerja->id,
+            'tmt_jabatan' => '2026-03-01',
+            'no_sk' => 'SK-POS-INVALID',
+            'tanggal_sk' => '2026-03-10',
+            'file_sk' => 'sk/jabatan.docx',
+        ])->assertJsonValidationErrors(['file_sk']);
+
+        $this->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/riwayat-kgb", [
+            'tmt_kgb' => '2026-04-01',
+            'gaji_pokok' => 4500000,
+            'no_sk' => 'SK-KGB-INVALID',
+            'tanggal_sk' => '2026-04-10',
+            'file_sk' => '/sk/kgb.pdf',
+        ])->assertJsonValidationErrors(['file_sk']);
+
+        $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\TrimStrings::class)
+            ->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/riwayat-kepangkatan", [
+                ...$this->validRankHistoryPayload(),
+                'file_sk' => "sk/rank.pdf\n",
+            ])->assertJsonValidationErrors(['file_sk']);
+
+        $this->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/riwayat-kepangkatan", [
+            ...$this->validRankHistoryPayload(),
+            'file_sk' => 'sk/rank-aman.pdf',
+        ])->assertCreated();
+    }
+
     public function test_unauthenticated_request_cannot_create_rank_history(): void
     {
         $employee = Employee::factory()->create();
