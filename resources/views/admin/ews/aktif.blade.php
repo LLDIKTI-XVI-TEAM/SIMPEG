@@ -1,9 +1,10 @@
 <x-layouts.app title="EWS Aktif">
-    <div class="space-y-6">
+    <div class="space-y-6" x-data="{ search: '' }">
         {{-- PAGE HEADER --}}
         {{-- ================================================================ --}}
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
+                <h2 class="text-2xl font-semibold text-ink">Daftar EWS Aktif</h2>
                 <nav class="mb-1 flex items-center gap-1.5 text-xs text-muted">
                     <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
                     <span>/</span>
@@ -11,10 +12,6 @@
                     <span>/</span>
                     <span class="font-medium text-ink">EWS Aktif</span>
                 </nav>
-                <h2 class="text-2xl font-semibold text-ink">Daftar EWS Aktif</h2>
-                <p class="mt-1.5 max-w-2xl text-sm text-muted">
-                    Pantau dan tindaklanjuti peringatan dini kepegawaian (Kenaikan Pangkat, KGB, Pensiun, dan Kontrak PPPK) sebelum melewati batas waktu toleransi.
-                </p>
             </div>
             
             @if(session('active_role') === 'Super Admin')
@@ -54,7 +51,7 @@
                 </div>
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-wider text-muted font-sans">Sangat Mendesak</p>
-                    <h3 class="text-base font-bold text-danger">{{ $countMerah }} (< 30 Hari)</h3>
+                    <h3 class="text-base font-bold text-danger">{{ $countMerah }} (&lt; 30 Hari)</h3>
                 </div>
             </div>
 
@@ -74,14 +71,16 @@
                 </div>
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-wider text-muted font-sans">Pemantauan Rutin</p>
-                    <h3 class="text-base font-bold text-success">{{ $countHijau }} (> 90 Hari)</h3>
+                    <h3 class="text-base font-bold text-success">{{ $countHijau }} (&gt; 90 Hari)</h3>
                 </div>
             </div>
         </div>
 
+
+
         {{-- FILTER & SEARCH AREA --}}
         {{-- ================================================================ --}}
-        <div class="rounded-lg border border-border bg-surface shadow-sm overflow-hidden" x-data="{ search: '' }">
+        <div class="rounded-lg border border-border bg-surface shadow-sm overflow-hidden">
             <div class="border-b border-border bg-soft/30 px-6 py-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 
                 {{-- Event Filter Links --}}

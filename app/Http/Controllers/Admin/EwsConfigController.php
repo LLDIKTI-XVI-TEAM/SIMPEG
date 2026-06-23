@@ -47,17 +47,31 @@ class EwsConfigController extends Controller
                 $auditRows[] = [
                     'time' => date('d Jun Y, H:i', strtotime($log['timestamp'])),
                     'actor' => $log['operator'],
+                    'event' => $log['event'] ?? 'UPDATE_EWS_CONFIG',
                     'field' => $log['record_id'] ?? 'Parameter',
                     'before' => $log['old_values']['value'] ?? 'Tidak ada',
                     'after' => $log['new_values']['value'] ?? 'Tidak ada',
+                    'ip_address' => $log['ip_address'] ?? '127.0.0.1',
+                    'user_agent' => $log['user_agent'] ?? '-',
+                    'reason' => $log['new_values']['reason'] ?? '-',
                 ];
             }
         }
 
         // Base/mock history as defined in the spec
         $baseLogs = [
-            ['time' => '22 Jun 2026, 10:00', 'actor' => 'Super Admin', 'field' => 'KGB Tahap 3 (Hari)', 'before' => '14', 'after' => '14'],
-            ['time' => '21 Jun 2026, 09:30', 'actor' => 'Super Admin', 'field' => 'Scheduler Time', 'before' => '08:00', 'after' => '07:00'],
+            [
+                'time' => '22 Jun 2026, 10:00', 'actor' => 'Super Admin', 'event' => 'UPDATE_EWS_CONFIG',
+                'field' => 'KGB Tahap 3 (Hari)', 'before' => '14', 'after' => '14',
+                'ip_address' => '192.168.1.10', 'user_agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/126.0.0.0',
+                'reason' => 'Verifikasi ulang parameter KGB setelah rapat koordinasi',
+            ],
+            [
+                'time' => '21 Jun 2026, 09:30', 'actor' => 'Super Admin', 'event' => 'UPDATE_EWS_CONFIG',
+                'field' => 'Scheduler Time', 'before' => '08:00', 'after' => '07:00',
+                'ip_address' => '192.168.1.10', 'user_agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/126.0.0.0',
+                'reason' => 'Memajukan waktu scheduler agar alert terkirim sebelum jam kerja dimulai',
+            ],
         ];
 
         // Merge, dynamic logs first (most recent)
