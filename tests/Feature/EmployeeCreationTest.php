@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\AuditLog;
 use App\Models\RefJenisPegawai;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -47,6 +48,26 @@ class EmployeeCreationTest extends TestCase
             'nip' => '198001012006041001',
             'jenis_pegawai_id' => RefJenisPegawai::where('nama', 'PNS')->firstOrFail()->id,
         ]);
+    }
+
+    public function test_authenticated_user_create_employee_writes_audit_log(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf(self::EMPLOYEES_ENDPOINT, $this->validPayload());
+
+        $response->assertCreated();
+        $employeeId = $response->json('employee.id');
+
+        $audit = AuditLog::where('event', 'CREATE')
+            ->where('auditable_type', 'Employee')
+            ->where('auditable_id', $employeeId)
+            ->firstOrFail();
+
+        $this->assertSame($user->id, $audit->user_id);
+        $this->assertSame('Budi Santoso', $audit->new_values['nama_lengkap']);
+        $this->assertSame('198001012006041001', $audit->new_values['nip']);
     }
 
     public function test_pegawai_cannot_create_employee(): void
