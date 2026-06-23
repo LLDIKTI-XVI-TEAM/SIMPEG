@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\Employee;
+use App\Models\EwsAlert;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -308,6 +310,12 @@ class ExampleTest extends TestCase
             'value' => '95',
         ]);
 
+        $this->assertDatabaseHas('audit_logs', [
+            'event' => 'UPDATE',
+            'auditable_type' => 'EwsConfig',
+            'auditable_id' => null,
+        ]);
+
         $dynamicLogs = session('dynamic_audit_logs', []);
         $this->assertNotEmpty($dynamicLogs);
 
@@ -338,6 +346,25 @@ class ExampleTest extends TestCase
         $admin = User::factory()->create(['role' => 'Admin Kepegawaian']);
         session(['active_role' => 'Admin Kepegawaian']);
 
+        // Seed two employees with EWS alerts so the page renders real data
+        $fauzi = Employee::factory()->create(['nama_lengkap' => 'Ahmad Fauzi']);
+        EwsAlert::create([
+            'employee_id'   => $fauzi->id,
+            'type'          => 'KGB',
+            'target_date'   => now()->addDays(45)->toDateString(),
+            'interval_days' => 60,
+            'is_processed'  => false,
+        ]);
+
+        $cimma = Employee::factory()->create(['nama_lengkap' => 'Cimma Sari Oktariani Di Silapu']);
+        EwsAlert::create([
+            'employee_id'   => $cimma->id,
+            'type'          => 'KENAIKAN_PANGKAT',
+            'target_date'   => now()->addDays(70)->toDateString(),
+            'interval_days' => 90,
+            'is_processed'  => false,
+        ]);
+
         $response = $this->actingAs($admin)->get('/ews');
         $response->assertOk();
         $response->assertSee('Daftar EWS Aktif');
@@ -349,6 +376,25 @@ class ExampleTest extends TestCase
     {
         $admin = User::factory()->create(['role' => 'Admin Kepegawaian']);
         session(['active_role' => 'Admin Kepegawaian']);
+
+        // Seed employees with specific alert types for filtering
+        $fauzi = Employee::factory()->create(['nama_lengkap' => 'Ahmad Fauzi']);
+        EwsAlert::create([
+            'employee_id'   => $fauzi->id,
+            'type'          => 'KGB',
+            'target_date'   => now()->addDays(45)->toDateString(),
+            'interval_days' => 60,
+            'is_processed'  => false,
+        ]);
+
+        $cimma = Employee::factory()->create(['nama_lengkap' => 'Cimma Sari Oktariani Di Silapu']);
+        EwsAlert::create([
+            'employee_id'   => $cimma->id,
+            'type'          => 'KENAIKAN_PANGKAT',
+            'target_date'   => now()->addDays(70)->toDateString(),
+            'interval_days' => 90,
+            'is_processed'  => false,
+        ]);
 
         // Filter for KGB
         $response = $this->actingAs($admin)->get('/ews?event=KGB');

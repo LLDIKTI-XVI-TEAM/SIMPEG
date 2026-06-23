@@ -40,11 +40,13 @@
 
 ## Modul EWS
 
-| Feature         | Status | Notes                                        |
-| --------------- | ------ | -------------------------------------------- |
-| Dashboard EWS   | ❌      | Masih mock data                              |
-| Konfigurasi EWS | ⚠️     | Tabel tersedia, integrasi belum diverifikasi |
-| Notifikasi EWS  | ❌      | Belum menggunakan EwsAlert                   |
+| Feature              | Status | Notes                                                                 |
+| -------------------- | ------ | --------------------------------------------------------------------- |
+| EWS Aktif            | ✅      | Terintegrasi dengan `ews_alerts`, filter event, role access, dan test |
+| Konfigurasi EWS      | ✅      | Terintegrasi dengan `ews_configs`, validasi, audit DB, dan test       |
+| Scheduler Engine EWS | ✅      | Command `app:run-ews`, schedule harian WITA, run log, anti-duplikasi  |
+| Notifikasi EWS       | ⚠️     | In-app pegawai sudah jalan; notifikasi admin dan email masih pending  |
+| EWS Pribadi          | ❌      | Belum diimplementasikan                                               |
 
 ---
 
@@ -97,6 +99,6 @@
 
 ---
 
-Last Updated: 23 Juni 2026
+Last Updated: 24 Juni 2026
 Current Sprint: Frontend Backend Integration
-Current Focus: Pegawai Create Store
+Current Focus: EWS Configuration + Scheduler Engine verified

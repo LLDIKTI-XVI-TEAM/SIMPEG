@@ -47,28 +47,28 @@
     {{-- ================================================================ --}}
     <div class="space-y-6" x-data="{
             configs: {{ json_encode($configs) }},
-            reason: '',
+            reason: '{{ old('reason', '') }}',
             showConfirm: false,
             expandedAudit: null,
 
             // Visual Helpers
-            pangkat_h90: '{{ $configs['pangkat_h90'] }}',
-            pangkat_h60: '{{ $configs['pangkat_h60'] }}',
-            pangkat_h30: '{{ $configs['pangkat_h30'] }}',
+            pangkat_h90: '{{ old('pangkat_h90', $configs['pangkat_h90']) }}',
+            pangkat_h60: '{{ old('pangkat_h60', $configs['pangkat_h60']) }}',
+            pangkat_h30: '{{ old('pangkat_h30', $configs['pangkat_h30']) }}',
 
-            kgb_h60: '{{ $configs['kgb_h60'] }}',
-            kgb_h30: '{{ $configs['kgb_h30'] }}',
-            kgb_h14: '{{ $configs['kgb_h14'] }}',
+            kgb_h60: '{{ old('kgb_h60', $configs['kgb_h60']) }}',
+            kgb_h30: '{{ old('kgb_h30', $configs['kgb_h30']) }}',
+            kgb_h14: '{{ old('kgb_h14', $configs['kgb_h14']) }}',
 
-            pensiun_y1: '{{ $configs['pensiun_y1'] }}',
-            pensiun_m6: '{{ $configs['pensiun_m6'] }}',
-            pensiun_m3: '{{ $configs['pensiun_m3'] }}',
+            pensiun_y1: '{{ old('pensiun_y1', $configs['pensiun_y1']) }}',
+            pensiun_m6: '{{ old('pensiun_m6', $configs['pensiun_m6']) }}',
+            pensiun_m3: '{{ old('pensiun_m3', $configs['pensiun_m3']) }}',
 
-            pppk_m6: '{{ $configs['pppk_m6'] }}',
-            pppk_m3: '{{ $configs['pppk_m3'] }}',
-            pppk_m1: '{{ $configs['pppk_m1'] }}',
+            pppk_m6: '{{ old('pppk_m6', $configs['pppk_m6']) }}',
+            pppk_m3: '{{ old('pppk_m3', $configs['pppk_m3']) }}',
+            pppk_m1: '{{ old('pppk_m1', $configs['pppk_m1']) }}',
 
-            ews_scheduler_time: '{{ $configs['ews_scheduler_time'] }}',
+            ews_scheduler_time: '{{ old('ews_scheduler_time', $configs['ews_scheduler_time']) }}',
 
             // Threshold validation
             get thresholdWarnings() {
@@ -98,11 +98,24 @@
                 return 'H-' + d + ' Hari';
             },
 
+            p90Class() { return +this.pangkat_h90 <= +this.pangkat_h60 ? 'border-danger focus:ring-danger/20 focus:border-danger' : 'border-border focus:ring-primary/20 focus:border-primary'; },
+            p60Class() { return (+this.pangkat_h90 <= +this.pangkat_h60 || +this.pangkat_h60 <= +this.pangkat_h30) ? 'border-danger focus:ring-danger/20 focus:border-danger' : 'border-border focus:ring-primary/20 focus:border-primary'; },
+            p30Class() { return +this.pangkat_h60 <= +this.pangkat_h30 ? 'border-danger focus:ring-danger/20 focus:border-danger' : 'border-border focus:ring-primary/20 focus:border-primary'; },
+
+            k60Class() { return +this.kgb_h60 <= +this.kgb_h30 ? 'border-danger focus:ring-danger/20 focus:border-danger' : 'border-border focus:ring-primary/20 focus:border-primary'; },
+            k30Class() { return (+this.kgb_h60 <= +this.kgb_h30 || +this.kgb_h30 <= +this.kgb_h14) ? 'border-danger focus:ring-danger/20 focus:border-danger' : 'border-border focus:ring-primary/20 focus:border-primary'; },
+            k14Class() { return +this.kgb_h30 <= +this.kgb_h14 ? 'border-danger focus:ring-danger/20 focus:border-danger' : 'border-border focus:ring-primary/20 focus:border-primary'; },
+
+            py1Class() { return +this.pensiun_y1 <= +this.pensiun_m6 ? 'border-danger focus:ring-danger/20 focus:border-danger' : 'border-border focus:ring-primary/20 focus:border-primary'; },
+            pm6Class() { return (+this.pensiun_y1 <= +this.pensiun_m6 || +this.pensiun_m6 <= +this.pensiun_m3) ? 'border-danger focus:ring-danger/20 focus:border-danger' : 'border-border focus:ring-primary/20 focus:border-primary'; },
+            pm3Class() { return +this.pensiun_m6 <= +this.pensiun_m3 ? 'border-danger focus:ring-danger/20 focus:border-danger' : 'border-border focus:ring-primary/20 focus:border-primary'; },
+
+            pp6Class() { return +this.pppk_m6 <= +this.pppk_m3 ? 'border-danger focus:ring-danger/20 focus:border-danger' : 'border-border focus:ring-primary/20 focus:border-primary'; },
+            pp3Class() { return (+this.pppk_m6 <= +this.pppk_m3 || +this.pppk_m3 <= +this.pppk_m1) ? 'border-danger focus:ring-danger/20 focus:border-danger' : 'border-border focus:ring-primary/20 focus:border-primary'; },
+            pp1Class() { return +this.pppk_m3 <= +this.pppk_m1 ? 'border-danger focus:ring-danger/20 focus:border-danger' : 'border-border focus:ring-primary/20 focus:border-primary'; },
+
             openConfirm() {
-                if (this.reason.trim() === '') return;
-                if (this.thresholdWarnings.length > 0) {
-                    if (!confirm('Terdapat peringatan urutan threshold:\n\n' + this.thresholdWarnings.join('\n') + '\n\nLanjutkan menyimpan?')) return;
-                }
+                if (this.reason.trim() === '' || this.thresholdWarnings.length > 0) return;
                 this.showConfirm = true;
             },
             submitForm() {
@@ -137,30 +150,38 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
                 </svg>
             </a>
-        </div>
+        </div>        @if(session('success'))
+            <div class="rounded-lg bg-success/10 border border-success/20 px-5 py-3 text-sm text-success flex items-center gap-2 mb-4">
+                <svg class="w-5 h-5 shrink-0 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                </svg>
+                <span>{{ session('success') }}</span>
+            </div>
+        @endif
 
-
-        {{-- ================================================================ --}}
-        {{-- E1: SCHEDULER STATUS BAR (Layout E Horizontal Style) --}}
-        {{-- ================================================================ --}}
-        @php
-            // Simulated scheduler status data
-            $schedulerStatus = [
-                'last_run' => '23 Jun 2026, 07:00 WITA',
-                'next_run' => '24 Jun 2026, ' . $configs['ews_scheduler_time'] . ' WITA',
-                'status' => 'success', // success | failed | pending
-                'alerts_created' => 12,
-                'last_duration' => '2.4 detik',
-                'pegawai_checked' => 48,
-            ];
-        @endphp
+        @if(session('error'))
+            <div class="rounded-lg bg-danger/10 border border-danger/20 px-5 py-3 text-sm text-danger flex items-center gap-2 mb-4">
+                <svg class="w-5 h-5 shrink-0 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                </svg>
+                <span>{{ session('error') }}</span>
+            </div>
+        @endif
         <div
             class="rounded-lg border border-border bg-surface px-5 py-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div class="flex items-center gap-3">
                 <div>
                     <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">Status
                         Scheduler</span>
-                    <p class="text-sm font-semibold text-ink">Aktif & Berjalan Normal</p>
+                    <p class="text-sm font-semibold {{ $schedulerStatus['status'] === 'gagal' ? 'text-danger' : ($schedulerStatus['status'] === 'berhasil' ? 'text-success' : 'text-muted') }}">
+                        @if($schedulerStatus['status'] === 'gagal')
+                            Gagal (Perlu Perhatian)
+                        @elseif($schedulerStatus['status'] === 'berhasil')
+                            Aktif & Berjalan Normal
+                        @else
+                            {{ $schedulerStatus['status_label'] ?? 'Belum Jalan' }}
+                        @endif
+                    </p>
                 </div>
             </div>
 
@@ -178,7 +199,7 @@
                 </div>
                 <div>
                     <span class="text-[9px] font-bold text-muted uppercase tracking-wider block">Total Pegawai</span>
-                    <span class="text-xs font-semibold text-ink">{{ $schedulerStatus['pegawai_checked'] }}
+                    <span class="text-xs font-semibold text-ink">{{ $schedulerStatus['employees_checked'] }}
                         checked</span>
                 </div>
                 <div>
@@ -187,6 +208,20 @@
                 </div>
             </div>
         </div>
+
+        @if($schedulerStatus['status'] === 'gagal' && !empty($schedulerStatus['error_message']))
+            <div class="rounded-lg border border-danger/25 bg-danger/5 px-5 py-3 mt-3">
+                <div class="flex items-start gap-2.5">
+                    <svg class="w-4 h-4 shrink-0 text-danger mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+                    </svg>
+                    <div>
+                        <span class="text-xs font-semibold text-danger">Pesan Error Eksekusi Terakhir:</span>
+                        <p class="text-xs text-danger font-mono mt-1 whitespace-pre-wrap">{{ $schedulerStatus['error_message'] }}</p>
+                    </div>
+                </div>
+            </div>
+        @endif
 
         {{-- ================================================================ --}}
         {{-- E2: CORE CONFIGURATIONS FORM (Settings Row-by-Row Flow) --}}
@@ -227,173 +262,201 @@
                     </div>
                 </template>
 
-                {{-- Row 1: Scheduler Time --}}
-                <div
-                    class="px-5 py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-soft/10 transition-colors">
-                    <div class="max-w-md">
-                        <label class="text-sm font-semibold text-ink block" for="cfg-scheduler-time">Waktu Scheduler
-                            Harian (WITA)</label>
-                        <p class="text-xs text-muted mt-1 leading-relaxed">Pemeriksaan otomatis berjalan di jam ini
-                            setiap hari untuk memperbarui peringatan kepegawaian.</p>
+                <!-- Header Tabel Desktop -->
+                <div class="px-5 py-3 bg-soft/40 border-b border-border grid grid-cols-1 sm:grid-cols-12 gap-4 text-[10px] font-bold text-muted uppercase tracking-wider hidden sm:grid select-none">
+                    <div class="sm:col-span-5 flex items-center gap-3">
+                        <span>Parameter Notifikasi</span>
                     </div>
-                    <div class="flex items-center gap-4">
-                        <input type="time" id="cfg-scheduler-time" name="ews_scheduler_time"
-                            x-model="ews_scheduler_time"
-                            class="w-40 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono font-semibold">
-                        @error('ews_scheduler_time')
-                            <p class="text-xs text-danger mt-1">{{ $message }}</p>
-                        @enderror
+                    <div class="sm:col-span-7 grid grid-cols-3 gap-6 text-center">
+                        <div class="text-success bg-success/5 border border-success/10 rounded-md py-1">Tahap 1</div>
+                        <div class="text-warning bg-warning/5 border border-warning/10 rounded-md py-1">Tahap 2</div>
+                        <div class="text-danger bg-danger/5 border border-danger/10 rounded-md py-1">Tahap 3</div>
+                    </div>
+                </div>
+
+                {{-- Row 1: Scheduler Time --}}
+                <div class="px-5 py-5 grid grid-cols-1 sm:grid-cols-12 gap-4 items-center hover:bg-soft/10 transition-colors">
+                    <div class="sm:col-span-5">
+                        <div class="flex items-center gap-3">
+                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary shadow-sm">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <label class="text-sm font-semibold text-ink block" for="cfg-scheduler-time">Waktu Scheduler Harian (WITA)</label>
+                                <p class="text-xs text-muted mt-0.5 leading-relaxed">Pemeriksaan otomatis berjalan di jam ini setiap hari untuk memperbarui peringatan.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="sm:col-span-7 flex sm:justify-end">
+                        <div class="w-full sm:w-auto">
+                            <input type="time" id="cfg-scheduler-time" name="ews_scheduler_time"
+                                x-model="ews_scheduler_time"
+                                class="w-full sm:w-40 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono font-semibold">
+                            @error('ews_scheduler_time')
+                                <p class="text-xs text-danger mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
                     </div>
                 </div>
 
                 {{-- Row 2: Kenaikan Pangkat --}}
-                <div
-                    class="px-5 py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-soft/10 transition-colors">
-                    <div class="max-w-md">
-                        <span class="text-sm font-semibold text-ink block">Kenaikan Pangkat</span>
-                        <p class="text-xs text-muted mt-1 leading-relaxed">Peringatan periodik menjelang kenaikan
-                            pangkat berkala pegawai berdasarkan PP 99/2000 (TMT + 4 Tahun).</p>
+                <div class="px-5 py-5 grid grid-cols-1 sm:grid-cols-12 gap-4 items-center hover:bg-soft/10 transition-colors">
+                    <div class="sm:col-span-5">
+                        <div class="flex items-center gap-3">
+                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success shadow-sm">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <span class="text-sm font-semibold text-ink block">Kenaikan Pangkat</span>
+                                <p class="text-xs text-muted mt-0.5 leading-relaxed">Peringatan periodik menjelang kenaikan pangkat berkala pegawai berdasarkan PP 99/2000 (TMT + 4 Tahun).</p>
+                            </div>
+                        </div>
                     </div>
-
-                    <div class="flex items-center gap-6 flex-wrap">
-                        <div class="text-center min-w-[90px]">
-                            <span class="text-[9px] font-bold text-success uppercase tracking-wider block">Tahap
-                                1</span>
-                            <input type="number" name="pangkat_h90" x-model="pangkat_h90"
-                                class="w-24 text-center mt-1 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono">
-                            <span class="text-[9px] font-semibold text-success block mt-1"
-                                x-text="humanLabel(pangkat_h90)"></span>
+                    <div class="sm:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+                        <!-- Tahap 1 -->
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-success/5 border border-success/15 rounded-xl px-3 py-2.5 shadow-sm">
+                            <span class="text-[10px] font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1</span>
+                            <input type="number" name="pangkat_h90" x-model="pangkat_h90" min="1" step="1"
+                                :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + p90Class()">
+                            <span class="text-[10px] font-bold text-success bg-success/10 px-2 py-0.5 rounded-md min-w-[68px] text-center" x-text="humanLabel(pangkat_h90)"></span>
                         </div>
-                        <div class="h-10 w-px bg-border hidden sm:block"></div>
-                        <div class="text-center min-w-[90px]">
-                            <span class="text-[9px] font-bold text-warning uppercase tracking-wider block">Tahap
-                                2</span>
-                            <input type="number" name="pangkat_h60" x-model="pangkat_h60"
-                                class="w-24 text-center mt-1 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono">
-                            <span class="text-[9px] font-semibold text-warning block mt-1"
-                                x-text="humanLabel(pangkat_h60)"></span>
+                        <!-- Tahap 2 -->
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-warning/5 border border-warning/15 rounded-xl px-3 py-2.5 shadow-sm">
+                            <span class="text-[10px] font-bold text-warning uppercase tracking-wider block sm:hidden">Tahap 2</span>
+                            <input type="number" name="pangkat_h60" x-model="pangkat_h60" min="1" step="1"
+                                :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + p60Class()">
+                            <span class="text-[10px] font-bold text-warning bg-warning/10 px-2.5 py-0.5 rounded-md min-w-[68px] text-center" x-text="humanLabel(pangkat_h60)"></span>
                         </div>
-                        <div class="h-10 w-px bg-border hidden sm:block"></div>
-                        <div class="text-center min-w-[90px]">
-                            <span class="text-[9px] font-bold text-danger uppercase tracking-wider block">Tahap 3</span>
-                            <input type="number" name="pangkat_h30" x-model="pangkat_h30"
-                                class="w-24 text-center mt-1 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono">
-                            <span class="text-[9px] font-semibold text-danger block mt-1"
-                                x-text="humanLabel(pangkat_h30)"></span>
+                        <!-- Tahap 3 -->
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-danger/5 border border-danger/15 rounded-xl px-3 py-2.5 shadow-sm">
+                            <span class="text-[10px] font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3</span>
+                            <input type="number" name="pangkat_h30" x-model="pangkat_h30" min="1" step="1"
+                                :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + p30Class()">
+                            <span class="text-[10px] font-bold text-danger bg-danger/10 px-2.5 py-0.5 rounded-md min-w-[68px] text-center" x-text="humanLabel(pangkat_h30)"></span>
                         </div>
                     </div>
                 </div>
 
                 {{-- Row 3: KGB --}}
-                <div
-                    class="px-5 py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-soft/10 transition-colors">
-                    <div class="max-w-md">
-                        <span class="text-sm font-semibold text-ink block">Kenaikan Gaji Berkala (KGB)</span>
-                        <p class="text-xs text-muted mt-1 leading-relaxed">Peringatan periodik menjelang kenaikan gaji
-                            berkala (KGB) pegawai (TMT + 2 Tahun).</p>
+                <div class="px-5 py-5 grid grid-cols-1 sm:grid-cols-12 gap-4 items-center hover:bg-soft/10 transition-colors">
+                    <div class="sm:col-span-5">
+                        <div class="flex items-center gap-3">
+                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-info/10 text-info shadow-sm">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5h16.5M5.25 7.5h13.5m-12 9a3 3 0 0 1 3-3h9a3 3 0 0 1 3 3M5.25 12h13.5" />
+                                </svg>
+                            </div>
+                            <div>
+                                <span class="text-sm font-semibold text-ink block">Kenaikan Gaji Berkala (KGB)</span>
+                                <p class="text-xs text-muted mt-0.5 leading-relaxed">Peringatan periodik menjelang kenaikan gaji berkala (KGB) pegawai (TMT + 2 Tahun).</p>
+                            </div>
+                        </div>
                     </div>
-
-                    <div class="flex items-center gap-6 flex-wrap">
-                        <div class="text-center min-w-[90px]">
-                            <span class="text-[9px] font-bold text-success uppercase tracking-wider block">Tahap
-                                1</span>
-                            <input type="number" name="kgb_h60" x-model="kgb_h60"
-                                class="w-24 text-center mt-1 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono">
-                            <span class="text-[9px] font-semibold text-success block mt-1"
-                                x-text="humanLabel(kgb_h60)"></span>
+                    <div class="sm:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+                        <!-- Tahap 1 -->
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-success/5 border border-success/15 rounded-xl px-3 py-2.5 shadow-sm">
+                            <span class="text-[10px] font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1</span>
+                            <input type="number" name="kgb_h60" x-model="kgb_h60" min="1" step="1"
+                                :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + k60Class()">
+                            <span class="text-[10px] font-bold text-success bg-success/10 px-2 py-0.5 rounded-md min-w-[68px] text-center" x-text="humanLabel(kgb_h60)"></span>
                         </div>
-                        <div class="h-10 w-px bg-border hidden sm:block"></div>
-                        <div class="text-center min-w-[90px]">
-                            <span class="text-[9px] font-bold text-warning uppercase tracking-wider block">Tahap
-                                2</span>
-                            <input type="number" name="kgb_h30" x-model="kgb_h30"
-                                class="w-24 text-center mt-1 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono">
-                            <span class="text-[9px] font-semibold text-warning block mt-1"
-                                x-text="humanLabel(kgb_h30)"></span>
+                        <!-- Tahap 2 -->
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-warning/5 border border-warning/15 rounded-xl px-3 py-2.5 shadow-sm">
+                            <span class="text-[10px] font-bold text-warning uppercase tracking-wider block sm:hidden">Tahap 2</span>
+                            <input type="number" name="kgb_h30" x-model="kgb_h30" min="1" step="1"
+                                :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + k30Class()">
+                            <span class="text-[10px] font-bold text-warning bg-warning/10 px-2.5 py-0.5 rounded-md min-w-[68px] text-center" x-text="humanLabel(kgb_h30)"></span>
                         </div>
-                        <div class="h-10 w-px bg-border hidden sm:block"></div>
-                        <div class="text-center min-w-[90px]">
-                            <span class="text-[9px] font-bold text-danger uppercase tracking-wider block">Tahap 3</span>
-                            <input type="number" name="kgb_h14" x-model="kgb_h14"
-                                class="w-24 text-center mt-1 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono">
-                            <span class="text-[9px] font-semibold text-danger block mt-1"
-                                x-text="humanLabel(kgb_h14)"></span>
+                        <!-- Tahap 3 -->
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-danger/5 border border-danger/15 rounded-xl px-3 py-2.5 shadow-sm">
+                            <span class="text-[10px] font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3</span>
+                            <input type="number" name="kgb_h14" x-model="kgb_h14" min="1" step="1"
+                                :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + k14Class()">
+                            <span class="text-[10px] font-bold text-danger bg-danger/10 px-2.5 py-0.5 rounded-md min-w-[68px] text-center" x-text="humanLabel(kgb_h14)"></span>
                         </div>
                     </div>
                 </div>
 
                 {{-- Row 4: Pensiun --}}
-                <div
-                    class="px-5 py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-soft/10 transition-colors">
-                    <div class="max-w-md">
-                        <span class="text-sm font-semibold text-ink block">Batas Usia Pensiun (BUP)</span>
-                        <p class="text-xs text-muted mt-1 leading-relaxed">Peringatan pensiun berdasarkan tanggal lahir
-                            ditambah usia wajib pensiun pegawai.</p>
+                <div class="px-5 py-5 grid grid-cols-1 sm:grid-cols-12 gap-4 items-center hover:bg-soft/10 transition-colors">
+                    <div class="sm:col-span-5">
+                        <div class="flex items-center gap-3">
+                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-danger/10 text-danger shadow-sm">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-.778.099-1.533.284-2.253" />
+                                </svg>
+                            </div>
+                            <div>
+                                <span class="text-sm font-semibold text-ink block">Batas Usia Pensiun (BUP)</span>
+                                <p class="text-xs text-muted mt-0.5 leading-relaxed">Peringatan pensiun berdasarkan tanggal lahir ditambah usia wajib pensiun pegawai.</p>
+                            </div>
+                        </div>
                     </div>
-
-                    <div class="flex items-center gap-6 flex-wrap">
-                        <div class="text-center min-w-[90px]">
-                            <span class="text-[9px] font-bold text-success uppercase tracking-wider block">Tahap
-                                1</span>
-                            <input type="number" name="pensiun_y1" x-model="pensiun_y1"
-                                class="w-24 text-center mt-1 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono">
-                            <span class="text-[9px] font-semibold text-success block mt-1"
-                                x-text="humanLabel(pensiun_y1)"></span>
+                    <div class="sm:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+                        <!-- Tahap 1 -->
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-success/5 border border-success/15 rounded-xl px-3 py-2.5 shadow-sm">
+                            <span class="text-[10px] font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1</span>
+                            <input type="number" name="pensiun_y1" x-model="pensiun_y1" min="1" step="1"
+                                :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + py1Class()">
+                            <span class="text-[10px] font-bold text-success bg-success/10 px-2 py-0.5 rounded-md min-w-[68px] text-center" x-text="humanLabel(pensiun_y1)"></span>
                         </div>
-                        <div class="h-10 w-px bg-border hidden sm:block"></div>
-                        <div class="text-center min-w-[90px]">
-                            <span class="text-[9px] font-bold text-warning uppercase tracking-wider block">Tahap
-                                2</span>
-                            <input type="number" name="pensiun_m6" x-model="pensiun_m6"
-                                class="w-24 text-center mt-1 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono">
-                            <span class="text-[9px] font-semibold text-warning block mt-1"
-                                x-text="humanLabel(pensiun_m6)"></span>
+                        <!-- Tahap 2 -->
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-warning/5 border border-warning/15 rounded-xl px-3 py-2.5 shadow-sm">
+                            <span class="text-[10px] font-bold text-warning uppercase tracking-wider block sm:hidden">Tahap 2</span>
+                            <input type="number" name="pensiun_m6" x-model="pensiun_m6" min="1" step="1"
+                                :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + pm6Class()">
+                            <span class="text-[10px] font-bold text-warning bg-warning/10 px-2.5 py-0.5 rounded-md min-w-[68px] text-center" x-text="humanLabel(pensiun_m6)"></span>
                         </div>
-                        <div class="h-10 w-px bg-border hidden sm:block"></div>
-                        <div class="text-center min-w-[90px]">
-                            <span class="text-[9px] font-bold text-danger uppercase tracking-wider block">Tahap 3</span>
-                            <input type="number" name="pensiun_m3" x-model="pensiun_m3"
-                                class="w-24 text-center mt-1 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono">
-                            <span class="text-[9px] font-semibold text-danger block mt-1"
-                                x-text="humanLabel(pensiun_m3)"></span>
+                        <!-- Tahap 3 -->
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-danger/5 border border-danger/15 rounded-xl px-3 py-2.5 shadow-sm">
+                            <span class="text-[10px] font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3</span>
+                            <input type="number" name="pensiun_m3" x-model="pensiun_m3" min="1" step="1"
+                                :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + pm3Class()">
+                            <span class="text-[10px] font-bold text-danger bg-danger/10 px-2.5 py-0.5 rounded-md min-w-[68px] text-center" x-text="humanLabel(pensiun_m3)"></span>
                         </div>
                     </div>
                 </div>
 
                 {{-- Row 5: PPPK --}}
-                <div
-                    class="px-5 py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-soft/10 transition-colors">
-                    <div class="max-w-md">
-                        <span class="text-sm font-semibold text-ink block">Kontrak PPPK</span>
-                        <p class="text-xs text-muted mt-1 leading-relaxed">Peringatan periodik menjelang kedaluwarsa
-                            masa penugasan kontrak PPPK pegawai.</p>
+                <div class="px-5 py-5 grid grid-cols-1 sm:grid-cols-12 gap-4 items-center hover:bg-soft/10 transition-colors">
+                    <div class="sm:col-span-5">
+                        <div class="flex items-center gap-3">
+                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-warning/10 text-warning shadow-sm">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <span class="text-sm font-semibold text-ink block">Kontrak PPPK</span>
+                                <p class="text-xs text-muted mt-0.5 leading-relaxed">Peringatan periodik menjelang kedaluwarsa masa penugasan kontrak PPPK pegawai.</p>
+                            </div>
+                        </div>
                     </div>
-
-                    <div class="flex items-center gap-6 flex-wrap">
-                        <div class="text-center min-w-[90px]">
-                            <span class="text-[9px] font-bold text-success uppercase tracking-wider block">Tahap
-                                1</span>
-                            <input type="number" name="pppk_m6" x-model="pppk_m6"
-                                class="w-24 text-center mt-1 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono">
-                            <span class="text-[9px] font-semibold text-success block mt-1"
-                                x-text="humanLabel(pppk_m6)"></span>
+                    <div class="sm:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+                        <!-- Tahap 1 -->
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-success/5 border border-success/15 rounded-xl px-3 py-2.5 shadow-sm">
+                            <span class="text-[10px] font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1</span>
+                            <input type="number" name="pppk_m6" x-model="pppk_m6" min="1" step="1"
+                                :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + pp6Class()">
+                            <span class="text-[10px] font-bold text-success bg-success/10 px-2 py-0.5 rounded-md min-w-[68px] text-center" x-text="humanLabel(pppk_m6)"></span>
                         </div>
-                        <div class="h-10 w-px bg-border hidden sm:block"></div>
-                        <div class="text-center min-w-[90px]">
-                            <span class="text-[9px] font-bold text-warning uppercase tracking-wider block">Tahap
-                                2</span>
-                            <input type="number" name="pppk_m3" x-model="pppk_m3"
-                                class="w-24 text-center mt-1 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono">
-                            <span class="text-[9px] font-semibold text-warning block mt-1"
-                                x-text="humanLabel(pppk_m3)"></span>
+                        <!-- Tahap 2 -->
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-warning/5 border border-warning/15 rounded-xl px-3 py-2.5 shadow-sm">
+                            <span class="text-[10px] font-bold text-warning uppercase tracking-wider block sm:hidden">Tahap 2</span>
+                            <input type="number" name="pppk_m3" x-model="pppk_m3" min="1" step="1"
+                                :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + pp3Class()">
+                            <span class="text-[10px] font-bold text-warning bg-warning/10 px-2.5 py-0.5 rounded-md min-w-[68px] text-center" x-text="humanLabel(pppk_m3)"></span>
                         </div>
-                        <div class="h-10 w-px bg-border hidden sm:block"></div>
-                        <div class="text-center min-w-[90px]">
-                            <span class="text-[9px] font-bold text-danger uppercase tracking-wider block">Tahap 3</span>
-                            <input type="number" name="pppk_m1" x-model="pppk_m1"
-                                class="w-24 text-center mt-1 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono">
-                            <span class="text-[9px] font-semibold text-danger block mt-1"
-                                x-text="humanLabel(pppk_m1)"></span>
+                        <!-- Tahap 3 -->
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-danger/5 border border-danger/15 rounded-xl px-3 py-2.5 shadow-sm">
+                            <span class="text-[10px] font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3</span>
+                            <input type="number" name="pppk_m1" x-model="pppk_m1" min="1" step="1"
+                                :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + pp1Class()">
+                            <span class="text-[10px] font-bold text-danger bg-danger/10 px-2.5 py-0.5 rounded-md min-w-[68px] text-center" x-text="humanLabel(pppk_m1)"></span>
                         </div>
                     </div>
                 </div>
@@ -417,7 +480,7 @@
 
                         <button type="button" @click="openConfirm()"
                             class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 active:opacity-80 disabled:cursor-not-allowed disabled:opacity-50 font-sans cursor-pointer"
-                            :disabled="reason.trim() === ''">
+                            :disabled="reason.trim() === '' || thresholdWarnings.length > 0">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                             </svg>

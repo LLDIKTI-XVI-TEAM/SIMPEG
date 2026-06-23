@@ -45,6 +45,7 @@ class Employee extends Model
         'tanggal_pensiun',
         'tanggal_kenaikan_pangkat_berikutnya',
         'tanggal_kgb_berikutnya',
+        'tanggal_akhir_kontrak',
 
         // Profil status
         'profil_status',
@@ -70,6 +71,7 @@ class Employee extends Model
             'tanggal_pensiun' => 'date',
             'tanggal_kenaikan_pangkat_berikutnya' => 'date',
             'tanggal_kgb_berikutnya' => 'date',
+            'tanggal_akhir_kontrak' => 'date',
             'is_kinerja_baik' => 'boolean',
             'nik' => 'encrypted',
             'no_kk' => 'encrypted',

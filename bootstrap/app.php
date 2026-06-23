@@ -14,6 +14,12 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    ->withSchedule(function (\Illuminate\Console\Scheduling\Schedule $schedule): void {
+        $schedulerTime = \App\Models\EwsConfig::getVal('ews_scheduler_time', '07:00');
+        $schedule->command('app:run-ews')
+            ->timezone('Asia/Makassar')
+            ->dailyAt($schedulerTime);
+    })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'keycloak.auth' => EnsureKeycloakAuthenticated::class,
