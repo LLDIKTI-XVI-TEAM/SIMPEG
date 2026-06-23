@@ -43,6 +43,8 @@ class Employee extends Model
 
         // Pensiun
         'tanggal_pensiun',
+        'tanggal_kenaikan_pangkat_berikutnya',
+        'tanggal_kgb_berikutnya',
 
         // Profil status
         'profil_status',
@@ -66,6 +68,8 @@ class Employee extends Model
         return [
             'tanggal_lahir' => 'date',
             'tanggal_pensiun' => 'date',
+            'tanggal_kenaikan_pangkat_berikutnya' => 'date',
+            'tanggal_kgb_berikutnya' => 'date',
             'is_kinerja_baik' => 'boolean',
             'nik' => 'encrypted',
             'no_kk' => 'encrypted',
