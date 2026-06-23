@@ -3,7 +3,7 @@
     @php
         // Mapping riwayat berkas digital pegawai
         $riwayatDokumen = [];
-        if ($p['id'] == 1) {
+        if ($p->id == 1) {
             $riwayatDokumen = [
                 [
                     'id' => 1,
@@ -39,17 +39,17 @@
         }
 
         // Kalkulator otomatis jadwal
-        $tmtPangkatTerakhir = isset($p['tmt']) ? \Carbon\Carbon::parse($p['tmt']) : null;
+        $tmtPangkatTerakhir = isset($p->tmt) ? \Carbon\Carbon::parse($p->tmt) : null;
         $estimasiPangkatNext = $tmtPangkatTerakhir ? $tmtPangkatTerakhir->copy()->addYears(4)->format('d-m-Y') : '-';
         $estimasiKgbNext = $tmtPangkatTerakhir ? $tmtPangkatTerakhir->copy()->addYears(2)->format('d-m-Y') : '-';
         
         // Logika BUP dinamis berdasarkan jabatan
         $bup = 58;
-        if (isset($p['jabatan']) && (str_contains(strtolower($p['jabatan']), 'madya') || str_contains(strtolower($p['jabatan']), 'utama') || str_contains(strtolower($p['jabatan']), 'pimpinan tinggi'))) {
+        if (isset($p->jabatan) && (str_contains(strtolower($p->jabatan), 'madya') || str_contains(strtolower($p->jabatan), 'utama') || str_contains(strtolower($p->jabatan), 'pimpinan tinggi'))) {
             $bup = 60;
         }
 
-        $tglLahir = isset($p['tanggal_lahir']) ? \Carbon\Carbon::parse($p['tanggal_lahir']) : null;
+        $tglLahir = isset($p->tanggal_lahir) ? \Carbon\Carbon::parse($p->tanggal_lahir) : null;
         $estimasiPensiun = $tglLahir ? $tglLahir->copy()->addYears($bup)->format('d-m-Y') : '-';
         
         $sisaPensiunStr = '-';
@@ -67,7 +67,7 @@
 
     <div x-data="{
         activeTab: 'profile',
-        kinerjaBaik: {{ $p['kinerja_baik'] ? 'true' : 'false' }},
+        kinerjaBaik: {{ $p->kinerja_baik ? 'true' : 'false' }},
         showModal: false,
         modalTitle: '',
         modalType: '',
@@ -91,7 +91,7 @@
         ],
         disiplinList: [],
         pendidikanList: [
-            { tingkat: '{{ $p['pendidikan_terakhir'] ?? 'Sarjana (S1)' }}', institusi: 'Universitas Sam Ratulangi', prodi: '{{ $p['prodi_pendidikan'] ?? 'Manajemen' }}', lulus: '2007', no_ijazah: 'IJZ-S1-MAN-2007' }
+            { tingkat: '{{ $p->pendidikan_terakhir ?? 'Sarjana (S1)' }}', institusi: 'Universitas Sam Ratulangi', prodi: '{{ $p->prodi_pendidikan ?? 'Manajemen' }}', lulus: '2007', no_ijazah: 'IJZ-S1-MAN-2007' }
         ],
         
         // Form states
@@ -149,31 +149,31 @@
             <div class="border-b border-border pb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div class="flex items-center gap-4">
                     <div class="h-16 w-16 rounded-full border border-border bg-soft flex items-center justify-center overflow-hidden shrink-0">
-                        @if($p['foto'])
+                        @if($p->foto)
                             <svg class="h-8 w-8 text-primary/70" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
                             </svg>
                         @else
                             <div class="flex h-full w-full items-center justify-center bg-primary/10 text-xl font-bold text-primary font-sans uppercase">
-                                {{ strtoupper(substr($p['nama'], 0, 1)) }}
+                                {{ strtoupper(substr($p->nama, 0, 1)) }}
                             </div>
                         @endif
                     </div>
                     <div class="min-w-0">
                         <div class="flex flex-wrap items-center gap-2">
-                            <h2 class="text-xl font-bold text-ink font-sans leading-tight">{{ $p['nama'] }}</h2>
+                            <h2 class="text-xl font-bold text-ink font-sans leading-tight">{{ $p->nama }}</h2>
                             <template x-if="kinerjaBaik">
                                 <span class="inline-flex items-center gap-1 rounded bg-success/10 px-2 py-0.5 text-[10px] font-bold text-success font-sans">
                                     🌟 KINERJA BAIK
                                 </span>
                             </template>
                         </div>
-                        <p class="text-xs text-muted font-sans font-mono mt-0.5">NIP. {{ $p['nip'] }}</p>
-                        <span class="inline-block mt-1.5 rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-semibold font-sans uppercase">{{ $p['jenis'] }}</span>
+                        <p class="text-xs text-muted font-sans font-mono mt-0.5">NIP. {{ $p->nip }}</p>
+                        <span class="inline-block mt-1.5 rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-semibold font-sans uppercase">{{ $p->jenis }}</span>
                     </div>
                 </div>
                 <div class="flex items-center gap-3 shrink-0">
-                    <a href="{{ route('pegawai.edit', $p['id']) }}" class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm">
+                    <a href="{{ route('pegawai.edit', $p->id) }}" class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm">
                         Edit Pegawai
                     </a>
                     <a href="{{ route('data-pegawai') }}" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-soft">
@@ -219,8 +219,8 @@
                         </div>
                         <div>
                             <span class="text-[9px] font-bold text-muted uppercase tracking-wider font-sans block">Atasan Langsung</span>
-                            <p class="text-xs font-bold text-ink font-sans">{{ $p['atasan_nama'] ?? 'Rina Amalia, S.Sos., M.M.' }}</p>
-                            <p class="text-[10px] text-muted font-mono leading-none mt-0.5">NIP. {{ $p['atasan_nip'] ?? '19810405200501 2 004' }} ({{ $p['atasan_jabatan'] ?? 'Kepala Bagian' }})</p>
+                            <p class="text-xs font-bold text-ink font-sans">{{ $p->atasan_nama ?? 'Rina Amalia, S.Sos., M.M.' }}</p>
+                            <p class="text-[10px] text-muted font-mono leading-none mt-0.5">NIP. {{ $p->atasan_nip ?? '19810405200501 2 004' }} ({{ $p->atasan_jabatan ?? 'Kepala Bagian' }})</p>
                         </div>
                     </div>
                 </div>
@@ -256,31 +256,31 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">NIK (KTP)</span>
-                                <p class="text-ink font-mono font-bold">{{ $p['nik'] ?? '3273251203850002' }}</p>
+                                <p class="text-ink font-mono font-bold">{{ $p->nik ?? '3273251203850002' }}</p>
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">No. Kartu Keluarga (KK)</span>
-                                <p class="text-ink font-mono font-bold">{{ $p['kk'] ?? '3273250102120045' }}</p>
+                                <p class="text-ink font-mono font-bold">{{ $p->kk ?? '3273250102120045' }}</p>
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Tempat / Tanggal Lahir</span>
-                                <p class="text-ink font-sans">{{ $p['tempat_lahir'] ?? 'Bandung' }}, {{ isset($p['tanggal_lahir']) ? \Carbon\Carbon::parse($p['tanggal_lahir'])->format('d-m-Y') : '-' }}</p>
+                                <p class="text-ink font-sans">{{ $p->tempat_lahir ?? 'Bandung' }}, {{ isset($p->tanggal_lahir) ? \Carbon\Carbon::parse($p->tanggal_lahir)->format('d-m-Y') : '-' }}</p>
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Jenis Kelamin</span>
-                                <p class="text-ink font-sans">{{ $p['jenis_kelamin'] ?? 'Laki-laki' }}</p>
+                                <p class="text-ink font-sans">{{ $p->jenis_kelamin ?? 'Laki-laki' }}</p>
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Agama</span>
-                                <p class="text-ink font-sans">{{ $p['agama'] ?? 'Islam' }}</p>
+                                <p class="text-ink font-sans">{{ $p->agama ?? 'Islam' }}</p>
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Status Kawin</span>
-                                <p class="text-ink font-sans">{{ $p['status_kawin'] ?? 'Kawin' }}</p>
+                                <p class="text-ink font-sans">{{ $p->status_kawin ?? 'Kawin' }}</p>
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Golongan Darah</span>
-                                <p class="text-ink font-sans font-bold">{{ $p['golongan_darah'] ?? 'O' }}</p>
+                                <p class="text-ink font-sans font-bold">{{ $p->golongan_darah ?? 'O' }}</p>
                             </div>
                         </div>
                     </div>
@@ -290,23 +290,23 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Email Dinas</span>
-                                <p class="text-ink font-sans font-mono">{{ $p['email_dinas'] ?? '-' }}</p>
+                                <p class="text-ink font-sans font-mono">{{ $p->email_dinas ?? '-' }}</p>
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Email Pribadi</span>
-                                <p class="text-ink font-sans font-mono">{{ $p['email'] ?? '-' }}</p>
+                                <p class="text-ink font-sans font-mono">{{ $p->email ?? '-' }}</p>
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Nomor HP</span>
-                                <p class="text-ink font-sans font-mono">{{ $p['telepon'] ?? '-' }}</p>
+                                <p class="text-ink font-sans font-mono">{{ $p->telepon ?? '-' }}</p>
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Telepon Rumah</span>
-                                <p class="text-ink font-sans font-mono">{{ $p['telepon_rumah'] ?? '-' }}</p>
+                                <p class="text-ink font-sans font-mono">{{ $p->telepon_rumah ?? '-' }}</p>
                             </div>
                             <div class="space-y-0.5 sm:col-span-2">
                                 <span class="font-semibold text-muted font-sans">Alamat</span>
-                                <p class="text-ink font-sans leading-relaxed">{{ $p['alamat'] ?? '-' }}</p>
+                                <p class="text-ink font-sans leading-relaxed">{{ $p->alamat ?? '-' }}</p>
                             </div>
                         </div>
                     </div>
@@ -318,27 +318,27 @@
                     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-xs">
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">Jabatan Sekarang</span>
-                            <p class="text-ink font-sans font-bold">{{ $p['jabatan'] }}</p>
+                            <p class="text-ink font-sans font-bold">{{ $p->jabatan }}</p>
                         </div>
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">Unit Kerja</span>
-                            <p class="text-ink font-sans">{{ $p['unit'] }}</p>
+                            <p class="text-ink font-sans">{{ $p->unit }}</p>
                         </div>
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">Pangkat</span>
-                            <p class="text-ink font-sans font-bold">{{ $p['pangkat'] ?? 'Penata Tkt. I' }}</p>
+                            <p class="text-ink font-sans font-bold">{{ $p->pangkat ?? 'Penata Tkt. I' }}</p>
                         </div>
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">Golongan Saat Ini</span>
-                            <p class="text-ink font-sans font-bold">{{ $p['golongan'] }}</p>
+                            <p class="text-ink font-sans font-bold">{{ $p->golongan }}</p>
                         </div>
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">Kelas Jabatan</span>
-                            <p class="text-ink font-sans font-bold">{{ $p['kelas_jabatan'] ?? '8' }}</p>
+                            <p class="text-ink font-sans font-bold">{{ $p->kelas_jabatan ?? '8' }}</p>
                         </div>
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">TMT Golongan</span>
-                            <p class="text-ink font-mono">{{ isset($p['tmt']) ? \Carbon\Carbon::parse($p['tmt'])->format('d-m-Y') : '-' }}</p>
+                            <p class="text-ink font-mono">{{ isset($p->tmt) ? \Carbon\Carbon::parse($p->tmt)->format('d-m-Y') : '-' }}</p>
                         </div>
                     </div>
                 </div>
@@ -580,21 +580,21 @@
                         <div class="space-y-2">
                             <div class="flex justify-between border-b border-border pb-1">
                                 <span class="font-semibold text-muted">Jenis Pengangkatan:</span>
-                                <span class="text-ink font-bold">{{ $p['jenis_pengangkatan'] ?? 'PNS Formasi Umum' }}</span>
+                                <span class="text-ink font-bold">{{ $p->jenis_pengangkatan ?? 'PNS Formasi Umum' }}</span>
                             </div>
                             <div class="flex justify-between border-b border-border pb-1">
                                 <span class="font-semibold text-muted">Nomor SK Pengangkatan:</span>
-                                <span class="text-ink font-mono font-bold">{{ $p['nomor_sk'] ?? 'SK-882-KP-2024' }}</span>
+                                <span class="text-ink font-mono font-bold">{{ $p->nomor_sk ?? 'SK-882-KP-2024' }}</span>
                             </div>
                             <div class="flex justify-between border-b border-border pb-1">
                                 <span class="font-semibold text-muted">Tanggal SK Terbit:</span>
-                                <span class="text-ink font-mono">{{ isset($p['tanggal_sk']) ? \Carbon\Carbon::parse($p['tanggal_sk'])->format('d-m-Y') : '-' }}</span>
+                                <span class="text-ink font-mono">{{ isset($p->tanggal_sk) ? \Carbon\Carbon::parse($p->tanggal_sk)->format('d-m-Y') : '-' }}</span>
                             </div>
                         </div>
                         <div class="space-y-2">
                             <div class="flex justify-between border-b border-border pb-1">
                                 <span class="font-semibold text-muted">TMT Pengangkatan:</span>
-                                <span class="text-ink font-mono font-bold">{{ isset($p['tmt']) ? \Carbon\Carbon::parse($p['tmt'])->format('d-m-Y') : '-' }}</span>
+                                <span class="text-ink font-mono font-bold">{{ isset($p->tmt) ? \Carbon\Carbon::parse($p->tmt)->format('d-m-Y') : '-' }}</span>
                             </div>
                             <div class="flex justify-between border-b border-border pb-1">
                                 <span class="font-semibold text-muted">Pejabat yang Menetapkan:</span>

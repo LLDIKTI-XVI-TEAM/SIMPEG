@@ -18,6 +18,8 @@ class DatabaseSeeder extends Seeder
         $this->call([
             ReferenceSeeder::class,
             RbacSeeder::class,
+            ApprovalConfigSeeder::class,
+            EwsConfigSeeder::class,
         ]);
 
         User::factory()->create([

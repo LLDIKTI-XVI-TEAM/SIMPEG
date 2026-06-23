@@ -10,6 +10,12 @@ class ExampleTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed();
+    }
+
     public function test_guest_home_redirects_to_keycloak(): void
     {
         $response = $this->get('/');
@@ -182,7 +188,7 @@ class ExampleTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Matriks Konfigurasi RBAC');
-        $response->assertSee('manage_reference_tables');
+        $response->assertSee('employees.create');
     }
 
     public function test_rbac_aborts_for_non_super_admin(): void
@@ -200,33 +206,34 @@ class ExampleTest extends TestCase
         $admin = User::factory()->create(['role' => 'Super Admin']);
         session(['active_role' => 'Super Admin']);
 
-        // Let's modify permissions for role 2 (Admin Kepegawaian)
-        $roleId = 2;
-        $permissionIds = [1, 2, 3]; // manage_reference_tables, configure_ews, manage_holidays
+        // Let's modify permissions for role Admin Kepegawaian
+        $role = \App\Models\Role::where('name', 'admin_kepegawaian')->firstOrFail();
+        $permissions = \App\Models\Permission::limit(3)->pluck('id')->toArray();
+        $roleId = $role->id;
 
         $response = $this->actingAs($admin)
             ->from('/rbac')
             ->post('/rbac/update', [
                 'matrix' => [
-                    $roleId => $permissionIds
+                    $roleId => $permissions
                 ]
             ]);
 
         $response->assertRedirect('/rbac');
         $response->assertSessionHas('success', 'Hak akses peran (RBAC) berhasil diperbarui!');
 
-        // Check if database table role_permissions has exactly these mappings for role_id 2
+        // Check if database table role_permissions has exactly these mappings for role_id
         $this->assertDatabaseHas('role_permissions', [
             'role_id' => $roleId,
-            'permission_id' => 1
+            'permission_id' => $permissions[0]
         ]);
         $this->assertDatabaseHas('role_permissions', [
             'role_id' => $roleId,
-            'permission_id' => 2
+            'permission_id' => $permissions[1]
         ]);
         $this->assertDatabaseHas('role_permissions', [
             'role_id' => $roleId,
-            'permission_id' => 3
+            'permission_id' => $permissions[2]
         ]);
 
         // Check audit log

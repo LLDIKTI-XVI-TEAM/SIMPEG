@@ -40,8 +40,8 @@ class RbacController extends Controller
 
         foreach ($roles as $role) {
             $oldPerms = $role->permissions->pluck('id')->toArray();
-            // Get checked permission IDs for this role, convert to integers
-            $newPerms = array_map('intval', $matrix[$role->id] ?? []);
+            // Get checked permission IDs for this role
+            $newPerms = $matrix[$role->id] ?? [];
 
             sort($oldPerms);
             sort($newPerms);
