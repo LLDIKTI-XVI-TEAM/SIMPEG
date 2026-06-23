@@ -195,6 +195,7 @@
                 <select id="filter-status" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Status</option>
                     <option value="aktif">Aktif</option>
+                    <option value="nonaktif">Non-Aktif</option>
                     <option value="cuti">Cuti</option>
                 </select>
                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">

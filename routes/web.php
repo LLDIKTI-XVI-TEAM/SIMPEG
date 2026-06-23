@@ -73,7 +73,6 @@ Route::middleware('keycloak.auth')->group(function (): void {
 
     Route::get('/pegawai/import/template/{type}', function ($type) {
         $headers = [];
-        $filename = 'template_' . $type . '.xlsx';
         
         if ($type === 'utama') {
             $headers = ['No', 'Nama Pegawai', 'Email Pegawai', 'Golongan', 'Jabatan', 'Kelas Jabatan', 'NIP', 'Nomor Telepon', 'Pangkat', 'Pendidikan Terakhir', 'Pensiun', 'Person', 'Person Formula', 'Prodi Pendidikan Terakhir', 'Status Kepegawaian', 'Tanggal Lahir'];
@@ -87,6 +86,25 @@ Route::middleware('keycloak.auth')->group(function (): void {
             $headers = ['NIP', 'TMT KGB', 'Gaji Pokok', 'No SK', 'Tanggal SK'];
         } else {
             abort(404);
+        }
+
+        $format = strtolower((string) request('format', 'xlsx'));
+        $format = in_array($format, ['xlsx', 'csv'], true) ? $format : 'xlsx';
+        $filename = 'template_' . $type . '.' . $format;
+
+        if ($format === 'csv') {
+            return response()->streamDownload(function () use ($headers) {
+                $output = fopen('php://output', 'w');
+                echo "\xEF\xBB\xBF";
+                fputcsv($output, $headers);
+                fclose($output);
+            }, $filename, [
+                'Content-Type'        => 'text/csv; charset=UTF-8',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                'Cache-Control'       => 'no-cache, no-store, must-revalidate',
+                'Pragma'              => 'no-cache',
+                'Expires'             => '0',
+            ]);
         }
         
         $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
