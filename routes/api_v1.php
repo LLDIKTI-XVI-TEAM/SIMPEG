@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\DisciplineRecordController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\EmployeeImportController;
 use App\Http\Controllers\HariLiburController;
@@ -32,9 +33,22 @@ Route::middleware($employeeGroupMiddleware)
         Route::post('/import', [EmployeeImportController::class, 'store'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.import'])
             ->name('import.store');
+        Route::get('/{employee}', [EmployeeController::class, 'show'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
+            ->whereUuid('employee')
+            ->name('show');
         Route::put('/{employee}', [EmployeeController::class, 'update'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.update'])
+            ->whereUuid('employee')
             ->name('update');
+        Route::get('/{employee}/disiplin', [DisciplineRecordController::class, 'index'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:discipline_records.read'])
+            ->whereUuid('employee')
+            ->name('disiplin.index');
+        Route::post('/{employee}/disiplin', [DisciplineRecordController::class, 'store'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:discipline_records.create'])
+            ->whereUuid('employee')
+            ->name('disiplin.store');
         Route::get('/{employee}/riwayat-kepangkatan', [RankHistoryController::class, 'index'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_histories.read'])
             ->name('riwayat-kepangkatan.index');
