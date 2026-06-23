@@ -18,7 +18,7 @@ class DatabaseSeederTest extends TestCase
             'email' => 'demo-klabat@dev.local',
             'keycloak_username' => 'demo-klabat',
             'employee_id' => null,
-            'role' => 'super_admin',
+            'role' => 'Super Admin',
         ]);
     }
 }

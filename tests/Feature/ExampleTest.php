@@ -122,6 +122,7 @@ class ExampleTest extends TestCase
     public function test_authenticated_user_management_renders(): void
     {
         $user = User::factory()->create(['role' => 'Super Admin']);
+        session(['active_role' => 'Super Admin']);
 
         $response = $this->actingAs($user)->get('/user-management');
 
@@ -133,6 +134,7 @@ class ExampleTest extends TestCase
     public function test_user_management_update_mapping_success(): void
     {
         $admin = User::factory()->create(['role' => 'Super Admin']);
+        session(['active_role' => 'Super Admin']);
 
         $response = $this->actingAs($admin)
             ->from('/user-management')
@@ -159,6 +161,7 @@ class ExampleTest extends TestCase
     public function test_user_management_rejects_duplicate_keycloak_id(): void
     {
         $admin = User::factory()->create(['role' => 'Super Admin']);
+        session(['active_role' => 'Super Admin']);
         
         // Mapped user 1
         User::factory()->create([
