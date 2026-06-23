@@ -10,9 +10,9 @@ class RbacSeeder extends Seeder
 {
     public function run(): void
     {
-        // Daftar role Fase 1 sesuai permission matrix SIMPEG (5 role).
+        // Daftar role aplikasi sesuai permission matrix SIMPEG.
         $roles = [
-            'super_admin' => 'Super Admin — akses penuh termasuk konfigurasi sistem dan hard delete',
+            'super_admin' => 'Super Admin — akses penuh termasuk konfigurasi sistem dan soft delete/restore',
             'admin_kepegawaian' => 'Admin Kepegawaian — CRUD data pegawai, import, riwayat, cuti, EWS, laporan',
             'pimpinan' => 'Pimpinan (Kepala Lembaga) — dashboard, read-only data, final approval cuti',
             'atasan_langsung' => 'Atasan Langsung — approval stage 1 cuti, read-only data bawahan',
@@ -24,6 +24,8 @@ class RbacSeeder extends Seeder
             'employees.create' => ['module' => 'employees', 'description' => 'Membuat data pegawai'],
             'employees.update' => ['module' => 'employees', 'description' => 'Mengubah data pegawai'],
             'employees.import' => ['module' => 'employees', 'description' => 'Import data pegawai'],
+            'employee_histories.read' => ['module' => 'employee_histories', 'description' => 'Melihat riwayat pegawai'],
+            'employee_histories.create' => ['module' => 'employee_histories', 'description' => 'Membuat entri riwayat pegawai'],
             'hari_libur.read' => ['module' => 'hari_libur', 'description' => 'Melihat hari libur dan cuti bersama'],
             'hari_libur.create' => ['module' => 'hari_libur', 'description' => 'Membuat hari libur dan cuti bersama'],
             'hari_libur.update' => ['module' => 'hari_libur', 'description' => 'Mengubah hari libur dan cuti bersama'],
@@ -45,13 +47,15 @@ class RbacSeeder extends Seeder
         }
 
         // Mapping permission per role dibuat eksplisit agar perubahan hak akses mudah ditelusuri saat review.
-        // hari_libur tetap khusus super_admin pada Fase 1; pimpinan/atasan/pegawai belum punya akses route admin.
+        // hari_libur tetap khusus super_admin; pimpinan/atasan/pegawai belum punya akses route admin.
         $this->syncRolePermissions([
             'super_admin' => array_keys($permissions),
             'admin_kepegawaian' => [
                 'employees.create',
                 'employees.update',
                 'employees.import',
+                'employee_histories.read',
+                'employee_histories.create',
                 'audit_logs.read',
                 'notifications.read',
                 'notifications.update',
