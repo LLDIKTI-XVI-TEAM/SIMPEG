@@ -13,16 +13,17 @@
 
 | Feature             | Status | Notes                                    |
 | ------------------- | ------ | ---------------------------------------- |
-| Daftar Pegawai      | 🔃      | Backend sudah terintegrasi, menunggu testing & verifikasi  |
-| Detail Pegawai      | 🔃      | Menunggu testing & verifikasi                            |
-| Tambah Pegawai Baru | ❌      | Belum terintegrasi dengan Employee Model |
+| Daftar Pegawai      | ✅      | Backend terintegrasi, fitur filter/search mengikuti database |
+| Detail Pegawai      | ⚠️      | Menggunakan Employee Model + relasi database, namun ada fungsionalitas/data dari backend yang belum lengkap  |
+| Tambah Pegawai Baru | ✅      | Terintegrasi dengan form Request Validation dan relasi database backend |
 | Edit Pegawai        | ❌      | Masih menggunakan pegawaiList dummy      |
 | Hapus Pegawai       | ❌      | Belum menggunakan Soft Delete            |
 | Import Pegawai      | ❌      | Belum diaudit                            |
 | Export Pegawai      | ❌      | Belum diaudit                            |
-| Riwayat Pangkat     | ❌      | Belum menggunakan relasi RankHistory     |
-| Riwayat Jabatan     | ❌      | Belum menggunakan relasi PositionHistory |
-| Dokumen Pegawai     | ❌      | Belum menggunakan tabel documents        |
+| Riwayat Pangkat     | ⚠️      | Sudah tampil dari RankHistory pada halaman Detail Pegawai, CRUD belum terintegrasi     |
+| Riwayat Jabatan     | ⚠️      | Sudah tampil dari PositionHistory pada halaman Detail Pegawai, CRUD belum terintegrasi |
+| Riwayat KGB         | ⚠️      | Sudah tampil dari SalaryHistory pada halaman Detail Pegawai, CRUD belum terintegrasi |
+| Dokumen Pegawai     | ⚠️      | Sudah tampil dari relasi documents pada halaman Detail Pegawai, fitur upload/manajemen belum terintegrasi  |
 
 ---
 
@@ -101,4 +102,4 @@
 
 Last Updated: 24 Juni 2026
 Current Sprint: Frontend Backend Integration
-Current Focus: EWS Configuration + Scheduler Engine verified
+Current Focus: Tambah Pegawai

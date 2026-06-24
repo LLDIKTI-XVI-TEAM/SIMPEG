@@ -43,7 +43,7 @@
                                         {{ strtoupper(substr($r['nama'] ?? 'P', 0, 1)) }}
                                     </div>
                                     <div>
-                                        <p class="text-sm font-semibold text-ink font-sans leading-tight">{{ $r['nama'] ?? 'Pegawai' }}</p>
+                                        <p class="text-sm font-semibold text-ink font-sans leading-tight">{{ $r['nama'] ?? 'pegawai' }}</p>
                                         <p class="text-[10px] text-muted font-sans mt-0.5">Pengajuan: {{ \Carbon\Carbon::parse($r['tgl_pengajuan'])->translatedFormat('d M Y') }}</p>
                                     </div>
                                 </div>

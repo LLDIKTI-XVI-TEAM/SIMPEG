@@ -196,7 +196,7 @@ class EwsEngineService
             ]);
 
             // Notify Super Admin if scheduler fails
-            $superAdmins = \App\Models\User::where('role', 'Super Admin')
+            $superAdmins = \App\Models\User::where('role', 'super_admin')
                 ->whereNotNull('employee_id')
                 ->get();
 

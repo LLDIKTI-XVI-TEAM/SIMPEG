@@ -615,7 +615,7 @@
                     ['user' => 'Admin HR',   'aksi' => 'Menyetujui pengajuan cuti',               'target' => 'Siti Rahayu',                 'waktu' => '15 menit lalu', 'type' => 'setujui'],
                     ['user' => 'Supervisor', 'aksi' => 'Mengunggah dokumen SK Pengangkatan',      'target' => 'Ahmad Fauzi',                 'waktu' => '1 jam lalu',    'type' => 'unggah'],
                     ['user' => 'Admin HR',   'aksi' => 'Memperbarui data jabatan pegawai',        'target' => 'Nurarningsih Dumbea, S.P.',   'waktu' => '3 jam lalu',    'type' => 'perbarui'],
-                    ['user' => 'Super Admin', 'aksi' => 'Mengubah batas cuti tahunan sistem',     'target' => 'Konfigurasi Cuti',            'waktu' => '5 jam lalu',    'type' => 'perbarui'],
+                    ['user' => 'super_admin', 'aksi' => 'Mengubah batas cuti tahunan sistem',     'target' => 'Konfigurasi Cuti',            'waktu' => '5 jam lalu',    'type' => 'perbarui'],
                 ];
                 $auditColorMap = [
                     'tambah'   => 'bg-success/10 text-success',

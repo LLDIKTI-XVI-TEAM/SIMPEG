@@ -39,17 +39,17 @@ Route::get('/dev-login', function () {
             'name' => 'Demo Klabat',
             'email' => 'demo@example.com',
             'password' => bcrypt('password'),
-            'role' => 'Super Admin',
+            'role' => 'super_admin',
         ]);
     } else {
         $user->name = 'Demo Klabat';
         if (empty($user->role)) {
-            $user->role = 'Super Admin';
+            $user->role = 'super_admin';
         }
         $user->save();
     }
     Auth::login($user);
-    session(['active_role' => $user->role ?? 'Super Admin']);
+    session(['active_role' => $user->role ?? 'super_admin']);
     return redirect()->route('dashboard');
 })->name('dev-login');
 
@@ -60,7 +60,7 @@ Route::middleware('keycloak.auth')->group(function (): void {
     })->name('dashboard');
 
     Route::get('/change-role/{role}', function ($role) {
-        $allowedRoles = ['Super Admin', 'Admin Kepegawaian', 'Pimpinan', 'Atasan Langsung', 'Pegawai'];
+        $allowedRoles = ['super_admin', 'admin_kepegawaian', 'pimpinan', 'atasan_langsung', 'pegawai'];
         if (in_array($role, $allowedRoles)) {
             session(['active_role' => $role]);
         }
@@ -167,7 +167,7 @@ Route::middleware('keycloak.auth')->group(function (): void {
     Route::post('/rbac/update', [RbacController::class, 'update'])->name('rbac.update');
 
     Route::get('/data-master', function () {
-        if (session('active_role') !== 'Super Admin') {
+        if (session('active_role') !== 'super_admin') {
             abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
         }
         return view('admin.data-master.index');

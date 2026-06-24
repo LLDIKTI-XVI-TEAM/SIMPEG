@@ -5,6 +5,10 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use Illuminate\Http\Request;
+use App\Http\Requests\StoreEmployeeRequest;
+use App\Models\Appointment;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class PegawaiController extends Controller
 {
@@ -278,39 +282,68 @@ class PegawaiController extends Controller
 
     public function create()
     {
-        return view('admin.pegawai.create');
+        $jenisPegawai = \App\Models\RefJenisPegawai::all();
+        $agama = \App\Models\RefAgama::all();
+        $statusKawin = \App\Models\RefStatusPerkawinan::all();
+        
+        return view('admin.pegawai.create', compact('jenisPegawai', 'agama', 'statusKawin'));
     }
 
-    public function store(Request $request)
+    public function store(StoreEmployeeRequest $request)
     {
-        $request->validate([
-            'nama' => 'required|string|max:255',
-            'nip' => 'required|string|max:50',
-            'nik' => 'required|string|size:16',
-            'kk' => 'nullable|string|size:16',
-            'jabatan' => 'required|string|max:255',
-            'pangkat' => 'required|string|max:100',
-            'kelas_jabatan' => 'required|string|max:10',
-            'unit' => 'required|string',
-            'golongan' => 'required|string',
-            'jenis' => 'required|string',
-            'tmt' => 'required|string',
-            'email_dinas' => 'required|email|max:255',
-            'email' => 'nullable|email|max:255',
-            'foto' => 'nullable|image|max:10240|mimes:jpg,png',
-            'file_sk' => 'nullable|file|max:10240|mimes:pdf,jpg,png',
-        ]);
+        $validated = $request->validated();
 
-        return redirect()->route('data-pegawai')
-            ->with('success', 'Data pegawai ' . $request->input('nama') . ' berhasil ditambahkan.');
+        try {
+            DB::beginTransaction();
+
+            // Handle Photo
+            if ($request->hasFile('foto')) {
+                $validated['foto'] = $request->file('foto')->store('employees/photos', 'public');
+            }
+
+            // Create Employee
+            $employee = Employee::create($validated);
+
+            // Handle Appointment (SK Pengangkatan)
+            $appointmentData = [
+                'employee_id' => $employee->id,
+                'jenis_pengangkatan' => $validated['jenis_pengangkatan'],
+                'tmt_pengangkatan' => $validated['tmt'],
+                'no_sk' => $validated['nomor_sk'],
+                'tanggal_sk' => $validated['tanggal_sk'],
+            ];
+
+            if ($request->hasFile('file_sk')) {
+                $appointmentData['file_sk'] = $request->file('file_sk')->store('appointments/sk', 'public');
+            }
+
+            Appointment::create($appointmentData);
+
+            DB::commit();
+
+            return redirect()->route('data-pegawai')
+                ->with('success', 'Data pegawai ' . $employee->nama_lengkap . ' berhasil ditambahkan.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->withInput()->with('error', 'Gagal menambahkan pegawai: ' . $e->getMessage());
+        }
     }
 
     public function show($id)
     {
-        $p = collect(self::$pegawaiList)->firstWhere('id', (int)$id);
-        if (!$p) {
-            abort(404);
-        }
+        $p = Employee::with([
+            'families',
+            'rankHistories',
+            'positionHistories',
+            'salaryHistories',
+            'disciplineRecords',
+            'educationHistories',
+            'documents',
+            'agama',
+            'statusKawin',
+            'jenisPegawai'
+        ])->findOrFail($id);
+
         return view('admin.pegawai.show', compact('p'));
     }
 
@@ -350,7 +383,7 @@ class PegawaiController extends Controller
     public function destroy($id)
     {
         $p = collect(self::$pegawaiList)->firstWhere('id', (int)$id);
-        $nama = $p ? $p['nama'] : 'Pegawai';
+        $nama = $p ? $p['nama'] : 'pegawai';
         return redirect()->route('data-pegawai')
             ->with('success', 'Data pegawai ' . $nama . ' berhasil dihapus dari sistem.');
     }

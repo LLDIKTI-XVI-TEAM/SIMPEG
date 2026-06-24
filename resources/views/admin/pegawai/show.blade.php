@@ -2,50 +2,17 @@
 
     @php
         // Mapping riwayat berkas digital pegawai
-        $riwayatDokumen = [];
-        if ($p->id == 1) {
-            $riwayatDokumen = [
-                [
-                    'id' => 1,
-                    'jenis' => 'SK Kenaikan Pangkat',
-                    'nama' => 'SK Kenaikan Pangkat Penata Tkt. I',
-                    'nomor' => 'SK-882-KP-2024',
-                    'tanggal' => '2024-03-15',
-                    'kategori_label' => 'SK Kenaikan Pangkat',
-                    'file_size' => '1.2 MB',
-                    'deskripsi' => 'SK Kenaikan Pangkat Penata Tingkat I Golongan Ruang III/d atas nama Ahmad Fauzi.'
-                ],
-                [
-                    'id' => 2,
-                    'jenis' => 'SK Kenaikan Jabatan',
-                    'nama' => 'SK Pengangkatan Jabatan Analis Kepegawaian',
-                    'nomor' => 'SK-104-JAB-2022',
-                    'tanggal' => '2022-08-15',
-                    'kategori_label' => 'SK Kenaikan Jabatan',
-                    'file_size' => '850 KB',
-                    'deskripsi' => 'SK Pengangkatan Pertama kali dalam Jabatan Fungsional Analis Kepegawaian Ahli Pertama.'
-                ],
-                [
-                    'id' => 3,
-                    'jenis' => 'SK KGB',
-                    'nama' => 'SK Kenaikan Gaji Berkala 2025',
-                    'nomor' => 'KGB-334-VII-2025',
-                    'tanggal' => '2025-07-01',
-                    'kategori_label' => 'SK KGB',
-                    'file_size' => '420 KB',
-                    'deskripsi' => 'Surat Keterangan Kenaikan Gaji Berkala Reguler tahun berjalan 2025.'
-                ]
-            ];
-        }
+        $riwayatDokumen = $p->documents ?? [];
 
         // Kalkulator otomatis jadwal
-        $tmtPangkatTerakhir = isset($p->tmt) ? \Carbon\Carbon::parse($p->tmt) : null;
+        $tmtPangkatTerakhir = $p->latestRank()?->tmt_pangkat ? \Carbon\Carbon::parse($p->latestRank()->tmt_pangkat) : null;
         $estimasiPangkatNext = $tmtPangkatTerakhir ? $tmtPangkatTerakhir->copy()->addYears(4)->format('d-m-Y') : '-';
         $estimasiKgbNext = $tmtPangkatTerakhir ? $tmtPangkatTerakhir->copy()->addYears(2)->format('d-m-Y') : '-';
         
         // Logika BUP dinamis berdasarkan jabatan
         $bup = 58;
-        if (isset($p->jabatan) && (str_contains(strtolower($p->jabatan), 'madya') || str_contains(strtolower($p->jabatan), 'utama') || str_contains(strtolower($p->jabatan), 'pimpinan tinggi'))) {
+        $jabatanStr = $p->latestPosition()?->nama_jabatan ?? '';
+        if (str_contains(strtolower($jabatanStr), 'madya') || str_contains(strtolower($jabatanStr), 'utama') || str_contains(strtolower($jabatanStr), 'pimpinan tinggi')) {
             $bup = 60;
         }
 
@@ -67,32 +34,18 @@
 
     <div x-data="{
         activeTab: 'profile',
-        kinerjaBaik: {{ $p->kinerja_baik ? 'true' : 'false' }},
+        kinerjaBaik: {{ $p->is_kinerja_baik ? 'true' : 'false' }},
         showModal: false,
         modalTitle: '',
         modalType: '',
         
         // Data list dummy untuk riwayat
-        keluargaList: [
-            { nama: 'Siti Aminah', hubungan: 'Istri', tgl_lahir: '1987-05-14', pekerjaan: 'Guru', status: 'Hidup' },
-            { nama: 'Budi Fauzi', hubungan: 'Anak', tgl_lahir: '2015-08-20', pekerjaan: 'Pelajar', status: 'Hidup' }
-        ],
-        pangkatList: [
-            { golongan: 'III/b', no_sk: 'SK-442-KP-2020', tgl_sk: '2020-03-10', tmt: '2020-04-01' },
-            { golongan: 'III/c', no_sk: 'SK-882-KP-2024', tgl_sk: '2024-03-15', tmt: '2024-04-01' }
-        ],
-        jabatanList: [
-            { jabatan: 'Analis Kepegawaian Ahli Pertama', unit: 'Bag. Umum', no_sk: 'SK-121-JAB-2010', tgl_sk: '2010-09-20', tmt: '2010-10-01' },
-            { jabatan: 'Analis Kepegawaian', unit: 'Bag. Umum', no_sk: 'SK-883-JAB-2020', tgl_sk: '2020-09-15', tmt: '2020-10-01' }
-        ],
-        kgbList: [
-            { gaji: 'Rp 3.500.000', no_sk: 'KGB-102-2022', tgl_sk: '2022-09-01', tmt: '2022-10-01' },
-            { gaji: 'Rp 3.800.000', no_sk: 'KGB-334-2024', tgl_sk: '2024-09-01', tmt: '2024-10-01' }
-        ],
-        disiplinList: [],
-        pendidikanList: [
-            { tingkat: '{{ $p->pendidikan_terakhir ?? 'Sarjana (S1)' }}', institusi: 'Universitas Sam Ratulangi', prodi: '{{ $p->prodi_pendidikan ?? 'Manajemen' }}', lulus: '2007', no_ijazah: 'IJZ-S1-MAN-2007' }
-        ],
+        keluargaList: {{ $p->families->map(fn($f) => ['nama' => $f->nama_anggota, 'hubungan' => $f->hubungan_keluarga, 'tgl_lahir' => $f->tanggal_lahir, 'pekerjaan' => $f->pekerjaan, 'status' => $f->status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'])->toJson() }},
+        pangkatList: {{ $p->rankHistories->map(fn($r) => ['golongan' => $r->golongan->nama ?? '-', 'no_sk' => $r->no_sk, 'tgl_sk' => $r->tanggal_sk, 'tmt' => $r->tmt_pangkat])->toJson() }},
+        jabatanList: {{ $p->positionHistories->map(fn($j) => ['jabatan' => $j->nama_jabatan, 'unit' => $j->unitKerja->nama ?? '-', 'no_sk' => $j->no_sk, 'tgl_sk' => $j->tanggal_sk, 'tmt' => $j->tmt_jabatan])->toJson() }},
+        kgbList: {{ $p->salaryHistories->map(fn($s) => ['gaji' => 'Rp ' . number_format($s->gaji_pokok, 0, ',', '.'), 'no_sk' => $s->no_sk, 'tgl_sk' => $s->tanggal_sk, 'tmt' => $s->tmt_kgb])->toJson() }},
+        disiplinList: {{ $p->disciplineRecords->map(fn($d) => ['jenis' => $d->jenis_hukuman, 'alasan' => $d->deskripsi, 'no_sk' => $d->no_sk, 'tgl_sk' => $d->tanggal_sk, 'masa' => $d->tanggal_mulai . ' s/d ' . ($d->tanggal_berakhir ?? 'Sekarang')])->toJson() }},
+        pendidikanList: {{ $p->educationHistories->map(fn($e) => ['tingkat' => $e->jenjang->nama ?? '-', 'institusi' => $e->nama_institusi, 'prodi' => $e->jurusan, 'lulus' => $e->tahun_lulus, 'no_ijazah' => $e->no_ijazah])->toJson() }},
         
         // Form states
         newKeluarga: { nama: '', hubungan: 'Istri', tgl_lahir: '', pekerjaan: '' },
@@ -155,13 +108,13 @@
                             </svg>
                         @else
                             <div class="flex h-full w-full items-center justify-center bg-primary/10 text-xl font-bold text-primary font-sans uppercase">
-                                {{ strtoupper(substr($p->nama, 0, 1)) }}
+                                {{ strtoupper(substr($p->nama_lengkap, 0, 1)) }}
                             </div>
                         @endif
                     </div>
                     <div class="min-w-0">
                         <div class="flex flex-wrap items-center gap-2">
-                            <h2 class="text-xl font-bold text-ink font-sans leading-tight">{{ $p->nama }}</h2>
+                            <h2 class="text-xl font-bold text-ink font-sans leading-tight">{{ $p->nama_lengkap }}</h2>
                             <template x-if="kinerjaBaik">
                                 <span class="inline-flex items-center gap-1 rounded bg-success/10 px-2 py-0.5 text-[10px] font-bold text-success font-sans">
                                     🌟 KINERJA BAIK
@@ -169,7 +122,7 @@
                             </template>
                         </div>
                         <p class="text-xs text-muted font-sans font-mono mt-0.5">NIP. {{ $p->nip }}</p>
-                        <span class="inline-block mt-1.5 rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-semibold font-sans uppercase">{{ $p->jenis }}</span>
+                        <span class="inline-block mt-1.5 rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-semibold font-sans uppercase">{{ $p->jenisPegawai->nama ?? '-' }}</span>
                     </div>
                 </div>
                 <div class="flex items-center gap-3 shrink-0">
@@ -219,8 +172,8 @@
                         </div>
                         <div>
                             <span class="text-[9px] font-bold text-muted uppercase tracking-wider font-sans block">Atasan Langsung</span>
-                            <p class="text-xs font-bold text-ink font-sans">{{ $p->atasan_nama ?? 'Rina Amalia, S.Sos., M.M.' }}</p>
-                            <p class="text-[10px] text-muted font-mono leading-none mt-0.5">NIP. {{ $p->atasan_nip ?? '19810405200501 2 004' }} ({{ $p->atasan_jabatan ?? 'Kepala Bagian' }})</p>
+                            <p class="text-xs font-bold text-ink font-sans">{{ $p->currentSupervisor()?->supervisor->nama_lengkap ?? '-' }}</p>
+                            <p class="text-[10px] text-muted font-mono leading-none mt-0.5">NIP. {{ $p->currentSupervisor()?->supervisor->nip ?? '-' }} ({{ $p->currentSupervisor()?->supervisor->latestPosition()?->nama_jabatan ?? '-' }})</p>
                         </div>
                     </div>
                 </div>
@@ -260,7 +213,7 @@
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">No. Kartu Keluarga (KK)</span>
-                                <p class="text-ink font-mono font-bold">{{ $p->kk ?? '3273250102120045' }}</p>
+                                <p class="text-ink font-mono font-bold">{{ $p->no_kk ?? '3273250102120045' }}</p>
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Tempat / Tanggal Lahir</span>
@@ -268,19 +221,19 @@
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Jenis Kelamin</span>
-                                <p class="text-ink font-sans">{{ $p->jenis_kelamin ?? 'Laki-laki' }}</p>
+                                <p class="text-ink font-sans">{{ $p->jenis_kelamin == 'L' ? 'Laki-laki' : 'Perempuan' }}</p>
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Agama</span>
-                                <p class="text-ink font-sans">{{ $p->agama ?? 'Islam' }}</p>
+                                <p class="text-ink font-sans">{{ $p->agama->nama ?? '-' }}</p>
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Status Kawin</span>
-                                <p class="text-ink font-sans">{{ $p->status_kawin ?? 'Kawin' }}</p>
+                                <p class="text-ink font-sans">{{ $p->statusKawin->nama ?? '-' }}</p>
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Golongan Darah</span>
-                                <p class="text-ink font-sans font-bold">{{ $p->golongan_darah ?? 'O' }}</p>
+                                <p class="text-ink font-sans font-bold">{{ $p->golongan_darah ?? '-' }}</p>
                             </div>
                         </div>
                     </div>
@@ -290,7 +243,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Email Dinas</span>
-                                <p class="text-ink font-sans font-mono">{{ $p->email_dinas ?? '-' }}</p>
+                                <p class="text-ink font-sans font-mono">{{ '-' ?? '-' }}</p>
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Email Pribadi</span>
@@ -298,11 +251,11 @@
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Nomor HP</span>
-                                <p class="text-ink font-sans font-mono">{{ $p->telepon ?? '-' }}</p>
+                                <p class="text-ink font-sans font-mono">{{ $p->no_hp ?? '-' }}</p>
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Telepon Rumah</span>
-                                <p class="text-ink font-sans font-mono">{{ $p->telepon_rumah ?? '-' }}</p>
+                                <p class="text-ink font-sans font-mono">{{ $p->no_hp_rumah ?? '-' }}</p>
                             </div>
                             <div class="space-y-0.5 sm:col-span-2">
                                 <span class="font-semibold text-muted font-sans">Alamat</span>
@@ -318,19 +271,19 @@
                     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-xs">
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">Jabatan Sekarang</span>
-                            <p class="text-ink font-sans font-bold">{{ $p->jabatan }}</p>
+                            <p class="text-ink font-sans font-bold">{{ $p->latestPosition()->nama_jabatan ?? '-' }}</p>
                         </div>
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">Unit Kerja</span>
-                            <p class="text-ink font-sans">{{ $p->unit }}</p>
+                            <p class="text-ink font-sans">{{ $p->latestPosition()->unitKerja->nama ?? '-' }}</p>
                         </div>
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">Pangkat</span>
-                            <p class="text-ink font-sans font-bold">{{ $p->pangkat ?? 'Penata Tkt. I' }}</p>
+                            <p class="text-ink font-sans font-bold">{{ $p->latestRank()->golongan->nama ?? '-' ?? 'Penata Tkt. I' }}</p>
                         </div>
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">Golongan Saat Ini</span>
-                            <p class="text-ink font-sans font-bold">{{ $p->golongan }}</p>
+                            <p class="text-ink font-sans font-bold">{{ $p->latestRank()->golongan->nama ?? '-' }}</p>
                         </div>
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">Kelas Jabatan</span>
@@ -338,7 +291,7 @@
                         </div>
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">TMT Golongan</span>
-                            <p class="text-ink font-mono">{{ isset($p->tmt) ? \Carbon\Carbon::parse($p->tmt)->format('d-m-Y') : '-' }}</p>
+                            <p class="text-ink font-mono">{{ $p->latestRank()?->tmt_pangkat ? \Carbon\Carbon::parse($p->latestRank()->tmt_pangkat)->format('d-m-Y') : '-' }}</p>
                         </div>
                     </div>
                 </div>
@@ -580,21 +533,21 @@
                         <div class="space-y-2">
                             <div class="flex justify-between border-b border-border pb-1">
                                 <span class="font-semibold text-muted">Jenis Pengangkatan:</span>
-                                <span class="text-ink font-bold">{{ $p->jenis_pengangkatan ?? 'PNS Formasi Umum' }}</span>
+                                <span class="text-ink font-bold">{{ $p->appointment->jenis_pengangkatan ?? '-' }}</span>
                             </div>
                             <div class="flex justify-between border-b border-border pb-1">
                                 <span class="font-semibold text-muted">Nomor SK Pengangkatan:</span>
-                                <span class="text-ink font-mono font-bold">{{ $p->nomor_sk ?? 'SK-882-KP-2024' }}</span>
+                                <span class="text-ink font-mono font-bold">{{ $p->appointment->no_sk ?? '-' }}</span>
                             </div>
                             <div class="flex justify-between border-b border-border pb-1">
                                 <span class="font-semibold text-muted">Tanggal SK Terbit:</span>
-                                <span class="text-ink font-mono">{{ isset($p->tanggal_sk) ? \Carbon\Carbon::parse($p->tanggal_sk)->format('d-m-Y') : '-' }}</span>
+                                <span class="text-ink font-mono">{{ $p->appointment?->tanggal_sk ? \Carbon\Carbon::parse($p->appointment->tanggal_sk)->format('d-m-Y') : '-' }}</span>
                             </div>
                         </div>
                         <div class="space-y-2">
                             <div class="flex justify-between border-b border-border pb-1">
                                 <span class="font-semibold text-muted">TMT Pengangkatan:</span>
-                                <span class="text-ink font-mono font-bold">{{ isset($p->tmt) ? \Carbon\Carbon::parse($p->tmt)->format('d-m-Y') : '-' }}</span>
+                                <span class="text-ink font-mono font-bold">{{ $p->appointment?->tmt_pengangkatan ? \Carbon\Carbon::parse($p->appointment->tmt_pengangkatan)->format('d-m-Y') : '-' }}</span>
                             </div>
                             <div class="flex justify-between border-b border-border pb-1">
                                 <span class="font-semibold text-muted">Pejabat yang Menetapkan:</span>

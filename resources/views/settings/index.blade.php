@@ -14,7 +14,7 @@
     ];
 
     $cutiConfig = [
-        'stage1_role' => 'Atasan Langsung',
+        'stage1_role' => 'atasan_langsung',
         'stage2_approver' => 'Riza Hamzah, S.Sos.',
         'stage2_nip' => '197804122005012002',
         'stage3_approver' => 'Munawir Sadzali Razak, S.I.P., M.A.',
@@ -30,7 +30,7 @@
             'nip' => '19850312201001 1 001',
             'email' => 'ahmadfauzi@gmail.com',
             'keycloak_id' => 'user-fauzi-85',
-            'role' => 'Admin Kepegawaian',
+            'role' => 'admin_kepegawaian',
             'status' => 'Terhubung'
         ],
         [
@@ -39,7 +39,7 @@
             'nip' => '19901120201501 2 003',
             'email' => 'sitirahayu@gmail.com',
             'keycloak_id' => 'user-rahayu-90',
-            'role' => 'Atasan Langsung',
+            'role' => 'atasan_langsung',
             'status' => 'Terhubung'
         ],
         [
@@ -48,7 +48,7 @@
             'nip' => '20261210820500 0 04',
             'email' => 'sabrinarossa24@gmail.com',
             'keycloak_id' => 'user-sabrina-26',
-            'role' => 'Pegawai',
+            'role' => 'pegawai',
             'status' => 'Terhubung'
         ],
         [
@@ -57,7 +57,7 @@
             'nip' => '26110820520600 0 04',
             'email' => 'sikaemma@gmail.com',
             'keycloak_id' => 'user-cimma-26',
-            'role' => 'Pegawai',
+            'role' => 'pegawai',
             'status' => 'Terhubung'
         ],
         [
@@ -66,7 +66,7 @@
             'nip' => '19880123202 1 1005',
             'email' => 'rainingdumbea47@gmail.com',
             'keycloak_id' => '',
-            'role' => 'Pegawai',
+            'role' => 'pegawai',
             'status' => 'Belum Terhubung'
         ]
     ];
@@ -340,9 +340,9 @@
                                     <td class="px-4 py-3 text-xs">
                                         <span class="rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
                                             :class="{
-                                                'bg-primary/10 text-primary': user.role === 'Admin Kepegawaian',
-                                                'bg-warning/10 text-warning': user.role === 'Atasan Langsung',
-                                                'bg-success/10 text-success': user.role === 'Pegawai'
+                                                'bg-primary/10 text-primary': user.role === 'admin_kepegawaian',
+                                                'bg-warning/10 text-warning': user.role === 'atasan_langsung',
+                                                'bg-success/10 text-success': user.role === 'pegawai'
                                             }"
                                             x-text="user.role"
                                         ></span>

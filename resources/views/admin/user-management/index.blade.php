@@ -51,7 +51,7 @@
                 nama: emp.nama,
                 email: emp.mapped_email,
                 keycloak_id: emp.keycloak_id || '',
-                role: emp.role || 'Pegawai',
+                role: emp.role || 'pegawai',
                 nip: emp.nip
             };
             this.showEditModal = true;
@@ -188,11 +188,11 @@
                                 <td class="px-4 py-3.5 text-xs whitespace-nowrap">
                                      <span class="text-[10px] font-bold uppercase tracking-wide"
                                            :class="{
-                                               'text-danger': emp.role === 'Super Admin',
-                                               'text-primary': emp.role === 'Admin Kepegawaian',
-                                               'text-secondary': emp.role === 'Pimpinan',
-                                               'text-warning': emp.role === 'Atasan Langsung',
-                                               'text-success': emp.role === 'Pegawai'
+                                               'text-danger': emp.role === 'super_admin',
+                                               'text-primary': emp.role === 'admin_kepegawaian',
+                                               'text-secondary': emp.role === 'pimpinan',
+                                               'text-warning': emp.role === 'atasan_langsung',
+                                               'text-success': emp.role === 'pegawai'
                                            }"
                                            x-text="emp.role"
                                      ></span>
@@ -328,7 +328,7 @@
                         </div>
 
                         {{-- WARNING SENSITIVE ROLE --}}
-                        <div x-show="selectedEmployee.role === 'Super Admin'" class="rounded-lg border border-danger/20 bg-danger/5 p-3 text-xs text-danger flex gap-2" style="display: none;">
+                        <div x-show="selectedEmployee.role === 'super_admin'" class="rounded-lg border border-danger/20 bg-danger/5 p-3 text-xs text-danger flex gap-2" style="display: none;">
                             <svg class="w-4 h-4 shrink-0 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
                             </svg>

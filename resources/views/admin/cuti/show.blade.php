@@ -23,7 +23,7 @@
                         {{ strtoupper(substr($c['nama'] ?? 'P', 0, 1)) }}
                     </div>
                     <div>
-                        <h3 class="text-base font-bold text-ink font-sans leading-tight">{{ $c['nama'] ?? 'Pegawai' }}</h3>
+                        <h3 class="text-base font-bold text-ink font-sans leading-tight">{{ $c['nama'] ?? 'pegawai' }}</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Pengajuan: {{ \Carbon\Carbon::parse($c['tgl_pengajuan'])->translatedFormat('d F Y') }}</p>
                     </div>
                 </div>

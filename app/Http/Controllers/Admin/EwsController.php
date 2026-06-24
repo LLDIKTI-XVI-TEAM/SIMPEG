@@ -16,7 +16,7 @@ class EwsController extends Controller
     {
         // Enforce authorization (Super Admin, Admin Kepegawaian, Pimpinan)
         $activeRole = session('active_role');
-        $allowedRoles = ['Super Admin', 'Admin Kepegawaian', 'Pimpinan'];
+        $allowedRoles = ['super_admin', 'admin_kepegawaian', 'pimpinan'];
         if (!in_array($activeRole, $allowedRoles)) {
             abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin, Admin Kepegawaian, dan Pimpinan.');
         }

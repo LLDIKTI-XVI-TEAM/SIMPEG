@@ -60,17 +60,17 @@
         {{-- Navigation --}}
         <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-1">
             @php
-            $activeRole = session('active_role', 'Super Admin');
+            $activeRole = session('active_role', 'super_admin');
             
             // Menu terlarang/dikunci untuk masing-masing role
             $lockedMenus = [
-                'Super Admin' => [],
-                'Admin Kepegawaian' => [
+                'super_admin' => [],
+                'admin_kepegawaian' => [
                     'pengaturan',
                     'user-management',
                     'rbac',
                 ],
-                'Pimpinan' => [
+                'pimpinan' => [
                     'audit-log',
                     'pengaturan',
                     'user-management',
@@ -78,7 +78,7 @@
                     'data-nonaktif',
                     'ews.config',
                 ],
-                'Atasan Langsung' => [
+                'atasan_langsung' => [
                     'pegawai.import',
                     'hari-libur',
                     'dokumen',
@@ -93,7 +93,7 @@
                     'laporan.cuti',
                     'ews.config',
                 ],
-                'Pegawai' => [
+                'pegawai' => [
                     'data-pegawai',
                     'pegawai.import',
                     'data-nonaktif',
@@ -392,7 +392,7 @@
                             <p class="text-sm font-semibold leading-tight text-ink font-sans">
                                 {{ auth()->user()->name ?? 'Pengguna' }}
                             </p>
-                            <p class="text-[11px] leading-tight text-muted font-sans">{{ session('active_role', 'Super Admin') }}</p>
+                            <p class="text-[11px] leading-tight text-muted font-sans">{{ session('active_role', 'super_admin') }}</p>
                         </div>
                         <svg class="w-4 h-4 text-muted shrink-0 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
                     </button>

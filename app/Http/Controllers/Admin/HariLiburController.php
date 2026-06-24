@@ -26,7 +26,7 @@ class HariLiburController extends Controller
 
     public function index()
     {
-        if (session('active_role') !== 'Super Admin') {
+        if (session('active_role') !== 'super_admin') {
             abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
         }
 
@@ -35,7 +35,7 @@ class HariLiburController extends Controller
 
     public function store(Request $request)
     {
-        if (session('active_role') !== 'Super Admin') {
+        if (session('active_role') !== 'super_admin') {
             abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
         }
 
@@ -52,7 +52,7 @@ class HariLiburController extends Controller
         $dynamicLogs[] = [
             'id' => $newId,
             'timestamp' => now()->format('Y-m-d H:i:s'),
-            'operator' => auth()->user()->name ?? 'Super Admin',
+            'operator' => auth()->user()->name ?? 'super_admin',
             'event' => 'CREATE_HOLIDAY',
             'kategori' => 'konfigurasi_sistem',
             'modul' => 'Hari Libur',
@@ -75,7 +75,7 @@ class HariLiburController extends Controller
 
     public function edit($id)
     {
-        if (session('active_role') !== 'Super Admin') {
+        if (session('active_role') !== 'super_admin') {
             abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
         }
 
@@ -88,7 +88,7 @@ class HariLiburController extends Controller
 
     public function update(Request $request, $id)
     {
-        if (session('active_role') !== 'Super Admin') {
+        if (session('active_role') !== 'super_admin') {
             abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
         }
 
@@ -107,7 +107,7 @@ class HariLiburController extends Controller
         $dynamicLogs[] = [
             'id' => $newId,
             'timestamp' => now()->format('Y-m-d H:i:s'),
-            'operator' => auth()->user()->name ?? 'Super Admin',
+            'operator' => auth()->user()->name ?? 'super_admin',
             'event' => 'UPDATE_HOLIDAY',
             'kategori' => 'konfigurasi_sistem',
             'modul' => 'Hari Libur',
@@ -134,7 +134,7 @@ class HariLiburController extends Controller
 
     public function destroy(Request $request, $id)
     {
-        if (session('active_role') !== 'Super Admin') {
+        if (session('active_role') !== 'super_admin') {
             abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
         }
 
@@ -148,7 +148,7 @@ class HariLiburController extends Controller
         $dynamicLogs[] = [
             'id' => $newId,
             'timestamp' => now()->format('Y-m-d H:i:s'),
-            'operator' => auth()->user()->name ?? 'Super Admin',
+            'operator' => auth()->user()->name ?? 'super_admin',
             'event' => 'DELETE_HOLIDAY',
             'kategori' => 'konfigurasi_sistem',
             'modul' => 'Hari Libur',

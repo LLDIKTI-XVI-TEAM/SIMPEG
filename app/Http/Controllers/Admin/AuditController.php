@@ -151,7 +151,7 @@ class AuditController extends Controller
 
     public function index()
     {
-        if (!in_array(session('active_role'), ['Super Admin', 'Admin Kepegawaian'])) {
+        if (!in_array(session('active_role'), ['super_admin', 'admin_kepegawaian'])) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -169,7 +169,7 @@ class AuditController extends Controller
 
     public function show($id)
     {
-        if (!in_array(session('active_role'), ['Super Admin', 'Admin Kepegawaian'])) {
+        if (!in_array(session('active_role'), ['super_admin', 'admin_kepegawaian'])) {
             abort(403, 'Unauthorized action.');
         }
 

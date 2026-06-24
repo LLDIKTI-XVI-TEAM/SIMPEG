@@ -230,7 +230,7 @@ class EwsSchedulerTest extends TestCase
     {
         $superAdminEmployee = Employee::factory()->create();
         $admin = User::factory()->create([
-            'role' => 'Super Admin',
+            'role' => 'super_admin',
             'employee_id' => $superAdminEmployee->id,
         ]);
 

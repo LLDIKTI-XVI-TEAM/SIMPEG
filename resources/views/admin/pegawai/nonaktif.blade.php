@@ -110,7 +110,7 @@
                                         </svg>
                                     </a>
                                     <button type="button"
-                                        onclick="showNonaktifDetail('Yucna Dara, S.P., M.M.', 'Pensiun', 'BUP sudah tercapai', '2026-06-15', 'Admin Kepegawaian', '2026-06-15 09:30 WITA', 'Soft delete karena pensiun')"
+                                        onclick="showNonaktifDetail('Yucna Dara, S.P., M.M.', 'Pensiun', 'BUP sudah tercapai', '2026-06-15', 'admin_kepegawaian', '2026-06-15 09:30 WITA', 'Soft delete karena pensiun')"
                                         class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-primary shadow-sm transition hover:border-primary/20 hover:bg-primary/5"
                                         title="Lihat Detail Non-Aktif">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -177,7 +177,7 @@
                                         </svg>
                                     </a>
                                     <button type="button"
-                                        onclick="showNonaktifDetail('Nadia Kusuma', 'Mutasi', 'Pindah unit kerja', '2026-05-28', 'Super Admin', '2026-05-28 14:10 WITA', 'Soft delete karena mutasi')"
+                                        onclick="showNonaktifDetail('Nadia Kusuma', 'Mutasi', 'Pindah unit kerja', '2026-05-28', 'super_admin', '2026-05-28 14:10 WITA', 'Soft delete karena mutasi')"
                                         class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-primary shadow-sm transition hover:border-primary/20 hover:bg-primary/5"
                                         title="Lihat Detail Non-Aktif">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"

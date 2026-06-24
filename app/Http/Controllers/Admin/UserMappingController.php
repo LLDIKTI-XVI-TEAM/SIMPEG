@@ -11,7 +11,7 @@ class UserMappingController extends Controller
 {
     public function index()
     {
-        if (session('active_role') !== 'Super Admin') {
+        if (session('active_role') !== 'super_admin') {
             abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
         }
 
@@ -32,7 +32,7 @@ class UserMappingController extends Controller
             }
 
             $p['keycloak_id'] = $user ? $user->keycloak_id : null;
-            $p['role'] = $user ? $user->role : 'Pegawai';
+            $p['role'] = $user ? $user->role : 'pegawai';
             $p['is_connected'] = $user && !empty($user->keycloak_id);
             $p['mapped_email'] = $user ? $user->email : ($emailDinas ?: $email);
 
@@ -47,14 +47,14 @@ class UserMappingController extends Controller
 
     public function update(Request $request)
     {
-        if (session('active_role') !== 'Super Admin') {
+        if (session('active_role') !== 'super_admin') {
             abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
         }
 
         $request->validate([
             'email' => 'required|email',
             'keycloak_id' => 'nullable|string',
-            'role' => 'required|string|in:Super Admin,Admin Kepegawaian,Pimpinan,Atasan Langsung,Pegawai',
+            'role' => 'required|string|in:super_admin,admin_kepegawaian,pimpinan,atasan_langsung,pegawai',
         ]);
 
         $email = $request->input('email');
@@ -74,7 +74,7 @@ class UserMappingController extends Controller
         $user = User::firstOrNew(['email' => $email]);
         
         $oldKeycloakId = $user->keycloak_id;
-        $oldRole = $user->role ?? 'Pegawai';
+        $oldRole = $user->role ?? 'pegawai';
 
         $user->fill([
             'keycloak_id' => $keycloakId ?: null,
@@ -95,7 +95,7 @@ class UserMappingController extends Controller
         $dynamicLogs[] = [
             'id' => $newId,
             'timestamp' => now()->format('Y-m-d H:i:s'),
-            'operator' => auth()->user()->name ?? 'Super Admin',
+            'operator' => auth()->user()->name ?? 'super_admin',
             'event' => 'UPDATE_MAPPING',
             'kategori' => 'user_management',
             'modul' => 'UserMapping',

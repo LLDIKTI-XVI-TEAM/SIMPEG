@@ -15,12 +15,12 @@ class CutiConfigController extends Controller
     public function index()
     {
         // Enforce Super Admin authorization
-        if (session('active_role') !== 'Super Admin') {
+        if (session('active_role') !== 'super_admin') {
             abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
         }
 
         // Get all users who can potentially be approvers
-        $eligibleUsers = User::whereIn('role', ['Admin Kepegawaian', 'Pimpinan', 'Atasan Langsung'])->get();
+        $eligibleUsers = User::whereIn('role', ['admin_kepegawaian', 'pimpinan', 'atasan_langsung'])->get();
 
         // Get current configuration values
         $stage2Id = ApprovalConfig::getVal('stage2_approver_id');
@@ -52,9 +52,9 @@ class CutiConfigController extends Controller
 
         // Base/mock history as defined in the spec
         $baseLogs = [
-            ['time' => '22 Jun 2026, 16:12', 'actor' => 'Super Admin', 'field' => 'Stage 2',       'before' => 'Riza Hamzah',     'after' => 'Dra. Merlina Rahman'],
-            ['time' => '20 Jun 2026, 09:40', 'actor' => 'Super Admin', 'field' => 'Stage 3',       'before' => 'Dr. Abdul Kadir', 'after' => 'Dr. Abdul Kadir'],
-            ['time' => '18 Jun 2026, 14:25', 'actor' => 'Super Admin', 'field' => 'Skip duplikat', 'before' => 'Tidak aktif',     'after' => 'Aktif'],
+            ['time' => '22 Jun 2026, 16:12', 'actor' => 'super_admin', 'field' => 'Stage 2',       'before' => 'Riza Hamzah',     'after' => 'Dra. Merlina Rahman'],
+            ['time' => '20 Jun 2026, 09:40', 'actor' => 'super_admin', 'field' => 'Stage 3',       'before' => 'Dr. Abdul Kadir', 'after' => 'Dr. Abdul Kadir'],
+            ['time' => '18 Jun 2026, 14:25', 'actor' => 'super_admin', 'field' => 'Skip duplikat', 'before' => 'Tidak aktif',     'after' => 'Aktif'],
         ];
 
         // Merge, dynamic logs first (most recent)
@@ -76,7 +76,7 @@ class CutiConfigController extends Controller
     public function update(Request $request)
     {
         // Enforce Super Admin authorization
-        if (session('active_role') !== 'Super Admin') {
+        if (session('active_role') !== 'super_admin') {
             abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
         }
 
@@ -111,7 +111,7 @@ class CutiConfigController extends Controller
         $newStage3Name = $newStage3User ? $newStage3User->name : 'Tidak ada';
 
         $dynamicLogs = session('dynamic_audit_logs', []);
-        $operator = auth()->user()->name ?? 'Super Admin';
+        $operator = auth()->user()->name ?? 'super_admin';
         $ip = $request->ip();
         $userAgent = $request->userAgent();
 

@@ -12,7 +12,7 @@ class RbacController extends Controller
     public function index()
     {
         // Enforce Super Admin authorization
-        if (session('active_role') !== 'Super Admin') {
+        if (session('active_role') !== 'super_admin') {
             abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
         }
 
@@ -30,7 +30,7 @@ class RbacController extends Controller
     public function update(Request $request)
     {
         // Enforce Super Admin authorization
-        if (session('active_role') !== 'Super Admin') {
+        if (session('active_role') !== 'super_admin') {
             abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
         }
 
@@ -69,7 +69,7 @@ class RbacController extends Controller
             $dynamicLogs[] = [
                 'id' => $newId,
                 'timestamp' => now()->format('Y-m-d H:i:s'),
-                'operator' => auth()->user()->name ?? 'Super Admin',
+                'operator' => auth()->user()->name ?? 'super_admin',
                 'event' => 'UPDATE_RBAC',
                 'kategori' => 'user_management',
                 'modul' => 'RBAC',

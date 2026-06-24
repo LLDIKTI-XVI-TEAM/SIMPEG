@@ -14,25 +14,25 @@ class ApprovalConfigSeeder extends Seeder
             [
                 'name' => 'Dra. Merlina Rahman',
                 'email' => 'merlina.rahman@example.com',
-                'role' => 'Admin Kepegawaian',
+                'role' => 'admin_kepegawaian',
                 'password' => bcrypt('password'),
             ],
             [
                 'name' => 'Riza Hamzah',
                 'email' => 'riza.hamzah@example.com',
-                'role' => 'Admin Kepegawaian',
+                'role' => 'admin_kepegawaian',
                 'password' => bcrypt('password'),
             ],
             [
                 'name' => 'Dr. Abdul Kadir',
                 'email' => 'abdul.kadir@example.com',
-                'role' => 'Pimpinan',
+                'role' => 'pimpinan',
                 'password' => bcrypt('password'),
             ],
             [
                 'name' => 'Nurarningsih Dumbea, S.P.',
                 'email' => 'rainingdumbea47@gmail.com',
-                'role' => 'Admin Kepegawaian',
+                'role' => 'admin_kepegawaian',
                 'password' => bcrypt('password'),
             ]
         ];

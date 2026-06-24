@@ -33,7 +33,7 @@ class DatabaseSeeder extends Seeder
             [
                 'name' => 'Demo Klabat',
                 'email' => 'demo-klabat@dev.local',
-                'role' => 'Super Admin',
+                'role' => 'super_admin',
                 'password' => null,
                 'email_verified_at' => now(),
             ],

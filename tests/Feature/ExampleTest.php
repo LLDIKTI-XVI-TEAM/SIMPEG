@@ -45,8 +45,8 @@ class ExampleTest extends TestCase
 
     public function test_authenticated_settings_renders(): void
     {
-        $user = User::factory()->create(['role' => 'Super Admin']);
-        session(['active_role' => 'Super Admin']);
+        $user = User::factory()->create(['role' => 'super_admin']);
+        session(['active_role' => 'super_admin']);
 
         $response = $this->actingAs($user)->get('/dashboard/pengaturan');
 
@@ -57,8 +57,8 @@ class ExampleTest extends TestCase
 
     public function test_settings_redirects(): void
     {
-        $user = User::factory()->create(['role' => 'Super Admin']);
-        session(['active_role' => 'Super Admin']);
+        $user = User::factory()->create(['role' => 'super_admin']);
+        session(['active_role' => 'super_admin']);
 
         $response = $this->actingAs($user)->get('/pengaturan');
         $response->assertRedirect('/dashboard/pengaturan');
@@ -69,8 +69,8 @@ class ExampleTest extends TestCase
 
     public function test_settings_aborts_for_non_super_admin(): void
     {
-        $user = User::factory()->create(['role' => 'Pegawai']);
-        session(['active_role' => 'Pegawai']);
+        $user = User::factory()->create(['role' => 'pegawai']);
+        session(['active_role' => 'pegawai']);
 
         $response = $this->actingAs($user)->get('/dashboard/pengaturan');
         $response->assertStatus(403);
@@ -123,8 +123,8 @@ class ExampleTest extends TestCase
 
     public function test_authenticated_user_management_renders(): void
     {
-        $user = User::factory()->create(['role' => 'Super Admin']);
-        session(['active_role' => 'Super Admin']);
+        $user = User::factory()->create(['role' => 'super_admin']);
+        session(['active_role' => 'super_admin']);
 
         $response = $this->actingAs($user)->get('/user-management');
 
@@ -135,15 +135,15 @@ class ExampleTest extends TestCase
 
     public function test_user_management_update_mapping_success(): void
     {
-        $admin = User::factory()->create(['role' => 'Super Admin']);
-        session(['active_role' => 'Super Admin']);
+        $admin = User::factory()->create(['role' => 'super_admin']);
+        session(['active_role' => 'super_admin']);
 
         $response = $this->actingAs($admin)
             ->from('/user-management')
             ->post('/user-management/update', [
                 'email' => 'ahmadfauzi@gmail.com',
                 'keycloak_id' => 'keycloak-fauzi-99',
-                'role' => 'Admin Kepegawaian',
+                'role' => 'admin_kepegawaian',
             ]);
 
         $response->assertRedirect('/user-management');
@@ -152,7 +152,7 @@ class ExampleTest extends TestCase
         $this->assertDatabaseHas('users', [
             'email' => 'ahmadfauzi@gmail.com',
             'keycloak_id' => 'keycloak-fauzi-99',
-            'role' => 'Admin Kepegawaian',
+            'role' => 'admin_kepegawaian',
         ]);
 
         $dynamicLogs = session('dynamic_audit_logs', []);
@@ -162,14 +162,14 @@ class ExampleTest extends TestCase
 
     public function test_user_management_rejects_duplicate_keycloak_id(): void
     {
-        $admin = User::factory()->create(['role' => 'Super Admin']);
-        session(['active_role' => 'Super Admin']);
+        $admin = User::factory()->create(['role' => 'super_admin']);
+        session(['active_role' => 'super_admin']);
         
         // Mapped user 1
         User::factory()->create([
             'email' => 'ahmadfauzi@gmail.com',
             'keycloak_id' => 'shared-keycloak-id',
-            'role' => 'Pegawai',
+            'role' => 'pegawai',
         ]);
 
         $response = $this->actingAs($admin)
@@ -177,7 +177,7 @@ class ExampleTest extends TestCase
             ->post('/user-management/update', [
                 'email' => 'sitirahayu@gmail.com',
                 'keycloak_id' => 'shared-keycloak-id',
-                'role' => 'Atasan Langsung',
+                'role' => 'atasan_langsung',
             ]);
 
         $response->assertRedirect('/user-management');
@@ -186,8 +186,8 @@ class ExampleTest extends TestCase
 
     public function test_authenticated_rbac_renders_for_super_admin(): void
     {
-        $admin = User::factory()->create(['role' => 'Super Admin']);
-        session(['active_role' => 'Super Admin']);
+        $admin = User::factory()->create(['role' => 'super_admin']);
+        session(['active_role' => 'super_admin']);
 
         $response = $this->actingAs($admin)->get('/rbac');
 
@@ -198,8 +198,8 @@ class ExampleTest extends TestCase
 
     public function test_rbac_aborts_for_non_super_admin(): void
     {
-        $pegawai = User::factory()->create(['role' => 'Pegawai']);
-        session(['active_role' => 'Pegawai']);
+        $pegawai = User::factory()->create(['role' => 'pegawai']);
+        session(['active_role' => 'pegawai']);
 
         $response = $this->actingAs($pegawai)->get('/rbac');
 
@@ -208,8 +208,8 @@ class ExampleTest extends TestCase
 
     public function test_rbac_update_permissions_success(): void
     {
-        $admin = User::factory()->create(['role' => 'Super Admin']);
-        session(['active_role' => 'Super Admin']);
+        $admin = User::factory()->create(['role' => 'super_admin']);
+        session(['active_role' => 'super_admin']);
 
         // Let's modify permissions for role Admin Kepegawaian
         $role = \App\Models\Role::where('name', 'admin_kepegawaian')->firstOrFail();
@@ -250,8 +250,8 @@ class ExampleTest extends TestCase
 
     public function test_unauthorized_access_to_ews_config_aborts(): void
     {
-        $user = User::factory()->create(['role' => 'Pegawai']);
-        session(['active_role' => 'Pegawai']);
+        $user = User::factory()->create(['role' => 'pegawai']);
+        session(['active_role' => 'pegawai']);
 
         $response = $this->actingAs($user)->get('/konfigurasi');
         $response->assertStatus(403);
@@ -265,8 +265,8 @@ class ExampleTest extends TestCase
 
     public function test_authorized_super_admin_can_view_ews_config(): void
     {
-        $admin = User::factory()->create(['role' => 'Super Admin']);
-        session(['active_role' => 'Super Admin']);
+        $admin = User::factory()->create(['role' => 'super_admin']);
+        session(['active_role' => 'super_admin']);
 
         $response = $this->actingAs($admin)->get('/konfigurasi');
         $response->assertOk();
@@ -276,8 +276,8 @@ class ExampleTest extends TestCase
 
     public function test_super_admin_can_update_ews_config(): void
     {
-        $admin = User::factory()->create(['role' => 'Super Admin']);
-        session(['active_role' => 'Super Admin']);
+        $admin = User::factory()->create(['role' => 'super_admin']);
+        session(['active_role' => 'super_admin']);
 
         $response = $this->actingAs($admin)
             ->from('/konfigurasi')
@@ -334,8 +334,8 @@ class ExampleTest extends TestCase
 
     public function test_unauthorized_access_to_ews_active_aborts(): void
     {
-        $user = User::factory()->create(['role' => 'Pegawai']);
-        session(['active_role' => 'Pegawai']);
+        $user = User::factory()->create(['role' => 'pegawai']);
+        session(['active_role' => 'pegawai']);
 
         $response = $this->actingAs($user)->get('/ews');
         $response->assertStatus(403);
@@ -343,8 +343,8 @@ class ExampleTest extends TestCase
 
     public function test_authorized_user_can_view_ews_active(): void
     {
-        $admin = User::factory()->create(['role' => 'Admin Kepegawaian']);
-        session(['active_role' => 'Admin Kepegawaian']);
+        $admin = User::factory()->create(['role' => 'admin_kepegawaian']);
+        session(['active_role' => 'admin_kepegawaian']);
 
         // Seed two employees with EWS alerts so the page renders real data
         $fauzi = Employee::factory()->create(['nama_lengkap' => 'Ahmad Fauzi']);
@@ -374,8 +374,8 @@ class ExampleTest extends TestCase
 
     public function test_ews_active_filtering(): void
     {
-        $admin = User::factory()->create(['role' => 'Admin Kepegawaian']);
-        session(['active_role' => 'Admin Kepegawaian']);
+        $admin = User::factory()->create(['role' => 'admin_kepegawaian']);
+        session(['active_role' => 'admin_kepegawaian']);
 
         // Seed employees with specific alert types for filtering
         $fauzi = Employee::factory()->create(['nama_lengkap' => 'Ahmad Fauzi']);
@@ -405,8 +405,8 @@ class ExampleTest extends TestCase
 
     public function test_unauthorized_access_to_hari_libur_aborts(): void
     {
-        $user = User::factory()->create(['role' => 'Pegawai']);
-        session(['active_role' => 'Pegawai']);
+        $user = User::factory()->create(['role' => 'pegawai']);
+        session(['active_role' => 'pegawai']);
 
         $response = $this->actingAs($user)->get('/hari-libur');
         $response->assertStatus(403);
@@ -414,8 +414,8 @@ class ExampleTest extends TestCase
 
     public function test_authorized_super_admin_can_view_hari_libur(): void
     {
-        $admin = User::factory()->create(['role' => 'Super Admin']);
-        session(['active_role' => 'Super Admin']);
+        $admin = User::factory()->create(['role' => 'super_admin']);
+        session(['active_role' => 'super_admin']);
 
         $response = $this->actingAs($admin)->get('/hari-libur');
         $response->assertOk();
@@ -424,8 +424,8 @@ class ExampleTest extends TestCase
 
     public function test_super_admin_can_create_holiday(): void
     {
-        $admin = User::factory()->create(['role' => 'Super Admin']);
-        session(['active_role' => 'Super Admin']);
+        $admin = User::factory()->create(['role' => 'super_admin']);
+        session(['active_role' => 'super_admin']);
 
         $response = $this->actingAs($admin)->post('/hari-libur', [
             'tanggal' => '2026-08-17',
@@ -451,8 +451,8 @@ class ExampleTest extends TestCase
 
     public function test_super_admin_can_update_holiday(): void
     {
-        $admin = User::factory()->create(['role' => 'Super Admin']);
-        session(['active_role' => 'Super Admin']);
+        $admin = User::factory()->create(['role' => 'super_admin']);
+        session(['active_role' => 'super_admin']);
 
         $response = $this->actingAs($admin)->post('/hari-libur/1', [
             'tanggal' => '2026-01-02',
@@ -478,8 +478,8 @@ class ExampleTest extends TestCase
 
     public function test_super_admin_can_delete_holiday(): void
     {
-        $admin = User::factory()->create(['role' => 'Super Admin']);
-        session(['active_role' => 'Super Admin']);
+        $admin = User::factory()->create(['role' => 'super_admin']);
+        session(['active_role' => 'super_admin']);
 
         $response = $this->actingAs($admin)->post('/hari-libur/1/delete');
 

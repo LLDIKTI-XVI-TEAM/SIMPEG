@@ -119,11 +119,11 @@ $permissionPaths = [
                 <div class="rounded-lg border border-border bg-surface p-4 shadow-sm flex flex-col justify-between hover:border-primary/25 transition-all duration-300">
                     <div>
                         <span class="text-[10px] font-bold uppercase tracking-wide
-                            {{ $role->name === 'Super Admin' ? 'text-danger' : '' }}
-                            {{ $role->name === 'Admin Kepegawaian' ? 'text-primary' : '' }}
-                            {{ $role->name === 'Pimpinan' ? 'text-secondary' : '' }}
-                            {{ $role->name === 'Atasan Langsung' ? 'text-warning' : '' }}
-                            {{ $role->name === 'Pegawai' ? 'text-success' : '' }}
+                            {{ $role->name === 'super_admin' ? 'text-danger' : '' }}
+                            {{ $role->name === 'admin_kepegawaian' ? 'text-primary' : '' }}
+                            {{ $role->name === 'pimpinan' ? 'text-secondary' : '' }}
+                            {{ $role->name === 'atasan_langsung' ? 'text-warning' : '' }}
+                            {{ $role->name === 'pegawai' ? 'text-success' : '' }}
                         ">
                             {{ $role->name }}
                         </span>
@@ -252,7 +252,7 @@ $permissionPaths = [
                                             </td>
                                             @foreach($roles as $role)
                                                 <td class="px-4 py-3.5 text-center align-middle hover:bg-soft/40 transition">
-                                                    @if($role->name === 'Super Admin')
+                                                    @if($role->name === 'super_admin')
                                                         {{-- Super Admin is always checked and disabled to prevent lockout --}}
                                                         <div class="flex items-center justify-center">
                                                             <input

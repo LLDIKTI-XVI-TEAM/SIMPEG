@@ -34,7 +34,7 @@ class EwsConfigController extends Controller
     public function index()
     {
         // Enforce Super Admin authorization
-        if (session('active_role') !== 'Super Admin') {
+        if (session('active_role') !== 'super_admin') {
             abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
         }
 
@@ -129,7 +129,7 @@ class EwsConfigController extends Controller
     public function update(Request $request)
     {
         // Enforce Super Admin authorization
-        if (session('active_role') !== 'Super Admin') {
+        if (session('active_role') !== 'super_admin') {
             abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
         }
 
@@ -210,7 +210,7 @@ class EwsConfigController extends Controller
         }
 
         $dynamicLogs = session('dynamic_audit_logs', []);
-        $operator    = auth()->user()->name ?? 'Super Admin';
+        $operator    = auth()->user()->name ?? 'super_admin';
         $ip          = $request->ip();
         $userAgent   = $request->userAgent();
         $reason      = $request->input('reason');
