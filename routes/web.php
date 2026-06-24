@@ -59,17 +59,19 @@ Route::middleware('keycloak.auth')->group(function (): void {
         return view('dashboard');
     })->name('dashboard');
 
-    Route::get('/change-role/{role}', function ($role) {
-        $allowedRoles = ['super_admin', 'admin_kepegawaian', 'pimpinan', 'atasan_langsung', 'pegawai'];
-        if (in_array($role, $allowedRoles)) {
-            session(['active_role' => $role]);
-        }
+    Route::get('/change-role/{role}', function (\Illuminate\Http\Request $request, string $role) {
+        abort_unless($request->user()?->role === $role, 403, 'Role aktif harus sesuai dengan role akun.');
+
+        session(['active_role' => $role]);
+
         return back();
-    })->name('change-role');
+    })->whereIn('role', ['super_admin', 'admin_kepegawaian', 'pimpinan', 'atasan_langsung', 'pegawai'])
+        ->name('change-role');
 
     Route::get('/pegawai/import-data', function () {
         return view('admin.pegawai.import');
-    })->name('pegawai.import');
+    })->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->name('pegawai.import');
 
     Route::get('/pegawai/import/template/{type}', function ($type) {
         $headers = [];
@@ -152,38 +154,54 @@ Route::middleware('keycloak.auth')->group(function (): void {
             'Pragma'              => 'no-cache',
             'Expires'             => '0',
         ]);
-    })->name('pegawai.import-template');
+    })->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->name('pegawai.import-template');
 
-    Route::get('/ews', [EwsController::class, 'index'])->name('ews');
+    Route::get('/ews', [EwsController::class, 'index'])
+        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan', 'permission:ews.read'])
+        ->name('ews');
 
     Route::get('/laporan-export', function () {
         return view('dummy', ['title' => 'Laporan / Export']);
-    })->name('laporan');
+    })->middleware(['role:super_admin,admin_kepegawaian,pimpinan', 'permission:reports.export'])
+        ->name('laporan');
 
-    Route::get('/user-management', [UserMappingController::class, 'index'])->name('user-management');
-    Route::post('/user-management/update', [UserMappingController::class, 'update'])->name('user-management.update');
+    Route::get('/user-management', [UserMappingController::class, 'index'])
+        ->middleware(['role:super_admin', 'permission:user_management.read'])
+        ->name('user-management');
+    Route::post('/user-management/update', [UserMappingController::class, 'update'])
+        ->middleware(['role:super_admin', 'permission:user_management.update'])
+        ->name('user-management.update');
 
-    Route::get('/rbac', [RbacController::class, 'index'])->name('rbac');
-    Route::post('/rbac/update', [RbacController::class, 'update'])->name('rbac.update');
+    Route::get('/rbac', [RbacController::class, 'index'])
+        ->middleware(['role:super_admin', 'permission:rbac.read'])
+        ->name('rbac');
+    Route::post('/rbac/update', [RbacController::class, 'update'])
+        ->middleware(['role:super_admin', 'permission:rbac.update'])
+        ->name('rbac.update');
 
     Route::get('/data-master', function () {
-        if (session('active_role') !== 'super_admin') {
-            abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
-        }
         return view('admin.data-master.index');
-    })->name('data-master');
+    })->middleware(['role:super_admin', 'permission:reference_data.manage'])
+        ->name('data-master');
 
 
     Route::get('/pegawai/nonaktif-list', function () {
         return view('admin.pegawai.nonaktif');
-    })->name('data-nonaktif');
+    })->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.restore'])
+        ->name('data-nonaktif');
 
     Route::get('/cuti/rekap', function () {
         return view('admin.cuti.rekap');
-    })->name('cuti.rekap');
+    })->middleware(['role:super_admin,admin_kepegawaian', 'permission:leave_balances.read'])
+        ->name('cuti.rekap');
 
-    Route::get('/konfigurasi', [EwsConfigController::class, 'index'])->name('ews.config');
-    Route::post('/konfigurasi/update', [EwsConfigController::class, 'update'])->name('ews.config.update');
+    Route::get('/konfigurasi', [EwsConfigController::class, 'index'])
+        ->middleware(['role:super_admin', 'permission:ews.configure'])
+        ->name('ews.config');
+    Route::post('/konfigurasi/update', [EwsConfigController::class, 'update'])
+        ->middleware(['role:super_admin', 'permission:ews.configure'])
+        ->name('ews.config.update');
 
      Route::get('/laporan/export-pegawai', function () {
          $pegawai = PegawaiController::$pegawaiList;
@@ -191,7 +209,8 @@ Route::middleware('keycloak.auth')->group(function (): void {
              'pegawai' => $pegawai,
              'title' => 'Laporan - Export Pegawai'
          ]);
-     })->name('laporan.pegawai');
+     })->middleware(['role:super_admin,admin_kepegawaian,pimpinan', 'permission:reports.export'])
+         ->name('laporan.pegawai');
 
      Route::get('/laporan/export-pegawai/excel', function (\Illuminate\Http\Request $request) {
          $pegawai = PegawaiController::$pegawaiList;
@@ -322,7 +341,8 @@ Route::middleware('keycloak.auth')->group(function (): void {
              'Pragma'              => 'no-cache',
              'Expires'             => '0',
          ]);
-     })->name('laporan.pegawai.excel');
+     })->middleware(['role:super_admin,admin_kepegawaian,pimpinan', 'permission:reports.export'])
+         ->name('laporan.pegawai.excel');
 
     Route::get('/laporan/export-cuti', function () {
         $riwayatCuti = CutiController::$riwayatCuti;
@@ -332,7 +352,8 @@ Route::middleware('keycloak.auth')->group(function (): void {
             'pegawai' => $pegawai,
             'title' => 'Laporan - Export Cuti'
         ]);
-    })->name('laporan.cuti');
+    })->middleware(['role:super_admin,admin_kepegawaian,pimpinan', 'permission:reports.export'])
+        ->name('laporan.cuti');
 
     Route::get('/laporan/export-cuti/excel', function (\Illuminate\Http\Request $request) {
         $riwayatCuti = CutiController::$riwayatCuti;
@@ -562,25 +583,54 @@ Route::middleware('keycloak.auth')->group(function (): void {
             'Pragma'              => 'no-cache',
             'Expires'             => '0',
         ]);
-    })->name('laporan.cuti.excel');
+    })->middleware(['role:super_admin,admin_kepegawaian,pimpinan', 'permission:reports.export'])
+        ->name('laporan.cuti.excel');
 
-    Route::get('/pegawai', [PegawaiController::class, 'index'])->name('data-pegawai');
-    Route::get('/pegawai/create', [PegawaiController::class, 'create'])->name('pegawai.create');
-    Route::post('/pegawai', [PegawaiController::class, 'store'])->name('pegawai.store');
-    Route::get('/pegawai/{id}', [PegawaiController::class, 'show'])->whereUuid('id')->name('pegawai.show');
-    Route::get('/pegawai/{id}/edit', [PegawaiController::class, 'edit'])->whereUuid('id')->name('pegawai.edit');
-    Route::post('/pegawai/{id}', [PegawaiController::class, 'update'])->whereUuid('id')->name('pegawai.update');
-    Route::post('/pegawai/{id}/delete', [PegawaiController::class, 'destroy'])->whereUuid('id')->name('pegawai.destroy');
+    Route::get('/pegawai', [PegawaiController::class, 'index'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
+        ->name('data-pegawai');
+    Route::get('/pegawai/create', [PegawaiController::class, 'create'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.create'])
+        ->name('pegawai.create');
+    Route::post('/pegawai', [PegawaiController::class, 'store'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.create'])
+        ->name('pegawai.store');
+    Route::get('/pegawai/{id}', [PegawaiController::class, 'show'])
+        ->whereUuid('id')
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
+        ->name('pegawai.show');
+    Route::get('/pegawai/{id}/edit', [PegawaiController::class, 'edit'])
+        ->whereUuid('id')
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
+        ->name('pegawai.edit');
+    Route::post('/pegawai/{id}', [PegawaiController::class, 'update'])
+        ->whereUuid('id')
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
+        ->name('pegawai.update');
+    Route::post('/pegawai/{id}/delete', [PegawaiController::class, 'destroy'])
+        ->whereUuid('id')
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.deactivate'])
+        ->name('pegawai.destroy');
 
     Route::get('/pegawai/legacy', function () {
         return redirect()->route('data-pegawai');
     })->name('pegawai.index');
 
-    Route::get('/hari-libur', [HariLiburController::class, 'index'])->name('hari-libur');
-    Route::post('/hari-libur', [HariLiburController::class, 'store'])->name('hari-libur.store');
-    Route::get('/hari-libur/{id}/edit', [HariLiburController::class, 'edit'])->name('hari-libur.edit');
-    Route::post('/hari-libur/{id}', [HariLiburController::class, 'update'])->name('hari-libur.update');
-    Route::post('/hari-libur/{id}/delete', [HariLiburController::class, 'destroy'])->name('hari-libur.destroy');
+    Route::get('/hari-libur', [HariLiburController::class, 'index'])
+        ->middleware(['role:super_admin', 'permission:hari_libur.read'])
+        ->name('hari-libur');
+    Route::post('/hari-libur', [HariLiburController::class, 'store'])
+        ->middleware(['role:super_admin', 'permission:hari_libur.create'])
+        ->name('hari-libur.store');
+    Route::get('/hari-libur/{id}/edit', [HariLiburController::class, 'edit'])
+        ->middleware(['role:super_admin', 'permission:hari_libur.update'])
+        ->name('hari-libur.edit');
+    Route::post('/hari-libur/{id}', [HariLiburController::class, 'update'])
+        ->middleware(['role:super_admin', 'permission:hari_libur.update'])
+        ->name('hari-libur.update');
+    Route::post('/hari-libur/{id}/delete', [HariLiburController::class, 'destroy'])
+        ->middleware(['role:super_admin', 'permission:hari_libur.delete'])
+        ->name('hari-libur.destroy');
 
     Route::get('/hari-libur/legacy', function () {
         return redirect()->route('hari-libur');
@@ -601,10 +651,18 @@ Route::middleware('keycloak.auth')->group(function (): void {
         return redirect()->route('cuti');
     });
 
-    Route::get('/dashboard/dokumen', [DokumenController::class, 'index'])->name('dokumen');
-    Route::post('/dashboard/dokumen/upload', [DokumenController::class, 'store'])->name('dokumen.store');
-    Route::get('/dashboard/dokumen/{id}', [DokumenController::class, 'show'])->name('dokumen.show');
-    Route::get('/dashboard/dokumen/{id}/download', [DokumenController::class, 'download'])->name('dokumen.download');
+    Route::get('/dashboard/dokumen', [DokumenController::class, 'index'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:documents.read'])
+        ->name('dokumen');
+    Route::post('/dashboard/dokumen/upload', [DokumenController::class, 'store'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:documents.create'])
+        ->name('dokumen.store');
+    Route::get('/dashboard/dokumen/{id}', [DokumenController::class, 'show'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:documents.read'])
+        ->name('dokumen.show');
+    Route::get('/dashboard/dokumen/{id}/download', [DokumenController::class, 'download'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:documents.download'])
+        ->name('dokumen.download');
 
     Route::get('/dashboard/dokumen/legacy', function () {
         return redirect()->route('dokumen');
@@ -614,8 +672,12 @@ Route::middleware('keycloak.auth')->group(function (): void {
         return redirect()->route('dokumen');
     });
 
-    Route::get('/dashboard/audit', [AuditController::class, 'index'])->name('audit-log');
-    Route::get('/dashboard/audit/{id}', [AuditController::class, 'show'])->name('audit-log.show');
+    Route::get('/dashboard/audit', [AuditController::class, 'index'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:audit_logs.read'])
+        ->name('audit-log');
+    Route::get('/dashboard/audit/{id}', [AuditController::class, 'show'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:audit_logs.read'])
+        ->name('audit-log.show');
 
     Route::get('/dashboard/audit/legacy', function () {
         return redirect()->route('audit-log');
@@ -628,8 +690,12 @@ Route::middleware('keycloak.auth')->group(function (): void {
     Route::get('/dashboard/profil', [ProfileController::class, 'index'])->name('profil');
     Route::post('/dashboard/profil/password', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
 
-    Route::get('/dashboard/pengaturan', [SettingsController::class, 'index'])->name('pengaturan');
-    Route::post('/dashboard/pengaturan', [SettingsController::class, 'update'])->name('settings.update');
+    Route::get('/dashboard/pengaturan', [SettingsController::class, 'index'])
+        ->middleware(['role:super_admin', 'permission:settings.manage'])
+        ->name('pengaturan');
+    Route::post('/dashboard/pengaturan', [SettingsController::class, 'update'])
+        ->middleware(['role:super_admin', 'permission:settings.manage'])
+        ->name('settings.update');
 
     Route::get('/dashboard/pengaturan/legacy', function () {
         return redirect()->route('pengaturan');
@@ -643,7 +709,9 @@ Route::middleware('keycloak.auth')->group(function (): void {
         return redirect()->route('pengaturan');
     });
 
-    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::get('/notifications', [NotificationController::class, 'index'])
+        ->middleware('permission:notifications.read')
+        ->name('notifications.index');
 
     // ── Export Data Pegawai (.xlsx — PhpSpreadsheet) ─────────────────────────
     Route::get('/pegawai/export', function (\Illuminate\Http\Request $request) {
@@ -814,6 +882,7 @@ Route::middleware('keycloak.auth')->group(function (): void {
             'Expires'             => '0',
         ]);
 
-    })->name('pegawai.export');
+    })->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.export'])
+        ->name('pegawai.export');
 
 });

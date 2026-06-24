@@ -653,7 +653,9 @@
                 <h3 class="text-sm font-bold text-ink font-sans">Hari Libur Mendatang</h3>
                 <p class="text-[10px] text-muted font-sans mt-0.5">Garis waktu 3-4 bulan ke depan</p>
             </div>
-            <a href="{{ route('hari-libur') }}" class="text-xs font-semibold text-primary hover:underline font-sans">Kelola</a>
+            @if(auth()->user()?->role === 'super_admin')
+                <a href="{{ route('hari-libur') }}" class="text-xs font-semibold text-primary hover:underline font-sans">Kelola</a>
+            @endif
         </div>
         
         @php

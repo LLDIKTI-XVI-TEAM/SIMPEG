@@ -19,6 +19,7 @@ class EmployeeCreateIntegrationTest extends TestCase
     {
         parent::setUp();
         $this->artisan('db:seed', ['--class' => 'ReferenceSeeder']);
+        $this->artisan('db:seed', ['--class' => 'RbacSeeder']);
     }
 
     public function test_can_create_employee_via_ui_form()

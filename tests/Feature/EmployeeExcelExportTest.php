@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Employee;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\TestCase;
@@ -14,7 +15,9 @@ class EmployeeExcelExportTest extends TestCase
 
     public function test_employee_export_uses_database_data_and_expected_layout(): void
     {
-        $user = User::factory()->create();
+        $this->seed(RbacSeeder::class);
+
+        $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create([
             'nama_lengkap' => 'Abd Rahim Har, S.E.',
             'nip' => '197906252008011009',

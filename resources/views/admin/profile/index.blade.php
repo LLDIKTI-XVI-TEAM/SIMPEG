@@ -36,11 +36,13 @@
                 </div>
             </div>
 
-            <div class="border-t border-border pt-6 flex justify-end">
-                <a href="{{ route('pengaturan') }}" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-soft">
-                    Kelola Pengaturan
-                </a>
-            </div>
+            @if(auth()->user()?->role === 'super_admin')
+                <div class="border-t border-border pt-6 flex justify-end">
+                    <a href="{{ route('pengaturan') }}" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-soft">
+                        Kelola Pengaturan
+                    </a>
+                </div>
+            @endif
         </div>
 
         {{-- Change Password Card --}}
