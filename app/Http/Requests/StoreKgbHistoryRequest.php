@@ -23,7 +23,7 @@ class StoreKgbHistoryRequest extends FormRequest
             'gaji_pokok' => ['required', 'numeric', 'min:0'],
             'no_sk' => ['required', 'string', 'max:100'],
             'tanggal_sk' => ['required', 'date'],
-            'file_sk' => SkFilePathRules::nullablePdfPath(),
+            'file_sk' => SkFilePathRules::nullableUploadOrControlledPath(),
         ];
     }
 

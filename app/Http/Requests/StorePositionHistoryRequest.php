@@ -26,7 +26,7 @@ class StorePositionHistoryRequest extends FormRequest
             'tmt_jabatan' => ['required', 'date'],
             'no_sk' => ['required', 'string', 'max:100'],
             'tanggal_sk' => ['required', 'date'],
-            'file_sk' => SkFilePathRules::nullablePdfPath(),
+            'file_sk' => SkFilePathRules::nullableUploadOrControlledPath(),
         ];
     }
 
