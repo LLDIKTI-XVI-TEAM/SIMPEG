@@ -60,7 +60,7 @@
         {{-- Navigation --}}
         <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-1">
             @php
-            $activeRole = session('active_role', 'super_admin');
+            $activeRole = auth()->user()?->role ?? 'pegawai';
             
             // Menu terlarang/dikunci untuk masing-masing role
             $lockedMenus = [
@@ -69,6 +69,9 @@
                     'pengaturan',
                     'user-management',
                     'rbac',
+                    'data-master',
+                    'hari-libur',
+                    'ews.config',
                 ],
                 'pimpinan' => [
                     'audit-log',
@@ -185,39 +188,35 @@
                         @php
                             $routeExists = \Illuminate\Support\Facades\Route::has($menu['route']);
                             $isLocked    = in_array($menu['route'], $myLockedMenus);
-                            
+
+                            if (!$routeExists || $isLocked) {
+                                continue;
+                            }
+
                             $isActive = false;
-                            if ($routeExists && !$isLocked) {
-                                $currentRoute = request()->route() ? request()->route()->getName() : null;
-                                if ($currentRoute === $menu['route']) {
-                                    $isActive = true;
-                                } elseif ($currentRoute && str_starts_with($currentRoute, $menu['route'] . '.')) {
-                                    $hasMoreSpecific = false;
-                                    foreach ($allMenuRoutes as $otherRoute) {
-                                        if ($otherRoute !== $menu['route'] && 
-                                            str_starts_with($otherRoute, $menu['route'] . '.') && 
-                                            ($currentRoute === $otherRoute || str_starts_with($currentRoute, $otherRoute . '.'))) {
-                                            $hasMoreSpecific = true;
-                                            break;
-                                        }
-                                    }
-                                    if (!$hasMoreSpecific) {
-                                        $isActive = true;
+                            $currentRoute = request()->route() ? request()->route()->getName() : null;
+                            if ($currentRoute === $menu['route']) {
+                                $isActive = true;
+                            } elseif ($currentRoute && str_starts_with($currentRoute, $menu['route'] . '.')) {
+                                $hasMoreSpecific = false;
+                                foreach ($allMenuRoutes as $otherRoute) {
+                                    if ($otherRoute !== $menu['route'] &&
+                                        str_starts_with($otherRoute, $menu['route'] . '.') &&
+                                        ($currentRoute === $otherRoute || str_starts_with($currentRoute, $otherRoute . '.'))) {
+                                        $hasMoreSpecific = true;
+                                        break;
                                     }
                                 }
+                                if (!$hasMoreSpecific) {
+                                    $isActive = true;
+                                }
                             }
-                            
-                            if ($isLocked) {
-                                $href = '#';
-                                $itemClass = 'opacity-50 cursor-not-allowed text-muted hover:text-muted font-medium';
-                                $iconClass = 'text-muted';
-                            } else {
-                                $href = $routeExists ? route($menu['route']) : '#';
-                                $itemClass = $isActive
-                                    ? 'bg-primary text-white font-semibold'
-                                    : 'text-muted hover:bg-soft hover:text-ink font-medium';
-                                $iconClass = $isActive ? 'text-white' : 'text-muted';
-                            }
+
+                            $href = route($menu['route']);
+                            $itemClass = $isActive
+                                ? 'bg-primary text-white font-semibold'
+                                : 'text-muted hover:bg-soft hover:text-ink font-medium';
+                            $iconClass = $isActive ? 'text-white' : 'text-muted';
                         @endphp
                         <a
                             href="{{ $href }}"
@@ -265,9 +264,6 @@
                                 <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M22 10.5h-6m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM4 19.235A10.19 10.19 0 0 1 12.75 15c2.015 0 3.907.585 5.5 1.59m-14.25 2.645A9.903 9.903 0 0 1 12.75 18a9.903 9.903 0 0 1 6.002 2.235" /></svg>
                             @endif
                             <span>{{ $menu['label'] }}</span>
-                            @if($isLocked)
-                                <svg class="w-3.5 h-3.5 ml-auto text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
-                            @endif
                         </a>
                     @endforeach
                 </div>
@@ -392,7 +388,7 @@
                             <p class="text-sm font-semibold leading-tight text-ink font-sans">
                                 {{ auth()->user()->name ?? 'Pengguna' }}
                             </p>
-                            <p class="text-[11px] leading-tight text-muted font-sans">{{ session('active_role', 'super_admin') }}</p>
+                            <p class="text-[11px] leading-tight text-muted font-sans">{{ $activeRole }}</p>
                         </div>
                         <svg class="w-4 h-4 text-muted shrink-0 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
                     </button>
@@ -421,14 +417,16 @@
                                 </svg>
                                 Profil Saya
                             </a>
-                            <a href="{{ route('pengaturan') }}" id="settings-link" class="flex items-center gap-2.5 rounded-lg px-4 py-2 text-sm text-ink transition-colors hover:bg-soft font-sans font-medium font-semibold font-semibold">
-                                {{-- heroicon: cog-6-tooth (outline) --}}
-                                <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                </svg>
-                                Pengaturan
-                            </a>
+                            @if($activeRole === 'super_admin')
+                                <a href="{{ route('pengaturan') }}" id="settings-link" class="flex items-center gap-2.5 rounded-lg px-4 py-2 text-sm text-ink transition-colors hover:bg-soft font-sans font-medium font-semibold">
+                                    {{-- heroicon: cog-6-tooth (outline) --}}
+                                    <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                                    </svg>
+                                    Pengaturan
+                                </a>
+                            @endif
                         </div>
                         <div class="border-t border-border p-1.5">
                             <form method="POST" action="{{ route('logout') }}">

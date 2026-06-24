@@ -78,7 +78,7 @@ class ExampleTest extends TestCase
 
     public function test_authenticated_export_cuti_renders(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->adminKepegawaian()->create();
 
         $response = $this->actingAs($user)->get('/laporan/export-cuti');
 
@@ -90,7 +90,7 @@ class ExampleTest extends TestCase
 
     public function test_authenticated_export_cuti_excel(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->adminKepegawaian()->create();
 
         $response = $this->actingAs($user)->get('/laporan/export-cuti/excel');
 
@@ -101,7 +101,7 @@ class ExampleTest extends TestCase
 
     public function test_authenticated_export_pegawai_renders(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->adminKepegawaian()->create();
 
         $response = $this->actingAs($user)->get('/laporan/export-pegawai');
 
@@ -112,7 +112,7 @@ class ExampleTest extends TestCase
 
     public function test_authenticated_export_pegawai_excel(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->adminKepegawaian()->create();
 
         $response = $this->actingAs($user)->get('/laporan/export-pegawai/excel');
 
@@ -498,4 +498,3 @@ class ExampleTest extends TestCase
         $this->assertTrue($found);
     }
 }
-
