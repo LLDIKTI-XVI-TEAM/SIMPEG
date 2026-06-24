@@ -70,60 +70,6 @@ class EmployeeController extends Controller
         ]);
     }
 
-    public function show(Employee $employee): JsonResponse
-    {
-        $employee->load([
-            'jenisPegawai',
-            'rankHistories' => fn ($query) => $query->with('golongan')->orderByDesc('tmt_pangkat')->orderByDesc('created_at'),
-            'positionHistories' => fn ($query) => $query->with(['jenisJabatan', 'eselon', 'unitKerja'])->orderByDesc('tmt_jabatan')->orderByDesc('created_at'),
-            'salaryHistories' => fn ($query) => $query->orderByDesc('tmt_kgb')->orderByDesc('created_at'),
-        ]);
-
-        return response()->json([
-            'message' => 'Detail pegawai berhasil diambil.',
-            'employee' => $this->employeeDetailPayload($employee),
-        ]);
-    }
-
-    /**
-     * Membatasi data detail pegawai agar field sensitif dan riwayat khusus tidak bocor lewat endpoint umum.
-     */
-    private function employeeDetailPayload(Employee $employee): array
-    {
-        return [
-            ...Arr::only($employee->toArray(), [
-                'id',
-                'nama_lengkap',
-                'nip',
-                'tempat_lahir',
-                'tanggal_lahir',
-                'jenis_kelamin',
-                'golongan_darah',
-                'foto',
-                'jenis_pegawai_id',
-                'status_aktif',
-                'golongan_terakhir',
-                'pangkat_terakhir',
-                'jabatan_terakhir',
-                'kelas_jabatan',
-                'pendidikan_terakhir',
-                'prodi_pendidikan_terakhir',
-                'tanggal_pensiun',
-                'tanggal_kenaikan_pangkat_berikutnya',
-                'tanggal_kgb_berikutnya',
-                'profil_status',
-                'email',
-                'is_kinerja_baik',
-                'created_at',
-                'updated_at',
-            ]),
-            'jenis_pegawai' => $employee->jenisPegawai,
-            'rank_histories' => $employee->rankHistories,
-            'position_histories' => $employee->positionHistories,
-            'salary_histories' => $employee->salaryHistories,
-        ];
-    }
-
     public function store(StoreEmployeeRequest $request, EmployeeFileStorageService $files): JsonResponse|RedirectResponse
     {
         $data = $request->validated();
@@ -177,9 +123,11 @@ class EmployeeController extends Controller
 
     public function show(Employee $employee): JsonResponse
     {
+        $employee = $this->loadDetailRelations($employee);
+
         return response()->json([
             'message' => 'Detail pegawai berhasil diambil.',
-            'employee' => $this->loadDetailRelations($employee),
+            'employee' => $this->employeeDetailPayload($employee),
         ]);
     }
 
@@ -189,10 +137,62 @@ class EmployeeController extends Controller
 
         abort_if($employee === null, 404, 'Data pegawai untuk akun ini belum terhubung.');
 
+        $employee = $this->loadDetailRelations($employee);
+
         return response()->json([
             'message' => 'Detail profil pegawai berhasil diambil.',
-            'employee' => $this->loadDetailRelations($employee),
+            'employee' => $this->employeeDetailPayload($employee),
         ]);
+    }
+
+    /**
+     * Membatasi detail pegawai agar field sensitif tidak ikut terbuka ke frontend.
+     */
+    private function employeeDetailPayload(Employee $employee): array
+    {
+        return [
+            ...Arr::only($employee->toArray(), [
+                'id',
+                'nama_lengkap',
+                'nip',
+                'tempat_lahir',
+                'tanggal_lahir',
+                'jenis_kelamin',
+                'golongan_darah',
+                'foto',
+                'jenis_pegawai_id',
+                'status_aktif',
+                'golongan_terakhir',
+                'pangkat_terakhir',
+                'jabatan_terakhir',
+                'kelas_jabatan',
+                'pendidikan_terakhir',
+                'prodi_pendidikan_terakhir',
+                'tanggal_pensiun',
+                'tanggal_kenaikan_pangkat_berikutnya',
+                'tanggal_kgb_berikutnya',
+                'profil_status',
+                'email',
+                'is_kinerja_baik',
+                'created_at',
+                'updated_at',
+            ]),
+            'agama' => $employee->agama,
+            'status_kawin' => $employee->statusKawin,
+            'jenis_pegawai' => $employee->jenisPegawai,
+            'families' => $employee->families,
+            'appointments' => $employee->appointments,
+            'rank_histories' => $employee->rankHistories,
+            'position_histories' => $employee->positionHistories,
+            'salary_histories' => $employee->salaryHistories,
+            'discipline_records' => $employee->disciplineRecords,
+            'education_histories' => $employee->educationHistories,
+            'documents' => $employee->documents,
+            'supervisor_assignments' => $employee->supervisorAssignments,
+            'leave_balances' => $employee->leaveBalances,
+            'leave_requests' => $employee->leaveRequests,
+            'ews_alerts' => $employee->ewsAlerts,
+        ];
     }
 
     private function loadDetailRelations(Employee $employee): Employee
