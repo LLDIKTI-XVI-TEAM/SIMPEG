@@ -9,6 +9,8 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class EmployeeCreationTest extends TestCase
@@ -68,6 +70,43 @@ class EmployeeCreationTest extends TestCase
         $this->assertSame($user->id, $audit->user_id);
         $this->assertSame('Budi Santoso', $audit->new_values['nama_lengkap']);
         $this->assertSame('198001012006041001', $audit->new_values['nip']);
+    }
+
+    public function test_authenticated_user_can_create_employee_with_photo_upload(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->adminKepegawaian()->create();
+        $payload = $this->validPayload([
+            'foto' => UploadedFile::fake()->image('foto-valid.jpg', 640, 640)->size(512),
+        ]);
+
+        $this->actingAs($user);
+        $response = $this->postWithCsrf(self::EMPLOYEES_ENDPOINT, $payload);
+
+        $response->assertCreated();
+        $photoPath = $response->json('employee.foto');
+        $this->assertIsString($photoPath);
+        $this->assertStringStartsWith('photos/', $photoPath);
+        $this->assertStringEndsWith('.jpg', $photoPath);
+        Storage::disk('public')->assertExists($photoPath);
+        $this->assertDatabaseHas('employees', [
+            'nip' => '198001012006041001',
+            'foto' => $photoPath,
+        ]);
+    }
+
+    public function test_photo_upload_rejects_disallowed_extension_even_when_content_is_image(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $payload = $this->validPayload([
+            'foto' => UploadedFile::fake()->image('foto-invalid.gif', 640, 640)->size(512),
+        ]);
+
+        $this->actingAs($user);
+        $response = $this->postWithCsrf(self::EMPLOYEES_ENDPOINT, $payload);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['foto']);
     }
 
     public function test_pegawai_cannot_create_employee(): void
@@ -137,9 +176,15 @@ class EmployeeCreationTest extends TestCase
             ->postJson($uri, $data, ['X-CSRF-TOKEN' => 'test-token']);
     }
 
-    private function validPayload(): array
+    private function postWithCsrf(string $uri, array $data)
     {
-        return [
+        return $this->withSession(['_token' => 'test-token'])
+            ->post($uri, $data, ['X-CSRF-TOKEN' => 'test-token', 'Accept' => 'application/json']);
+    }
+
+    private function validPayload(array $overrides = []): array
+    {
+        return array_merge([
             'nama_lengkap' => 'Budi Santoso',
             'email' => 'budi@example.com',
             'golongan_terakhir' => 'III/a',
@@ -153,6 +198,6 @@ class EmployeeCreationTest extends TestCase
             'prodi_pendidikan_terakhir' => 'Manajemen',
             'jenis_pegawai_id' => RefJenisPegawai::where('nama', 'PNS')->firstOrFail()->id,
             'tanggal_lahir' => '1980-01-01',
-        ];
+        ], $overrides);
     }
 }

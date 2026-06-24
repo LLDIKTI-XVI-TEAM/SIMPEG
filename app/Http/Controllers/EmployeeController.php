@@ -7,6 +7,7 @@ use App\Http\Requests\StoreEmployeeRequest;
 use App\Http\Requests\UpdateEmployeeRequest;
 use App\Models\Employee;
 use App\Services\AuditService;
+use App\Services\EmployeeFileStorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Arr;
@@ -122,9 +123,15 @@ class EmployeeController extends Controller
         ];
     }
 
-    public function store(StoreEmployeeRequest $request): JsonResponse|RedirectResponse
+    public function store(StoreEmployeeRequest $request, EmployeeFileStorageService $files): JsonResponse|RedirectResponse
     {
-        $employee = Employee::create($request->validated());
+        $data = $request->validated();
+
+        if ($request->hasFile('foto')) {
+            $data['foto'] = $files->storePhoto($request->file('foto'));
+        }
+
+        $employee = Employee::create($data);
 
         AuditService::log('CREATE', 'Employee', $employee->id, null, $employee->toArray(), $request);
 
@@ -138,12 +145,22 @@ class EmployeeController extends Controller
         return back()->with('success', 'Data pegawai berhasil ditambahkan.');
     }
 
-    public function update(UpdateEmployeeRequest $request, Employee $employee): JsonResponse|RedirectResponse
+    public function update(UpdateEmployeeRequest $request, Employee $employee, EmployeeFileStorageService $files): JsonResponse|RedirectResponse
     {
         $oldValues = $employee->toArray();
+        $oldPhotoPath = $employee->foto;
+        $data = $request->validated();
 
-        $employee->update($request->validated());
+        if ($request->hasFile('foto')) {
+            $data['foto'] = $files->storePhoto($request->file('foto'));
+        }
+
+        $employee->update($data);
         $employee->refresh();
+
+        if ($request->hasFile('foto')) {
+            $files->deletePublicFile($oldPhotoPath);
+        }
 
         AuditService::log('UPDATE', 'Employee', $employee->id, $oldValues, $employee->toArray(), $request);
 
