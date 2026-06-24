@@ -25,6 +25,7 @@ class RbacSeeder extends Seeder
             'employees.create' => ['module' => 'employees', 'description' => 'Membuat data pegawai'],
             'employees.update' => ['module' => 'employees', 'description' => 'Mengubah data pegawai'],
             'employees.import' => ['module' => 'employees', 'description' => 'Import data pegawai'],
+            'employees.read_self' => ['module' => 'employees', 'description' => 'Melihat detail data pegawai milik sendiri'],
             'employee_histories.read' => ['module' => 'employee_histories', 'description' => 'Melihat riwayat pegawai'],
             'employee_histories.create' => ['module' => 'employee_histories', 'description' => 'Membuat entri riwayat pegawai'],
             'hari_libur.read' => ['module' => 'hari_libur', 'description' => 'Melihat hari libur dan cuti bersama'],
@@ -64,7 +65,7 @@ class RbacSeeder extends Seeder
             ],
             'pimpinan' => ['notifications.read', 'notifications.update'],
             'atasan_langsung' => ['notifications.read', 'notifications.update'],
-            'pegawai' => ['notifications.read', 'notifications.update'],
+            'pegawai' => ['employees.read_self', 'notifications.read', 'notifications.update'],
         ]);
     }
 

@@ -9,6 +9,7 @@ use App\Models\Employee;
 use App\Services\AuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 
 class EmployeeController extends Controller
 {
@@ -100,5 +101,55 @@ class EmployeeController extends Controller
         }
 
         return back()->with('success', 'Data pegawai berhasil diperbarui.');
+    }
+
+    public function show(Employee $employee): JsonResponse
+    {
+        return response()->json([
+            'message' => 'Detail pegawai berhasil diambil.',
+            'employee' => $this->loadDetailRelations($employee),
+        ]);
+    }
+
+    public function myProfile(Request $request): JsonResponse
+    {
+        $employee = $request->user()?->employee;
+
+        abort_if($employee === null, 404, 'Data pegawai untuk akun ini belum terhubung.');
+
+        return response()->json([
+            'message' => 'Detail profil pegawai berhasil diambil.',
+            'employee' => $this->loadDetailRelations($employee),
+        ]);
+    }
+
+    private function loadDetailRelations(Employee $employee): Employee
+    {
+        return $employee->load([
+            'agama:id,nama',
+            'statusKawin:id,nama',
+            'jenisPegawai:id,nama',
+            'families' => fn ($query) => $query->latest(),
+            'appointments' => fn ($query) => $query->orderByDesc('tmt_pengangkatan'),
+            'rankHistories' => fn ($query) => $query->with('golongan:id,kode,nama')->orderByDesc('tmt_pangkat'),
+            'positionHistories' => fn ($query) => $query
+                ->with([
+                    'jenisJabatan:id,nama,maks_usia_pensiun',
+                    'eselon:id,kode,nama',
+                    'unitKerja:id,nama',
+                ])
+                ->orderByDesc('tmt_jabatan'),
+            'salaryHistories' => fn ($query) => $query->orderByDesc('tmt_kgb'),
+            'disciplineRecords' => fn ($query) => $query->orderByDesc('tanggal_mulai'),
+            'educationHistories' => fn ($query) => $query->with('jenjang:id,nama')->orderByDesc('tahun_lulus'),
+            'documents' => fn ($query) => $query->latest(),
+            'supervisorAssignments' => fn ($query) => $query
+                ->with('supervisor:id,nama_lengkap,nip,jabatan_terakhir')
+                ->orderByRaw('tanggal_berakhir is null desc')
+                ->orderByDesc('tanggal_mulai'),
+            'leaveBalances' => fn ($query) => $query->orderByDesc('tahun'),
+            'leaveRequests' => fn ($query) => $query->with('jenisCuti:id,nama')->latest(),
+            'ewsAlerts' => fn ($query) => $query->orderBy('target_date'),
+        ]);
     }
 }

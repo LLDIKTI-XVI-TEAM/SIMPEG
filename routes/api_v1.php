@@ -53,7 +53,15 @@ Route::middleware($employeeGroupMiddleware)
         Route::post('/{employee}/riwayat-kgb', [KgbHistoryController::class, 'store'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_histories.create'])
             ->name('riwayat-kgb.store');
+        Route::get('/{employee}', [EmployeeController::class, 'show'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
+            ->name('show');
     });
+
+Route::middleware(['web', 'keycloak.auth', 'role:pegawai'])
+    ->get('/profil-saya', [EmployeeController::class, 'myProfile'])
+    ->middleware('permission:employees.read_self')
+    ->name('profil-saya.show');
 
 Route::middleware(['web', 'keycloak.auth', 'role:super_admin'])
     ->prefix('hari-libur')
