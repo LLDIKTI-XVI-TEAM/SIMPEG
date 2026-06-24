@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\SkFilePathRules;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreKgbHistoryRequest extends FormRequest
@@ -22,7 +23,7 @@ class StoreKgbHistoryRequest extends FormRequest
             'gaji_pokok' => ['required', 'numeric', 'min:0'],
             'no_sk' => ['required', 'string', 'max:100'],
             'tanggal_sk' => ['required', 'date'],
-            'file_sk' => ['nullable', 'string', 'max:255'],
+            'file_sk' => SkFilePathRules::nullableUploadOrControlledPath(),
         ];
     }
 

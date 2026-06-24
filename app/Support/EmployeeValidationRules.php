@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Employee;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\File;
 
 class EmployeeValidationRules
 {
@@ -23,7 +24,7 @@ class EmployeeValidationRules
             'agama_id' => ['nullable', 'uuid', 'exists:ref_agama,id'],
             'status_kawin_id' => ['nullable', 'uuid', 'exists:ref_status_perkawinan,id'],
             'golongan_darah' => ['nullable', 'in:A,B,AB,O'],
-            'foto' => ['nullable', 'string', 'max:255'],
+            'foto' => ['nullable', File::image()->types(['jpg', 'jpeg', 'png'])->max('10mb')],
             'jenis_pegawai_id' => ['required', 'uuid', 'exists:ref_jenis_pegawai,id'],
             'status_aktif' => ['nullable', 'in:Aktif,Non-Aktif,Pensiun,Mutasi'],
 

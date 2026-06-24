@@ -7,9 +7,11 @@ use App\Http\Requests\StoreEmployeeRequest;
 use App\Http\Requests\UpdateEmployeeRequest;
 use App\Models\Employee;
 use App\Services\AuditService;
+use App\Services\EmployeeFileStorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 
 class EmployeeController extends Controller
 {
@@ -68,9 +70,69 @@ class EmployeeController extends Controller
         ]);
     }
 
-    public function store(StoreEmployeeRequest $request): JsonResponse|RedirectResponse
+    public function show(Employee $employee): JsonResponse
     {
-        $employee = Employee::create($request->validated());
+        $employee->load([
+            'jenisPegawai',
+            'rankHistories' => fn ($query) => $query->with('golongan')->orderByDesc('tmt_pangkat')->orderByDesc('created_at'),
+            'positionHistories' => fn ($query) => $query->with(['jenisJabatan', 'eselon', 'unitKerja'])->orderByDesc('tmt_jabatan')->orderByDesc('created_at'),
+            'salaryHistories' => fn ($query) => $query->orderByDesc('tmt_kgb')->orderByDesc('created_at'),
+        ]);
+
+        return response()->json([
+            'message' => 'Detail pegawai berhasil diambil.',
+            'employee' => $this->employeeDetailPayload($employee),
+        ]);
+    }
+
+    /**
+     * Membatasi data detail pegawai agar field sensitif dan riwayat khusus tidak bocor lewat endpoint umum.
+     */
+    private function employeeDetailPayload(Employee $employee): array
+    {
+        return [
+            ...Arr::only($employee->toArray(), [
+                'id',
+                'nama_lengkap',
+                'nip',
+                'tempat_lahir',
+                'tanggal_lahir',
+                'jenis_kelamin',
+                'golongan_darah',
+                'foto',
+                'jenis_pegawai_id',
+                'status_aktif',
+                'golongan_terakhir',
+                'pangkat_terakhir',
+                'jabatan_terakhir',
+                'kelas_jabatan',
+                'pendidikan_terakhir',
+                'prodi_pendidikan_terakhir',
+                'tanggal_pensiun',
+                'tanggal_kenaikan_pangkat_berikutnya',
+                'tanggal_kgb_berikutnya',
+                'profil_status',
+                'email',
+                'is_kinerja_baik',
+                'created_at',
+                'updated_at',
+            ]),
+            'jenis_pegawai' => $employee->jenisPegawai,
+            'rank_histories' => $employee->rankHistories,
+            'position_histories' => $employee->positionHistories,
+            'salary_histories' => $employee->salaryHistories,
+        ];
+    }
+
+    public function store(StoreEmployeeRequest $request, EmployeeFileStorageService $files): JsonResponse|RedirectResponse
+    {
+        $data = $request->validated();
+
+        if ($request->hasFile('foto')) {
+            $data['foto'] = $files->storePhoto($request->file('foto'));
+        }
+
+        $employee = Employee::create($data);
 
         AuditService::log('CREATE', 'Employee', $employee->id, null, $employee->toArray(), $request);
 
@@ -84,12 +146,22 @@ class EmployeeController extends Controller
         return back()->with('success', 'Data pegawai berhasil ditambahkan.');
     }
 
-    public function update(UpdateEmployeeRequest $request, Employee $employee): JsonResponse|RedirectResponse
+    public function update(UpdateEmployeeRequest $request, Employee $employee, EmployeeFileStorageService $files): JsonResponse|RedirectResponse
     {
         $oldValues = $employee->toArray();
+        $oldPhotoPath = $employee->foto;
+        $data = $request->validated();
 
-        $employee->update($request->validated());
+        if ($request->hasFile('foto')) {
+            $data['foto'] = $files->storePhoto($request->file('foto'));
+        }
+
+        $employee->update($data);
         $employee->refresh();
+
+        if ($request->hasFile('foto')) {
+            $files->deletePublicFile($oldPhotoPath);
+        }
 
         AuditService::log('UPDATE', 'Employee', $employee->id, $oldValues, $employee->toArray(), $request);
 

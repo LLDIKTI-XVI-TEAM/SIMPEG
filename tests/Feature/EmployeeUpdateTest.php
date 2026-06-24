@@ -8,6 +8,8 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class EmployeeUpdateTest extends TestCase
@@ -79,6 +81,33 @@ class EmployeeUpdateTest extends TestCase
         $this->assertDatabaseHas('employees', [
             'id' => $employee->id,
             'nama_lengkap' => 'Diperbarui Super Admin',
+        ]);
+    }
+
+    public function test_admin_can_replace_employee_photo_upload(): void
+    {
+        Storage::fake('public');
+        Storage::disk('public')->put('photos/foto-lama.jpg', 'old-photo');
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create([
+            'foto' => 'photos/foto-lama.jpg',
+        ]);
+
+        $this->actingAs($user);
+        $response = $this->putWithCsrf($this->endpoint($employee), $this->validPayload($employee, [
+            'foto' => UploadedFile::fake()->image('foto-baru.png', 640, 640)->size(512),
+        ]));
+
+        $response->assertOk();
+        $photoPath = $response->json('employee.foto');
+        $this->assertIsString($photoPath);
+        $this->assertStringStartsWith('photos/', $photoPath);
+        $this->assertStringEndsWith('.png', $photoPath);
+        Storage::disk('public')->assertExists($photoPath);
+        Storage::disk('public')->assertMissing('photos/foto-lama.jpg');
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'foto' => $photoPath,
         ]);
     }
 
@@ -170,6 +199,12 @@ class EmployeeUpdateTest extends TestCase
     {
         return $this->withSession(['_token' => 'test-token'])
             ->putJson($uri, $data, ['X-CSRF-TOKEN' => 'test-token']);
+    }
+
+    private function putWithCsrf(string $uri, array $data)
+    {
+        return $this->withSession(['_token' => 'test-token'])
+            ->put($uri, $data, ['X-CSRF-TOKEN' => 'test-token', 'Accept' => 'application/json']);
     }
 
     private function validPayload(Employee $employee, array $overrides = []): array
