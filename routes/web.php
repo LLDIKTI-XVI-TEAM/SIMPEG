@@ -567,10 +567,10 @@ Route::middleware('keycloak.auth')->group(function (): void {
     Route::get('/pegawai', [PegawaiController::class, 'index'])->name('data-pegawai');
     Route::get('/pegawai/create', [PegawaiController::class, 'create'])->name('pegawai.create');
     Route::post('/pegawai', [PegawaiController::class, 'store'])->name('pegawai.store');
-    Route::get('/pegawai/{id}', [PegawaiController::class, 'show'])->name('pegawai.show');
-    Route::get('/pegawai/{id}/edit', [PegawaiController::class, 'edit'])->name('pegawai.edit');
-    Route::post('/pegawai/{id}', [PegawaiController::class, 'update'])->name('pegawai.update');
-    Route::post('/pegawai/{id}/delete', [PegawaiController::class, 'destroy'])->name('pegawai.destroy');
+    Route::get('/pegawai/{id}', [PegawaiController::class, 'show'])->whereUuid('id')->name('pegawai.show');
+    Route::get('/pegawai/{id}/edit', [PegawaiController::class, 'edit'])->whereUuid('id')->name('pegawai.edit');
+    Route::post('/pegawai/{id}', [PegawaiController::class, 'update'])->whereUuid('id')->name('pegawai.update');
+    Route::post('/pegawai/{id}/delete', [PegawaiController::class, 'destroy'])->whereUuid('id')->name('pegawai.destroy');
 
     Route::get('/pegawai/legacy', function () {
         return redirect()->route('data-pegawai');
@@ -646,96 +646,161 @@ Route::middleware('keycloak.auth')->group(function (): void {
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
 
     // ── Export Data Pegawai (.xlsx — PhpSpreadsheet) ─────────────────────────
-    Route::get('/pegawai/export', function () {
-        $pegawaiData = [
-            ['nama'=>'Ahmad Fauzi',                   'email'=>'ahmadfauzi@gmail.com',      'golongan'=>'III/c', 'jabatan'=>'Analis Kepegawaian',                  'kelas_jabatan'=>'8', 'nip'=>'19850312201001 1 001', 'telepon'=>'081234567890', 'pangkat'=>'Penata Tkt. I',  'pendidikan'=>'S1', 'tgl_lahir'=>'March 12, 1985',     'pensiun'=>'Abd Rahim Har',           'atasan'=>'Abd Rahim Har',           'person_familia'=>'Abd Rahim Har',           'prodi'=>'Manajemen',                  'jenis'=>'PNS'],
-            ['nama'=>'Siti Rahayu',                   'email'=>'sitirahayu@gmail.com',       'golongan'=>'II/d',  'jabatan'=>'Analis Ahli Madya',                       'kelas_jabatan'=>'8', 'nip'=>'19901120201501 2 003', 'telepon'=>'085298765432', 'pangkat'=>'Pemula Tkt. I', 'pendidikan'=>'S2', 'tgl_lahir'=>'November 20, 1990',  'pensiun'=>'Riza Hamzah',             'atasan'=>'Riza Hamzah',             'person_familia'=>'Riza Hamzah',             'prodi'=>'Administrasi Pemerintahan',  'jenis'=>'PNS'],
-            ['nama'=>'Sabrina Rossa Adriani Wibowo',  'email'=>'sabrinarossa24@gmail.com',   'golongan'=>'III/a', 'jabatan'=>'Analis SDM Aparatur Ahli Pertama',     'kelas_jabatan'=>'8', 'nip'=>'20261210820500 0 04',  'telepon'=>'081285066001', 'pangkat'=>'Pemula Tkt. I', 'pendidikan'=>'S1', 'tgl_lahir'=>'October 12, 1998',   'pensiun'=>'Sabrina Rossa',           'atasan'=>'Sabrina Rossa',           'person_familia'=>'Sabrina Rossa',           'prodi'=>'Informatika',                'jenis'=>'PNS'],
-            ['nama'=>'Cimma Sari Oktariani Di Silapu','email'=>'sikaemma@gmail.com',         'golongan'=>'III/c', 'jabatan'=>'Pranata SDM Terampil',                 'kelas_jabatan'=>'6', 'nip'=>'26110820520600 0 04',  'telepon'=>'081258206006', 'pangkat'=>'Pengatur DO',   'pendidikan'=>'S1', 'tgl_lahir'=>'October 28, 2001',   'pensiun'=>'Cimma Sari Oktariani Di', 'atasan'=>'Cimma Sari Oktariani Di', 'person_familia'=>'Cimma Sari Oktariani Di', 'prodi'=>'Manajemen Informatika',     'jenis'=>'PNS'],
-            ['nama'=>'Nurarningsih Dumbea, S.P.',     'email'=>'rainingdumbea47@gmail.com',  'golongan'=>'III/b', 'jabatan'=>'Pejabat Lelang Operational',             'kelas_jabatan'=>'7', 'nip'=>'19880123202 1 005',    'telepon'=>'082302200526', 'pangkat'=>'Penata Tkt. I', 'pendidikan'=>'S1', 'tgl_lahir'=>'January 23, 1988',   'pensiun'=>'Naning Dumbea',           'atasan'=>'Naning Dumbea',           'person_familia'=>'Faria Dana Puri',         'prodi'=>'Agribisnis',                 'jenis'=>'PPPK'],
-            ['nama'=>'Nadia Kusuma',                  'email'=>'nadiakusuma@gmail.com',      'golongan'=>'II/c',  'jabatan'=>'Pengelola Kepegawaian',                  'kelas_jabatan'=>'6', 'nip'=>'19950822202001 2 002', 'telepon'=>'081299887766', 'pangkat'=>'Pengatur',      'pendidikan'=>'S1', 'tgl_lahir'=>'August 22, 1995',    'pensiun'=>'Nadia Kusuma',            'atasan'=>'Nadia Kusuma',            'person_familia'=>'Nadia Kusuma',            'prodi'=>'Ilmu Pemerintahan',          'jenis'=>'PPPK'],
-            ['nama'=>'Yucna Dara, S.P., M.M.',       'email'=>'hanaryog101@gmail.com',      'golongan'=>'III/b', 'jabatan'=>'Analis Ahli Pertama',                    'kelas_jabatan'=>'8', 'nip'=>'19840120099 2 002',    'telepon'=>'081284920002', 'pangkat'=>'Penata Tkt. I', 'pendidikan'=>'S2', 'tgl_lahir'=>'January 20, 1984',   'pensiun'=>'Yucna Dara',              'atasan'=>'Ingat Gobel',             'person_familia'=>'Ingat Gobel',             'prodi'=>'Teknik Informatika',         'jenis'=>'PNS'],
-            ['nama'=>'Siraajuddin Laluv, OE., M.',   'email'=>'siraajuddinlaluv@gmail.com', 'golongan'=>'IV/a',  'jabatan'=>'Pengolah Data dan Informasi',            'kelas_jabatan'=>'7', 'nip'=>'19721231984 0 1062',   'telepon'=>'081238500',    'pangkat'=>'Pembina',       'pendidikan'=>'S1', 'tgl_lahir'=>'December 31, 1972',  'pensiun'=>'Siraajuddin Laluv',       'atasan'=>'Siraajuddin Laluv',       'person_familia'=>'Siraajuddin Laluv',       'prodi'=>'Manajemen',                  'jenis'=>'PNS'],
-        ];
+    Route::get('/pegawai/export', function (\Illuminate\Http\Request $request) {
+        $requestedNips = collect($request->input('nips', []))
+            ->filter(fn ($nip) => is_string($nip) && trim($nip) !== '')
+            ->map(fn (string $nip) => trim($nip))
+            ->unique()
+            ->values();
 
-        // Buat spreadsheet
+        $pegawaiData = \App\Models\Employee::query()
+            ->with('jenisPegawai:id,nama')
+            ->when(
+                $requestedNips->isNotEmpty(),
+                fn ($query) => $query->whereIn('nip', $requestedNips->all())
+            )
+            ->orderBy('nama_lengkap')
+            ->get();
+
+        if ($requestedNips->isNotEmpty()) {
+            $requestedOrder = $requestedNips->flip();
+            $pegawaiData = $pegawaiData
+                ->sortBy(fn (\App\Models\Employee $employee) => $requestedOrder[$employee->nip] ?? PHP_INT_MAX)
+                ->values();
+        }
+
         $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Data Pegawai');
+        $sheet->setShowGridlines(false);
 
-        // Definisi kolom: [huruf => [label, lebar]]
         $cols = [
-            'A' => ['No',                        5],
-            'B' => ['Nama Pegawai',              32],
-            'C' => ['Email Pegawai',             30],
+            'A' => ['No',                         5],
+            'B' => ['Nama Pegawai',              31],
+            'C' => ['Email Pegawai',             29],
             'D' => ['Golongan',                  12],
-            'E' => ['Jabatan',                   38],
-            'F' => ['Kelas Jabatan',             14],
-            'G' => ['NIP',                       24],
-            'H' => ['Nomor Telepon',             18],
-            'I' => ['Pangkat',                   20],
-            'J' => ['Pendidikan Terakhir',       20],
-            'K' => ['Pensiun',                   22],
-            'L' => ['Person',                    24],
-            'M' => ['Person Familia',            24],
+            'E' => ['Jabatan',                   34],
+            'F' => ['Kelas Jabatan',             15],
+            'G' => ['NIP',                       23],
+            'H' => ['Nomor Telepon',             19],
+            'I' => ['Pangkat',                   18],
+            'J' => ['Pendidikan Terakhir',       18],
+            'K' => ['Pensiun',                   20],
+            'L' => ['Person',                    22],
+            'M' => ['Person Formula',            22],
             'N' => ['Prodi Pendidikan Terakhir', 28],
             'O' => ['Status Kepegawaian',        20],
             'P' => ['Tanggal Lahir',             20],
         ];
 
-        // Isi header & set lebar kolom
         foreach ($cols as $col => [$label, $width]) {
             $sheet->getColumnDimension($col)->setWidth($width);
             $sheet->setCellValue($col . '1', $label);
         }
-        $sheet->getRowDimension(1)->setRowHeight(30);
+        $sheet->getRowDimension(1)->setRowHeight(32);
 
-        // Style header (biru #122E92, teks putih, bold, centered, border)
         $sheet->getStyle('A1:P1')->applyFromArray([
-            'font'      => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 11, 'name' => 'Calibri'],
-            'fill'      => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '122E92']],
-            'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER, 'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER, 'wrapText' => true],
-            'borders'   => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['rgb' => 'CACFE0']]],
+            'font' => [
+                'bold' => true,
+                'color' => ['rgb' => 'FFFFFF'],
+                'size' => 10,
+                'name' => 'Calibri',
+            ],
+            'fill' => [
+                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'startColor' => ['rgb' => '1F5A83'],
+            ],
+            'alignment' => [
+                'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER,
+                'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER,
+                'wrapText' => true,
+            ],
+            'borders' => [
+                'allBorders' => [
+                    'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                    'color' => ['rgb' => '69BFE3'],
+                ],
+            ],
         ]);
 
-        // Isi baris data
-        foreach ($pegawaiData as $i => $row) {
+        foreach ($pegawaiData as $i => $employee) {
             $r = $i + 2;
 
             $sheet->setCellValue('A'.$r, $i + 1);
-            $sheet->setCellValue('B'.$r, $row['nama']);
-            $sheet->setCellValue('C'.$r, $row['email']);
-            $sheet->setCellValue('D'.$r, $row['golongan']);
-            $sheet->setCellValue('E'.$r, $row['jabatan']);
-            $sheet->setCellValue('F'.$r, $row['kelas_jabatan']);
-            $sheet->setCellValueExplicit('G'.$r, $row['nip'],     \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-            $sheet->setCellValueExplicit('H'.$r, $row['telepon'], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-            $sheet->setCellValue('I'.$r, $row['pangkat']);
-            $sheet->setCellValue('J'.$r, $row['pendidikan']);
-            $sheet->setCellValue('K'.$r, $row['pensiun']);
-            $sheet->setCellValue('L'.$r, $row['atasan']);
-            $sheet->setCellValue('M'.$r, $row['person_familia']);
-            $sheet->setCellValue('N'.$r, $row['prodi']);
-            $sheet->setCellValue('O'.$r, $row['jenis']);
-            $sheet->setCellValue('P'.$r, $row['tgl_lahir']);
+            $sheet->setCellValue('B'.$r, $employee->nama_lengkap);
+            $sheet->setCellValue('C'.$r, $employee->email ?? '');
+            $sheet->setCellValue('D'.$r, $employee->golongan_terakhir ?? '');
+            $sheet->setCellValue('E'.$r, $employee->jabatan_terakhir ?? '');
+            $sheet->setCellValue('F'.$r, $employee->kelas_jabatan ?? '');
+            $sheet->setCellValueExplicit('G'.$r, $employee->nip, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit('H'.$r, $employee->no_hp ?? '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            $sheet->setCellValue('I'.$r, $employee->pangkat_terakhir ?? '');
+            $sheet->setCellValue('J'.$r, $employee->pendidikan_terakhir ?? '');
 
-            $sheet->getRowDimension($r)->setRowHeight(18);
+            if ($employee->tanggal_pensiun !== null) {
+                $sheet->setCellValue('K'.$r, \PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel($employee->tanggal_pensiun));
+            }
 
-            // Alternating stripe: putih / biru muda
-            $bg = ($i % 2 === 0) ? 'FFFFFF' : 'EEF2FF';
+            // Field Person dari file sumber belum disimpan terpisah di database.
+            // Nama lengkap dipakai sebagai fallback agar struktur export tetap konsisten.
+            $sheet->setCellValue('L'.$r, $employee->nama_lengkap);
+            $sheet->setCellValue('M'.$r, $employee->nama_lengkap);
+            $sheet->setCellValue('N'.$r, $employee->prodi_pendidikan_terakhir ?? '');
+            $sheet->setCellValue('O'.$r, $employee->jenisPegawai?->nama ?? '');
+
+            if ($employee->tanggal_lahir !== null) {
+                $sheet->setCellValue('P'.$r, \PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel($employee->tanggal_lahir));
+            }
+
+            $sheet->getRowDimension($r)->setRowHeight(21);
             $sheet->getStyle('A'.$r.':P'.$r)->applyFromArray([
-                'font'      => ['size' => 10, 'name' => 'Calibri'],
-                'fill'      => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => $bg]],
-                'alignment' => ['vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER],
-                'borders'   => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['rgb' => 'CACFE0']]],
+                'font' => ['size' => 10, 'name' => 'Calibri', 'color' => ['rgb' => '111827']],
+                'fill' => [
+                    'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'D9F2FB'],
+                ],
+                'alignment' => [
+                    'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER,
+                    'wrapText' => false,
+                ],
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                        'color' => ['rgb' => '69BFE3'],
+                    ],
+                ],
             ]);
         }
 
-        // Freeze header row & auto-filter
-        $sheet->freezePane('A2');
-        $sheet->setAutoFilter('A1:P' . (count($pegawaiData) + 1));
+        $lastRow = $pegawaiData->count() + 1;
 
-        // Download
+        if ($pegawaiData->isNotEmpty()) {
+            $sheet->getStyle('A2:A'.$lastRow)->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('D2:D'.$lastRow)->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('F2:K'.$lastRow)->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('O2:P'.$lastRow)->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('K2:K'.$lastRow)->getNumberFormat()->setFormatCode('mmmm d, yyyy');
+            $sheet->getStyle('P2:P'.$lastRow)->getNumberFormat()->setFormatCode('mmmm d, yyyy');
+        }
+
+        $sheet->freezePane('A2');
+        $sheet->setAutoFilter('A1:P'.$lastRow);
+        $sheet->getPageSetup()
+            ->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE)
+            ->setPaperSize(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::PAPERSIZE_A4)
+            ->setFitToWidth(1)
+            ->setFitToHeight(0);
+        $sheet->getPageMargins()
+            ->setTop(0.3)
+            ->setRight(0.25)
+            ->setBottom(0.3)
+            ->setLeft(0.25);
+        $sheet->getPageSetup()->setRowsToRepeatAtTopByStartAndEnd(1, 1);
+
         $filename = 'Data_Pegawai_SIMPEG_' . now()->format('Ymd') . '.xlsx';
 
         return response()->streamDownload(function () use ($spreadsheet) {

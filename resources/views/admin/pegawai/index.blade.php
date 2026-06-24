@@ -160,7 +160,7 @@
                 </thead>
                 <tbody class="divide-y divide-border">
                     @foreach($pegawaiData as $p)
-                    <tr class="transition-colors hover:bg-soft/50" data-nama="{{ $p->nama_lengkap }}" data-nip="{{ $p->nip }}" data-unit="{{ $p->jabatan_terakhir ?? '-' }}" data-jenis="{{ $p->jenisPegawai->nama_jenis ?? '-' }}" data-status="{{ strtolower($p->status_aktif) }}" data-golongan="{{ $p->golongan_terakhir ?? '-' }}">
+                    <tr class="transition-colors hover:bg-soft/50" data-nama="{{ $p->nama_lengkap }}" data-nip="{{ $p->nip }}" data-unit="{{ $p->jabatan_terakhir ?? '-' }}" data-jenis="{{ $p->jenisPegawai->nama ?? '-' }}" data-status="{{ strtolower($p->status_aktif) }}" data-golongan="{{ $p->golongan_terakhir ?? '-' }}">
                         <td class="px-4 py-3.5">
                             <input type="checkbox" class="row-check h-4 w-4 rounded border-border text-primary focus:ring-primary/20">
                         </td>
@@ -181,7 +181,7 @@
                         </td>
                         <td class="px-4 py-3.5">
                             <p class="text-sm font-bold text-ink leading-tight">{{ $p->golongan_terakhir ?? '-' }}</p>
-                            <p class="text-xs font-bold text-primary mt-0.5 leading-tight">{{ $p->jenisPegawai->nama_jenis ?? '-' }}</p>
+                            <p class="text-xs font-bold text-primary mt-0.5 leading-tight">{{ $p->jenisPegawai->nama ?? '-' }}</p>
                         </td>
                         <td class="px-4 py-3.5">
                             <p class="text-sm text-ink font-mono">-</p>
@@ -401,40 +401,20 @@
         updateBulk();
     }
 
-    // Client-side CSV/Excel export based on visible filtered data
+    // Export baris yang sedang terlihat melalui generator XLSX di backend.
     function exportFilteredData() {
-        const rows = document.querySelectorAll('tbody tr');
-        let csvContent = "data:text/csv;charset=utf-8,";
-        
-        // Header
-        csvContent += "No,Nama,NIP,Jabatan,Unit Kerja,Golongan,Jenis Pegawai,Status\n";
-        
-        let count = 1;
-        rows.forEach(row => {
-            if (row.style.display !== 'none' && row.getAttribute('data-nama')) {
-                const nama = row.getAttribute('data-nama');
-                const nip = row.getAttribute('data-nip');
-                const unit = row.getAttribute('data-unit');
-                const jenis = row.getAttribute('data-jenis');
-                const status = row.getAttribute('data-status');
-                const golongan = row.getAttribute('data-golongan');
-                
-                // Cari jabatan dari kolom
-                const jabatanEl = row.querySelector('td:nth-child(3) p:first-child');
-                const jabatan = jabatanEl ? jabatanEl.textContent.trim() : '';
+        const visibleNips = Array.from(document.querySelectorAll('tbody tr'))
+            .filter(row => row.style.display !== 'none' && row.dataset.nip)
+            .map(row => row.dataset.nip);
 
-                csvContent += `"${count}","${nama}","${nip}","${jabatan}","${unit}","${golongan}","${jenis}","${status}"\n`;
-                count++;
-            }
-        });
+        if (visibleNips.length === 0) {
+            window.alert('Tidak ada data pegawai yang dapat diekspor.');
+            return;
+        }
 
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `Data_Pegawai_Filtered_${new Date().toISOString().slice(0,10)}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const exportUrl = new URL(@json(route('pegawai.export')), window.location.origin);
+        visibleNips.forEach(nip => exportUrl.searchParams.append('nips[]', nip));
+        window.location.href = exportUrl.toString();
     }
 
     // Sorting functionality
