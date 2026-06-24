@@ -105,6 +105,32 @@ class EmployeeDetailTest extends TestCase
         $response->assertJsonMissingPath('employee.role');
     }
 
+    public function test_discipline_records_are_loaded_from_dedicated_endpoint_not_general_employee_detail(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+
+        DisciplineRecord::create([
+            'employee_id' => $employee->id,
+            'jenis_hukuman' => 'Ringan',
+            'deskripsi' => 'Teguran tertulis',
+            'tanggal_mulai' => '2026-04-01',
+            'no_sk' => 'SK-DIS-CONTRACT',
+            'tanggal_sk' => '2026-04-10',
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($user);
+
+        $this->getJson("/api/v1/pegawai/{$employee->id}")
+            ->assertOk()
+            ->assertJsonMissingPath('employee.discipline_records');
+
+        $this->getJson("/api/v1/pegawai/{$employee->id}/disiplin")
+            ->assertOk()
+            ->assertJsonPath('records.0.no_sk', 'SK-DIS-CONTRACT');
+    }
+
     public function test_pegawai_cannot_view_employee_detail(): void
     {
         $user = User::factory()->pegawai()->create();

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\SkFilePathRules;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -25,7 +26,7 @@ class StoreDisciplineRecordRequest extends FormRequest
             'tanggal_berakhir' => ['nullable', 'date', 'after_or_equal:tanggal_mulai'],
             'no_sk' => ['required', 'string', 'max:100'],
             'tanggal_sk' => ['required', 'date'],
-            'file_sk' => ['nullable', 'string', 'max:255', 'regex:/^sk\/[A-Za-z0-9][A-Za-z0-9._-]*\.pdf$/'],
+            'file_sk' => SkFilePathRules::nullableUploadOrControlledPath(),
         ];
     }
 }

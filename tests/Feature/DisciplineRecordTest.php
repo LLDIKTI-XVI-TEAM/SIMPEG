@@ -10,8 +10,10 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class DisciplineRecordTest extends TestCase
@@ -107,6 +109,43 @@ class DisciplineRecordTest extends TestCase
         ]))->assertCreated();
     }
 
+    public function test_admin_can_create_discipline_record_with_sk_upload(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+
+        $this->actingAs($user);
+        $response = $this->postWithCsrf("/api/v1/pegawai/{$employee->id}/disiplin", $this->validPayload([
+            'file_sk' => UploadedFile::fake()->create('sk-valid.pdf', 512, 'application/pdf'),
+        ]));
+
+        $response->assertCreated();
+        $skPath = $response->json('record.file_sk');
+        $this->assertIsString($skPath);
+        $this->assertStringStartsWith('sk/', $skPath);
+        $this->assertStringEndsWith('.pdf', $skPath);
+        Storage::disk('public')->assertExists($skPath);
+        $this->assertDatabaseHas('discipline_records', [
+            'employee_id' => $employee->id,
+            'file_sk' => $skPath,
+        ]);
+    }
+
+    public function test_sk_upload_rejects_disallowed_extension_even_when_content_is_pdf(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+
+        $this->actingAs($user);
+        $response = $this->postWithCsrf("/api/v1/pegawai/{$employee->id}/disiplin", $this->validPayload([
+            'file_sk' => UploadedFile::fake()->create('sk-invalid.txt', 512, 'application/pdf'),
+        ]));
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['file_sk']);
+    }
+
     public function test_active_status_is_computed_for_future_today_and_past_end_dates(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -189,6 +228,12 @@ class DisciplineRecordTest extends TestCase
     {
         return $this->withSession(['_token' => 'test-token'])
             ->postJson($uri, $data, ['X-CSRF-TOKEN' => 'test-token']);
+    }
+
+    private function postWithCsrf(string $uri, array $data)
+    {
+        return $this->withSession(['_token' => 'test-token'])
+            ->post($uri, $data, ['X-CSRF-TOKEN' => 'test-token', 'Accept' => 'application/json']);
     }
 
     private function validPayload(array $overrides = []): array
