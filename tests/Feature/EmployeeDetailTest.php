@@ -98,14 +98,14 @@ class EmployeeDetailTest extends TestCase
         $response->assertJsonPath('employee.position_histories.0.eselon.id', $eselon->id);
         $response->assertJsonPath('employee.position_histories.0.unit_kerja.id', $unitKerja->id);
         $response->assertJsonPath('employee.salary_histories.0.no_sk', 'SK-KGB-NEW');
-        $response->assertJsonMissingPath('employee.discipline_records');
+        $response->assertJsonPath('employee.discipline_records.0.no_sk', 'SK-DIS-NEW');
         $response->assertJsonMissingPath('employee.nik');
         $response->assertJsonMissingPath('employee.no_kk');
         $response->assertJsonMissingPath('employee.keycloak_id');
         $response->assertJsonMissingPath('employee.role');
     }
 
-    public function test_discipline_records_are_loaded_from_dedicated_endpoint_not_general_employee_detail(): void
+    public function test_discipline_records_are_loaded_in_general_detail_and_dedicated_endpoint(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create();
@@ -124,7 +124,7 @@ class EmployeeDetailTest extends TestCase
 
         $this->getJson("/api/v1/pegawai/{$employee->id}")
             ->assertOk()
-            ->assertJsonMissingPath('employee.discipline_records');
+            ->assertJsonPath('employee.discipline_records.0.no_sk', 'SK-DIS-CONTRACT');
 
         $this->getJson("/api/v1/pegawai/{$employee->id}/disiplin")
             ->assertOk()
