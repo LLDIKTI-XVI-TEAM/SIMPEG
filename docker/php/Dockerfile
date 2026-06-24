@@ -26,6 +26,10 @@ RUN apt-get update && apt-get install -y \
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
+# Custom PHP settings
+RUN echo "upload_max_filesize = 100M" > /usr/local/etc/php/conf.d/uploads.ini \
+    && echo "post_max_size = 100M" >> /usr/local/etc/php/conf.d/uploads.ini
+
 # Buat storage & cache directories writable untuk rootless Podman
 RUN mkdir -p /var/www/html/storage/logs \
     /var/www/html/storage/framework/cache \

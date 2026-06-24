@@ -162,6 +162,11 @@ class Employee extends Model
         return $this->hasMany(SimpegNotification::class, 'user_id');
     }
 
+    public function appointment(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Appointment::class);
+    }
+
     // --- Helpers ---
 
     public function latestRank(): ?RankHistory

@@ -66,6 +66,69 @@
             skFileName: '',
             skFileSize: '',
             skFileError: '',
+            validateUtama() {
+                const requiredIds = ['nama_lengkap', 'nip', 'jenis_pegawai_id', 'tanggal_lahir', 'pangkat_terakhir', 'jabatan_terakhir', 'kelas_jabatan', 'pendidikan_terakhir', 'prodi_pendidikan_terakhir'];
+                for (let id of requiredIds) {
+                    const el = document.getElementById(id);
+                    if (el && !el.value.trim()) {
+                        el.setCustomValidity('Mohon lengkapi isian kolom ini terlebih dahulu.');
+                        el.reportValidity();
+                        return false;
+                    } else if (el) {
+                        el.setCustomValidity('');
+                    }
+                }
+
+                const elNip = document.getElementById('nip');
+                if (elNip && elNip.value.trim().length !== 18) {
+                    elNip.setCustomValidity('NIP harus tepat 18 digit.');
+                    elNip.reportValidity();
+                    return false;
+                } else if (elNip) {
+                    elNip.setCustomValidity('');
+                }
+                return true;
+            },
+            validateKontak() {
+                const requiredIds = ['no_hp', 'alamat'];
+                for (let id of requiredIds) {
+                    const el = document.getElementById(id);
+                    if (el && !el.value.trim()) {
+                        el.setCustomValidity('Mohon lengkapi isian kolom ini terlebih dahulu.');
+                        el.reportValidity();
+                        return false;
+                    } else if (el) {
+                        el.setCustomValidity('');
+                    }
+                }
+                return true;
+            },
+            validatePelengkap() {
+                const elNik = document.getElementById('nik');
+                if (this.nik.length < 16) {
+                    this.nikError = 'NIK harus tepat 16 digit sebelum melanjutkan';
+                    if (elNik) {
+                        elNik.setCustomValidity('Mohon lengkapi NIK dengan tepat 16 digit.');
+                        elNik.reportValidity();
+                    }
+                    return false;
+                } else if (elNik) {
+                    elNik.setCustomValidity('');
+                }
+
+                const elKk = document.getElementById('no_kk');
+                if (this.kk.length > 0 && this.kk.length < 16) {
+                    this.kkError = 'Nomor KK harus tepat 16 digit sebelum melanjutkan';
+                    if (elKk) {
+                        elKk.setCustomValidity('Mohon lengkapi Nomor KK dengan tepat 16 digit.');
+                        elKk.reportValidity();
+                    }
+                    return false;
+                } else if (elKk) {
+                    elKk.setCustomValidity('');
+                }
+                return true;
+            },
             validateNik() {
                 this.nik = this.nik.replace(/\D/g, '');
                 if (this.nik.length > 0 && this.nik.length < 16) {
@@ -123,14 +186,18 @@
             
             {{-- Tab Bar Navigasi --}}
             <div class="border-b border-border flex flex-wrap gap-4 md:gap-6 mb-6">
-                <button type="button" @click="activeTab = 'utama'"
+                <button type="button" @click="
+                    if (activeTab === 'pelengkap' && !validatePelengkap()) return;
+                    if (activeTab === 'kontak' && !validateKontak()) return;
+                    activeTab = 'utama';
+                "
                         :class="activeTab === 'utama' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'"
                         class="text-sm transition-colors cursor-pointer focus:outline-none font-sans">
                     1. Data Utama
                 </button>
                 <button type="button" @click="
-                    if (nik.length < 16) { nikError = 'NIK harus tepat 16 digit sebelum berpindah tab'; return; }
-                    if (kk.length > 0 && kk.length < 16) { kkError = 'Nomor KK harus tepat 16 digit sebelum berpindah tab'; return; }
+                    if (activeTab === 'utama' && !validateUtama()) return;
+                    if (activeTab === 'kontak' && !validateKontak()) return;
                     activeTab = 'pelengkap';
                 "
                         :class="activeTab === 'pelengkap' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'"
@@ -138,8 +205,8 @@
                     2. Data Pelengkap
                 </button>
                 <button type="button" @click="
-                    if (nik.length < 16) { nikError = 'NIK harus tepat 16 digit sebelum berpindah tab'; return; }
-                    if (kk.length > 0 && kk.length < 16) { kkError = 'Nomor KK harus tepat 16 digit sebelum berpindah tab'; return; }
+                    if (activeTab === 'utama' && !validateUtama()) return;
+                    if (activeTab === 'pelengkap' && !validatePelengkap()) return;
                     activeTab = 'kontak';
                 "
                         :class="activeTab === 'kontak' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'"
@@ -147,8 +214,9 @@
                     3. Data Kontak
                 </button>
                 <button type="button" @click="
-                    if (nik.length < 16) { nikError = 'NIK harus tepat 16 digit sebelum berpindah tab'; return; }
-                    if (kk.length > 0 && kk.length < 16) { kkError = 'Nomor KK harus tepat 16 digit sebelum berpindah tab'; return; }
+                    if (activeTab === 'utama' && !validateUtama()) return;
+                    if (activeTab === 'pelengkap' && !validatePelengkap()) return;
+                    if (activeTab === 'kontak' && !validateKontak()) return;
                     activeTab = 'pengangkatan';
                 "
                         :class="activeTab === 'pengangkatan' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'"
@@ -172,14 +240,14 @@
                         {{-- NIP --}}
                         <div class="space-y-1">
                             <label for="nip" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">NIP <span class="text-danger">*</span></label>
-                            <input id="nip" name="nip" type="text" required placeholder="19850312201001 1 001" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <input id="nip" name="nip" type="text" oninput="this.value = this.value.replace(/[^0-9]/g, '')" required placeholder="198503122010011001" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                         </div>
 
                         {{-- Status Kepegawaian (Jenis) --}}
                         <div class="space-y-1">
                             <label for="jenis_pegawai_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Status Kepegawaian <span class="text-danger">*</span></label>
                             <div class="relative">
-                                <select id="jenis_pegawai_id" name="jenis_pegawai_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                <select id="jenis_pegawai_id" name="jenis_pegawai_id" required class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
                                     <option value="" disabled selected>Pilih Status Kepegawaian</option>
                                     @foreach($jenisPegawai as $jenis)
                                         <option value="{{ $jenis->id }}">{{ $jenis->nama }}</option>
@@ -196,36 +264,29 @@
                         {{-- Tanggal Lahir --}}
                         <div class="space-y-1">
                             <label for="tanggal_lahir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Lahir <span class="text-danger">*</span></label>
-                            <input id="tanggal_lahir" name="tanggal_lahir" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                            <input id="tanggal_lahir" name="tanggal_lahir" type="date" required max="{{ date('Y-m-d') }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
                         </div>
 
                         {{-- Golongan --}}
-                        <div class="space-y-1">
+                        <div class="space-y-1" x-data="{ open: false, selected: 'I/a' }">
                             <label for="golongan_terakhir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Golongan <span class="text-danger">*</span></label>
                             <div class="relative">
-                                <select id="golongan_terakhir" name="golongan_terakhir" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="I/a">I/a</option>
-                                    <option value="I/b">I/b</option>
-                                    <option value="I/c">I/c</option>
-                                    <option value="I/d">I/d</option>
-                                    <option value="II/a">II/a</option>
-                                    <option value="II/b">II/b</option>
-                                    <option value="II/c">II/c</option>
-                                    <option value="II/d">II/d</option>
-                                    <option value="III/a">III/a</option>
-                                    <option value="III/b">III/b</option>
-                                    <option value="III/c">III/c</option>
-                                    <option value="III/d">III/d</option>
-                                    <option value="IV/a">IV/a</option>
-                                    <option value="IV/b">IV/b</option>
-                                    <option value="IV/c">IV/c</option>
-                                    <option value="IV/d">IV/d</option>
-                                    <option value="IV/e">IV/e</option>
-                                </select>
+                                <input type="hidden" name="golongan_terakhir" :value="selected">
+                                <button type="button" @click="open = !open" @click.away="open = false" class="w-full text-left appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <span x-text="selected"></span>
+                                </button>
                                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
                                     </svg>
+                                </div>
+
+                                <div x-show="open" x-transition.opacity style="display: none;" class="absolute z-50 w-full mt-1 bg-surface border border-border rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                                    @foreach(['I/a','I/b','I/c','I/d','II/a','II/b','II/c','II/d','III/a','III/b','III/c','III/d','IV/a','IV/b','IV/c','IV/d','IV/e'] as $gol)
+                                    <div @click="selected = '{{ $gol }}'; open = false" class="px-4 py-2 text-sm text-ink cursor-pointer hover:bg-soft transition-colors" :class="selected === '{{ $gol }}' ? 'bg-primary/10 text-primary font-bold' : ''">
+                                        {{ $gol }}
+                                    </div>
+                                    @endforeach
                                 </div>
                             </div>
                         </div>
@@ -252,7 +313,7 @@
                         <div class="space-y-1">
                             <label for="pendidikan_terakhir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Pendidikan Terakhir <span class="text-danger">*</span></label>
                             <div class="relative">
-                                <select id="pendidikan_terakhir" name="pendidikan_terakhir" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                <select id="pendidikan_terakhir" name="pendidikan_terakhir" required class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
                                     <option value="Diploma III (D3)">Diploma III (D3)</option>
                                     <option value="Sarjana (S1)">Sarjana (S1)</option>
                                     <option value="Magister (S2)">Magister (S2)</option>
@@ -277,7 +338,7 @@
 
                         {{-- Tanggal Pensiun (Optional) --}}
                         <div class="space-y-1">
-                            <label for="tanggal_pensiun" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Pensiun <span class="text-muted">(opsional)</span></label>
+                            <label for="tanggal_pensiun" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Pensiun <span class="text-[10px] font-normal normal-case text-muted tracking-normal">(opsional)</span></label>
                             <input id="tanggal_pensiun" name="tanggal_pensiun" type="date" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
                         </div>
                     </div>
@@ -435,7 +496,7 @@
                         <div class="space-y-1">
                             <label for="jenis_pengangkatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Pengangkatan <span class="text-danger">*</span></label>
                             <div class="relative">
-                                <select id="jenis_pengangkatan" name="jenis_pengangkatan" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                <select id="jenis_pengangkatan" name="jenis_pengangkatan" required class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
                                     <option value="" disabled selected>Pilih Jenis Pengangkatan</option>
                                     <option value="CPNS">CPNS</option>
                                     <option value="PNS">PNS</option>
@@ -513,18 +574,13 @@
                                 x-show="activeTab !== 'pengangkatan'" 
                                 @click="
                                     if (activeTab === 'utama') {
+                                        if (!validateUtama()) return;
                                         activeTab = 'pelengkap';
                                     } else if (activeTab === 'pelengkap') {
-                                        if (nik.length < 16) {
-                                            nikError = 'NIK harus tepat 16 digit sebelum melanjutkan';
-                                            return;
-                                        }
-                                        if (kk.length > 0 && kk.length < 16) {
-                                            kkError = 'Nomor KK harus tepat 16 digit sebelum melanjutkan';
-                                            return;
-                                        }
+                                        if (!validatePelengkap()) return;
                                         activeTab = 'kontak';
                                     } else if (activeTab === 'kontak') {
+                                        if (!validateKontak()) return;
                                         activeTab = 'pengangkatan';
                                     }
                                 " 
@@ -545,4 +601,25 @@
             </form>
         </div>
     </div>
+
+    @push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const requiredElements = document.querySelectorAll('input[required], select[required], textarea[required]');
+            requiredElements.forEach(el => {
+                el.addEventListener('invalid', function(e) {
+                    if (e.target.validity.valueMissing) {
+                        e.target.setCustomValidity('Mohon lengkapi isian kolom ini terlebih dahulu.');
+                    }
+                });
+                el.addEventListener('input', function(e) {
+                    e.target.setCustomValidity('');
+                });
+                el.addEventListener('change', function(e) {
+                    e.target.setCustomValidity('');
+                });
+            });
+        });
+    </script>
+    @endpush
 </x-layouts.app>

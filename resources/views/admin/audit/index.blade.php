@@ -337,8 +337,8 @@
                                 <td class="px-4 py-3.5 text-xs font-mono text-ink" x-text="log.timestamp"></td>
                                 <td class="px-4 py-3.5 text-sm font-semibold text-ink font-sans" x-text="log.operator"></td>
                                 <td class="px-4 py-3.5">
-                                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold font-sans"
-                                        :class="log.event === 'CREATE' || log.event === 'IMPORT' || log.event === 'APPROVE' || log.event === 'RESTORE' ? 'bg-success/10 text-success' : (log.event === 'LOGIN' ? 'bg-primary/10 text-primary' : (log.event === 'SOFT_DELETE' || log.event === 'LOGOUT' ? 'bg-danger/10 text-danger' : 'bg-warning/10 text-warning'))"
+                                    <span class="inline-flex items-center gap-1.5 text-xs font-semibold font-sans"
+                                        :class="log.event === 'CREATE' || log.event === 'IMPORT' || log.event === 'APPROVE' || log.event === 'RESTORE' ? 'text-success' : (log.event === 'LOGIN' ? 'text-primary' : (log.event === 'SOFT_DELETE' || log.event === 'LOGOUT' ? 'text-danger' : 'text-warning'))"
                                     >
                                         <span class="h-1.5 w-1.5 rounded-full"
                                             :class="log.event === 'CREATE' || log.event === 'IMPORT' || log.event === 'APPROVE' || log.event === 'RESTORE' ? 'bg-success' : (log.event === 'LOGIN' ? 'bg-primary' : (log.event === 'SOFT_DELETE' || log.event === 'LOGOUT' ? 'bg-danger' : 'bg-warning'))"

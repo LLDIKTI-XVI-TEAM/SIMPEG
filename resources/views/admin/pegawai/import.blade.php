@@ -242,7 +242,7 @@
                             fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
                         </svg>
-                        <span class="text-xs font-sans" :class="activeTemplate === 'utama' ? 'font-bold text-primary' : 'font-semibold text-ink'">Template Utama</span>
+                        <span class="text-xs font-sans font-normal" :class="activeTemplate === 'utama' ? 'text-primary' : 'text-ink'">Template Utama</span>
                         <span class="text-[9px] text-muted font-sans mt-0.5">(NIP, Gol, Jabatan, dll.)</span>
                     </button>
                     <button type="button" @click="activeTemplate = 'pelengkap'; downloadTemplate('pelengkap')"
@@ -253,7 +253,7 @@
                             fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Zm6-10.125a1.875 1.875 0 1 1-3.75 0 1.875 1.875 0 0 1 3.75 0Zm-1.2 6.477a6 6 0 0 0-3.75 0A.45.45 0 0 0 5.25 16.2c0 1.156.986 2.067 2.13 1.9c1.077-.156 2.155-.156 3.232 0 1.144.167 2.13-.744 2.13-1.9a.45.45 0 0 0-.27-.423Z" />
                         </svg>
-                        <span class="text-xs font-sans" :class="activeTemplate === 'pelengkap' ? 'font-bold text-primary' : 'font-semibold text-ink'">Data Pelengkap</span>
+                        <span class="text-xs font-sans font-normal" :class="activeTemplate === 'pelengkap' ? 'text-primary' : 'text-ink'">Data Pelengkap</span>
                         <span class="text-[9px] text-muted font-sans mt-0.5">(NIK, KK, TTL, dll.)</span>
                     </button>
                     <button type="button" @click="activeTemplate = 'kepangkatan'; downloadTemplate('kepangkatan')"
@@ -264,7 +264,7 @@
                             fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296 3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043 3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12Z" />
                         </svg>
-                        <span class="text-xs font-sans" :class="activeTemplate === 'kepangkatan' ? 'font-bold text-primary' : 'font-semibold text-ink'">Riwayat Pangkat</span>
+                        <span class="text-xs font-sans font-normal" :class="activeTemplate === 'kepangkatan' ? 'text-primary' : 'text-ink'">Riwayat Pangkat</span>
                         <span class="text-[9px] text-muted font-sans mt-0.5">(Append-only pangkat)</span>
                     </button>
                     <button type="button" @click="activeTemplate = 'jabatan'; downloadTemplate('jabatan')"
@@ -275,7 +275,7 @@
                             fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 .621-.504 1.125-1.125 1.125H4.875c-.621 0-1.125-.504-1.125-1.125v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387m4.5 8.006c-.194.165-.453.258-.75.258H4.875c-.297 0-.556-.093-.75-.258m16.5 0a2.18 2.18 0 0 1-.75 1.661v-4.25c0-.18-.02-.36-.06-.532m-16.5 4.88c-.19-.164-.324-.403-.324-.672v-4.25c0-.18.02-.36.06-.532m0 0a2.18 2.18 0 0 1 .75-1.661V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 0 1 3.413-.387m0 0V4.875c0-.621.504-1.125 1.125-1.125h4.125c.621 0 1.125.504 1.125 1.125v1.278m-5.25 0h5.25" />
                         </svg>
-                        <span class="text-xs font-sans" :class="activeTemplate === 'jabatan' ? 'font-bold text-primary' : 'font-semibold text-ink'">Riwayat Jabatan</span>
+                        <span class="text-xs font-sans font-normal" :class="activeTemplate === 'jabatan' ? 'text-primary' : 'text-ink'">Riwayat Jabatan</span>
                         <span class="text-[9px] text-muted font-sans mt-0.5">(Append-only jabatan)</span>
                     </button>
                     <button type="button" @click="activeTemplate = 'kgb'; downloadTemplate('kgb')"
@@ -287,7 +287,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5h16.5c.621 0 1.125.504 1.125 1.125v12.75c0 .621-.504 1.125-1.125 1.125H3.75c-.621 0-1.125-.504-1.125-1.125V5.625c0-.621.504-1.125 1.125-1.125Z" />
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 12.75a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0ZM19.5 12a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z" />
                         </svg>
-                        <span class="text-xs font-sans" :class="activeTemplate === 'kgb' ? 'font-bold text-primary' : 'font-semibold text-ink'">Riwayat KGB</span>
+                        <span class="text-xs font-sans font-normal" :class="activeTemplate === 'kgb' ? 'text-primary' : 'text-ink'">Riwayat KGB</span>
                         <span class="text-[9px] text-muted font-sans mt-0.5">(Append-only KGB)</span>
                     </button>
                 </div>
@@ -489,7 +489,7 @@
                                     <td class="px-4 py-2.5 font-semibold text-ink" x-text="item.name"></td>
                                     <td class="px-4 py-2.5 font-mono text-muted" x-text="item.col || '-'"></td>
                                     <td class="px-4 py-2.5">
-                                        <span :class="item.status === 'valid' ? 'bg-success/10 text-success' : (item.status === 'skip' ? 'bg-primary/10 text-primary' : 'bg-danger/10 text-danger')" class="inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider font-sans">
+                                        <span :class="item.status === 'valid' ? 'text-success' : (item.status === 'skip' ? 'text-primary' : 'text-danger')" class="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider font-sans">
                                             <span x-text="item.status"></span>
                                         </span>
                                     </td>

@@ -159,7 +159,7 @@ class KeycloakAuthController extends Controller
 
         AuditService::logAs($user->id, $user->name, 'LOGIN', 'User', $user->id, null, null, request());
 
-        return redirect()->intended(route('dashboard'));
+        return redirect()->intended(route('dashboard'))->with('login_success', 'Selamat Datang! Anda berhasil masuk ke dalam sistem.');
     }
 
     private function employeeMatchField(): ?string

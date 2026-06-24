@@ -1,44 +1,134 @@
 <x-layouts.app title="Edit Pegawai">
-    @php
-        $formattedTglLahir = isset($p['tanggal_lahir']) ? \Carbon\Carbon::parse($p['tanggal_lahir'])->format('Y-m-d') : '';
-        $formattedTmt = isset($p['tmt']) ? \Carbon\Carbon::parse($p['tmt'])->format('Y-m-d') : '';
-        $formattedTglSk = isset($p['tanggal_sk']) ? \Carbon\Carbon::parse($p['tanggal_sk'])->format('Y-m-d') : '';
-        $formattedTglPensiun = isset($p['tanggal_pensiun']) ? \Carbon\Carbon::parse($p['tanggal_pensiun'])->format('Y-m-d') : '';
-        if (empty($formattedTglPensiun) && isset($p['tanggal_lahir'])) {
-            // Default BUP kalkulasi
-            $bup = 58;
-            if (isset($p['jabatan']) && (str_contains(strtolower($p['jabatan']), 'madya') || str_contains(strtolower($p['jabatan']), 'utama') || str_contains(strtolower($p['jabatan']), 'pimpinan tinggi'))) {
-                $bup = 60;
-            }
-            $formattedTglPensiun = \Carbon\Carbon::parse($p['tanggal_lahir'])->addYears($bup)->format('Y-m-d');
-        }
-    @endphp
-
     <div class="mx-auto max-w-4xl space-y-6">
         
         {{-- Breadcrumbs & Title --}}
         <div class="flex flex-col gap-1.5">
-            <h2 class="text-2xl font-bold text-ink font-sans">Edit Data Pegawai</h2>
+            <h2 class="text-2xl font-bold text-ink font-sans">Edit Pegawai Baru</h2>
             <nav class="flex items-center gap-1.5 text-xs text-muted">
                 <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
                 <span>/</span>
                 <a href="{{ route('data-pegawai') }}" class="transition-colors hover:text-ink">Data Pegawai</a>
                 <span>/</span>
-                <span class="font-medium text-ink">Edit - {{ $p['nama'] }}</span>
+                <span class="font-medium text-ink">Tambah</span>
             </nav>
         </div>
+
+        {{-- Session Error --}}
+        @if (session('error'))
+            <div class="rounded-lg bg-red-50 p-4 border border-red-200">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-sm font-medium text-red-800">Gagal Menyimpan:</h3>
+                        <div class="mt-2 text-sm text-red-700">
+                            <p>{{ session('error') }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
+
+        {{-- Validation Errors --}}
+        @if ($errors->any())
+            <div class="rounded-lg bg-red-50 p-4 border border-red-200">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-sm font-medium text-red-800">Terdapat kesalahan pengisian form:</h3>
+                        <div class="mt-2 text-sm text-red-700">
+                            <ul role="list" class="list-disc space-y-1 pl-5">
+                                @foreach ($errors->all() as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
 
         {{-- Form Card --}}
         <div class="rounded-lg border border-border bg-surface p-6 shadow-sm" x-data="{
             activeTab: 'utama',
-            nik: '{{ $p['nik'] ?? '' }}',
-            kk: '{{ $p['kk'] ?? '' }}',
+            nik: '{{ $p->nik ?? '' }}',
+            kk: '{{ $p->no_kk ?? '' }}',
             nikError: '',
             kkError: '',
-            fotoPreview: '{{ $p['foto'] ? asset('storage/foto/' . $p['foto']) : '' }}',
-            skFileName: '{{ $p['nomor_sk'] ? 'SK_Pengangkatan_' . $p['id'] . '.pdf' : '' }}',
-            skFileSize: '1.5 MB',
+            fotoPreview: '{{ $p->foto ? asset("storage/" . $p->foto) : "" }}',
+            skFileName: '{{ $p->appointment && $p->appointment->file_sk ? "SK_Pengangkatan.pdf" : "" }}',
+            skFileSize: '',
             skFileError: '',
+            validateUtama() {
+                const requiredIds = ['nama_lengkap', 'nip', 'jenis_pegawai_id', 'tanggal_lahir', 'pangkat_terakhir', 'jabatan_terakhir', 'kelas_jabatan', 'pendidikan_terakhir', 'prodi_pendidikan_terakhir'];
+                for (let id of requiredIds) {
+                    const el = document.getElementById(id);
+                    if (el && !el.value.trim()) {
+                        el.setCustomValidity('Mohon lengkapi isian kolom ini terlebih dahulu.');
+                        el.reportValidity();
+                        return false;
+                    } else if (el) {
+                        el.setCustomValidity('');
+                    }
+                }
+
+                const elNip = document.getElementById('nip');
+                if (elNip && elNip.value.trim().length !== 18) {
+                    elNip.setCustomValidity('NIP harus tepat 18 digit.');
+                    elNip.reportValidity();
+                    return false;
+                } else if (elNip) {
+                    elNip.setCustomValidity('');
+                }
+                return true;
+            },
+            validateKontak() {
+                const requiredIds = ['no_hp', 'alamat'];
+                for (let id of requiredIds) {
+                    const el = document.getElementById(id);
+                    if (el && !el.value.trim()) {
+                        el.setCustomValidity('Mohon lengkapi isian kolom ini terlebih dahulu.');
+                        el.reportValidity();
+                        return false;
+                    } else if (el) {
+                        el.setCustomValidity('');
+                    }
+                }
+                return true;
+            },
+            validatePelengkap() {
+                const elNik = document.getElementById('nik');
+                if (this.nik.length < 16) {
+                    this.nikError = 'NIK harus tepat 16 digit sebelum melanjutkan';
+                    if (elNik) {
+                        elNik.setCustomValidity('Mohon lengkapi NIK dengan tepat 16 digit.');
+                        elNik.reportValidity();
+                    }
+                    return false;
+                } else if (elNik) {
+                    elNik.setCustomValidity('');
+                }
+
+                const elKk = document.getElementById('no_kk');
+                if (this.kk.length > 0 && this.kk.length < 16) {
+                    this.kkError = 'Nomor KK harus tepat 16 digit sebelum melanjutkan';
+                    if (elKk) {
+                        elKk.setCustomValidity('Mohon lengkapi Nomor KK dengan tepat 16 digit.');
+                        elKk.reportValidity();
+                    }
+                    return false;
+                } else if (elKk) {
+                    elKk.setCustomValidity('');
+                }
+                return true;
+            },
             validateNik() {
                 this.nik = this.nik.replace(/\D/g, '');
                 if (this.nik.length > 0 && this.nik.length < 16) {
@@ -92,18 +182,22 @@
                     this.skFileError = '';
                 }
             }
-        }" x-init="validateNik(); validateKk();">
+        }">
             
             {{-- Tab Bar Navigasi --}}
             <div class="border-b border-border flex flex-wrap gap-4 md:gap-6 mb-6">
-                <button type="button" @click="activeTab = 'utama'"
+                <button type="button" @click="
+                    if (activeTab === 'pelengkap' && !validatePelengkap()) return;
+                    if (activeTab === 'kontak' && !validateKontak()) return;
+                    activeTab = 'utama';
+                "
                         :class="activeTab === 'utama' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'"
                         class="text-sm transition-colors cursor-pointer focus:outline-none font-sans">
                     1. Data Utama
                 </button>
                 <button type="button" @click="
-                    if (nik.length < 16) { nikError = 'NIK harus tepat 16 digit sebelum berpindah tab'; return; }
-                    if (kk.length > 0 && kk.length < 16) { kkError = 'Nomor KK harus tepat 16 digit sebelum berpindah tab'; return; }
+                    if (activeTab === 'utama' && !validateUtama()) return;
+                    if (activeTab === 'kontak' && !validateKontak()) return;
                     activeTab = 'pelengkap';
                 "
                         :class="activeTab === 'pelengkap' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'"
@@ -111,8 +205,8 @@
                     2. Data Pelengkap
                 </button>
                 <button type="button" @click="
-                    if (nik.length < 16) { nikError = 'NIK harus tepat 16 digit sebelum berpindah tab'; return; }
-                    if (kk.length > 0 && kk.length < 16) { kkError = 'Nomor KK harus tepat 16 digit sebelum berpindah tab'; return; }
+                    if (activeTab === 'utama' && !validateUtama()) return;
+                    if (activeTab === 'pelengkap' && !validatePelengkap()) return;
                     activeTab = 'kontak';
                 "
                         :class="activeTab === 'kontak' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'"
@@ -120,8 +214,9 @@
                     3. Data Kontak
                 </button>
                 <button type="button" @click="
-                    if (nik.length < 16) { nikError = 'NIK harus tepat 16 digit sebelum berpindah tab'; return; }
-                    if (kk.length > 0 && kk.length < 16) { kkError = 'Nomor KK harus tepat 16 digit sebelum berpindah tab'; return; }
+                    if (activeTab === 'utama' && !validateUtama()) return;
+                    if (activeTab === 'pelengkap' && !validatePelengkap()) return;
+                    if (activeTab === 'kontak' && !validateKontak()) return;
                     activeTab = 'pengangkatan';
                 "
                         :class="activeTab === 'pengangkatan' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'"
@@ -130,31 +225,34 @@
                 </button>
             </div>
 
-            <form action="{{ route('pegawai.update', $p['id']) }}" method="POST" enctype="multipart/form-data" class="space-y-6">
+            <form action="{{ route('pegawai.update', $p->id) }}" method="POST" enctype="multipart/form-data" class="space-y-6">
                 @csrf
+                @method('POST')
 
                 {{-- TAB 1: DATA UTAMA --}}
                 <div x-show="activeTab === 'utama'" class="space-y-6" x-transition>
                     <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                         {{-- Nama Lengkap --}}
                         <div class="space-y-1">
-                            <label for="nama" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Lengkap <span class="text-danger">*</span></label>
-                            <input id="nama" name="nama" type="text" required value="{{ $p['nama'] }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <label for="nama_lengkap" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Lengkap <span class="text-danger">*</span></label>
+                            <input id="nama_lengkap" name="nama_lengkap" type="text" required placeholder="Ahmad Fauzi, S.Kom." class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->nama_lengkap }}" >
                         </div>
 
                         {{-- NIP --}}
                         <div class="space-y-1">
                             <label for="nip" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">NIP <span class="text-danger">*</span></label>
-                            <input id="nip" name="nip" type="text" required value="{{ $p['nip'] }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <input id="nip" name="nip" type="text" oninput="this.value = this.value.replace(/[^0-9]/g, '')" required placeholder="198503122010011001" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->nip }}" >
                         </div>
 
                         {{-- Status Kepegawaian (Jenis) --}}
                         <div class="space-y-1">
-                            <label for="jenis" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Status Kepegawaian <span class="text-danger">*</span></label>
+                            <label for="jenis_pegawai_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Status Kepegawaian <span class="text-danger">*</span></label>
                             <div class="relative">
-                                <select id="jenis" name="jenis" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="PNS" {{ ($p['jenis'] ?? '') === 'PNS' ? 'selected' : '' }}>PNS</option>
-                                    <option value="PPPK" {{ ($p['jenis'] ?? '') === 'PPPK' ? 'selected' : '' }}>PPPK</option>
+                                <select id="jenis_pegawai_id" name="jenis_pegawai_id" required class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="" disabled selected>Pilih Status Kepegawaian</option>
+                                    @foreach($jenisPegawai as $jenis)
+                                        <option value="{{ $jenis->id }}">{{ $jenis->nama }}</option>
+                                    @endforeach
                                 </select>
                                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -167,52 +265,61 @@
                         {{-- Tanggal Lahir --}}
                         <div class="space-y-1">
                             <label for="tanggal_lahir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Lahir <span class="text-danger">*</span></label>
-                            <input id="tanggal_lahir" name="tanggal_lahir" type="date" required value="{{ $formattedTglLahir }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                            <input id="tanggal_lahir" name="tanggal_lahir" type="date" required max="{{ date('Y-m-d') }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" value="{{ $p->tanggal_lahir ? \Carbon\Carbon::parse($p->tanggal_lahir)->format('Y-m-d') : '' }}" >
                         </div>
 
                         {{-- Golongan --}}
-                        <div class="space-y-1">
-                            <label for="golongan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Golongan <span class="text-danger">*</span></label>
+                        <div class="space-y-1" x-data="{ open: false, selected: 'I/a' }">
+                            <label for="golongan_terakhir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Golongan <span class="text-danger">*</span></label>
                             <div class="relative">
-                                <select id="golongan" name="golongan" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    @foreach(['I/a','I/b','I/c','I/d','II/a','II/b','II/c','II/d','III/a','III/b','III/c','III/d','IV/a','IV/b','IV/c','IV/d','IV/e'] as $gol)
-                                        <option value="{{ $gol }}" {{ ($p['golongan'] ?? '') === $gol ? 'selected' : '' }}>{{ $gol }}</option>
-                                    @endforeach
-                                </select>
+                                <input type="hidden" name="golongan_terakhir" :value="selected">
+                                <button type="button" @click="open = !open" @click.away="open = false" class="w-full text-left appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <span x-text="selected"></span>
+                                </button>
                                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
                                     </svg>
+                                </div>
+
+                                <div x-show="open" x-transition.opacity style="display: none;" class="absolute z-50 w-full mt-1 bg-surface border border-border rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                                    @foreach(['I/a','I/b','I/c','I/d','II/a','II/b','II/c','II/d','III/a','III/b','III/c','III/d','IV/a','IV/b','IV/c','IV/d','IV/e'] as $gol)
+                                    <div @click="selected = '{{ $gol }}'; open = false" class="px-4 py-2 text-sm text-ink cursor-pointer hover:bg-soft transition-colors" :class="selected === '{{ $gol }}' ? 'bg-primary/10 text-primary font-bold' : ''">
+                                        {{ $gol }}
+                                    </div>
+                                    @endforeach
                                 </div>
                             </div>
                         </div>
 
                         {{-- Pangkat --}}
                         <div class="space-y-1">
-                            <label for="pangkat" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Pangkat <span class="text-danger">*</span></label>
-                            <input id="pangkat" name="pangkat" type="text" required value="{{ $p['pangkat'] ?? 'Penata Tkt. I' }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <label for="pangkat_terakhir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Pangkat <span class="text-danger">*</span></label>
+                            <input id="pangkat_terakhir" name="pangkat_terakhir" type="text" required placeholder="Penata Tkt. I" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->pangkat_terakhir }}" >
                         </div>
 
                         {{-- Jabatan --}}
                         <div class="space-y-1">
-                            <label for="jabatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jabatan <span class="text-danger">*</span></label>
-                            <input id="jabatan" name="jabatan" type="text" required value="{{ $p['jabatan'] }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <label for="jabatan_terakhir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jabatan <span class="text-danger">*</span></label>
+                            <input id="jabatan_terakhir" name="jabatan_terakhir" type="text" required placeholder="Analis Kepegawaian" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->jabatan_terakhir }}" >
                         </div>
 
                         {{-- Kelas Jabatan --}}
                         <div class="space-y-1">
                             <label for="kelas_jabatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Kelas Jabatan <span class="text-danger">*</span></label>
-                            <input id="kelas_jabatan" name="kelas_jabatan" type="text" required value="{{ $p['kelas_jabatan'] ?? '8' }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <input id="kelas_jabatan" name="kelas_jabatan" type="text" required placeholder="8" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->kelas_jabatan }}" >
                         </div>
 
                         {{-- Pendidikan Terakhir --}}
                         <div class="space-y-1">
                             <label for="pendidikan_terakhir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Pendidikan Terakhir <span class="text-danger">*</span></label>
                             <div class="relative">
-                                <select id="pendidikan_terakhir" name="pendidikan_terakhir" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    @foreach(['Diploma III (D3)', 'Sarjana (S1)', 'Magister (S2)', 'Doktor (S3)', 'SMA / Sederajat'] as $pend)
-                                        <option value="{{ $pend }}" {{ ($p['pendidikan_terakhir'] ?? '') === $pend ? 'selected' : '' }}>{{ $pend }}</option>
-                                    @endforeach
+                                <select id="pendidikan_terakhir" name="pendidikan_terakhir" required class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="Diploma III (D3)">Diploma III (D3)</option>
+                                    <option value="Sarjana (S1)">Sarjana (S1)</option>
+                                    <option value="Magister (S2)">Magister (S2)</option>
+                                    <option value="Doktor (S3)">Doktor (S3)</option>
+                                    <option value="SMA / Sederajat">SMA / Sederajat</option>
                                 </select>
                                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -224,20 +331,16 @@
 
                         {{-- Program Studi --}}
                         <div class="space-y-1">
-                            <label for="prodi_pendidikan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Program Studi <span class="text-danger">*</span></label>
-                            <input id="prodi_pendidikan" name="prodi_pendidikan" type="text" required value="{{ $p['prodi_pendidikan'] ?? '' }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <label for="prodi_pendidikan_terakhir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Program Studi <span class="text-danger">*</span></label>
+                            <input id="prodi_pendidikan_terakhir" name="prodi_pendidikan_terakhir" type="text" required placeholder="Teknik Informatika" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->prodi_pendidikan_terakhir }}" >
                         </div>
 
-                        {{-- Email Dinas / Keycloak --}}
-                        <div class="space-y-1">
-                            <label for="email_dinas" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Email Dinas (Keycloak SSO) <span class="text-danger">*</span></label>
-                            <input id="email_dinas" name="email_dinas" type="email" required value="{{ $p['email_dinas'] ?? '' }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                        </div>
+                        
 
-                        {{-- Tanggal Pensiun --}}
+                        {{-- Tanggal Pensiun (Optional) --}}
                         <div class="space-y-1">
-                            <label for="tanggal_pensiun" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Pensiun <span class="text-muted">(opsional)</span></label>
-                            <input id="tanggal_pensiun" name="tanggal_pensiun" type="date" value="{{ $formattedTglPensiun }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                            <label for="tanggal_pensiun" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Pensiun <span class="text-[10px] font-normal normal-case text-muted tracking-normal">(opsional)</span></label>
+                            <input id="tanggal_pensiun" name="tanggal_pensiun" type="date" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" value="{{ $p->tanggal_pensiun ? \Carbon\Carbon::parse($p->tanggal_pensiun)->format('Y-m-d') : '' }}" >
                         </div>
                     </div>
                 </div>
@@ -248,21 +351,21 @@
                         {{-- NIK --}}
                         <div class="space-y-1">
                             <label for="nik" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">NIK (No. KTP) <span class="text-danger">*</span></label>
-                            <input id="nik" name="nik" type="text" required maxlength="16" x-model="nik" @input="validateNik" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <input id="nik" name="nik" type="text" required maxlength="16" x-model="nik" @input="validateNik" placeholder="3273251203850002" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                             <p x-show="nikError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="nikError"></p>
                         </div>
 
                         {{-- KK --}}
                         <div class="space-y-1">
-                            <label for="kk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor Kartu Keluarga (KK)</label>
-                            <input id="kk" name="kk" type="text" maxlength="16" x-model="kk" @input="validateKk" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <label for="no_kk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor Kartu Keluarga (KK)</label>
+                            <input id="no_kk" name="no_kk" type="text" maxlength="16" x-model="kk" @input="validateKk" placeholder="3273250102120045" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                             <p x-show="kkError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="kkError"></p>
                         </div>
 
                         {{-- Tempat Lahir --}}
                         <div class="space-y-1">
                             <label for="tempat_lahir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tempat Lahir</label>
-                            <input id="tempat_lahir" name="tempat_lahir" type="text" value="{{ $p['tempat_lahir'] ?? '' }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <input id="tempat_lahir" name="tempat_lahir" type="text" placeholder="Bandung" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->tempat_lahir }}" >
                         </div>
 
                         {{-- Jenis Kelamin --}}
@@ -270,8 +373,8 @@
                             <label for="jenis_kelamin" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Kelamin</label>
                             <div class="relative">
                                 <select id="jenis_kelamin" name="jenis_kelamin" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="Laki-laki" {{ ($p['jenis_kelamin'] ?? '') === 'Laki-laki' ? 'selected' : '' }}>Laki-laki</option>
-                                    <option value="Perempuan" {{ ($p['jenis_kelamin'] ?? '') === 'Perempuan' ? 'selected' : '' }}>Perempuan</option>
+                                    <option value="L">Laki-laki</option>
+                                    <option value="P">Perempuan</option>
                                 </select>
                                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -283,11 +386,12 @@
 
                         {{-- Agama --}}
                         <div class="space-y-1">
-                            <label for="agama" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Agama</label>
+                            <label for="agama_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Agama</label>
                             <div class="relative">
-                                <select id="agama" name="agama" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    @foreach(['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Khonghucu'] as $agm)
-                                        <option value="{{ $agm }}" {{ ($p['agama'] ?? '') === $agm ? 'selected' : '' }}>{{ $agm }}</option>
+                                <select id="agama_id" name="agama_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="" disabled selected>Pilih Agama</option>
+                                    @foreach($agama as $a)
+                                        <option value="{{ $a->id }}">{{ $a->nama }}</option>
                                     @endforeach
                                 </select>
                                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
@@ -300,11 +404,12 @@
 
                         {{-- Status Pernikahan --}}
                         <div class="space-y-1">
-                            <label for="status_kawin" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Status Kawin</label>
+                            <label for="status_kawin_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Status Kawin</label>
                             <div class="relative">
-                                <select id="status_kawin" name="status_kawin" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    @foreach(['Belum Kawin', 'Kawin', 'Cerai Hidup', 'Cerai Mati'] as $skw)
-                                        <option value="{{ $skw }}" {{ ($p['status_kawin'] ?? '') === $skw ? 'selected' : '' }}>{{ $skw }}</option>
+                                <select id="status_kawin_id" name="status_kawin_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="" disabled selected>Pilih Status Kawin</option>
+                                    @foreach($statusKawin as $sk)
+                                        <option value="{{ $sk->id }}">{{ $sk->nama }}</option>
                                     @endforeach
                                 </select>
                                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
@@ -320,9 +425,10 @@
                             <label for="golongan_darah" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Golongan Darah</label>
                             <div class="relative">
                                 <select id="golongan_darah" name="golongan_darah" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    @foreach(['A', 'B', 'AB', 'O'] as $goldar)
-                                        <option value="{{ $goldar }}" {{ ($p['golongan_darah'] ?? '') === $goldar ? 'selected' : '' }}>{{ $goldar }}</option>
-                                    @endforeach
+                                    <option value="A">A</option>
+                                    <option value="B">B</option>
+                                    <option value="AB">AB</option>
+                                    <option value="O">O</option>
                                 </select>
                                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -360,26 +466,26 @@
                     <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                         {{-- Telepon Handphone --}}
                         <div class="space-y-1">
-                            <label for="telepon" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor HP <span class="text-danger">*</span></label>
-                            <input id="telepon" name="telepon" type="tel" required value="{{ $p['telepon'] ?? '' }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <label for="no_hp" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor HP <span class="text-danger">*</span></label>
+                            <input id="no_hp" name="no_hp" type="tel" required placeholder="081234567890" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->no_hp }}" >
                         </div>
 
                         {{-- Telepon Rumah --}}
                         <div class="space-y-1">
-                            <label for="telepon_rumah" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Telepon Rumah</label>
-                            <input id="telepon_rumah" name="telepon_rumah" type="tel" value="{{ $p['telepon_rumah'] ?? '' }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <label for="no_telepon_rumah" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Telepon Rumah</label>
+                            <input id="no_telepon_rumah" name="no_telepon_rumah" type="tel" placeholder="0227301234" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->no_telepon_rumah }}" >
                         </div>
 
                         {{-- Email Pribadi --}}
                         <div class="space-y-1 sm:col-span-2">
                             <label for="email" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Email Pribadi</label>
-                            <input id="email" name="email" type="email" value="{{ $p['email'] ?? '' }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <input id="email" name="email" type="email" placeholder="pegawai@domain.com" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->email }}" >
                         </div>
 
                         {{-- Alamat Lengkap --}}
                         <div class="space-y-1 sm:col-span-2">
                             <label for="alamat" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Alamat Tempat Tinggal <span class="text-danger">*</span></label>
-                            <textarea id="alamat" name="alamat" rows="3" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans resize-none">{{ $p['alamat'] ?? '' }}</textarea>
+                            <textarea id="alamat" name="alamat" rows="3" required placeholder="Jl. Buah Batu No. 120, Lengkong, Bandung" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans resize-none">{{ $p->alamat }}</textarea>
                         </div>
                     </div>
                 </div>
@@ -391,10 +497,11 @@
                         <div class="space-y-1">
                             <label for="jenis_pengangkatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Pengangkatan <span class="text-danger">*</span></label>
                             <div class="relative">
-                                <select id="jenis_pengangkatan" name="jenis_pengangkatan" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    @foreach(['PNS Formasi Umum', 'PPPK Tahap I', 'PPPK Tahap II', 'Pengangkatan Khusus'] as $jnsPeng)
-                                        <option value="{{ $jnsPeng }}" {{ ($p['jenis_pengangkatan'] ?? '') === $jnsPeng ? 'selected' : '' }}>{{ $jnsPeng }}</option>
-                                    @endforeach
+                                <select id="jenis_pengangkatan" name="jenis_pengangkatan" required class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="" disabled selected>Pilih Jenis Pengangkatan</option>
+                                    <option value="CPNS">CPNS</option>
+                                    <option value="PNS">PNS</option>
+                                    <option value="PPPK">PPPK</option>
                                 </select>
                                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -407,19 +514,19 @@
                         {{-- TMT --}}
                         <div class="space-y-1">
                             <label for="tmt" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Pengangkatan <span class="text-danger">*</span></label>
-                            <input id="tmt" name="tmt" type="date" required value="{{ $formattedTmt }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                            <input id="tmt" name="tmt" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" value="{{ $p->appointment ? \Carbon\Carbon::parse($p->appointment->tmt_pengangkatan)->format('Y-m-d') : '' }}" >
                         </div>
 
                         {{-- Nomor SK --}}
                         <div class="space-y-1">
                             <label for="nomor_sk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Pengangkatan <span class="text-danger">*</span></label>
-                            <input id="nomor_sk" name="nomor_sk" type="text" required value="{{ $p['nomor_sk'] ?? '' }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <input id="nomor_sk" name="nomor_sk" type="text" required placeholder="SK-882-KP-2024" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->appointment ? $p->appointment->no_sk : '' }}" >
                         </div>
 
                         {{-- Tanggal SK --}}
                         <div class="space-y-1">
                             <label for="tanggal_sk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK Terbit <span class="text-danger">*</span></label>
-                            <input id="tanggal_sk" name="tanggal_sk" type="date" required value="{{ $formattedTglSk }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                            <input id="tanggal_sk" name="tanggal_sk" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" value="{{ $p->appointment && $p->appointment->tanggal_sk ? \Carbon\Carbon::parse($p->appointment->tanggal_sk)->format('Y-m-d') : '' }}" >
                         </div>
 
                         {{-- Upload File SK --}}
@@ -468,18 +575,13 @@
                                 x-show="activeTab !== 'pengangkatan'" 
                                 @click="
                                     if (activeTab === 'utama') {
+                                        if (!validateUtama()) return;
                                         activeTab = 'pelengkap';
                                     } else if (activeTab === 'pelengkap') {
-                                        if (nik.length < 16) {
-                                            nikError = 'NIK harus tepat 16 digit sebelum melanjutkan';
-                                            return;
-                                        }
-                                        if (kk.length > 0 && kk.length < 16) {
-                                            kkError = 'Nomor KK harus tepat 16 digit sebelum melanjutkan';
-                                            return;
-                                        }
+                                        if (!validatePelengkap()) return;
                                         activeTab = 'kontak';
                                     } else if (activeTab === 'kontak') {
+                                        if (!validateKontak()) return;
                                         activeTab = 'pengangkatan';
                                     }
                                 " 
@@ -493,11 +595,32 @@
                                 :disabled="nik.length < 16 || (kk.length > 0 && kk.length < 16) || skFileError !== ''"
                                 :class="(nik.length < 16 || (kk.length > 0 && kk.length < 16) || skFileError !== '') ? 'opacity-50 cursor-not-allowed' : ''"
                                 class="inline-flex items-center justify-center rounded-lg bg-success px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 font-sans cursor-pointer">
-                            Simpan Perubahan
+                            Simpan Pegawai
                         </button>
                     </div>
                 </div>
             </form>
         </div>
     </div>
+
+    @push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const requiredElements = document.querySelectorAll('input[required], select[required], textarea[required]');
+            requiredElements.forEach(el => {
+                el.addEventListener('invalid', function(e) {
+                    if (e.target.validity.valueMissing) {
+                        e.target.setCustomValidity('Mohon lengkapi isian kolom ini terlebih dahulu.');
+                    }
+                });
+                el.addEventListener('input', function(e) {
+                    e.target.setCustomValidity('');
+                });
+                el.addEventListener('change', function(e) {
+                    e.target.setCustomValidity('');
+                });
+            });
+        });
+    </script>
+    @endpush
 </x-layouts.app>

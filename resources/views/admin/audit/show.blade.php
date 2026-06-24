@@ -54,7 +54,7 @@
                     <p class="text-xs text-muted font-sans mt-0.5">Waktu Operasional: {{ $log['timestamp'] }}</p>
                 </div>
                 <div>
-                    <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold font-sans bg-primary/10 text-primary border border-primary/20">
+                    <span class="inline-flex items-center gap-1.5 text-xs font-bold font-sans text-primary">
                         Modul: {{ $log['modul'] }}
                     </span>
                 </div>

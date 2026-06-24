@@ -14,10 +14,10 @@
                 </nav>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-                <span class="inline-flex items-center gap-1 rounded bg-danger/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-danger shadow-sm">
+                <span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-danger shadow-sm">
                     ⚠️ Akses: Khusus Super Admin
                 </span>
-                <span class="inline-flex items-center gap-1 rounded bg-info/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-info shadow-sm">
+                <span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-info shadow-sm">
                     🔒 Audit Trail Aktif
                 </span>
             </div>

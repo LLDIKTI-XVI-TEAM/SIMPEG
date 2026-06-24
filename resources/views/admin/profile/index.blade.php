@@ -10,7 +10,7 @@
                 <div>
                     <h2 class="text-xl font-bold text-ink font-sans leading-tight">{{ auth()->user()->name ?? 'Pengguna' }}</h2>
                     <p class="text-xs text-muted font-sans font-mono">{{ auth()->user()->email ?? '' }}</p>
-                    <span class="inline-block mt-1.5 rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-bold font-sans">Administrator</span>
+                    <span class="inline-block mt-1.5 text-xs font-bold font-sans text-primary">Administrator</span>
                 </div>
             </div>
 

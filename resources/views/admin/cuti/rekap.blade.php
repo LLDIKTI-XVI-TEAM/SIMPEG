@@ -30,12 +30,12 @@
         ];
 
         $statusClass = [
-            'Aman' => 'bg-success/10 text-success',
-            'Perhatian' => 'bg-warning/10 text-warning',
-            'Kritis' => 'bg-danger/10 text-danger',
-            'Menunggu' => 'bg-warning/10 text-warning',
-            'Disetujui' => 'bg-success/10 text-success',
-            'Ditunda' => 'bg-danger/10 text-danger',
+            'Aman' => 'text-success',
+            'Perhatian' => 'text-warning',
+            'Kritis' => 'text-danger',
+            'Menunggu' => 'text-warning',
+            'Disetujui' => 'text-success',
+            'Ditunda' => 'text-danger',
         ];
 
         $toneText = [
@@ -209,7 +209,7 @@
                                         <td class="px-4 py-3 text-right font-mono text-sm text-ink">{{ $row['sakit'] }}</td>
                                         <td class="px-4 py-3">
                                             <span
-                                                class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusClass[$row['status']] }}">{{ $row['status'] }}</span>
+                                                class="text-xs font-semibold {{ $statusClass[$row['status']] }}">{{ $row['status'] }}</span>
                                         </td>
                                         <td class="px-4 py-3 text-right">
                                             <button
@@ -269,7 +269,7 @@
                                         <td class="px-4 py-3 text-right font-mono text-sm text-ink">{{ $row['hari'] }}</td>
                                         <td class="px-4 py-3">
                                             <span
-                                                class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusClass[$row['status']] }}">{{ $row['status'] }}</span>
+                                                class="text-xs font-semibold {{ $statusClass[$row['status']] }}">{{ $row['status'] }}</span>
                                         </td>
                                     </tr>
                                 @endforeach
@@ -380,7 +380,7 @@
                                 <td class="px-3 py-3 text-right font-mono text-sm text-ink">{{ $row['hari'] }}</td>
                                 <td class="px-3 py-3">
                                     <span
-                                        class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusClass[$row['status']] }}">{{ $row['status'] }}</span>
+                                        class="text-xs font-semibold {{ $statusClass[$row['status']] }}">{{ $row['status'] }}</span>
                                 </td>
                             </tr>
                         @endforeach

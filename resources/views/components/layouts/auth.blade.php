@@ -13,6 +13,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{{ asset('img/dikti16-favicon-blue-150x150.png') }}">
+
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('head')
 </head>

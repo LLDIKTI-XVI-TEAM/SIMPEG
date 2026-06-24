@@ -12,6 +12,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{{ asset('img/dikti16-favicon-blue-150x150.png') }}">
+
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('head')
 </head>
@@ -346,7 +349,7 @@
                                 <div>
                                     <p class="text-sm font-medium text-ink">Dokumen kadaluarsa H-30</p>
                                     <p class="mt-0.5 text-xs text-muted font-sans">SK Pengangkatan — Budi Santoso</p>
-                                    <span class="mt-1 inline-block rounded-full bg-danger/10 px-2 py-0.5 text-[10px] font-semibold text-danger">H-30</span>
+                                    <span class="mt-1 inline-block text-[10px] font-semibold text-danger">H-30</span>
                                 </div>
                             </div>
                             <div class="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-soft">
@@ -354,7 +357,7 @@
                                 <div>
                                     <p class="text-sm font-medium text-ink">Masa pensiun mendekat H-60</p>
                                     <p class="mt-0.5 text-xs text-muted font-sans">Siti Rahayu — Februari 2026</p>
-                                    <span class="mt-1 inline-block rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-semibold text-warning">H-60</span>
+                                    <span class="mt-1 inline-block text-[10px] font-semibold text-warning">H-60</span>
                                 </div>
                             </div>
                             <div class="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-soft">
@@ -362,7 +365,7 @@
                                 <div>
                                     <p class="text-sm font-medium text-ink">Pengajuan cuti baru</p>
                                     <p class="mt-0.5 text-xs text-muted font-sans">Ahmad Fauzi — Cuti tahunan 5 hari</p>
-                                    <span class="mt-1 inline-block rounded-full bg-info/10 px-2 py-0.5 text-[10px] font-semibold text-info">Menunggu</span>
+                                    <span class="mt-1 inline-block text-[10px] font-semibold text-info">Menunggu</span>
                                 </div>
                             </div>
                         </div>

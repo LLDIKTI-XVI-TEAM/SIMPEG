@@ -30,19 +30,19 @@
                 <div>
                     @php
                     $statusClass = [
-                        'menunggu' => 'bg-warning/10 text-warning border border-warning/20',
-                        'disetujui' => 'bg-success/10 text-success border border-success/20',
-                        'ditunda' => 'bg-danger/10 text-danger border border-danger/20'
+                        'menunggu' => 'text-warning',
+                        'disetujui' => 'text-success',
+                        'ditunda' => 'text-danger'
                     ];
                     $statusLabel = [
                         'menunggu' => 'Menunggu Persetujuan',
                         'disetujui' => 'Disetujui',
                         'ditunda' => 'Ditunda'
                     ];
-                    $stClass = $statusClass[$c['status']] ?? 'bg-soft text-muted';
+                    $stClass = $statusClass[$c['status']] ?? 'text-muted';
                     $stLabel = $statusLabel[$c['status']] ?? $c['status'];
                     @endphp
-                    <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-bold {{ $stClass }} font-sans">
+                    <span class="inline-flex items-center text-xs font-bold {{ $stClass }} font-sans">
                         {{ $stLabel }}
                     </span>
                 </div>

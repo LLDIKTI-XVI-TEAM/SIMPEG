@@ -1,17 +1,165 @@
 <x-layouts.app title="Dashboard" subtitle="Ringkasan eksekutif dan pemantauan aktivitas kepegawaian hari ini.">
 
+    {{-- Welcome Toast Notification --}}
+    @if(session('login_success'))
+        <div
+            x-data="{ show: true }"
+            x-init="setTimeout(() => show = false, 5000)"
+            x-show="show"
+            x-transition:enter="transition ease-out duration-300 transform"
+            x-transition:enter-start="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2"
+            x-transition:enter-end="translate-y-0 opacity-100 sm:translate-x-0"
+            x-transition:leave="transition ease-in duration-200"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            class="fixed bottom-5 right-5 z-50 max-w-sm w-full bg-surface/95 backdrop-blur-md border border-success/20 rounded-xl shadow-2xl p-4 flex items-start gap-4 transition-all duration-300 hover:scale-[1.02]"
+            style="display: none;"
+        >
+            <!-- Icon Container with Gradient -->
+            <div class="shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-400 to-success flex items-center justify-center shadow-md">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                </svg>
+            </div>
+
+            <!-- Content -->
+            <div class="flex-1 min-w-0">
+                <h4 class="text-sm font-bold text-ink font-sans">Masuk Berhasil!</h4>
+                <p class="text-xs text-muted font-sans mt-1 leading-normal">
+                    {{ session('login_success') }}
+                </p>
+                <p class="text-[10px] text-primary/70 font-semibold font-sans mt-1.5 flex items-center gap-1">
+                    <span>Selamat datang, {{ auth()->user()->name }}</span>
+                    <span class="animate-bounce">👋</span>
+                </p>
+            </div>
+
+            <!-- Close Button -->
+            <button
+                @click="show = false"
+                class="shrink-0 text-muted hover:text-ink transition-colors cursor-pointer focus:outline-none"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+    @endif
+
     {{-- ================================================================ --}}
     {{-- WELCOME BANNER --}}
     {{-- ================================================================ --}}
-    <div class="mb-6 overflow-hidden rounded-lg border border-primary/20 bg-primary px-6 py-5 shadow-sm">
-        <div class="space-y-1">
-            <p class="text-[10px] font-bold uppercase tracking-wider text-white/60">Selamat datang kembali</p>
-            <h2 class="text-2xl font-extrabold text-white leading-tight">
+    <div class="mb-6 relative overflow-hidden rounded-xl bg-gradient-to-r from-[#173292] to-[#2143c2] px-5 py-4 shadow-md w-full flex flex-col lg:flex-row lg:items-center min-h-[140px]">
+        <!-- Abstract Background Shapes -->
+        <div class="absolute inset-0 pointer-events-none overflow-hidden rounded-xl">
+            <!-- Dots pattern top right -->
+            <div class="absolute top-2 right-4 opacity-20">
+                <svg width="40" height="30" fill="currentColor" class="text-white">
+                    <pattern id="dots" x="0" y="0" width="8" height="8" patternUnits="userSpaceOnUse">
+                        <circle cx="1.5" cy="1.5" r="1.5"></circle>
+                    </pattern>
+                    <rect width="40" height="30" fill="url(#dots)"></rect>
+                </svg>
+            </div>
+            <!-- Abstract arcs -->
+            <svg class="absolute top-0 right-[20%] h-full text-white/5" viewBox="0 0 200 400" preserveAspectRatio="none">
+                <path d="M 200 -50 Q 50 200 200 450" fill="none" stroke="currentColor" stroke-width="40"/>
+                <path d="M 280 -50 Q 130 200 280 450" fill="none" stroke="currentColor" stroke-width="20"/>
+            </svg>
+            <!-- Small floating ring -->
+            <div class="absolute bottom-1/4 right-[40%] w-3 h-3 border-[2px] border-white/20 rounded-full"></div>
+        </div>
+
+        <!-- Content Left -->
+        <div class="relative z-10 w-full lg:w-[70%] flex flex-col justify-center">
+            <p class="text-[10px] font-bold uppercase tracking-widest text-white/70 mb-0.5">Selamat datang kembali</p>
+            <h2 class="text-xl sm:text-2xl font-extrabold text-white leading-tight">
                 {{ auth()->user()->name }}
             </h2>
-            <p class="text-sm text-white/70">
-                {{ now()->translatedFormat('l, d F Y') }} · Sistem Informasi Kepegawaian Wilayah XVI.
+            
+            <p class="mt-1 text-[12px] text-white/80 font-sans max-w-lg">
+                Semangat menjalankan tugas hari ini. Tetap produktif dan berikan pelayanan terbaik.
             </p>
+
+            <div class="mt-3 flex flex-wrap items-center gap-2.5">
+                <!-- Box 1 -->
+                <div class="flex items-center gap-3 rounded-lg bg-white/10 px-3 py-2 backdrop-blur-md border border-white/10 hover:bg-white/15 transition-colors cursor-default">
+                    <div class="shrink-0 text-white/90">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008zM9.75 15h.008v.008H9.75V15zm0 2.25h.008v.008H9.75v-.008zM7.5 15h.008v.008H7.5V15zm0 2.25h.008v.008H7.5v-.008zm6.75-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H16.5v-.008zm0 2.25h.008v.008H16.5V15z" /></svg>
+                    </div>
+                    <div class="w-px h-6 bg-white/20"></div>
+                    <div class="flex flex-col">
+                        <span class="text-[12px] font-medium text-white/90 leading-none">{{ now()->translatedFormat('l, d F Y') }}</span>
+                        <span class="text-[10px] text-white/70 mt-0.5">Hari ini</span>
+                    </div>
+                </div>
+
+                <!-- Box 2 -->
+                <div class="flex items-center gap-3 rounded-lg bg-white/10 px-3 py-2 backdrop-blur-md border border-white/10 hover:bg-white/15 transition-colors cursor-default">
+                    <div class="shrink-0 text-white/90">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0012 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75z" /></svg>
+                    </div>
+                    <div class="w-px h-6 bg-white/20"></div>
+                    <div class="flex flex-col">
+                        <span class="text-[12px] font-medium text-white/90 leading-none">Sistem Informasi Kepegawaian</span>
+                        <span class="text-[10px] text-white/70 mt-0.5">LLDIKTI Wilayah XVI</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Image Right (Pure SVG Illustration) -->
+        <div class="hidden lg:block absolute right-4 bottom-0 z-10 w-[180px] pointer-events-none">
+            <svg class="w-full h-auto drop-shadow-xl" viewBox="0 0 400 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- Computer Monitor Base -->
+                <path d="M 150 260 L 250 260 Q 260 260 255 250 L 235 200 L 165 200 L 145 250 Q 140 260 150 260 Z" fill="#142C80"/>
+                <rect x="185" y="200" width="30" height="20" fill="#142C80"/>
+                <!-- Monitor -->
+                <rect x="30" y="40" width="340" height="180" rx="14" fill="#E2E8F0" stroke="#FFFFFF" stroke-width="6"/>
+                <rect x="40" y="50" width="320" height="160" rx="8" fill="#FFFFFF"/>
+                
+                <!-- Dashboard UI inside Monitor -->
+                <!-- Profile -->
+                <circle cx="80" cy="90" r="22" fill="#E2E8F0"/>
+                <circle cx="80" cy="85" r="9" fill="#94A3B8"/>
+                <path d="M 62 107 Q 80 85 98 107 Z" fill="#94A3B8"/>
+                
+                <!-- Bar Chart -->
+                <rect x="135" y="145" width="18" height="45" rx="4" fill="#3B82F6"/>
+                <rect x="165" y="120" width="18" height="70" rx="4" fill="#60A5FA"/>
+                <rect x="195" y="85" width="18" height="105" rx="4" fill="#2563EB"/>
+                
+                <!-- Pie Chart -->
+                <circle cx="300" cy="115" r="40" fill="#E2E8F0"/>
+                <path d="M 300 115 L 300 75 A 40 40 0 0 1 340 115 Z" fill="#2563EB"/>
+                <circle cx="300" cy="115" r="16" fill="#FFFFFF"/>
+
+                <!-- Calendar Front -->
+                <rect x="100" y="180" width="100" height="90" rx="10" fill="#F8FAFC" stroke="#FFFFFF" stroke-width="4"/>
+                <rect x="100" y="180" width="100" height="28" rx="8" fill="#3B82F6"/>
+                <rect x="100" y="198" width="100" height="10" fill="#3B82F6"/>
+                <rect x="115" y="168" width="8" height="24" rx="4" fill="#1E40AF"/>
+                <rect x="177" y="168" width="8" height="24" rx="4" fill="#1E40AF"/>
+                <!-- Grid dots in calendar -->
+                <circle cx="118" cy="225" r="4" fill="#CBD5E1"/>
+                <circle cx="134" cy="225" r="4" fill="#CBD5E1"/>
+                <circle cx="150" cy="225" r="4" fill="#CBD5E1"/>
+                <circle cx="166" cy="225" r="4" fill="#CBD5E1"/>
+                <circle cx="182" cy="225" r="4" fill="#CBD5E1"/>
+                <circle cx="118" cy="242" r="4" fill="#CBD5E1"/>
+                <circle cx="134" cy="242" r="4" fill="#CBD5E1"/>
+                <circle cx="150" cy="242" r="4" fill="#CBD5E1"/>
+                <circle cx="166" cy="242" r="4" fill="#CBD5E1"/>
+                <circle cx="182" cy="242" r="4" fill="#CBD5E1"/>
+                <circle cx="118" cy="259" r="4" fill="#CBD5E1"/>
+                <circle cx="134" cy="259" r="4" fill="#3B82F6"/>
+
+                <!-- Plant Right Side -->
+                <path d="M 335 260 L 385 260 L 375 215 L 345 215 Z" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="2"/>
+                <path d="M 360 215 Q 330 180 345 135 Q 370 170 360 215" fill="#64748B" opacity="0.3"/>
+                <path d="M 360 215 Q 380 175 395 155 Q 405 195 360 215" fill="#64748B" opacity="0.4"/>
+                <path d="M 360 215 Q 360 160 375 115 Q 385 160 360 215" fill="#64748B" opacity="0.5"/>
+            </svg>
         </div>
     </div>
 
@@ -21,66 +169,82 @@
     <div class="mb-6 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
 
         {{-- W1: Total Pegawai Aktif --}}
-        <a href="{{ route('data-pegawai') }}" class="rounded-lg border border-border bg-surface p-5 shadow-sm flex flex-col justify-between cursor-pointer hover:bg-soft/40 transition-colors">
-            <div class="flex items-center justify-between">
+        <a href="{{ route('data-pegawai') }}" class="rounded-xl border border-border border-b-[3px] border-b-primary bg-surface p-5 shadow-sm flex flex-col justify-between cursor-pointer hover:bg-soft/40 transition-colors">
+            <div class="flex items-start justify-between">
                 <div>
-                    <p class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Total Pegawai Aktif</p>
-                    <p class="mt-1.5 text-2xl font-extrabold text-primary leading-none font-mono">228</p>
+                    <div class="flex items-center gap-1.5">
+                        <p class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Total Pegawai Aktif</p>
+                        <svg class="w-3.5 h-3.5 text-muted/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
+                    </div>
+                    <p class="mt-1 text-3xl font-extrabold text-primary leading-none font-mono tracking-tight">228</p>
                 </div>
-                <div class="rounded-lg bg-primary/10 p-2.5 shrink-0">
+                <div class="rounded-xl bg-primary/10 p-3 shrink-0">
                     <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
                 </div>
             </div>
-            <div class="mt-4 pt-3 border-t border-border flex items-center justify-between text-[10px] text-muted font-sans">
-                <span>186 PNS · 42 PPPK</span>
+            <div class="mt-4 pt-3 border-t border-border flex flex-col gap-1.5 text-[10px] text-muted font-sans">
+                <span class="font-medium text-ink">186 PNS · 42 PPPK</span>
+                <span>Per {{ now()->translatedFormat('d F Y') }}</span>
             </div>
         </a>
 
         {{-- W2: Kenaikan Pangkat --}}
-        <a href="{{ route('data-pegawai', ['filter' => 'pangkat']) }}" class="rounded-lg border border-border bg-surface p-5 shadow-sm flex flex-col justify-between cursor-pointer hover:bg-soft/40 transition-colors">
-            <div class="flex items-center justify-between">
+        <a href="{{ route('data-pegawai', ['filter' => 'pangkat']) }}" class="rounded-xl border border-border border-b-[3px] border-b-success bg-surface p-5 shadow-sm flex flex-col justify-between cursor-pointer hover:bg-soft/40 transition-colors">
+            <div class="flex items-start justify-between">
                 <div>
-                    <p class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Kenaikan Pangkat</p>
-                    <p class="mt-1.5 text-2xl font-extrabold text-success leading-none font-mono">2</p>
+                    <div class="flex items-center gap-1.5">
+                        <p class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Kenaikan Pangkat</p>
+                        <svg class="w-3.5 h-3.5 text-muted/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
+                    </div>
+                    <p class="mt-1 text-3xl font-extrabold text-success leading-none font-mono tracking-tight">2</p>
                 </div>
-                <div class="rounded-lg bg-success/10 p-2.5 shrink-0">
+                <div class="rounded-xl bg-success/10 p-3 shrink-0">
                     <svg class="w-6 h-6 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.25 18 9 11.25l4.306 4.307a11.95 11.95 0 0 1 5.814-5.519l2.74-1.22m0 0-5.94-2.28m5.94 2.28-2.28 5.94" /></svg>
                 </div>
             </div>
-            <div class="mt-4 pt-3 border-t border-border flex items-center justify-between text-[10px] text-muted font-sans">
-                <span>2 Bulan Ini · 8 Tahun Ini</span>
+            <div class="mt-4 pt-3 border-t border-border flex flex-col gap-1.5 text-[10px] text-muted font-sans">
+                <span class="font-medium text-ink">2 Bulan Ini · 8 Tahun Ini</span>
+                <span>Per {{ now()->translatedFormat('d F Y') }}</span>
             </div>
         </a>
 
         {{-- W3: Status Cuti --}}
-        <a href="{{ route('cuti') }}" class="rounded-lg border border-border bg-surface p-5 shadow-sm flex flex-col justify-between cursor-pointer hover:bg-soft/40 transition-colors">
-            <div class="flex items-center justify-between">
+        <a href="{{ route('cuti') }}" class="rounded-xl border border-border border-b-[3px] border-b-warning bg-surface p-5 shadow-sm flex flex-col justify-between cursor-pointer hover:bg-soft/40 transition-colors">
+            <div class="flex items-start justify-between">
                 <div>
-                    <p class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Status Cuti</p>
-                    <p class="mt-1.5 text-2xl font-extrabold text-warning leading-none font-mono">3</p>
+                    <div class="flex items-center gap-1.5">
+                        <p class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Status Cuti</p>
+                        <svg class="w-3.5 h-3.5 text-muted/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
+                    </div>
+                    <p class="mt-1 text-3xl font-extrabold text-warning leading-none font-mono tracking-tight">3</p>
                 </div>
-                <div class="rounded-lg bg-warning/10 p-2.5 shrink-0">
+                <div class="rounded-xl bg-warning/10 p-3 shrink-0">
                     <svg class="w-6 h-6 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
                 </div>
             </div>
-            <div class="mt-4 pt-3 border-t border-border flex items-center justify-between text-[10px] text-muted font-sans">
-                <span>3 Pending · 15 Disetujui · 2 Ditunda</span>
+            <div class="mt-4 pt-3 border-t border-border flex flex-col gap-1.5 text-[10px] text-muted font-sans">
+                <span class="font-medium text-ink">3 Pending · 15 Disetujui · 2 Ditunda</span>
+                <span>Per {{ now()->translatedFormat('d F Y') }}</span>
             </div>
         </a>
 
         {{-- W4: EWS Aktif --}}
-        <a href="#ews-section" class="rounded-lg border border-border bg-surface p-5 shadow-sm flex flex-col justify-between cursor-pointer hover:bg-soft/40 transition-colors">
-            <div class="flex items-center justify-between">
+        <a href="#ews-section" class="rounded-xl border border-border border-b-[3px] border-b-danger bg-surface p-5 shadow-sm flex flex-col justify-between cursor-pointer hover:bg-soft/40 transition-colors">
+            <div class="flex items-start justify-between">
                 <div>
-                    <p class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">EWS Aktif</p>
-                    <p class="mt-1.5 text-2xl font-extrabold text-danger leading-none font-mono">5</p>
+                    <div class="flex items-center gap-1.5">
+                        <p class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">EWS Aktif</p>
+                        <svg class="w-3.5 h-3.5 text-muted/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
+                    </div>
+                    <p class="mt-1 text-3xl font-extrabold text-danger leading-none font-mono tracking-tight">5</p>
                 </div>
-                <div class="rounded-lg bg-danger/10 p-2.5 shrink-0">
+                <div class="rounded-xl bg-danger/10 p-3 shrink-0">
                     <svg class="w-6 h-6 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
                 </div>
             </div>
-            <div class="mt-4 pt-3 border-t border-border flex items-center justify-between text-[10px] text-muted font-sans">
-                <span class="text-danger font-semibold">1 Urgent · 3 Warning · 1 Info</span>
+            <div class="mt-4 pt-3 border-t border-border flex flex-col gap-1.5 text-[10px] text-muted font-sans">
+                <span class="font-semibold text-danger">1 Urgent · 3 Warning · 1 Info</span>
+                <span>Per {{ now()->translatedFormat('d F Y') }}</span>
             </div>
         </a>
     </div>
@@ -114,7 +278,7 @@
                     </thead>
                     <tbody class="divide-y divide-border">
                         <tr class="transition-colors hover:bg-soft/30 cursor-pointer">
-                            <td class="px-6 py-3.5">
+                            <td class="px-6 py-5">
                                 <div class="flex items-center gap-3">
                                     <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
                                         <span class="text-xs font-bold text-primary">A</span>
@@ -125,10 +289,10 @@
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-3.5 text-xs text-muted font-medium font-sans">III/c (Penata)</td>
-                            <td class="px-6 py-3.5 text-xs text-primary font-bold font-sans">III/d (Penata Tingkat 1)</td>
-                            <td class="px-6 py-3.5 text-xs text-ink font-semibold font-mono">01-07-2026</td>
-                            <td class="px-6 py-3.5 text-right">
+                            <td class="px-6 py-5 text-xs text-muted font-medium font-sans">III/c (Penata)</td>
+                            <td class="px-6 py-5 text-xs text-muted font-medium font-sans">III/d (Penata Tingkat 1)</td>
+                            <td class="px-6 py-5 text-xs text-ink font-semibold font-mono">01-07-2026</td>
+                            <td class="px-6 py-5 text-right">
                                 <div class="flex items-center justify-end">
                                     <a href="{{ route('pegawai.show', ['id' => 1]) }}" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Detail">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -140,7 +304,7 @@
                             </td>
                         </tr>
                         <tr class="transition-colors hover:bg-soft/30 cursor-pointer">
-                            <td class="px-6 py-3.5">
+                            <td class="px-6 py-5">
                                 <div class="flex items-center gap-3">
                                     <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
                                         <span class="text-xs font-bold text-primary">S</span>
@@ -151,10 +315,10 @@
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-3.5 text-xs text-muted font-medium font-sans">II/d (Pengatur Tkt. 1)</td>
-                            <td class="px-6 py-3.5 text-xs text-primary font-bold font-sans">III/a (Penata Muda)</td>
-                            <td class="px-6 py-3.5 text-xs text-ink font-semibold font-mono">01-07-2026</td>
-                            <td class="px-6 py-3.5 text-right">
+                            <td class="px-6 py-5 text-xs text-muted font-medium font-sans">II/d (Pengatur Tkt. 1)</td>
+                            <td class="px-6 py-5 text-xs text-muted font-medium font-sans">III/a (Penata Muda)</td>
+                            <td class="px-6 py-5 text-xs text-ink font-semibold font-mono">01-07-2026</td>
+                            <td class="px-6 py-5 text-right">
                                 <div class="flex items-center justify-end">
                                     <a href="{{ route('pegawai.show', ['id' => 2]) }}" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Detail">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -247,15 +411,24 @@
                         {{-- EWS Item 1: Merah (<30 Hari) --}}
                         <tr class="transition-colors hover:bg-soft/30 cursor-pointer">
                             <td class="px-6 py-3.5">
-                                <p class="text-xs font-bold text-ink font-sans leading-tight">Budi Santoso</p>
-                                <p class="text-[9px] text-muted font-sans leading-none">NIP. 19780601 200312 1 002</p>
+                                <div class="flex items-center gap-3">
+                                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                                        <span class="text-xs font-bold text-primary">B</span>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <p class="text-xs font-bold text-ink font-sans leading-tight">Budi Santoso</p>
+                                        <p class="text-[9px] text-muted font-sans leading-none mt-0.5">NIP. 19780601 200312 1 002</p>
+                                    </div>
+                                </div>
                             </td>
                             <td class="px-6 py-3.5 text-xs text-ink font-medium font-sans">Masa Berlaku SK Pengangkatan</td>
-                            <td class="px-6 py-3.5 text-xs text-danger font-bold font-mono">12 Hari Lagi</td>
+                            <td class="px-6 py-3.5 text-xs text-ink font-sans font-medium">12 Hari Lagi</td>
                             <td class="px-6 py-3.5">
-                                <span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[9px] font-bold bg-danger/10 text-danger">
-                                    <span class="h-1.2 w-1.2 rounded-full bg-danger"></span>
-                                    Urgent (H-30)
+                                <span class="inline-flex items-center gap-1.5 rounded border border-danger/20 bg-danger/5 px-2 py-0.5 text-xs font-semibold text-danger">
+                                    <svg class="w-3 h-3 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                                    </svg>
+                                    Urgent
                                 </span>
                             </td>
                             <td class="px-6 py-3.5 text-right">
@@ -272,15 +445,24 @@
                         {{-- EWS Item 2: Kuning (30-90 Hari) --}}
                         <tr class="transition-colors hover:bg-soft/30 cursor-pointer">
                             <td class="px-6 py-3.5">
-                                <p class="text-xs font-bold text-ink font-sans leading-tight">Siti Rahayu</p>
-                                <p class="text-[9px] text-muted font-sans leading-none">NIP. 19901120 201501 2 003</p>
+                                <div class="flex items-center gap-3">
+                                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                                        <span class="text-xs font-bold text-primary">S</span>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <p class="text-xs font-bold text-ink font-sans leading-tight">Siti Rahayu</p>
+                                        <p class="text-[9px] text-muted font-sans leading-none mt-0.5">NIP. 19901120 201501 2 003</p>
+                                    </div>
+                                </div>
                             </td>
                             <td class="px-6 py-3.5 text-xs text-ink font-medium font-sans">Persiapan Administrasi Pensiun</td>
-                            <td class="px-6 py-3.5 text-xs text-warning font-bold font-mono">45 Hari Lagi</td>
+                            <td class="px-6 py-3.5 text-xs text-ink font-sans font-medium">45 Hari Lagi</td>
                             <td class="px-6 py-3.5">
-                                <span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[9px] font-bold bg-warning/10 text-warning">
-                                    <span class="h-1.2 w-1.2 rounded-full bg-warning"></span>
-                                    Warning (H-60)
+                                <span class="inline-flex items-center gap-1.5 rounded border border-warning/35 bg-warning/10 px-2 py-0.5 text-xs font-semibold text-warning">
+                                    <svg class="w-3 h-3 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                                    </svg>
+                                    Warning
                                 </span>
                             </td>
                             <td class="px-6 py-3.5 text-right">
@@ -297,15 +479,24 @@
                         {{-- EWS Item 3: Kuning --}}
                         <tr class="transition-colors hover:bg-soft/30 cursor-pointer">
                             <td class="px-6 py-3.5">
-                                <p class="text-xs font-bold text-ink font-sans leading-tight">Ahmad Fauzi</p>
-                                <p class="text-[9px] text-muted font-sans leading-none">NIP. 19850312 201001 1 001</p>
+                                <div class="flex items-center gap-3">
+                                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                                        <span class="text-xs font-bold text-primary">A</span>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <p class="text-xs font-bold text-ink font-sans leading-tight">Ahmad Fauzi</p>
+                                        <p class="text-[9px] text-muted font-sans leading-none mt-0.5">NIP. 19850312 201001 1 001</p>
+                                    </div>
+                                </div>
                             </td>
                             <td class="px-6 py-3.5 text-xs text-ink font-medium font-sans">Kenaikan Gaji Berkala (KGB)</td>
-                            <td class="px-6 py-3.5 text-xs text-warning font-bold font-mono">55 Hari Lagi</td>
+                            <td class="px-6 py-3.5 text-xs text-ink font-sans font-medium">55 Hari Lagi</td>
                             <td class="px-6 py-3.5">
-                                <span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[9px] font-bold bg-warning/10 text-warning">
-                                    <span class="h-1.2 w-1.2 rounded-full bg-warning"></span>
-                                    Warning (H-60)
+                                <span class="inline-flex items-center gap-1.5 rounded border border-warning/35 bg-warning/10 px-2 py-0.5 text-xs font-semibold text-warning">
+                                    <svg class="w-3 h-3 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                                    </svg>
+                                    Warning
                                 </span>
                             </td>
                             <td class="px-6 py-3.5 text-right">
@@ -322,15 +513,24 @@
                         {{-- EWS Item 4: Kuning --}}
                         <tr class="transition-colors hover:bg-soft/30 cursor-pointer">
                             <td class="px-6 py-3.5">
-                                <p class="text-xs font-bold text-ink font-sans leading-tight">Dewi Pertiwi</p>
-                                <p class="text-[9px] text-muted font-sans leading-none">NIP. 19931205 201901 2 001</p>
+                                <div class="flex items-center gap-3">
+                                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                                        <span class="text-xs font-bold text-primary">D</span>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <p class="text-xs font-bold text-ink font-sans leading-tight">Dewi Pertiwi</p>
+                                        <p class="text-[9px] text-muted font-sans leading-none mt-0.5">NIP. 19931205 201901 2 001</p>
+                                    </div>
+                                </div>
                             </td>
                             <td class="px-6 py-3.5 text-xs text-ink font-medium font-sans">Peninjauan Kontrak PPPK</td>
-                            <td class="px-6 py-3.5 text-xs text-warning font-bold font-mono">80 Hari Lagi</td>
+                            <td class="px-6 py-3.5 text-xs text-ink font-sans font-medium">80 Hari Lagi</td>
                             <td class="px-6 py-3.5">
-                                <span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[9px] font-bold bg-warning/10 text-warning">
-                                    <span class="h-1.2 w-1.2 rounded-full bg-warning"></span>
-                                    Warning (H-90)
+                                <span class="inline-flex items-center gap-1.5 rounded border border-warning/35 bg-warning/10 px-2 py-0.5 text-xs font-semibold text-warning">
+                                    <svg class="w-3 h-3 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                                    </svg>
+                                    Warning
                                 </span>
                             </td>
                             <td class="px-6 py-3.5 text-right">
@@ -347,15 +547,24 @@
                         {{-- EWS Item 5: Hijau (>90 Hari) --}}
                         <tr class="transition-colors hover:bg-soft/30 cursor-pointer">
                             <td class="px-6 py-3.5">
-                                <p class="text-xs font-bold text-ink font-sans leading-tight">Rudi Hermawan</p>
-                                <p class="text-[9px] text-muted font-sans leading-none">NIP. 19751010 199903 1 004</p>
+                                <div class="flex items-center gap-3">
+                                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                                        <span class="text-xs font-bold text-primary">R</span>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <p class="text-xs font-bold text-ink font-sans leading-tight">Rudi Hermawan</p>
+                                        <p class="text-[9px] text-muted font-sans leading-none mt-0.5">NIP. 19751010 199903 1 004</p>
+                                    </div>
+                                </div>
                             </td>
                             <td class="px-6 py-3.5 text-xs text-ink font-medium font-sans">Pembaruan SK Jabatan Struktural</td>
-                            <td class="px-6 py-3.5 text-xs text-success font-bold font-mono">110 Hari Lagi</td>
+                            <td class="px-6 py-3.5 text-xs text-ink font-sans font-medium">110 Hari Lagi</td>
                             <td class="px-6 py-3.5">
-                                <span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[9px] font-bold bg-info/10 text-info">
-                                    <span class="h-1.2 w-1.2 rounded-full bg-info"></span>
-                                    Informasi (H-90)
+                                <span class="inline-flex items-center gap-1.5 rounded border border-info/35 bg-info/10 px-2 py-0.5 text-xs font-semibold text-info">
+                                    <svg class="w-3 h-3 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 11.25v5m0-7.5h.008v.008H12V8.75Zm9 3.25a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                    </svg>
+                                    Informasi
                                 </span>
                             </td>
                             <td class="px-6 py-3.5 text-right">
@@ -382,7 +591,7 @@
                         <h3 class="text-sm font-bold text-ink font-sans">Otorisasi Cuti Pending</h3>
                         <p class="text-[10px] text-muted font-sans mt-0.5">Menunggu keputusan persetujuan</p>
                     </div>
-                    <span class="rounded-full bg-warning/10 text-warning px-2.5 py-0.5 text-xs font-bold font-sans">3</span>
+                    <span class="text-xs font-bold font-sans text-warning">3</span>
                 </div>
                 <div class="divide-y divide-border">
                     @php
@@ -416,7 +625,7 @@
             </div>
             <div class="border-t border-border px-6 py-4 bg-soft/20 text-center">
                 <a href="{{ route('cuti') }}" class="text-xs font-bold text-primary hover:underline transition-all font-sans">
-                    Kelola Seluruh Pengajuan Cuti →
+                    Kelola Seluruh Pengajuan Cuti
                 </a>
             </div>
         </div>
@@ -577,8 +786,10 @@
                                 <p class="text-xs font-medium text-ink font-sans">{{ $p['unit'] }}</p>
                             </td>
                             <td class="px-6 py-3.5">
-                                <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-success/10 text-success">
-                                    <span class="h-1.5 w-1.5 rounded-full bg-success"></span>
+                                <span class="inline-flex items-center gap-1.5 rounded border border-success/20 bg-success/5 px-2 py-0.5 text-xs font-semibold text-success">
+                                    <svg class="w-3 h-3 text-success shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                                    </svg>
                                     Aktif
                                 </span>
                             </td>

@@ -349,42 +349,159 @@ class PegawaiController extends Controller
 
     public function edit($id)
     {
-        $p = collect(self::$pegawaiList)->firstWhere('id', (int)$id);
-        if (!$p) {
-            abort(404);
-        }
-        return view('admin.pegawai.edit', compact('p'));
+        $p = Employee::with('appointment')->findOrFail($id);
+        $jenisPegawai = \App\Models\RefJenisPegawai::all();
+        $agama = \App\Models\RefAgama::all();
+        $statusKawin = \App\Models\RefStatusPerkawinan::all();
+        
+        return view('admin.pegawai.edit', compact('p', 'jenisPegawai', 'agama', 'statusKawin'));
     }
 
-    public function update(Request $request, $id)
+    public function update(\App\Http\Requests\StoreEmployeeRequest $request, $id)
     {
-        $request->validate([
-            'nama' => 'required|string|max:255',
-            'nip' => 'required|string|max:50',
-            'nik' => 'required|string|size:16',
-            'kk' => 'nullable|string|size:16',
-            'jabatan' => 'required|string|max:255',
-            'pangkat' => 'required|string|max:100',
-            'kelas_jabatan' => 'required|string|max:10',
-            'unit' => 'required|string',
-            'golongan' => 'required|string',
-            'jenis' => 'required|string',
-            'tmt' => 'required|string',
-            'email_dinas' => 'required|email|max:255',
-            'email' => 'nullable|email|max:255',
-            'foto' => 'nullable|image|max:10240|mimes:jpg,png',
-            'file_sk' => 'nullable|file|max:10240|mimes:pdf,jpg,png',
-        ]);
+        $employee = Employee::findOrFail($id);
+        $validated = $request->validated();
 
-        return redirect()->route('data-pegawai')
-            ->with('success', 'Data pegawai ' . $request->input('nama') . ' berhasil diperbarui.');
+        try {
+            DB::beginTransaction();
+
+            if ($request->hasFile('foto')) {
+                // Delete old photo if needed (omitted for brevity)
+                $validated['foto'] = $request->file('foto')->store('employees/photos', 'public');
+            }
+
+            $employee->update($validated);
+
+            $appointment = $employee->appointment;
+            if ($appointment) {
+                $appointmentData = [
+                    'jenis_pengangkatan' => $validated['jenis_pengangkatan'] ?? $appointment->jenis_pengangkatan,
+                    'tmt_pengangkatan' => $validated['tmt'] ?? $appointment->tmt_pengangkatan,
+                    'no_sk' => $validated['nomor_sk'] ?? $appointment->no_sk,
+                    'tanggal_sk' => $validated['tanggal_sk'] ?? $appointment->tanggal_sk,
+                ];
+
+                if ($request->hasFile('file_sk')) {
+                    $appointmentData['file_sk'] = $request->file('file_sk')->store('appointments/sk', 'public');
+                }
+
+                $appointment->update($appointmentData);
+            }
+
+            DB::commit();
+
+            return redirect()->route('data-pegawai')
+                ->with('success', 'Data pegawai ' . $employee->nama_lengkap . ' berhasil diperbarui.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->withInput()->with('error', 'Gagal memperbarui pegawai: ' . $e->getMessage());
+        }
     }
 
     public function destroy($id)
     {
-        $p = collect(self::$pegawaiList)->firstWhere('id', (int)$id);
-        $nama = $p ? $p['nama'] : 'pegawai';
+        $employee = Employee::findOrFail($id);
+        $nama = $employee->nama_lengkap;
+        $employee->delete();
+        
         return redirect()->route('data-pegawai')
             ->with('success', 'Data pegawai ' . $nama . ' berhasil dihapus dari sistem.');
     }
+    public function storeRiwayat($id, \Illuminate\Http\Request $request)
+    {
+        $employee = Employee::findOrFail($id);
+        $type = $request->input('type');
+        
+        try {
+            DB::beginTransaction();
+            
+            switch ($type) {
+                case 'keluarga':
+                    $employee->families()->create([
+                        'nama_anggota' => $request->input('nama'),
+                        'hubungan' => $request->input('hubungan'),
+                        'tanggal_lahir' => $request->input('tgl_lahir'),
+                        'pekerjaan' => $request->input('pekerjaan'),
+                        'status_tunjangan' => true,
+                    ]);
+                    break;
+                case 'pangkat':
+                    $gol = \App\Models\RefGolongan::where('nama', $request->input('golongan'))->first();
+                    $employee->rankHistories()->create([
+                        'golongan_id' => $gol ? $gol->id : null,
+                        'no_sk' => $request->input('no_sk'),
+                        'tanggal_sk' => $request->input('tgl_sk'),
+                        'tmt_pangkat' => $request->input('tmt'),
+                        'is_latest' => true,
+                    ]);
+                    break;
+                case 'jabatan':
+                    $unit = \App\Models\RefUnitKerja::where('nama', $request->input('unit'))->first();
+                    $employee->positionHistories()->create([
+                        'nama_jabatan' => $request->input('jabatan'),
+                        'unit_kerja_id' => $unit ? $unit->id : null,
+                        'no_sk' => $request->input('no_sk'),
+                        'tanggal_sk' => $request->input('tgl_sk'),
+                        'tmt_jabatan' => $request->input('tmt'),
+                        'is_latest' => true,
+                    ]);
+                    break;
+                case 'kgb':
+                    $gaji = preg_replace('/[^0-9]/', '', $request->input('gaji'));
+                    $employee->salaryHistories()->create([
+                        'gaji_pokok' => $gaji ?: 0,
+                        'no_sk' => $request->input('no_sk'),
+                        'tanggal_sk' => $request->input('tgl_sk'),
+                        'tmt_kgb' => $request->input('tmt'),
+                        'is_latest' => true,
+                    ]);
+                    break;
+                case 'disiplin':
+                    $tglMulai = $request->input('tgl_sk');
+                    $masa = $request->input('masa');
+                    $tglAkhir = null;
+                    if ($masa) {
+                        if (stripos($masa, 'bulan') !== false) {
+                            $months = (int) preg_replace('/[^0-9]/', '', $masa);
+                            if ($months > 0) {
+                                $tglAkhir = \Carbon\Carbon::parse($tglMulai)->addMonths($months)->format('Y-m-d');
+                            }
+                        } elseif (stripos($masa, 'tahun') !== false) {
+                            $years = (int) preg_replace('/[^0-9]/', '', $masa);
+                            if ($years > 0) {
+                                $tglAkhir = \Carbon\Carbon::parse($tglMulai)->addYears($years)->format('Y-m-d');
+                            }
+                        }
+                    }
+                    $employee->disciplineRecords()->create([
+                        'jenis_hukuman' => $request->input('jenis'),
+                        'deskripsi' => $request->input('alasan'),
+                        'no_sk' => $request->input('no_sk'),
+                        'tanggal_sk' => $request->input('tgl_sk'),
+                        'tanggal_mulai' => $tglMulai,
+                        'tanggal_berakhir' => $tglAkhir,
+                    ]);
+                    break;
+                case 'pendidikan':
+                    $jenjang = \App\Models\RefJenjangPendidikan::where('nama', $request->input('tingkat'))->first();
+                    $employee->educationHistories()->create([
+                        'jenjang_id' => $jenjang ? $jenjang->id : null,
+                        'nama_institusi' => $request->input('institusi'),
+                        'jurusan' => $request->input('prodi'),
+                        'tahun_lulus' => $request->input('lulus'),
+                        'no_ijazah' => $request->input('no_ijazah'),
+                    ]);
+                    break;
+                default:
+                    throw new \Exception('Tipe riwayat tidak valid.');
+            }
+            
+            DB::commit();
+            return response()->json(['success' => true, 'message' => 'Data riwayat berhasil disimpan.']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
 }

@@ -140,13 +140,13 @@
                                 $sisaBadgeClass = '';
                                 if ($alert['sisa_hari'] < 30) {
                                     $rowColorClass = 'hover:bg-danger/[0.01]';
-                                    $sisaBadgeClass = 'bg-danger/10 text-danger';
+                                    $sisaBadgeClass = 'text-danger';
                                 } elseif ($alert['sisa_hari'] <= 90) {
                                     $rowColorClass = 'hover:bg-warning/[0.01]';
-                                    $sisaBadgeClass = 'bg-warning/10 text-warning';
+                                    $sisaBadgeClass = 'text-warning';
                                 } else {
                                     $rowColorClass = 'hover:bg-success/[0.01]';
-                                    $sisaBadgeClass = 'bg-success/10 text-success';
+                                    $sisaBadgeClass = 'text-success';
                                 }
                             @endphp
                             <tr 
@@ -183,7 +183,7 @@
                                             {{ $alert['jenis_event'] }}
                                         </span>
                                         <div class="flex flex-wrap gap-1.5">
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                                            <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-primary">
                                                 <span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
                                                 {{ $alert['threshold_label'] }}
                                             </span>
@@ -200,7 +200,7 @@
                                     <div class="mt-1 text-[11px] font-medium text-muted">Tanggal target</div>
                                 </td>
                                 <td class="px-5 py-4 text-sm">
-                                    <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold {{ $sisaBadgeClass }} border border-current/10">
+                                    <span class="inline-flex items-center text-xs font-semibold {{ $sisaBadgeClass }}">
                                         {{ $alert['sisa_hari'] }} Hari
                                     </span>
                                     <div class="mt-1 text-[11px] font-medium text-muted">
@@ -216,7 +216,7 @@
                                 <td class="px-5 py-4 text-sm">
                                     @if($alert['jenis_event'] === 'Kenaikan Pangkat')
                                         <div class="max-w-[240px] rounded-lg border {{ $alert['is_eligible'] ? 'border-success/20 bg-success/5' : 'border-danger/20 bg-danger/5' }} p-2.5">
-                                            <div class="mb-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $alert['is_eligible'] ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger' }}">
+                                            <div class="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold {{ $alert['is_eligible'] ? 'text-success' : 'text-danger' }}">
                                                 @if($alert['is_eligible'])
                                                     <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                                         <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
@@ -248,14 +248,14 @@
                                             </div>
                                         </div>
                                     @elseif($alert['is_eligible'])
-                                        <div class="inline-flex items-center gap-1.5 text-xs font-semibold text-success bg-success/10 border border-success/20 rounded-md px-2.5 py-1">
+                                        <div class="inline-flex items-center gap-1.5 text-xs font-semibold text-success">
                                             <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                                             </svg>
                                             {{ $alert['eligibility_reason'] }}
                                         </div>
                                     @else
-                                        <div class="inline-flex items-center gap-1.5 text-xs font-semibold text-danger bg-danger/10 border border-danger/20 rounded-md px-2.5 py-1" title="Kinerja pegawai kurang baik untuk syarat usulan pangkat">
+                                        <div class="inline-flex items-center gap-1.5 text-xs font-semibold text-danger" title="Kinerja pegawai kurang baik untuk syarat usulan pangkat">
                                             <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m0-10.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.75c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.57-.598-3.75h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
                                             </svg>

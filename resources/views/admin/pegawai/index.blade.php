@@ -141,8 +141,8 @@
                                 <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
                             </span>
                         </th>
-                        <th onclick="sortTable(3)" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted cursor-pointer hover:text-ink transition-colors select-none">
-                            <span class="flex items-center gap-1">
+                        <th onclick="sortTable(3)" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted cursor-pointer hover:text-ink transition-colors select-none">
+                            <span class="flex items-center justify-center gap-1">
                                 Gol. / Jenis
                                 <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
                             </span>
@@ -155,7 +155,7 @@
                         </th>
                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted select-none">Status</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted select-none">Dokumen</th>
-                        <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted select-none">Aksi</th>
+                        <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted select-none">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-border">
@@ -179,9 +179,8 @@
                             <p class="text-sm font-medium text-ink">{{ $p->jabatan_terakhir ?? '-' }}</p>
                             <p class="text-xs text-muted">{{ $p->jabatan_terakhir ?? '-' }}</p>
                         </td>
-                        <td class="px-4 py-3.5">
-                            <p class="text-sm font-bold text-ink leading-tight">{{ $p->golongan_terakhir ?? '-' }}</p>
-                            <p class="text-xs font-bold text-primary mt-0.5 leading-tight">{{ $p->jenisPegawai->nama ?? '-' }}</p>
+                        <td class="px-4 py-3.5 text-center">
+                            <span class="text-sm font-medium text-ink">{{ $p->golongan_terakhir ?? '-' }} / {{ $p->jenisPegawai->nama ?? '-' }}</span>
                         </td>
                         <td class="px-4 py-3.5">
                             <p class="text-sm text-ink font-mono">-</p>
@@ -190,11 +189,11 @@
                             @php
                             $status_lower = strtolower($p->status_aktif);
                             $statusClasses = [
-                                'aktif' => 'bg-success/10 text-success',
-                                'cuti' => 'bg-warning/10 text-warning',
-                                'non-aktif' => 'bg-danger/10 text-danger',
-                                'pensiun' => 'bg-danger/10 text-danger',
-                                'mutasi' => 'bg-warning/10 text-warning'
+                                'aktif' => 'text-success',
+                                'cuti' => 'text-warning',
+                                'non-aktif' => 'text-danger',
+                                'pensiun' => 'text-danger',
+                                'mutasi' => 'text-warning'
                             ];
                             $statusDots = [
                                 'aktif' => 'bg-success',
@@ -203,10 +202,10 @@
                                 'pensiun' => 'bg-danger',
                                 'mutasi' => 'bg-warning'
                             ];
-                            $stClass = $statusClasses[$status_lower] ?? 'bg-soft text-muted';
+                            $stClass = $statusClasses[$status_lower] ?? 'text-muted';
                             $stDot = $statusDots[$status_lower] ?? 'bg-muted';
                             @endphp
-                            <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $stClass }}">
+                            <span class="inline-flex items-center gap-1.5 text-xs font-semibold {{ $stClass }}">
                                 <span class="h-1.5 w-1.5 rounded-full {{ $stDot }}"></span>
                                 {{ $p->status_aktif }}
                             </span>
@@ -216,9 +215,9 @@
                             // Default mock for 'dok' since we don't have it on model
                             $dok = 'ok';
                             $dokClasses = [
-                                'ok' => 'bg-success/10 text-success',
-                                'warn' => 'bg-warning/10 text-warning',
-                                'danger' => 'bg-danger/10 text-danger'
+                                'ok' => 'text-success',
+                                'warn' => 'text-warning',
+                                'danger' => 'text-danger'
                             ];
                             $dokDots = [
                                 'ok' => 'bg-success',
@@ -230,16 +229,16 @@
                                 'warn' => 'H-60',
                                 'danger' => 'H-30'
                             ];
-                            $dkClass = $dokClasses[$dok] ?? 'bg-soft text-muted';
+                            $dkClass = $dokClasses[$dok] ?? 'text-muted';
                             $dkDot = $dokDots[$dok] ?? 'bg-muted';
                             @endphp
-                            <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $dkClass }}">
+                            <span class="inline-flex items-center gap-1.5 text-xs font-semibold {{ $dkClass }}">
                                 <span class="h-1.5 w-1.5 rounded-full {{ $dkDot }}"></span>
                                 {{ $dokLabels[$dok] ?? $dok }}
                             </span>
                         </td>
-                        <td class="px-4 py-3.5 text-right">
-                            <div class="flex items-center justify-end gap-1.5">
+                        <td class="px-4 py-3.5 text-center">
+                            <div class="flex items-center justify-center gap-1.5">
                                 {{-- Detail --}}
                                 <a href="{{ route('pegawai.show', $p->id) }}" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Detail">
                                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">

@@ -434,12 +434,12 @@
                                 <td class="px-4 py-3.5 text-xs font-mono text-muted" x-text="doc.tanggal"></td>
                                 <td class="px-4 py-3.5">
                                     <span
-                                        class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                                        class="inline-flex items-center gap-1.5 text-xs font-semibold"
                                         :class="{
-                                            'bg-success/10 text-success': doc.status_dokumen === 'terverifikasi',
-                                            'bg-primary/10 text-primary': doc.status_dokumen === 'aktif',
-                                            'bg-warning/10 text-warning': doc.status_dokumen === 'perlu_review',
-                                            'bg-danger/10 text-danger': doc.status_dokumen === 'kadaluarsa'
+                                            'text-success': doc.status_dokumen === 'terverifikasi',
+                                            'text-primary': doc.status_dokumen === 'aktif',
+                                            'text-warning': doc.status_dokumen === 'perlu_review',
+                                            'text-danger': doc.status_dokumen === 'kadaluarsa'
                                         }">
                                         <span class="h-1.5 w-1.5 rounded-full" :class="{
                                                 'bg-success': doc.status_dokumen === 'terverifikasi',

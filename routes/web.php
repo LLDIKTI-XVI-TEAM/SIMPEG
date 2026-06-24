@@ -50,7 +50,7 @@ Route::get('/dev-login', function () {
     }
     Auth::login($user);
     session(['active_role' => $user->role ?? 'super_admin']);
-    return redirect()->route('dashboard');
+    return redirect()->route('dashboard')->with('login_success', 'Selamat Datang! Anda berhasil masuk ke dalam sistem (Mode Dev).');
 })->name('dev-login');
 
 Route::middleware('keycloak.auth')->group(function (): void {
@@ -611,6 +611,10 @@ Route::middleware('keycloak.auth')->group(function (): void {
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.deactivate'])
         ->name('pegawai.destroy');
+    Route::post('/pegawai/{id}/riwayat', [PegawaiController::class, 'storeRiwayat'])
+        ->whereUuid('id')
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
+        ->name('pegawai.riwayat.store');
 
     Route::get('/pegawai/legacy', function () {
         return redirect()->route('data-pegawai');

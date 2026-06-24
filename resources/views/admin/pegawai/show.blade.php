@@ -60,27 +60,41 @@
             this.modalTitle = title;
             this.showModal = true;
         },
-        submitForm() {
+        async submitForm() {
+            let payload = { type: this.modalType };
             if (this.modalType === 'keluarga') {
-                this.keluargaList.push({...this.newKeluarga, status: 'Hidup'});
-                this.newKeluarga = { nama: '', hubungan: 'Istri', tgl_lahir: '', pekerjaan: '' };
+                payload = { ...payload, ...this.newKeluarga };
             } else if (this.modalType === 'pangkat') {
-                this.pangkatList.push({...this.newPangkat});
-                this.newPangkat = { golongan: 'III/c', no_sk: '', tgl_sk: '', tmt: '' };
+                payload = { ...payload, ...this.newPangkat };
             } else if (this.modalType === 'jabatan') {
-                this.jabatanList.push({...this.newJabatan});
-                this.newJabatan = { jabatan: '', unit: 'Bag. Umum', no_sk: '', tgl_sk: '', tmt: '' };
+                payload = { ...payload, ...this.newJabatan };
             } else if (this.modalType === 'kgb') {
-                this.kgbList.push({...this.newKgb});
-                this.newKgb = { gaji: '', no_sk: '', tgl_sk: '', tmt: '' };
+                payload = { ...payload, ...this.newKgb };
             } else if (this.modalType === 'disiplin') {
-                this.disiplinList.push({...this.newDisiplin});
-                this.newDisiplin = { jenis: 'Teguran Tertulis', alasan: '', no_sk: '', tgl_sk: '', masa: '' };
+                payload = { ...payload, ...this.newDisiplin };
             } else if (this.modalType === 'pendidikan') {
-                this.pendidikanList.push({...this.newPendidikan});
-                this.newPendidikan = { tingkat: 'Sarjana (S1)', institusi: '', prodi: '', lulus: '', no_ijazah: '' };
+                payload = { ...payload, ...this.newPendidikan };
             }
-            this.showModal = false;
+
+            try {
+                const response = await fetch(`/pegawai/{{ $p->id }}/riwayat`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    const errorData = await response.json();
+                    alert('Gagal menyimpan: ' + (errorData.message || 'Terjadi kesalahan'));
+                }
+            } catch (error) {
+                alert('Gagal terhubung ke server');
+            }
         }
     }" class="mx-auto max-w-5xl space-y-6">
         
@@ -116,8 +130,8 @@
                         <div class="flex flex-wrap items-center gap-2">
                             <h2 class="text-xl font-bold text-ink font-sans leading-tight">{{ $p->nama_lengkap }}</h2>
                             <template x-if="kinerjaBaik">
-                                <span class="inline-flex items-center gap-1 rounded bg-success/10 px-2 py-0.5 text-[10px] font-bold text-success font-sans">
-                                    🌟 KINERJA BAIK
+                                <span class="inline-flex items-center gap-1 text-[10px] font-bold text-success font-sans">
+                                    KINERJA BAIK
                                 </span>
                             </template>
                         </div>
@@ -127,9 +141,15 @@
                 </div>
                 <div class="flex items-center gap-3 shrink-0">
                     <a href="{{ route('pegawai.edit', $p->id) }}" class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm">
+                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                        </svg>
                         Edit Pegawai
                     </a>
                     <a href="{{ route('data-pegawai') }}" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-soft">
+                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                        </svg>
                         Kembali
                     </a>
                 </div>
@@ -181,7 +201,7 @@
                 {{-- Auto-Kalkulasi Jadwal --}}
                 <div class="space-y-3">
                     <h3 class="text-xs font-bold text-ink uppercase tracking-wider font-sans border-b border-border pb-1.5 flex items-center gap-1.5">
-                        🗓️ Estimasi Jadwal Kepegawaian <span class="text-[9px] bg-primary/10 text-primary rounded px-1 py-0.5 lowercase font-normal">(kalkulator otomatis)</span>
+                        Estimasi Jadwal Kepegawaian <span class="text-[9px] text-primary lowercase font-normal">(kalkulator otomatis)</span>
                     </h3>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div class="rounded-lg border border-border bg-surface p-3 shadow-sm text-center">
@@ -305,7 +325,10 @@
                         <p class="text-xs text-muted font-sans mt-0.5">Daftar istri/suami dan anak yang tercatat sebagai tanggungan.</p>
                     </div>
                     <button type="button" @click="openModal('keluarga', 'Tambah Anggota Keluarga')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
-                        + Tambah Keluarga
+                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                        Tambah Keluarga
                     </button>
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-border">
@@ -327,7 +350,7 @@
                                     <td class="px-4 py-3 font-mono" x-text="fam.tgl_lahir"></td>
                                     <td class="px-4 py-3" x-text="fam.pekerjaan"></td>
                                     <td class="px-4 py-3">
-                                        <span class="inline-flex items-center gap-1 rounded bg-success/10 px-2 py-0.5 text-[10px] font-bold text-success" x-text="fam.status"></span>
+                                        <span class="inline-flex items-center gap-1 text-[10px] font-bold text-success" x-text="fam.status"></span>
                                     </td>
                                 </tr>
                             </template>
@@ -344,7 +367,10 @@
                         <p class="text-xs text-muted font-sans mt-0.5">Catatan kenaikan pangkat reguler maupun pilihan selama masa dinas.</p>
                     </div>
                     <button type="button" @click="openModal('pangkat', 'Tambah Riwayat Kepangkatan')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
-                        + Tambah Pangkat
+                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                        Tambah Pangkat
                     </button>
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-border">
@@ -379,7 +405,10 @@
                         <p class="text-xs text-muted font-sans mt-0.5">Catatan penugasan jabatan fungsional maupun struktural.</p>
                     </div>
                     <button type="button" @click="openModal('jabatan', 'Tambah Riwayat Jabatan')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
-                        + Tambah Jabatan
+                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                        Tambah Jabatan
                     </button>
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-border">
@@ -416,7 +445,10 @@
                         <p class="text-xs text-muted font-sans mt-0.5">Catatan penyesuaian gaji berkala setiap 2 tahun sekali.</p>
                     </div>
                     <button type="button" @click="openModal('kgb', 'Tambah Riwayat KGB')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
-                        + Tambah KGB
+                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                        Tambah KGB
                     </button>
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-border">
@@ -451,7 +483,10 @@
                         <p class="text-xs text-muted font-sans mt-0.5">Catatan sanksi disiplin pegawai yang mempengaruhi promosi kepegawaian.</p>
                     </div>
                     <button type="button" @click="openModal('disiplin', 'Tambah Hukuman Disiplin')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
-                        + Tambah Hukuman
+                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                        Tambah Hukuman
                     </button>
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-border">
@@ -493,7 +528,10 @@
                         <p class="text-xs text-muted font-sans mt-0.5">Riwayat kualifikasi akademis tertinggi staf.</p>
                     </div>
                     <button type="button" @click="openModal('pendidikan', 'Tambah Riwayat Pendidikan')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
-                        + Tambah Pendidikan
+                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                        Tambah Pendidikan
                     </button>
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-border">
@@ -630,12 +668,12 @@
         {{-- MODAL DYNAMIC FORM --}}
         <div x-show="showModal" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;" x-transition>
             <div class="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-                <div class="fixed inset-0 bg-ink/30 transition-opacity" @click="showModal = false"></div>
+                <div class="fixed inset-0 bg-ink/60 transition-opacity" @click="showModal = false"></div>
                 
                 {{-- Centering spacer --}}
                 <span class="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">&#8203;</span>
                 
-                <div class="inline-block transform overflow-hidden rounded-lg bg-surface px-4 pt-5 pb-4 text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6 sm:align-middle border border-border">
+                <div class="relative z-10 inline-block transform overflow-hidden rounded-lg bg-surface px-4 pt-5 pb-4 text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6 sm:align-middle border border-border">
                     <div class="flex items-center justify-between border-b border-border pb-3 mb-4">
                         <h3 class="text-sm font-bold text-ink font-sans" x-text="modalTitle"></h3>
                         <button @click="showModal = false" class="text-muted hover:text-ink cursor-pointer">
@@ -651,11 +689,11 @@
                             <div class="space-y-4">
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Lengkap</label>
-                                    <input type="text" x-model="newKeluarga.nama" required class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="text" x-model="newKeluarga.nama" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Hubungan</label>
-                                    <select x-model="newKeluarga.hubungan" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <select x-model="newKeluarga.hubungan" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                         <option value="Suami">Suami</option>
                                         <option value="Istri">Istri</option>
                                         <option value="Anak">Anak</option>
@@ -664,11 +702,11 @@
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Lahir</label>
-                                    <input type="date" x-model="newKeluarga.tgl_lahir" required class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="date" x-model="newKeluarga.tgl_lahir" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Pekerjaan</label>
-                                    <input type="text" x-model="newKeluarga.pekerjaan" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="text" x-model="newKeluarga.pekerjaan" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                             </div>
                         </template>
@@ -678,7 +716,7 @@
                             <div class="space-y-4">
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Golongan</label>
-                                    <select x-model="newPangkat.golongan" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <select x-model="newPangkat.golongan" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                         <option value="I/a">I/a</option>
                                         <option value="I/b">I/b</option>
                                         <option value="I/c">I/c</option>
@@ -700,15 +738,15 @@
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Pangkat</label>
-                                    <input type="text" x-model="newPangkat.no_sk" required placeholder="SK-321-KP-2026" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="text" x-model="newPangkat.no_sk" required placeholder="SK-321-KP-2026" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK Terbit</label>
-                                    <input type="date" x-model="newPangkat.tgl_sk" required class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="date" x-model="newPangkat.tgl_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Golongan</label>
-                                    <input type="date" x-model="newPangkat.tmt" required class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="date" x-model="newPangkat.tmt" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                             </div>
                         </template>
@@ -718,11 +756,11 @@
                             <div class="space-y-4">
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Jabatan</label>
-                                    <input type="text" x-model="newJabatan.jabatan" required placeholder="Analis Kepegawaian Muda" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="text" x-model="newJabatan.jabatan" required placeholder="Analis Kepegawaian Muda" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Unit Kerja</label>
-                                    <select x-model="newJabatan.unit" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <select x-model="newJabatan.unit" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                         <option value="Bag. Umum">Bag. Umum</option>
                                         <option value="Bag. Keuangan">Bag. Keuangan</option>
                                         <option value="Bag. SDM">Bag. SDM</option>
@@ -731,15 +769,15 @@
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Jabatan</label>
-                                    <input type="text" x-model="newJabatan.no_sk" required placeholder="SK-910-JAB-2026" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="text" x-model="newJabatan.no_sk" required placeholder="SK-910-JAB-2026" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK Terbit</label>
-                                    <input type="date" x-model="newJabatan.tgl_sk" required class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="date" x-model="newJabatan.tgl_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Jabatan</label>
-                                    <input type="date" x-model="newJabatan.tmt" required class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="date" x-model="newJabatan.tmt" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                             </div>
                         </template>
@@ -749,19 +787,19 @@
                             <div class="space-y-4">
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Gaji Pokok Baru</label>
-                                    <input type="text" x-model="newKgb.gaji" required placeholder="Rp 4.100.000" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="text" x-model="newKgb.gaji" required placeholder="Rp 4.100.000" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor Surat KGB</label>
-                                    <input type="text" x-model="newKgb.no_sk" required placeholder="KGB-012-2026" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="text" x-model="newKgb.no_sk" required placeholder="KGB-012-2026" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Surat Terbit</label>
-                                    <input type="date" x-model="newKgb.tgl_sk" required class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="date" x-model="newKgb.tgl_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT KGB</label>
-                                    <input type="date" x-model="newKgb.tmt" required class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="date" x-model="newKgb.tmt" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                             </div>
                         </template>
@@ -771,7 +809,7 @@
                             <div class="space-y-4">
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Hukuman</label>
-                                    <select x-model="newDisiplin.jenis" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <select x-model="newDisiplin.jenis" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                         <option value="Teguran Lisan">Teguran Lisan</option>
                                         <option value="Teguran Tertulis">Teguran Tertulis</option>
                                         <option value="Pernyataan Tidak Puas secara Tertulis">Pernyataan Tidak Puas secara Tertulis</option>
@@ -780,19 +818,19 @@
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Alasan / Pelanggaran</label>
-                                    <input type="text" x-model="newDisiplin.alasan" required placeholder="Keterlambatan absensi berulang" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="text" x-model="newDisiplin.alasan" required placeholder="Keterlambatan absensi berulang" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Hukuman</label>
-                                    <input type="text" x-model="newDisiplin.no_sk" required placeholder="SK-HD-023-2026" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="text" x-model="newDisiplin.no_sk" required placeholder="SK-HD-023-2026" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK Terbit</label>
-                                    <input type="date" x-model="newDisiplin.tgl_sk" required class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="date" x-model="newDisiplin.tgl_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Masa Berlaku</label>
-                                    <input type="text" x-model="newDisiplin.masa" placeholder="6 Bulan" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="text" x-model="newDisiplin.masa" placeholder="6 Bulan" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                             </div>
                         </template>
@@ -802,7 +840,7 @@
                             <div class="space-y-4">
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tingkat Pendidikan</label>
-                                    <select x-model="newPendidikan.tingkat" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <select x-model="newPendidikan.tingkat" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                         <option value="Diploma III (D3)">Diploma III (D3)</option>
                                         <option value="Sarjana (S1)">Sarjana (S1)</option>
                                         <option value="Magister (S2)">Magister (S2)</option>
@@ -811,19 +849,19 @@
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Institusi</label>
-                                    <input type="text" x-model="newPendidikan.institusi" required placeholder="Universitas Sam Ratulangi" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="text" x-model="newPendidikan.institusi" required placeholder="Universitas Sam Ratulangi" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Program Studi</label>
-                                    <input type="text" x-model="newPendidikan.prodi" placeholder="Manajemen Keuangan" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="text" x-model="newPendidikan.prodi" placeholder="Manajemen Keuangan" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tahun Lulus</label>
-                                    <input type="number" x-model="newPendidikan.lulus" required placeholder="2007" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="number" x-model="newPendidikan.lulus" required placeholder="2007" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor Ijazah</label>
-                                    <input type="text" x-model="newPendidikan.no_ijazah" placeholder="IJZ-S1-MAN-2007" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="text" x-model="newPendidikan.no_ijazah" placeholder="IJZ-S1-MAN-2007" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                             </div>
                         </template>

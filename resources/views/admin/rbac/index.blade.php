@@ -239,7 +239,7 @@ $permissionPaths = [
                                                 <div class="flex items-center gap-1.5 flex-wrap">
                                                     <span class="font-bold text-primary font-mono text-[11px]">{{ $displayPath }}</span>
                                                     @if($isSensitive)
-                                                        <span class="inline-flex items-center rounded bg-danger/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-danger leading-none">⚠️ High Risk / Sensitif</span>
+                                                        <span class="inline-flex items-center text-[9px] font-bold uppercase tracking-wider text-danger leading-none">⚠️ High Risk / Sensitif</span>
                                                     @endif
                                                 </div>
                                                 <div class="text-[10px] text-muted mt-0.5 leading-relaxed">

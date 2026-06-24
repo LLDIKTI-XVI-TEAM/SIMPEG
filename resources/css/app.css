@@ -12,26 +12,26 @@
         'Segoe UI Symbol', 'Noto Color Emoji';
 
     /* Brand Colors */
-    --color-primary:   #122E92;
+    --color-primary: #122E92;
     --color-secondary: #D6AC48;
 
     /* Surface Colors */
-    --color-page:    #F8FAFC;
+    --color-page: #F8FAFC;
     --color-surface: #FFFFFF;
 
     /* Text Colors */
-    --color-ink:   #111827;
+    --color-ink: #111827;
     --color-muted: #6B7280;
 
     /* Status Colors */
     --color-success: #16A34A;
     --color-warning: #F59E0B;
-    --color-danger:  #DC2626;
-    --color-info:    #0284C7;
+    --color-danger: #DC2626;
+    --color-info: #0284C7;
 
     /* Utility Colors */
     --color-border: #E5E7EB;
-    --color-soft:   #F3F4F6;
+    --color-soft: #F3F4F6;
 }
 
 /* Reduced motion support */
@@ -40,4 +40,14 @@
         transition-duration: 0.01ms !important;
         animation-duration: 0.01ms !important;
     }
+}
+
+/* Fix Chrome Autofill background color */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px var(--color-surface) inset !important;
+    -webkit-text-fill-color: var(--color-ink) !important;
+    transition: background-color 5000s ease-in-out 0s;
 }

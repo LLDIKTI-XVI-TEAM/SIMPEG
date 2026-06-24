@@ -449,10 +449,10 @@
                                     <td class="px-4 py-3 text-center">
                                         @if($item['khusus_pns'] === 'Ya')
                                             <span
-                                                class="rounded-full bg-primary/10 text-primary px-3 py-1 text-[11px] font-semibold">Ya</span>
+                                                class="text-[11px] font-semibold text-primary">Ya</span>
                                         @else
                                             <span
-                                                class="rounded-full bg-soft text-muted px-3 py-1 text-[11px] font-semibold">Tidak</span>
+                                                class="text-[11px] font-semibold text-muted">Tidak</span>
                                         @endif
                                     </td>
                                     <td class="px-4 py-3 text-right">
@@ -909,9 +909,9 @@
                                     <td class="px-4 py-3 text-sm text-muted">{{ $item['nama'] }}</td>
                                     <td class="px-4 py-3 text-sm text-center">
                                         @if($item['jenis'] === 'Cuti Bersama')
-                                            <span class="rounded-full bg-secondary/10 text-secondary px-3 py-1 text-[11px] font-semibold">Cuti Bersama</span>
+                                            <span class="text-[11px] font-semibold text-secondary">Cuti Bersama</span>
                                         @else
-                                            <span class="rounded-full bg-danger/10 text-danger px-3 py-1 text-[11px] font-semibold">Libur Nasional</span>
+                                            <span class="text-[11px] font-semibold text-danger">Libur Nasional</span>
                                         @endif
                                     </td>
                                     <td class="px-4 py-3 text-right">

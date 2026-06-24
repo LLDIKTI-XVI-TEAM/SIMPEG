@@ -93,7 +93,7 @@
                             </td>
                             <td class="px-6 py-5">
                                 <span
-                                    class="inline-flex items-center gap-1.5 rounded-full bg-danger/10 px-3 py-1 text-xs font-bold text-danger">
+                                    class="inline-flex items-center gap-1.5 text-xs font-bold text-danger">
                                     <span class="h-1.5 w-1.5 rounded-full bg-danger"></span>
                                     Non-Aktif
                                 </span>
@@ -160,7 +160,7 @@
                             </td>
                             <td class="px-6 py-5">
                                 <span
-                                    class="inline-flex items-center gap-1.5 rounded-full bg-danger/10 px-3 py-1 text-xs font-bold text-danger">
+                                    class="inline-flex items-center gap-1.5 text-xs font-bold text-danger">
                                     <span class="h-1.5 w-1.5 rounded-full bg-danger"></span>
                                     Non-Aktif
                                 </span>
@@ -254,7 +254,7 @@
                             <dt class="text-muted">Status</dt>
                             <dd class="text-right">
                                 <span
-                                    class="inline-flex items-center gap-1.5 rounded-full bg-danger/10 px-3 py-1 text-xs font-bold text-danger">
+                                    class="inline-flex items-center gap-1.5 text-xs font-bold text-danger">
                                     <span class="h-1.5 w-1.5 rounded-full bg-danger"></span>
                                     Non-Aktif
                                 </span>

@@ -124,9 +124,9 @@
     }
 
     $statusClass = [
-        'menunggu'  => 'bg-warning/10 text-warning',
-        'disetujui' => 'bg-success/10 text-success',
-        'ditunda'   => 'bg-danger/10 text-danger',
+        'menunggu'  => 'text-warning',
+        'disetujui' => 'text-success',
+        'ditunda'   => 'text-danger',
     ];
 
     $statusDot = [
@@ -374,7 +374,7 @@
                                 </div>
                             </td>
                             <td class="px-4 py-3.5">
-                                <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $statusClass[$r['status']] }} font-sans">
+                                <span class="inline-flex items-center gap-1.5 text-xs font-semibold {{ $statusClass[$r['status']] }} font-sans">
                                     <span class="h-1.5 w-1.5 rounded-full {{ $statusDot[$r['status']] }}"></span>
                                     {{ $statusLabel[$r['status']] }}
                                 </span>

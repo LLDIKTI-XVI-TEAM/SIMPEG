@@ -443,7 +443,7 @@
                                             <div class="text-[10px] text-muted font-mono mt-0.5" x-text="user.email"></div>
                                         </td>
                                         <td class="px-4 py-3 text-xs">
-                                            <span class="rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                                            <span class="text-[10px] font-bold uppercase tracking-wide"
                                                 :class="{
                                                     'bg-danger/10 text-danger': user.role === 'super_admin',
                                                     'bg-primary/10 text-primary': user.role === 'admin_kepegawaian',

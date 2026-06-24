@@ -1,9 +1,9 @@
 <x-layouts.app title="Konfigurasi EWS">
     @php
         $badgeClass = [
-            'Read-only' => 'bg-info/10 text-info',
-            'Configurable' => 'bg-primary/10 text-primary',
-            'Aktif' => 'bg-success/10 text-success',
+            'Read-only' => 'text-info',
+            'Configurable' => 'text-primary',
+            'Aktif' => 'text-success',
         ];
 
         // Helper: convert days to human-readable label
@@ -234,7 +234,7 @@
                 </div>
                 <div class="flex items-center gap-2.5">
                     <span
-                        class="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-0.5 text-[10px] font-semibold text-success border border-success/15">
+                        class="inline-flex items-center gap-1.5 text-[10px] font-semibold text-success">
                         <span class="h-1.5 w-1.5 rounded-full bg-success"></span>
                         Status: Configurable
                     </span>
@@ -322,21 +322,21 @@
                             <span class="text-[10px] font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1</span>
                             <input type="number" name="pangkat_h90" x-model="pangkat_h90" min="1" step="1"
                                 :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + p90Class()">
-                            <span class="text-[10px] font-bold text-success bg-success/10 px-2 py-0.5 rounded-md min-w-[68px] text-center" x-text="humanLabel(pangkat_h90)"></span>
+                            <span class="text-[10px] font-bold text-success min-w-[68px] text-center" x-text="humanLabel(pangkat_h90)"></span>
                         </div>
                         <!-- Tahap 2 -->
                         <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-warning/5 border border-warning/15 rounded-xl px-3 py-2.5 shadow-sm">
                             <span class="text-[10px] font-bold text-warning uppercase tracking-wider block sm:hidden">Tahap 2</span>
                             <input type="number" name="pangkat_h60" x-model="pangkat_h60" min="1" step="1"
                                 :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + p60Class()">
-                            <span class="text-[10px] font-bold text-warning bg-warning/10 px-2.5 py-0.5 rounded-md min-w-[68px] text-center" x-text="humanLabel(pangkat_h60)"></span>
+                            <span class="text-[10px] font-bold text-warning min-w-[68px] text-center" x-text="humanLabel(pangkat_h60)"></span>
                         </div>
                         <!-- Tahap 3 -->
                         <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-danger/5 border border-danger/15 rounded-xl px-3 py-2.5 shadow-sm">
                             <span class="text-[10px] font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3</span>
                             <input type="number" name="pangkat_h30" x-model="pangkat_h30" min="1" step="1"
                                 :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + p30Class()">
-                            <span class="text-[10px] font-bold text-danger bg-danger/10 px-2.5 py-0.5 rounded-md min-w-[68px] text-center" x-text="humanLabel(pangkat_h30)"></span>
+                            <span class="text-[10px] font-bold text-danger min-w-[68px] text-center" x-text="humanLabel(pangkat_h30)"></span>
                         </div>
                     </div>
                 </div>
@@ -362,21 +362,21 @@
                             <span class="text-[10px] font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1</span>
                             <input type="number" name="kgb_h60" x-model="kgb_h60" min="1" step="1"
                                 :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + k60Class()">
-                            <span class="text-[10px] font-bold text-success bg-success/10 px-2 py-0.5 rounded-md min-w-[68px] text-center" x-text="humanLabel(kgb_h60)"></span>
+                            <span class="text-[10px] font-bold text-success min-w-[68px] text-center" x-text="humanLabel(kgb_h60)"></span>
                         </div>
                         <!-- Tahap 2 -->
                         <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-warning/5 border border-warning/15 rounded-xl px-3 py-2.5 shadow-sm">
                             <span class="text-[10px] font-bold text-warning uppercase tracking-wider block sm:hidden">Tahap 2</span>
                             <input type="number" name="kgb_h30" x-model="kgb_h30" min="1" step="1"
                                 :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + k30Class()">
-                            <span class="text-[10px] font-bold text-warning bg-warning/10 px-2.5 py-0.5 rounded-md min-w-[68px] text-center" x-text="humanLabel(kgb_h30)"></span>
+                            <span class="text-[10px] font-bold text-warning min-w-[68px] text-center" x-text="humanLabel(kgb_h30)"></span>
                         </div>
                         <!-- Tahap 3 -->
                         <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-danger/5 border border-danger/15 rounded-xl px-3 py-2.5 shadow-sm">
                             <span class="text-[10px] font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3</span>
                             <input type="number" name="kgb_h14" x-model="kgb_h14" min="1" step="1"
                                 :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + k14Class()">
-                            <span class="text-[10px] font-bold text-danger bg-danger/10 px-2.5 py-0.5 rounded-md min-w-[68px] text-center" x-text="humanLabel(kgb_h14)"></span>
+                            <span class="text-[10px] font-bold text-danger min-w-[68px] text-center" x-text="humanLabel(kgb_h14)"></span>
                         </div>
                     </div>
                 </div>
@@ -402,21 +402,21 @@
                             <span class="text-[10px] font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1</span>
                             <input type="number" name="pensiun_y1" x-model="pensiun_y1" min="1" step="1"
                                 :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + py1Class()">
-                            <span class="text-[10px] font-bold text-success bg-success/10 px-2 py-0.5 rounded-md min-w-[68px] text-center" x-text="humanLabel(pensiun_y1)"></span>
+                            <span class="text-[10px] font-bold text-success min-w-[68px] text-center" x-text="humanLabel(pensiun_y1)"></span>
                         </div>
                         <!-- Tahap 2 -->
                         <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-warning/5 border border-warning/15 rounded-xl px-3 py-2.5 shadow-sm">
                             <span class="text-[10px] font-bold text-warning uppercase tracking-wider block sm:hidden">Tahap 2</span>
                             <input type="number" name="pensiun_m6" x-model="pensiun_m6" min="1" step="1"
                                 :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + pm6Class()">
-                            <span class="text-[10px] font-bold text-warning bg-warning/10 px-2.5 py-0.5 rounded-md min-w-[68px] text-center" x-text="humanLabel(pensiun_m6)"></span>
+                            <span class="text-[10px] font-bold text-warning min-w-[68px] text-center" x-text="humanLabel(pensiun_m6)"></span>
                         </div>
                         <!-- Tahap 3 -->
                         <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-danger/5 border border-danger/15 rounded-xl px-3 py-2.5 shadow-sm">
                             <span class="text-[10px] font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3</span>
                             <input type="number" name="pensiun_m3" x-model="pensiun_m3" min="1" step="1"
                                 :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + pm3Class()">
-                            <span class="text-[10px] font-bold text-danger bg-danger/10 px-2.5 py-0.5 rounded-md min-w-[68px] text-center" x-text="humanLabel(pensiun_m3)"></span>
+                            <span class="text-[10px] font-bold text-danger min-w-[68px] text-center" x-text="humanLabel(pensiun_m3)"></span>
                         </div>
                     </div>
                 </div>
@@ -442,21 +442,21 @@
                             <span class="text-[10px] font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1</span>
                             <input type="number" name="pppk_m6" x-model="pppk_m6" min="1" step="1"
                                 :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + pp6Class()">
-                            <span class="text-[10px] font-bold text-success bg-success/10 px-2 py-0.5 rounded-md min-w-[68px] text-center" x-text="humanLabel(pppk_m6)"></span>
+                            <span class="text-[10px] font-bold text-success min-w-[68px] text-center" x-text="humanLabel(pppk_m6)"></span>
                         </div>
                         <!-- Tahap 2 -->
                         <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-warning/5 border border-warning/15 rounded-xl px-3 py-2.5 shadow-sm">
                             <span class="text-[10px] font-bold text-warning uppercase tracking-wider block sm:hidden">Tahap 2</span>
                             <input type="number" name="pppk_m3" x-model="pppk_m3" min="1" step="1"
                                 :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + pp3Class()">
-                            <span class="text-[10px] font-bold text-warning bg-warning/10 px-2.5 py-0.5 rounded-md min-w-[68px] text-center" x-text="humanLabel(pppk_m3)"></span>
+                            <span class="text-[10px] font-bold text-warning min-w-[68px] text-center" x-text="humanLabel(pppk_m3)"></span>
                         </div>
                         <!-- Tahap 3 -->
                         <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-danger/5 border border-danger/15 rounded-xl px-3 py-2.5 shadow-sm">
                             <span class="text-[10px] font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3</span>
                             <input type="number" name="pppk_m1" x-model="pppk_m1" min="1" step="1"
                                 :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + pp1Class()">
-                            <span class="text-[10px] font-bold text-danger bg-danger/10 px-2.5 py-0.5 rounded-md min-w-[68px] text-center" x-text="humanLabel(pppk_m1)"></span>
+                            <span class="text-[10px] font-bold text-danger min-w-[68px] text-center" x-text="humanLabel(pppk_m1)"></span>
                         </div>
                     </div>
                 </div>
