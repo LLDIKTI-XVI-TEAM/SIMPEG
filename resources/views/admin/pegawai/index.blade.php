@@ -166,8 +166,19 @@
                         </td>
                         <td class="px-4 py-3.5">
                             <div class="flex items-center gap-3">
-                                <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                                    {{ strtoupper(substr($p->nama_lengkap, 0, 1)) }}
+                                <div class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-sm font-bold text-primary">
+                                    @if($p->foto)
+                                        <img
+                                            src="{{ asset('storage/' . ltrim($p->foto, '/')) }}"
+                                            alt="Foto {{ $p->nama_lengkap }}"
+                                            class="h-full w-full object-cover"
+                                            loading="lazy"
+                                            onerror="this.classList.add('hidden'); this.nextElementSibling.classList.remove('hidden')"
+                                        >
+                                    @endif
+                                    <span class="{{ $p->foto ? 'hidden' : '' }}" aria-hidden="true">
+                                        {{ strtoupper(substr($p->nama_lengkap, 0, 1)) }}
+                                    </span>
                                 </div>
                                 <div class="min-w-0">
                                     <p class="text-sm font-semibold text-ink">{{ $p->nama_lengkap }}</p>
