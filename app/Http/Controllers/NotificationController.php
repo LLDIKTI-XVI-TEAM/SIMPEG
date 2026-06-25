@@ -2,42 +2,35 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\NotificationService;
+use App\Actions\Notifications\GetUnreadNotificationCountAction;
+use App\Actions\Notifications\ListNotificationsAction;
+use App\Actions\Notifications\MarkAllNotificationsAsReadAction;
+use App\Actions\Notifications\MarkNotificationAsReadAction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class NotificationController extends Controller
 {
-    public function __construct(private readonly NotificationService $notifications) {}
-
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, ListNotificationsAction $action): JsonResponse
     {
-        $employeeId = $request->user()?->employee_id;
-        $items = $this->notifications
-            ->latestForEmployee($employeeId)
-            ->map(fn ($notification) => $notification->toApiArray())
-            ->values();
-
-        return response()->json([
-            'data' => $items,
-            'meta' => [
-                'unread_count' => $this->notifications->unreadCountForEmployee($employeeId),
-            ],
-        ]);
+        return response()->json($action->execute($request->user()?->employee_id));
     }
 
-    public function unreadCount(Request $request): JsonResponse
+    public function unreadCount(Request $request, GetUnreadNotificationCountAction $action): JsonResponse
     {
         return response()->json([
             'data' => [
-                'unread_count' => $this->notifications->unreadCountForEmployee($request->user()?->employee_id),
+                'unread_count' => $action->execute($request->user()?->employee_id),
             ],
         ]);
     }
 
-    public function markAsRead(Request $request, string $notificationId): JsonResponse
-    {
-        $notification = $this->notifications->markAsReadForEmployee($notificationId, $request->user()?->employee_id);
+    public function markAsRead(
+        Request $request,
+        string $notificationId,
+        MarkNotificationAsReadAction $action,
+    ): JsonResponse {
+        $notification = $action->execute($notificationId, $request->user()?->employee_id);
 
         if ($notification === null) {
             abort(404);
@@ -46,11 +39,11 @@ class NotificationController extends Controller
         return response()->json(['data' => $notification->toApiArray()]);
     }
 
-    public function markAllAsRead(Request $request): JsonResponse
+    public function markAllAsRead(Request $request, MarkAllNotificationsAsReadAction $action): JsonResponse
     {
         return response()->json([
             'data' => [
-                'updated' => $this->notifications->markAllAsReadForEmployee($request->user()?->employee_id),
+                'updated' => $action->execute($request->user()?->employee_id),
             ],
         ]);
     }
