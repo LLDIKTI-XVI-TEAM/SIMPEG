@@ -14,7 +14,6 @@
         
         // Loading states
         isUploading: false,
-        isLoadingPreview: false,
         isValidating: false,
         isExecuting: false,
         apiError: '',
@@ -22,9 +21,18 @@
         // File reference
         selectedFile: null,
         
-        // Preview data (dari server)
+        // ALL rows data (editable) — [{row: N, data: {field: value, ...}}, ...]
         mainHeaders: [],
-        previewRows: [],
+        allRows: [],
+        
+        // Pagination preview
+        previewPage: 1,
+        previewPerPage: 10,
+        get previewTotalPages() { return Math.max(1, Math.ceil(this.allRows.length / this.previewPerPage)); },
+        get paginatedRows() {
+            const start = (this.previewPage - 1) * this.previewPerPage;
+            return this.allRows.slice(start, start + this.previewPerPage);
+        },
         
         // Validation results (dari server)
         validations: [],
@@ -32,6 +40,24 @@
         validRows: 0,
         skipRows: 0,
         errorRows: 0,
+        
+        // Validation pagination
+        valPage: 1,
+        valPerPage: 15,
+        valFilter: 'all',
+        get filteredValidations() {
+            if (this.valFilter === 'all') return this.validations;
+            return this.validations.filter(v => v.status === this.valFilter);
+        },
+        get valTotalPages() { return Math.max(1, Math.ceil(this.filteredValidations.length / this.valPerPage)); },
+        get paginatedValidations() {
+            const start = (this.valPage - 1) * this.valPerPage;
+            return this.filteredValidations.slice(start, start + this.valPerPage);
+        },
+        
+        // Track edits
+        hasEdits: false,
+        editedRowIndices: new Set(),
         
         // Execute results
         insertedCount: 0,
@@ -49,11 +75,7 @@
             let headers = ['Baris', 'Nama Pegawai', 'Kolom Bermasalah', 'Jenis Kesalahan'];
             let rows = this.validations
                 .filter(v => v.status === 'error')
-                .map(v => {
-                    let errorText = v.error || Object.values(v.errors || {}).flat().join('; ');
-                    let colText = v.col || Object.keys(v.errors || {}).join(', ') || '-';
-                    return [v.row, v.nama || v.name, colText, errorText];
-                });
+                .map(v => [v.row, v.name, v.col || '-', v.error || '']);
             
             let csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.map(val => String.fromCharCode(34) + val + String.fromCharCode(34)).join(','))].join('\n');
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -87,6 +109,12 @@
             }
         },
         
+        // Mark cell as edited
+        onCellEdit(rowIndex, header) {
+            this.hasEdits = true;
+            this.editedRowIndices.add(rowIndex);
+        },
+        
         // Step 1 → 2: Upload file ke server, lalu load preview
         async uploadAndPreview() {
             if (!this.selectedFile) return;
@@ -95,11 +123,11 @@
             this.apiError = '';
             
             try {
-                // Step 1: Upload
+                // Upload
                 const formData = new FormData();
                 formData.append('file', this.selectedFile);
                 
-                const uploadRes = await fetch('/api/v1/pegawai/import/upload', {
+                const uploadRes = await fetch('/api/pegawai/import/upload', {
                     method: 'POST',
                     headers: {
                         'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
@@ -117,9 +145,8 @@
                 this.batchId = uploadData.batch_id;
                 this.totalRows = uploadData.total_rows;
                 
-                // Step 2: Load Preview
-                this.isLoadingPreview = true;
-                const previewRes = await fetch('/api/v1/pegawai/import/' + this.batchId + '/preview', {
+                // Load Preview (all rows)
+                const previewRes = await fetch('/api/pegawai/import/' + this.batchId + '/preview', {
                     headers: {
                         'Accept': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
@@ -133,11 +160,11 @@
                 
                 const previewData = await previewRes.json();
                 this.mainHeaders = previewData.headers;
-                
-                // Transform preview data: array of objects → array of arrays (untuk table render)
-                this.previewRows = previewData.preview.map(item => {
-                    return previewData.headers.map(h => item.data[h] ?? '-');
-                });
+                this.allRows = previewData.rows; // [{row: N, data: {...}}, ...]
+                this.totalRows = previewData.total_rows;
+                this.previewPage = 1;
+                this.hasEdits = false;
+                this.editedRowIndices = new Set();
                 
                 this.step = 2;
                 
@@ -145,11 +172,10 @@
                 this.apiError = e.message;
             } finally {
                 this.isUploading = false;
-                this.isLoadingPreview = false;
             }
         },
         
-        // Step 2 → 3: Jalankan validasi
+        // Step 2 → 3: Jalankan validasi (kirim rows yang diedit)
         async runValidation() {
             if (!this.batchId) return;
             
@@ -157,13 +183,17 @@
             this.apiError = '';
             
             try {
-                const res = await fetch('/api/v1/pegawai/import/' + this.batchId + '/validate', {
+                // Kirim rows jika ada edit, atau tanpa body jika tidak ada perubahan
+                const body = this.hasEdits ? { rows: this.allRows } : {};
+                
+                const res = await fetch('/api/pegawai/import/' + this.batchId + '/validate', {
                     method: 'POST',
                     headers: {
                         'Accept': 'application/json',
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
                     },
+                    body: JSON.stringify(body),
                 });
                 
                 if (!res.ok) {
@@ -178,7 +208,7 @@
                 this.skipRows = data.skip_count;
                 
                 // Transform results untuk tabel validasi
-                this.validations = data.results.map(r => {
+                this.validations = data.results.map((r, i) => {
                     let errorMessages = [];
                     let errorCols = [];
                     if (r.errors && typeof r.errors === 'object') {
@@ -197,9 +227,15 @@
                         status: r.status,
                         col: errorCols.join(', ') || '-',
                         error: errorMessages.join('; ') || '',
+                        // Simpan index ke allRows untuk inline edit di step 3
+                        dataIndex: i,
                     };
                 });
                 
+                this.hasEdits = false;
+                this.editedRowIndices = new Set();
+                this.valPage = 1;
+                this.valFilter = 'all';
                 this.step = 3;
                 
             } catch (e) {
@@ -207,6 +243,13 @@
             } finally {
                 this.isValidating = false;
             }
+        },
+        
+        // Re-validate (dari step 3, setelah edit error rows)
+        async reValidate() {
+            // Karena allRows sudah diubah, kirim ulang
+            this.hasEdits = true;
+            await this.runValidation();
         },
         
         // Step 3 → 4 → 5: Execute import
@@ -219,7 +262,6 @@
             this.progress = 0;
             this.progressText = 'Mengirim data ke server...';
             
-            // Animasi progress simulasi (karena request berjalan di background)
             let progressInterval = setInterval(() => {
                 if (this.progress < 80) {
                     this.progress += 10;
@@ -231,7 +273,7 @@
             }, 600);
             
             try {
-                const res = await fetch('/api/v1/pegawai/import/' + this.batchId + '/execute', {
+                const res = await fetch('/api/pegawai/import/' + this.batchId + '/execute', {
                     method: 'POST',
                     headers: {
                         'Accept': 'application/json',
@@ -264,7 +306,7 @@
             } catch (e) {
                 clearInterval(progressInterval);
                 this.apiError = e.message;
-                this.step = 3; // Kembali ke validasi jika gagal
+                this.step = 3;
                 this.isExecuting = false;
             }
         },
@@ -279,7 +321,7 @@
             this.selectedFile = null;
             this.batchId = null;
             this.mainHeaders = [];
-            this.previewRows = [];
+            this.allRows = [];
             this.validations = [];
             this.totalRows = 0;
             this.validRows = 0;
@@ -288,6 +330,11 @@
             this.insertedCount = 0;
             this.apiError = '';
             this.progress = 0;
+            this.hasEdits = false;
+            this.editedRowIndices = new Set();
+            this.previewPage = 1;
+            this.valPage = 1;
+            this.valFilter = 'all';
         }
     }">
         
@@ -316,53 +363,43 @@
         {{-- STEP INDICATORS (Wizard) --}}
         <div class="rounded-lg border border-border bg-surface p-4 shadow-sm select-none">
             <div class="flex items-center justify-between max-w-4xl mx-auto text-xs font-semibold overflow-x-auto pb-1">
-                
-                {{-- Step 1 --}}
                 <div class="flex items-center gap-2 shrink-0">
                     <span :class="step >= 1 ? 'bg-primary text-white' : 'bg-soft text-muted border border-border'" class="h-6 w-6 rounded-full flex items-center justify-center font-mono">1</span>
-                    <span :class="step >= 1 ? 'text-primary font-bold' : 'text-muted'" class="font-sans">Upload Berkas</span>
+                    <span :class="step >= 1 ? 'text-primary font-bold' : 'text-muted'" class="font-sans">Upload</span>
                 </div>
                 <div :class="step > 1 ? 'bg-primary' : 'bg-border'" class="h-0.5 flex-1 mx-3 min-w-8 max-w-[72px]"></div>
-
-                {{-- Step 2 --}}
                 <div class="flex items-center gap-2 shrink-0">
                     <span :class="step >= 2 ? 'bg-primary text-white' : 'bg-soft text-muted border border-border'" class="h-6 w-6 rounded-full flex items-center justify-center font-mono">2</span>
-                    <span :class="step >= 2 ? 'text-primary font-bold' : 'text-muted'" class="font-sans">Preview Data</span>
+                    <span :class="step >= 2 ? 'text-primary font-bold' : 'text-muted'" class="font-sans">Preview & Edit</span>
                 </div>
                 <div :class="step > 2 ? 'bg-primary' : 'bg-border'" class="h-0.5 flex-1 mx-3 min-w-8 max-w-[72px]"></div>
-
-                {{-- Step 3 --}}
                 <div class="flex items-center gap-2 shrink-0">
                     <span :class="step >= 3 ? 'bg-primary text-white' : 'bg-soft text-muted border border-border'" class="h-6 w-6 rounded-full flex items-center justify-center font-mono">3</span>
-                    <span :class="step >= 3 ? 'text-primary font-bold' : 'text-muted'" class="font-sans">Validasi Data</span>
+                    <span :class="step >= 3 ? 'text-primary font-bold' : 'text-muted'" class="font-sans">Validasi</span>
                 </div>
                 <div :class="step > 3 ? 'bg-primary' : 'bg-border'" class="h-0.5 flex-1 mx-3 min-w-8 max-w-[72px]"></div>
-
-                {{-- Step 4 --}}
                 <div class="flex items-center gap-2 shrink-0">
                     <span :class="step >= 4 ? 'bg-primary text-white' : 'bg-soft text-muted border border-border'" class="h-6 w-6 rounded-full flex items-center justify-center font-mono">4</span>
-                    <span :class="step >= 4 ? 'text-primary font-bold' : 'text-muted'" class="font-sans">Proses Import</span>
+                    <span :class="step >= 4 ? 'text-primary font-bold' : 'text-muted'" class="font-sans">Proses</span>
                 </div>
                 <div :class="step > 4 ? 'bg-primary' : 'bg-border'" class="h-0.5 flex-1 mx-3 min-w-8 max-w-[72px]"></div>
-
-                {{-- Step 5 --}}
                 <div class="flex items-center gap-2 shrink-0">
                     <span :class="step >= 5 ? 'bg-primary text-white' : 'bg-soft text-muted border border-border'" class="h-6 w-6 rounded-full flex items-center justify-center font-mono">5</span>
-                    <span :class="step >= 5 ? 'text-primary font-bold' : 'text-muted'" class="font-sans">Hasil Akhir</span>
+                    <span :class="step >= 5 ? 'text-primary font-bold' : 'text-muted'" class="font-sans">Hasil</span>
                 </div>
             </div>
         </div>
 
-        {{-- STEP CONTENT --}}
-        
-        {{-- STEP 1: DOWNLOAD TEMPLATE & UPLOAD --}}
+        {{-- ═══════════════════════════════════════════════════════════════════ --}}
+        {{-- STEP 1: DOWNLOAD TEMPLATE & UPLOAD                                --}}
+        {{-- ═══════════════════════════════════════════════════════════════════ --}}
         <div x-show="step === 1" class="space-y-6" x-transition>
             
             {{-- Download Template Card --}}
             <div class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-4">
                 <div>
                     <h3 class="text-sm font-bold text-ink uppercase tracking-wider font-sans">1. Download Template Import Pegawai</h3>
-                    <p class="text-xs text-muted font-sans mt-0.5">Gunakan template di bawah agar header kolom sesuai dan data dapat terbaca dengan tepat oleh sistem.</p>
+                    <p class="text-xs text-muted font-sans mt-0.5">Gunakan template agar header kolom sesuai dan data dapat terbaca dengan tepat oleh sistem.</p>
                 </div>
                 <div class="inline-flex rounded-lg border border-border bg-soft p-1 text-xs font-semibold text-muted">
                     <button type="button" @click="templateFormat = 'xlsx'"
@@ -376,58 +413,37 @@
                     <button type="button" @click="activeTemplate = 'utama'; downloadTemplate('utama')"
                         :class="activeTemplate === 'utama' ? 'border-primary/20 bg-primary/5 text-primary' : 'border-border bg-surface text-ink hover:bg-soft'"
                         class="flex flex-col items-center justify-center p-3 rounded-lg text-center transition group cursor-pointer border">
-                        <svg class="w-8 h-8 mb-1.5 group-hover:scale-110 transition-transform duration-300"
-                            :class="activeTemplate === 'utama' ? 'text-primary' : 'text-ink/70'"
-                            fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-                        </svg>
+                        <svg class="w-8 h-8 mb-1.5 group-hover:scale-110 transition-transform duration-300" :class="activeTemplate === 'utama' ? 'text-primary' : 'text-ink/70'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
                         <span class="text-xs font-sans font-normal" :class="activeTemplate === 'utama' ? 'text-primary' : 'text-ink'">Template Utama</span>
-                        <span class="text-[9px] text-muted font-sans mt-0.5">(NIP, NIK, No KK, Gol, Jabatan, dll.)</span>
+                        <span class="text-[9px] text-muted font-sans mt-0.5">(NIP, NIK, No KK, dll.)</span>
                     </button>
                     <button type="button" @click="activeTemplate = 'pelengkap'; downloadTemplate('pelengkap')"
                         :class="activeTemplate === 'pelengkap' ? 'border-primary/20 bg-primary/5 text-primary' : 'border-border bg-surface text-ink hover:bg-soft'"
                         class="flex flex-col items-center justify-center p-3 rounded-lg text-center transition group cursor-pointer border">
-                        <svg class="w-8 h-8 mb-1.5 group-hover:scale-110 transition-transform duration-300"
-                            :class="activeTemplate === 'pelengkap' ? 'text-primary' : 'text-ink/70'"
-                            fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Zm6-10.125a1.875 1.875 0 1 1-3.75 0 1.875 1.875 0 0 1 3.75 0Zm-1.2 6.477a6 6 0 0 0-3.75 0A.45.45 0 0 0 5.25 16.2c0 1.156.986 2.067 2.13 1.9c1.077-.156 2.155-.156 3.232 0 1.144.167 2.13-.744 2.13-1.9a.45.45 0 0 0-.27-.423Z" />
-                        </svg>
+                        <svg class="w-8 h-8 mb-1.5 group-hover:scale-110 transition-transform duration-300" :class="activeTemplate === 'pelengkap' ? 'text-primary' : 'text-ink/70'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Zm6-10.125a1.875 1.875 0 1 1-3.75 0 1.875 1.875 0 0 1 3.75 0Zm-1.2 6.477a6 6 0 0 0-3.75 0" /></svg>
                         <span class="text-xs font-sans font-normal" :class="activeTemplate === 'pelengkap' ? 'text-primary' : 'text-ink'">Data Pelengkap</span>
                         <span class="text-[9px] text-muted font-sans mt-0.5">(NIK, KK, TTL, dll.)</span>
                     </button>
                     <button type="button" @click="activeTemplate = 'kepangkatan'; downloadTemplate('kepangkatan')"
                         :class="activeTemplate === 'kepangkatan' ? 'border-primary/20 bg-primary/5 text-primary' : 'border-border bg-surface text-ink hover:bg-soft'"
                         class="flex flex-col items-center justify-center p-3 rounded-lg text-center transition group cursor-pointer border">
-                        <svg class="w-8 h-8 mb-1.5 group-hover:scale-110 transition-transform duration-300"
-                            :class="activeTemplate === 'kepangkatan' ? 'text-primary' : 'text-ink/70'"
-                            fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296 3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043 3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12Z" />
-                        </svg>
+                        <svg class="w-8 h-8 mb-1.5 group-hover:scale-110 transition-transform duration-300" :class="activeTemplate === 'kepangkatan' ? 'text-primary' : 'text-ink/70'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296 3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043 3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12Z" /></svg>
                         <span class="text-xs font-sans font-normal" :class="activeTemplate === 'kepangkatan' ? 'text-primary' : 'text-ink'">Riwayat Pangkat</span>
-                        <span class="text-[9px] text-muted font-sans mt-0.5">(Append-only pangkat)</span>
+                        <span class="text-[9px] text-muted font-sans mt-0.5">(Append-only)</span>
                     </button>
                     <button type="button" @click="activeTemplate = 'jabatan'; downloadTemplate('jabatan')"
                         :class="activeTemplate === 'jabatan' ? 'border-primary/20 bg-primary/5 text-primary' : 'border-border bg-surface text-ink hover:bg-soft'"
                         class="flex flex-col items-center justify-center p-3 rounded-lg text-center transition group cursor-pointer border">
-                        <svg class="w-8 h-8 mb-1.5 group-hover:scale-110 transition-transform duration-300"
-                            :class="activeTemplate === 'jabatan' ? 'text-primary' : 'text-ink/70'"
-                            fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 .621-.504 1.125-1.125 1.125H4.875c-.621 0-1.125-.504-1.125-1.125v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387m4.5 8.006c-.194.165-.453.258-.75.258H4.875c-.297 0-.556-.093-.75-.258m16.5 0a2.18 2.18 0 0 1-.75 1.661v-4.25c0-.18-.02-.36-.06-.532m-16.5 4.88c-.19-.164-.324-.403-.324-.672v-4.25c0-.18.02-.36.06-.532m0 0a2.18 2.18 0 0 1 .75-1.661V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 0 1 3.413-.387m0 0V4.875c0-.621.504-1.125 1.125-1.125h4.125c.621 0 1.125.504 1.125 1.125v1.278m-5.25 0h5.25" />
-                        </svg>
+                        <svg class="w-8 h-8 mb-1.5 group-hover:scale-110 transition-transform duration-300" :class="activeTemplate === 'jabatan' ? 'text-primary' : 'text-ink/70'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 .621-.504 1.125-1.125 1.125H4.875c-.621 0-1.125-.504-1.125-1.125v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387m4.5 8.006c-.194.165-.453.258-.75.258H4.875" /></svg>
                         <span class="text-xs font-sans font-normal" :class="activeTemplate === 'jabatan' ? 'text-primary' : 'text-ink'">Riwayat Jabatan</span>
-                        <span class="text-[9px] text-muted font-sans mt-0.5">(Append-only jabatan)</span>
+                        <span class="text-[9px] text-muted font-sans mt-0.5">(Append-only)</span>
                     </button>
                     <button type="button" @click="activeTemplate = 'kgb'; downloadTemplate('kgb')"
                         :class="activeTemplate === 'kgb' ? 'border-primary/20 bg-primary/5 text-primary' : 'border-border bg-surface text-ink hover:bg-soft'"
                         class="flex flex-col items-center justify-center p-3 rounded-lg text-center transition group cursor-pointer border">
-                        <svg class="w-8 h-8 mb-1.5 group-hover:scale-110 transition-transform duration-300"
-                            :class="activeTemplate === 'kgb' ? 'text-primary' : 'text-ink/70'"
-                            fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5h16.5c.621 0 1.125.504 1.125 1.125v12.75c0 .621-.504 1.125-1.125 1.125H3.75c-.621 0-1.125-.504-1.125-1.125V5.625c0-.621.504-1.125 1.125-1.125Z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 12.75a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0ZM19.5 12a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z" />
-                        </svg>
+                        <svg class="w-8 h-8 mb-1.5 group-hover:scale-110 transition-transform duration-300" :class="activeTemplate === 'kgb' ? 'text-primary' : 'text-ink/70'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5h16.5c.621 0 1.125.504 1.125 1.125v12.75c0 .621-.504 1.125-1.125 1.125H3.75c-.621 0-1.125-.504-1.125-1.125V5.625c0-.621.504-1.125 1.125-1.125Z" /></svg>
                         <span class="text-xs font-sans font-normal" :class="activeTemplate === 'kgb' ? 'text-primary' : 'text-ink'">Riwayat KGB</span>
-                        <span class="text-[9px] text-muted font-sans mt-0.5">(Append-only KGB)</span>
+                        <span class="text-[9px] text-muted font-sans mt-0.5">(Append-only)</span>
                     </button>
                 </div>
             </div>
@@ -435,11 +451,10 @@
             {{-- Upload File Area Card --}}
             <div class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-4">
                 <div>
-                    <h3 class="text-sm font-bold text-ink uppercase tracking-wider font-sans">2. Unggah Berkas Pegawai (Excel / CSV)</h3>
-                    <p class="text-xs text-muted font-sans mt-0.5">Unggah berkas data pegawai dalam format CSV atau Excel (.xlsx) dengan ukuran maksimal 10MB.</p>
+                    <h3 class="text-sm font-bold text-ink uppercase tracking-wider font-sans">2. Unggah Berkas Pegawai (CSV)</h3>
+                    <p class="text-xs text-muted font-sans mt-0.5">Unggah berkas data pegawai dalam format CSV UTF-8 dengan ukuran maksimal 10MB.</p>
                 </div>
                 
-                {{-- Drag and drop container --}}
                 <div 
                     @dragover.prevent="dragover = true" 
                     @dragleave.prevent="dragover = false" 
@@ -447,19 +462,13 @@
                     :class="dragover ? 'border-primary bg-primary/5' : 'border-border bg-soft/50'"
                     class="border-2 border-dashed rounded-lg p-10 text-center relative hover:border-primary transition group"
                 >
-                    <input type="file" id="import_file" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" @change="handleFileSelect" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
-                    <svg class="mx-auto h-12 w-12 text-muted group-hover:text-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
-                    </svg>
+                    <input type="file" id="import_file" accept=".csv" @change="handleFileSelect" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+                    <svg class="mx-auto h-12 w-12 text-muted group-hover:text-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" /></svg>
                     <p class="text-sm text-ink font-semibold mt-3 font-sans">Pilih berkas atau seret berkas Anda di sini</p>
-                    <p class="text-xs text-muted mt-1 font-sans">Format yang diizinkan: CSV UTF-8 atau Excel (.xlsx). Maksimal 10MB.</p>
-                    
-                    {{-- File Upload Info State --}}
+                    <p class="text-xs text-muted mt-1 font-sans">Format: CSV UTF-8. Maksimal 10MB.</p>
                     <template x-if="fileName">
                         <div class="mt-4 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink font-mono shadow-sm">
-                            <svg class="w-4 h-4 text-success shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                            </svg>
+                            <svg class="w-4 h-4 text-success shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                             <span x-text="fileName"></span>
                             <span class="text-muted" x-text="'(' + fileSize + ')'"></span>
                         </div>
@@ -467,63 +476,72 @@
                     <p x-show="fileError" class="text-xs text-danger font-semibold mt-3 font-sans" x-text="fileError"></p>
                 </div>
 
-                {{-- Action bar --}}
                 <div class="border-t border-border pt-4 flex justify-end">
-                    <button 
-                        type="button" 
-                        @click="uploadAndPreview()" 
-                        :disabled="!fileValid || isUploading"
+                    <button type="button" @click="uploadAndPreview()" :disabled="!fileValid || isUploading"
                         :class="(!fileValid || isUploading) ? 'opacity-50 cursor-not-allowed bg-muted' : 'bg-primary hover:opacity-90 cursor-pointer'"
-                        class="inline-flex items-center justify-center rounded-lg px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition font-sans gap-2"
-                    >
-                        <svg x-show="isUploading" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-                        </svg>
+                        class="inline-flex items-center justify-center rounded-lg px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition font-sans gap-2">
+                        <svg x-show="isUploading" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
                         <span x-text="isUploading ? 'Mengupload & Memproses...' : 'Upload & Lanjutkan ke Preview'"></span>
                     </button>
                 </div>
             </div>
         </div>
 
-        {{-- STEP 2: PREVIEW DATA --}}
+        {{-- ═══════════════════════════════════════════════════════════════════ --}}
+        {{-- STEP 2: PREVIEW & EDIT DATA (EDITABLE TABLE)                      --}}
+        {{-- ═══════════════════════════════════════════════════════════════════ --}}
         <div x-show="step === 2" class="space-y-6" style="display: none;" x-transition>
             
             {{-- File Info Bar --}}
             <div class="rounded-lg border border-primary/20 bg-primary/5 p-4 flex items-center justify-between">
                 <div class="flex items-center gap-3 text-xs font-sans">
-                    <svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-                    </svg>
+                    <svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
                     <div>
                         <span class="font-bold text-ink" x-text="fileName"></span>
                         <span class="text-muted ml-2" x-text="'(' + totalRows + ' baris data)'"></span>
                     </div>
                 </div>
+                <div x-show="hasEdits" class="flex items-center gap-1.5 text-[10px] font-bold text-warning uppercase tracking-wider">
+                    <span>●</span> Ada perubahan belum divalidasi
+                </div>
             </div>
 
-            {{-- 10 Rows Preview Table --}}
+            {{-- Editable Preview Table --}}
             <div class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-4">
-                <div>
-                    <h3 class="text-sm font-bold text-ink uppercase tracking-wider font-sans">Preview Berkas (Maks 10 Baris Pertama)</h3>
-                    <p class="text-xs text-muted font-sans mt-0.5">Berikut adalah pratinjau data pegawai dari berkas yang Anda unggah. Pastikan data sudah benar sebelum masuk ke tahap validasi.</p>
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-bold text-ink uppercase tracking-wider font-sans">Preview & Edit Data</h3>
+                        <p class="text-xs text-muted font-sans mt-0.5">Klik langsung pada sel untuk mengedit data. Perubahan akan disimpan secara otomatis sebelum validasi.</p>
+                    </div>
+                    <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans bg-soft px-2 py-1 rounded">
+                        Hal. <span x-text="previewPage"></span> / <span x-text="previewTotalPages"></span>
+                    </span>
                 </div>
                 
                 <div class="overflow-x-auto rounded-lg border border-border">
                     <table class="w-full text-xs">
-                        <thead class="bg-soft">
+                        <thead class="bg-soft sticky top-0 z-10">
                             <tr>
-                                <th class="px-3 py-2 text-left font-bold text-muted border-r border-border">No</th>
+                                <th class="px-3 py-2 text-left font-bold text-muted border-r border-border w-12">No</th>
                                 <template x-for="header in mainHeaders" :key="header">
-                                    <th class="px-3 py-2 text-left font-bold text-muted border-r border-border truncate max-w-[120px]" x-text="header"></th>
+                                    <th class="px-3 py-2 text-left font-bold text-muted border-r border-border min-w-[120px]" x-text="header"></th>
                                 </template>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border">
-                            <template x-for="(row, rIndex) in previewRows" :key="rIndex">
-                                <tr class="hover:bg-soft/20">
-                                    <td class="px-3 py-2 border-r border-border font-mono text-muted" x-text="rIndex + 1"></td>
-                                    <template x-for="(cell, cIndex) in row" :key="cIndex">
-                                        <td class="px-3 py-2 border-r border-border font-mono text-ink truncate max-w-[120px]" x-text="cell || '-'"></td>
+                            <template x-for="(rowObj, rIndex) in paginatedRows" :key="rowObj.row">
+                                <tr class="group hover:bg-primary/[0.02]" :class="editedRowIndices.has((previewPage - 1) * previewPerPage + rIndex) ? 'bg-warning/[0.04]' : ''">
+                                    <td class="px-3 py-1.5 border-r border-border font-mono text-muted text-center" x-text="(previewPage - 1) * previewPerPage + rIndex + 1"></td>
+                                    <template x-for="header in mainHeaders" :key="header">
+                                        <td class="px-0.5 py-0.5 border-r border-border">
+                                            <input 
+                                                type="text"
+                                                :value="rowObj.data[header] ?? ''"
+                                                @input="rowObj.data[header] = $event.target.value; onCellEdit((previewPage - 1) * previewPerPage + rIndex, header)"
+                                                class="w-full px-2 py-1.5 text-xs font-mono text-ink bg-transparent border border-transparent rounded hover:border-border focus:border-primary focus:bg-surface focus:outline-none focus:ring-1 focus:ring-primary/30 transition"
+                                                :placeholder="header"
+                                            >
+                                        </td>
                                     </template>
                                 </tr>
                             </template>
@@ -531,139 +549,200 @@
                     </table>
                 </div>
 
-                <div x-show="totalRows > 10" class="text-xs text-muted font-sans text-center py-1">
-                    Menampilkan 10 dari <span class="font-bold text-ink" x-text="totalRows"></span> baris. Semua baris akan divalidasi di langkah berikutnya.
+                {{-- Pagination --}}
+                <div class="flex items-center justify-between text-xs font-sans" x-show="previewTotalPages > 1">
+                    <span class="text-muted">
+                        Menampilkan <span class="font-bold text-ink" x-text="((previewPage - 1) * previewPerPage) + 1"></span>–<span class="font-bold text-ink" x-text="Math.min(previewPage * previewPerPage, allRows.length)"></span>
+                        dari <span class="font-bold text-ink" x-text="allRows.length"></span> baris
+                    </span>
+                    <div class="flex items-center gap-1">
+                        <button type="button" @click="previewPage = Math.max(1, previewPage - 1)" :disabled="previewPage <= 1"
+                            :class="previewPage <= 1 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-soft cursor-pointer'"
+                            class="rounded border border-border bg-surface px-2.5 py-1 font-semibold text-ink transition">←</button>
+                        <template x-for="p in previewTotalPages" :key="p">
+                            <button type="button" @click="previewPage = p" x-show="p <= 5 || p === previewTotalPages || Math.abs(p - previewPage) <= 1"
+                                :class="previewPage === p ? 'bg-primary text-white border-primary' : 'bg-surface text-ink hover:bg-soft border-border'"
+                                class="rounded border px-2.5 py-1 font-semibold transition cursor-pointer" x-text="p"></button>
+                        </template>
+                        <button type="button" @click="previewPage = Math.min(previewTotalPages, previewPage + 1)" :disabled="previewPage >= previewTotalPages"
+                            :class="previewPage >= previewTotalPages ? 'opacity-30 cursor-not-allowed' : 'hover:bg-soft cursor-pointer'"
+                            class="rounded border border-border bg-surface px-2.5 py-1 font-semibold text-ink transition">→</button>
+                    </div>
                 </div>
 
                 {{-- Action Buttons --}}
                 <div class="border-t border-border pt-4 flex justify-between items-center gap-3">
-                    <button 
-                        type="button" 
-                        @click="resetAll()" 
-                        class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-semibold text-ink transition hover:bg-soft shadow-sm font-sans cursor-pointer"
-                    >
+                    <button type="button" @click="resetAll()" class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-semibold text-ink transition hover:bg-soft shadow-sm font-sans cursor-pointer">
                         Batal & Upload Ulang
                     </button>
-                    <button 
-                        type="button" 
-                        @click="runValidation()"
-                        :disabled="isValidating"
+                    <button type="button" @click="runValidation()" :disabled="isValidating"
                         :class="isValidating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'"
-                        class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition font-sans gap-2"
-                    >
-                        <svg x-show="isValidating" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-                        </svg>
+                        class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition font-sans gap-2">
+                        <svg x-show="isValidating" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
                         <span x-text="isValidating ? 'Memvalidasi...' : 'Lanjutkan ke Validasi'"></span>
                     </button>
                 </div>
             </div>
         </div>
 
-        {{-- STEP 3: VALIDASI DATA --}}
+        {{-- ═══════════════════════════════════════════════════════════════════ --}}
+        {{-- STEP 3: VALIDASI DATA (EDITABLE ERROR ROWS)                       --}}
+        {{-- ═══════════════════════════════════════════════════════════════════ --}}
         <div x-show="step === 3" class="space-y-6" style="display: none;" x-transition>
             
             {{-- Ringkasan Validasi Cards --}}
             <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div class="rounded-lg border border-border bg-surface p-4 shadow-sm text-center">
-                    <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Total Baris Berkas</span>
+                    <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Total Baris</span>
                     <p class="text-2xl font-bold text-ink font-sans mt-1" x-text="totalRows"></p>
                 </div>
-                <div class="rounded-lg border border-success/20 bg-success/5 p-4 shadow-sm text-center">
-                    <span class="text-[10px] font-bold text-success uppercase tracking-wider font-sans">Baris Valid (Siap Impor)</span>
+                <div class="rounded-lg border border-success/20 bg-success/5 p-4 shadow-sm text-center cursor-pointer" @click="valFilter = valFilter === 'valid' ? 'all' : 'valid'; valPage = 1">
+                    <span class="text-[10px] font-bold text-success uppercase tracking-wider font-sans">Valid (Siap Impor)</span>
                     <p class="text-2xl font-bold text-success font-sans mt-1" x-text="validRows"></p>
                 </div>
-                <div class="rounded-lg border border-primary/20 bg-primary/5 p-4 shadow-sm text-center">
-                    <span class="text-[10px] font-bold text-primary uppercase tracking-wider font-sans">Baris Di-skip (NIP Terdaftar)</span>
+                <div class="rounded-lg border border-primary/20 bg-primary/5 p-4 shadow-sm text-center cursor-pointer" @click="valFilter = valFilter === 'skip' ? 'all' : 'skip'; valPage = 1">
+                    <span class="text-[10px] font-bold text-primary uppercase tracking-wider font-sans">Di-skip (Duplikat)</span>
                     <p class="text-2xl font-bold text-primary font-sans mt-1" x-text="skipRows"></p>
                 </div>
-                <div class="rounded-lg border border-danger/20 bg-danger/5 p-4 shadow-sm text-center">
-                    <span class="text-[10px] font-bold text-danger uppercase tracking-wider font-sans">Baris Error (Bermasalah)</span>
+                <div class="rounded-lg border border-danger/20 bg-danger/5 p-4 shadow-sm text-center cursor-pointer" @click="valFilter = valFilter === 'error' ? 'all' : 'error'; valPage = 1">
+                    <span class="text-[10px] font-bold text-danger uppercase tracking-wider font-sans">Error (Bermasalah)</span>
                     <p class="text-2xl font-bold text-danger font-sans mt-1" x-text="errorRows"></p>
                 </div>
             </div>
 
-            {{-- Detail Error List Table --}}
+            {{-- Filter indicator --}}
+            <div x-show="valFilter !== 'all'" class="rounded-lg bg-soft border border-border p-3 flex items-center justify-between text-xs font-sans">
+                <span class="text-muted">Filter aktif: <span class="font-bold text-ink uppercase" x-text="valFilter"></span> (<span x-text="filteredValidations.length"></span> baris)</span>
+                <button type="button" @click="valFilter = 'all'; valPage = 1" class="text-primary font-semibold hover:underline cursor-pointer">Tampilkan Semua</button>
+            </div>
+
+            {{-- Validation Results Table with Inline Edit --}}
             <div class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-4">
-                <div>
-                    <h3 class="text-sm font-bold text-ink uppercase tracking-wider font-sans">Hasil Validasi Log Dokumen</h3>
-                    <p class="text-xs text-muted font-sans mt-0.5">Tinjau daftar baris data yang bermasalah atau sudah terdaftar di database sebelum memulai proses impor.</p>
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-bold text-ink uppercase tracking-wider font-sans">Hasil Validasi</h3>
+                        <p class="text-xs text-muted font-sans mt-0.5">Baris error bisa diedit langsung. Klik <strong>"Validasi Ulang"</strong> setelah memperbaiki data.</p>
+                    </div>
+                    <div x-show="hasEdits" class="flex items-center gap-1.5 text-[10px] font-bold text-warning uppercase tracking-wider">
+                        <span>●</span> Ada perubahan
+                    </div>
                 </div>
                 
                 <div class="overflow-x-auto rounded-lg border border-border">
                     <table class="w-full text-xs">
-                        <thead class="bg-soft">
+                        <thead class="bg-soft sticky top-0 z-10">
                             <tr>
-                                <th class="px-4 py-2 text-left font-bold text-muted">No. Baris</th>
-                                <th class="px-4 py-2 text-left font-bold text-muted">Nama Pegawai</th>
-                                <th class="px-4 py-2 text-left font-bold text-muted">Kolom Target</th>
-                                <th class="px-4 py-2 text-left font-bold text-muted">Status Validasi</th>
-                                <th class="px-4 py-2 text-left font-bold text-muted">Deskripsi Error / Tindakan</th>
+                                <th class="px-3 py-2 text-left font-bold text-muted border-r border-border w-16">Baris</th>
+                                <th class="px-3 py-2 text-left font-bold text-muted border-r border-border w-16">Status</th>
+                                <template x-for="header in mainHeaders" :key="'val-' + header">
+                                    <th class="px-3 py-2 text-left font-bold text-muted border-r border-border min-w-[120px]" x-text="header"></th>
+                                </template>
+                                <th class="px-3 py-2 text-left font-bold text-muted min-w-[200px]">Keterangan</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border">
-                            <template x-for="item in validations" :key="item.row">
-                                <tr :class="item.status === 'error' ? 'bg-danger/[0.02]' : (item.status === 'skip' ? 'bg-primary/[0.02]' : '')">
-                                    <td class="px-4 py-2.5 font-mono text-ink" x-text="item.row"></td>
-                                    <td class="px-4 py-2.5 font-semibold text-ink" x-text="item.name"></td>
-                                    <td class="px-4 py-2.5 font-mono text-muted" x-text="item.col || '-'"></td>
-                                    <td class="px-4 py-2.5">
-                                        <span :class="item.status === 'valid' ? 'text-success' : (item.status === 'skip' ? 'text-primary' : 'text-danger')" class="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider font-sans">
-                                            <span x-text="item.status"></span>
-                                        </span>
+                            <template x-for="item in paginatedValidations" :key="item.row">
+                                <tr :class="{
+                                    'bg-danger/[0.03]': item.status === 'error',
+                                    'bg-primary/[0.03]': item.status === 'skip',
+                                    '': item.status === 'valid'
+                                }">
+                                    <td class="px-3 py-1.5 border-r border-border font-mono text-muted text-center" x-text="item.row"></td>
+                                    <td class="px-3 py-1.5 border-r border-border text-center">
+                                        <span :class="{
+                                            'text-success bg-success/10': item.status === 'valid',
+                                            'text-danger bg-danger/10': item.status === 'error',
+                                            'text-primary bg-primary/10': item.status === 'skip'
+                                        }" class="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider" x-text="item.status"></span>
                                     </td>
-                                    <td class="px-4 py-2.5 font-sans" :class="item.status === 'error' ? 'text-danger font-semibold' : (item.status === 'skip' ? 'text-primary' : 'text-success')" x-text="item.error || 'Data siap untuk diimpor'"></td>
+                                    <template x-for="header in mainHeaders" :key="'val-cell-' + item.row + '-' + header">
+                                        <td class="px-0.5 py-0.5 border-r border-border">
+                                            {{-- Error/skip rows: editable inputs --}}
+                                            <template x-if="item.status === 'error' || item.status === 'skip'">
+                                                <input 
+                                                    type="text"
+                                                    :value="allRows[item.dataIndex]?.data[header] ?? ''"
+                                                    @input="allRows[item.dataIndex].data[header] = $event.target.value; onCellEdit(item.dataIndex, header)"
+                                                    :class="item.col && item.col.includes(header) ? 'border-danger/50 bg-danger/[0.03]' : 'border-transparent'"
+                                                    class="w-full px-2 py-1.5 text-xs font-mono text-ink bg-transparent border rounded hover:border-border focus:border-primary focus:bg-surface focus:outline-none focus:ring-1 focus:ring-primary/30 transition"
+                                                >
+                                            </template>
+                                            {{-- Valid rows: read-only --}}
+                                            <template x-if="item.status === 'valid'">
+                                                <span class="px-2 py-1.5 text-xs font-mono text-ink block" x-text="allRows[item.dataIndex]?.data[header] ?? '-'"></span>
+                                            </template>
+                                        </td>
+                                    </template>
+                                    <td class="px-3 py-1.5">
+                                        <span :class="{
+                                            'text-danger font-semibold': item.status === 'error',
+                                            'text-primary': item.status === 'skip',
+                                            'text-success': item.status === 'valid'
+                                        }" class="text-xs font-sans" x-text="item.error || 'Siap impor'"></span>
+                                    </td>
                                 </tr>
                             </template>
                         </tbody>
                     </table>
                 </div>
 
+                {{-- Validation Pagination --}}
+                <div class="flex items-center justify-between text-xs font-sans" x-show="valTotalPages > 1">
+                    <span class="text-muted">
+                        Hal. <span class="font-bold text-ink" x-text="valPage"></span> / <span class="font-bold text-ink" x-text="valTotalPages"></span>
+                    </span>
+                    <div class="flex items-center gap-1">
+                        <button type="button" @click="valPage = Math.max(1, valPage - 1)" :disabled="valPage <= 1"
+                            :class="valPage <= 1 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-soft cursor-pointer'"
+                            class="rounded border border-border bg-surface px-2.5 py-1 font-semibold text-ink transition">←</button>
+                        <template x-for="p in valTotalPages" :key="'vp-' + p">
+                            <button type="button" @click="valPage = p" x-show="p <= 5 || p === valTotalPages || Math.abs(p - valPage) <= 1"
+                                :class="valPage === p ? 'bg-primary text-white border-primary' : 'bg-surface text-ink hover:bg-soft border-border'"
+                                class="rounded border px-2.5 py-1 font-semibold transition cursor-pointer" x-text="p"></button>
+                        </template>
+                        <button type="button" @click="valPage = Math.min(valTotalPages, valPage + 1)" :disabled="valPage >= valTotalPages"
+                            :class="valPage >= valTotalPages ? 'opacity-30 cursor-not-allowed' : 'hover:bg-soft cursor-pointer'"
+                            class="rounded border border-border bg-surface px-2.5 py-1 font-semibold text-ink transition">→</button>
+                    </div>
+                </div>
+
                 {{-- Action Buttons --}}
                 <div class="border-t border-border pt-4 flex justify-between items-center gap-3">
-                    <button 
-                        type="button" 
-                        @click="resetAll()" 
-                        class="inline-flex items-center justify-center rounded-lg border border-danger/15 bg-surface px-5 py-2.5 text-sm font-semibold text-danger transition hover:bg-danger/5 shadow-sm font-sans cursor-pointer"
-                    >
+                    <button type="button" @click="resetAll()" class="inline-flex items-center justify-center rounded-lg border border-danger/15 bg-surface px-5 py-2.5 text-sm font-semibold text-danger transition hover:bg-danger/5 shadow-sm font-sans cursor-pointer">
                         Batalkan Semua
                     </button>
                     <div class="flex items-center gap-3">
-                        <button 
-                            type="button" 
-                            @click="step = 2" 
-                            class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-semibold text-ink transition hover:bg-soft shadow-sm font-sans cursor-pointer"
-                        >
-                            Kembali ke Preview
+                        <button type="button" @click="step = 2; hasEdits = false;" class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-semibold text-ink transition hover:bg-soft shadow-sm font-sans cursor-pointer">
+                            ← Kembali ke Preview
                         </button>
-                        <button 
-                            type="button" 
-                            @click="executeImport()"
-                            :disabled="validRows === 0 || isExecuting"
+                        <button type="button" @click="reValidate()" x-show="hasEdits" :disabled="isValidating"
+                            :class="isValidating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'"
+                            class="inline-flex items-center justify-center rounded-lg bg-warning px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition font-sans gap-2">
+                            <svg x-show="isValidating" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+                            🔄 Validasi Ulang
+                        </button>
+                        <button type="button" @click="executeImport()" :disabled="validRows === 0 || isExecuting"
                             :class="(validRows === 0 || isExecuting) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'"
-                            class="inline-flex items-center justify-center rounded-lg bg-success px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition font-sans"
-                        >
-                            Import Hanya yang Valid (<span x-text="validRows"></span> baris)
+                            class="inline-flex items-center justify-center rounded-lg bg-success px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition font-sans">
+                            Import Valid (<span x-text="validRows"></span> baris)
                         </button>
                     </div>
                 </div>
             </div>
         </div>
 
-        {{-- STEP 4: PROSES IMPORT --}}
+        {{-- ═══════════════════════════════════════════════════════════════════ --}}
+        {{-- STEP 4: PROSES IMPORT                                             --}}
+        {{-- ═══════════════════════════════════════════════════════════════════ --}}
         <div x-show="step === 4" class="space-y-6" style="display: none;" x-transition>
             <div class="rounded-lg border border-border bg-surface p-12 shadow-sm text-center max-w-xl mx-auto space-y-6">
                 <div class="flex items-center justify-center h-16 w-16 rounded-full bg-primary/10 text-primary mx-auto animate-pulse">
-                    <svg class="w-8 h-8 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-                    </svg>
+                    <svg class="w-8 h-8 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
                 </div>
                 <div class="space-y-2">
                     <h3 class="text-base font-bold text-ink font-sans" x-text="progressText"></h3>
-                    <p class="text-xs text-muted font-sans">Proses impor data sedang berlangsung. Mohon jangan menutup halaman ini.</p>
+                    <p class="text-xs text-muted font-sans">Mohon jangan menutup halaman ini.</p>
                 </div>
-                
-                {{-- Progress Bar --}}
                 <div class="space-y-1">
                     <div class="w-full bg-soft rounded-full h-2.5 overflow-hidden border border-border">
                         <div class="bg-primary h-2.5 rounded-full transition-all duration-300" :style="'width: ' + progress + '%'"></div>
@@ -673,70 +752,58 @@
             </div>
         </div>
 
-        {{-- STEP 5: LAPORAN HASIL --}}
+        {{-- ═══════════════════════════════════════════════════════════════════ --}}
+        {{-- STEP 5: LAPORAN HASIL                                             --}}
+        {{-- ═══════════════════════════════════════════════════════════════════ --}}
         <div x-show="step === 5" class="space-y-6" style="display: none;" x-transition>
-            
-            {{-- Success Result Card --}}
             <div class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6">
                 <div class="flex items-center gap-4 border-b border-border pb-4">
-                    <div class="flex h-12 w-12 items-center justify-center rounded-full bg-success/15 text-success text-2xl">
-                        ✓
-                    </div>
+                    <div class="flex h-12 w-12 items-center justify-center rounded-full bg-success/15 text-success text-2xl">✓</div>
                     <div>
-                        <h3 class="text-base font-bold text-ink font-sans">Proses Impor Selesai Diproses!</h3>
-                        <p class="text-xs text-muted font-sans mt-0.5">Hasil ringkasan data dari berkas yang diunggah tercantum di bawah ini.</p>
+                        <h3 class="text-base font-bold text-ink font-sans">Proses Impor Selesai!</h3>
+                        <p class="text-xs text-muted font-sans mt-0.5">Ringkasan hasil impor tercantum di bawah ini.</p>
                     </div>
                 </div>
 
-                {{-- Result stats --}}
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
                     <div class="rounded-lg bg-success/5 border border-success/15 p-4">
-                        <span class="text-xs font-bold text-success uppercase tracking-wider font-sans">Jumlah Berhasil</span>
+                        <span class="text-xs font-bold text-success uppercase tracking-wider font-sans">Berhasil</span>
                         <p class="text-2xl font-bold text-success mt-1" x-text="insertedCount"></p>
                         <span class="text-[9px] text-muted font-sans mt-0.5 block">(Status Aktif di database)</span>
                     </div>
                     <div class="rounded-lg bg-primary/5 border border-primary/15 p-4">
-                        <span class="text-xs font-bold text-primary uppercase tracking-wider font-sans">Jumlah Di-skip</span>
+                        <span class="text-xs font-bold text-primary uppercase tracking-wider font-sans">Di-skip</span>
                         <p class="text-2xl font-bold text-primary mt-1" x-text="skipRows"></p>
-                        <span class="text-[9px] text-muted font-sans mt-0.5 block">(NIP terdaftar - dilewati)</span>
+                        <span class="text-[9px] text-muted font-sans mt-0.5 block">(NIP terdaftar)</span>
                     </div>
                     <div class="rounded-lg bg-danger/5 border border-danger/15 p-4">
-                        <span class="text-xs font-bold text-danger uppercase tracking-wider font-sans">Jumlah Gagal</span>
+                        <span class="text-xs font-bold text-danger uppercase tracking-wider font-sans">Gagal</span>
                         <p class="text-2xl font-bold text-danger mt-1" x-text="errorRows"></p>
                         <span class="text-[9px] text-muted font-sans mt-0.5 block">(Data bermasalah)</span>
                     </div>
                 </div>
 
-                {{-- Download Failures & Audit log --}}
                 <div class="bg-soft/40 border border-border rounded-lg p-4 space-y-3.5 text-xs text-ink font-sans">
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                         <div>
-                            <span class="font-bold">Laporan Kegagalan Berkas</span>
-                            <p class="text-[11px] text-muted mt-0.5">Unduh file laporan berisi daftar baris bermasalah beserta alasan kegagalan untuk direvisi.</p>
+                            <span class="font-bold">Laporan Kegagalan</span>
+                            <p class="text-[11px] text-muted mt-0.5">Unduh daftar baris bermasalah untuk direvisi.</p>
                         </div>
-                        <button 
-                            @click="downloadErrorReport()"
-                            x-show="errorRows > 0"
-                            class="inline-flex items-center justify-center rounded-lg border border-danger/15 bg-surface px-4 py-2 font-bold text-danger transition hover:bg-danger/5 shadow-xs cursor-pointer"
-                        >
-                            📥 Unduh Laporan Gagal (.csv)
+                        <button @click="downloadErrorReport()" x-show="errorRows > 0"
+                            class="inline-flex items-center justify-center rounded-lg border border-danger/15 bg-surface px-4 py-2 font-bold text-danger transition hover:bg-danger/5 shadow-xs cursor-pointer">
+                            📥 Unduh Laporan (.csv)
                         </button>
                     </div>
-                    
                     <div class="border-t border-border/80 pt-3 space-y-1 text-muted text-[11px]">
-                        <span class="font-bold text-ink uppercase tracking-wider block text-[9px] mb-1">📝 Catatan Audit Log</span>
-                        <p>• User Operator: <span class="font-semibold text-ink">{{ session('active_role') ?? 'admin_kepegawaian' }}</span></p>
+                        <span class="font-bold text-ink uppercase tracking-wider block text-[9px] mb-1">📝 Audit Log</span>
+                        <p>• Operator: <span class="font-semibold text-ink">{{ session('active_role') ?? 'admin_kepegawaian' }}</span></p>
                         <p>• Timestamp: <span class="font-mono text-ink">{{ date('Y-m-d H:i:s') }} WITA</span></p>
                         <p>• Berkas: <span class="font-mono text-ink" x-text="fileName"></span></p>
                     </div>
                 </div>
 
-                {{-- Finish button --}}
                 <div class="border-t border-border pt-4 flex justify-end">
-                    <a 
-                        href="{{ route('data-pegawai') }}"
-                        class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 font-sans"
-                    >
+                    <a href="{{ route('data-pegawai') }}" class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 font-sans">
                         Kembali ke Daftar Pegawai
                     </a>
                 </div>

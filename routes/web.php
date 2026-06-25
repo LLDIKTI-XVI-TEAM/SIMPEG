@@ -157,6 +157,23 @@ Route::middleware('keycloak.auth')->group(function (): void {
     })->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
         ->name('pegawai.import-template');
 
+    // Import API endpoints (dipanggil via fetch dari blade, butuh session auth)
+    Route::post('/api/pegawai/import/upload', [\App\Http\Controllers\EmployeeImportController::class, 'upload'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->name('pegawai.import.upload');
+
+    Route::get('/api/pegawai/import/{batchId}/preview', [\App\Http\Controllers\EmployeeImportController::class, 'preview'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->name('pegawai.import.preview');
+
+    Route::post('/api/pegawai/import/{batchId}/validate', [\App\Http\Controllers\EmployeeImportController::class, 'validate'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->name('pegawai.import.validate');
+
+    Route::post('/api/pegawai/import/{batchId}/execute', [\App\Http\Controllers\EmployeeImportController::class, 'execute'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->name('pegawai.import.execute');
+
     Route::get('/ews', [EwsController::class, 'index'])
         ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('ews');

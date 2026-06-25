@@ -79,14 +79,12 @@ class EmployeeImportController extends Controller
     {
         $batch = $this->getBatchOrFail($batchId, $request);
 
-        $previewRows = array_slice($batch['rows'], 0, self::PREVIEW_LIMIT);
-
         return response()->json([
             'batch_id'   => $batchId,
             'filename'   => $batch['filename'],
             'total_rows' => $batch['total_rows'],
             'headers'    => $batch['headers'],
-            'preview'    => $previewRows,
+            'rows'       => $batch['rows'],
         ]);
     }
 
@@ -95,6 +93,14 @@ class EmployeeImportController extends Controller
     public function validate(Request $request, string $batchId): JsonResponse
     {
         $batch = $this->getBatchOrFail($batchId, $request);
+
+        // Jika frontend mengirim rows yang sudah diedit, update cache
+        if ($request->has('rows')) {
+            $editedRows = $request->input('rows');
+            $batch['rows'] = $editedRows;
+            $batch['total_rows'] = count($editedRows);
+            Cache::put(self::CACHE_PREFIX . $batchId, $batch, now()->addMinutes(self::CACHE_TTL_MINUTES));
+        }
 
         $results = [];
         $validCount = 0;
