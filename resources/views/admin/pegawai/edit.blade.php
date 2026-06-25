@@ -266,9 +266,9 @@
                             <label for="jenis_pegawai_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Status Kepegawaian <span class="text-danger">*</span></label>
                             <div class="relative">
                                 <select id="jenis_pegawai_id" name="jenis_pegawai_id" required class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="" disabled selected>Pilih Status Kepegawaian</option>
+                                    <option value="" disabled {{ empty($p->jenis_pegawai_id) ? 'selected' : '' }}>Pilih Status Kepegawaian</option>
                                     @foreach($jenisPegawai as $jenis)
-                                        <option value="{{ $jenis->id }}">{{ $jenis->nama }}</option>
+                                        <option value="{{ $jenis->id }}" {{ $p->jenis_pegawai_id == $jenis->id ? 'selected' : '' }}>{{ $jenis->nama }}</option>
                                     @endforeach
                                 </select>
                                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
@@ -286,7 +286,7 @@
                         </div>
 
                         {{-- Golongan --}}
-                        <div class="space-y-1" x-data="{ open: false, selected: 'I/a' }">
+                        <div class="space-y-1" x-data="{ open: false, selected: '{{ $p->golongan_terakhir ?? 'I/a' }}' }">
                             <label for="golongan_terakhir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Golongan <span class="text-danger">*</span></label>
                             <div class="relative">
                                 <input type="hidden" name="golongan_terakhir" :value="selected">
@@ -332,11 +332,11 @@
                             <label for="pendidikan_terakhir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Pendidikan Terakhir <span class="text-danger">*</span></label>
                             <div class="relative">
                                 <select id="pendidikan_terakhir" name="pendidikan_terakhir" required class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="Diploma III (D3)">Diploma III (D3)</option>
-                                    <option value="Sarjana (S1)">Sarjana (S1)</option>
-                                    <option value="Magister (S2)">Magister (S2)</option>
-                                    <option value="Doktor (S3)">Doktor (S3)</option>
-                                    <option value="SMA / Sederajat">SMA / Sederajat</option>
+                                    <option value="Diploma III (D3)" {{ $p->pendidikan_terakhir == 'Diploma III (D3)' ? 'selected' : '' }}>Diploma III (D3)</option>
+                                    <option value="Sarjana (S1)" {{ $p->pendidikan_terakhir == 'Sarjana (S1)' ? 'selected' : '' }}>Sarjana (S1)</option>
+                                    <option value="Magister (S2)" {{ $p->pendidikan_terakhir == 'Magister (S2)' ? 'selected' : '' }}>Magister (S2)</option>
+                                    <option value="Doktor (S3)" {{ $p->pendidikan_terakhir == 'Doktor (S3)' ? 'selected' : '' }}>Doktor (S3)</option>
+                                    <option value="SMA / Sederajat" {{ $p->pendidikan_terakhir == 'SMA / Sederajat' ? 'selected' : '' }}>SMA / Sederajat</option>
                                 </select>
                                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -390,8 +390,8 @@
                             <label for="jenis_kelamin" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Kelamin</label>
                             <div class="relative">
                                 <select id="jenis_kelamin" name="jenis_kelamin" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="L">Laki-laki</option>
-                                    <option value="P">Perempuan</option>
+                                    <option value="L" {{ $p->jenis_kelamin == 'L' ? 'selected' : '' }}>Laki-laki</option>
+                                    <option value="P" {{ $p->jenis_kelamin == 'P' ? 'selected' : '' }}>Perempuan</option>
                                 </select>
                                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -406,9 +406,9 @@
                             <label for="agama_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Agama</label>
                             <div class="relative">
                                 <select id="agama_id" name="agama_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="" disabled selected>Pilih Agama</option>
+                                    <option value="" disabled {{ empty($p->agama_id) ? 'selected' : '' }}>Pilih Agama</option>
                                     @foreach($agama as $a)
-                                        <option value="{{ $a->id }}">{{ $a->nama }}</option>
+                                        <option value="{{ $a->id }}" {{ $p->agama_id == $a->id ? 'selected' : '' }}>{{ $a->nama }}</option>
                                     @endforeach
                                 </select>
                                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
@@ -424,9 +424,9 @@
                             <label for="status_kawin_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Status Kawin</label>
                             <div class="relative">
                                 <select id="status_kawin_id" name="status_kawin_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="" disabled selected>Pilih Status Kawin</option>
+                                    <option value="" disabled {{ empty($p->status_kawin_id) ? 'selected' : '' }}>Pilih Status Kawin</option>
                                     @foreach($statusKawin as $sk)
-                                        <option value="{{ $sk->id }}">{{ $sk->nama }}</option>
+                                        <option value="{{ $sk->id }}" {{ $p->status_kawin_id == $sk->id ? 'selected' : '' }}>{{ $sk->nama }}</option>
                                     @endforeach
                                 </select>
                                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
@@ -442,10 +442,10 @@
                             <label for="golongan_darah" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Golongan Darah</label>
                             <div class="relative">
                                 <select id="golongan_darah" name="golongan_darah" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="A">A</option>
-                                    <option value="B">B</option>
-                                    <option value="AB">AB</option>
-                                    <option value="O">O</option>
+                                    <option value="A" {{ $p->golongan_darah == 'A' ? 'selected' : '' }}>A</option>
+                                    <option value="B" {{ $p->golongan_darah == 'B' ? 'selected' : '' }}>B</option>
+                                    <option value="AB" {{ $p->golongan_darah == 'AB' ? 'selected' : '' }}>AB</option>
+                                    <option value="O" {{ $p->golongan_darah == 'O' ? 'selected' : '' }}>O</option>
                                 </select>
                                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -520,10 +520,10 @@
                             <label for="jenis_pengangkatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Pengangkatan <span class="text-danger">*</span></label>
                             <div class="relative">
                                 <select id="jenis_pengangkatan" name="jenis_pengangkatan" required class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="" disabled selected>Pilih Jenis Pengangkatan</option>
-                                    <option value="CPNS">CPNS</option>
-                                    <option value="PNS">PNS</option>
-                                    <option value="PPPK">PPPK</option>
+                                    <option value="" disabled {{ empty($p->appointment->jenis_pengangkatan) ? 'selected' : '' }}>Pilih Jenis Pengangkatan</option>
+                                    <option value="CPNS" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'CPNS' ? 'selected' : '' }}>CPNS</option>
+                                    <option value="PNS" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'PNS' ? 'selected' : '' }}>PNS</option>
+                                    <option value="PPPK" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'PPPK' ? 'selected' : '' }}>PPPK</option>
                                 </select>
                                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
