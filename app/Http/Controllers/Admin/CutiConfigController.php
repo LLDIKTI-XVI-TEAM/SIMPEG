@@ -117,7 +117,7 @@ class CutiConfigController extends Controller
 
         // 1. Stage 2 change log
         if ((string)$oldStage2Id !== (string)$newStage2Id) {
-            $newId = count($dynamicLogs) + count(AuditController::$auditLogs) + 1;
+            $newId = count($dynamicLogs) + 1;
             $dynamicLogs[] = [
                 'id' => $newId,
                 'timestamp' => now()->format('Y-m-d H:i:s'),
@@ -136,7 +136,7 @@ class CutiConfigController extends Controller
 
         // 2. Stage 3 change log
         if ((string)$oldStage3Id !== (string)$newStage3Id) {
-            $newId = count($dynamicLogs) + count(AuditController::$auditLogs) + 1;
+            $newId = count($dynamicLogs) + 1;
             $dynamicLogs[] = [
                 'id' => $newId,
                 'timestamp' => now()->format('Y-m-d H:i:s'),
@@ -158,7 +158,7 @@ class CutiConfigController extends Controller
         $newSkip = ((string)$newStage2Id === (string)$newStage3Id) ? 'Aktif' : 'Tidak aktif';
 
         if ($oldSkip !== $newSkip) {
-            $newId = count($dynamicLogs) + count(AuditController::$auditLogs) + 1;
+            $newId = count($dynamicLogs) + 1;
             $dynamicLogs[] = [
                 'id' => $newId,
                 'timestamp' => now()->format('Y-m-d H:i:s'),
