@@ -10,15 +10,10 @@ class DatabaseSeederTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_database_seeder_whitelists_demo_klabat_for_local_sso_testing(): void
+    public function test_database_seeder_does_not_create_users_before_sso_bootstrap(): void
     {
         $this->seed(DatabaseSeeder::class);
 
-        $this->assertDatabaseHas('users', [
-            'email' => 'demo-klabat@dev.local',
-            'keycloak_username' => 'demo-klabat',
-            'employee_id' => null,
-            'role' => 'super_admin',
-        ]);
+        $this->assertDatabaseCount('users', 0);
     }
 }
