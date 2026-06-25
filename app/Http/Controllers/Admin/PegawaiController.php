@@ -7,6 +7,9 @@ use App\Models\Employee;
 use Illuminate\Http\Request;
 use App\Http\Requests\StoreEmployeeRequest;
 use App\Models\Appointment;
+use App\Models\PositionHistory;
+use App\Models\RefJenisPegawai;
+use App\Models\RefUnitKerja;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -276,43 +279,174 @@ class PegawaiController extends Controller
 
     public function index(Request $request)
     {
-        $perPage = (int) $request->input('per_page', 10);
-        $query = Employee::with(['jenisPegawai']);
+        $perPage = (int) $request->query('per_page', 10);
+        $perPage = in_array($perPage, [10, 25, 50], true) ? $perPage : 10;
 
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('nama_lengkap', 'like', '%' . $search . '%')
-                  ->orWhere('nip', 'like', '%' . $search . '%');
-            });
-        }
-        if ($request->filled('golongan')) {
-            $query->where('golongan_terakhir', 'like', $request->golongan . '%');
-        }
-        if ($request->filled('unit')) {
-            $unitJabatanMap = [
-                'Bag. SDM' => 'Analis Kepegawaian',
-                'Bag. IT' => 'Pengelola Data',
-                'Bag. Umum' => 'Perencana',
-                'Bag. Keuangan' => 'Arsiparis',
-            ];
-            if (isset($unitJabatanMap[$request->unit])) {
-                $query->where('jabatan_terakhir', $unitJabatanMap[$request->unit]);
-            } else {
-                $query->where('jabatan_terakhir', 'like', '%' . $request->unit . '%');
-            }
-        }
-        if ($request->filled('jenis')) {
-            $query->whereHas('jenisPegawai', function($q) use ($request) {
-                $q->where('nama', $request->jenis);
-            });
-        }
-        if ($request->filled('status')) {
-            $query->where('status_aktif', 'like', strtolower($request->status) . '%');
+        $unitKerjaOptions = RefUnitKerja::query()
+            ->orderBy('nama')
+            ->get(['id', 'nama']);
+        $jenisPegawaiOptions = RefJenisPegawai::query()
+            ->orderBy('nama')
+            ->get(['id', 'nama']);
+        $statusOptions = ['Aktif', 'Non-Aktif', 'Pensiun', 'Mutasi'];
+        $golonganOptions = Employee::query()
+            ->whereNotNull('golongan_terakhir')
+            ->distinct()
+            ->orderBy('golongan_terakhir')
+            ->pluck('golongan_terakhir')
+            ->map(fn (?string $golongan) => $golongan ? strtok($golongan, '/') : null)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($golonganOptions->isEmpty()) {
+            $golonganOptions = collect(['II', 'III', 'IV']);
         }
 
-        $pegawaiData = $query->paginate($perPage)->withQueryString();
-        return view('admin.pegawai.index', compact('pegawaiData'));
+        $filters = [
+            'search' => trim((string) $request->query('search', '')),
+            'golongan' => trim((string) $request->query('golongan', '')),
+            'unit_kerja_id' => trim((string) $request->query('unit_kerja_id', '')),
+            'jenis_pegawai_id' => trim((string) $request->query('jenis_pegawai_id', '')),
+            'status_aktif' => trim((string) $request->query('status_aktif', '')),
+        ];
+
+        // Backward-compatible query params from the pagination branch.
+        if ($filters['unit_kerja_id'] === '' && $request->filled('unit')) {
+            $legacyUnit = (string) $request->query('unit');
+            $matchedUnit = $unitKerjaOptions->firstWhere('nama', $legacyUnit);
+            $filters['unit_kerja_id'] = $matchedUnit?->id ?? '';
+        }
+
+        if ($filters['jenis_pegawai_id'] === '' && $request->filled('jenis')) {
+            $legacyJenis = (string) $request->query('jenis');
+            $matchedJenis = $jenisPegawaiOptions->firstWhere('nama', $legacyJenis);
+            $filters['jenis_pegawai_id'] = $matchedJenis?->id ?? '';
+        }
+
+        if ($filters['status_aktif'] === '' && $request->filled('status')) {
+            $legacyStatus = strtolower((string) $request->query('status'));
+            $filters['status_aktif'] = match ($legacyStatus) {
+                'aktif' => 'Aktif',
+                'nonaktif', 'non-aktif' => 'Non-Aktif',
+                'pensiun' => 'Pensiun',
+                'mutasi' => 'Mutasi',
+                default => '',
+            };
+        }
+
+        if ($request->query('filter') === 'pensiun' && $filters['status_aktif'] === '') {
+            $filters['status_aktif'] = 'Pensiun';
+        }
+
+        if (! $unitKerjaOptions->contains('id', $filters['unit_kerja_id'])) {
+            $filters['unit_kerja_id'] = '';
+        }
+
+        if (! $jenisPegawaiOptions->contains('id', $filters['jenis_pegawai_id'])) {
+            $filters['jenis_pegawai_id'] = '';
+        }
+
+        if (! in_array($filters['status_aktif'], $statusOptions, true)) {
+            $filters['status_aktif'] = '';
+        }
+
+        if ($filters['golongan'] !== '' && ! $golonganOptions->contains($filters['golongan'])) {
+            $filters['golongan'] = '';
+        }
+
+        $allowedSorts = ['pegawai', 'jabatan', 'golongan', 'tmt'];
+        $sort = $request->query('sort', 'pegawai');
+        $sort = in_array($sort, $allowedSorts, true) ? $sort : 'pegawai';
+
+        $direction = strtolower((string) $request->query('direction', 'asc'));
+        $direction = in_array($direction, ['asc', 'desc'], true) ? $direction : 'asc';
+
+        $pegawaiQuery = Employee::query()
+            ->with([
+                'jenisPegawai',
+                'appointment',
+                'positionHistories' => fn ($query) => $query
+                    ->with('unitKerja')
+                    ->orderByDesc('is_latest')
+                    ->orderByDesc('tmt_jabatan'),
+            ]);
+
+        if ($filters['search'] !== '') {
+            $search = mb_strtolower($filters['search']);
+            $pegawaiQuery->where(function ($query) use ($search): void {
+                $query
+                    ->whereRaw('LOWER(nama_lengkap) LIKE ?', ["%{$search}%"])
+                    ->orWhereRaw('LOWER(nip) LIKE ?', ["%{$search}%"]);
+            });
+        }
+
+        if ($filters['golongan'] !== '') {
+            $pegawaiQuery->where('golongan_terakhir', 'like', $filters['golongan'] . '%');
+        }
+
+        if ($filters['unit_kerja_id'] !== '') {
+            $pegawaiQuery->whereHas('positionHistories', function ($query) use ($filters): void {
+                $query
+                    ->where('unit_kerja_id', $filters['unit_kerja_id'])
+                    ->where('is_latest', true);
+            });
+        }
+
+        if ($filters['jenis_pegawai_id'] !== '') {
+            $pegawaiQuery->where('jenis_pegawai_id', $filters['jenis_pegawai_id']);
+        }
+
+        if ($filters['status_aktif'] !== '') {
+            $pegawaiQuery->where('status_aktif', $filters['status_aktif']);
+        }
+
+        match ($sort) {
+            'jabatan' => $pegawaiQuery
+                ->orderBy('jabatan_terakhir', $direction)
+                ->orderBy('nama_lengkap'),
+            'golongan' => $pegawaiQuery
+                ->orderBy('golongan_terakhir', $direction)
+                ->orderBy('nama_lengkap'),
+            'tmt' => $pegawaiQuery
+                ->orderBy(
+                    PositionHistory::query()
+                        ->select('tmt_jabatan')
+                        ->whereColumn('position_histories.employee_id', 'employees.id')
+                        ->orderByDesc('is_latest')
+                        ->orderByDesc('tmt_jabatan')
+                        ->limit(1),
+                    $direction
+                )
+                ->orderBy(
+                    Appointment::query()
+                        ->select('tmt_pengangkatan')
+                        ->whereColumn('appointments.employee_id', 'employees.id')
+                        ->orderBy('tmt_pengangkatan')
+                        ->limit(1),
+                    $direction
+                )
+                ->orderBy('nama_lengkap'),
+            default => $pegawaiQuery
+                ->orderBy('nama_lengkap', $direction)
+                ->orderBy('nip'),
+        };
+
+        $pegawaiData = $pegawaiQuery
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return view('admin.pegawai.index', compact(
+            'pegawaiData',
+            'perPage',
+            'sort',
+            'direction',
+            'filters',
+            'golonganOptions',
+            'unitKerjaOptions',
+            'jenisPegawaiOptions',
+            'statusOptions'
+        ));
     }
 
     public function create()

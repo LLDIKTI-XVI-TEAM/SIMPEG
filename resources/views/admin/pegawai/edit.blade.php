@@ -1,4 +1,8 @@
 <x-layouts.app title="Edit Pegawai">
+    @php
+        $fotoUrl = $p->foto_url;
+    @endphp
+
     <div class="mx-auto max-w-4xl space-y-6">
         
         {{-- Breadcrumbs & Title --}}
@@ -62,7 +66,7 @@
             kk: '{{ $p->no_kk ?? '' }}',
             nikError: '',
             kkError: '',
-            fotoPreview: '{{ $p->foto ? asset("storage/" . $p->foto) : "" }}',
+            fotoPreview: @js($fotoUrl),
             skFileName: '{{ $p->appointment && $p->appointment->file_sk ? "SK_Pengangkatan.pdf" : "" }}',
             skFileSize: '',
             skFileError: '',
@@ -443,14 +447,19 @@
                             <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans block">Foto Profil Pegawai</label>
                             <div class="flex items-center gap-4">
                                 <div class="h-16 w-16 rounded-full border border-border bg-soft flex items-center justify-center overflow-hidden shrink-0">
-                                    <template x-if="fotoPreview">
-                                        <img :src="fotoPreview" class="h-full w-full object-cover">
-                                    </template>
-                                    <template x-if="!fotoPreview">
+                                    <img
+                                        x-show="fotoPreview"
+                                        :src="fotoPreview"
+                                        src="{{ $fotoUrl ?? '' }}"
+                                        alt="Foto {{ $p->nama_lengkap }}"
+                                        class="h-full w-full object-cover"
+                                        @if(! $fotoUrl) style="display: none;" @endif
+                                    >
+                                    <div x-show="!fotoPreview" @if($fotoUrl) style="display: none;" @endif>
                                         <svg class="h-8 w-8 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
                                         </svg>
-                                    </template>
+                                    </div>
                                 </div>
                                 <div class="space-y-1">
                                     <input type="file" id="foto" name="foto" accept="image/*" @change="handleFotoChange" class="text-xs text-muted focus:outline-none file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 file:transition file:cursor-pointer">
