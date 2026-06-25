@@ -13,6 +13,7 @@ use App\Models\RefUnitKerja;
 use App\Models\RefAgama;
 use App\Models\RefStatusPerkawinan;
 use App\Models\RefGolongan;
+use App\Services\AuditService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -491,6 +492,8 @@ class PegawaiController extends Controller
 
             Appointment::create($appointmentData);
 
+            AuditService::log('CREATE', 'Employee', $employee->id, null, $employee->toArray(), $request);
+
             DB::commit();
 
             return redirect()->route('data-pegawai')
@@ -537,6 +540,8 @@ class PegawaiController extends Controller
         try {
             DB::beginTransaction();
 
+            $oldValues = $employee->toArray();
+
             if ($request->hasFile('foto')) {
                 // Delete old photo if needed (omitted for brevity)
                 $validated['foto'] = $request->file('foto')->store('employees/photos', 'public');
@@ -560,6 +565,8 @@ class PegawaiController extends Controller
                 $appointment->update($appointmentData);
             }
 
+            AuditService::log('UPDATE', 'Employee', $employee->id, $oldValues, $employee->toArray(), $request);
+
             DB::commit();
 
             return redirect()->route('data-pegawai')
@@ -570,12 +577,15 @@ class PegawaiController extends Controller
         }
     }
 
-    public function destroy($id)
+    public function destroy($id, Request $request)
     {
         $employee = Employee::findOrFail($id);
         $nama = $employee->nama_lengkap;
+        $oldValues = $employee->toArray();
         $employee->delete();
         
+        AuditService::log('DELETE', 'Employee', $id, $oldValues, null, $request);
+
         return redirect()->route('data-pegawai')
             ->with('success', 'Data pegawai ' . $nama . ' berhasil dihapus dari sistem.');
     }
