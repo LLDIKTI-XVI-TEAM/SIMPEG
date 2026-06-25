@@ -5,7 +5,8 @@ namespace Database\Seeders;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Database\Seeders\ApprovalConfigSeeder;
-
+use Database\Seeders\EwsConfigSeeder;
+use Database\Seeders\DemoSsoUserSeeder;
 class DatabaseSeeder extends Seeder
 {
     use WithoutModelEvents;
