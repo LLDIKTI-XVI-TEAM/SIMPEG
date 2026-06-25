@@ -10,7 +10,7 @@ class DemoSsoUserSeeder extends Seeder
 {
     public function run(): void
     {
-        $username = env('KEYCLOAK_TEST_USERNAME', 'demo-klabat');
+        $username = config('services.keycloak.test_username', 'demo-klabat');
 
         if ($username === '') {
             return;
@@ -24,7 +24,7 @@ class DemoSsoUserSeeder extends Seeder
             'email_verified_at' => $user->email_verified_at ?? now(),
         ]);
 
-        if (!$user->exists) {
+        if (! $user->exists) {
             $user->password = Str::random(48);
         }
 

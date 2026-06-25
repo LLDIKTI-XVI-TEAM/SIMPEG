@@ -9,7 +9,7 @@ class ListEmployeesRequest extends FormRequest
     public function authorize(): bool
     {
         if (app()->environment('local')
-            && filter_var(env('SIMPEG_DISABLE_EMPLOYEE_API_AUTH', false), FILTER_VALIDATE_BOOLEAN)) {
+            && config('services.simpeg.disable_employee_api_auth')) {
             return true;
         }
 
