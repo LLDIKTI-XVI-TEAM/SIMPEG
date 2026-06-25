@@ -3,23 +3,29 @@
 namespace App\Services;
 
 use App\Models\Employee;
+use App\Models\DisciplineRecord;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\RefGolongan;
 use App\Models\RefJenisJabatan;
 use App\Models\SalaryHistory;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class EmployeeHistoryService
 {
+    public function __construct(private readonly EmployeeFileStorageService $files) {}
+
     /**
      * Menambah riwayat pangkat secara append-only dan menjaga hanya satu data terbaru.
      */
     public function createRankHistory(Employee $employee, array $data, ?Request $request = null): RankHistory
     {
+        $data = $this->storeSkUpload($data);
+
         return DB::transaction(function () use ($employee, $data, $request): RankHistory {
             // Kunci baris pegawai agar dua penulisan paralel tidak sama-sama menyisakan riwayat terbaru.
             $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
@@ -58,6 +64,8 @@ class EmployeeHistoryService
      */
     public function createPositionHistory(Employee $employee, array $data, ?Request $request = null): PositionHistory
     {
+        $data = $this->storeSkUpload($data);
+
         return DB::transaction(function () use ($employee, $data, $request): PositionHistory {
             // Kunci baris pegawai agar dua penulisan paralel tidak sama-sama menyisakan riwayat terbaru.
             $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
@@ -105,6 +113,8 @@ class EmployeeHistoryService
      */
     public function createKgbHistory(Employee $employee, array $data, ?Request $request = null): SalaryHistory
     {
+        $data = $this->storeSkUpload($data);
+
         return DB::transaction(function () use ($employee, $data, $request): SalaryHistory {
             // Kunci baris pegawai agar dua penulisan paralel tidak sama-sama menyisakan riwayat terbaru.
             $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
@@ -133,5 +143,60 @@ class EmployeeHistoryService
 
             return $history->refresh();
         });
+    }
+
+    /**
+     * Menambah riwayat hukuman disiplin secara append-only dan menghitung status aktif dari tanggal berakhir.
+     */
+    public function createDisciplineRecord(Employee $employee, array $data, ?Request $request = null): DisciplineRecord
+    {
+        $data = $this->storeSkUpload($data);
+
+        return DB::transaction(function () use ($employee, $data, $request): DisciplineRecord {
+            $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
+            $endDate = isset($data['tanggal_berakhir']) && $data['tanggal_berakhir'] !== null
+                ? Carbon::parse($data['tanggal_berakhir'])
+                : null;
+
+            $record = $employee->disciplineRecords()->create([
+                ...Arr::only($data, [
+                    'jenis_hukuman',
+                    'deskripsi',
+                    'tanggal_mulai',
+                    'tanggal_berakhir',
+                    'no_sk',
+                    'tanggal_sk',
+                    'file_sk',
+                ]),
+                'is_active' => $endDate === null || $endDate->greaterThanOrEqualTo(Carbon::today()),
+            ]);
+
+            AuditService::log('CREATE', 'DisciplineRecord', $record->id, null, Arr::only($record->toArray(), [
+                'id',
+                'employee_id',
+                'jenis_hukuman',
+                'tanggal_mulai',
+                'tanggal_berakhir',
+                'tanggal_sk',
+                'is_active',
+            ]), $request);
+
+            return $record->refresh();
+        });
+    }
+
+    /**
+     * Upload SK disimpan sebelum transaksi data agar model hanya menerima path relatif yang aman.
+     *
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    private function storeSkUpload(array $data): array
+    {
+        if (($data['file_sk'] ?? null) instanceof UploadedFile) {
+            $data['file_sk'] = $this->files->storeSk($data['file_sk']);
+        }
+
+        return $data;
     }
 }

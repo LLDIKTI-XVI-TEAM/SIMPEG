@@ -4,12 +4,13 @@ namespace App\Http\Requests;
 
 use App\Support\SkFilePathRules;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
-class StoreRankHistoryRequest extends FormRequest
+class StoreDisciplineRecordRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Mutasi riwayat pangkat hanya boleh dilakukan oleh pengelola data kepegawaian.
+        // Mutasi hukuman disiplin hanya boleh dilakukan pengelola data kepegawaian.
         $user = $this->user();
 
         return $user !== null
@@ -19,22 +20,13 @@ class StoreRankHistoryRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'golongan_id' => ['required', 'uuid', 'exists:ref_golongan,id'],
-            'tmt_pangkat' => ['required', 'date'],
+            'jenis_hukuman' => ['required', Rule::in(['Ringan', 'Sedang', 'Berat'])],
+            'deskripsi' => ['required', 'string', 'max:2000'],
+            'tanggal_mulai' => ['required', 'date'],
+            'tanggal_berakhir' => ['nullable', 'date', 'after_or_equal:tanggal_mulai'],
             'no_sk' => ['required', 'string', 'max:100'],
             'tanggal_sk' => ['required', 'date'],
             'file_sk' => SkFilePathRules::nullableUploadOrControlledPath(),
-        ];
-    }
-
-    public function attributes(): array
-    {
-        return [
-            'golongan_id' => 'Golongan',
-            'tmt_pangkat' => 'TMT Pangkat',
-            'no_sk' => 'Nomor SK',
-            'tanggal_sk' => 'Tanggal SK',
-            'file_sk' => 'File SK',
         ];
     }
 }
