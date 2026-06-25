@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\UserMappingController;
 use App\Http\Controllers\Admin\RbacController;
+use App\Http\Controllers\Admin\GlobalSearchController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -58,6 +59,8 @@ Route::middleware('keycloak.auth')->group(function (): void {
     Route::get('/dashboard', function () {
         return view('dashboard');
     })->name('dashboard');
+
+    Route::get('/admin/search', [GlobalSearchController::class, 'search'])->name('global.search');
 
     Route::get('/change-role/{role}', function (\Illuminate\Http\Request $request, string $role) {
         abort_unless($request->user()?->role === $role, 403, 'Role aktif harus sesuai dengan role akun.');

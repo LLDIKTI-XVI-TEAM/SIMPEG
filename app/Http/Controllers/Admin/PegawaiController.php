@@ -526,7 +526,7 @@ class PegawaiController extends Controller
         return view('admin.pegawai.edit', compact('p', 'jenisPegawai', 'agama', 'statusKawin'));
     }
 
-    public function update(\App\Http\Requests\StoreEmployeeRequest $request, $id)
+    public function update(\App\Http\Requests\UpdateEmployeeRequest $request, $id)
     {
         $employee = Employee::findOrFail($id);
         $validated = $request->validated();

@@ -21,7 +21,7 @@
 </head>
 <body class="h-full bg-page font-sans">
 
-<div class="flex h-screen overflow-hidden" x-data="{ sidebarOpen: false }">
+<div class="flex h-screen overflow-hidden" x-data="{ sidebarOpen: false, searchQuery: '', searchResults: [], isSearching: false, showDropdown: false }">
 
     {{-- ================================================================== --}}
     {{-- MOBILE OVERLAY --}}
@@ -43,8 +43,8 @@
     {{-- SIDEBAR — stays fixed, scrolls internally --}}
     {{-- ================================================================== --}}
     <aside
-        :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
-        class="fixed inset-y-0 left-0 z-30 flex h-full w-64 shrink-0 flex-col border-r border-border bg-surface transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 lg:z-auto"
+        :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
+        class="fixed inset-y-0 left-0 z-30 flex h-full w-64 shrink-0 flex-col border-r border-border bg-surface transition-transform duration-200 ease-in-out lg:static lg:z-auto"
     >
         {{-- Brand --}}
         <div class="flex h-16 shrink-0 items-center gap-3 border-b border-border px-5">
@@ -236,7 +236,7 @@
                             @elseif($menu['icon'] === 'calendar')
                                 <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" /></svg>
                             @elseif($menu['icon'] === 'check-badge')
-                                <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296 3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043 3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12Z" /></svg>
+                                <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296a3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043a3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12Z" /></svg>
                             @elseif($menu['icon'] === 'document-text')
                                 <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
                             @elseif($menu['icon'] === 'exclamation-triangle')
@@ -301,17 +301,61 @@
         {{-- NAVBAR --}}
         <header class="sticky top-0 z-40 flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface px-4 lg:px-6">
 
-            {{-- Left: hamburger + page title --}}
-            <div class="flex items-center gap-3">
+            {{-- Left: Hamburger (mobile only) + Search --}}
+            <div class="flex items-center gap-4 w-full max-w-sm">
                 <button
                     @click="sidebarOpen = !sidebarOpen"
                     id="sidebar-toggle"
-                    class="inline-flex items-center justify-center rounded-lg p-2 text-muted transition-colors hover:bg-soft hover:text-ink lg:hidden"
+                    class="inline-flex items-center justify-center rounded-lg border border-border p-2 text-muted transition-colors hover:bg-soft hover:text-ink lg:hidden"
                     aria-label="Toggle sidebar"
                 >
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
                 </button>
-                <h1 class="text-base font-semibold text-ink lg:text-lg">{{ $title }}</h1>
+                
+                {{-- Search Bar --}}
+                <div class="relative w-full hidden sm:block">
+                    <input 
+                        type="text" 
+                        x-model="searchQuery" 
+                        @input.debounce.500ms="if(searchQuery.length > 1) { isSearching = true; fetch('/admin/search?q=' + searchQuery).then(r => r.json()).then(data => { searchResults = data; isSearching = false; showDropdown = true; }) } else { showDropdown = false; }"
+                        @click.outside="showDropdown = false"
+                        @focus="if(searchQuery.length > 1) showDropdown = true"
+                        @keydown.enter="if(searchQuery.length > 1) { isSearching = true; fetch('/admin/search?q=' + searchQuery).then(r => r.json()).then(data => { searchResults = data; isSearching = false; showDropdown = true; let keys = Object.keys(data); if(keys.length === 0) { alert('Pencarian tidak ada'); } else { window.location.href = data[keys[0]][0].url; } }) }"
+                        class="w-full rounded-lg border border-border bg-soft pl-10 pr-4 py-2 text-sm text-ink focus:border-primary focus:bg-surface focus:outline-none focus:ring-1 focus:ring-primary font-sans transition-colors"
+                        placeholder="Cari pegawai, NIP, dokumen, cuti, unit kerja..."
+                    >
+                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
+                    </div>
+
+                    {{-- Search Dropdown --}}
+                    <div 
+                        x-show="showDropdown && (Object.keys(searchResults).length > 0 || isSearching)"
+                        class="absolute top-full left-0 mt-1 w-full max-h-96 overflow-y-auto rounded-lg border border-border bg-surface shadow-lg z-50 p-2"
+                        style="display: none;"
+                    >
+                        <template x-if="isSearching">
+                            <div class="p-3 text-center text-sm text-muted">Mencari...</div>
+                        </template>
+                        <template x-if="!isSearching && Object.keys(searchResults).length > 0">
+                            <div>
+                                <template x-for="(group, title) in searchResults" :key="title">
+                                    <div class="mb-2 last:mb-0">
+                                        <div class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted/60" x-text="title"></div>
+                                        <div class="space-y-1">
+                                            <template x-for="item in group" :key="item.url">
+                                                <a :href="item.url" class="block rounded-md px-3 py-2 text-sm text-ink hover:bg-soft transition-colors">
+                                                    <div class="font-medium" x-text="item.title"></div>
+                                                    <div class="text-xs text-muted mt-0.5" x-show="item.subtitle" x-text="item.subtitle"></div>
+                                                </a>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </div>
             </div>
 
             {{-- Right: notif bell + profile dropdown --}}

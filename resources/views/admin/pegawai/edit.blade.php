@@ -3,17 +3,17 @@
         $fotoUrl = $p->foto_url;
     @endphp
 
-    <div class="mx-auto max-w-4xl space-y-6">
+    <div class="mx-auto max-w-7xl space-y-6">
         
         {{-- Breadcrumbs & Title --}}
         <div class="flex flex-col gap-1.5">
-            <h2 class="text-2xl font-bold text-ink font-sans">Edit Pegawai Baru</h2>
+            <h2 class="text-2xl font-bold text-ink font-sans">Edit Data Pegawai</h2>
             <nav class="flex items-center gap-1.5 text-xs text-muted">
                 <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
                 <span>/</span>
                 <a href="{{ route('data-pegawai') }}" class="transition-colors hover:text-ink">Data Pegawai</a>
                 <span>/</span>
-                <span class="font-medium text-ink">Tambah</span>
+                <span class="font-medium text-ink">Edit</span>
             </nav>
         </div>
 
@@ -62,6 +62,8 @@
         {{-- Form Card --}}
         <div class="rounded-lg border border-border bg-surface p-6 shadow-sm" x-data="{
             activeTab: 'utama',
+            nip: '{{ $p->nip ?? '' }}',
+            nipError: '',
             nik: '{{ $p->nik ?? '' }}',
             kk: '{{ $p->no_kk ?? '' }}',
             nikError: '',
@@ -84,9 +86,12 @@
                 }
 
                 const elNip = document.getElementById('nip');
-                if (elNip && elNip.value.trim().length !== 18) {
-                    elNip.setCustomValidity('NIP harus tepat 18 digit.');
-                    elNip.reportValidity();
+                if (this.nip.length < 18) {
+                    this.nipError = 'NIP harus tepat 18 digit sebelum melanjutkan';
+                    if (elNip) {
+                        elNip.setCustomValidity('Mohon lengkapi NIP dengan tepat 18 digit.');
+                        elNip.reportValidity();
+                    }
                     return false;
                 } else if (elNip) {
                     elNip.setCustomValidity('');
@@ -147,6 +152,14 @@
                     this.kkError = 'Nomor KK harus tepat 16 digit (Saat ini: ' + this.kk.length + ' digit)';
                 } else {
                     this.kkError = '';
+                }
+            },
+            validateNip() {
+                this.nip = this.nip.replace(/\D/g, '');
+                if (this.nip.length > 0 && this.nip.length < 18) {
+                    this.nipError = 'NIP harus tepat 18 digit (Saat ini: ' + this.nip.length + ' digit)';
+                } else {
+                    this.nipError = '';
                 }
             },
             handleFotoChange(e) {
@@ -229,9 +242,8 @@
                 </button>
             </div>
 
-            <form action="{{ route('pegawai.update', $p->id) }}" method="POST" enctype="multipart/form-data" class="space-y-6">
+            <form action="{{ route('pegawai.update', $p->id) }}" method="POST" enctype="multipart/form-data" class="space-y-6" novalidate>
                 @csrf
-                @method('POST')
 
                 {{-- TAB 1: DATA UTAMA --}}
                 <div x-show="activeTab === 'utama'" class="space-y-6" x-transition>
@@ -245,7 +257,8 @@
                         {{-- NIP --}}
                         <div class="space-y-1">
                             <label for="nip" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">NIP <span class="text-danger">*</span></label>
-                            <input id="nip" name="nip" type="text" oninput="this.value = this.value.replace(/[^0-9]/g, '')" required placeholder="198503122010011001" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->nip }}" >
+                            <input id="nip" name="nip" type="text" required maxlength="18" x-model="nip" @input="validateNip" value="{{ $p->nip }}" placeholder="198503122010011001" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <p x-show="nipError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="nipError"></p>
                         </div>
 
                         {{-- Status Kepegawaian (Jenis) --}}
@@ -341,9 +354,9 @@
 
                         
 
-                        {{-- Tanggal Pensiun (Optional) --}}
+                        {{-- Tanggal Pensiun --}}
                         <div class="space-y-1">
-                            <label for="tanggal_pensiun" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Pensiun <span class="text-[10px] font-normal normal-case text-muted tracking-normal">(opsional)</span></label>
+                            <label for="tanggal_pensiun" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Pensiun</label>
                             <input id="tanggal_pensiun" name="tanggal_pensiun" type="date" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" value="{{ $p->tanggal_pensiun ? \Carbon\Carbon::parse($p->tanggal_pensiun)->format('Y-m-d') : '' }}" >
                         </div>
                     </div>
@@ -566,7 +579,10 @@
                 {{-- Action Buttons --}}
                 <div class="border-t border-border pt-6 flex justify-between items-center gap-3">
                     <div>
-                        <a href="{{ route('data-pegawai') }}" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-5 py-2.5 text-sm font-semibold text-primary transition hover:bg-soft">
+                        <a href="{{ route('data-pegawai') }}" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft">
+                            <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                            </svg>
                             Batal
                         </a>
                     </div>
@@ -575,7 +591,10 @@
                         <button type="button" 
                                 x-show="activeTab !== 'utama'" 
                                 @click="activeTab = activeTab === 'pengangkatan' ? 'kontak' : (activeTab === 'kontak' ? 'pelengkap' : 'utama')" 
-                                class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-semibold text-ink transition hover:bg-soft shadow-sm font-sans cursor-pointer">
+                                class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft shadow-sm font-sans cursor-pointer">
+                            <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                            </svg>
                             Sebelumnya
                         </button>
                         
@@ -594,16 +613,22 @@
                                         activeTab = 'pengangkatan';
                                     }
                                 " 
-                                class="inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm font-sans cursor-pointer">
+                                class="inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm font-sans cursor-pointer">
+                            <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                            </svg>
                             Selanjutnya
                         </button>
 
                         {{-- Tombol Simpan --}}
                         <button type="submit" 
                                 x-show="activeTab === 'pengangkatan'" 
-                                :disabled="nik.length < 16 || (kk.length > 0 && kk.length < 16) || skFileError !== ''"
-                                :class="(nik.length < 16 || (kk.length > 0 && kk.length < 16) || skFileError !== '') ? 'opacity-50 cursor-not-allowed' : ''"
-                                class="inline-flex items-center justify-center rounded-lg bg-success px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 font-sans cursor-pointer">
+                                :disabled="nip.length < 18 || nik.length < 16 || (kk.length > 0 && kk.length < 16) || skFileError !== ''"
+                                :class="(nip.length < 18 || nik.length < 16 || (kk.length > 0 && kk.length < 16) || skFileError !== '') ? 'opacity-50 cursor-not-allowed' : ''"
+                                class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 font-sans cursor-pointer">
+                            <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                            </svg>
                             Simpan Pegawai
                         </button>
                     </div>
