@@ -2,85 +2,32 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Employees\CreateEmployeeAction;
+use App\Actions\Employees\ListEmployeesAction;
+use App\Actions\Employees\ShowEmployeeAction;
+use App\Actions\Employees\ShowMyProfileAction;
+use App\Actions\Employees\UpdateEmployeeAction;
 use App\Http\Requests\ListEmployeesRequest;
 use App\Http\Requests\StoreEmployeeRequest;
 use App\Http\Requests\UpdateEmployeeRequest;
 use App\Models\Employee;
-use App\Services\AuditService;
-use App\Services\EmployeeFileStorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
 
 class EmployeeController extends Controller
 {
-    public function index(ListEmployeesRequest $request): JsonResponse
+    public function index(ListEmployeesRequest $request, ListEmployeesAction $action): JsonResponse
     {
-        $validated = $request->validated();
-        $sort = $validated['sort'] ?? 'nama_lengkap';
-        $direction = $validated['direction'] ?? 'asc';
-        $perPage = (int) ($validated['per_page'] ?? 10);
-
-        $employees = Employee::query()
-            ->select([
-                'id',
-                'nama_lengkap',
-                'nip',
-                'email',
-                'golongan_terakhir',
-                'pangkat_terakhir',
-                'jabatan_terakhir',
-                'kelas_jabatan',
-                'jenis_pegawai_id',
-                'status_aktif',
-                'foto',
-                'created_at',
-            ])
-            ->with(['jenisPegawai:id,nama'])
-            ->when(
-                $validated['search'] ?? null,
-                fn ($query, string $search) => $query->where(function ($query) use ($search): void {
-                    $keyword = '%'.mb_strtolower($search).'%';
-
-                    $query->whereRaw('lower(nama_lengkap) like ?', [$keyword])
-                        ->orWhereRaw('lower(nip) like ?', [$keyword]);
-                })
-            )
-            ->when(
-                $validated['golongan'] ?? null,
-                fn ($query, string $golongan) => $query->where('golongan_terakhir', $golongan)
-            )
-            ->when(
-                $validated['jenis_pegawai_id'] ?? null,
-                fn ($query, string $jenisPegawaiId) => $query->where('jenis_pegawai_id', $jenisPegawaiId)
-            )
-            ->when(
-                $validated['status_aktif'] ?? null,
-                fn ($query, string $statusAktif) => $query->where('status_aktif', $statusAktif),
-                fn ($query) => $query->where('status_aktif', 'Aktif')
-            )
-            ->orderBy($sort, $direction)
-            ->paginate($perPage)
-            ->withQueryString();
-
         return response()->json([
             'message' => 'Daftar pegawai berhasil diambil.',
-            'employees' => $employees,
+            'employees' => $action->execute($request->validated()),
         ]);
     }
 
-    public function store(StoreEmployeeRequest $request, EmployeeFileStorageService $files): JsonResponse|RedirectResponse
+    public function store(StoreEmployeeRequest $request, CreateEmployeeAction $action): JsonResponse|RedirectResponse
     {
-        $data = $request->validated();
-
-        if ($request->hasFile('foto')) {
-            $data['foto'] = $files->storePhoto($request->file('foto'));
-        }
-
-        $employee = Employee::create($data);
-
-        AuditService::log('CREATE', 'Employee', $employee->id, null, $employee->toArray(), $request);
+        $employee = $action->execute($request->validated(), $request);
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -92,24 +39,9 @@ class EmployeeController extends Controller
         return back()->with('success', 'Data pegawai berhasil ditambahkan.');
     }
 
-    public function update(UpdateEmployeeRequest $request, Employee $employee, EmployeeFileStorageService $files): JsonResponse|RedirectResponse
+    public function update(UpdateEmployeeRequest $request, Employee $employee, UpdateEmployeeAction $action): JsonResponse|RedirectResponse
     {
-        $oldValues = $employee->toArray();
-        $oldPhotoPath = $employee->foto;
-        $data = $request->validated();
-
-        if ($request->hasFile('foto')) {
-            $data['foto'] = $files->storePhoto($request->file('foto'));
-        }
-
-        $employee->update($data);
-        $employee->refresh();
-
-        if ($request->hasFile('foto')) {
-            $files->deletePublicFile($oldPhotoPath);
-        }
-
-        AuditService::log('UPDATE', 'Employee', $employee->id, $oldValues, $employee->toArray(), $request);
+        $employee = $action->execute($employee, $request->validated(), $request);
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -121,107 +53,19 @@ class EmployeeController extends Controller
         return back()->with('success', 'Data pegawai berhasil diperbarui.');
     }
 
-    public function show(Employee $employee): JsonResponse
+    public function show(Employee $employee, ShowEmployeeAction $action): JsonResponse
     {
-        $employee = $this->loadDetailRelations($employee);
-
         return response()->json([
             'message' => 'Detail pegawai berhasil diambil.',
-            'employee' => $this->employeeDetailPayload($employee),
+            'employee' => $action->execute($employee),
         ]);
     }
 
-    public function myProfile(Request $request): JsonResponse
+    public function myProfile(Request $request, ShowMyProfileAction $action): JsonResponse
     {
-        $employee = $request->user()?->employee;
-
-        abort_if($employee === null, 404, 'Data pegawai untuk akun ini belum terhubung.');
-
-        $employee = $this->loadDetailRelations($employee);
-
         return response()->json([
             'message' => 'Detail profil pegawai berhasil diambil.',
-            'employee' => $this->employeeDetailPayload($employee),
-        ]);
-    }
-
-    /**
-     * Membatasi detail pegawai agar field sensitif tidak ikut terbuka ke frontend.
-     */
-    private function employeeDetailPayload(Employee $employee): array
-    {
-        return [
-            ...Arr::only($employee->toArray(), [
-                'id',
-                'nama_lengkap',
-                'nip',
-                'tempat_lahir',
-                'tanggal_lahir',
-                'jenis_kelamin',
-                'golongan_darah',
-                'foto',
-                'jenis_pegawai_id',
-                'status_aktif',
-                'golongan_terakhir',
-                'pangkat_terakhir',
-                'jabatan_terakhir',
-                'kelas_jabatan',
-                'pendidikan_terakhir',
-                'prodi_pendidikan_terakhir',
-                'tanggal_pensiun',
-                'tanggal_kenaikan_pangkat_berikutnya',
-                'tanggal_kgb_berikutnya',
-                'profil_status',
-                'email',
-                'is_kinerja_baik',
-                'created_at',
-                'updated_at',
-            ]),
-            'agama' => $employee->agama,
-            'status_kawin' => $employee->statusKawin,
-            'jenis_pegawai' => $employee->jenisPegawai,
-            'families' => $employee->families,
-            'appointments' => $employee->appointments,
-            'rank_histories' => $employee->rankHistories,
-            'position_histories' => $employee->positionHistories,
-            'salary_histories' => $employee->salaryHistories,
-            'discipline_records' => $employee->disciplineRecords,
-            'education_histories' => $employee->educationHistories,
-            'documents' => $employee->documents,
-            'supervisor_assignments' => $employee->supervisorAssignments,
-            'leave_balances' => $employee->leaveBalances,
-            'leave_requests' => $employee->leaveRequests,
-            'ews_alerts' => $employee->ewsAlerts,
-        ];
-    }
-
-    private function loadDetailRelations(Employee $employee): Employee
-    {
-        return $employee->load([
-            'agama:id,nama',
-            'statusKawin:id,nama',
-            'jenisPegawai:id,nama',
-            'families' => fn ($query) => $query->latest(),
-            'appointments' => fn ($query) => $query->orderByDesc('tmt_pengangkatan'),
-            'rankHistories' => fn ($query) => $query->with('golongan:id,kode,nama')->orderByDesc('tmt_pangkat'),
-            'positionHistories' => fn ($query) => $query
-                ->with([
-                    'jenisJabatan:id,nama,maks_usia_pensiun',
-                    'eselon:id,kode,nama',
-                    'unitKerja:id,nama',
-                ])
-                ->orderByDesc('tmt_jabatan'),
-            'salaryHistories' => fn ($query) => $query->orderByDesc('tmt_kgb'),
-            'disciplineRecords' => fn ($query) => $query->orderByDesc('tanggal_mulai'),
-            'educationHistories' => fn ($query) => $query->with('jenjang:id,nama')->orderByDesc('tahun_lulus'),
-            'documents' => fn ($query) => $query->latest(),
-            'supervisorAssignments' => fn ($query) => $query
-                ->with('supervisor:id,nama_lengkap,nip,jabatan_terakhir')
-                ->orderByRaw('tanggal_berakhir is null desc')
-                ->orderByDesc('tanggal_mulai'),
-            'leaveBalances' => fn ($query) => $query->orderByDesc('tahun'),
-            'leaveRequests' => fn ($query) => $query->with('jenisCuti:id,nama')->latest(),
-            'ewsAlerts' => fn ($query) => $query->orderBy('target_date'),
+            'employee' => $action->execute($request->user()?->employee),
         ]);
     }
 }
