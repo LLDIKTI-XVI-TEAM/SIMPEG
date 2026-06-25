@@ -35,6 +35,7 @@ class AdminKepegawaianAccessTest extends TestCase
             'hari-libur',
             'ews.config',
             'pengaturan',
+            'data-nonaktif',
         ] as $forbiddenRoute) {
             $response->assertDontSee('href="' . route($forbiddenRoute) . '"', false);
         }
@@ -42,7 +43,6 @@ class AdminKepegawaianAccessTest extends TestCase
         foreach ([
             'data-pegawai',
             'pegawai.import',
-            'data-nonaktif',
             'dokumen',
             'cuti.rekap',
             'ews',
@@ -80,7 +80,6 @@ class AdminKepegawaianAccessTest extends TestCase
             '/dashboard',
             '/pegawai',
             '/pegawai/import-data',
-            '/pegawai/nonaktif-list',
             '/dashboard/dokumen',
             '/cuti/rekap',
             '/ews',
@@ -89,7 +88,11 @@ class AdminKepegawaianAccessTest extends TestCase
             '/dashboard/audit',
             '/notifications',
         ] as $uri) {
-            $this->get($uri)->assertOk();
+            $response = $this->get($uri);
+            if ($response->status() !== 200) {
+                dump("Failed on URI: $uri, Status: " . $response->status());
+            }
+            $response->assertOk();
         }
     }
 

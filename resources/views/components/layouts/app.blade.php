@@ -75,6 +75,7 @@
                     'data-master',
                     'hari-libur',
                     'ews.config',
+                    'data-nonaktif',
                 ],
                 'pimpinan' => [
                     'audit-log',
