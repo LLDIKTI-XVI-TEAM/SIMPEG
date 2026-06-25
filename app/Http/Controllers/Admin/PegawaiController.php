@@ -276,7 +276,8 @@ class PegawaiController extends Controller
 
     public function index(Request $request)
     {
-        $pegawaiData = Employee::with(['jenisPegawai'])->paginate(10);
+        $perPage = (int) $request->input('per_page', 10);
+        $pegawaiData = Employee::with(['jenisPegawai'])->paginate($perPage)->withQueryString();
         return view('admin.pegawai.index', compact('pegawaiData'));
     }
 

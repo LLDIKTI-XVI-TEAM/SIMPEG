@@ -281,8 +281,26 @@
         </div>
 
         {{-- TABLE FOOTER --}}
-        <div class="border-t border-border px-6 py-4 bg-surface">
-            {{ $pegawaiData->links() }}
+        <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row">
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-muted">Tampilkan</span>
+                    <select onchange="updatePerPage(this.value)" class="appearance-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer">
+                        <option value="10" {{ request('per_page', 10) == 10 ? 'selected' : '' }}>10</option>
+                        <option value="25" {{ request('per_page') == 25 ? 'selected' : '' }}>25</option>
+                        <option value="50" {{ request('per_page') == 50 ? 'selected' : '' }}>50</option>
+                    </select>
+                    <span class="text-sm text-muted">data per halaman</span>
+                </div>
+                @if($pegawaiData->total() > 0)
+                <p class="text-sm text-muted hidden sm:block">
+                    Menampilkan <span class="font-semibold text-ink">{{ $pegawaiData->firstItem() }}</span> hingga <span class="font-semibold text-ink">{{ $pegawaiData->lastItem() }}</span> dari <span class="font-semibold text-ink">{{ $pegawaiData->total() }}</span> hasil
+                </p>
+                @endif
+            </div>
+            <div class="w-full sm:w-auto">
+                {{ $pegawaiData->links('vendor.pagination.simpeg') }}
+            </div>
         </div>
     </div>
 
@@ -425,6 +443,13 @@
         const exportUrl = new URL(@json(route('pegawai.export')), window.location.origin);
         visibleNips.forEach(nip => exportUrl.searchParams.append('nips[]', nip));
         window.location.href = exportUrl.toString();
+    }
+
+    function updatePerPage(val) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('per_page', val);
+        url.searchParams.delete('page');
+        window.location.assign(url.href);
     }
 
     // Sorting functionality
