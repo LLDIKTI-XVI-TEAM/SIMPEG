@@ -6,7 +6,7 @@
         filterModul: 'all',
         filterStartDate: '',
         filterEndDate: '',
-        selectedLogId: 8,
+        selectedLogId: null,
         showDrawer: false,
         searchQuery: '',
         logs: {{ json_encode($auditLogs) }},

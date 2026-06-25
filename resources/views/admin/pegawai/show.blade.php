@@ -111,15 +111,20 @@
 
         {{-- MAIN DETAIL CARD --}}
         <div class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6">
+            @php
+                $fotoUrl = $p->foto_url;
+            @endphp
             
             {{-- Header info --}}
             <div class="border-b border-border pb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div class="flex items-center gap-4">
                     <div class="h-16 w-16 rounded-full border border-border bg-soft flex items-center justify-center overflow-hidden shrink-0">
-                        @if($p->foto)
-                            <svg class="h-8 w-8 text-primary/70" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-                            </svg>
+                        @if($fotoUrl)
+                            <img
+                                src="{{ $fotoUrl }}"
+                                alt="Foto {{ $p->nama_lengkap }}"
+                                class="h-full w-full object-cover"
+                            >
                         @else
                             <div class="flex h-full w-full items-center justify-center bg-primary/10 text-xl font-bold text-primary font-sans uppercase">
                                 {{ strtoupper(substr($p->nama_lengkap, 0, 1)) }}

@@ -33,7 +33,7 @@ Route::get('/auth/keycloak/callback', [KeycloakAuthController::class, 'handleCal
 Route::post('/logout', [KeycloakAuthController::class, 'logout'])->name('logout');
 
 Route::get('/dev-login', function () {
-    $user = \App\Models\User::first();
+    $user = \App\Models\User::where('role', 'super_admin')->first();
     if (!$user) {
         $user = \App\Models\User::create([
             'name' => 'Demo Klabat',
@@ -890,3 +890,5 @@ Route::middleware('keycloak.auth')->group(function (): void {
         ->name('pegawai.export');
 
 });
+
+

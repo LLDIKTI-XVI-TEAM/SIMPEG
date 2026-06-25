@@ -48,23 +48,26 @@
     </div>
 
     {{-- FILTER BAR --}}
-    <div class="mb-6 rounded-lg border border-border bg-surface p-4 flex flex-col gap-4 shadow-sm">
+    <form id="filter-form" method="GET" action="{{ route('data-pegawai') }}" class="mb-6 rounded-lg border border-border bg-surface p-4 flex flex-col gap-4 shadow-sm">
+        <input type="hidden" name="sort" value="{{ $sort }}">
+        <input type="hidden" name="direction" value="{{ $direction }}">
+        <input type="hidden" name="per_page" value="{{ $perPage ?? request('per_page', 10) }}">
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
             {{-- Search input --}}
             <div class="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5">
                 <svg class="w-4 h-4 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                 </svg>
-                <input id="search-input" type="text" placeholder="Cari nama atau NIP..." class="flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none font-sans">
+                <input id="search-input" name="search" value="{{ $filters['search'] }}" type="search" placeholder="Cari nama atau NIP..." class="flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none font-sans">
             </div>
             
             {{-- Filter Golongan --}}
             <div class="relative">
-                <select id="filter-golongan" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                <select id="filter-golongan" name="golongan" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Golongan</option>
-                    <option value="IV">Golongan IV</option>
-                    <option value="III">Golongan III</option>
-                    <option value="II">Golongan II</option>
+                    @foreach($golonganOptions as $golongan)
+                        <option value="{{ $golongan }}" @selected($filters['golongan'] === $golongan)>Golongan {{ $golongan }}</option>
+                    @endforeach
                 </select>
                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -75,12 +78,11 @@
 
             {{-- Filter Unit --}}
             <div class="relative">
-                <select id="filter-unit" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                <select id="filter-unit" name="unit_kerja_id" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Unit</option>
-                    <option>Bag. Umum</option>
-                    <option>Bag. Keuangan</option>
-                    <option>Bag. SDM</option>
-                    <option>Bag. IT</option>
+                    @foreach($unitKerjaOptions as $unit)
+                        <option value="{{ $unit->id }}" @selected($filters['unit_kerja_id'] === $unit->id)>{{ $unit->nama }}</option>
+                    @endforeach
                 </select>
                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -91,10 +93,11 @@
 
             {{-- Filter Jenis --}}
             <div class="relative">
-                <select id="filter-jenis" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                <select id="filter-jenis" name="jenis_pegawai_id" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Jenis</option>
-                    <option>PNS</option>
-                    <option>PPPK</option>
+                    @foreach($jenisPegawaiOptions as $jenis)
+                        <option value="{{ $jenis->id }}" @selected($filters['jenis_pegawai_id'] === $jenis->id)>{{ $jenis->nama }}</option>
+                    @endforeach
                 </select>
                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -105,11 +108,11 @@
 
             {{-- Filter Status --}}
             <div class="relative">
-                <select id="filter-status" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                <select id="filter-status" name="status_aktif" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Status</option>
-                    <option value="aktif">Aktif</option>
-                    <option value="nonaktif">Non-Aktif</option>
-                    <option value="cuti">Cuti</option>
+                    @foreach($statusOptions as $status)
+                        <option value="{{ $status }}" @selected($filters['status_aktif'] === $status)>{{ $status }}</option>
+                    @endforeach
                 </select>
                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -118,9 +121,17 @@
                 </div>
             </div>
         </div>
-    </div>
+    </form>
 
     {{-- TABLE --}}
+    @php
+        $nextDirection = fn (string $column) => $sort === $column && $direction === 'asc' ? 'desc' : 'asc';
+        $sortUrl = fn (string $column) => route('data-pegawai', array_merge(request()->except('page'), [
+            'sort' => $column,
+            'direction' => $nextDirection($column),
+        ]));
+        $sortIconClass = fn (string $column) => 'w-3.5 h-3.5 shrink-0 transition ' . ($sort === $column ? 'text-primary ' . ($direction === 'asc' ? 'rotate-180' : '') : '');
+    @endphp
     <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
         <div class="overflow-x-auto">
             <table class="w-full" id="pegawai-table">
@@ -129,61 +140,91 @@
                         <th class="w-10 px-4 py-3 select-none">
                             <input id="check-all" type="checkbox" class="h-4 w-4 rounded border-border text-primary focus:ring-primary/20">
                         </th>
-                        <th onclick="sortTable(1)" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted cursor-pointer hover:text-ink transition-colors select-none">
-                            <span class="flex items-center gap-1">
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted select-none">
+                            <a href="{{ $sortUrl('pegawai') }}" class="flex items-center gap-1 hover:text-ink transition-colors">
                                 Pegawai
-                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
-                            </span>
+                                <svg class="{{ $sortIconClass('pegawai') }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
+                            </a>
                         </th>
-                        <th onclick="sortTable(2)" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted cursor-pointer hover:text-ink transition-colors select-none">
-                            <span class="flex items-center gap-1">
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted select-none">
+                            <a href="{{ $sortUrl('jabatan') }}" class="flex items-center gap-1 hover:text-ink transition-colors">
                                 Jabatan & Unit
-                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
-                            </span>
+                                <svg class="{{ $sortIconClass('jabatan') }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
+                            </a>
                         </th>
-                        <th onclick="sortTable(3)" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted cursor-pointer hover:text-ink transition-colors select-none">
-                            <span class="flex items-center justify-center gap-1">
+                        <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted select-none">
+                            <a href="{{ $sortUrl('golongan') }}" class="flex items-center justify-center gap-1 hover:text-ink transition-colors">
                                 Gol. / Jenis
-                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
-                            </span>
+                                <svg class="{{ $sortIconClass('golongan') }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
+                            </a>
                         </th>
-                        <th onclick="sortTable(4)" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted cursor-pointer hover:text-ink transition-colors select-none">
-                            <span class="flex items-center gap-1">
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted select-none">
+                            <a href="{{ $sortUrl('tmt') }}" class="flex items-center gap-1 hover:text-ink transition-colors">
                                 TMT
-                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
-                            </span>
+                                <svg class="{{ $sortIconClass('tmt') }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
+                            </a>
                         </th>
                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted select-none">Status</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted select-none">Dokumen</th>
-                        <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted select-none">Aksi</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted select-none">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-border">
                     @foreach($pegawaiData as $p)
-                    <tr class="transition-colors hover:bg-soft/50" data-nama="{{ $p->nama_lengkap }}" data-nip="{{ $p->nip }}" data-unit="{{ $p->jabatan_terakhir ?? '-' }}" data-jenis="{{ $p->jenisPegawai->nama ?? '-' }}" data-status="{{ strtolower($p->status_aktif) }}" data-golongan="{{ $p->golongan_terakhir ?? '-' }}">
+                    @php
+                        $currentPosition = $p->positionHistories->first();
+                        $currentUnit = $currentPosition?->unitKerja?->nama ?? '-';
+                        $tmt = $currentPosition?->tmt_jabatan ?? $p->appointment?->tmt_pengangkatan;
+                        $fotoUrl = $p->foto_url;
+                    @endphp
+                    <tr class="transition-colors hover:bg-soft/50" data-nama="{{ $p->nama_lengkap }}" data-nip="{{ $p->nip }}" data-unit="{{ $currentUnit }}" data-jenis="{{ $p->jenisPegawai->nama ?? '-' }}" data-status="{{ strtolower($p->status_aktif) }}" data-golongan="{{ $p->golongan_terakhir ?? '-' }}">
                         <td class="px-4 py-3.5">
                             <input type="checkbox" class="row-check h-4 w-4 rounded border-border text-primary focus:ring-primary/20">
                         </td>
                         <td class="px-4 py-3.5">
                             <div class="flex items-center gap-3">
-                                <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                                    {{ strtoupper(substr($p->nama_lengkap, 0, 1)) }}
-                                </div>
+                                <a
+                                    href="{{ route('pegawai.show', $p->id) }}"
+                                    class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-sm font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                    title="Buka detail profil {{ $p->nama_lengkap }}"
+                                    aria-label="Buka detail profil {{ $p->nama_lengkap }}"
+                                >
+                                    @if($fotoUrl)
+                                        <img
+                                            src="{{ $fotoUrl }}"
+                                            alt="Foto {{ $p->nama_lengkap }}"
+                                            class="h-full w-full object-cover"
+                                            loading="lazy"
+                                            onerror="this.classList.add('hidden'); this.nextElementSibling.classList.remove('hidden')"
+                                        >
+                                    @endif
+                                    <span class="{{ $fotoUrl ? 'hidden' : '' }}" aria-hidden="true">
+                                        {{ strtoupper(substr($p->nama_lengkap, 0, 1)) }}
+                                    </span>
+                                </a>
                                 <div class="min-w-0">
-                                    <p class="text-sm font-semibold text-ink">{{ $p->nama_lengkap }}</p>
+                                    <a
+                                        href="{{ route('pegawai.show', $p->id) }}"
+                                        class="block truncate text-sm font-semibold text-ink transition hover:text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/20 rounded"
+                                        title="Buka detail {{ $p->nama_lengkap }}"
+                                    >
+                                        {{ $p->nama_lengkap }}
+                                    </a>
                                     <p class="font-mono text-xs text-muted">{{ $p->nip }}</p>
                                 </div>
                             </div>
                         </td>
                         <td class="px-4 py-3.5">
                             <p class="text-sm font-medium text-ink">{{ $p->jabatan_terakhir ?? '-' }}</p>
-                            <p class="text-xs text-muted">{{ $p->jabatan_terakhir ?? '-' }}</p>
+                            <p class="text-xs text-muted">{{ $currentUnit }}</p>
                         </td>
-                        <td class="px-4 py-3.5 text-center">
+                        <td class="px-4 py-3.5 text-left">
                             <span class="text-sm font-medium text-ink">{{ $p->golongan_terakhir ?? '-' }} / {{ $p->jenisPegawai->nama ?? '-' }}</span>
                         </td>
                         <td class="px-4 py-3.5">
-                            <p class="text-sm text-ink font-mono">-</p>
+                            <p class="text-sm text-ink font-mono">
+                                {{ $tmt?->format('d-m-Y') ?? '-' }}
+                            </p>
                         </td>
                         <td class="px-4 py-3.5">
                             @php
@@ -237,8 +278,8 @@
                                 {{ $dokLabels[$dok] ?? $dok }}
                             </span>
                         </td>
-                        <td class="px-4 py-3.5 text-center">
-                            <div class="flex items-center justify-center gap-1.5">
+                        <td class="px-4 py-3.5 text-left">
+                            <div class="flex items-center justify-start gap-1.5">
                                 {{-- Detail --}}
                                 <a href="{{ route('pegawai.show', $p->id) }}" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Detail">
                                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -270,8 +311,26 @@
         </div>
 
         {{-- TABLE FOOTER --}}
-        <div class="border-t border-border px-6 py-4 bg-surface">
-            {{ $pegawaiData->links() }}
+        <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row">
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-muted">Tampilkan</span>
+                    <select onchange="updatePerPage(this.value)" class="appearance-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer">
+                        <option value="10" {{ request('per_page', 10) == 10 ? 'selected' : '' }}>10</option>
+                        <option value="25" {{ request('per_page') == 25 ? 'selected' : '' }}>25</option>
+                        <option value="50" {{ request('per_page') == 50 ? 'selected' : '' }}>50</option>
+                    </select>
+                    <span class="text-sm text-muted">data per halaman</span>
+                </div>
+                @if($pegawaiData->total() > 0)
+                <p class="text-sm text-muted hidden sm:block">
+                    Menampilkan <span class="font-semibold text-ink">{{ $pegawaiData->firstItem() }}</span> hingga <span class="font-semibold text-ink">{{ $pegawaiData->lastItem() }}</span> dari <span class="font-semibold text-ink">{{ $pegawaiData->total() }}</span> hasil
+                </p>
+                @endif
+            </div>
+            <div class="w-full sm:w-auto">
+                {{ $pegawaiData->links('vendor.pagination.simpeg') }}
+            </div>
         </div>
     </div>
 
@@ -286,75 +345,30 @@
 
     @push('scripts')
     <script>
+    const filterForm = document.getElementById('filter-form');
     const searchInput = document.getElementById('search-input');
     const filterGolongan = document.getElementById('filter-golongan');
     const filterUnit = document.getElementById('filter-unit');
     const filterJenis = document.getElementById('filter-jenis');
     const filterStatus = document.getElementById('filter-status');
 
-    function applyFilters() {
-        const query = searchInput.value.toLowerCase();
-        const golongan = filterGolongan.value;
-        const unit = filterUnit.value;
-        const jenis = filterJenis.value;
-        const status = filterStatus.value;
+    let filterSubmitTimer;
 
-        const rows = document.querySelectorAll('tbody tr');
-        let visibleCount = 0;
+    function submitFilterForm(delay = 0) {
+        if (!filterForm) return;
 
-        rows.forEach(row => {
-            const rNama = row.getAttribute('data-nama');
-            if (!rNama) return;
-            const rNip = row.getAttribute('data-nip').toLowerCase();
-            const rGolongan = row.getAttribute('data-golongan');
-            const rUnit = row.getAttribute('data-unit');
-            const rJenis = row.getAttribute('data-jenis');
-            const rStatus = row.getAttribute('data-status');
-
-            const matchesSearch = rNama.toLowerCase().includes(query) || rNip.includes(query);
-            const matchesGolongan = !golongan || rGolongan.startsWith(golongan);
-            const matchesUnit = !unit || rUnit === unit;
-            const matchesJenis = !jenis || rJenis === jenis;
-            const matchesStatus = !status || rStatus === status;
-
-            if (matchesSearch && matchesGolongan && matchesUnit && matchesJenis && matchesStatus) {
-                row.style.display = '';
-                visibleCount++;
-            } else {
-                row.style.display = 'none';
-            }
-        });
-        
-        const countText = document.getElementById('pegawai-count-text');
-        if (countText) {
-            countText.textContent = `Menampilkan 1 - ${visibleCount} dari ${visibleCount} data aktif`;
-        }
+        window.clearTimeout(filterSubmitTimer);
+        filterSubmitTimer = window.setTimeout(() => {
+            clearBulk();
+            filterForm.submit();
+        }, delay);
     }
 
-    if (searchInput) searchInput.addEventListener('input', applyFilters);
-    if (filterGolongan) filterGolongan.addEventListener('change', applyFilters);
-    if (filterUnit) filterUnit.addEventListener('change', applyFilters);
-    if (filterJenis) filterJenis.addEventListener('change', applyFilters);
-    if (filterStatus) filterStatus.addEventListener('change', applyFilters);
-
-    document.addEventListener('DOMContentLoaded', () => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const filterParam = urlParams.get('filter');
-        if (filterParam === 'pensiun') {
-            if (searchInput) {
-                searchInput.value = 'Siti Rahayu';
-                applyFilters();
-            }
-        } else if (filterParam === 'ews') {
-            // Saring Budi Santoso (Masa Berlaku SK Pengangkatan H-30/danger)
-            if (searchInput) {
-                searchInput.value = 'Ahmad Fauzi'; // salah satu yang EWS-nya aktif
-                applyFilters();
-            }
-        } else {
-            applyFilters();
-        }
-    });
+    if (searchInput) searchInput.addEventListener('input', () => submitFilterForm(450));
+    if (filterGolongan) filterGolongan.addEventListener('change', () => submitFilterForm());
+    if (filterUnit) filterUnit.addEventListener('change', () => submitFilterForm());
+    if (filterJenis) filterJenis.addEventListener('change', () => submitFilterForm());
+    if (filterStatus) filterStatus.addEventListener('change', () => submitFilterForm());
 
     // Checkbox bulk
     const checkAll = document.getElementById('check-all');
@@ -416,63 +430,11 @@
         window.location.href = exportUrl.toString();
     }
 
-    // Sorting functionality
-    let sortDirections = {};
-    function sortTable(colIndex) {
-        const table = document.getElementById("pegawai-table");
-        const tbody = table.querySelector("tbody");
-        const rows = Array.from(tbody.querySelectorAll("tr"));
-        
-        // Tentukan arah sort
-        const dir = sortDirections[colIndex] === 'asc' ? 'desc' : 'asc';
-        sortDirections = { [colIndex]: dir }; // Reset sort lainnya
-
-        // Tampilkan indikator arah sort secara visual
-        const headers = table.querySelectorAll("thead th");
-        headers.forEach((th, idx) => {
-            const svg = th.querySelector("svg");
-            if (svg) {
-                if (idx === colIndex) {
-                    svg.style.transform = dir === 'asc' ? 'rotate(180deg)' : '';
-                    svg.style.color = '#122E92'; // warna primary aktif
-                } else {
-                    svg.style.transform = '';
-                    svg.style.color = '';
-                }
-            }
-        });
-
-        const sortedRows = rows.sort((a, b) => {
-            let valA = "", valB = "";
-            
-            if (colIndex === 1) { // Pegawai (Nama)
-                valA = a.getAttribute('data-nama') || '';
-                valB = b.getAttribute('data-nama') || '';
-            } else if (colIndex === 2) { // Jabatan & Unit
-                valA = a.querySelector('td:nth-child(3) p:first-child').textContent.trim();
-                valB = b.querySelector('td:nth-child(3) p:first-child').textContent.trim();
-            } else if (colIndex === 3) { // Gol. / Jenis
-                valA = a.getAttribute('data-golongan') || '';
-                valB = b.getAttribute('data-golongan') || '';
-            } else if (colIndex === 4) { // TMT
-                // Ubah format DD-MM-YYYY ke YYYYMMDD agar mudah disortir
-                const dateA = (a.querySelector('td:nth-child(5) p').textContent.trim()).split('-').reverse().join('');
-                const dateB = (b.querySelector('td:nth-child(5) p').textContent.trim()).split('-').reverse().join('');
-                valA = dateA;
-                valB = dateB;
-            }
-
-            return dir === 'asc' 
-                ? valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' })
-                : valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' });
-        });
-
-        // Append yang sudah disortir
-        tbody.innerHTML = "";
-        sortedRows.forEach(row => tbody.appendChild(row));
-        
-        // Re-apply filter checkbox
-        clearBulk();
+    function updatePerPage(val) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('per_page', val);
+        url.searchParams.delete('page');
+        window.location.assign(url.href);
     }
     </script>
     @endpush

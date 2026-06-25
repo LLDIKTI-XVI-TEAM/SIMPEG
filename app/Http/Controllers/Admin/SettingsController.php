@@ -24,7 +24,7 @@ class SettingsController extends Controller
 
         // Write Audit Log
         $dynamicLogs = session('dynamic_audit_logs', []);
-        $newId = count($dynamicLogs) + count(\App\Http\Controllers\Admin\AuditController::$auditLogs) + 1;
+        $newId = count($dynamicLogs) + 1;
 
         $dynamicLogs[] = [
             'id' => $newId,
