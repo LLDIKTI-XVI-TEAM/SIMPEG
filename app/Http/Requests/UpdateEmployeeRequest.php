@@ -11,7 +11,7 @@ class UpdateEmployeeRequest extends FormRequest
     public function authorize(): bool
     {
         if (app()->environment('local')
-            && filter_var(env('SIMPEG_DISABLE_EMPLOYEE_API_AUTH', false), FILTER_VALIDATE_BOOLEAN)) {
+            && config('services.simpeg.disable_employee_api_auth')) {
             return true;
         }
 
@@ -24,7 +24,7 @@ class UpdateEmployeeRequest extends FormRequest
     public function rules(): array
     {
         $employeeParam = $this->route('employee');
-        
+
         if ($employeeParam instanceof Employee) {
             $employee = $employeeParam;
         } else {
@@ -33,7 +33,7 @@ class UpdateEmployeeRequest extends FormRequest
         }
 
         $rules = EmployeeValidationRules::update($employee);
-        
+
         // Aturan tambahan khusus form UI web
         if (! $this->wantsJson() && ! $this->is('api/*')) {
             $rules['jenis_pengangkatan'] = ['required', 'string', 'max:100'];
@@ -41,7 +41,7 @@ class UpdateEmployeeRequest extends FormRequest
             $rules['nomor_sk'] = ['required', 'string', 'max:255'];
             $rules['tanggal_sk'] = ['required', 'date'];
             $rules['file_sk'] = ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png'];
-            
+
             // Override foto khusus web (file upload)
             $rules['foto'] = ['nullable', 'image', 'max:10240', 'mimes:jpg,jpeg,png'];
         }

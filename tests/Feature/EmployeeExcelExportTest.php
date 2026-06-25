@@ -7,6 +7,7 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use Tests\TestCase;
 
 class EmployeeExcelExportTest extends TestCase
@@ -38,6 +39,7 @@ class EmployeeExcelExportTest extends TestCase
 
         $temporaryFile = tempnam(sys_get_temp_dir(), 'simpeg-export-');
         file_put_contents($temporaryFile, $response->streamedContent());
+        $spreadsheet = null;
 
         try {
             $spreadsheet = IOFactory::load($temporaryFile);
@@ -53,7 +55,9 @@ class EmployeeExcelExportTest extends TestCase
             $this->assertSame('mmmm d, yyyy', $sheet->getStyle('P2')->getNumberFormat()->getFormatCode());
             $this->assertSame('A2', $sheet->getFreezePane());
         } finally {
-            $spreadsheet->disconnectWorksheets();
+            if ($spreadsheet instanceof Spreadsheet) {
+                $spreadsheet->disconnectWorksheets();
+            }
             @unlink($temporaryFile);
         }
     }

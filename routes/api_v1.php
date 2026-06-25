@@ -13,7 +13,7 @@ use App\Http\Controllers\RankHistoryController;
 use Illuminate\Support\Facades\Route;
 
 $disableEmployeeApiAuth = app()->environment('local')
-    && filter_var(env('SIMPEG_DISABLE_EMPLOYEE_API_AUTH', false), FILTER_VALIDATE_BOOLEAN);
+    && config('services.simpeg.disable_employee_api_auth');
 
 $employeeGroupMiddleware = $disableEmployeeApiAuth
     ? []

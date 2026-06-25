@@ -44,6 +44,11 @@ return [
         'redirect' => env('KEYCLOAK_REDIRECT_URI'),
         'employee_match_field' => env('SSO_EMPLOYEE_MATCH_FIELD', 'email'),
         'dev_usernames' => array_filter(array_map('trim', explode(',', env('SSO_DEV_USERNAMES', 'demo-klabat')))),
+        'test_username' => env('KEYCLOAK_TEST_USERNAME', 'demo-klabat'),
+    ],
+
+    'simpeg' => [
+        'disable_employee_api_auth' => filter_var(env('SIMPEG_DISABLE_EMPLOYEE_API_AUTH', false), FILTER_VALIDATE_BOOLEAN),
     ],
 
 ];
