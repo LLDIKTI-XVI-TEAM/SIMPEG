@@ -97,9 +97,9 @@ Status ✅ pada tracker ini hanya berarti **terintegrasi dalam kode dan didukung
 
 | Fitur | Referensi | Target sprint | Status aktual | Kondisi implementasi dan bukti |
 |---|---|---:|---|---|
-| Riwayat kepangkatan | US-2.6, Issue #18 | Sprint 2 | ⚠️ Sebagian | API list/create append-only, latest flag, update tanggal EWS, audit, dan test tersedia. Form CRUD pada halaman detail belum terintegrasi |
-| Riwayat jabatan | US-2.6 | Sprint 2 | ⚠️ Sebagian | API list/create append-only dan test tersedia; UI input belum terintegrasi |
-| Riwayat KGB | US-2.6 | Sprint 2 | ⚠️ Sebagian | API list/create append-only dan test tersedia; UI input belum terintegrasi |
+| Riwayat kepangkatan | US-2.6, Issue #18 | Sprint 2 | ✅ Terintegrasi | API list/create append-only, latest flag, update tanggal EWS, audit, dan test tersedia. Form CRUD pada halaman detail sudah terintegrasi ke API v1 |
+| Riwayat jabatan | US-2.6 | Sprint 2 | ✅ Terintegrasi | API list/create append-only, latest flag, audit dan test tersedia. Form input UI sudah terhubung ke API v1 dengan binding referensi |
+| Riwayat KGB | US-2.6 | Sprint 2 | ✅ Terintegrasi | API list/create append-only, latest flag, audit dan test tersedia. Form input UI sudah terhubung ke API v1 |
 | Hukuman disiplin | US-2.7, Issue #19 | Sprint 2 | 🧱 Scaffold | Model, migration, relasi, dan tampilan detail tersedia. CRUD dan aturan auto-deactivate belum lengkap |
 | Data keluarga | US-2.8, Issue #24 | Sprint 3 | 🧱 Scaffold | Model, migration, relasi, dan tampilan tersedia. CRUD belum terintegrasi |
 | Pendidikan | PRD 7.3 | Pelengkap data | 🧱 Scaffold | Model, migration, dan relasi tersedia; CRUD belum terintegrasi |

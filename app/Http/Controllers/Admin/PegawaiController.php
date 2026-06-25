@@ -13,6 +13,8 @@ use App\Models\RefUnitKerja;
 use App\Models\RefAgama;
 use App\Models\RefStatusPerkawinan;
 use App\Models\RefGolongan;
+use App\Models\RefJenisJabatan;
+use App\Models\RefEselon;
 use App\Services\AuditService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -519,7 +521,12 @@ class PegawaiController extends Controller
             'jenisPegawai'
         ])->findOrFail($id);
 
-        return view('admin.pegawai.show', compact('p'));
+        $golonganOptions = RefGolongan::all();
+        $jenisJabatanOptions = RefJenisJabatan::all();
+        $unitKerjaOptions = RefUnitKerja::all();
+        $eselonOptions = RefEselon::all();
+
+        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions'));
     }
 
     public function edit($id)
@@ -598,72 +605,6 @@ class PegawaiController extends Controller
             DB::beginTransaction();
             
             switch ($type) {
-                case 'keluarga':
-                    $employee->families()->create([
-                        'nama_anggota' => $request->input('nama'),
-                        'hubungan' => $request->input('hubungan'),
-                        'tanggal_lahir' => $request->input('tgl_lahir'),
-                        'pekerjaan' => $request->input('pekerjaan'),
-                        'status_tunjangan' => true,
-                    ]);
-                    break;
-                case 'pangkat':
-                    $gol = RefGolongan::where('nama', $request->input('golongan'))->first();
-                    $employee->rankHistories()->create([
-                        'golongan_id' => $gol ? $gol->id : null,
-                        'no_sk' => $request->input('no_sk'),
-                        'tanggal_sk' => $request->input('tgl_sk'),
-                        'tmt_pangkat' => $request->input('tmt'),
-                        'is_latest' => true,
-                    ]);
-                    break;
-                case 'jabatan':
-                    $unit = RefUnitKerja::where('nama', $request->input('unit'))->first();
-                    $employee->positionHistories()->create([
-                        'nama_jabatan' => $request->input('jabatan'),
-                        'unit_kerja_id' => $unit ? $unit->id : null,
-                        'no_sk' => $request->input('no_sk'),
-                        'tanggal_sk' => $request->input('tgl_sk'),
-                        'tmt_jabatan' => $request->input('tmt'),
-                        'is_latest' => true,
-                    ]);
-                    break;
-                case 'kgb':
-                    $gaji = preg_replace('/[^0-9]/', '', $request->input('gaji'));
-                    $employee->salaryHistories()->create([
-                        'gaji_pokok' => $gaji ?: 0,
-                        'no_sk' => $request->input('no_sk'),
-                        'tanggal_sk' => $request->input('tgl_sk'),
-                        'tmt_kgb' => $request->input('tmt'),
-                        'is_latest' => true,
-                    ]);
-                    break;
-                case 'disiplin':
-                    $tglMulai = $request->input('tgl_sk');
-                    $masa = $request->input('masa');
-                    $tglAkhir = null;
-                    if ($masa) {
-                        if (stripos($masa, 'bulan') !== false) {
-                            $months = (int) preg_replace('/[^0-9]/', '', $masa);
-                            if ($months > 0) {
-                                $tglAkhir = \Carbon\Carbon::parse($tglMulai)->addMonths($months)->format('Y-m-d');
-                            }
-                        } elseif (stripos($masa, 'tahun') !== false) {
-                            $years = (int) preg_replace('/[^0-9]/', '', $masa);
-                            if ($years > 0) {
-                                $tglAkhir = \Carbon\Carbon::parse($tglMulai)->addYears($years)->format('Y-m-d');
-                            }
-                        }
-                    }
-                    $employee->disciplineRecords()->create([
-                        'jenis_hukuman' => $request->input('jenis'),
-                        'deskripsi' => $request->input('alasan'),
-                        'no_sk' => $request->input('no_sk'),
-                        'tanggal_sk' => $request->input('tgl_sk'),
-                        'tanggal_mulai' => $tglMulai,
-                        'tanggal_berakhir' => $tglAkhir,
-                    ]);
-                    break;
                 case 'pendidikan':
                     $jenjang = \App\Models\RefJenjangPendidikan::where('nama', $request->input('tingkat'))->first();
                     $employee->educationHistories()->create([
@@ -675,7 +616,7 @@ class PegawaiController extends Controller
                     ]);
                     break;
                 default:
-                    throw new \Exception('Tipe riwayat tidak valid.');
+                    throw new \Exception('Tipe riwayat tidak valid atau sudah dimigrasikan ke endpoint khusus.');
             }
             
             DB::commit();

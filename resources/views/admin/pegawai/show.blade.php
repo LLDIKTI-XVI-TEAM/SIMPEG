@@ -49,9 +49,9 @@
         
         // Form states
         newKeluarga: { nama: '', hubungan: 'Istri', tgl_lahir: '', pekerjaan: '' },
-        newPangkat: { golongan: 'III/c', no_sk: '', tgl_sk: '', tmt: '' },
-        newJabatan: { jabatan: '', unit: 'Bag. Umum', no_sk: '', tgl_sk: '', tmt: '' },
-        newKgb: { gaji: '', no_sk: '', tgl_sk: '', tmt: '' },
+        newPangkat: { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '' },
+        newJabatan: { nama_jabatan: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '' },
+        newKgb: { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '' },
         newDisiplin: { jenis: 'Teguran Tertulis', alasan: '', no_sk: '', tgl_sk: '', masa: '' },
         newPendidikan: { tingkat: 'Sarjana (S1)', institusi: '', prodi: '', lulus: '', no_ijazah: '' },
         
@@ -76,8 +76,15 @@
                 payload = { ...payload, ...this.newPendidikan };
             }
 
+            let endpoint = `/pegawai/{{ $p->id }}/riwayat`;
+            if (this.modalType === 'pangkat') endpoint = `/api/v1/pegawai/{{ $p->id }}/riwayat-kepangkatan`;
+            else if (this.modalType === 'jabatan') endpoint = `/api/v1/pegawai/{{ $p->id }}/riwayat-jabatan`;
+            else if (this.modalType === 'kgb') endpoint = `/api/v1/pegawai/{{ $p->id }}/riwayat-kgb`;
+            else if (this.modalType === 'keluarga') endpoint = `/api/v1/pegawai/{{ $p->id }}/keluarga`;
+            else if (this.modalType === 'disiplin') endpoint = `/api/v1/pegawai/{{ $p->id }}/disiplin`;
+
             try {
-                const response = await fetch(`/pegawai/{{ $p->id }}/riwayat`, {
+                const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -721,24 +728,11 @@
                             <div class="space-y-4">
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Golongan</label>
-                                    <select x-model="newPangkat.golongan" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                        <option value="I/a">I/a</option>
-                                        <option value="I/b">I/b</option>
-                                        <option value="I/c">I/c</option>
-                                        <option value="I/d">I/d</option>
-                                        <option value="II/a">II/a</option>
-                                        <option value="II/b">II/b</option>
-                                        <option value="II/c">II/c</option>
-                                        <option value="II/d">II/d</option>
-                                        <option value="III/a">III/a</option>
-                                        <option value="III/b">III/b</option>
-                                        <option value="III/c">III/c</option>
-                                        <option value="III/d">III/d</option>
-                                        <option value="IV/a">IV/a</option>
-                                        <option value="IV/b">IV/b</option>
-                                        <option value="IV/c">IV/c</option>
-                                        <option value="IV/d">IV/d</option>
-                                        <option value="IV/e">IV/e</option>
+                                    <select x-model="newPangkat.golongan_id" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                        <option value="">-- Pilih Golongan --</option>
+                                        @foreach($golonganOptions as $gol)
+                                            <option value="{{ $gol->id }}">{{ $gol->nama }} ({{ $gol->pangkat }})</option>
+                                        @endforeach
                                     </select>
                                 </div>
                                 <div class="space-y-1">
@@ -747,11 +741,11 @@
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK Terbit</label>
-                                    <input type="date" x-model="newPangkat.tgl_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="date" x-model="newPangkat.tanggal_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Golongan</label>
-                                    <input type="date" x-model="newPangkat.tmt" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="date" x-model="newPangkat.tmt_pangkat" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                             </div>
                         </template>
@@ -761,15 +755,33 @@
                             <div class="space-y-4">
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Jabatan</label>
-                                    <input type="text" x-model="newJabatan.jabatan" required placeholder="Analis Kepegawaian Muda" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="text" x-model="newJabatan.nama_jabatan" required placeholder="Analis Kepegawaian Muda" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Jabatan</label>
+                                    <select x-model="newJabatan.jenis_jabatan_id" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                        <option value="">-- Pilih Jenis Jabatan --</option>
+                                        @foreach($jenisJabatanOptions as $jj)
+                                            <option value="{{ $jj->id }}">{{ $jj->nama }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Eselon (Opsional)</label>
+                                    <select x-model="newJabatan.eselon_id" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                        <option value="">-- Pilih Eselon --</option>
+                                        @foreach($eselonOptions as $esl)
+                                            <option value="{{ $esl->id }}">{{ $esl->nama }}</option>
+                                        @endforeach
+                                    </select>
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Unit Kerja</label>
-                                    <select x-model="newJabatan.unit" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                        <option value="Bag. Umum">Bag. Umum</option>
-                                        <option value="Bag. Keuangan">Bag. Keuangan</option>
-                                        <option value="Bag. SDM">Bag. SDM</option>
-                                        <option value="Bag. IT">Bag. IT</option>
+                                    <select x-model="newJabatan.unit_kerja_id" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                        <option value="">-- Pilih Unit Kerja --</option>
+                                        @foreach($unitKerjaOptions as $unit)
+                                            <option value="{{ $unit->id }}">{{ $unit->nama }}</option>
+                                        @endforeach
                                     </select>
                                 </div>
                                 <div class="space-y-1">
@@ -778,11 +790,11 @@
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK Terbit</label>
-                                    <input type="date" x-model="newJabatan.tgl_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="date" x-model="newJabatan.tanggal_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Jabatan</label>
-                                    <input type="date" x-model="newJabatan.tmt" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="date" x-model="newJabatan.tmt_jabatan" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                             </div>
                         </template>
@@ -792,7 +804,7 @@
                             <div class="space-y-4">
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Gaji Pokok Baru</label>
-                                    <input type="text" x-model="newKgb.gaji" required placeholder="Rp 4.100.000" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="number" x-model="newKgb.gaji_pokok" required placeholder="4100000" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor Surat KGB</label>
@@ -800,11 +812,11 @@
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Surat Terbit</label>
-                                    <input type="date" x-model="newKgb.tgl_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="date" x-model="newKgb.tanggal_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT KGB</label>
-                                    <input type="date" x-model="newKgb.tmt" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="date" x-model="newKgb.tmt_kgb" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                             </div>
                         </template>
