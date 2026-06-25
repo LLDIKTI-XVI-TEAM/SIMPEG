@@ -277,7 +277,41 @@ class PegawaiController extends Controller
     public function index(Request $request)
     {
         $perPage = (int) $request->input('per_page', 10);
-        $pegawaiData = Employee::with(['jenisPegawai'])->paginate($perPage)->withQueryString();
+        $query = Employee::with(['jenisPegawai']);
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('nama_lengkap', 'like', '%' . $search . '%')
+                  ->orWhere('nip', 'like', '%' . $search . '%');
+            });
+        }
+        if ($request->filled('golongan')) {
+            $query->where('golongan_terakhir', 'like', $request->golongan . '%');
+        }
+        if ($request->filled('unit')) {
+            $unitJabatanMap = [
+                'Bag. SDM' => 'Analis Kepegawaian',
+                'Bag. IT' => 'Pengelola Data',
+                'Bag. Umum' => 'Perencana',
+                'Bag. Keuangan' => 'Arsiparis',
+            ];
+            if (isset($unitJabatanMap[$request->unit])) {
+                $query->where('jabatan_terakhir', $unitJabatanMap[$request->unit]);
+            } else {
+                $query->where('jabatan_terakhir', 'like', '%' . $request->unit . '%');
+            }
+        }
+        if ($request->filled('jenis')) {
+            $query->whereHas('jenisPegawai', function($q) use ($request) {
+                $q->where('nama', $request->jenis);
+            });
+        }
+        if ($request->filled('status')) {
+            $query->where('status_aktif', 'like', strtolower($request->status) . '%');
+        }
+
+        $pegawaiData = $query->paginate($perPage)->withQueryString();
         return view('admin.pegawai.index', compact('pegawaiData'));
     }
 

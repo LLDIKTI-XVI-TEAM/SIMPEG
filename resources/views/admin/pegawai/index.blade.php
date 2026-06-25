@@ -48,23 +48,26 @@
     </div>
 
     {{-- FILTER BAR --}}
-    <div class="mb-6 rounded-lg border border-border bg-surface p-4 flex flex-col gap-4 shadow-sm">
+    <form id="filter-form" method="GET" action="{{ route('data-pegawai') }}" class="mb-6 rounded-lg border border-border bg-surface p-4 flex flex-col gap-4 shadow-sm">
+        @if(request('per_page'))
+            <input type="hidden" name="per_page" value="{{ request('per_page') }}">
+        @endif
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
             {{-- Search input --}}
             <div class="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5">
                 <svg class="w-4 h-4 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                 </svg>
-                <input id="search-input" type="text" placeholder="Cari nama atau NIP..." class="flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none font-sans">
+                <input id="search-input" name="search" value="{{ request('search') }}" type="text" placeholder="Cari nama atau NIP..." class="flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none font-sans">
             </div>
             
             {{-- Filter Golongan --}}
             <div class="relative">
-                <select id="filter-golongan" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                <select id="filter-golongan" name="golongan" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Golongan</option>
-                    <option value="IV">Golongan IV</option>
-                    <option value="III">Golongan III</option>
-                    <option value="II">Golongan II</option>
+                    <option value="IV" {{ request('golongan') == 'IV' ? 'selected' : '' }}>Golongan IV</option>
+                    <option value="III" {{ request('golongan') == 'III' ? 'selected' : '' }}>Golongan III</option>
+                    <option value="II" {{ request('golongan') == 'II' ? 'selected' : '' }}>Golongan II</option>
                 </select>
                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -75,12 +78,12 @@
 
             {{-- Filter Unit --}}
             <div class="relative">
-                <select id="filter-unit" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                <select id="filter-unit" name="unit" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Unit</option>
-                    <option>Bag. Umum</option>
-                    <option>Bag. Keuangan</option>
-                    <option>Bag. SDM</option>
-                    <option>Bag. IT</option>
+                    <option value="Bag. Umum" {{ request('unit') == 'Bag. Umum' ? 'selected' : '' }}>Bag. Umum</option>
+                    <option value="Bag. Keuangan" {{ request('unit') == 'Bag. Keuangan' ? 'selected' : '' }}>Bag. Keuangan</option>
+                    <option value="Bag. SDM" {{ request('unit') == 'Bag. SDM' ? 'selected' : '' }}>Bag. SDM</option>
+                    <option value="Bag. IT" {{ request('unit') == 'Bag. IT' ? 'selected' : '' }}>Bag. IT</option>
                 </select>
                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -91,10 +94,10 @@
 
             {{-- Filter Jenis --}}
             <div class="relative">
-                <select id="filter-jenis" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                <select id="filter-jenis" name="jenis" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Jenis</option>
-                    <option>PNS</option>
-                    <option>PPPK</option>
+                    <option value="PNS" {{ request('jenis') == 'PNS' ? 'selected' : '' }}>PNS</option>
+                    <option value="PPPK" {{ request('jenis') == 'PPPK' ? 'selected' : '' }}>PPPK</option>
                 </select>
                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -105,11 +108,11 @@
 
             {{-- Filter Status --}}
             <div class="relative">
-                <select id="filter-status" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                <select id="filter-status" name="status" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Status</option>
-                    <option value="aktif">Aktif</option>
-                    <option value="nonaktif">Non-Aktif</option>
-                    <option value="cuti">Cuti</option>
+                    <option value="aktif" {{ request('status') == 'aktif' ? 'selected' : '' }}>Aktif</option>
+                    <option value="nonaktif" {{ request('status') == 'nonaktif' ? 'selected' : '' }}>Non-Aktif</option>
+                    <option value="cuti" {{ request('status') == 'cuti' ? 'selected' : '' }}>Cuti</option>
                 </select>
                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -118,7 +121,7 @@
                 </div>
             </div>
         </div>
-    </div>
+    </form>
 
     {{-- TABLE --}}
     <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
@@ -141,8 +144,8 @@
                                 <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
                             </span>
                         </th>
-                        <th onclick="sortTable(3)" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted cursor-pointer hover:text-ink transition-colors select-none">
-                            <span class="flex items-center justify-center gap-1">
+                        <th onclick="sortTable(3)" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted cursor-pointer hover:text-ink transition-colors select-none whitespace-nowrap">
+                            <span class="flex items-center gap-1">
                                 Gol. / Jenis
                                 <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
                             </span>
@@ -155,7 +158,7 @@
                         </th>
                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted select-none">Status</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted select-none">Dokumen</th>
-                        <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted select-none">Aksi</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted select-none">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-border">
@@ -198,10 +201,19 @@
                             </div>
                         </td>
                         <td class="px-4 py-3.5">
+                            @php
+                                $unitMap = [
+                                    'Analis Kepegawaian' => 'Bag. SDM',
+                                    'Pengelola Data' => 'Bag. IT',
+                                    'Perencana' => 'Bag. Umum',
+                                    'Arsiparis' => 'Bag. Keuangan'
+                                ];
+                                $unitName = $unitMap[$p->jabatan_terakhir] ?? '-';
+                            @endphp
                             <p class="text-sm font-medium text-ink">{{ $p->jabatan_terakhir ?? '-' }}</p>
-                            <p class="text-xs text-muted">{{ $p->jabatan_terakhir ?? '-' }}</p>
+                            <p class="text-xs text-muted">{{ $unitName }}</p>
                         </td>
-                        <td class="px-4 py-3.5 text-center">
+                        <td class="px-4 py-3.5 text-left">
                             <span class="text-sm font-medium text-ink">{{ $p->golongan_terakhir ?? '-' }} / {{ $p->jenisPegawai->nama ?? '-' }}</span>
                         </td>
                         <td class="px-4 py-3.5">
@@ -259,8 +271,8 @@
                                 {{ $dokLabels[$dok] ?? $dok }}
                             </span>
                         </td>
-                        <td class="px-4 py-3.5 text-center">
-                            <div class="flex items-center justify-center gap-1.5">
+                        <td class="px-4 py-3.5 text-left">
+                            <div class="flex items-center justify-start gap-1.5">
                                 {{-- Detail --}}
                                 <a href="{{ route('pegawai.show', $p->id) }}" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Detail">
                                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -331,68 +343,36 @@
     const filterUnit = document.getElementById('filter-unit');
     const filterJenis = document.getElementById('filter-jenis');
     const filterStatus = document.getElementById('filter-status');
+    const filterForm = document.getElementById('filter-form');
 
-    function applyFilters() {
-        const query = searchInput.value.toLowerCase();
-        const golongan = filterGolongan.value;
-        const unit = filterUnit.value;
-        const jenis = filterJenis.value;
-        const status = filterStatus.value;
-
-        const rows = document.querySelectorAll('tbody tr');
-        let visibleCount = 0;
-
-        rows.forEach(row => {
-            const rNama = row.getAttribute('data-nama');
-            if (!rNama) return;
-            const rNip = row.getAttribute('data-nip').toLowerCase();
-            const rGolongan = row.getAttribute('data-golongan');
-            const rUnit = row.getAttribute('data-unit');
-            const rJenis = row.getAttribute('data-jenis');
-            const rStatus = row.getAttribute('data-status');
-
-            const matchesSearch = rNama.toLowerCase().includes(query) || rNip.includes(query);
-            const matchesGolongan = !golongan || rGolongan.startsWith(golongan);
-            const matchesUnit = !unit || rUnit === unit;
-            const matchesJenis = !jenis || rJenis === jenis;
-            const matchesStatus = !status || rStatus === status;
-
-            if (matchesSearch && matchesGolongan && matchesUnit && matchesJenis && matchesStatus) {
-                row.style.display = '';
-                visibleCount++;
-            } else {
-                row.style.display = 'none';
-            }
+    let typingTimer;
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(() => {
+                filterForm.submit();
+            }, 500);
         });
-        
-        const countText = document.getElementById('pegawai-count-text');
-        if (countText) {
-            countText.textContent = `Menampilkan 1 - ${visibleCount} dari ${visibleCount} data aktif`;
-        }
     }
 
-    if (searchInput) searchInput.addEventListener('input', applyFilters);
-    if (filterGolongan) filterGolongan.addEventListener('change', applyFilters);
-    if (filterUnit) filterUnit.addEventListener('change', applyFilters);
-    if (filterJenis) filterJenis.addEventListener('change', applyFilters);
-    if (filterStatus) filterStatus.addEventListener('change', applyFilters);
+    if (filterGolongan) filterGolongan.addEventListener('change', () => filterForm.submit());
+    if (filterUnit) filterUnit.addEventListener('change', () => filterForm.submit());
+    if (filterJenis) filterJenis.addEventListener('change', () => filterForm.submit());
+    if (filterStatus) filterStatus.addEventListener('change', () => filterForm.submit());
 
     document.addEventListener('DOMContentLoaded', () => {
         const urlParams = new URLSearchParams(window.location.search);
         const filterParam = urlParams.get('filter');
         if (filterParam === 'pensiun') {
-            if (searchInput) {
+            if (searchInput && !urlParams.has('search')) {
                 searchInput.value = 'Siti Rahayu';
-                applyFilters();
+                filterForm.submit();
             }
         } else if (filterParam === 'ews') {
-            // Saring Budi Santoso (Masa Berlaku SK Pengangkatan H-30/danger)
-            if (searchInput) {
-                searchInput.value = 'Ahmad Fauzi'; // salah satu yang EWS-nya aktif
-                applyFilters();
+            if (searchInput && !urlParams.has('search')) {
+                searchInput.value = 'Ahmad Fauzi';
+                filterForm.submit();
             }
-        } else {
-            applyFilters();
         }
     });
 
