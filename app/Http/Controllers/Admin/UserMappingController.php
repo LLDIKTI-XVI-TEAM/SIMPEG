@@ -90,7 +90,7 @@ class UserMappingController extends Controller
 
         // Write Audit Log
         $dynamicLogs = session('dynamic_audit_logs', []);
-        $newId = count($dynamicLogs) + count(AuditController::$auditLogs) + 1;
+        $newId = count($dynamicLogs) + 1;
         
         $dynamicLogs[] = [
             'id' => $newId,

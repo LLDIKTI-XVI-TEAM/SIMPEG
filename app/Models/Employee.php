@@ -190,4 +190,30 @@ class Employee extends Model
             ->whereNull('tanggal_berakhir')
             ->first();
     }
+
+    public function getFotoPublicPathAttribute(): ?string
+    {
+        $path = trim((string) $this->getRawOriginal('foto'));
+
+        if ($path === '' || $path === '0') {
+            return null;
+        }
+
+        $path = ltrim($path, '/');
+
+        foreach (['public/', 'storage/'] as $prefix) {
+            if (str_starts_with($path, $prefix)) {
+                $path = substr($path, strlen($prefix));
+            }
+        }
+
+        return $path !== '' && $path !== '0' ? $path : null;
+    }
+
+    public function getFotoUrlAttribute(): ?string
+    {
+        return $this->foto_public_path
+            ? asset('storage/' . $this->foto_public_path)
+            : null;
+    }
 }

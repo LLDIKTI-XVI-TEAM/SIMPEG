@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Http\Controllers\Admin\AuditController;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\EwsConfig;
@@ -232,7 +231,7 @@ class EwsConfigController extends Controller
                 );
 
                 // Mirror to session for test compatibility
-                $newId = count($dynamicLogs) + count(AuditController::$auditLogs) + 1;
+                $newId = count($dynamicLogs) + 1;
                 $dynamicLogs[] = [
                     'id'        => $newId,
                     'timestamp' => now()->format('Y-m-d H:i:s'),

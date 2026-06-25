@@ -7,6 +7,9 @@ use App\Models\Employee;
 use Illuminate\Http\Request;
 use App\Http\Requests\StoreEmployeeRequest;
 use App\Models\Appointment;
+use App\Models\PositionHistory;
+use App\Models\RefJenisPegawai;
+use App\Models\RefUnitKerja;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -276,8 +279,174 @@ class PegawaiController extends Controller
 
     public function index(Request $request)
     {
-        $pegawaiData = Employee::with(['jenisPegawai'])->paginate(10);
-        return view('admin.pegawai.index', compact('pegawaiData'));
+        $perPage = (int) $request->query('per_page', 10);
+        $perPage = in_array($perPage, [10, 25, 50], true) ? $perPage : 10;
+
+        $unitKerjaOptions = RefUnitKerja::query()
+            ->orderBy('nama')
+            ->get(['id', 'nama']);
+        $jenisPegawaiOptions = RefJenisPegawai::query()
+            ->orderBy('nama')
+            ->get(['id', 'nama']);
+        $statusOptions = ['Aktif', 'Non-Aktif', 'Pensiun', 'Mutasi'];
+        $golonganOptions = Employee::query()
+            ->whereNotNull('golongan_terakhir')
+            ->distinct()
+            ->orderBy('golongan_terakhir')
+            ->pluck('golongan_terakhir')
+            ->map(fn (?string $golongan) => $golongan ? strtok($golongan, '/') : null)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($golonganOptions->isEmpty()) {
+            $golonganOptions = collect(['II', 'III', 'IV']);
+        }
+
+        $filters = [
+            'search' => trim((string) $request->query('search', '')),
+            'golongan' => trim((string) $request->query('golongan', '')),
+            'unit_kerja_id' => trim((string) $request->query('unit_kerja_id', '')),
+            'jenis_pegawai_id' => trim((string) $request->query('jenis_pegawai_id', '')),
+            'status_aktif' => trim((string) $request->query('status_aktif', '')),
+        ];
+
+        // Backward-compatible query params from the pagination branch.
+        if ($filters['unit_kerja_id'] === '' && $request->filled('unit')) {
+            $legacyUnit = (string) $request->query('unit');
+            $matchedUnit = $unitKerjaOptions->firstWhere('nama', $legacyUnit);
+            $filters['unit_kerja_id'] = $matchedUnit?->id ?? '';
+        }
+
+        if ($filters['jenis_pegawai_id'] === '' && $request->filled('jenis')) {
+            $legacyJenis = (string) $request->query('jenis');
+            $matchedJenis = $jenisPegawaiOptions->firstWhere('nama', $legacyJenis);
+            $filters['jenis_pegawai_id'] = $matchedJenis?->id ?? '';
+        }
+
+        if ($filters['status_aktif'] === '' && $request->filled('status')) {
+            $legacyStatus = strtolower((string) $request->query('status'));
+            $filters['status_aktif'] = match ($legacyStatus) {
+                'aktif' => 'Aktif',
+                'nonaktif', 'non-aktif' => 'Non-Aktif',
+                'pensiun' => 'Pensiun',
+                'mutasi' => 'Mutasi',
+                default => '',
+            };
+        }
+
+        if ($request->query('filter') === 'pensiun' && $filters['status_aktif'] === '') {
+            $filters['status_aktif'] = 'Pensiun';
+        }
+
+        if (! $unitKerjaOptions->contains('id', $filters['unit_kerja_id'])) {
+            $filters['unit_kerja_id'] = '';
+        }
+
+        if (! $jenisPegawaiOptions->contains('id', $filters['jenis_pegawai_id'])) {
+            $filters['jenis_pegawai_id'] = '';
+        }
+
+        if (! in_array($filters['status_aktif'], $statusOptions, true)) {
+            $filters['status_aktif'] = '';
+        }
+
+        if ($filters['golongan'] !== '' && ! $golonganOptions->contains($filters['golongan'])) {
+            $filters['golongan'] = '';
+        }
+
+        $allowedSorts = ['pegawai', 'jabatan', 'golongan', 'tmt'];
+        $sort = $request->query('sort', 'pegawai');
+        $sort = in_array($sort, $allowedSorts, true) ? $sort : 'pegawai';
+
+        $direction = strtolower((string) $request->query('direction', 'asc'));
+        $direction = in_array($direction, ['asc', 'desc'], true) ? $direction : 'asc';
+
+        $pegawaiQuery = Employee::query()
+            ->with([
+                'jenisPegawai',
+                'appointment',
+                'positionHistories' => fn ($query) => $query
+                    ->with('unitKerja')
+                    ->orderByDesc('is_latest')
+                    ->orderByDesc('tmt_jabatan'),
+            ]);
+
+        if ($filters['search'] !== '') {
+            $search = mb_strtolower($filters['search']);
+            $pegawaiQuery->where(function ($query) use ($search): void {
+                $query
+                    ->whereRaw('LOWER(nama_lengkap) LIKE ?', ["%{$search}%"])
+                    ->orWhereRaw('LOWER(nip) LIKE ?', ["%{$search}%"]);
+            });
+        }
+
+        if ($filters['golongan'] !== '') {
+            $pegawaiQuery->where('golongan_terakhir', 'like', $filters['golongan'] . '%');
+        }
+
+        if ($filters['unit_kerja_id'] !== '') {
+            $pegawaiQuery->whereHas('positionHistories', function ($query) use ($filters): void {
+                $query
+                    ->where('unit_kerja_id', $filters['unit_kerja_id'])
+                    ->where('is_latest', true);
+            });
+        }
+
+        if ($filters['jenis_pegawai_id'] !== '') {
+            $pegawaiQuery->where('jenis_pegawai_id', $filters['jenis_pegawai_id']);
+        }
+
+        if ($filters['status_aktif'] !== '') {
+            $pegawaiQuery->where('status_aktif', $filters['status_aktif']);
+        }
+
+        match ($sort) {
+            'jabatan' => $pegawaiQuery
+                ->orderBy('jabatan_terakhir', $direction)
+                ->orderBy('nama_lengkap'),
+            'golongan' => $pegawaiQuery
+                ->orderBy('golongan_terakhir', $direction)
+                ->orderBy('nama_lengkap'),
+            'tmt' => $pegawaiQuery
+                ->orderBy(
+                    PositionHistory::query()
+                        ->select('tmt_jabatan')
+                        ->whereColumn('position_histories.employee_id', 'employees.id')
+                        ->orderByDesc('is_latest')
+                        ->orderByDesc('tmt_jabatan')
+                        ->limit(1),
+                    $direction
+                )
+                ->orderBy(
+                    Appointment::query()
+                        ->select('tmt_pengangkatan')
+                        ->whereColumn('appointments.employee_id', 'employees.id')
+                        ->orderBy('tmt_pengangkatan')
+                        ->limit(1),
+                    $direction
+                )
+                ->orderBy('nama_lengkap'),
+            default => $pegawaiQuery
+                ->orderBy('nama_lengkap', $direction)
+                ->orderBy('nip'),
+        };
+
+        $pegawaiData = $pegawaiQuery
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return view('admin.pegawai.index', compact(
+            'pegawaiData',
+            'perPage',
+            'sort',
+            'direction',
+            'filters',
+            'golonganOptions',
+            'unitKerjaOptions',
+            'jenisPegawaiOptions',
+            'statusOptions'
+        ));
     }
 
     public function create()
@@ -504,4 +673,175 @@ class PegawaiController extends Controller
         }
     }
 
+    public function export(Request $request)
+    {
+        $requestedNips = collect($request->input('nips', []))
+            ->filter(fn($nip) => is_string($nip) && trim($nip) !== '')
+            ->map(fn(string $nip) => trim($nip))
+            ->unique()
+            ->values();
+
+        $pegawaiData = Employee::query()
+            ->with('jenisPegawai:id,nama')
+            ->when(
+                $requestedNips->isNotEmpty(),
+                fn($query) => $query->whereIn('nip', $requestedNips->all())
+            )
+            ->orderBy('nama_lengkap')
+            ->get();
+
+        if ($requestedNips->isNotEmpty()) {
+            $requestedOrder = $requestedNips->flip();
+            $pegawaiData = $pegawaiData
+                ->sortBy(fn(Employee $employee) => $requestedOrder[$employee->nip] ?? PHP_INT_MAX)
+                ->values();
+        }
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Data Pegawai');
+        $sheet->setShowGridlines(false);
+
+        $cols = [
+            'A' => ['No', 5],
+            'B' => ['Nama Pegawai', 31],
+            'C' => ['Email Pegawai', 29],
+            'D' => ['Golongan', 12],
+            'E' => ['Jabatan', 34],
+            'F' => ['Kelas Jabatan', 15],
+            'G' => ['NIP', 23],
+            'H' => ['Nomor Telepon', 19],
+            'I' => ['Pangkat', 18],
+            'J' => ['Pendidikan Terakhir', 18],
+            'K' => ['Pensiun', 20],
+            'L' => ['Person', 22],
+            'M' => ['Person Formula', 22],
+            'N' => ['Prodi Pendidikan Terakhir', 28],
+            'O' => ['Status Kepegawaian', 20],
+            'P' => ['Tanggal Lahir', 20],
+        ];
+
+        foreach ($cols as $col => [$label, $width]) {
+            $sheet->getColumnDimension($col)->setWidth($width);
+            $sheet->setCellValue($col . '1', $label);
+        }
+        $sheet->getRowDimension(1)->setRowHeight(32);
+
+        $sheet->getStyle('A1:P1')->applyFromArray([
+            'font' => [
+                'bold' => true,
+                'color' => ['rgb' => 'FFFFFF'],
+                'size' => 10,
+                'name' => 'Calibri',
+            ],
+            'fill' => [
+                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'startColor' => ['rgb' => '1F5A83'],
+            ],
+            'alignment' => [
+                'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER,
+                'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER,
+                'wrapText' => true,
+            ],
+            'borders' => [
+                'allBorders' => [
+                    'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                    'color' => ['rgb' => '69BFE3'],
+                ],
+            ],
+        ]);
+
+        foreach ($pegawaiData as $i => $employee) {
+            $r = $i + 2;
+
+            $sheet->setCellValue('A' . $r, $i + 1);
+            $sheet->setCellValue('B' . $r, $employee->nama_lengkap);
+            $sheet->setCellValue('C' . $r, $employee->email ?? '');
+            $sheet->setCellValue('D' . $r, $employee->golongan_terakhir ?? '');
+            $sheet->setCellValue('E' . $r, $employee->jabatan_terakhir ?? '');
+            $sheet->setCellValue('F' . $r, $employee->kelas_jabatan ?? '');
+            $sheet->setCellValueExplicit('G' . $r, $employee->nip, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit('H' . $r, $employee->no_hp ?? '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            $sheet->setCellValue('I' . $r, $employee->pangkat_terakhir ?? '');
+            $sheet->setCellValue('J' . $r, $employee->pendidikan_terakhir ?? '');
+
+            if ($employee->tanggal_pensiun !== null) {
+                $sheet->setCellValue('K' . $r, \PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel($employee->tanggal_pensiun));
+            }
+
+            // Field Person dari file sumber belum disimpan terpisah di database.
+            // Nama lengkap dipakai sebagai fallback agar struktur export tetap konsisten.
+            $sheet->setCellValue('L' . $r, $employee->nama_lengkap);
+            $sheet->setCellValue('M' . $r, $employee->nama_lengkap);
+            $sheet->setCellValue('N' . $r, $employee->prodi_pendidikan_terakhir ?? '');
+            $sheet->setCellValue('O' . $r, $employee->jenisPegawai?->nama ?? '');
+
+            if ($employee->tanggal_lahir !== null) {
+                $sheet->setCellValue('P' . $r, \PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel($employee->tanggal_lahir));
+            }
+
+            $sheet->getRowDimension($r)->setRowHeight(21);
+            $sheet->getStyle('A' . $r . ':P' . $r)->applyFromArray([
+                'font' => ['size' => 10, 'name' => 'Calibri', 'color' => ['rgb' => '111827']],
+                'fill' => [
+                    'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'D9F2FB'],
+                ],
+                'alignment' => [
+                    'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER,
+                    'wrapText' => false,
+                ],
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                        'color' => ['rgb' => '69BFE3'],
+                    ],
+                ],
+            ]);
+        }
+
+        $lastRow = $pegawaiData->count() + 1;
+
+        if ($pegawaiData->isNotEmpty()) {
+            $sheet->getStyle('A2:A' . $lastRow)->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('D2:D' . $lastRow)->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('F2:K' . $lastRow)->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('O2:P' . $lastRow)->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('K2:K' . $lastRow)->getNumberFormat()->setFormatCode('mmmm d, yyyy');
+            $sheet->getStyle('P2:P' . $lastRow)->getNumberFormat()->setFormatCode('mmmm d, yyyy');
+        }
+
+        $sheet->freezePane('A2');
+        $sheet->setAutoFilter('A1:P' . $lastRow);
+        $sheet->getPageSetup()
+            ->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE)
+            ->setPaperSize(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::PAPERSIZE_A4)
+            ->setFitToWidth(1)
+            ->setFitToHeight(0);
+        $sheet->getPageMargins()
+            ->setTop(0.3)
+            ->setRight(0.25)
+            ->setBottom(0.3)
+            ->setLeft(0.25);
+        $sheet->getPageSetup()->setRowsToRepeatAtTopByStartAndEnd(1, 1);
+
+        $filename = 'Data_Pegawai_SIMPEG_' . now()->format('Ymd') . '.xlsx';
+
+        return response()->streamDownload(function () use ($spreadsheet) {
+            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+            $writer->save('php://output');
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
+        ]);
+    }
+
 }
+
