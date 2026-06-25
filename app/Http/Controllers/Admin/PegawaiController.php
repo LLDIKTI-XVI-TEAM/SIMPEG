@@ -673,4 +673,175 @@ class PegawaiController extends Controller
         }
     }
 
+    public function export(Request $request)
+    {
+        $requestedNips = collect($request->input('nips', []))
+            ->filter(fn($nip) => is_string($nip) && trim($nip) !== '')
+            ->map(fn(string $nip) => trim($nip))
+            ->unique()
+            ->values();
+
+        $pegawaiData = Employee::query()
+            ->with('jenisPegawai:id,nama')
+            ->when(
+                $requestedNips->isNotEmpty(),
+                fn($query) => $query->whereIn('nip', $requestedNips->all())
+            )
+            ->orderBy('nama_lengkap')
+            ->get();
+
+        if ($requestedNips->isNotEmpty()) {
+            $requestedOrder = $requestedNips->flip();
+            $pegawaiData = $pegawaiData
+                ->sortBy(fn(Employee $employee) => $requestedOrder[$employee->nip] ?? PHP_INT_MAX)
+                ->values();
+        }
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Data Pegawai');
+        $sheet->setShowGridlines(false);
+
+        $cols = [
+            'A' => ['No', 5],
+            'B' => ['Nama Pegawai', 31],
+            'C' => ['Email Pegawai', 29],
+            'D' => ['Golongan', 12],
+            'E' => ['Jabatan', 34],
+            'F' => ['Kelas Jabatan', 15],
+            'G' => ['NIP', 23],
+            'H' => ['Nomor Telepon', 19],
+            'I' => ['Pangkat', 18],
+            'J' => ['Pendidikan Terakhir', 18],
+            'K' => ['Pensiun', 20],
+            'L' => ['Person', 22],
+            'M' => ['Person Formula', 22],
+            'N' => ['Prodi Pendidikan Terakhir', 28],
+            'O' => ['Status Kepegawaian', 20],
+            'P' => ['Tanggal Lahir', 20],
+        ];
+
+        foreach ($cols as $col => [$label, $width]) {
+            $sheet->getColumnDimension($col)->setWidth($width);
+            $sheet->setCellValue($col . '1', $label);
+        }
+        $sheet->getRowDimension(1)->setRowHeight(32);
+
+        $sheet->getStyle('A1:P1')->applyFromArray([
+            'font' => [
+                'bold' => true,
+                'color' => ['rgb' => 'FFFFFF'],
+                'size' => 10,
+                'name' => 'Calibri',
+            ],
+            'fill' => [
+                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'startColor' => ['rgb' => '1F5A83'],
+            ],
+            'alignment' => [
+                'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER,
+                'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER,
+                'wrapText' => true,
+            ],
+            'borders' => [
+                'allBorders' => [
+                    'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                    'color' => ['rgb' => '69BFE3'],
+                ],
+            ],
+        ]);
+
+        foreach ($pegawaiData as $i => $employee) {
+            $r = $i + 2;
+
+            $sheet->setCellValue('A' . $r, $i + 1);
+            $sheet->setCellValue('B' . $r, $employee->nama_lengkap);
+            $sheet->setCellValue('C' . $r, $employee->email ?? '');
+            $sheet->setCellValue('D' . $r, $employee->golongan_terakhir ?? '');
+            $sheet->setCellValue('E' . $r, $employee->jabatan_terakhir ?? '');
+            $sheet->setCellValue('F' . $r, $employee->kelas_jabatan ?? '');
+            $sheet->setCellValueExplicit('G' . $r, $employee->nip, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit('H' . $r, $employee->no_hp ?? '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            $sheet->setCellValue('I' . $r, $employee->pangkat_terakhir ?? '');
+            $sheet->setCellValue('J' . $r, $employee->pendidikan_terakhir ?? '');
+
+            if ($employee->tanggal_pensiun !== null) {
+                $sheet->setCellValue('K' . $r, \PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel($employee->tanggal_pensiun));
+            }
+
+            // Field Person dari file sumber belum disimpan terpisah di database.
+            // Nama lengkap dipakai sebagai fallback agar struktur export tetap konsisten.
+            $sheet->setCellValue('L' . $r, $employee->nama_lengkap);
+            $sheet->setCellValue('M' . $r, $employee->nama_lengkap);
+            $sheet->setCellValue('N' . $r, $employee->prodi_pendidikan_terakhir ?? '');
+            $sheet->setCellValue('O' . $r, $employee->jenisPegawai?->nama ?? '');
+
+            if ($employee->tanggal_lahir !== null) {
+                $sheet->setCellValue('P' . $r, \PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel($employee->tanggal_lahir));
+            }
+
+            $sheet->getRowDimension($r)->setRowHeight(21);
+            $sheet->getStyle('A' . $r . ':P' . $r)->applyFromArray([
+                'font' => ['size' => 10, 'name' => 'Calibri', 'color' => ['rgb' => '111827']],
+                'fill' => [
+                    'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'D9F2FB'],
+                ],
+                'alignment' => [
+                    'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER,
+                    'wrapText' => false,
+                ],
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                        'color' => ['rgb' => '69BFE3'],
+                    ],
+                ],
+            ]);
+        }
+
+        $lastRow = $pegawaiData->count() + 1;
+
+        if ($pegawaiData->isNotEmpty()) {
+            $sheet->getStyle('A2:A' . $lastRow)->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('D2:D' . $lastRow)->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('F2:K' . $lastRow)->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('O2:P' . $lastRow)->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('K2:K' . $lastRow)->getNumberFormat()->setFormatCode('mmmm d, yyyy');
+            $sheet->getStyle('P2:P' . $lastRow)->getNumberFormat()->setFormatCode('mmmm d, yyyy');
+        }
+
+        $sheet->freezePane('A2');
+        $sheet->setAutoFilter('A1:P' . $lastRow);
+        $sheet->getPageSetup()
+            ->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE)
+            ->setPaperSize(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::PAPERSIZE_A4)
+            ->setFitToWidth(1)
+            ->setFitToHeight(0);
+        $sheet->getPageMargins()
+            ->setTop(0.3)
+            ->setRight(0.25)
+            ->setBottom(0.3)
+            ->setLeft(0.25);
+        $sheet->getPageSetup()->setRowsToRepeatAtTopByStartAndEnd(1, 1);
+
+        $filename = 'Data_Pegawai_SIMPEG_' . now()->format('Ymd') . '.xlsx';
+
+        return response()->streamDownload(function () use ($spreadsheet) {
+            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+            $writer->save('php://output');
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
+        ]);
+    }
+
 }
+
