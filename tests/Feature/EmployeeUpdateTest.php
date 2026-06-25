@@ -220,10 +220,10 @@ class EmployeeUpdateTest extends TestCase
             'no_hp' => $employee->no_hp,
             'pangkat_terakhir' => $employee->pangkat_terakhir,
             'pendidikan_terakhir' => $employee->pendidikan_terakhir,
-            'tanggal_pensiun' => $employee->tanggal_pensiun?->format('Y-m-d'),
+            'tanggal_pensiun' => $employee->tanggal_pensiun ? \Carbon\Carbon::parse($employee->tanggal_pensiun)->format('Y-m-d') : null,
             'prodi_pendidikan_terakhir' => $employee->prodi_pendidikan_terakhir,
             'jenis_pegawai_id' => $employee->jenis_pegawai_id ?: RefJenisPegawai::where('nama', 'PNS')->firstOrFail()->id,
-            'tanggal_lahir' => $employee->tanggal_lahir->format('Y-m-d'),
+            'tanggal_lahir' => \Carbon\Carbon::parse($employee->tanggal_lahir)->format('Y-m-d'),
         ], $overrides);
     }
 }

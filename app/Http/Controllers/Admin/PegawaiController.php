@@ -10,6 +10,9 @@ use App\Models\Appointment;
 use App\Models\PositionHistory;
 use App\Models\RefJenisPegawai;
 use App\Models\RefUnitKerja;
+use App\Models\RefAgama;
+use App\Models\RefStatusPerkawinan;
+use App\Models\RefGolongan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -445,15 +448,15 @@ class PegawaiController extends Controller
             'golonganOptions',
             'unitKerjaOptions',
             'jenisPegawaiOptions',
-            'statusOptions'
+'statusOptions'
         ));
     }
 
     public function create()
     {
-        $jenisPegawai = \App\Models\RefJenisPegawai::all();
-        $agama = \App\Models\RefAgama::all();
-        $statusKawin = \App\Models\RefStatusPerkawinan::all();
+        $jenisPegawai = RefJenisPegawai::all();
+        $agama = RefAgama::all();
+        $statusKawin = RefStatusPerkawinan::all();
         
         return view('admin.pegawai.create', compact('jenisPegawai', 'agama', 'statusKawin'));
     }
@@ -519,9 +522,9 @@ class PegawaiController extends Controller
     public function edit($id)
     {
         $p = Employee::with('appointment')->findOrFail($id);
-        $jenisPegawai = \App\Models\RefJenisPegawai::all();
-        $agama = \App\Models\RefAgama::all();
-        $statusKawin = \App\Models\RefStatusPerkawinan::all();
+        $jenisPegawai = RefJenisPegawai::all();
+        $agama = RefAgama::all();
+        $statusKawin = RefStatusPerkawinan::all();
         
         return view('admin.pegawai.edit', compact('p', 'jenisPegawai', 'agama', 'statusKawin'));
     }
@@ -576,7 +579,7 @@ class PegawaiController extends Controller
         return redirect()->route('data-pegawai')
             ->with('success', 'Data pegawai ' . $nama . ' berhasil dihapus dari sistem.');
     }
-    public function storeRiwayat($id, \Illuminate\Http\Request $request)
+    public function storeRiwayat($id, Request $request)
     {
         $employee = Employee::findOrFail($id);
         $type = $request->input('type');
@@ -595,7 +598,7 @@ class PegawaiController extends Controller
                     ]);
                     break;
                 case 'pangkat':
-                    $gol = \App\Models\RefGolongan::where('nama', $request->input('golongan'))->first();
+                    $gol = RefGolongan::where('nama', $request->input('golongan'))->first();
                     $employee->rankHistories()->create([
                         'golongan_id' => $gol ? $gol->id : null,
                         'no_sk' => $request->input('no_sk'),
@@ -605,7 +608,7 @@ class PegawaiController extends Controller
                     ]);
                     break;
                 case 'jabatan':
-                    $unit = \App\Models\RefUnitKerja::where('nama', $request->input('unit'))->first();
+                    $unit = RefUnitKerja::where('nama', $request->input('unit'))->first();
                     $employee->positionHistories()->create([
                         'nama_jabatan' => $request->input('jabatan'),
                         'unit_kerja_id' => $unit ? $unit->id : null,
@@ -673,6 +676,9 @@ class PegawaiController extends Controller
         }
     }
 
+    /**
+     * @return \Symfony\Component\HttpFoundation\StreamedResponse
+     */
     public function export(Request $request)
     {
         $requestedNips = collect($request->input('nips', []))
@@ -697,6 +703,24 @@ class PegawaiController extends Controller
                 ->values();
         }
 
+        $spreadsheet = $this->generateExcelSpreadsheet($pegawaiData);
+
+        $filename = 'Data_Pegawai_SIMPEG_' . now()->format('Ymd') . '.xlsx';
+
+        return response()->streamDownload(function () use ($spreadsheet) {
+            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+            $writer->save('php://output');
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
+        ]);
+    }
+
+    private function generateExcelSpreadsheet($pegawaiData): \PhpOffice\PhpSpreadsheet\Spreadsheet
+    {
         $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Data Pegawai');
@@ -728,27 +752,10 @@ class PegawaiController extends Controller
         $sheet->getRowDimension(1)->setRowHeight(32);
 
         $sheet->getStyle('A1:P1')->applyFromArray([
-            'font' => [
-                'bold' => true,
-                'color' => ['rgb' => 'FFFFFF'],
-                'size' => 10,
-                'name' => 'Calibri',
-            ],
-            'fill' => [
-                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
-                'startColor' => ['rgb' => '1F5A83'],
-            ],
-            'alignment' => [
-                'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER,
-                'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER,
-                'wrapText' => true,
-            ],
-            'borders' => [
-                'allBorders' => [
-                    'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
-                    'color' => ['rgb' => '69BFE3'],
-                ],
-            ],
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 10, 'name' => 'Calibri'],
+            'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '1F5A83']],
+            'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER, 'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER, 'wrapText' => true],
+            'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['rgb' => '69BFE3']]],
         ]);
 
         foreach ($pegawaiData as $i => $employee) {
@@ -769,8 +776,6 @@ class PegawaiController extends Controller
                 $sheet->setCellValue('K' . $r, \PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel($employee->tanggal_pensiun));
             }
 
-            // Field Person dari file sumber belum disimpan terpisah di database.
-            // Nama lengkap dipakai sebagai fallback agar struktur export tetap konsisten.
             $sheet->setCellValue('L' . $r, $employee->nama_lengkap);
             $sheet->setCellValue('M' . $r, $employee->nama_lengkap);
             $sheet->setCellValue('N' . $r, $employee->prodi_pendidikan_terakhir ?? '');
@@ -783,65 +788,30 @@ class PegawaiController extends Controller
             $sheet->getRowDimension($r)->setRowHeight(21);
             $sheet->getStyle('A' . $r . ':P' . $r)->applyFromArray([
                 'font' => ['size' => 10, 'name' => 'Calibri', 'color' => ['rgb' => '111827']],
-                'fill' => [
-                    'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => 'D9F2FB'],
-                ],
-                'alignment' => [
-                    'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER,
-                    'wrapText' => false,
-                ],
-                'borders' => [
-                    'allBorders' => [
-                        'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
-                        'color' => ['rgb' => '69BFE3'],
-                    ],
-                ],
+                'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => 'D9F2FB']],
+                'alignment' => ['vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER, 'wrapText' => false],
+                'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['rgb' => '69BFE3']]],
             ]);
         }
 
         $lastRow = $pegawaiData->count() + 1;
 
         if ($pegawaiData->isNotEmpty()) {
-            $sheet->getStyle('A2:A' . $lastRow)->getAlignment()
-                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('D2:D' . $lastRow)->getAlignment()
-                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('F2:K' . $lastRow)->getAlignment()
-                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('O2:P' . $lastRow)->getAlignment()
-                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('A2:A' . $lastRow)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('D2:D' . $lastRow)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('F2:K' . $lastRow)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('O2:P' . $lastRow)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle('K2:K' . $lastRow)->getNumberFormat()->setFormatCode('mmmm d, yyyy');
             $sheet->getStyle('P2:P' . $lastRow)->getNumberFormat()->setFormatCode('mmmm d, yyyy');
         }
 
         $sheet->freezePane('A2');
         $sheet->setAutoFilter('A1:P' . $lastRow);
-        $sheet->getPageSetup()
-            ->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE)
-            ->setPaperSize(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::PAPERSIZE_A4)
-            ->setFitToWidth(1)
-            ->setFitToHeight(0);
-        $sheet->getPageMargins()
-            ->setTop(0.3)
-            ->setRight(0.25)
-            ->setBottom(0.3)
-            ->setLeft(0.25);
+        $sheet->getPageSetup()->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE)->setPaperSize(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::PAPERSIZE_A4)->setFitToWidth(1)->setFitToHeight(0);
+        $sheet->getPageMargins()->setTop(0.3)->setRight(0.25)->setBottom(0.3)->setLeft(0.25);
         $sheet->getPageSetup()->setRowsToRepeatAtTopByStartAndEnd(1, 1);
 
-        $filename = 'Data_Pegawai_SIMPEG_' . now()->format('Ymd') . '.xlsx';
-
-        return response()->streamDownload(function () use ($spreadsheet) {
-            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
-            $writer->save('php://output');
-        }, $filename, [
-            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-            'Cache-Control' => 'no-cache, no-store, must-revalidate',
-            'Pragma' => 'no-cache',
-            'Expires' => '0',
-        ]);
+        return $spreadsheet;
     }
-
 }
 
