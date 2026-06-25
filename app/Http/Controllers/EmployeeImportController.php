@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ImportEmployeesRequest;
 use App\Models\Employee;
-use App\Services\AuditService;
 use App\Models\RefJenisPegawai;
+use App\Services\AuditService;
 use App\Support\EmployeeImport\CsvEmployeeReader;
 use App\Support\EmployeeValidationRules;
 use Illuminate\Http\JsonResponse;
@@ -21,9 +21,10 @@ use RuntimeException;
 class EmployeeImportController extends Controller
 {
     private const CACHE_PREFIX = 'import_batch:';
+
     private const CACHE_TTL_MINUTES = 30;
+
     private const STORAGE_DIR = 'imports';
-    private const PREVIEW_LIMIT = 10;
 
     private ?array $jenisPegawaiCache = null;
 
@@ -48,28 +49,28 @@ class EmployeeImportController extends Controller
         $batchId = (string) Str::uuid();
 
         // Simpan file asli ke storage sementara
-        $request->file('file')->storeAs(self::STORAGE_DIR, $batchId . '_' . $request->file('file')->getClientOriginalName(), 'local');
+        $request->file('file')->storeAs(self::STORAGE_DIR, $batchId.'_'.$request->file('file')->getClientOriginalName(), 'local');
 
         // Ambil headers dari keys data baris pertama
         $firstRowData = $rows[0]['data'] ?? [];
         $headers = array_keys($firstRowData);
 
         // Simpan parsed data ke cache
-        Cache::put(self::CACHE_PREFIX . $batchId, [
-            'filename'    => $request->file('file')->getClientOriginalName(),
+        Cache::put(self::CACHE_PREFIX.$batchId, [
+            'filename' => $request->file('file')->getClientOriginalName(),
             'uploaded_at' => now()->toIso8601String(),
-            'user_id'     => $request->user()?->id,
-            'headers'     => $headers,
-            'total_rows'  => count($rows),
-            'rows'        => $rows,
-            'validation'  => null,
+            'user_id' => $request->user()?->id,
+            'headers' => $headers,
+            'total_rows' => count($rows),
+            'rows' => $rows,
+            'validation' => null,
         ], now()->addMinutes(self::CACHE_TTL_MINUTES));
 
         return response()->json([
-            'batch_id'   => $batchId,
-            'filename'   => $request->file('file')->getClientOriginalName(),
+            'batch_id' => $batchId,
+            'filename' => $request->file('file')->getClientOriginalName(),
             'total_rows' => count($rows),
-            'headers'    => $headers,
+            'headers' => $headers,
         ]);
     }
 
@@ -80,11 +81,11 @@ class EmployeeImportController extends Controller
         $batch = $this->getBatchOrFail($batchId, $request);
 
         return response()->json([
-            'batch_id'   => $batchId,
-            'filename'   => $batch['filename'],
+            'batch_id' => $batchId,
+            'filename' => $batch['filename'],
             'total_rows' => $batch['total_rows'],
-            'headers'    => $batch['headers'],
-            'rows'       => $batch['rows'],
+            'headers' => $batch['headers'],
+            'rows' => $batch['rows'],
         ]);
     }
 
@@ -96,10 +97,15 @@ class EmployeeImportController extends Controller
 
         // Jika frontend mengirim rows yang sudah diedit, update cache
         if ($request->has('rows')) {
-            $editedRows = $request->input('rows');
+            $validatedRequest = $request->validate([
+                'rows' => ['required', 'array'],
+                'rows.*.row' => ['required', 'integer', 'min:2'],
+                'rows.*.data' => ['required', 'array'],
+            ]);
+            $editedRows = $validatedRequest['rows'];
             $batch['rows'] = $editedRows;
             $batch['total_rows'] = count($editedRows);
-            Cache::put(self::CACHE_PREFIX . $batchId, $batch, now()->addMinutes(self::CACHE_TTL_MINUTES));
+            Cache::put(self::CACHE_PREFIX.$batchId, $batch, now()->addMinutes(self::CACHE_TTL_MINUTES));
         }
 
         $results = [];
@@ -116,7 +122,7 @@ class EmployeeImportController extends Controller
             match ($rowResult['status']) {
                 'valid' => $validCount++,
                 'error' => $errorCount++,
-                'skip'  => $skipCount++,
+                'skip' => $skipCount++,
             };
         }
 
@@ -124,18 +130,18 @@ class EmployeeImportController extends Controller
         $batch['validation'] = [
             'valid_count' => $validCount,
             'error_count' => $errorCount,
-            'skip_count'  => $skipCount,
-            'results'     => $results,
+            'skip_count' => $skipCount,
+            'results' => $results,
         ];
-        Cache::put(self::CACHE_PREFIX . $batchId, $batch, now()->addMinutes(self::CACHE_TTL_MINUTES));
+        Cache::put(self::CACHE_PREFIX.$batchId, $batch, now()->addMinutes(self::CACHE_TTL_MINUTES));
 
         return response()->json([
-            'batch_id'    => $batchId,
-            'total_rows'  => $batch['total_rows'],
+            'batch_id' => $batchId,
+            'total_rows' => $batch['total_rows'],
             'valid_count' => $validCount,
             'error_count' => $errorCount,
-            'skip_count'  => $skipCount,
-            'results'     => $results,
+            'skip_count' => $skipCount,
+            'results' => $results,
         ]);
     }
 
@@ -157,8 +163,8 @@ class EmployeeImportController extends Controller
         foreach ($validationResults as $result) {
             if ($result['status'] === 'valid' && isset($result['validated_data'])) {
                 $rowsToInsert[] = $result['validated_data'] + [
-                    'status_aktif'    => 'Aktif',
-                    'profil_status'   => 'belum_lengkap',
+                    'status_aktif' => 'Aktif',
+                    'profil_status' => 'belum_lengkap',
                     'is_kinerja_baik' => true,
                 ];
             }
@@ -177,19 +183,19 @@ class EmployeeImportController extends Controller
 
         AuditService::log('IMPORT', 'Employee', null, null, [
             'total_inserted' => $insertedCount,
-            'total_skipped'  => $batch['validation']['skip_count'],
-            'total_failed'   => $batch['validation']['error_count'],
-            'filename'       => $batch['filename'],
+            'total_skipped' => $batch['validation']['skip_count'],
+            'total_failed' => $batch['validation']['error_count'],
+            'filename' => $batch['filename'],
         ], $request);
 
         // Cleanup: hapus cache dan file temp
         $this->cleanupBatch($batchId, $batch['filename']);
 
         return response()->json([
-            'message'  => 'Import selesai.',
+            'message' => 'Import selesai.',
             'inserted' => $insertedCount,
-            'skipped'  => $batch['validation']['skip_count'],
-            'failed'   => $batch['validation']['error_count'],
+            'skipped' => $batch['validation']['skip_count'],
+            'failed' => $batch['validation']['error_count'],
         ]);
     }
 
@@ -197,7 +203,7 @@ class EmployeeImportController extends Controller
 
     private function getBatchOrFail(string $batchId, Request $request): array
     {
-        $batch = Cache::get(self::CACHE_PREFIX . $batchId);
+        $batch = Cache::get(self::CACHE_PREFIX.$batchId);
 
         if ($batch === null) {
             abort(404, 'Batch import tidak ditemukan atau sudah kedaluwarsa. Silakan upload ulang.');
@@ -221,8 +227,8 @@ class EmployeeImportController extends Controller
 
         if ($validator->fails()) {
             return [
-                'row'    => $row['row'],
-                'nama'   => $nama,
+                'row' => $row['row'],
+                'nama' => $nama,
                 'status' => 'error',
                 'errors' => $validator->errors()->toArray(),
             ];
@@ -242,36 +248,44 @@ class EmployeeImportController extends Controller
             }
         }
 
+        $databaseErrors = [];
+        if (! empty($validated['email'])) {
+            $emailExistsInDb = Employee::whereRaw('LOWER(email) = ?', [strtolower($validated['email'])])->exists();
+            if ($emailExistsInDb) {
+                $databaseErrors['email'][] = 'Email pegawai sudah terdaftar di database.';
+            }
+        }
+
         // Cek duplikat di dalam file
         $duplicateErrors = $this->duplicateErrors($validated, $row['row'], $seenNips, $seenEmails);
 
         // Jika ada skip (NIP di DB), mark sebagai skip
         if ($skipErrors !== []) {
             return [
-                'row'    => $row['row'],
-                'nama'   => $nama,
+                'row' => $row['row'],
+                'nama' => $nama,
                 'status' => 'skip',
                 'errors' => $skipErrors,
             ];
         }
 
         // Gabungkan reference errors dan duplicate errors
-        $allErrors = array_merge_recursive($referenceErrors, $duplicateErrors);
+        $allErrors = array_merge_recursive($referenceErrors, $databaseErrors, $duplicateErrors);
 
         if ($allErrors !== []) {
             return [
-                'row'    => $row['row'],
-                'nama'   => $nama,
+                'row' => $row['row'],
+                'nama' => $nama,
                 'status' => 'error',
                 'errors' => $allErrors,
             ];
         }
 
         return [
-            'row'            => $row['row'],
-            'nama'           => $nama,
-            'status'         => 'valid',
-            'errors'         => [],
+            'row' => $row['row'],
+            'nama' => $nama,
+            'status' => 'valid',
+            'errors' => [],
             'validated_data' => $validated,
         ];
     }
@@ -298,7 +312,7 @@ class EmployeeImportController extends Controller
             if (isset($cacheNormalized[$key])) {
                 $data['jenis_pegawai_id'] = $cacheNormalized[$key];
             } else {
-                $errors['jenis_pegawai'][] = 'Jenis pegawai harus salah satu dari: ' . implode(', ', array_keys($cache)) . '.';
+                $errors['jenis_pegawai'][] = 'Jenis pegawai harus salah satu dari: '.implode(', ', array_keys($cache)).'.';
             }
             unset($data['jenis_pegawai']);
         }
@@ -335,11 +349,11 @@ class EmployeeImportController extends Controller
 
     private function cleanupBatch(string $batchId, string $filename): void
     {
-        Cache::forget(self::CACHE_PREFIX . $batchId);
+        Cache::forget(self::CACHE_PREFIX.$batchId);
 
-        $storedName = $batchId . '_' . $filename;
-        if (Storage::disk('local')->exists(self::STORAGE_DIR . '/' . $storedName)) {
-            Storage::disk('local')->delete(self::STORAGE_DIR . '/' . $storedName);
+        $storedName = $batchId.'_'.$filename;
+        if (Storage::disk('local')->exists(self::STORAGE_DIR.'/'.$storedName)) {
+            Storage::disk('local')->delete(self::STORAGE_DIR.'/'.$storedName);
         }
     }
 }

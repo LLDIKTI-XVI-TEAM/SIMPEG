@@ -80,10 +80,12 @@ class EmployeeValidationRules
     {
         return [
             'nama_lengkap' => ['required', 'string', 'max:255'],
-            'nip' => ['required', 'string', 'size:18', 'unique:employees,nip'],
+            // Duplikat database ditangani oleh EmployeeImportController agar
+            // NIP existing dapat berstatus "skip", bukan gagal validasi.
+            'nip' => ['required', 'string', 'size:18'],
             'nik' => ['nullable', 'string', 'size:16'],
             'no_kk' => ['nullable', 'string', 'size:16'],
-            'email' => ['nullable', 'email', 'max:255', 'unique:employees,email'],
+            'email' => ['nullable', 'email', 'max:255'],
             'tanggal_lahir' => ['nullable', 'date', 'before:today'],
             'jenis_pegawai' => ['required', 'in:PNS,PPPK,CPNS'],
             'golongan_terakhir' => ['nullable', 'string', 'max:20'],
