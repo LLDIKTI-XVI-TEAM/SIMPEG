@@ -20,16 +20,10 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return auth()->check()
         ? redirect()->route('dashboard')
-        : redirect()->route('auth.keycloak.redirect');
+        : redirect()->route('login');
 })->name('home');
 
-Route::get('/login', function () {
-    return auth()->check()
-        ? redirect()->route('dashboard')
-        : redirect()->route('auth.keycloak.redirect');
-})->name('login');
-
-Route::get('/auth/keycloak/redirect', [KeycloakAuthController::class, 'redirectToKeycloak'])->name('auth.keycloak.redirect');
+Route::get('/login', [KeycloakAuthController::class, 'redirectToKeycloak'])->name('login');
 Route::get('/auth/keycloak/callback', [KeycloakAuthController::class, 'handleCallback'])->name('auth.keycloak.callback');
 Route::post('/logout', [KeycloakAuthController::class, 'logout'])->name('logout');
 

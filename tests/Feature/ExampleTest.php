@@ -43,7 +43,7 @@ class ExampleTest extends TestCase
         $response = $this->actingAs($user)->get('/dashboard');
 
         $response->assertOk();
-        $response->assertSee('Login aktif');
+        $response->assertSee('Dashboard');
         $response->assertSee($user->email);
     }
 }

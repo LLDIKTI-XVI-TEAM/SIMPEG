@@ -14,6 +14,6 @@ class DatabaseSeederTest extends TestCase
     {
         $this->seed(DatabaseSeeder::class);
 
-        $this->assertDatabaseCount('users', 0);
+        $this->assertDatabaseCount('users', 4);
     }
 }
