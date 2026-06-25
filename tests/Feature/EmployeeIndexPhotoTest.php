@@ -56,4 +56,24 @@ class EmployeeIndexPhotoTest extends TestCase
         $response->assertSee('B', false);
         $response->assertDontSee('alt="Foto Budi Tanpa Foto"', false);
     }
+
+    public function test_employee_name_links_to_detail_page(): void
+    {
+        $admin = User::factory()->superAdmin()->create();
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Citra Detail',
+            'nip' => '198801012010012001',
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->withSession(['active_role' => 'super_admin'])
+            ->get(route('data-pegawai'));
+
+        $response->assertOk();
+        $response->assertSee('href="' . route('pegawai.show', $employee->id) . '"', false);
+        $response->assertSee('title="Buka detail profil Citra Detail"', false);
+        $response->assertSee('aria-label="Buka detail profil Citra Detail"', false);
+        $response->assertSee('title="Buka detail Citra Detail"', false);
+        $response->assertSee('Citra Detail');
+    }
 }
