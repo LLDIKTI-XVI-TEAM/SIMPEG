@@ -7,7 +7,9 @@
         // Kalkulator otomatis jadwal
         $tmtPangkatTerakhir = $p->latestRank()?->tmt_pangkat ? \Carbon\Carbon::parse($p->latestRank()->tmt_pangkat) : null;
         $estimasiPangkatNext = $tmtPangkatTerakhir ? $tmtPangkatTerakhir->copy()->addYears(4)->format('d-m-Y') : '-';
-        $estimasiKgbNext = $tmtPangkatTerakhir ? $tmtPangkatTerakhir->copy()->addYears(2)->format('d-m-Y') : '-';
+        $estimasiKgbNext = $p->tanggal_kgb_berikutnya
+            ? \Carbon\Carbon::parse($p->tanggal_kgb_berikutnya)->format('d-m-Y')
+            : ($p->latestSalary()?->tmt_kgb ? \Carbon\Carbon::parse($p->latestSalary()->tmt_kgb)->addYears(2)->format('d-m-Y') : '-');
         
         // Logika BUP dinamis berdasarkan jabatan
         $bup = 58;
@@ -241,19 +243,19 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">NIK (KTP)</span>
-                                <p class="text-ink font-mono font-bold">{{ $p->nik ?? '3273251203850002' }}</p>
+                                <p class="text-ink font-mono font-bold">{{ $p->nik ?? '-' }}</p>
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">No. Kartu Keluarga (KK)</span>
-                                <p class="text-ink font-mono font-bold">{{ $p->no_kk ?? '3273250102120045' }}</p>
+                                <p class="text-ink font-mono font-bold">{{ $p->no_kk ?? '-' }}</p>
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Tempat / Tanggal Lahir</span>
-                                <p class="text-ink font-sans">{{ $p->tempat_lahir ?? 'Bandung' }}, {{ isset($p->tanggal_lahir) ? \Carbon\Carbon::parse($p->tanggal_lahir)->format('d-m-Y') : '-' }}</p>
+                                <p class="text-ink font-sans">{{ $p->tempat_lahir ?? '-' }}, {{ isset($p->tanggal_lahir) ? \Carbon\Carbon::parse($p->tanggal_lahir)->format('d-m-Y') : '-' }}</p>
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Jenis Kelamin</span>
-                                <p class="text-ink font-sans">{{ $p->jenis_kelamin == 'L' ? 'Laki-laki' : 'Perempuan' }}</p>
+                                <p class="text-ink font-sans">{{ $p->jenis_kelamin === 'L' ? 'Laki-laki' : ($p->jenis_kelamin === 'P' ? 'Perempuan' : '-') }}</p>
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Agama</span>
@@ -287,7 +289,7 @@
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Telepon Rumah</span>
-                                <p class="text-ink font-sans font-mono">{{ $p->no_hp_rumah ?? '-' }}</p>
+                                <p class="text-ink font-sans font-mono">{{ $p->no_telepon_rumah ?? '-' }}</p>
                             </div>
                             <div class="space-y-0.5 sm:col-span-2">
                                 <span class="font-semibold text-muted font-sans">Alamat</span>
@@ -303,7 +305,7 @@
                     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-xs">
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">Jabatan Sekarang</span>
-                            <p class="text-ink font-sans font-bold">{{ $p->latestPosition()->nama_jabatan ?? '-' }}</p>
+                            <p class="text-ink font-sans font-bold">{{ $p->latestPosition()->nama_jabatan ?? $p->jabatan_terakhir ?? '-' }}</p>
                         </div>
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">Unit Kerja</span>
@@ -311,15 +313,15 @@
                         </div>
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">Pangkat</span>
-                            <p class="text-ink font-sans font-bold">{{ $p->latestRank()->golongan->nama ?? '-' ?? 'Penata Tkt. I' }}</p>
+                            <p class="text-ink font-sans font-bold">{{ $p->latestRank()->golongan->nama ?? $p->pangkat_terakhir ?? '-' }}</p>
                         </div>
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">Golongan Saat Ini</span>
-                            <p class="text-ink font-sans font-bold">{{ $p->latestRank()->golongan->nama ?? '-' }}</p>
+                            <p class="text-ink font-sans font-bold">{{ $p->latestRank()->golongan->kode ?? $p->golongan_terakhir ?? '-' }}</p>
                         </div>
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">Kelas Jabatan</span>
-                            <p class="text-ink font-sans font-bold">{{ $p->kelas_jabatan ?? '8' }}</p>
+                            <p class="text-ink font-sans font-bold">{{ $p->kelas_jabatan ?? '-' }}</p>
                         </div>
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">TMT Golongan</span>

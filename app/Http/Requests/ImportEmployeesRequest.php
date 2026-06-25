@@ -18,14 +18,14 @@ class ImportEmployeesRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'file' => ['required', 'file', 'max:10240', 'mimes:csv,txt'],
+            'file' => ['required', 'file', 'max:10240', 'mimes:csv,txt,xlsx,xls'],
         ];
     }
 
     public function messages(): array
     {
         return [
-            'file.mimes' => 'Format yang didukung saat ini hanya CSV.',
+            'file.mimes' => 'Format yang didukung adalah CSV, XLSX, atau XLS.',
         ];
     }
 }
