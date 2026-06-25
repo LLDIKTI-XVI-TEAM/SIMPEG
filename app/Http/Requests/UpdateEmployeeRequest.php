@@ -23,10 +23,30 @@ class UpdateEmployeeRequest extends FormRequest
 
     public function rules(): array
     {
-        /** @var Employee $employee */
-        $employee = $this->route('employee');
+        $employeeParam = $this->route('employee');
+        
+        if ($employeeParam instanceof Employee) {
+            $employee = $employeeParam;
+        } else {
+            $id = $this->route('id') ?? $employeeParam;
+            $employee = Employee::findOrFail($id);
+        }
 
-        return EmployeeValidationRules::update($employee);
+        $rules = EmployeeValidationRules::update($employee);
+        
+        // Aturan tambahan khusus form UI web
+        if (! $this->wantsJson() && ! $this->is('api/*')) {
+            $rules['jenis_pengangkatan'] = ['required', 'string', 'max:100'];
+            $rules['tmt'] = ['required', 'date'];
+            $rules['nomor_sk'] = ['required', 'string', 'max:255'];
+            $rules['tanggal_sk'] = ['required', 'date'];
+            $rules['file_sk'] = ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png'];
+            
+            // Override foto khusus web (file upload)
+            $rules['foto'] = ['nullable', 'image', 'max:10240', 'mimes:jpg,jpeg,png'];
+        }
+
+        return $rules;
     }
 
     public function attributes(): array

@@ -28,6 +28,14 @@ class EmployeeRowMapper
     ];
 
     /**
+     * Optional headers that may or may not be present in the file.
+     */
+    public const OPTIONAL_HEADERS = [
+        'NIK',
+        'No KK',
+    ];
+
+    /**
      * Mapping from Excel header to new SIMPEG field names.
      * 'Person' and 'Person Formula' are ignored (not in PRD schema).
      */
@@ -38,6 +46,8 @@ class EmployeeRowMapper
         'Jabatan' => 'jabatan_terakhir',
         'Kelas Jabatan' => 'kelas_jabatan',
         'NIP' => 'nip',
+        'NIK' => 'nik',
+        'No KK' => 'no_kk',
         'Nomor Telepon' => 'no_hp',
         'Pangkat' => 'pangkat_terakhir',
         'Pendidikan Terakhir' => 'pendidikan_terakhir',
@@ -76,6 +86,16 @@ class EmployeeRowMapper
         ];
     }
 
+    /**
+     * Check which optional headers are present in the file.
+     */
+    public function detectOptionalHeaders(array $headers): array
+    {
+        $normalized = array_map(fn ($header) => $this->normalizeHeader((string) $header), $headers);
+
+        return array_values(array_intersect(self::OPTIONAL_HEADERS, $normalized));
+    }
+
     public function map(array $row): array
     {
         $mapped = [];
@@ -95,11 +115,6 @@ class EmployeeRowMapper
 
             $mapped[$field] = $value;
         }
-
-        // Auto-set defaults for imported records
-        $mapped['status_aktif'] = 'Aktif';
-        $mapped['profil_status'] = 'belum_lengkap';
-        $mapped['is_kinerja_baik'] = true;
 
         return $mapped;
     }

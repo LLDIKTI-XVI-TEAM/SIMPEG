@@ -1,83 +1,31 @@
-<!doctype html>
-<html lang="id">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Akun Belum Terdaftar - SIMPEG</title>
-    <style>
-        body {
-            margin: 0;
-            min-height: 100vh;
-            background: #f8fafc;
-            color: #0f172a;
-            font-family: Arial, sans-serif;
-        }
+<x-layouts.auth title="Akun Belum Terdaftar">
 
-        main {
-            align-items: center;
-            display: flex;
-            justify-content: center;
-            min-height: 100vh;
-            padding: 24px;
-            text-align: center;
-        }
+    <div class="text-center">
+        <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-warning/10">
+            <svg class="h-7 w-7 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+        </div>
+        <h2 class="text-xl font-semibold text-ink" style="text-wrap: balance">Akun Belum Terdaftar</h2>
+        <p class="mt-2 text-sm text-muted" style="text-wrap: pretty">
+            {{ $message ?? 'Akun Anda belum terdaftar di sistem SIMPEG. Hubungi administrator untuk mendapatkan akses.' }}
+        </p>
+    </div>
 
-        section {
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            box-shadow: 0 1px 2px rgb(15 23 42 / 8%);
-            max-width: 520px;
-            padding: 32px;
-            width: 100%;
-        }
+    <div class="mt-6 rounded-lg bg-soft px-4 py-4">
+        <p class="text-xs text-muted text-center" style="text-wrap: pretty">
+            Sudah mendapatkan akses? Coba login kembali atau hubungi tim IT LLDIKTI Wilayah XVI.
+        </p>
+    </div>
 
-        .eyebrow {
-            color: #64748b;
-            font-size: 13px;
-            font-weight: 700;
-            letter-spacing: .08em;
-            margin: 0;
-            text-transform: uppercase;
-        }
+    <div class="mt-4">
+        <a
+            href="{{ route('login') }}"
+            id="retry-login-btn"
+            class="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90"
+        >
+            Coba Login Kembali
+        </a>
+    </div>
 
-        h1 {
-            font-size: 26px;
-            margin: 12px 0 0;
-        }
-
-        p.message {
-            color: #475569;
-            font-size: 15px;
-            line-height: 1.6;
-            margin: 18px 0 0;
-        }
-
-        a {
-            background: #020617;
-            border-radius: 6px;
-            color: #ffffff;
-            display: inline-flex;
-            font-size: 14px;
-            font-weight: 600;
-            margin-top: 24px;
-            padding: 10px 16px;
-            text-decoration: none;
-        }
-    </style>
-</head>
-<body>
-    <main>
-        <section>
-            <p class="eyebrow">SIMPEG</p>
-            <h1>Akun belum terdaftar</h1>
-            <p class="message">
-                {{ $message ?? 'Akun Anda belum terdaftar di SIMPEG. Silakan hubungi Admin Kepegawaian.' }}
-            </p>
-            <a href="{{ route('login') }}">
-                Login ulang
-            </a>
-        </section>
-    </main>
-</body>
-</html>
+</x-layouts.auth>

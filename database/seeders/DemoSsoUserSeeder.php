@@ -20,11 +20,11 @@ class DemoSsoUserSeeder extends Seeder
         $user->fill([
             'name' => 'Demo Klabat',
             'email' => 'demo-klabat@example.test',
-            'role' => 'admin_kepegawaian',
+            'role' => 'super_admin',
             'email_verified_at' => $user->email_verified_at ?? now(),
         ]);
 
-        if (! $user->exists) {
+        if (!$user->exists) {
             $user->password = Str::random(48);
         }
 

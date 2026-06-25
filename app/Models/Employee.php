@@ -45,6 +45,7 @@ class Employee extends Model
         'tanggal_pensiun',
         'tanggal_kenaikan_pangkat_berikutnya',
         'tanggal_kgb_berikutnya',
+        'tanggal_akhir_kontrak',
 
         // Profil status
         'profil_status',
@@ -70,6 +71,7 @@ class Employee extends Model
             'tanggal_pensiun' => 'date',
             'tanggal_kenaikan_pangkat_berikutnya' => 'date',
             'tanggal_kgb_berikutnya' => 'date',
+            'tanggal_akhir_kontrak' => 'date',
             'is_kinerja_baik' => 'boolean',
             'nik' => 'encrypted',
             'no_kk' => 'encrypted',
@@ -160,6 +162,11 @@ class Employee extends Model
         return $this->hasMany(SimpegNotification::class, 'user_id');
     }
 
+    public function appointment(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Appointment::class);
+    }
+
     // --- Helpers ---
 
     public function latestRank(): ?RankHistory
@@ -182,5 +189,31 @@ class Employee extends Model
         return $this->supervisorAssignments()
             ->whereNull('tanggal_berakhir')
             ->first();
+    }
+
+    public function getFotoPublicPathAttribute(): ?string
+    {
+        $path = trim((string) $this->getRawOriginal('foto'));
+
+        if ($path === '' || $path === '0') {
+            return null;
+        }
+
+        $path = ltrim($path, '/');
+
+        foreach (['public/', 'storage/'] as $prefix) {
+            if (str_starts_with($path, $prefix)) {
+                $path = substr($path, strlen($prefix));
+            }
+        }
+
+        return $path !== '' && $path !== '0' ? $path : null;
+    }
+
+    public function getFotoUrlAttribute(): ?string
+    {
+        return $this->foto_public_path
+            ? asset('storage/' . $this->foto_public_path)
+            : null;
     }
 }
