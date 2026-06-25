@@ -166,7 +166,12 @@
                         </td>
                         <td class="px-4 py-3.5">
                             <div class="flex items-center gap-3">
-                                <div class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-sm font-bold text-primary">
+                                <a
+                                    href="{{ route('pegawai.show', $p->id) }}"
+                                    class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-sm font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                    title="Buka detail profil {{ $p->nama_lengkap }}"
+                                    aria-label="Buka detail profil {{ $p->nama_lengkap }}"
+                                >
                                     @if($p->foto)
                                         <img
                                             src="{{ asset('storage/' . ltrim($p->foto, '/')) }}"
@@ -179,9 +184,15 @@
                                     <span class="{{ $p->foto ? 'hidden' : '' }}" aria-hidden="true">
                                         {{ strtoupper(substr($p->nama_lengkap, 0, 1)) }}
                                     </span>
-                                </div>
+                                </a>
                                 <div class="min-w-0">
-                                    <p class="text-sm font-semibold text-ink">{{ $p->nama_lengkap }}</p>
+                                    <a
+                                        href="{{ route('pegawai.show', $p->id) }}"
+                                        class="block truncate text-sm font-semibold text-ink transition hover:text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/20 rounded"
+                                        title="Buka detail {{ $p->nama_lengkap }}"
+                                    >
+                                        {{ $p->nama_lengkap }}
+                                    </a>
                                     <p class="font-mono text-xs text-muted">{{ $p->nip }}</p>
                                 </div>
                             </div>
