@@ -54,8 +54,7 @@ Route::get('/dev-login', function () {
     return redirect()->route('dashboard')->with('login_success', 'Selamat Datang! Anda berhasil masuk ke dalam sistem (Mode Dev).');
 })->name('dev-login');
 
-Route::middleware('keycloak.auth')->group(function (): void {
-
+Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan,atasan_langsung,pegawai'])->group(function (): void {
     Route::get('/dashboard', function () {
         return view('dashboard');
     })->name('dashboard');

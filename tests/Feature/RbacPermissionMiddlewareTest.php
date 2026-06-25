@@ -51,7 +51,7 @@ class RbacPermissionMiddlewareTest extends TestCase
         // Re-seed tidak boleh menduplikasi permission (firstOrCreate + sync).
         $this->seed(RbacSeeder::class);
 
-        $this->assertSame(16, Permission::count());
+        $this->assertSame(20, Permission::count());
         $this->assertTrue(
             Role::where('name', 'super_admin')->firstOrFail()
                 ->permissions()->where('name', 'hari_libur.delete')->exists()
@@ -163,6 +163,18 @@ class RbacPermissionMiddlewareTest extends TestCase
         $this->assertTrue(Permission::where('name', 'discipline_records.create')->exists());
         $this->assertTrue($role->permissions()->where('name', 'discipline_records.read')->exists());
         $this->assertTrue($role->permissions()->where('name', 'discipline_records.create')->exists());
+    }
+
+    public function test_employee_family_permissions_exist_and_are_assigned_to_admin_kepegawaian(): void
+    {
+        $role = Role::where('name', 'admin_kepegawaian')->firstOrFail();
+
+        foreach (['read', 'create', 'update', 'delete'] as $action) {
+            $permission = "employee_families.{$action}";
+
+            $this->assertTrue(Permission::where('name', $permission)->exists());
+            $this->assertTrue($role->permissions()->where('name', $permission)->exists());
+        }
     }
 
     /**

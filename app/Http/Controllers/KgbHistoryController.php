@@ -2,30 +2,28 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Histories\CreateKgbHistoryAction;
+use App\Actions\Histories\ListKgbHistoriesAction;
 use App\Http\Requests\StoreKgbHistoryRequest;
 use App\Models\Employee;
-use App\Services\EmployeeHistoryService;
 use Illuminate\Http\JsonResponse;
 
 class KgbHistoryController extends Controller
 {
-    public function index(Employee $employee): JsonResponse
+    public function index(Employee $employee, ListKgbHistoriesAction $action): JsonResponse
     {
         return response()->json([
             'employee_id' => $employee->id,
-            'histories' => $employee->salaryHistories()
-                ->orderByDesc('tmt_kgb')
-                ->orderByDesc('created_at')
-                ->get(),
+            'histories' => $action->execute($employee),
         ]);
     }
 
     public function store(
         StoreKgbHistoryRequest $request,
         Employee $employee,
-        EmployeeHistoryService $service,
+        CreateKgbHistoryAction $action,
     ): JsonResponse {
-        $history = $service->createKgbHistory($employee, $request->validated(), $request);
+        $history = $action->execute($employee, $request->validated(), $request);
 
         return response()->json([
             'message' => 'Riwayat KGB berhasil ditambahkan.',

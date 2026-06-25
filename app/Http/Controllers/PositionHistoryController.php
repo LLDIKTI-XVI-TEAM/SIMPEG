@@ -2,35 +2,32 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Histories\CreatePositionHistoryAction;
+use App\Actions\Histories\ListPositionHistoriesAction;
 use App\Http\Requests\StorePositionHistoryRequest;
 use App\Models\Employee;
-use App\Services\EmployeeHistoryService;
 use Illuminate\Http\JsonResponse;
 
 class PositionHistoryController extends Controller
 {
-    public function index(Employee $employee): JsonResponse
+    public function index(Employee $employee, ListPositionHistoriesAction $action): JsonResponse
     {
         return response()->json([
             'employee_id' => $employee->id,
-            'histories' => $employee->positionHistories()
-                ->with(['jenisJabatan', 'eselon', 'unitKerja'])
-                ->orderByDesc('tmt_jabatan')
-                ->orderByDesc('created_at')
-                ->get(),
+            'histories' => $action->execute($employee),
         ]);
     }
 
     public function store(
         StorePositionHistoryRequest $request,
         Employee $employee,
-        EmployeeHistoryService $service,
+        CreatePositionHistoryAction $action,
     ): JsonResponse {
-        $history = $service->createPositionHistory($employee, $request->validated(), $request);
+        $history = $action->execute($employee, $request->validated(), $request);
 
         return response()->json([
             'message' => 'Riwayat jabatan berhasil ditambahkan.',
-            'history' => $history->load(['jenisJabatan', 'eselon', 'unitKerja']),
+            'history' => $history,
         ], 201);
     }
 }

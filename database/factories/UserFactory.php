@@ -33,7 +33,7 @@ class UserFactory extends Factory
             'keycloak_id' => null,
             'keycloak_username' => null,
             'employee_id' => null,
-            'role' => 'pegawai',
+            'role' => null,
         ];
     }
 
