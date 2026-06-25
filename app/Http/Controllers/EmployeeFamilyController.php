@@ -2,44 +2,38 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\EmployeeFamilies\CreateEmployeeFamilyAction;
+use App\Actions\EmployeeFamilies\DeleteEmployeeFamilyAction;
+use App\Actions\EmployeeFamilies\ListEmployeeFamiliesAction;
+use App\Actions\EmployeeFamilies\UpdateEmployeeFamilyAction;
 use App\Http\Requests\StoreEmployeeFamilyRequest;
 use App\Http\Requests\UpdateEmployeeFamilyRequest;
 use App\Models\Employee;
 use App\Models\EmployeeFamily;
-use App\Services\AuditService;
+use App\Support\EmployeeFamilies\EmployeeFamilyPayload;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Arr;
 
 class EmployeeFamilyController extends Controller
 {
-    public function index(Employee $employee): JsonResponse
+    public function index(Employee $employee, ListEmployeeFamiliesAction $action): JsonResponse
     {
         return response()->json([
             'employee_id' => $employee->id,
-            'families' => $employee->families()
-                ->orderByDesc('created_at')
-                ->get()
-                ->map(fn (EmployeeFamily $family): array => $this->familyPayload($family))
-                ->values(),
+            'families' => $action->execute($employee),
         ]);
     }
 
-    public function store(StoreEmployeeFamilyRequest $request, Employee $employee): JsonResponse
-    {
-        $family = $employee->families()->create($request->validated());
-
-        AuditService::log(
-            'CREATE',
-            'EmployeeFamily',
-            $family->id,
-            null,
-            $this->auditPayload($family),
-            $request,
-        );
+    public function store(
+        StoreEmployeeFamilyRequest $request,
+        Employee $employee,
+        CreateEmployeeFamilyAction $action,
+        EmployeeFamilyPayload $payload,
+    ): JsonResponse {
+        $family = $action->execute($employee, $request->validated(), $request);
 
         return response()->json([
             'message' => 'Data keluarga berhasil ditambahkan.',
-            'family' => $this->familyPayload($family),
+            'family' => $payload->response($family),
         ], 201);
     }
 
@@ -47,81 +41,26 @@ class EmployeeFamilyController extends Controller
         UpdateEmployeeFamilyRequest $request,
         Employee $employee,
         EmployeeFamily $family,
+        UpdateEmployeeFamilyAction $action,
+        EmployeeFamilyPayload $payload,
     ): JsonResponse {
-        $this->abortIfFamilyOutsideEmployee($employee, $family);
-
-        $oldValues = $this->auditPayload($family);
-
-        $family->update($request->validated());
-        $family->refresh();
-
-        AuditService::log(
-            'UPDATE',
-            'EmployeeFamily',
-            $family->id,
-            $oldValues,
-            $this->auditPayload($family),
-            $request,
-        );
+        $family = $action->execute($employee, $family, $request->validated(), $request);
 
         return response()->json([
             'message' => 'Data keluarga berhasil diperbarui.',
-            'family' => $this->familyPayload($family),
+            'family' => $payload->response($family),
         ]);
     }
 
-    public function destroy(Employee $employee, EmployeeFamily $family): JsonResponse
-    {
-        $this->abortIfFamilyOutsideEmployee($employee, $family);
-
-        $oldValues = $this->auditPayload($family);
-        $family->delete();
-
-        AuditService::log(
-            'SOFT_DELETE',
-            'EmployeeFamily',
-            $family->id,
-            $oldValues,
-            null,
-            request(),
-        );
+    public function destroy(
+        Employee $employee,
+        EmployeeFamily $family,
+        DeleteEmployeeFamilyAction $action,
+    ): JsonResponse {
+        $action->execute($employee, $family, request());
 
         return response()->json([
             'message' => 'Data keluarga berhasil dinonaktifkan.',
         ]);
-    }
-
-    private function abortIfFamilyOutsideEmployee(Employee $employee, EmployeeFamily $family): void
-    {
-        abort_unless($family->employee_id === $employee->id, 404);
-    }
-
-    /**
-     * Membuka field keluarga yang aman dikembalikan ke admin; relasi pegawai tidak disertakan.
-     */
-    private function familyPayload(EmployeeFamily $family): array
-    {
-        return Arr::only($family->toArray(), [
-            'id',
-            'employee_id',
-            'nama_anggota',
-            'hubungan',
-            'nik',
-            'tempat_lahir',
-            'tanggal_lahir',
-            'jenis_kelamin',
-            'status_tunjangan',
-            'pekerjaan',
-            'created_at',
-            'updated_at',
-        ]);
-    }
-
-    /**
-     * NIK tidak dicatat di audit karena termasuk identitas keluarga yang sensitif.
-     */
-    private function auditPayload(EmployeeFamily $family): array
-    {
-        return Arr::except($this->familyPayload($family), ['nik']);
     }
 }
