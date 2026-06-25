@@ -5,10 +5,11 @@ namespace App\Models;
 use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class EmployeeFamily extends Model
 {
-    use HasUuid;
+    use HasUuid, SoftDeletes;
 
     protected $fillable = [
         'employee_id',

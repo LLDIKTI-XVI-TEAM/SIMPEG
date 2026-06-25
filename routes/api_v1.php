@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\DisciplineRecordController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\EmployeeFamilyController;
 use App\Http\Controllers\EmployeeImportController;
 use App\Http\Controllers\HariLiburController;
 use App\Http\Controllers\KgbHistoryController;
@@ -33,6 +34,22 @@ Route::middleware($employeeGroupMiddleware)
         Route::post('/import', [EmployeeImportController::class, 'store'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.import'])
             ->name('import.store');
+        Route::get('/{employee}/keluarga', [EmployeeFamilyController::class, 'index'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_families.read'])
+            ->whereUuid('employee')
+            ->name('keluarga.index');
+        Route::post('/{employee}/keluarga', [EmployeeFamilyController::class, 'store'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_families.create'])
+            ->whereUuid('employee')
+            ->name('keluarga.store');
+        Route::put('/{employee}/keluarga/{family}', [EmployeeFamilyController::class, 'update'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_families.update'])
+            ->whereUuid(['employee', 'family'])
+            ->name('keluarga.update');
+        Route::delete('/{employee}/keluarga/{family}', [EmployeeFamilyController::class, 'destroy'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_families.delete'])
+            ->whereUuid(['employee', 'family'])
+            ->name('keluarga.destroy');
         Route::get('/{employee}', [EmployeeController::class, 'show'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
             ->whereUuid('employee')
@@ -67,9 +84,6 @@ Route::middleware($employeeGroupMiddleware)
         Route::post('/{employee}/riwayat-kgb', [KgbHistoryController::class, 'store'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_histories.create'])
             ->name('riwayat-kgb.store');
-        Route::get('/{employee}', [EmployeeController::class, 'show'])
-            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
-            ->name('show');
     });
 
 Route::middleware(['web', 'keycloak.auth', 'role:pegawai'])
