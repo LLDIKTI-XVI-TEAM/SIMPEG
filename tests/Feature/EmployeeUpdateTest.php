@@ -49,6 +49,7 @@ class EmployeeUpdateTest extends TestCase
         ]);
 
         $this->actingAs($user);
+        $this->withoutExceptionHandling();
         $response = $this->putJsonWithCsrf($this->endpoint($employee), $payload);
 
         $response->assertOk();

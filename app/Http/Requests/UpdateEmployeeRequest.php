@@ -23,8 +23,14 @@ class UpdateEmployeeRequest extends FormRequest
 
     public function rules(): array
     {
-        $id = $this->route('id') ?? $this->route('employee');
-        $employee = Employee::findOrFail($id);
+        $employeeParam = $this->route('employee');
+        
+        if ($employeeParam instanceof Employee) {
+            $employee = $employeeParam;
+        } else {
+            $id = $this->route('id') ?? $employeeParam;
+            $employee = Employee::findOrFail($id);
+        }
 
         $rules = EmployeeValidationRules::update($employee);
         
