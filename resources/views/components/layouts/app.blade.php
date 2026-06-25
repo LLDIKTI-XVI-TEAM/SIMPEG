@@ -297,7 +297,7 @@
     <div class="flex flex-1 flex-col min-w-0 overflow-hidden">
 
         {{-- NAVBAR --}}
-        <header class="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface px-4 lg:px-6">
+        <header class="sticky top-0 z-40 flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface px-4 lg:px-6">
 
             {{-- Left: hamburger + page title --}}
             <div class="flex items-center gap-3">
@@ -404,7 +404,7 @@
                         x-transition:leave="transition ease-in duration-75"
                         x-transition:leave-start="opacity-100 scale-100"
                         x-transition:leave-end="opacity-0 scale-95"
-                        class="absolute right-0 top-full mt-2 w-56 origin-top-right overflow-hidden rounded-lg border border-border bg-surface shadow-lg"
+                        class="absolute right-0 top-full mt-2 w-56 origin-top-right overflow-hidden rounded-lg border border-border bg-surface shadow-lg z-50"
                         style="display: none;"
                     >
                         <div class="border-b border-border px-4 py-3">
