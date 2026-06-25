@@ -25,7 +25,7 @@ class ImportEmployeesRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'file.mimes' => 'Format awal yang didukung adalah CSV. Silakan export file Excel ke CSV terlebih dahulu.',
+            'file.mimes' => 'Format yang didukung adalah CSV atau Excel (.xlsx).',
         ];
     }
 }
