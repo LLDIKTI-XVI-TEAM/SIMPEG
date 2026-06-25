@@ -221,6 +221,47 @@ SIMPEG/
 
 ---
 
+## Laravel Action Pattern
+
+Endpoint SIMPEG memakai pola thin controller agar logic tidak menumpuk di controller:
+
+```text
+Route -> Controller -> FormRequest -> Action -> Service jika reusable -> Model/DB -> JsonResponse atau Resource
+```
+
+Aturan ringkas:
+
+- Controller hanya menerima request/model binding, memanggil satu Action, lalu mengembalikan response.
+- Endpoint mutasi wajib memakai FormRequest untuk validasi dan authorization request-level.
+- Action mewakili satu use case, misalnya `CreateHariLiburAction` atau `MarkNotificationAsReadAction`.
+- Service dipakai hanya untuk logic domain yang reusable, seperti audit, notifikasi, file storage, atau kalkulasi tanggal.
+- Audit, transaction, workflow transition, dan query kompleks tidak ditaruh langsung di controller.
+
+Contoh controller:
+
+```php
+public function store(StoreHariLiburRequest $request, CreateHariLiburAction $action): JsonResponse
+{
+    $hariLibur = $action->execute($request->validated(), $request);
+
+    return response()->json([
+        'message' => 'Hari libur berhasil ditambahkan.',
+        'data' => $hariLibur->toApiArray(),
+    ], 201);
+}
+```
+
+Checklist PR endpoint baru/refactor:
+
+- route hanya berisi path, middleware, dan controller method;
+- controller tetap tipis;
+- mutation endpoint memakai FormRequest;
+- Action punya satu use case dan method `execute(...)`;
+- Service tidak menjadi dumping ground untuk logic satu endpoint;
+- response shape lama tidak berubah kecuali PR memang mengubah kontrak API.
+
+---
+
 ## Arsitektur Container
 
 ```
