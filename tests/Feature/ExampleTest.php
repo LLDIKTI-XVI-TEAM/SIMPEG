@@ -3,12 +3,20 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(RbacSeeder::class);
+    }
 
     public function test_guest_home_redirects_to_login(): void
     {
@@ -30,7 +38,7 @@ class ExampleTest extends TestCase
 
     public function test_authenticated_dashboard_renders(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->pegawai()->create();
 
         $response = $this->actingAs($user)->get('/dashboard');
 

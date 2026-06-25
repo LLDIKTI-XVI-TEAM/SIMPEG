@@ -101,8 +101,8 @@ class KeycloakAuthController extends Controller
             ]);
 
             if (! $user->exists) {
-                // Role awal pegawai berasal dari SIMPEG, bukan claim role Keycloak.
-                $user->role = 'pegawai';
+                // Bootstrap pertama memberi akses super_admin; setelah itu role wajib ditetapkan admin SIMPEG.
+                $user->role = User::query()->exists() ? null : 'super_admin';
                 $user->password = Str::random(48);
             }
 

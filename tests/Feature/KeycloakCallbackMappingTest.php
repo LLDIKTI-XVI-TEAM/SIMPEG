@@ -13,7 +13,7 @@ class KeycloakCallbackMappingTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_keycloak_email_matches_employee_and_creates_local_user(): void
+    public function test_first_keycloak_email_match_creates_local_super_admin(): void
     {
         config()->set('services.keycloak.employee_match_field', 'email');
 
@@ -39,7 +39,36 @@ class KeycloakCallbackMappingTest extends TestCase
             'keycloak_id' => 'kc-pegawai-1',
             'keycloak_username' => 'budi',
             'employee_id' => $employee->id,
-            'role' => 'pegawai',
+            'role' => 'super_admin',
+        ]);
+    }
+
+    public function test_new_sso_matched_user_after_bootstrap_gets_null_role(): void
+    {
+        User::factory()->superAdmin()->create();
+
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Budi Santoso',
+            'email' => 'budi-null-role@example.com',
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-pegawai-null-role',
+            'nickname' => 'budi-null-role',
+            'name' => 'Budi SSO',
+            'email' => 'budi-null-role@example.com',
+            'raw' => ['email' => 'budi-null-role@example.com', 'email_verified' => true, 'preferred_username' => 'budi-null-role'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        $response->assertRedirect(route('dashboard'));
+        $this->assertAuthenticated();
+        $this->assertDatabaseHas('users', [
+            'email' => 'budi-null-role@example.com',
+            'keycloak_id' => 'kc-pegawai-null-role',
+            'employee_id' => $employee->id,
+            'role' => null,
         ]);
     }
 
@@ -342,6 +371,47 @@ class KeycloakCallbackMappingTest extends TestCase
         $this->assertDatabaseHas('users', [
             'id' => $user->id,
             'role' => 'pegawai',
+        ]);
+    }
+
+    public function test_keycloak_role_claim_does_not_assign_role_to_new_non_bootstrap_user(): void
+    {
+        User::factory()->superAdmin()->create();
+
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Siti Aminah',
+            'email' => 'siti@example.com',
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-siti',
+            'nickname' => 'siti',
+            'name' => 'Siti SSO',
+            'email' => 'siti@example.com',
+            'raw' => [
+                'email' => 'siti@example.com',
+                'email_verified' => true,
+                'preferred_username' => 'siti',
+                'realm_access' => ['roles' => ['super_admin']],
+            ],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        $response->assertRedirect(route('dashboard'));
+        $this->assertDatabaseHas('users', [
+            'email' => 'siti@example.com',
+            'employee_id' => $employee->id,
+            'role' => null,
+        ]);
+    }
+
+    public function test_database_seeder_does_not_create_generic_user_that_consumes_sso_bootstrap(): void
+    {
+        $this->seed(\Database\Seeders\DatabaseSeeder::class);
+
+        $this->assertDatabaseMissing('users', [
+            'email' => 'test@example.com',
         ]);
     }
 
