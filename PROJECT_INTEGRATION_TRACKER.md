@@ -87,9 +87,9 @@ Status ✅ pada tracker ini hanya berarti **terintegrasi dalam kode dan didukung
 |---|---|---:|---|---|
 | Daftar pegawai | US-2.3, Issue #16 | Sprint 2 | ⚠️ Sebagian | Halaman web membaca `Employee` dan pagination. API mendukung search/filter/sort nyata dan diuji. Filter halaman web hanya memfilter baris pada page aktif |
 | Detail pegawai | US-2.4, Issue #17 | Sprint 2 | ⚠️ Sebagian | `Employee` beserta keluarga, riwayat, disiplin, pendidikan, dan dokumen dibaca dari database. Beberapa aksi detail belum tersedia |
-| Tambah pegawai | US-2.1, Issue #14 | Sprint 2 | ⚠️ Sebagian | Form request, transaksi `Employee` + `Appointment`, upload, dan integration test tersedia. Flow web belum menulis audit log database |
-| Edit pegawai | US-2.2, Issue #15 | Sprint 2 | ⚠️ Sebagian | API update database dan audit telah diuji. Halaman/action web masih memakai `pegawaiList` dummy sehingga belum end-to-end |
-| Nonaktifkan pegawai | US-2.9, US-2.10 | Sprint 3 | 🧱 Scaffold | Model mendukung soft delete, tetapi action web belum melakukan delete database |
+| Tambah pegawai | US-2.1, Issue #14 | Sprint 2 | ✅ Terintegrasi | Form request, transaksi `Employee` + `Appointment`, upload, dan integration test tersedia. Flow web sudah 100% menggunakan DB nyata dan menulis audit log. |
+| Edit pegawai | US-2.2, Issue #15 | Sprint 2 | ✅ Terintegrasi | API update database dan audit telah diuji. Halaman web menggunakan `Employee` asli (bukan dummy) dan menulis audit log. |
+| Nonaktifkan pegawai | US-2.9, US-2.10 | Sprint 3 | ✅ Terintegrasi | Model mendukung soft delete, dan action web `destroy` sudah menghapus record database secara nyata beserta audit log-nya. |
 | Export pegawai Excel | US-9.1, Issue #42 | Sprint 6 | ✅ Terintegrasi | Route `/pegawai/export` membaca `Employee`, menghasilkan XLSX, dan memiliki feature test |
 | Export pegawai PDF | US-9.2, Issue #42 | Sprint 6 | ❌ Belum | Belum ditemukan output PDF database yang terverifikasi |
 
