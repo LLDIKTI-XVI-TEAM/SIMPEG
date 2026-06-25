@@ -9,68 +9,34 @@
         activeTemplate: 'utama',
         templateFormat: 'xlsx',
         
-        // Headers template utama
-        mainHeaders: ['No', 'Nama Pegawai', 'Email Pegawai', 'Golongan', 'Jabatan', 'Kelas Jabatan', 'NIP', 'Nomor Telepon', 'Pangkat', 'Pendidikan Terakhir', 'Pensiun', 'Person', 'Person Formula', 'Prodi Pendidikan Terakhir', 'Status Kepegawaian', 'Tanggal Lahir'],
+        // Batch state dari server
+        batchId: null,
         
-        // Mapping fields SIMPEG
-        simpegFields: [
-            { key: 'no', label: 'No' },
-            { key: 'nama', label: 'Nama Lengkap' },
-            { key: 'email_dinas', label: 'Email Dinas (Keycloak)' },
-            { key: 'golongan', label: 'Golongan' },
-            { key: 'jabatan', label: 'Jabatan' },
-            { key: 'kelas_jabatan', label: 'Kelas Jabatan' },
-            { key: 'nip', label: 'NIP' },
-            { key: 'telepon', label: 'Nomor HP' },
-            { key: 'pangkat', label: 'Pangkat' },
-            { key: 'pendidikan_terakhir', label: 'Pendidikan Terakhir' },
-            { key: 'tanggal_pensiun', label: 'Tanggal Pensiun' },
-            { key: 'person', label: 'Person' },
-            { key: 'person_formula', label: 'Person Formula' },
-            { key: 'prodi_pendidikan', label: 'Prodi Pendidikan' },
-            { key: 'jenis', label: 'Status Kepegawaian (PNS/CPNS/PPPK)' },
-            { key: 'tanggal_lahir', label: 'Tanggal Lahir' }
-        ],
+        // Loading states
+        isUploading: false,
+        isLoadingPreview: false,
+        isValidating: false,
+        isExecuting: false,
+        apiError: '',
         
-        // Current mapping state (Excel header -> SIMPEG field key)
-        mappings: {},
-        warningColumns: [],
+        // File reference
+        selectedFile: null,
         
-        // Preview data
-        previewRows: [
-            ['1', 'Ahmad Fauzi', 'ahmadfauzi@lldikti16.go.id', 'III/c', 'Analis Kepegawaian', '8', '198503122010011001', '081234567890', 'Penata Tkt. I', 'Sarjana (S1)', '2043-03-12', 'Ahmad Fauzi', 'PF-1', 'Manajemen', 'PNS', '1985-03-12'],
-            ['2', 'Rina Herlina', 'rina.herlina@lldikti16.go.id', 'III/b', 'Analis Kepegawaian', '8', '199204152018032002', '082384910002', 'Penata Tkt. I', 'Sarjana (S1)', '2050-04-15', 'Rina Herlina', 'PF-2', 'Administrasi', 'PNS', '1992-04-15'],
-            ['3', 'Dedi Kusnadi', 'dedi.kusnadi@lldikti16.go.id', 'III/a', 'Pranata Komputer', '7', '198807202012121004', '085298765431', 'Penata Muda', 'Sarjana (S1)', '2046-07-20', 'Dedi Kusnadi', 'PF-3', 'Teknik Informatika', 'PNS', '1988-07-20'],
-            ['4', 'Melani Putri', '', 'III/a', 'Analis SDM', '7', '199505122021012005', '081273940023', 'Penata Muda', 'Sarjana (S1)', '2053-05-12', 'Melani Putri', 'PF-4', 'Psikologi', 'PPPK', '1995-05-12'],
-            ['5', 'Gunawan Wibisono', 'gunawan@lldikti16.go.id', 'IV/a', 'Kepala Bagian', '9', '198003102008011003', '081394020304', 'Pembina', 'Magister (S2)', '2038-03-10', 'Gunawan W', 'PF-5', 'Manajemen Publik', 'HONORER', '1980-03-10'],
-            ['6', 'Taufik Hidayat', 'taufik@lldikti16.go.id', 'III/b', 'Pengolah Data', '8', '199312252020011006', '081294820392', 'Penata Muda Tkt. I', 'Sarjana (S1)', '2051-12-25', 'Taufik H', 'PF-6', 'Sistem Informasi', 'PNS', '1993-45-12'],
-            ['7', 'Hesti Lestari', 'hesti@lldikti16.go.id', 'V/a', 'Arsiparis', '6', '199109082019032007', '085294020392', 'Pengatur', 'Diploma III (D3)', '2049-09-08', 'Hesti L', 'PF-7', 'Kearsipan', 'PPPK', '1991-09-08'],
-            ['8', 'Rudi Tabuti', 'rudi@lldikti16.go.id', 'III/c', 'Analis Kepegawaian', '8', '198705052010011008', '081293029302', 'Penata Tkt. I', 'Sarjana (S1)', '2045-05-05', 'Rudi Tabuti', 'PF-8', 'Hukum', 'PNS', '1987-05-05'],
-            ['9', 'Maya Indah', 'maya@lldikti16.go.id', 'III/a', 'Pranata Humas', '7', '199408182022012009', '085283928392', 'Penata Muda', 'Sarjana (S1)', '2052-08-18', 'Maya Indah', 'PF-9', 'Komunikasi', 'PPPK', '1994-08-18'],
-            ['10', 'Agung Laksono', 'agung@lldikti16.go.id', 'III/b', 'Analis Kepegawaian', '8', '198602142010121010', '081283928302', 'Penata Muda Tkt. I', 'Sarjana (S1)', '2044-02-14', 'Agung L', 'PF-10', 'Manajemen', 'PNS', '1986-02-14']
-        ],
+        // Preview data (dari server)
+        mainHeaders: [],
+        previewRows: [],
         
-        // Validation outcomes
-        validations: [
-            { row: 1, name: 'Ahmad Fauzi', status: 'skip', error: 'Sudah ada - akan di-skip (NIP duplikat)' },
-            { row: 2, name: 'Rina Herlina', status: 'valid', error: '' },
-            { row: 3, name: 'Dedi Kusnadi', status: 'valid', error: '' },
-            { row: 4, name: 'Melani Putri', status: 'error', error: 'Email Pegawai wajib terisi', col: 'Email Pegawai' },
-            { row: 5, name: 'Gunawan Wibisono', status: 'error', error: 'Status Kepegawaian tidak valid (HONORER). Harus PNS/CPNS/PPPK', col: 'Status Kepegawaian' },
-            { row: 6, name: 'Taufik Hidayat', status: 'error', error: 'Format Tanggal Lahir tidak valid (1993-45-12)', col: 'Tanggal Lahir' },
-            { row: 7, name: 'Hesti Lestari', status: 'error', error: 'Golongan V/a tidak ditemukan di master reference', col: 'Golongan' },
-            { row: 8, name: 'Rudi Tabuti', status: 'valid', error: '' },
-            { row: 9, name: 'Maya Indah', status: 'valid', error: '' },
-            { row: 10, name: 'Agung Laksono', status: 'valid', error: '' }
-        ],
+        // Validation results (dari server)
+        validations: [],
+        totalRows: 0,
+        validRows: 0,
+        skipRows: 0,
+        errorRows: 0,
         
-        // Summary numbers
-        totalRows: 10,
-        validRows: 5,
-        skipRows: 1,
-        errorRows: 4,
+        // Execute results
+        insertedCount: 0,
         
-        // Progress simulation
+        // Progress
         progress: 0,
         progressText: 'Memulai proses impor...',
         
@@ -83,7 +49,11 @@
             let headers = ['Baris', 'Nama Pegawai', 'Kolom Bermasalah', 'Jenis Kesalahan'];
             let rows = this.validations
                 .filter(v => v.status === 'error')
-                .map(v => [v.row, v.name, v.col || '-', v.error]);
+                .map(v => {
+                    let errorText = v.error || Object.values(v.errors || {}).flat().join('; ');
+                    let colText = v.col || Object.keys(v.errors || {}).join(', ') || '-';
+                    return [v.row, v.nama || v.name, colText, errorText];
+                });
             
             let csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.map(val => String.fromCharCode(34) + val + String.fromCharCode(34)).join(','))].join('\n');
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -98,8 +68,9 @@
         
         // Handle File Upload Select
         handleFileSelect(e) {
-            const file = e.target.files[0];
+            const file = e.target.files ? e.target.files[0] : (e.dataTransfer ? e.dataTransfer.files[0] : null);
             if (file) {
+                this.selectedFile = file;
                 this.fileName = file.name;
                 const sizeInMb = (file.size / (1024 * 1024)).toFixed(2);
                 this.fileSize = sizeInMb + ' MB';
@@ -107,58 +78,216 @@
                 if (file.size > 10 * 1024 * 1024) {
                     this.fileError = 'Ukuran berkas melebihi batas 10MB! (Terdeteksi: ' + sizeInMb + 'MB)';
                     this.fileValid = false;
-                    e.target.value = '';
+                    this.selectedFile = null;
+                    if (e.target && e.target.value) e.target.value = '';
                 } else {
                     this.fileError = '';
                     this.fileValid = true;
-                    // Auto-mapping headers (Auto Match)
-                    this.mainHeaders.forEach(header => {
-                        // Find matching SIMPEG field
-                        let matchedField = this.simpegFields.find(f => 
-                            f.label.toLowerCase().includes(header.toLowerCase()) || 
-                            header.toLowerCase().includes(f.label.toLowerCase()) || 
-                            f.key.toLowerCase().includes(header.toLowerCase().replace(' ', '_'))
-                        );
-                        this.mappings[header] = matchedField ? matchedField.key : '';
-                    });
                 }
             }
         },
         
-        // Auto check for mismatch warnings
-        checkMismatch() {
-            this.warningColumns = [];
-            this.mainHeaders.forEach(header => {
-                if (!this.mappings[header]) {
-                    this.warningColumns.push(header);
+        // Step 1 → 2: Upload file ke server, lalu load preview
+        async uploadAndPreview() {
+            if (!this.selectedFile) return;
+            
+            this.isUploading = true;
+            this.apiError = '';
+            
+            try {
+                // Step 1: Upload
+                const formData = new FormData();
+                formData.append('file', this.selectedFile);
+                
+                const uploadRes = await fetch('/api/v1/pegawai/import/upload', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
+                        'Accept': 'application/json',
+                    },
+                    body: formData,
+                });
+                
+                if (!uploadRes.ok) {
+                    const err = await uploadRes.json();
+                    throw new Error(err.errors?.file?.[0] || err.message || 'Upload gagal.');
                 }
-            });
+                
+                const uploadData = await uploadRes.json();
+                this.batchId = uploadData.batch_id;
+                this.totalRows = uploadData.total_rows;
+                
+                // Step 2: Load Preview
+                this.isLoadingPreview = true;
+                const previewRes = await fetch('/api/v1/pegawai/import/' + this.batchId + '/preview', {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
+                    },
+                });
+                
+                if (!previewRes.ok) {
+                    const err = await previewRes.json();
+                    throw new Error(err.message || 'Gagal memuat preview.');
+                }
+                
+                const previewData = await previewRes.json();
+                this.mainHeaders = previewData.headers;
+                
+                // Transform preview data: array of objects → array of arrays (untuk table render)
+                this.previewRows = previewData.preview.map(item => {
+                    return previewData.headers.map(h => item.data[h] ?? '-');
+                });
+                
+                this.step = 2;
+                
+            } catch (e) {
+                this.apiError = e.message;
+            } finally {
+                this.isUploading = false;
+                this.isLoadingPreview = false;
+            }
         },
         
-        // Start simulation queue background
-        startImportSimulation() {
+        // Step 2 → 3: Jalankan validasi
+        async runValidation() {
+            if (!this.batchId) return;
+            
+            this.isValidating = true;
+            this.apiError = '';
+            
+            try {
+                const res = await fetch('/api/v1/pegawai/import/' + this.batchId + '/validate', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
+                    },
+                });
+                
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.message || 'Validasi gagal.');
+                }
+                
+                const data = await res.json();
+                this.totalRows = data.total_rows;
+                this.validRows = data.valid_count;
+                this.errorRows = data.error_count;
+                this.skipRows = data.skip_count;
+                
+                // Transform results untuk tabel validasi
+                this.validations = data.results.map(r => {
+                    let errorMessages = [];
+                    let errorCols = [];
+                    if (r.errors && typeof r.errors === 'object') {
+                        for (const [col, msgs] of Object.entries(r.errors)) {
+                            errorCols.push(col);
+                            if (Array.isArray(msgs)) {
+                                errorMessages.push(...msgs);
+                            } else {
+                                errorMessages.push(String(msgs));
+                            }
+                        }
+                    }
+                    return {
+                        row: r.row,
+                        name: r.nama,
+                        status: r.status,
+                        col: errorCols.join(', ') || '-',
+                        error: errorMessages.join('; ') || '',
+                    };
+                });
+                
+                this.step = 3;
+                
+            } catch (e) {
+                this.apiError = e.message;
+            } finally {
+                this.isValidating = false;
+            }
+        },
+        
+        // Step 3 → 4 → 5: Execute import
+        async executeImport() {
+            if (!this.batchId) return;
+            
+            this.isExecuting = true;
+            this.apiError = '';
             this.step = 4;
             this.progress = 0;
-            this.progressText = 'Memulai antrean latar belakang (queue job)...';
+            this.progressText = 'Mengirim data ke server...';
             
-            let interval = setInterval(() => {
-                this.progress += 20;
-                if (this.progress === 20) {
-                    this.progressText = 'Memvalidasi data baris kepegawaian...';
-                } else if (this.progress === 40) {
-                    this.progressText = 'Menghitung estimasi TMT Pangkat & KGB berikutnya...';
-                } else if (this.progress === 60) {
-                    this.progressText = 'Menyimpan 5 data pegawai baru ke database...';
-                } else if (this.progress === 80) {
-                    this.progressText = 'Mencatat aktivitas ke dalam audit log...';
-                } else if (this.progress === 100) {
-                    clearInterval(interval);
-                    this.progressText = 'Impor selesai!';
-                    setTimeout(() => {
-                        this.step = 5;
-                    }, 500);
+            // Animasi progress simulasi (karena request berjalan di background)
+            let progressInterval = setInterval(() => {
+                if (this.progress < 80) {
+                    this.progress += 10;
+                    if (this.progress === 20) this.progressText = 'Memvalidasi ulang data baris kepegawaian...';
+                    else if (this.progress === 40) this.progressText = 'Menyimpan data pegawai baru ke database...';
+                    else if (this.progress === 60) this.progressText = 'Mengenkripsi data sensitif (NIK, No KK)...';
+                    else if (this.progress === 80) this.progressText = 'Mencatat aktivitas ke dalam audit log...';
                 }
-            }, 800);
+            }, 600);
+            
+            try {
+                const res = await fetch('/api/v1/pegawai/import/' + this.batchId + '/execute', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
+                    },
+                });
+                
+                clearInterval(progressInterval);
+                
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.message || 'Eksekusi import gagal.');
+                }
+                
+                const data = await res.json();
+                this.insertedCount = data.inserted;
+                this.skipRows = data.skipped;
+                this.errorRows = data.failed;
+                this.validRows = data.inserted;
+                
+                this.progress = 100;
+                this.progressText = 'Impor selesai!';
+                
+                setTimeout(() => {
+                    this.step = 5;
+                    this.isExecuting = false;
+                }, 500);
+                
+            } catch (e) {
+                clearInterval(progressInterval);
+                this.apiError = e.message;
+                this.step = 3; // Kembali ke validasi jika gagal
+                this.isExecuting = false;
+            }
+        },
+        
+        // Reset semua state
+        resetAll() {
+            this.step = 1;
+            this.fileName = '';
+            this.fileSize = '';
+            this.fileError = '';
+            this.fileValid = false;
+            this.selectedFile = null;
+            this.batchId = null;
+            this.mainHeaders = [];
+            this.previewRows = [];
+            this.validations = [];
+            this.totalRows = 0;
+            this.validRows = 0;
+            this.skipRows = 0;
+            this.errorRows = 0;
+            this.insertedCount = 0;
+            this.apiError = '';
+            this.progress = 0;
         }
     }">
         
@@ -172,6 +301,16 @@
                 <span>/</span>
                 <span class="font-medium text-ink">Import Excel/CSV</span>
             </nav>
+        </div>
+
+        {{-- Global API Error Banner --}}
+        <div x-show="apiError" x-cloak class="rounded-lg bg-danger/10 border border-danger/20 p-4 text-xs text-danger font-sans flex items-start gap-2.5" x-transition>
+            <span class="text-base leading-none">❌</span>
+            <div>
+                <span class="font-bold">Terjadi Kesalahan</span>
+                <p class="mt-0.5 leading-relaxed" x-text="apiError"></p>
+            </div>
+            <button type="button" @click="apiError = ''" class="ml-auto text-danger/60 hover:text-danger cursor-pointer">✕</button>
         </div>
 
         {{-- STEP INDICATORS (Wizard) --}}
@@ -188,7 +327,7 @@
                 {{-- Step 2 --}}
                 <div class="flex items-center gap-2 shrink-0">
                     <span :class="step >= 2 ? 'bg-primary text-white' : 'bg-soft text-muted border border-border'" class="h-6 w-6 rounded-full flex items-center justify-center font-mono">2</span>
-                    <span :class="step >= 2 ? 'text-primary font-bold' : 'text-muted'" class="font-sans">Preview & Mapping</span>
+                    <span :class="step >= 2 ? 'text-primary font-bold' : 'text-muted'" class="font-sans">Preview Data</span>
                 </div>
                 <div :class="step > 2 ? 'bg-primary' : 'bg-border'" class="h-0.5 flex-1 mx-3 min-w-8 max-w-[72px]"></div>
 
@@ -243,7 +382,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
                         </svg>
                         <span class="text-xs font-sans font-normal" :class="activeTemplate === 'utama' ? 'text-primary' : 'text-ink'">Template Utama</span>
-                        <span class="text-[9px] text-muted font-sans mt-0.5">(NIP, Gol, Jabatan, dll.)</span>
+                        <span class="text-[9px] text-muted font-sans mt-0.5">(NIP, NIK, No KK, Gol, Jabatan, dll.)</span>
                     </button>
                     <button type="button" @click="activeTemplate = 'pelengkap'; downloadTemplate('pelengkap')"
                         :class="activeTemplate === 'pelengkap' ? 'border-primary/20 bg-primary/5 text-primary' : 'border-border bg-surface text-ink hover:bg-soft'"
@@ -332,78 +471,48 @@
                 <div class="border-t border-border pt-4 flex justify-end">
                     <button 
                         type="button" 
-                        @click="if(fileValid) { step = 2; checkMismatch(); }" 
-                        :disabled="!fileValid"
-                        :class="!fileValid ? 'opacity-50 cursor-not-allowed bg-muted' : 'bg-primary hover:opacity-90 cursor-pointer'"
-                        class="inline-flex items-center justify-center rounded-lg px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition font-sans"
+                        @click="uploadAndPreview()" 
+                        :disabled="!fileValid || isUploading"
+                        :class="(!fileValid || isUploading) ? 'opacity-50 cursor-not-allowed bg-muted' : 'bg-primary hover:opacity-90 cursor-pointer'"
+                        class="inline-flex items-center justify-center rounded-lg px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition font-sans gap-2"
                     >
-                        Lanjutkan ke Preview
+                        <svg x-show="isUploading" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                        </svg>
+                        <span x-text="isUploading ? 'Mengupload & Memproses...' : 'Upload & Lanjutkan ke Preview'"></span>
                     </button>
                 </div>
             </div>
         </div>
 
-        {{-- STEP 2: PREVIEW & MAPPING --}}
+        {{-- STEP 2: PREVIEW DATA --}}
         <div x-show="step === 2" class="space-y-6" style="display: none;" x-transition>
             
-            {{-- Columns Mapping panel --}}
-            <div class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-4">
-                <div>
-                    <h3 class="text-sm font-bold text-ink uppercase tracking-wider font-sans">1. Pemetaan Kolom Berkas</h3>
-                    <p class="text-xs text-muted font-sans mt-0.5">Hubungkan header kolom dari berkas Excel/CSV Anda dengan kolom field tujuan di aplikasi SIMPEG.</p>
-                </div>
-                
-                {{-- Warning jika ada kolom mismatch --}}
-                <div x-show="warningColumns.length > 0" class="rounded-lg bg-warning/10 border border-warning/20 p-4 text-xs text-warning font-sans flex items-start gap-2.5">
-                    <span class="text-base leading-none">⚠️</span>
+            {{-- File Info Bar --}}
+            <div class="rounded-lg border border-primary/20 bg-primary/5 p-4 flex items-center justify-between">
+                <div class="flex items-center gap-3 text-xs font-sans">
+                    <svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                    </svg>
                     <div>
-                        <span class="font-bold">Peringatan: Kolom tidak cocok!</span>
-                        <p class="mt-0.5 leading-relaxed">Sistem mendeteksi ada <span x-text="warningColumns.length"></span> kolom berkas yang tidak ter-mapping otomatis ke field SIMPEG. Silakan periksa atau sesuaikan secara manual kolom: <span class="font-semibold text-ink" x-text="warningColumns.join(', ')"></span></p>
+                        <span class="font-bold text-ink" x-text="fileName"></span>
+                        <span class="text-muted ml-2" x-text="'(' + totalRows + ' baris data)'"></span>
                     </div>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 border border-border rounded-lg p-4 bg-soft/30 max-h-[300px] overflow-y-auto">
-                    <template x-for="header in mainHeaders" :key="header">
-                        <div class="rounded-lg border border-border bg-surface p-3 flex flex-col gap-2 shadow-xs">
-                            <div class="flex justify-between items-center">
-                                <span class="text-xs font-bold text-ink font-sans truncate max-w-[150px]" x-text="header"></span>
-                                <span :class="mappings[header] ? 'bg-success/15 text-success' : 'bg-warning/15 text-warning'" class="text-[9px] px-1.5 py-0.5 font-bold rounded">
-                                    <span x-text="mappings[header] ? 'Matched' : 'Unmatched'"></span>
-                                </span>
-                            </div>
-                            <div class="relative">
-                                <select 
-                                    x-model="mappings[header]" 
-                                    @change="checkMismatch()"
-                                    class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-8 py-1 text-xs text-ink focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer"
-                                >
-                                    <option value="">-- Lewati Kolom Ini --</option>
-                                    <template x-for="field in simpegFields" :key="field.key">
-                                        <option :value="field.key" x-text="field.label" :selected="mappings[header] === field.key"></option>
-                                    </template>
-                                </select>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
-                    </template>
                 </div>
             </div>
 
             {{-- 10 Rows Preview Table --}}
             <div class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-4">
                 <div>
-                    <h3 class="text-sm font-bold text-ink uppercase tracking-wider font-sans">2. Preview Berkas (10 Baris Pertama)</h3>
-                    <p class="text-xs text-muted font-sans mt-0.5">Berikut adalah pratinjau data pegawai dari berkas yang Anda unggah sebelum masuk ke tahap validasi.</p>
+                    <h3 class="text-sm font-bold text-ink uppercase tracking-wider font-sans">Preview Berkas (Maks 10 Baris Pertama)</h3>
+                    <p class="text-xs text-muted font-sans mt-0.5">Berikut adalah pratinjau data pegawai dari berkas yang Anda unggah. Pastikan data sudah benar sebelum masuk ke tahap validasi.</p>
                 </div>
                 
                 <div class="overflow-x-auto rounded-lg border border-border">
                     <table class="w-full text-xs">
                         <thead class="bg-soft">
                             <tr>
+                                <th class="px-3 py-2 text-left font-bold text-muted border-r border-border">No</th>
                                 <template x-for="header in mainHeaders" :key="header">
                                     <th class="px-3 py-2 text-left font-bold text-muted border-r border-border truncate max-w-[120px]" x-text="header"></th>
                                 </template>
@@ -412,6 +521,7 @@
                         <tbody class="divide-y divide-border">
                             <template x-for="(row, rIndex) in previewRows" :key="rIndex">
                                 <tr class="hover:bg-soft/20">
+                                    <td class="px-3 py-2 border-r border-border font-mono text-muted" x-text="rIndex + 1"></td>
                                     <template x-for="(cell, cIndex) in row" :key="cIndex">
                                         <td class="px-3 py-2 border-r border-border font-mono text-ink truncate max-w-[120px]" x-text="cell || '-'"></td>
                                     </template>
@@ -421,21 +531,30 @@
                     </table>
                 </div>
 
+                <div x-show="totalRows > 10" class="text-xs text-muted font-sans text-center py-1">
+                    Menampilkan 10 dari <span class="font-bold text-ink" x-text="totalRows"></span> baris. Semua baris akan divalidasi di langkah berikutnya.
+                </div>
+
                 {{-- Action Buttons --}}
                 <div class="border-t border-border pt-4 flex justify-between items-center gap-3">
                     <button 
                         type="button" 
-                        @click="step = 1; fileName = ''; fileSize = ''; fileValid = false;" 
+                        @click="resetAll()" 
                         class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-semibold text-ink transition hover:bg-soft shadow-sm font-sans cursor-pointer"
                     >
-                        Batal
+                        Batal & Upload Ulang
                     </button>
                     <button 
                         type="button" 
-                        @click="step = 3" 
-                        class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 font-sans cursor-pointer"
+                        @click="runValidation()"
+                        :disabled="isValidating"
+                        :class="isValidating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'"
+                        class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition font-sans gap-2"
                     >
-                        Lanjutkan ke Validasi
+                        <svg x-show="isValidating" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                        </svg>
+                        <span x-text="isValidating ? 'Memvalidasi...' : 'Lanjutkan ke Validasi'"></span>
                     </button>
                 </div>
             </div>
@@ -504,7 +623,7 @@
                 <div class="border-t border-border pt-4 flex justify-between items-center gap-3">
                     <button 
                         type="button" 
-                        @click="step = 1; fileName = ''; fileSize = ''; fileValid = false;" 
+                        @click="resetAll()" 
                         class="inline-flex items-center justify-center rounded-lg border border-danger/15 bg-surface px-5 py-2.5 text-sm font-semibold text-danger transition hover:bg-danger/5 shadow-sm font-sans cursor-pointer"
                     >
                         Batalkan Semua
@@ -519,10 +638,12 @@
                         </button>
                         <button 
                             type="button" 
-                            @click="startImportSimulation()" 
-                            class="inline-flex items-center justify-center rounded-lg bg-success px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 font-sans cursor-pointer"
+                            @click="executeImport()"
+                            :disabled="validRows === 0 || isExecuting"
+                            :class="(validRows === 0 || isExecuting) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'"
+                            class="inline-flex items-center justify-center rounded-lg bg-success px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition font-sans"
                         >
-                            Import Hanya yang Valid
+                            Import Hanya yang Valid (<span x-text="validRows"></span> baris)
                         </button>
                     </div>
                 </div>
@@ -539,7 +660,7 @@
                 </div>
                 <div class="space-y-2">
                     <h3 class="text-base font-bold text-ink font-sans" x-text="progressText"></h3>
-                    <p class="text-xs text-muted font-sans">Proses impor data berjalan di background queue untuk menjaga stabilitas memori.</p>
+                    <p class="text-xs text-muted font-sans">Proses impor data sedang berlangsung. Mohon jangan menutup halaman ini.</p>
                 </div>
                 
                 {{-- Progress Bar --}}
@@ -571,7 +692,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
                     <div class="rounded-lg bg-success/5 border border-success/15 p-4">
                         <span class="text-xs font-bold text-success uppercase tracking-wider font-sans">Jumlah Berhasil</span>
-                        <p class="text-2xl font-bold text-success mt-1" x-text="validRows"></p>
+                        <p class="text-2xl font-bold text-success mt-1" x-text="insertedCount"></p>
                         <span class="text-[9px] text-muted font-sans mt-0.5 block">(Status Aktif di database)</span>
                     </div>
                     <div class="rounded-lg bg-primary/5 border border-primary/15 p-4">
@@ -595,6 +716,7 @@
                         </div>
                         <button 
                             @click="downloadErrorReport()"
+                            x-show="errorRows > 0"
                             class="inline-flex items-center justify-center rounded-lg border border-danger/15 bg-surface px-4 py-2 font-bold text-danger transition hover:bg-danger/5 shadow-xs cursor-pointer"
                         >
                             📥 Unduh Laporan Gagal (.csv)
@@ -622,4 +744,5 @@
         </div>
 
     </div>
+
 </x-layouts.app>

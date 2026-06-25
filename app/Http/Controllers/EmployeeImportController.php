@@ -9,25 +9,27 @@ use App\Models\RefJenisPegawai;
 use App\Support\EmployeeImport\CsvEmployeeReader;
 use App\Support\EmployeeValidationRules;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 class EmployeeImportController extends Controller
 {
+    private const CACHE_PREFIX = 'import_batch:';
+    private const CACHE_TTL_MINUTES = 30;
+    private const STORAGE_DIR = 'imports';
+    private const PREVIEW_LIMIT = 10;
+
     private ?array $jenisPegawaiCache = null;
 
-    private function getJenisPegawaiCache(): array
-    {
-        if ($this->jenisPegawaiCache === null) {
-            $this->jenisPegawaiCache = RefJenisPegawai::pluck('id', 'nama')->all();
-        }
-        return $this->jenisPegawaiCache;
-    }
+    // ── Step 1: Upload & Parse ───────────────────────────────────────────────
 
-    public function store(ImportEmployeesRequest $request, CsvEmployeeReader $reader): JsonResponse|RedirectResponse
+    public function upload(ImportEmployeesRequest $request, CsvEmployeeReader $reader): JsonResponse
     {
         try {
             $rows = $reader->read($request->file('file'));
@@ -37,72 +39,244 @@ class EmployeeImportController extends Controller
             ]);
         }
 
+        if ($rows === []) {
+            throw ValidationException::withMessages([
+                'file' => ['File tidak berisi data pegawai (hanya header).'],
+            ]);
+        }
 
-        $validatedRows = [];
-        $errors = [];
+        $batchId = (string) Str::uuid();
+
+        // Simpan file asli ke storage sementara
+        $request->file('file')->storeAs(self::STORAGE_DIR, $batchId . '_' . $request->file('file')->getClientOriginalName(), 'local');
+
+        // Ambil headers dari keys data baris pertama
+        $firstRowData = $rows[0]['data'] ?? [];
+        $headers = array_keys($firstRowData);
+
+        // Simpan parsed data ke cache
+        Cache::put(self::CACHE_PREFIX . $batchId, [
+            'filename'    => $request->file('file')->getClientOriginalName(),
+            'uploaded_at' => now()->toIso8601String(),
+            'user_id'     => $request->user()?->id,
+            'headers'     => $headers,
+            'total_rows'  => count($rows),
+            'rows'        => $rows,
+            'validation'  => null,
+        ], now()->addMinutes(self::CACHE_TTL_MINUTES));
+
+        return response()->json([
+            'batch_id'   => $batchId,
+            'filename'   => $request->file('file')->getClientOriginalName(),
+            'total_rows' => count($rows),
+            'headers'    => $headers,
+        ]);
+    }
+
+    // ── Step 2: Preview ──────────────────────────────────────────────────────
+
+    public function preview(Request $request, string $batchId): JsonResponse
+    {
+        $batch = $this->getBatchOrFail($batchId, $request);
+
+        $previewRows = array_slice($batch['rows'], 0, self::PREVIEW_LIMIT);
+
+        return response()->json([
+            'batch_id'   => $batchId,
+            'filename'   => $batch['filename'],
+            'total_rows' => $batch['total_rows'],
+            'headers'    => $batch['headers'],
+            'preview'    => $previewRows,
+        ]);
+    }
+
+    // ── Step 3: Validate ─────────────────────────────────────────────────────
+
+    public function validate(Request $request, string $batchId): JsonResponse
+    {
+        $batch = $this->getBatchOrFail($batchId, $request);
+
+        $results = [];
+        $validCount = 0;
+        $errorCount = 0;
+        $skipCount = 0;
         $seenNips = [];
         $seenEmails = [];
 
-        foreach ($rows as $row) {
-            $validator = Validator::make($row['data'], EmployeeValidationRules::import(), [], EmployeeValidationRules::attributes());
+        foreach ($batch['rows'] as $row) {
+            $rowResult = $this->validateRow($row, $seenNips, $seenEmails);
+            $results[] = $rowResult;
 
-            if ($validator->fails()) {
-                $errors[] = [
-                    'row' => $row['row'],
-                    'errors' => $validator->errors()->toArray(),
+            match ($rowResult['status']) {
+                'valid' => $validCount++,
+                'error' => $errorCount++,
+                'skip'  => $skipCount++,
+            };
+        }
+
+        // Simpan hasil validasi ke cache
+        $batch['validation'] = [
+            'valid_count' => $validCount,
+            'error_count' => $errorCount,
+            'skip_count'  => $skipCount,
+            'results'     => $results,
+        ];
+        Cache::put(self::CACHE_PREFIX . $batchId, $batch, now()->addMinutes(self::CACHE_TTL_MINUTES));
+
+        return response()->json([
+            'batch_id'    => $batchId,
+            'total_rows'  => $batch['total_rows'],
+            'valid_count' => $validCount,
+            'error_count' => $errorCount,
+            'skip_count'  => $skipCount,
+            'results'     => $results,
+        ]);
+    }
+
+    // ── Step 4: Execute ──────────────────────────────────────────────────────
+
+    public function execute(Request $request, string $batchId): JsonResponse
+    {
+        $batch = $this->getBatchOrFail($batchId, $request);
+
+        if ($batch['validation'] === null) {
+            return response()->json([
+                'message' => 'Data belum divalidasi. Jalankan validasi terlebih dahulu.',
+            ], 422);
+        }
+
+        $validationResults = $batch['validation']['results'];
+        $rowsToInsert = [];
+
+        foreach ($validationResults as $result) {
+            if ($result['status'] === 'valid' && isset($result['validated_data'])) {
+                $rowsToInsert[] = $result['validated_data'] + [
+                    'status_aktif'    => 'Aktif',
+                    'profil_status'   => 'belum_lengkap',
+                    'is_kinerja_baik' => true,
                 ];
-
-                continue;
             }
+        }
 
-            $data = $validator->validated();
-            $referenceErrors = $this->resolveReferences($data);
-            $duplicateErrors = $this->duplicateErrors($data, $row['row'], $seenNips, $seenEmails);
-            $rowErrors = array_merge_recursive($referenceErrors, $duplicateErrors);
+        $insertedCount = 0;
 
-            if ($rowErrors !== []) {
-                $errors[] = [
-                    'row' => $row['row'],
-                    'errors' => $rowErrors,
-                ];
+        if ($rowsToInsert !== []) {
+            DB::transaction(function () use ($rowsToInsert, &$insertedCount): void {
+                foreach ($rowsToInsert as $data) {
+                    Employee::create($data);
+                    $insertedCount++;
+                }
+            });
+        }
 
-                continue;
-            }
+        AuditService::log('IMPORT', 'Employee', null, null, [
+            'total_inserted' => $insertedCount,
+            'total_skipped'  => $batch['validation']['skip_count'],
+            'total_failed'   => $batch['validation']['error_count'],
+            'filename'       => $batch['filename'],
+        ], $request);
 
-            $validatedRows[] = $data + [
-                'status_aktif' => 'Aktif',
-                'profil_status' => 'belum_lengkap',
-                'is_kinerja_baik' => true,
+        // Cleanup: hapus cache dan file temp
+        $this->cleanupBatch($batchId, $batch['filename']);
+
+        return response()->json([
+            'message'  => 'Import selesai.',
+            'inserted' => $insertedCount,
+            'skipped'  => $batch['validation']['skip_count'],
+            'failed'   => $batch['validation']['error_count'],
+        ]);
+    }
+
+    // ── Private Helpers ──────────────────────────────────────────────────────
+
+    private function getBatchOrFail(string $batchId, Request $request): array
+    {
+        $batch = Cache::get(self::CACHE_PREFIX . $batchId);
+
+        if ($batch === null) {
+            abort(404, 'Batch import tidak ditemukan atau sudah kedaluwarsa. Silakan upload ulang.');
+        }
+
+        // Pastikan batch milik user yang sama
+        if ($batch['user_id'] !== null && $batch['user_id'] !== $request->user()?->id) {
+            abort(403, 'Anda tidak memiliki akses ke batch import ini.');
+        }
+
+        return $batch;
+    }
+
+    private function validateRow(array $row, array &$seenNips, array &$seenEmails): array
+    {
+        $data = $row['data'];
+        $nama = $data['nama_lengkap'] ?? '-';
+
+        // Validasi basic rules
+        $validator = Validator::make($data, EmployeeValidationRules::import(), [], EmployeeValidationRules::attributes());
+
+        if ($validator->fails()) {
+            return [
+                'row'    => $row['row'],
+                'nama'   => $nama,
+                'status' => 'error',
+                'errors' => $validator->errors()->toArray(),
             ];
         }
 
-        if ($errors !== []) {
-            return $this->failedImportResponse($request, $errors);
-        }
+        $validated = $validator->validated();
 
-        DB::transaction(function () use ($validatedRows): void {
-            foreach ($validatedRows as $data) {
-                Employee::create($data);
+        // Resolve jenis_pegawai → jenis_pegawai_id
+        $referenceErrors = $this->resolveReferences($validated);
+
+        // Cek duplikat NIP di database (skip, bukan error)
+        $skipErrors = [];
+        if (! empty($validated['nip'])) {
+            $existsInDb = Employee::where('nip', $validated['nip'])->exists();
+            if ($existsInDb) {
+                $skipErrors['nip'][] = 'NIP sudah terdaftar di database.';
             }
-        });
-
-        AuditService::log('IMPORT', 'Employee', null, null, [
-            'total_inserted' => count($validatedRows),
-            'filename' => $request->file('file')->getClientOriginalName(),
-        ], $request);
-
-        $summary = [
-            'message' => 'Import selesai.',
-            'inserted' => count($validatedRows),
-            'failed' => 0,
-            'errors' => [],
-        ];
-
-        if ($request->expectsJson()) {
-            return response()->json($summary);
         }
 
-        return back()->with('import_summary', $summary);
+        // Cek duplikat di dalam file
+        $duplicateErrors = $this->duplicateErrors($validated, $row['row'], $seenNips, $seenEmails);
+
+        // Jika ada skip (NIP di DB), mark sebagai skip
+        if ($skipErrors !== []) {
+            return [
+                'row'    => $row['row'],
+                'nama'   => $nama,
+                'status' => 'skip',
+                'errors' => $skipErrors,
+            ];
+        }
+
+        // Gabungkan reference errors dan duplicate errors
+        $allErrors = array_merge_recursive($referenceErrors, $duplicateErrors);
+
+        if ($allErrors !== []) {
+            return [
+                'row'    => $row['row'],
+                'nama'   => $nama,
+                'status' => 'error',
+                'errors' => $allErrors,
+            ];
+        }
+
+        return [
+            'row'            => $row['row'],
+            'nama'           => $nama,
+            'status'         => 'valid',
+            'errors'         => [],
+            'validated_data' => $validated,
+        ];
+    }
+
+    private function getJenisPegawaiCache(): array
+    {
+        if ($this->jenisPegawaiCache === null) {
+            $this->jenisPegawaiCache = RefJenisPegawai::pluck('id', 'nama')->all();
+        }
+
+        return $this->jenisPegawaiCache;
     }
 
     private function resolveReferences(array &$data): array
@@ -153,21 +327,13 @@ class EmployeeImportController extends Controller
         return $errors;
     }
 
-    private function failedImportResponse(ImportEmployeesRequest $request, array $errors): JsonResponse|RedirectResponse
+    private function cleanupBatch(string $batchId, string $filename): void
     {
-        $summary = [
-            'message' => 'Import gagal. Perbaiki baris bermasalah lalu unggah ulang.',
-            'inserted' => 0,
-            'failed' => count($errors),
-            'errors' => $errors,
-        ];
+        Cache::forget(self::CACHE_PREFIX . $batchId);
 
-        if ($request->expectsJson()) {
-            return response()->json($summary, 422);
+        $storedName = $batchId . '_' . $filename;
+        if (Storage::disk('local')->exists(self::STORAGE_DIR . '/' . $storedName)) {
+            Storage::disk('local')->delete(self::STORAGE_DIR . '/' . $storedName);
         }
-
-        return back()
-            ->withErrors(['file' => $summary['message']])
-            ->with('import_summary', $summary);
     }
 }

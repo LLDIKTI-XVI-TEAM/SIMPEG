@@ -30,9 +30,18 @@ Route::middleware($employeeGroupMiddleware)
         Route::post('/', [EmployeeController::class, 'store'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.create'])
             ->name('store');
-        Route::post('/import', [EmployeeImportController::class, 'store'])
+        Route::post('/import/upload', [EmployeeImportController::class, 'upload'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.import'])
-            ->name('import.store');
+            ->name('import.upload');
+        Route::get('/import/{batchId}/preview', [EmployeeImportController::class, 'preview'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.import'])
+            ->name('import.preview');
+        Route::post('/import/{batchId}/validate', [EmployeeImportController::class, 'validate'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.import'])
+            ->name('import.validate');
+        Route::post('/import/{batchId}/execute', [EmployeeImportController::class, 'execute'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.import'])
+            ->name('import.execute');
         Route::get('/{employee}', [EmployeeController::class, 'show'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
             ->whereUuid('employee')
