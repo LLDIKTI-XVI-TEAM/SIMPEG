@@ -208,9 +208,8 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
     })->middleware(['role:super_admin'])
         ->name('data-master');
 
-    Route::get('/pegawai/nonaktif-list', function () {
-        return view('admin.pegawai.nonaktif');
-    })->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.restore'])
+    Route::get('/pegawai/nonaktif-list', [PegawaiController::class, 'inactive'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.restore'])
         ->name('data-nonaktif');
 
     Route::get('/cuti/rekap', function () {
@@ -662,6 +661,10 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.deactivate'])
         ->name('pegawai.destroy');
+    Route::post('/pegawai/{id}/restore', [PegawaiController::class, 'restore'])
+        ->whereUuid('id')
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.restore'])
+        ->name('pegawai.restore');
     Route::post('/pegawai/{id}/riwayat', [PegawaiController::class, 'storeRiwayat'])
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
