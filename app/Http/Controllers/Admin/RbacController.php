@@ -11,10 +11,7 @@ class RbacController extends Controller
 {
     public function index()
     {
-        // Enforce Super Admin authorization
-        if (session('active_role') !== 'super_admin') {
-            abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
-        }
+
 
         $roles = Role::with('permissions')->get();
         $permissions = Permission::all();
@@ -29,10 +26,7 @@ class RbacController extends Controller
 
     public function update(Request $request)
     {
-        // Enforce Super Admin authorization
-        if (session('active_role') !== 'super_admin') {
-            abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
-        }
+
 
         $matrix = $request->input('matrix', []);
         $roles = Role::with('permissions')->get();

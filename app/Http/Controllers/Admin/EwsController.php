@@ -14,12 +14,7 @@ class EwsController extends Controller
      */
     public function index(Request $request)
     {
-        // Enforce authorization (Super Admin, Admin Kepegawaian, Pimpinan)
-        $activeRole = session('active_role');
-        $allowedRoles = ['super_admin', 'admin_kepegawaian', 'pimpinan'];
-        if (!in_array($activeRole, $allowedRoles)) {
-            abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin, Admin Kepegawaian, dan Pimpinan.');
-        }
+
 
         $typeLabels = [
             'KENAIKAN_PANGKAT' => 'Kenaikan Pangkat',
@@ -103,7 +98,7 @@ class EwsController extends Controller
                 $thresholdConfig = $thresholdMap[$alert->type] ?? ['days' => [], 'labeler' => fn (int $days): string => 'H-' . $days];
                 $thresholdPoints = $points($thresholdConfig['days'], $thresholdConfig['labeler']);
                 $thresholdSchedule = array_values($thresholdPoints);
-                $sisaHari = (int) now()->startOfDay()->diffInDays($alert->target_date->copy()->startOfDay(), false);
+                $sisaHari = (int) now()->startOfDay()->diffInDays(\Carbon\Carbon::parse($alert->target_date)->startOfDay(), false);
                 $activeThreshold = $thresholdPoints[$alert->interval_days] ?? 'H-' . $alert->interval_days;
 
                 $isEligible = true;
@@ -139,7 +134,7 @@ class EwsController extends Controller
                     'nama' => $employee->nama_lengkap,
                     'nip' => $employee->nip,
                     'jenis_event' => $typeLabels[$alert->type] ?? $alert->type,
-                    'tanggal_target' => $alert->target_date->format('Y-m-d'),
+                    'tanggal_target' => \Carbon\Carbon::parse($alert->target_date)->format('Y-m-d'),
                     'sisa_hari' => $sisaHari,
                     'threshold_label' => $activeThreshold,
                     'threshold_schedule' => $thresholdSchedule,

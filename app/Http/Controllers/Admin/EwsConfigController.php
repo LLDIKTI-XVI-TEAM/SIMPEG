@@ -32,10 +32,7 @@ class EwsConfigController extends Controller
      */
     public function index()
     {
-        // Enforce Super Admin authorization
-        if (session('active_role') !== 'super_admin') {
-            abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
-        }
+
 
         $schedulerTime = EwsConfig::getVal('ews_scheduler_time', '07:00');
 
@@ -127,10 +124,7 @@ class EwsConfigController extends Controller
      */
     public function update(Request $request)
     {
-        // Enforce Super Admin authorization
-        if (session('active_role') !== 'super_admin') {
-            abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
-        }
+
 
         $request->validate([
             'ews_scheduler_time' => 'required|date_format:H:i',

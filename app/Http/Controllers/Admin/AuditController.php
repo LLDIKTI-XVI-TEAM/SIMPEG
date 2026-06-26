@@ -9,9 +9,7 @@ class AuditController extends Controller
 {
     public function index()
     {
-        if (! in_array(session('active_role'), ['super_admin', 'admin_kepegawaian'], true)) {
-            abort(403, 'Unauthorized action.');
-        }
+
 
         $auditLogs = AuditLog::query()
             ->latest('created_at')
@@ -25,9 +23,7 @@ class AuditController extends Controller
 
     public function show(string $id)
     {
-        if (! in_array(session('active_role'), ['super_admin', 'admin_kepegawaian'], true)) {
-            abort(403, 'Unauthorized action.');
-        }
+
 
         $log = $this->mapForView(AuditLog::query()->findOrFail($id));
 
