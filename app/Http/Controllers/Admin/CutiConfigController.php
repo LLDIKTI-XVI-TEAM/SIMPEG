@@ -14,10 +14,7 @@ class CutiConfigController extends Controller
      */
     public function index()
     {
-        // Enforce Super Admin authorization
-        if (session('active_role') !== 'super_admin') {
-            abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
-        }
+
 
         // Get all users who can potentially be approvers
         $eligibleUsers = User::whereIn('role', ['admin_kepegawaian', 'pimpinan', 'atasan_langsung'])->get();
@@ -75,10 +72,7 @@ class CutiConfigController extends Controller
      */
     public function update(Request $request)
     {
-        // Enforce Super Admin authorization
-        if (session('active_role') !== 'super_admin') {
-            abort(403, 'Aksi tidak diizinkan. Halaman ini hanya untuk Super Admin.');
-        }
+
 
         $request->validate([
             'stage2_approver_id' => 'required|exists:users,id',
