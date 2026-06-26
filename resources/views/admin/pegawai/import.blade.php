@@ -126,6 +126,7 @@
                 // Upload
                 const formData = new FormData();
                 formData.append('file', this.selectedFile);
+                formData.append('type', this.activeTemplate);
                 
                 const uploadRes = await fetch('/api/pegawai/import/upload', {
                     method: 'POST',
@@ -144,6 +145,7 @@
                 const uploadData = await uploadRes.json();
                 this.batchId = uploadData.batch_id;
                 this.totalRows = uploadData.total_rows;
+                this.activeTemplate = uploadData.type || this.activeTemplate;
                 
                 // Load Preview (all rows)
                 const previewRes = await fetch('/api/pegawai/import/' + this.batchId + '/preview', {
@@ -208,7 +210,7 @@
                 this.skipRows = data.skip_count;
                 
                 // Transform results untuk tabel validasi
-                this.validations = data.results.map((r, i) => {
+                this.validations = data.results.map((r) => {
                     let errorMessages = [];
                     let errorCols = [];
                     if (r.errors && typeof r.errors === 'object') {
@@ -228,7 +230,7 @@
                         col: errorCols.join(', ') || '-',
                         error: errorMessages.join('; ') || '',
                         // Simpan index ke allRows untuk inline edit di step 3
-                        dataIndex: i,
+                        dataIndex: this.allRows.findIndex(row => Number(row.row) === Number(r.row)),
                     };
                 });
                 
@@ -451,8 +453,8 @@
             {{-- Upload File Area Card --}}
             <div class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-4">
                 <div>
-                    <h3 class="text-sm font-bold text-ink uppercase tracking-wider font-sans">2. Unggah Berkas Pegawai (CSV)</h3>
-                    <p class="text-xs text-muted font-sans mt-0.5">Unggah berkas data pegawai dalam format CSV UTF-8 dengan ukuran maksimal 10MB.</p>
+                    <h3 class="text-sm font-bold text-ink uppercase tracking-wider font-sans">2. Unggah Berkas Pegawai (Excel/CSV)</h3>
+                    <p class="text-xs text-muted font-sans mt-0.5">Unggah berkas data pegawai dalam format XLSX, XLS, atau CSV UTF-8 dengan ukuran maksimal 10MB.</p>
                 </div>
                 
                 <div 
@@ -462,10 +464,10 @@
                     :class="dragover ? 'border-primary bg-primary/5' : 'border-border bg-soft/50'"
                     class="border-2 border-dashed rounded-lg p-10 text-center relative hover:border-primary transition group"
                 >
-                    <input type="file" id="import_file" accept=".csv" @change="handleFileSelect" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+                    <input type="file" id="import_file" accept=".xlsx,.xls,.csv,.txt" @change="handleFileSelect" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
                     <svg class="mx-auto h-12 w-12 text-muted group-hover:text-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" /></svg>
                     <p class="text-sm text-ink font-semibold mt-3 font-sans">Pilih berkas atau seret berkas Anda di sini</p>
-                    <p class="text-xs text-muted mt-1 font-sans">Format: CSV UTF-8. Maksimal 10MB.</p>
+                    <p class="text-xs text-muted mt-1 font-sans">Format: XLSX, XLS, atau CSV UTF-8. Maksimal 10MB.</p>
                     <template x-if="fileName">
                         <div class="mt-4 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink font-mono shadow-sm">
                             <svg class="w-4 h-4 text-success shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
@@ -524,7 +526,7 @@
                             <tr>
                                 <th class="px-3 py-2 text-left font-bold text-muted border-r border-border w-12">No</th>
                                 <template x-for="header in mainHeaders" :key="header">
-                                    <th class="px-3 py-2 text-left font-bold text-muted border-r border-border min-w-[120px]" x-text="header"></th>
+                                    <th class="px-3 py-2 text-left font-bold text-muted border-r border-border min-w-[200px]" x-text="header"></th>
                                 </template>
                             </tr>
                         </thead>
@@ -538,7 +540,7 @@
                                                 type="text"
                                                 :value="rowObj.data[header] ?? ''"
                                                 @input="rowObj.data[header] = $event.target.value; onCellEdit((previewPage - 1) * previewPerPage + rIndex, header)"
-                                                class="w-full px-2 py-1.5 text-xs font-mono text-ink bg-transparent border border-transparent rounded hover:border-border focus:border-primary focus:bg-surface focus:outline-none focus:ring-1 focus:ring-primary/30 transition"
+                                                class="w-full px-2 py-1.5 text-xs font-mono text-ink bg-transparent border border-transparent rounded hover:border-border hover:bg-soft/10 focus:border-primary focus:bg-surface focus:outline-none focus:ring-1 focus:ring-primary/30 transition min-w-[200px]"
                                                 :placeholder="header"
                                             >
                                         </td>
@@ -635,7 +637,7 @@
                                 <th class="px-3 py-2 text-left font-bold text-muted border-r border-border w-16">Baris</th>
                                 <th class="px-3 py-2 text-left font-bold text-muted border-r border-border w-16">Status</th>
                                 <template x-for="header in mainHeaders" :key="'val-' + header">
-                                    <th class="px-3 py-2 text-left font-bold text-muted border-r border-border min-w-[120px]" x-text="header"></th>
+                                    <th class="px-3 py-2 text-left font-bold text-muted border-r border-border min-w-[200px]" x-text="header"></th>
                                 </template>
                                 <th class="px-3 py-2 text-left font-bold text-muted min-w-[200px]">Keterangan</th>
                             </tr>
@@ -662,14 +664,14 @@
                                                 <input 
                                                     type="text"
                                                     :value="allRows[item.dataIndex]?.data[header] ?? ''"
-                                                    @input="allRows[item.dataIndex].data[header] = $event.target.value; onCellEdit(item.dataIndex, header)"
+                                                @input="if (item.dataIndex >= 0) { allRows[item.dataIndex].data[header] = $event.target.value; onCellEdit(item.dataIndex, header) }"
                                                     :class="item.col && item.col.includes(header) ? 'border-danger/50 bg-danger/[0.03]' : 'border-transparent'"
-                                                    class="w-full px-2 py-1.5 text-xs font-mono text-ink bg-transparent border rounded hover:border-border focus:border-primary focus:bg-surface focus:outline-none focus:ring-1 focus:ring-primary/30 transition"
+                                                    class="w-full px-2 py-1.5 text-xs font-mono text-ink bg-transparent border rounded hover:border-border hover:bg-soft/10 focus:border-primary focus:bg-surface focus:outline-none focus:ring-1 focus:ring-primary/30 transition min-w-[200px]"
                                                 >
                                             </template>
                                             {{-- Valid rows: read-only --}}
                                             <template x-if="item.status === 'valid'">
-                                                <span class="px-2 py-1.5 text-xs font-mono text-ink block" x-text="allRows[item.dataIndex]?.data[header] ?? '-'"></span>
+                                                <span class="px-2 py-1.5 text-xs font-mono text-ink block min-w-[200px]" x-text="allRows[item.dataIndex]?.data[header] ?? '-'"></span>
                                             </template>
                                         </td>
                                     </template>

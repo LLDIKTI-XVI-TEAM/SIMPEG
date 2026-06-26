@@ -1,21 +1,30 @@
 <?php
 
-use App\Http\Controllers\Auth\KeycloakAuthController;
-use App\Http\Controllers\Admin\PegawaiController;
-use App\Http\Controllers\Admin\HariLiburController;
-use App\Http\Controllers\Admin\CutiController;
-use App\Http\Controllers\Admin\CutiConfigController;
-use App\Http\Controllers\Admin\EwsController;
-use App\Http\Controllers\Admin\EwsConfigController;
-use App\Http\Controllers\Admin\DokumenController;
 use App\Http\Controllers\Admin\AuditController;
-use App\Http\Controllers\Admin\ProfileController;
-use App\Http\Controllers\Admin\SettingsController;
-use App\Http\Controllers\Admin\NotificationController;
-use App\Http\Controllers\Admin\UserMappingController;
-use App\Http\Controllers\Admin\RbacController;
+use App\Http\Controllers\Admin\CutiController;
+use App\Http\Controllers\Admin\DokumenController;
+use App\Http\Controllers\Admin\EwsConfigController;
+use App\Http\Controllers\Admin\EwsController;
 use App\Http\Controllers\Admin\GlobalSearchController;
+use App\Http\Controllers\Admin\HariLiburController;
+use App\Http\Controllers\Admin\NotificationController;
+use App\Http\Controllers\Admin\PegawaiController;
+use App\Http\Controllers\Admin\ProfileController;
+use App\Http\Controllers\Admin\RbacController;
+use App\Http\Controllers\Admin\SettingsController;
+use App\Http\Controllers\Admin\UserMappingController;
+use App\Http\Controllers\Auth\KeycloakAuthController;
+use App\Http\Controllers\EmployeeImportController;
+use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 Route::get('/', function () {
     return auth()->check()
@@ -28,9 +37,9 @@ Route::get('/auth/keycloak/callback', [KeycloakAuthController::class, 'handleCal
 Route::post('/logout', [KeycloakAuthController::class, 'logout'])->name('logout');
 
 Route::get('/dev-login', function () {
-    $user = \App\Models\User::where('role', 'super_admin')->first();
-    if (!$user) {
-        $user = \App\Models\User::create([
+    $user = User::where('role', 'super_admin')->first();
+    if (! $user) {
+        $user = User::create([
             'name' => 'Demo Klabat',
             'email' => 'demo@example.com',
             'password' => bcrypt('password'),
@@ -45,6 +54,7 @@ Route::get('/dev-login', function () {
     }
     Auth::login($user);
     session(['active_role' => $user->role ?? 'super_admin']);
+
     return redirect()->route('dashboard')->with('login_success', 'Selamat Datang! Anda berhasil masuk ke dalam sistem (Mode Dev).');
 })->name('dev-login');
 
@@ -55,7 +65,7 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
 
     Route::get('/admin/search', [GlobalSearchController::class, 'search'])->name('global.search');
 
-    Route::get('/change-role/{role}', function (\Illuminate\Http\Request $request, string $role) {
+    Route::get('/change-role/{role}', function (Request $request, string $role) {
         abort_unless($request->user()?->role === $role, 403, 'Role aktif harus sesuai dengan role akun.');
 
         session(['active_role' => $role]);
@@ -73,7 +83,7 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         $headers = [];
 
         if ($type === 'utama') {
-            $headers = ['No', 'Nama Pegawai', 'Email Pegawai', 'Golongan', 'Jabatan', 'Kelas Jabatan', 'NIP', 'NIK', 'No KK', 'Nomor Telepon', 'Pangkat', 'Pendidikan Terakhir', 'Pensiun', 'Person', 'Person Formula', 'Prodi Pendidikan Terakhir', 'Status Kepegawaian', 'Tanggal Lahir'];
+            $headers = ['No', 'Nama Pegawai', 'Email Pegawai', 'Golongan', 'Jabatan', 'Kelas Jabatan', 'NIP', 'Nomor Telepon', 'Pangkat', 'Pendidikan Terakhir', 'Pensiun', 'Person', 'Person Formula', 'Prodi Pendidikan Terakhir', 'Status Kepegawaian', 'Tanggal Lahir'];
         } elseif ($type === 'pelengkap') {
             $headers = ['NIP', 'NIK', 'No KK', 'Tempat Lahir', 'Jenis Kelamin', 'Agama', 'Status Kawin', 'Golongan Darah'];
         } elseif ($type === 'kepangkatan') {
@@ -88,7 +98,7 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
 
         $format = strtolower((string) request('format', 'xlsx'));
         $format = in_array($format, ['xlsx', 'csv'], true) ? $format : 'xlsx';
-        $filename = 'template_' . $type . '.' . $format;
+        $filename = 'template_'.$type.'.'.$format;
 
         if ($format === 'csv') {
             return response()->streamDownload(function () use ($headers) {
@@ -98,28 +108,28 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
                 fclose($output);
             }, $filename, [
                 'Content-Type' => 'text/csv; charset=UTF-8',
-                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                'Content-Disposition' => 'attachment; filename="'.$filename.'"',
                 'Cache-Control' => 'no-cache, no-store, must-revalidate',
                 'Pragma' => 'no-cache',
                 'Expires' => '0',
             ]);
         }
 
-        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
-        $sheet->setTitle('Template ' . ucfirst($type));
+        $sheet->setTitle('Template '.ucfirst($type));
 
         // Write headers
         foreach ($headers as $index => $header) {
-            $colLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($index + 1);
-            $sheet->setCellValue($colLetter . '1', $header);
+            $colLetter = Coordinate::stringFromColumnIndex($index + 1);
+            $sheet->setCellValue($colLetter.'1', $header);
 
             // Set header style (Primary Blue background, white bold text, centered, borders)
-            $sheet->getStyle($colLetter . '1')->applyFromArray([
+            $sheet->getStyle($colLetter.'1')->applyFromArray([
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 10, 'name' => 'Calibri'],
-                'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '122E92']],
-                'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER, 'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER, 'wrapText' => true],
-                'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['rgb' => 'CACFE0']]],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '122E92']],
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => true],
+                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CACFE0']]],
             ]);
 
             // Auto fit column width
@@ -129,23 +139,23 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         $sheet->getRowDimension(1)->setRowHeight(30);
 
         // Add styled blank rows (e.g. 15 blank rows) with borders for a structured layout
-        $lastColLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count($headers));
+        $lastColLetter = Coordinate::stringFromColumnIndex(count($headers));
         for ($r = 2; $r <= 16; $r++) {
             $sheet->getRowDimension($r)->setRowHeight(20);
 
             // Set border
-            $sheet->getStyle('A' . $r . ':' . $lastColLetter . $r)->applyFromArray([
-                'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['rgb' => 'E5E7EB']]],
+            $sheet->getStyle('A'.$r.':'.$lastColLetter.$r)->applyFromArray([
+                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'E5E7EB']]],
             ]);
         }
 
         // Stream download
         return response()->streamDownload(function () use ($spreadsheet) {
-            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+            $writer = new Xlsx($spreadsheet);
             $writer->save('php://output');
         }, $filename, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
             'Cache-Control' => 'no-cache, no-store, must-revalidate',
             'Pragma' => 'no-cache',
             'Expires' => '0',
@@ -154,19 +164,19 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         ->name('pegawai.import-template');
 
     // Import API endpoints (dipanggil via fetch dari blade, butuh session auth)
-    Route::post('/api/pegawai/import/upload', [\App\Http\Controllers\EmployeeImportController::class, 'upload'])
+    Route::post('/api/pegawai/import/upload', [EmployeeImportController::class, 'upload'])
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
         ->name('pegawai.import.upload');
 
-    Route::get('/api/pegawai/import/{batchId}/preview', [\App\Http\Controllers\EmployeeImportController::class, 'preview'])
+    Route::get('/api/pegawai/import/{batchId}/preview', [EmployeeImportController::class, 'preview'])
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
         ->name('pegawai.import.preview');
 
-    Route::post('/api/pegawai/import/{batchId}/validate', [\App\Http\Controllers\EmployeeImportController::class, 'validate'])
+    Route::post('/api/pegawai/import/{batchId}/validate', [EmployeeImportController::class, 'validate'])
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
         ->name('pegawai.import.validate');
 
-    Route::post('/api/pegawai/import/{batchId}/execute', [\App\Http\Controllers\EmployeeImportController::class, 'execute'])
+    Route::post('/api/pegawai/import/{batchId}/execute', [EmployeeImportController::class, 'execute'])
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
         ->name('pegawai.import.execute');
 
@@ -198,7 +208,6 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
     })->middleware(['role:super_admin'])
         ->name('data-master');
 
-
     Route::get('/pegawai/nonaktif-list', function () {
         return view('admin.pegawai.nonaktif');
     })->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.restore'])
@@ -218,14 +227,15 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
 
     Route::get('/laporan/export-pegawai', function () {
         $pegawai = PegawaiController::$pegawaiList;
+
         return view('admin.laporan.export-pegawai', [
             'pegawai' => $pegawai,
-            'title' => 'Laporan - Export Pegawai'
+            'title' => 'Laporan - Export Pegawai',
         ]);
     })->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('laporan.pegawai');
 
-    Route::get('/laporan/export-pegawai/excel', function (\Illuminate\Http\Request $request) {
+    Route::get('/laporan/export-pegawai/excel', function (Request $request) {
         $pegawai = PegawaiController::$pegawaiList;
 
         // Apply filters
@@ -273,7 +283,7 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
             'I/d' => 14,
             'I/c' => 15,
             'I/b' => 16,
-            'I/a' => 17
+            'I/a' => 17,
         ];
 
         usort($filtered, function ($a, $b) use ($sortBy, $golonganOrder) {
@@ -284,13 +294,15 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
             } elseif ($sortBy === 'golongan') {
                 $rankA = $golonganOrder[$a['golongan']] ?? 99;
                 $rankB = $golonganOrder[$b['golongan']] ?? 99;
+
                 return $rankA - $rankB;
             }
+
             return 0;
         });
 
         // Buat spreadsheet
-        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Daftar Nominatif Pegawai');
 
@@ -309,16 +321,16 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         // Isi header & set lebar kolom
         foreach ($cols as $col => [$label, $width]) {
             $sheet->getColumnDimension($col)->setWidth($width);
-            $sheet->setCellValue($col . '1', $label);
+            $sheet->setCellValue($col.'1', $label);
         }
         $sheet->getRowDimension(1)->setRowHeight(30);
 
         // Style header (biru #122E92, teks putih, bold, centered, border)
         $sheet->getStyle('A1:H1')->applyFromArray([
             'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 11, 'name' => 'Calibri'],
-            'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '122E92']],
-            'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER, 'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER, 'wrapText' => true],
-            'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['rgb' => 'CACFE0']]],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '122E92']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => true],
+            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CACFE0']]],
         ]);
 
         // Isi baris data
@@ -326,24 +338,24 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         foreach ($filtered as $row) {
             $r = $index + 2;
 
-            $sheet->setCellValue('A' . $r, $index + 1);
-            $sheet->setCellValueExplicit('B' . $r, $row['nip'], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-            $sheet->setCellValue('C' . $r, $row['nama']);
-            $sheet->setCellValue('D' . $r, $row['golongan']);
-            $sheet->setCellValue('E' . $r, $row['jabatan']);
-            $sheet->setCellValue('F' . $r, $row['unit']);
-            $sheet->setCellValue('G' . $r, $row['jenis']);
-            $sheet->setCellValue('H' . $r, $row['status']);
+            $sheet->setCellValue('A'.$r, $index + 1);
+            $sheet->setCellValueExplicit('B'.$r, $row['nip'], DataType::TYPE_STRING);
+            $sheet->setCellValue('C'.$r, $row['nama']);
+            $sheet->setCellValue('D'.$r, $row['golongan']);
+            $sheet->setCellValue('E'.$r, $row['jabatan']);
+            $sheet->setCellValue('F'.$r, $row['unit']);
+            $sheet->setCellValue('G'.$r, $row['jenis']);
+            $sheet->setCellValue('H'.$r, $row['status']);
 
             $sheet->getRowDimension($r)->setRowHeight(18);
 
             // Alternating stripe: putih / biru muda
             $bg = ($index % 2 === 0) ? 'FFFFFF' : 'EEF2FF';
-            $sheet->getStyle('A' . $r . ':H' . $r)->applyFromArray([
+            $sheet->getStyle('A'.$r.':H'.$r)->applyFromArray([
                 'font' => ['size' => 10, 'name' => 'Calibri'],
-                'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => $bg]],
-                'alignment' => ['vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER],
-                'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['rgb' => 'CACFE0']]],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $bg]],
+                'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
+                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CACFE0']]],
             ]);
             $index++;
         }
@@ -351,18 +363,18 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         // Freeze header row & auto-filter
         $sheet->freezePane('A2');
         if ($index > 0) {
-            $sheet->setAutoFilter('A1:H' . ($index + 1));
+            $sheet->setAutoFilter('A1:H'.($index + 1));
         }
 
         // Download: US-9.1 AC-5: Daftar_Pegawai_LLDIKTI_XVI_{tanggal}.xlsx
-        $filename = 'Daftar_Pegawai_LLDIKTI_XVI_' . now()->format('Ymd') . '.xlsx';
+        $filename = 'Daftar_Pegawai_LLDIKTI_XVI_'.now()->format('Ymd').'.xlsx';
 
         return response()->streamDownload(function () use ($spreadsheet) {
-            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+            $writer = new Xlsx($spreadsheet);
             $writer->save('php://output');
         }, $filename, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
             'Cache-Control' => 'no-cache, no-store, must-revalidate',
             'Pragma' => 'no-cache',
             'Expires' => '0',
@@ -373,15 +385,16 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
     Route::get('/laporan/export-cuti', function () {
         $riwayatCuti = CutiController::$riwayatCuti;
         $pegawai = PegawaiController::$pegawaiList;
+
         return view('admin.laporan.export-cuti', [
             'riwayatCuti' => $riwayatCuti,
             'pegawai' => $pegawai,
-            'title' => 'Laporan - Export Cuti'
+            'title' => 'Laporan - Export Cuti',
         ]);
     })->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('laporan.cuti');
 
-    Route::get('/laporan/export-cuti/excel', function (\Illuminate\Http\Request $request) {
+    Route::get('/laporan/export-cuti/excel', function (Request $request) {
         $riwayatCuti = CutiController::$riwayatCuti;
         $pegawai = PegawaiController::$pegawaiList;
 
@@ -396,7 +409,7 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
             $matchesBulan = true;
             $matchesTahun = true;
 
-            if (!empty($c['mulai'])) {
+            if (! empty($c['mulai'])) {
                 $parts = explode('-', $c['mulai']); // YYYY-MM-DD
                 $year = $parts[0];
                 $month = (string) (int) $parts[1]; // Convert "06" -> "6"
@@ -417,7 +430,7 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         });
 
         // Buat spreadsheet
-        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $spreadsheet = new Spreadsheet;
 
         // Sheet 1: Detail Cuti Pegawai
         $sheet1 = $spreadsheet->getActiveSheet();
@@ -437,16 +450,16 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
 
         foreach ($colsSheet1 as $col => [$label, $width]) {
             $sheet1->getColumnDimension($col)->setWidth($width);
-            $sheet1->setCellValue($col . '1', $label);
+            $sheet1->setCellValue($col.'1', $label);
         }
         $sheet1->getRowDimension(1)->setRowHeight(30);
 
         // Header style for Sheet 1 (Primary Blue #122E92, White Text, Bold, Centered, Borders)
         $headerStyle = [
             'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 11, 'name' => 'Calibri'],
-            'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '122E92']],
-            'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER, 'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER, 'wrapText' => true],
-            'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['rgb' => 'CACFE0']]],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '122E92']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => true],
+            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CACFE0']]],
         ];
         $sheet1->getStyle('A1:H1')->applyFromArray($headerStyle);
 
@@ -455,24 +468,24 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         foreach ($filteredCuti as $row) {
             $r = $index1 + 2;
 
-            $sheet1->setCellValue('A' . $r, $index1 + 1);
-            $sheet1->setCellValueExplicit('B' . $r, $row['nip'], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-            $sheet1->setCellValue('C' . $r, $row['nama']);
-            $sheet1->setCellValue('D' . $r, $row['jenis']);
-            $sheet1->setCellValue('E' . $r, $row['mulai']);
-            $sheet1->setCellValue('F' . $r, $row['selesai']);
-            $sheet1->setCellValue('G' . $r, $row['hari']);
-            $sheet1->setCellValue('H' . $r, $row['status']);
+            $sheet1->setCellValue('A'.$r, $index1 + 1);
+            $sheet1->setCellValueExplicit('B'.$r, $row['nip'], DataType::TYPE_STRING);
+            $sheet1->setCellValue('C'.$r, $row['nama']);
+            $sheet1->setCellValue('D'.$r, $row['jenis']);
+            $sheet1->setCellValue('E'.$r, $row['mulai']);
+            $sheet1->setCellValue('F'.$r, $row['selesai']);
+            $sheet1->setCellValue('G'.$r, $row['hari']);
+            $sheet1->setCellValue('H'.$r, $row['status']);
 
             $sheet1->getRowDimension($r)->setRowHeight(18);
 
             // Alternating stripe: putih / biru muda #EEF2FF
             $bg = ($index1 % 2 === 0) ? 'FFFFFF' : 'EEF2FF';
-            $sheet1->getStyle('A' . $r . ':H' . $r)->applyFromArray([
+            $sheet1->getStyle('A'.$r.':H'.$r)->applyFromArray([
                 'font' => ['size' => 10, 'name' => 'Calibri'],
-                'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => $bg]],
-                'alignment' => ['vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER],
-                'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['rgb' => 'CACFE0']]],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $bg]],
+                'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
+                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CACFE0']]],
             ]);
             $index1++;
         }
@@ -480,7 +493,7 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         // Freeze header row & auto-filter for Sheet 1
         $sheet1->freezePane('A2');
         if ($index1 > 0) {
-            $sheet1->setAutoFilter('A1:H' . ($index1 + 1));
+            $sheet1->setAutoFilter('A1:H'.($index1 + 1));
         }
 
         // Sheet 2: Ringkasan Cuti Pegawai
@@ -500,7 +513,7 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
 
         foreach ($colsSheet2 as $col => [$label, $width]) {
             $sheet2->getColumnDimension($col)->setWidth($width);
-            $sheet2->setCellValue($col . '1', $label);
+            $sheet2->setCellValue($col.'1', $label);
         }
         $sheet2->getRowDimension(1)->setRowHeight(30);
         $sheet2->getStyle('A1:G1')->applyFromArray($headerStyle);
@@ -509,6 +522,7 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         $filteredPegawai = array_filter($pegawai, function ($p) use ($unit, $pegawaiNip) {
             $matchesUnit = ($unit === '') || ($p['unit'] === $unit);
             $matchesPegawai = ($pegawaiNip === '') || ($p['nip'] === $pegawaiNip);
+
             return $matchesUnit && $matchesPegawai;
         });
 
@@ -528,10 +542,12 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
                 if ($c['status'] !== 'disetujui') {
                     return false;
                 }
-                if (!empty($c['mulai'])) {
+                if (! empty($c['mulai'])) {
                     $year = explode('-', $c['mulai'])[0];
+
                     return $year === $targetYear;
                 }
+
                 return false;
             });
 
@@ -551,23 +567,23 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
 
             $sisaSaldo = 12 - $totalTahunan;
 
-            $sheet2->setCellValue('A' . $r, $index2 + 1);
-            $sheet2->setCellValueExplicit('B' . $r, $p['nip'], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-            $sheet2->setCellValue('C' . $r, $p['nama']);
-            $sheet2->setCellValue('D' . $r, $totalTahunan);
-            $sheet2->setCellValue('E' . $r, $totalSakit);
-            $sheet2->setCellValue('F' . $r, $totalMelahirkan);
-            $sheet2->setCellValue('G' . $r, $sisaSaldo);
+            $sheet2->setCellValue('A'.$r, $index2 + 1);
+            $sheet2->setCellValueExplicit('B'.$r, $p['nip'], DataType::TYPE_STRING);
+            $sheet2->setCellValue('C'.$r, $p['nama']);
+            $sheet2->setCellValue('D'.$r, $totalTahunan);
+            $sheet2->setCellValue('E'.$r, $totalSakit);
+            $sheet2->setCellValue('F'.$r, $totalMelahirkan);
+            $sheet2->setCellValue('G'.$r, $sisaSaldo);
 
             $sheet2->getRowDimension($r)->setRowHeight(18);
 
             // Alternating stripe
             $bg = ($index2 % 2 === 0) ? 'FFFFFF' : 'EEF2FF';
-            $sheet2->getStyle('A' . $r . ':G' . $r)->applyFromArray([
+            $sheet2->getStyle('A'.$r.':G'.$r)->applyFromArray([
                 'font' => ['size' => 10, 'name' => 'Calibri'],
-                'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => $bg]],
-                'alignment' => ['vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER],
-                'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['rgb' => 'CACFE0']]],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $bg]],
+                'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
+                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CACFE0']]],
             ]);
 
             $index2++;
@@ -576,7 +592,7 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         // Freeze header row & auto-filter for Sheet 2
         $sheet2->freezePane('A2');
         if ($index2 > 0) {
-            $sheet2->setAutoFilter('A1:G' . ($index2 + 1));
+            $sheet2->setAutoFilter('A1:G'.($index2 + 1));
         }
 
         $spreadsheet->setActiveSheetIndex(0);
@@ -594,11 +610,11 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
             '9' => 'September',
             '10' => 'Oktober',
             '11' => 'November',
-            '12' => 'Desember'
+            '12' => 'Desember',
         ];
         $periodeStr = '';
         if ($bulan && $tahun) {
-            $periodeStr = ($namaBulan[$bulan] ?? '') . '_' . $tahun;
+            $periodeStr = ($namaBulan[$bulan] ?? '').'_'.$tahun;
         } elseif ($bulan) {
             $periodeStr = $namaBulan[$bulan] ?? '';
         } elseif ($tahun) {
@@ -606,14 +622,14 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         } else {
             $periodeStr = 'Semua_Periode';
         }
-        $filename = 'Rekap_Cuti_' . $periodeStr . '_' . now()->format('Ymd') . '.xlsx';
+        $filename = 'Rekap_Cuti_'.$periodeStr.'_'.now()->format('Ymd').'.xlsx';
 
         return response()->streamDownload(function () use ($spreadsheet) {
-            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+            $writer = new Xlsx($spreadsheet);
             $writer->save('php://output');
         }, $filename, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
             'Cache-Control' => 'no-cache, no-store, must-revalidate',
             'Pragma' => 'no-cache',
             'Expires' => '0',
@@ -752,11 +768,8 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         ->middleware('permission:notifications.read')
         ->name('notifications.index');
 
-
     Route::get('/pegawai/export', [PegawaiController::class, 'export'])
         ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('pegawai.export');
 
 });
-
-

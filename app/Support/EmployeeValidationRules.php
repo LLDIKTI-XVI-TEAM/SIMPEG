@@ -81,17 +81,17 @@ class EmployeeValidationRules
         return [
             'nama_lengkap' => ['required', 'string', 'max:255'],
             'nip' => ['required', 'string', 'size:18', 'unique:employees,nip'],
-            'email' => ['nullable', 'email', 'max:255', 'unique:employees,email'],
-            'tanggal_lahir' => ['nullable', 'date', 'before:today'],
+            'email' => ['required', 'email', 'max:255', 'unique:employees,email'],
+            'tanggal_lahir' => ['required', 'date', 'before:today'],
             'jenis_pegawai' => ['required', 'in:PNS,PPPK,CPNS'],
-            'golongan_terakhir' => ['nullable', 'string', 'max:20'],
+            'golongan_terakhir' => ['required', 'string', 'max:20'],
             'pangkat_terakhir' => ['nullable', 'string', 'max:100'],
-            'jabatan_terakhir' => ['nullable', 'string', 'max:255'],
-            'kelas_jabatan' => ['nullable', 'string', 'max:10'],
-            'pendidikan_terakhir' => ['nullable', 'string', 'max:20'],
-            'prodi_pendidikan_terakhir' => ['nullable', 'string', 'max:255'],
+            'jabatan_terakhir' => ['required', 'string', 'max:255'],
+            'kelas_jabatan' => ['required', 'string', 'max:10'],
+            'pendidikan_terakhir' => ['required', 'string', 'max:20'],
+            'prodi_pendidikan_terakhir' => ['required', 'string', 'max:255'],
             'tanggal_pensiun' => ['nullable', 'date'],
-            'no_hp' => ['nullable', 'string', 'max:20'],
+            'no_hp' => ['required', 'string', 'max:20'],
         ];
     }
 
