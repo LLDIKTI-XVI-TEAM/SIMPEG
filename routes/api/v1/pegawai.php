@@ -31,6 +31,17 @@ Route::middleware($employeeGroupMiddleware)
         Route::post('/import', [EmployeeImportController::class, 'store'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.import'])
             ->name('import.store');
+        Route::get('/nonaktif', [EmployeeController::class, 'inactive'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
+            ->name('inactive');
+        Route::delete('/{employee}', [EmployeeController::class, 'destroy'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.deactivate'])
+            ->whereUuid('employee')
+            ->name('destroy');
+        Route::post('/{employee}/restore', [EmployeeController::class, 'restore'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.restore'])
+            ->whereUuid('employee')
+            ->name('restore');
         Route::get('/{employee}/keluarga', [EmployeeFamilyController::class, 'index'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_families.read'])
             ->whereUuid('employee')
