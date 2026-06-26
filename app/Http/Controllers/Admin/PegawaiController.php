@@ -442,6 +442,11 @@ class PegawaiController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
+        // Data referensi untuk modal "Tambah Riwayat" langsung dari halaman daftar pegawai.
+        $golonganRefOptions = RefGolongan::orderBy('kode')->get();
+        $jenisJabatanOptions = RefJenisJabatan::orderBy('nama')->get();
+        $eselonOptions = RefEselon::orderBy('nama')->get();
+
         return view('admin.pegawai.index', compact(
             'pegawaiData',
             'perPage',
@@ -451,7 +456,10 @@ class PegawaiController extends Controller
             'golonganOptions',
             'unitKerjaOptions',
             'jenisPegawaiOptions',
-'statusOptions'
+            'statusOptions',
+            'golonganRefOptions',
+            'jenisJabatanOptions',
+            'eselonOptions'
         ));
     }
 
