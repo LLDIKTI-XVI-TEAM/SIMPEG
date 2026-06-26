@@ -26,6 +26,7 @@ class EmployeeRowMapper
         'Prodi Pendidikan Terakhir',
         'Status Kepegawaian',
         'Tanggal Lahir',
+        'Role',
     ];
 
     /**
@@ -56,6 +57,19 @@ class EmployeeRowMapper
         'Prodi Pendidikan Terakhir' => 'prodi_pendidikan_terakhir',
         'Status Kepegawaian' => 'jenis_pegawai',
         'Tanggal Lahir' => 'tanggal_lahir',
+        'Role' => 'role',
+    ];
+
+    /**
+     * Mapping untuk normalisasi nilai Role dari berbagai format input.
+     */
+    private const ROLE_MAP = [
+        'admin_kepegawaian' => 'admin_kepegawaian',
+        'admin kepegawaian' => 'admin_kepegawaian',
+        'pimpinan' => 'pimpinan',
+        'atasan_langsung' => 'atasan_langsung',
+        'atasan langsung' => 'atasan_langsung',
+        'pegawai' => 'pegawai',
     ];
 
     /**
@@ -146,6 +160,11 @@ class EmployeeRowMapper
 
             if ($field === 'jenis_pegawai' && $value !== null) {
                 $value = self::STATUS_MAP[strtolower($value)] ?? $value;
+            }
+
+            // Normalisasi role ke format snake_case yang valid
+            if ($field === 'role' && $value !== null) {
+                $value = self::ROLE_MAP[strtolower($value)] ?? $value;
             }
 
             $mapped[$field] = $value;

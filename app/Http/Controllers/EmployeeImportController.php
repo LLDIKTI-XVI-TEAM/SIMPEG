@@ -334,6 +334,7 @@ class EmployeeImportController extends Controller
                 'prodi_pendidikan_terakhir' => 'Prodi Pendidikan Terakhir',
                 'jenis_pegawai' => 'Status Kepegawaian',
                 'tanggal_lahir' => 'Tanggal Lahir',
+                'role' => 'Role',
             ]));
         }
 
