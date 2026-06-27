@@ -34,6 +34,21 @@ class ListInactiveEmployeesAction
                         ->orWhereRaw('LOWER(nip) LIKE ?', ["%{$search}%"]);
                 });
             })
+            ->when(! empty($filters['golongan']), function ($query) use ($filters): void {
+                $query->where(function ($q) use ($filters) {
+                    $q->where('golongan_terakhir', $filters['golongan'])
+                      ->orWhere('golongan_terakhir', 'LIKE', $filters['golongan'] . '/%');
+                });
+            })
+            ->when(! empty($filters['unit_kerja_id']), function ($query) use ($filters): void {
+                $query->whereHas('positionHistories', function ($q) use ($filters) {
+                    $q->where('unit_kerja_id', $filters['unit_kerja_id'])
+                      ->where('is_latest', true);
+                });
+            })
+            ->when(! empty($filters['jenis_pegawai_id']), function ($query) use ($filters): void {
+                $query->where('jenis_pegawai_id', $filters['jenis_pegawai_id']);
+            })
             ->orderByDesc('deleted_at')
             ->orderBy('nama_lengkap')
             ->paginate($perPage)

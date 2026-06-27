@@ -289,53 +289,43 @@
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {{-- Search input --}}
                 <div
-                    class="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 col-span-1 sm:col-span-2 lg:col-span-1 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
+                    class="flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 col-span-1 sm:col-span-2 lg:col-span-1 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
                     <svg class="w-4 h-4 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                         stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                     </svg>
                     <input type="text" x-model="searchQuery" placeholder="Cari nama, nomor, jenis..."
-                        class="flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none font-sans">
+                        class="h-full flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none font-sans">
                 </div>
 
                 {{-- Filter Pegawai --}}
                 <div class="relative col-span-1 sm:col-span-1 lg:col-span-1">
                     <select x-model="activePegawai"
-                        class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                        class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                         <option value="">Semua Pegawai</option>
                         @foreach($pegawaiList as $p)
                             <option value="{{ $p['nip'] }}">{{ $p['nama'] }}</option>
                         @endforeach
                     </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
                 </div>
 
                 {{-- Filter Unit Kerja --}}
                 <div class="relative col-span-1 sm:col-span-1 lg:col-span-1">
                     <select x-model="activeUnit"
-                        class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                        class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                         <option value="">Semua Unit Kerja</option>
                         <option>Bag. Umum</option>
                         <option>Bag. Keuangan</option>
                         <option>Bag. SDM</option>
                         <option>Bag. IT</option>
                     </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
                 </div>
 
                 {{-- Filter Kategori Dokumen --}}
                 <div class="relative col-span-1 sm:col-span-2 lg:col-span-1">
                     <select x-model="activeKategori"
-                        class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                        class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                         <option value="">Semua Kategori Dokumen</option>
                         <option value="sk_pengangkatan">SK Pengangkatan</option>
                         <option value="sk_pangkat">SK Kenaikan Pangkat</option>
@@ -345,11 +335,6 @@
                         <option value="ktp_kk">Identitas Diri (KTP & KK)</option>
                         <option value="lainnya">Lampiran / Dokumen Lain</option>
                     </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
                 </div>
             </div>
         </div>
@@ -386,7 +371,7 @@
                                 class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border select-none">
                                 Status</th>
                             <th
-                                class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border select-none">
+                                class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border select-none">
                                 Aksi</th>
                         </tr>
                     </thead>
@@ -450,8 +435,8 @@
                                         <span x-text="doc.status_label"></span>
                                     </span>
                                 </td>
-                                <td class="px-4 py-3.5 text-right">
-                                    <div class="flex items-center justify-end gap-1.5">
+                                <td class="px-4 py-3.5 text-left">
+                                    <div class="flex items-center justify-start gap-1.5">
                                         {{-- Detail --}}
                                         <a :href="'/dashboard/dokumen/' + doc.id"
                                             class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
@@ -488,57 +473,51 @@
             </div>
 
             {{-- TABLE FOOTER --}}
-            <div
-                class="flex flex-col gap-3 border-t border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between bg-surface">
-                <div class="flex items-center gap-3">
-                    <p class="text-sm text-muted font-sans">
-                        Menampilkan <span
-                            x-text="filteredDocuments.length === 0 ? 0 : (currentPage - 1) * perPage + 1"></span> -
-                        <span x-text="Math.min(currentPage * perPage, filteredDocuments.length)"></span> dari <span
-                            x-text="filteredDocuments.length"></span> data
-                    </p>
-                    <div class="relative">
+            <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row">
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm text-muted">Tampilkan</span>
                         <select id="per-page" x-model.number="perPage" @change="currentPage = 1"
-                            class="appearance-none rounded-lg border border-border bg-surface pl-3 pr-8 py-1 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                            <option value="5">5 / halaman</option>
-                            <option value="10">10 / halaman</option>
-                            <option value="25">25 / halaman</option>
-                            <option value="50">50 / halaman</option>
+                            class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
                         </select>
-                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                            </svg>
-                        </div>
+                        <span class="text-sm text-muted">data per halaman</span>
                     </div>
+                    
+                    <p class="text-sm text-muted hidden sm:block" x-show="filteredDocuments.length > 0">
+                        Menampilkan <span class="font-semibold text-ink" x-text="(currentPage - 1) * perPage + 1"></span> hingga <span class="font-semibold text-ink" x-text="Math.min(currentPage * perPage, filteredDocuments.length)"></span> dari <span class="font-semibold text-ink" x-text="filteredDocuments.length"></span> hasil
+                    </p>
                 </div>
-                <div class="flex items-center gap-1.5">
-                    {{-- Prev --}}
-                    <button @click="if (currentPage > 1) currentPage--" :disabled="currentPage === 1"
-                        :class="currentPage === 1 ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-soft hover:text-ink text-ink cursor-pointer'"
-                        class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface transition">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                        </svg>
-                    </button>
-
-                    <template x-for="page in totalPages" :key="page">
-                        <button @click="currentPage = page"
-                            :class="currentPage === page ? 'bg-primary text-white border-primary' : 'bg-surface text-ink hover:bg-soft border-border'"
-                            class="flex h-8 w-8 items-center justify-center rounded-lg border text-sm font-semibold transition font-sans cursor-pointer"
-                            x-text="page">
+                
+                <div class="w-full sm:w-auto">
+                    <div class="flex items-center justify-center gap-1.5" x-show="totalPages > 1">
+                        {{-- Prev --}}
+                        <button @click="if (currentPage > 1) currentPage--" :disabled="currentPage === 1"
+                            :class="currentPage === 1 ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-soft hover:text-ink text-ink cursor-pointer'"
+                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface transition">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                            </svg>
                         </button>
-                    </template>
-
-                    {{-- Next --}}
-                    <button @click="if (currentPage < totalPages) currentPage++" :disabled="currentPage === totalPages"
-                        :class="currentPage === totalPages ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-soft hover:text-ink text-ink cursor-pointer'"
-                        class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface transition">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                        </svg>
-                    </button>
+    
+                        <template x-for="page in totalPages" :key="page">
+                            <button @click="currentPage = page"
+                                :class="currentPage === page ? 'bg-primary text-white border-primary' : 'bg-surface text-ink hover:bg-soft border-border'"
+                                class="flex h-8 w-8 items-center justify-center rounded-lg border text-sm font-semibold transition font-sans cursor-pointer"
+                                x-text="page"></button>
+                        </template>
+    
+                        {{-- Next --}}
+                        <button @click="if (currentPage < totalPages) currentPage++" :disabled="currentPage === totalPages"
+                            :class="currentPage === totalPages ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-soft hover:text-ink text-ink cursor-pointer'"
+                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface transition">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

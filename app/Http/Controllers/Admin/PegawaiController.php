@@ -481,14 +481,42 @@ class PegawaiController extends Controller
 
     public function inactive(Request $request, ListInactiveEmployeesAction $action)
     {
-        $employees = $action->execute($request->query());
+        $unitKerjaOptions = RefUnitKerja::query()
+            ->orderBy('nama')
+            ->get(['id', 'nama']);
+        $jenisPegawaiOptions = RefJenisPegawai::query()
+            ->orderBy('nama')
+            ->get(['id', 'nama']);
+        $golonganOptions = Employee::query()
+            ->whereNotNull('golongan_terakhir')
+            ->distinct()
+            ->orderBy('golongan_terakhir')
+            ->pluck('golongan_terakhir')
+            ->map(fn (?string $golongan) => $golongan ? strtok($golongan, '/') : null)
+            ->filter()
+            ->unique()
+            ->values();
 
-        return view('admin.pegawai.nonaktif', [
-            'employees' => $employees,
-            'filters' => [
-                'search' => trim((string) $request->query('search', '')),
-            ],
-        ]);
+        if ($golonganOptions->isEmpty()) {
+            $golonganOptions = collect(['II', 'III', 'IV']);
+        }
+
+        $filters = [
+            'search' => trim((string) $request->query('search', '')),
+            'golongan' => trim((string) $request->query('golongan', '')),
+            'unit_kerja_id' => trim((string) $request->query('unit_kerja_id', '')),
+            'jenis_pegawai_id' => trim((string) $request->query('jenis_pegawai_id', '')),
+        ];
+
+        $employees = $action->execute($filters);
+
+        return view('admin.pegawai.nonaktif', compact(
+            'employees',
+            'filters',
+            'unitKerjaOptions',
+            'jenisPegawaiOptions',
+            'golonganOptions'
+        ));
     }
 
     public function store(StoreEmployeeRequest $request)

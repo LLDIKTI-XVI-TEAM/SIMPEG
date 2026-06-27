@@ -15,7 +15,7 @@ class DeactivateEmployeeAction
     public function execute(Employee $employee, Request $request): void
     {
         DB::transaction(function () use ($employee, $request): void {
-            $oldValues = $employee->toArray();
+            $oldValues = $employee->getRawOriginal();
             $employeeId = $employee->id;
 
             $employee->delete();
