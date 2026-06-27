@@ -125,6 +125,7 @@ class EmployeeRowMapper
         $isPhoneEducation = in_array(strtoupper($phoneVal), ['SD', 'SMP', 'SMA', 'SMK', 'D1', 'D2', 'D3', 'D4', 'S1', 'S2', 'S3'], true);
 
         if ($isNikAPhone && $isPhoneEducation) {
+            $row['Role'] = $row['Status Kepegawaian'] ?? null;
             $row['Tanggal Lahir'] = $row['Prodi Pendidikan Terakhir'] ?? null;
             $row['Status Kepegawaian'] = $row['Person Formula'] ?? null;
             $row['Prodi Pendidikan Terakhir'] = $row['Person'] ?? null;
