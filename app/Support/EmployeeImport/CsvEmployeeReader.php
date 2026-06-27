@@ -41,6 +41,11 @@ class CsvEmployeeReader
                 continue;
             }
 
+            // Lewati baris contoh template agar tidak ikut ter-import bila admin lupa menghapusnya.
+            if ($this->mapper->isExampleRow($row)) {
+                continue;
+            }
+
             $row = array_pad($row, count($headers), null);
             $row = array_slice($row, 0, count($headers));
             $rows[] = [
@@ -77,6 +82,11 @@ class CsvEmployeeReader
             if ($headers === null) {
                 $headers = array_map(fn ($header) => $this->mapper->normalizeHeader((string) $header), $row);
 
+                continue;
+            }
+
+            // Lewati baris contoh template agar tidak ikut ter-import bila admin lupa menghapusnya.
+            if ($this->mapper->isExampleRow($row)) {
                 continue;
             }
 
@@ -131,6 +141,11 @@ class CsvEmployeeReader
                     $headers = array_map(fn ($header) => $this->mapper->normalizeHeader((string) $header), $row);
                 }
 
+                continue;
+            }
+
+            // Lewati baris contoh template agar tidak ikut ter-import bila admin lupa menghapusnya.
+            if ($this->mapper->isExampleRow($row)) {
                 continue;
             }
 

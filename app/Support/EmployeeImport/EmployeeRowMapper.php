@@ -38,6 +38,14 @@ class EmployeeRowMapper
     ];
 
     /**
+     * Penanda baris contoh pada template import.
+     * Dipakai bersama oleh penulis template dan pembaca import:
+     * penulis menaruh penanda ini pada baris contoh, pembaca melewatinya
+     * agar baris contoh tidak ikut ter-import bila admin lupa menghapusnya.
+     */
+    public const EXAMPLE_ROW_MARKER = 'CONTOH - HAPUS BARIS INI';
+
+    /**
      * Mapping from Excel header to new SIMPEG field names.
      * 'Person' and 'Person Formula' are ignored (not in PRD schema).
      */
@@ -183,6 +191,22 @@ class EmployeeRowMapper
         }
 
         return true;
+    }
+
+    /**
+     * Cek apakah baris merupakan baris contoh template (mengandung penanda).
+     * Pemeriksaan lintas kolom agar tetap dikenali walau urutan kolom berubah,
+     * sehingga baris contoh tidak ikut ter-import bila admin lupa menghapusnya.
+     */
+    public function isExampleRow(array $row): bool
+    {
+        foreach ($row as $value) {
+            if (is_string($value) && trim($value) === self::EXAMPLE_ROW_MARKER) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function parseDate(mixed $value): mixed
