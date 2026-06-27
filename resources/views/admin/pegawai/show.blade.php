@@ -35,18 +35,20 @@
     @endphp
 
     <div x-data="{
-        activeTab: 'profile',
+        activeTab: new URLSearchParams(window.location.search).get('tab') || 'profile',
         kinerjaBaik: {{ $p->is_kinerja_baik ? 'true' : 'false' }},
         showModal: false,
         modalTitle: '',
         modalType: '',
+        isSubmitting: false,
+        toast: { show: false, message: '', type: 'success' },
         
-        // Data list dummy untuk riwayat
+        // Mengambil data riwayat riil dari database melalui relasi model Employee
         keluargaList: {{ $p->families->map(fn($f) => ['nama' => $f->nama_anggota, 'hubungan' => $f->hubungan_keluarga, 'tgl_lahir' => $f->tanggal_lahir, 'pekerjaan' => $f->pekerjaan, 'status' => $f->status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'])->toJson() }},
         pangkatList: {{ $p->rankHistories->map(fn($r) => ['golongan' => $r->golongan->nama ?? '-', 'no_sk' => $r->no_sk, 'tgl_sk' => $r->tanggal_sk, 'tmt' => $r->tmt_pangkat])->toJson() }},
         jabatanList: {{ $p->positionHistories->map(fn($j) => ['jabatan' => $j->nama_jabatan, 'unit' => $j->unitKerja->nama ?? '-', 'no_sk' => $j->no_sk, 'tgl_sk' => $j->tanggal_sk, 'tmt' => $j->tmt_jabatan])->toJson() }},
         kgbList: {{ $p->salaryHistories->map(fn($s) => ['gaji' => 'Rp ' . number_format($s->gaji_pokok, 0, ',', '.'), 'no_sk' => $s->no_sk, 'tgl_sk' => $s->tanggal_sk, 'tmt' => $s->tmt_kgb])->toJson() }},
-        disiplinList: {{ $p->disciplineRecords->map(fn($d) => ['jenis' => $d->jenis_hukuman, 'alasan' => $d->deskripsi, 'no_sk' => $d->no_sk, 'tgl_sk' => $d->tanggal_sk, 'masa' => $d->tanggal_mulai . ' s/d ' . ($d->tanggal_berakhir ?? 'Sekarang')])->toJson() }},
+        disiplinList: {{ $p->disciplineRecords->map(fn($d) => ['jenis' => $d->jenis_hukuman, 'alasan' => $d->deskripsi, 'no_sk' => $d->no_sk, 'tgl_sk' => $d->tanggal_sk ? \Carbon\Carbon::parse($d->tanggal_sk)->format('d-m-Y') : '-', 'masa' => ($d->tanggal_mulai ? \Carbon\Carbon::parse($d->tanggal_mulai)->format('d-m-Y') : '-') . ' s/d ' . ($d->tanggal_berakhir ? \Carbon\Carbon::parse($d->tanggal_berakhir)->format('d-m-Y') : 'Sekarang'), 'is_active' => $d->is_active])->toJson() }},
         pendidikanList: {{ $p->educationHistories->map(fn($e) => ['tingkat' => $e->jenjang->nama ?? '-', 'institusi' => $e->nama_institusi, 'prodi' => $e->jurusan, 'lulus' => $e->tahun_lulus, 'no_ijazah' => $e->no_ijazah])->toJson() }},
         
         // Form states
@@ -54,7 +56,7 @@
         newPangkat: { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '' },
         newJabatan: { nama_jabatan: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '' },
         newKgb: { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '' },
-        newDisiplin: { jenis: 'Teguran Tertulis', alasan: '', no_sk: '', tgl_sk: '', masa: '' },
+        newDisiplin: { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '' },
         newPendidikan: { tingkat: 'Sarjana (S1)', institusi: '', prodi: '', lulus: '', no_ijazah: '' },
         
         openModal(type, title) {
@@ -85,6 +87,8 @@
             else if (this.modalType === 'keluarga') endpoint = `/api/v1/pegawai/{{ $p->id }}/keluarga`;
             else if (this.modalType === 'disiplin') endpoint = `/api/v1/pegawai/{{ $p->id }}/disiplin`;
 
+            this.isSubmitting = true;
+
             try {
                 const response = await fetch(endpoint, {
                     method: 'POST',
@@ -96,19 +100,82 @@
                 });
                 
                 if (response.ok) {
-                    window.location.reload();
+                    const result = await response.json();
+                    
+                    if (this.modalType === 'disiplin') {
+                        this.disiplinList.unshift({
+                            jenis: this.newDisiplin.jenis_hukuman,
+                            alasan: this.newDisiplin.deskripsi,
+                            no_sk: this.newDisiplin.no_sk,
+                            tgl_sk: this.newDisiplin.tanggal_sk,
+                            masa: this.newDisiplin.tanggal_mulai + ' s/d ' + (this.newDisiplin.tanggal_berakhir ? this.newDisiplin.tanggal_berakhir : 'Sekarang'),
+                            is_active: true
+                        });
+                        this.newDisiplin = { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '' };
+                    } else if (this.modalType === 'kgb') {
+                        this.kgbList.unshift({
+                            gaji: 'Rp ' + parseInt(this.newKgb.gaji_pokok).toLocaleString('id-ID'),
+                            no_sk: this.newKgb.no_sk,
+                            tgl_sk: this.newKgb.tanggal_sk,
+                            tmt: this.newKgb.tmt_kgb
+                        });
+                        this.newKgb = { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '' };
+                    } else if (this.modalType === 'jabatan') {
+                        this.jabatanList.unshift({
+                            jabatan: this.newJabatan.nama_jabatan,
+                            unit: '-', // Idealnya ini ambil dari nama referensi unit kerja
+                            no_sk: this.newJabatan.no_sk,
+                            tgl_sk: this.newJabatan.tanggal_sk,
+                            tmt: this.newJabatan.tmt_jabatan
+                        });
+                        this.newJabatan = { nama_jabatan: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '' };
+                    } else if (this.modalType === 'pangkat') {
+                        this.pangkatList.unshift({
+                            golongan: '-', // Idealnya ini ambil dari nama referensi golongan
+                            no_sk: this.newPangkat.no_sk,
+                            tgl_sk: this.newPangkat.tanggal_sk,
+                            tmt: this.newPangkat.tmt_pangkat
+                        });
+                        this.newPangkat = { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '' };
+                    } else if (this.modalType === 'keluarga') {
+                        this.keluargaList.unshift({
+                            nama: this.newKeluarga.nama,
+                            hubungan: this.newKeluarga.hubungan,
+                            tgl_lahir: this.newKeluarga.tgl_lahir,
+                            pekerjaan: this.newKeluarga.pekerjaan,
+                            status: 'Tidak Ditanggung'
+                        });
+                        this.newKeluarga = { nama: '', hubungan: 'Istri', tgl_lahir: '', pekerjaan: '' };
+                    } else if (this.modalType === 'pendidikan') {
+                        this.pendidikanList.unshift({
+                            tingkat: this.newPendidikan.tingkat,
+                            institusi: this.newPendidikan.institusi,
+                            prodi: this.newPendidikan.prodi,
+                            lulus: this.newPendidikan.lulus,
+                            no_ijazah: this.newPendidikan.no_ijazah
+                        });
+                        this.newPendidikan = { tingkat: 'Sarjana (S1)', institusi: '', prodi: '', lulus: '', no_ijazah: '' };
+                    }
+                    
+                    this.showModal = false;
+                    this.toast = { show: true, message: 'Data riwayat berhasil ditambahkan!', type: 'success' };
+                    setTimeout(() => this.toast.show = false, 3000);
                 } else {
                     const errorData = await response.json();
-                    alert('Gagal menyimpan: ' + (errorData.message || 'Terjadi kesalahan'));
+                    this.toast = { show: true, message: 'Gagal: ' + (errorData.message || 'Data tidak valid'), type: 'error' };
+                    setTimeout(() => this.toast.show = false, 5000);
                 }
             } catch (error) {
-                alert('Gagal terhubung ke server');
+                this.toast = { show: true, message: 'Terjadi kesalahan jaringan', type: 'error' };
+                setTimeout(() => this.toast.show = false, 5000);
+            } finally {
+                this.isSubmitting = false;
             }
         }
     }" class="mx-auto max-w-5xl space-y-6">
         
-        {{-- BREADCRUMBS --}}
-        <div class="mb-2">
+        {{-- BREADCRUMBS & DYNAMIC ALERT --}}
+        <div class="relative z-40 mb-2">
             <nav class="flex items-center gap-1.5 text-xs text-muted">
                 <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
                 <span>/</span>
@@ -116,6 +183,33 @@
                 <span>/</span>
                 <span class="font-medium text-ink">Detail Pegawai</span>
             </nav>
+
+            {{-- DYNAMIC ALERT (MENGGANTIKAN TOAST) --}}
+            <div x-show="toast.show" style="display: none;"
+                 class="absolute left-0 w-full mt-4 shadow-sm"
+                 x-transition:enter="transition ease-out duration-300"
+                 x-transition:enter-start="opacity-0 -translate-y-2"
+                 x-transition:enter-end="opacity-100 translate-y-0"
+                 x-transition:leave="transition ease-in duration-200"
+                 x-transition:leave-start="opacity-100 translate-y-0"
+                 x-transition:leave-end="opacity-0 -translate-y-2">
+                
+                <template x-if="toast.type === 'success'">
+                    <div class="flex items-center gap-3 rounded-lg border border-success/30 bg-white px-4 py-3 relative overflow-hidden shadow-md">
+                        <div class="absolute inset-0 bg-success/10 pointer-events-none"></div>
+                        <svg class="h-4 w-4 shrink-0 text-success relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                        <p class="text-sm font-medium text-success font-sans relative z-10" x-text="toast.message"></p>
+                    </div>
+                </template>
+                
+                <template x-if="toast.type === 'error'">
+                    <div class="flex items-center gap-3 rounded-lg border border-danger/30 bg-white px-4 py-3 relative overflow-hidden shadow-md">
+                        <div class="absolute inset-0 bg-danger/10 pointer-events-none"></div>
+                        <svg class="h-4 w-4 shrink-0 text-danger relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                        <p class="text-sm font-medium text-danger font-sans relative z-10" x-text="toast.message"></p>
+                    </div>
+                </template>
+            </div>
         </div>
 
         {{-- MAIN DETAIL CARD --}}
@@ -515,9 +609,14 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border text-xs font-sans">
-                            <template x-for="d in disiplinList" :key="d.no_sk">
+                            <template x-for="(d, index) in disiplinList" :key="index">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
-                                    <td class="px-4 py-3 font-bold text-danger" x-text="d.jenis"></td>
+                                    <td class="px-4 py-3">
+                                        <span class="font-bold text-danger" x-text="d.jenis"></span>
+                                        <template x-if="d.is_active">
+                                            <span class="ml-1 inline-flex items-center rounded-full bg-danger/10 px-1.5 py-0.5 text-[8px] font-bold text-danger uppercase">Aktif</span>
+                                        </template>
+                                    </td>
                                     <td class="px-4 py-3" x-text="d.alasan"></td>
                                     <td class="px-4 py-3 font-mono" x-text="d.no_sk"></td>
                                     <td class="px-4 py-3 font-mono" x-text="d.tgl_sk"></td>
@@ -828,16 +927,15 @@
                             <div class="space-y-4">
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Hukuman</label>
-                                    <select x-model="newDisiplin.jenis" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                        <option value="Teguran Lisan">Teguran Lisan</option>
-                                        <option value="Teguran Tertulis">Teguran Tertulis</option>
-                                        <option value="Pernyataan Tidak Puas secara Tertulis">Pernyataan Tidak Puas secara Tertulis</option>
-                                        <option value="Penundaan Kenaikan Pangkat">Penundaan Kenaikan Pangkat</option>
+                                    <select x-model="newDisiplin.jenis_hukuman" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                        <option value="Ringan">Ringan</option>
+                                        <option value="Sedang">Sedang</option>
+                                        <option value="Berat">Berat</option>
                                     </select>
                                 </div>
                                 <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Alasan / Pelanggaran</label>
-                                    <input type="text" x-model="newDisiplin.alasan" required placeholder="Keterlambatan absensi berulang" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Deskripsi Pelanggaran</label>
+                                    <textarea x-model="newDisiplin.deskripsi" required placeholder="Keterlambatan absensi berulang" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" rows="2"></textarea>
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Hukuman</label>
@@ -845,12 +943,19 @@
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK Terbit</label>
-                                    <input type="date" x-model="newDisiplin.tgl_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="date" x-model="newDisiplin.tanggal_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Masa Berlaku</label>
-                                    <input type="text" x-model="newDisiplin.masa" placeholder="6 Bulan" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="space-y-1">
+                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Mulai</label>
+                                        <input type="date" x-model="newDisiplin.tanggal_mulai" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Berakhir</label>
+                                        <input type="date" x-model="newDisiplin.tanggal_berakhir" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    </div>
                                 </div>
+                                <p class="text-[10px] text-muted italic font-sans">* Kosongkan tanggal berakhir jika masa berlaku tidak ditentukan (aktif selamanya).</p>
                             </div>
                         </template>
 
@@ -886,11 +991,22 @@
                         </template>
 
                         <div class="border-t border-border pt-4 flex justify-end gap-2.5 mt-6">
-                            <button type="button" @click="showModal = false" class="inline-flex items-center justify-center rounded border border-border bg-surface px-4 py-2 text-xs font-semibold text-ink hover:bg-soft transition font-sans cursor-pointer">
+                            <button type="button" @click="showModal = false" :disabled="isSubmitting" class="inline-flex items-center justify-center rounded border border-border bg-surface px-4 py-2 text-xs font-semibold text-ink hover:bg-soft transition font-sans cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
                                 Batal
                             </button>
-                            <button type="submit" class="inline-flex items-center justify-center rounded bg-primary px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition font-sans cursor-pointer">
-                                Simpan Riwayat
+                            <button type="submit" :disabled="isSubmitting" class="inline-flex items-center justify-center rounded bg-primary px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition font-sans cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px]">
+                                <template x-if="!isSubmitting">
+                                    <span>Simpan Riwayat</span>
+                                </template>
+                                <template x-if="isSubmitting">
+                                    <span class="flex items-center justify-center gap-2">
+                                        <svg class="animate-spin h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Menyimpan...
+                                    </span>
+                                </template>
                             </button>
                         </div>
                     </form>

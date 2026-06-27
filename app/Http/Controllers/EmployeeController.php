@@ -3,7 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Employees\CreateEmployeeAction;
+use App\Actions\Employees\DeactivateEmployeeAction;
 use App\Actions\Employees\ListEmployeesAction;
+use App\Actions\Employees\ListInactiveEmployeesAction;
+use App\Actions\Employees\RestoreEmployeeAction;
 use App\Actions\Employees\ShowEmployeeAction;
 use App\Actions\Employees\ShowMyProfileAction;
 use App\Actions\Employees\UpdateEmployeeAction;
@@ -61,11 +64,59 @@ class EmployeeController extends Controller
         ]);
     }
 
+    public function inactive(Request $request, ListInactiveEmployeesAction $action): JsonResponse
+    {
+        return response()->json([
+            'message' => 'Daftar pegawai nonaktif berhasil diambil.',
+            'employees' => $action->execute($request->query())->through(fn (Employee $employee): array => $this->employeeListPayload($employee)),
+        ]);
+    }
+
+    public function destroy(Employee $employee, Request $request, DeactivateEmployeeAction $action): JsonResponse
+    {
+        $action->execute($employee, $request);
+
+        return response()->json([
+            'message' => 'Data pegawai berhasil dinonaktifkan.',
+        ]);
+    }
+
+    public function restore(string $employee, Request $request, RestoreEmployeeAction $action): JsonResponse
+    {
+        $restored = $action->execute(Employee::onlyTrashed()->findOrFail($employee), $request);
+
+        return response()->json([
+            'message' => 'Data pegawai berhasil diaktifkan kembali.',
+            'employee' => $this->employeeListPayload($restored),
+        ]);
+    }
+
     public function myProfile(Request $request, ShowMyProfileAction $action): JsonResponse
     {
         return response()->json([
             'message' => 'Detail profil pegawai berhasil diambil.',
             'employee' => $action->execute($request->user()?->employee),
         ]);
+    }
+
+    /**
+     * Payload ringkas untuk daftar nonaktif agar endpoint tidak mengekspos NIK/No KK dan data sensitif lain.
+     *
+     * @return array<string, mixed>
+     */
+    private function employeeListPayload(Employee $employee): array
+    {
+        $latestPosition = $employee->positionHistories->first();
+
+        return [
+            'id' => $employee->id,
+            'nama_lengkap' => $employee->nama_lengkap,
+            'nip' => $employee->nip,
+            'jabatan_terakhir' => $employee->jabatan_terakhir,
+            'golongan_terakhir' => $employee->golongan_terakhir,
+            'jenis_pegawai' => $employee->jenisPegawai?->nama,
+            'unit_kerja' => $latestPosition?->unitKerja?->nama,
+            'deleted_at' => $employee->deleted_at,
+        ];
     }
 }

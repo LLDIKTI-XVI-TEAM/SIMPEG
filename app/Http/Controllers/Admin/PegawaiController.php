@@ -2,22 +2,35 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\Employees\DeactivateEmployeeAction;
+use App\Actions\Employees\ListInactiveEmployeesAction;
+use App\Actions\Employees\RestoreEmployeeAction;
 use App\Http\Controllers\Controller;
-use App\Models\Employee;
-use Illuminate\Http\Request;
 use App\Http\Requests\StoreEmployeeRequest;
+use App\Http\Requests\UpdateEmployeeRequest;
 use App\Models\Appointment;
+use App\Models\Employee;
 use App\Models\PositionHistory;
-use App\Models\RefJenisPegawai;
-use App\Models\RefUnitKerja;
 use App\Models\RefAgama;
-use App\Models\RefStatusPerkawinan;
+use App\Models\RefEselon;
 use App\Models\RefGolongan;
 use App\Models\RefJenisJabatan;
-use App\Models\RefEselon;
+use App\Models\RefJenisPegawai;
+use App\Models\RefJenjangPendidikan;
+use App\Models\RefStatusPerkawinan;
+use App\Models\RefUnitKerja;
 use App\Services\AuditService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Shared\Date;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PegawaiController extends Controller
 {
@@ -57,7 +70,7 @@ class PegawaiController extends Controller
             'kinerja_baik' => true,
             'atasan_nama' => 'Yudha Prasetya, M.Kom.',
             'atasan_nip' => '19780520200212 1 002',
-            'atasan_jabatan' => 'Kepala Bagian Umum'
+            'atasan_jabatan' => 'Kepala Bagian Umum',
         ],
         [
             'id' => 2,
@@ -94,7 +107,7 @@ class PegawaiController extends Controller
             'kinerja_baik' => true,
             'atasan_nama' => 'Dr. Hendra Wijaya, M.E.',
             'atasan_nip' => '19750912199903 1 001',
-            'atasan_jabatan' => 'Kepala Bagian Keuangan'
+            'atasan_jabatan' => 'Kepala Bagian Keuangan',
         ],
         [
             'id' => 3,
@@ -131,7 +144,7 @@ class PegawaiController extends Controller
             'kinerja_baik' => true,
             'atasan_nama' => 'Rina Amalia, S.Sos., M.M.',
             'atasan_nip' => '19810405200501 2 004',
-            'atasan_jabatan' => 'Kepala Bagian SDM'
+            'atasan_jabatan' => 'Kepala Bagian SDM',
         ],
         [
             'id' => 4,
@@ -168,7 +181,7 @@ class PegawaiController extends Controller
             'kinerja_baik' => false,
             'atasan_nama' => 'Irwan Santoso, M.T.',
             'atasan_nip' => '19800215200604 1 003',
-            'atasan_jabatan' => 'Kepala Bagian IT'
+            'atasan_jabatan' => 'Kepala Bagian IT',
         ],
         [
             'id' => 5,
@@ -205,7 +218,7 @@ class PegawaiController extends Controller
             'kinerja_baik' => true,
             'atasan_nama' => 'Yudha Prasetya, M.Kom.',
             'atasan_nip' => '19780520200212 1 002',
-            'atasan_jabatan' => 'Kepala Bagian Umum'
+            'atasan_jabatan' => 'Kepala Bagian Umum',
         ],
         [
             'id' => 6,
@@ -242,7 +255,7 @@ class PegawaiController extends Controller
             'kinerja_baik' => true,
             'atasan_nama' => 'Rina Amalia, S.Sos., M.M.',
             'atasan_nip' => '19810405200501 2 004',
-            'atasan_jabatan' => 'Kepala Bagian SDM'
+            'atasan_jabatan' => 'Kepala Bagian SDM',
         ],
         [
             'id' => 7,
@@ -279,8 +292,8 @@ class PegawaiController extends Controller
             'kinerja_baik' => true,
             'atasan_nama' => 'Dr. Hendra Wijaya, M.E.',
             'atasan_nip' => '19750912199903 1 001',
-            'atasan_jabatan' => 'Kepala Bagian Keuangan'
-        ]
+            'atasan_jabatan' => 'Kepala Bagian Keuangan',
+        ],
     ];
 
     public function index(Request $request)
@@ -388,7 +401,7 @@ class PegawaiController extends Controller
         }
 
         if ($filters['golongan'] !== '') {
-            $pegawaiQuery->where('golongan_terakhir', 'like', $filters['golongan'] . '%');
+            $pegawaiQuery->where('golongan_terakhir', 'like', $filters['golongan'].'%');
         }
 
         if ($filters['unit_kerja_id'] !== '') {
@@ -468,8 +481,20 @@ class PegawaiController extends Controller
         $jenisPegawai = RefJenisPegawai::all();
         $agama = RefAgama::all();
         $statusKawin = RefStatusPerkawinan::all();
-        
+
         return view('admin.pegawai.create', compact('jenisPegawai', 'agama', 'statusKawin'));
+    }
+
+    public function inactive(Request $request, ListInactiveEmployeesAction $action)
+    {
+        $employees = $action->execute($request->query());
+
+        return view('admin.pegawai.nonaktif', [
+            'employees' => $employees,
+            'filters' => [
+                'search' => trim((string) $request->query('search', '')),
+            ],
+        ]);
     }
 
     public function store(StoreEmployeeRequest $request)
@@ -507,10 +532,11 @@ class PegawaiController extends Controller
             DB::commit();
 
             return redirect()->route('data-pegawai')
-                ->with('success', 'Data pegawai ' . $employee->nama_lengkap . ' berhasil ditambahkan.');
+                ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil ditambahkan.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->withInput()->with('error', 'Gagal menambahkan pegawai: ' . $e->getMessage());
+
+            return back()->withInput()->with('error', 'Gagal menambahkan pegawai: '.$e->getMessage());
         }
     }
 
@@ -526,7 +552,7 @@ class PegawaiController extends Controller
             'documents',
             'agama',
             'statusKawin',
-            'jenisPegawai'
+            'jenisPegawai',
         ])->findOrFail($id);
 
         $golonganOptions = RefGolongan::all();
@@ -543,11 +569,11 @@ class PegawaiController extends Controller
         $jenisPegawai = RefJenisPegawai::all();
         $agama = RefAgama::all();
         $statusKawin = RefStatusPerkawinan::all();
-        
+
         return view('admin.pegawai.edit', compact('p', 'jenisPegawai', 'agama', 'statusKawin'));
     }
 
-    public function update(\App\Http\Requests\UpdateEmployeeRequest $request, $id)
+    public function update(UpdateEmployeeRequest $request, $id)
     {
         $employee = Employee::findOrFail($id);
         $validated = $request->validated();
@@ -585,36 +611,47 @@ class PegawaiController extends Controller
             DB::commit();
 
             return redirect()->route('data-pegawai')
-                ->with('success', 'Data pegawai ' . $employee->nama_lengkap . ' berhasil diperbarui.');
+                ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil diperbarui.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->withInput()->with('error', 'Gagal memperbarui pegawai: ' . $e->getMessage());
+
+            return back()->withInput()->with('error', 'Gagal memperbarui pegawai: '.$e->getMessage());
         }
     }
 
-    public function destroy($id, Request $request)
+    public function destroy($id, Request $request, DeactivateEmployeeAction $action)
     {
         $employee = Employee::findOrFail($id);
         $nama = $employee->nama_lengkap;
-        $oldValues = $employee->toArray();
-        $employee->delete();
-        
-        AuditService::log('DELETE', 'Employee', $id, $oldValues, null, $request);
+
+        $action->execute($employee, $request);
 
         return redirect()->route('data-pegawai')
-            ->with('success', 'Data pegawai ' . $nama . ' berhasil dihapus dari sistem.');
+            ->with('success', 'Data pegawai '.$nama.' berhasil dinonaktifkan.');
     }
+
+    public function restore($id, Request $request, RestoreEmployeeAction $action)
+    {
+        $employee = Employee::onlyTrashed()->findOrFail($id);
+        $nama = $employee->nama_lengkap;
+
+        $action->execute($employee, $request);
+
+        return redirect()->route('data-nonaktif')
+            ->with('success', 'Data pegawai '.$nama.' berhasil diaktifkan kembali.');
+    }
+
     public function storeRiwayat($id, Request $request)
     {
         $employee = Employee::findOrFail($id);
         $type = $request->input('type');
-        
+
         try {
             DB::beginTransaction();
-            
+
             switch ($type) {
                 case 'pendidikan':
-                    $jenjang = \App\Models\RefJenjangPendidikan::where('nama', $request->input('tingkat'))->first();
+                    $jenjang = RefJenjangPendidikan::where('nama', $request->input('tingkat'))->first();
                     $employee->educationHistories()->create([
                         'jenjang_id' => $jenjang ? $jenjang->id : null,
                         'nama_institusi' => $request->input('institusi'),
@@ -626,23 +663,25 @@ class PegawaiController extends Controller
                 default:
                     throw new \Exception('Tipe riwayat tidak valid atau sudah dimigrasikan ke endpoint khusus.');
             }
-            
+
             DB::commit();
+
             return response()->json(['success' => true, 'message' => 'Data riwayat berhasil disimpan.']);
         } catch (\Exception $e) {
             DB::rollBack();
+
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 
     /**
-     * @return \Symfony\Component\HttpFoundation\StreamedResponse
+     * @return StreamedResponse
      */
     public function export(Request $request)
     {
         $requestedNips = collect($request->input('nips', []))
-            ->filter(fn($nip) => is_string($nip) && trim($nip) !== '')
-            ->map(fn(string $nip) => trim($nip))
+            ->filter(fn ($nip) => is_string($nip) && trim($nip) !== '')
+            ->map(fn (string $nip) => trim($nip))
             ->unique()
             ->values();
 
@@ -650,7 +689,7 @@ class PegawaiController extends Controller
             ->with('jenisPegawai:id,nama')
             ->when(
                 $requestedNips->isNotEmpty(),
-                fn($query) => $query->whereIn('nip', $requestedNips->all())
+                fn ($query) => $query->whereIn('nip', $requestedNips->all())
             )
             ->orderBy('nama_lengkap')
             ->get();
@@ -658,29 +697,29 @@ class PegawaiController extends Controller
         if ($requestedNips->isNotEmpty()) {
             $requestedOrder = $requestedNips->flip();
             $pegawaiData = $pegawaiData
-                ->sortBy(fn(Employee $employee) => $requestedOrder[$employee->nip] ?? PHP_INT_MAX)
+                ->sortBy(fn (Employee $employee) => $requestedOrder[$employee->nip] ?? PHP_INT_MAX)
                 ->values();
         }
 
         $spreadsheet = $this->generateExcelSpreadsheet($pegawaiData);
 
-        $filename = 'Data_Pegawai_SIMPEG_' . now()->format('Ymd') . '.xlsx';
+        $filename = 'Data_Pegawai_SIMPEG_'.now()->format('Ymd').'.xlsx';
 
         return response()->streamDownload(function () use ($spreadsheet) {
-            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+            $writer = new Xlsx($spreadsheet);
             $writer->save('php://output');
         }, $filename, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
             'Cache-Control' => 'no-cache, no-store, must-revalidate',
             'Pragma' => 'no-cache',
             'Expires' => '0',
         ]);
     }
 
-    private function generateExcelSpreadsheet($pegawaiData): \PhpOffice\PhpSpreadsheet\Spreadsheet
+    private function generateExcelSpreadsheet($pegawaiData): Spreadsheet
     {
-        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Data Pegawai');
         $sheet->setShowGridlines(false);
@@ -706,71 +745,70 @@ class PegawaiController extends Controller
 
         foreach ($cols as $col => [$label, $width]) {
             $sheet->getColumnDimension($col)->setWidth($width);
-            $sheet->setCellValue($col . '1', $label);
+            $sheet->setCellValue($col.'1', $label);
         }
         $sheet->getRowDimension(1)->setRowHeight(32);
 
         $sheet->getStyle('A1:P1')->applyFromArray([
             'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 10, 'name' => 'Calibri'],
-            'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '1F5A83']],
-            'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER, 'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER, 'wrapText' => true],
-            'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['rgb' => '69BFE3']]],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1F5A83']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => true],
+            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '69BFE3']]],
         ]);
 
         foreach ($pegawaiData as $i => $employee) {
             $r = $i + 2;
 
-            $sheet->setCellValue('A' . $r, $i + 1);
-            $sheet->setCellValue('B' . $r, $employee->nama_lengkap);
-            $sheet->setCellValue('C' . $r, $employee->email ?? '');
-            $sheet->setCellValue('D' . $r, $employee->golongan_terakhir ?? '');
-            $sheet->setCellValue('E' . $r, $employee->jabatan_terakhir ?? '');
-            $sheet->setCellValue('F' . $r, $employee->kelas_jabatan ?? '');
-            $sheet->setCellValueExplicit('G' . $r, $employee->nip, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-            $sheet->setCellValueExplicit('H' . $r, $employee->no_hp ?? '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-            $sheet->setCellValue('I' . $r, $employee->pangkat_terakhir ?? '');
-            $sheet->setCellValue('J' . $r, $employee->pendidikan_terakhir ?? '');
+            $sheet->setCellValue('A'.$r, $i + 1);
+            $sheet->setCellValue('B'.$r, $employee->nama_lengkap);
+            $sheet->setCellValue('C'.$r, $employee->email ?? '');
+            $sheet->setCellValue('D'.$r, $employee->golongan_terakhir ?? '');
+            $sheet->setCellValue('E'.$r, $employee->jabatan_terakhir ?? '');
+            $sheet->setCellValue('F'.$r, $employee->kelas_jabatan ?? '');
+            $sheet->setCellValueExplicit('G'.$r, $employee->nip, DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit('H'.$r, $employee->no_hp ?? '', DataType::TYPE_STRING);
+            $sheet->setCellValue('I'.$r, $employee->pangkat_terakhir ?? '');
+            $sheet->setCellValue('J'.$r, $employee->pendidikan_terakhir ?? '');
 
             if ($employee->tanggal_pensiun !== null) {
-                $sheet->setCellValue('K' . $r, \PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel($employee->tanggal_pensiun));
+                $sheet->setCellValue('K'.$r, Date::PHPToExcel($employee->tanggal_pensiun));
             }
 
-            $sheet->setCellValue('L' . $r, $employee->nama_lengkap);
-            $sheet->setCellValue('M' . $r, $employee->nama_lengkap);
-            $sheet->setCellValue('N' . $r, $employee->prodi_pendidikan_terakhir ?? '');
-            $sheet->setCellValue('O' . $r, $employee->jenisPegawai?->nama ?? '');
+            $sheet->setCellValue('L'.$r, $employee->nama_lengkap);
+            $sheet->setCellValue('M'.$r, $employee->nama_lengkap);
+            $sheet->setCellValue('N'.$r, $employee->prodi_pendidikan_terakhir ?? '');
+            $sheet->setCellValue('O'.$r, $employee->jenisPegawai?->nama ?? '');
 
             if ($employee->tanggal_lahir !== null) {
-                $sheet->setCellValue('P' . $r, \PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel($employee->tanggal_lahir));
+                $sheet->setCellValue('P'.$r, Date::PHPToExcel($employee->tanggal_lahir));
             }
 
             $sheet->getRowDimension($r)->setRowHeight(21);
-            $sheet->getStyle('A' . $r . ':P' . $r)->applyFromArray([
+            $sheet->getStyle('A'.$r.':P'.$r)->applyFromArray([
                 'font' => ['size' => 10, 'name' => 'Calibri', 'color' => ['rgb' => '111827']],
-                'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => 'D9F2FB']],
-                'alignment' => ['vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER, 'wrapText' => false],
-                'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['rgb' => '69BFE3']]],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'D9F2FB']],
+                'alignment' => ['vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => false],
+                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '69BFE3']]],
             ]);
         }
 
         $lastRow = $pegawaiData->count() + 1;
 
         if ($pegawaiData->isNotEmpty()) {
-            $sheet->getStyle('A2:A' . $lastRow)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('D2:D' . $lastRow)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('F2:K' . $lastRow)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('O2:P' . $lastRow)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('K2:K' . $lastRow)->getNumberFormat()->setFormatCode('mmmm d, yyyy');
-            $sheet->getStyle('P2:P' . $lastRow)->getNumberFormat()->setFormatCode('mmmm d, yyyy');
+            $sheet->getStyle('A2:A'.$lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('D2:D'.$lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('F2:K'.$lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('O2:P'.$lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('K2:K'.$lastRow)->getNumberFormat()->setFormatCode('mmmm d, yyyy');
+            $sheet->getStyle('P2:P'.$lastRow)->getNumberFormat()->setFormatCode('mmmm d, yyyy');
         }
 
         $sheet->freezePane('A2');
-        $sheet->setAutoFilter('A1:P' . $lastRow);
-        $sheet->getPageSetup()->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE)->setPaperSize(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::PAPERSIZE_A4)->setFitToWidth(1)->setFitToHeight(0);
+        $sheet->setAutoFilter('A1:P'.$lastRow);
+        $sheet->getPageSetup()->setOrientation(PageSetup::ORIENTATION_LANDSCAPE)->setPaperSize(PageSetup::PAPERSIZE_A4)->setFitToWidth(1)->setFitToHeight(0);
         $sheet->getPageMargins()->setTop(0.3)->setRight(0.25)->setBottom(0.3)->setLeft(0.25);
         $sheet->getPageSetup()->setRowsToRepeatAtTopByStartAndEnd(1, 1);
 
         return $spreadsheet;
     }
 }
-
