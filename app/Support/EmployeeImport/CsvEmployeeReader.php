@@ -194,6 +194,11 @@ class CsvEmployeeReader
             return $row;
         }
 
+        // Ambil nilai Role dari slot Status Kepegawaian sebelum slot itu ditimpa,
+        // karena pada baris yang tergeser (NIK & No KK kosong) nilai Role ikut bergeser
+        // ke kolom Status Kepegawaian. Tanpa baris ini, Role hilang dan validasi
+        // wajib-Role menolak baris yang sebenarnya valid.
+        $row['Role'] = $row['Status Kepegawaian'] ?? null;
         $row['Tanggal Lahir'] = $row['Prodi Pendidikan Terakhir'] ?? null;
         $row['Status Kepegawaian'] = $row['Person Formula'] ?? null;
         $row['Prodi Pendidikan Terakhir'] = $row['Person'] ?? null;

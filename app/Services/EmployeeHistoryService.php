@@ -27,6 +27,7 @@ class EmployeeHistoryService
         $data = $this->storeSkUpload($data);
 
         return DB::transaction(function () use ($employee, $data, $request): RankHistory {
+            $golongan = RefGolongan::findOrFail($data['golongan_id']);
             // Kunci baris pegawai agar dua penulisan paralel tidak sama-sama menyisakan riwayat terbaru.
             $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
             $currentLatest = $employee->rankHistories()->where('is_latest', true)->first();
@@ -44,12 +45,22 @@ class EmployeeHistoryService
             ]);
 
             if ($isLatest) {
-                $golongan = RefGolongan::findOrFail($data['golongan_id']);
                 $employee->update([
                     'golongan_terakhir' => $golongan->kode,
                     'pangkat_terakhir' => $golongan->nama,
                     // Aturan domain EWS: jadwal kenaikan pangkat reguler dihitung 4 tahun dari TMT pangkat terbaru.
                     'tanggal_kenaikan_pangkat_berikutnya' => Carbon::parse($data['tmt_pangkat'])->addYears(4)->toDateString(),
+                ]);
+            }
+
+            if ($history->file_sk) {
+                $employee->documents()->create([
+                    'jenis_dokumen' => 'sk_pangkat',
+                    'nama_dokumen' => 'SK Kenaikan Pangkat ' . $golongan->kode,
+                    'nomor_dokumen' => $history->no_sk,
+                    'tanggal_dokumen' => $history->tanggal_sk,
+                    'file_path' => $history->file_sk,
+                    'keterangan' => 'Unggah otomatis dari riwayat kepangkatan.',
                 ]);
             }
 
@@ -102,6 +113,17 @@ class EmployeeHistoryService
                 ]);
             }
 
+            if ($history->file_sk) {
+                $employee->documents()->create([
+                    'jenis_dokumen' => 'sk_jabatan',
+                    'nama_dokumen' => 'SK Kenaikan Jabatan ' . $history->nama_jabatan,
+                    'nomor_dokumen' => $history->no_sk,
+                    'tanggal_dokumen' => $history->tanggal_sk,
+                    'file_path' => $history->file_sk,
+                    'keterangan' => 'Unggah otomatis dari riwayat jabatan.',
+                ]);
+            }
+
             AuditService::log('CREATE', 'PositionHistory', $history->id, null, $history->toArray(), $request);
 
             return $history->refresh();
@@ -136,6 +158,17 @@ class EmployeeHistoryService
                 $employee->update([
                     // Aturan domain EWS: jadwal KGB berikutnya dihitung 2 tahun dari TMT KGB terbaru.
                     'tanggal_kgb_berikutnya' => Carbon::parse($data['tmt_kgb'])->addYears(2)->toDateString(),
+                ]);
+            }
+
+            if ($history->file_sk) {
+                $employee->documents()->create([
+                    'jenis_dokumen' => 'sk_kgb',
+                    'nama_dokumen' => 'SK KGB TMT ' . ($history->tmt_kgb ? $history->tmt_kgb->format('d-m-Y') : ''),
+                    'nomor_dokumen' => $history->no_sk,
+                    'tanggal_dokumen' => $history->tanggal_sk,
+                    'file_path' => $history->file_sk,
+                    'keterangan' => 'Unggah otomatis dari riwayat kenaikan gaji berkala.',
                 ]);
             }
 

@@ -1,5 +1,104 @@
 <x-layouts.app title="Data Pegawai">
 
+<div x-data="{
+    showRiwayatModal: false,
+    riwayatType: '',
+    riwayatEmployeeId: '',
+    riwayatEmployeeName: '',
+    isSubmitting: false,
+    errors: {},
+    successMessage: '',
+
+    newPangkat: { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '', file_sk: null },
+    newJabatan: { nama_jabatan: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '', file_sk: null },
+    newKgb: { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '', file_sk: null },
+
+    openRiwayatModal(type, employeeId, employeeName) {
+        this.riwayatType = type;
+        this.riwayatEmployeeId = employeeId;
+        this.riwayatEmployeeName = employeeName;
+        this.errors = {};
+        this.successMessage = '';
+        this.resetForm();
+        this.showRiwayatModal = true;
+    },
+
+    resetForm() {
+        this.newPangkat = { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '', file_sk: null };
+        this.newJabatan = { nama_jabatan: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '', file_sk: null };
+        this.newKgb = { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '', file_sk: null };
+    },
+
+    get modalTitle() {
+        const titles = {
+            pangkat: 'Tambah Riwayat Kepangkatan',
+            jabatan: 'Tambah Riwayat Jabatan',
+            kgb: 'Tambah Riwayat KGB'
+        };
+        return titles[this.riwayatType] || '';
+    },
+
+    async submitRiwayat() {
+        if (this.isSubmitting) return;
+        this.isSubmitting = true;
+        this.errors = {};
+        this.successMessage = '';
+
+        const endpoints = {
+            pangkat: `/api/v1/pegawai/${this.riwayatEmployeeId}/riwayat-kepangkatan`,
+            jabatan: `/api/v1/pegawai/${this.riwayatEmployeeId}/riwayat-jabatan`,
+            kgb: `/api/v1/pegawai/${this.riwayatEmployeeId}/riwayat-kgb`
+        };
+
+        const formData = new FormData();
+        let source = this.riwayatType === 'pangkat' ? this.newPangkat
+                    : this.riwayatType === 'jabatan' ? this.newJabatan
+                    : this.newKgb;
+
+        for (const [key, value] of Object.entries(source)) {
+            if (key === 'file_sk') continue;
+            if (value !== '' && value !== null) formData.append(key, value);
+        }
+
+        const fileInput = this.$refs.fileSkInput;
+        if (fileInput && fileInput.files.length > 0) {
+            formData.append('file_sk', fileInput.files[0]);
+        }
+
+        try {
+            const response = await fetch(endpoints[this.riwayatType], {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '{{ csrf_token() }}',
+                    'Accept': 'application/json'
+                },
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.successMessage = data.message || 'Riwayat berhasil ditambahkan.';
+                this.resetForm();
+                setTimeout(() => {
+                    this.showRiwayatModal = false;
+                    this.successMessage = '';
+                    window.location.reload();
+                }, 1200);
+            } else if (response.status === 422 && data.errors) {
+                this.errors = data.errors;
+            } else {
+                this.errors = { _general: [data.message || 'Terjadi kesalahan saat menyimpan data.'] };
+            }
+        } catch (error) {
+            this.errors = { _general: ['Gagal terhubung ke server. Periksa koneksi Anda.'] };
+        } finally {
+            this.isSubmitting = false;
+        }
+    }
+}">
+
+
 
 
     {{-- PAGE HEADER --}}
@@ -293,6 +392,33 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                     </svg>
                                 </a>
+                                {{-- Tambah Riwayat Dropdown --}}
+                                <div x-data="{ open: false }" class="relative">
+                                    <button @click="open = !open" type="button" class="flex h-8 items-center gap-1 rounded-lg border border-border bg-surface px-2 text-primary transition hover:bg-soft shadow-sm cursor-pointer" title="Tambah Riwayat">
+                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                        </svg>
+                                        <svg class="w-3 h-3 shrink-0 transition" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                                        </svg>
+                                    </button>
+                                    <div x-show="open" @click.away="open = false" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-75" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" class="absolute right-0 z-30 mt-1 w-48 origin-top-right rounded-lg border border-border bg-surface shadow-lg" style="display: none;">
+                                        <div class="py-1">
+                                            <button type="button" @click="open = false; $dispatch('open-riwayat', { type: 'pangkat', id: '{{ $p->id }}', name: '{{ addslashes($p->nama_lengkap) }}' })" class="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-ink transition hover:bg-soft cursor-pointer font-sans">
+                                                <svg class="w-4 h-4 shrink-0 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" /></svg>
+                                                Riwayat Pangkat
+                                            </button>
+                                            <button type="button" @click="open = false; $dispatch('open-riwayat', { type: 'jabatan', id: '{{ $p->id }}', name: '{{ addslashes($p->nama_lengkap) }}' })" class="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-ink transition hover:bg-soft cursor-pointer font-sans">
+                                                <svg class="w-4 h-4 shrink-0 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0 1 12 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 0 1-.673-.38m0 0A2.18 2.18 0 0 1 3 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 0 1 3.413-.387m7.5 0V5.25A2.25 2.25 0 0 0 13.5 3h-3a2.25 2.25 0 0 0-2.25 2.25v.894m7.5 0a48.667 48.667 0 0 0-7.5 0M12 12.75h.008v.008H12v-.008Z" /></svg>
+                                                Riwayat Jabatan
+                                            </button>
+                                            <button type="button" @click="open = false; $dispatch('open-riwayat', { type: 'kgb', id: '{{ $p->id }}', name: '{{ addslashes($p->nama_lengkap) }}' })" class="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-ink transition hover:bg-soft cursor-pointer font-sans">
+                                                <svg class="w-4 h-4 shrink-0 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" /></svg>
+                                                Riwayat KGB
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                                 {{-- Nonaktifkan --}}
                                 <form action="{{ route('pegawai.destroy', $p->id) }}" method="POST" class="inline" onsubmit="return confirm('Apakah Anda yakin ingin menonaktifkan pegawai ini?')">
                                     @csrf
@@ -357,6 +483,197 @@
             Batal
         </button>
     </div>
+
+    {{-- MODAL TAMBAH RIWAYAT --}}
+    <div x-show="showRiwayatModal" @open-riwayat.window="openRiwayatModal($event.detail.type, $event.detail.id, $event.detail.name)" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;" x-transition>
+        <div class="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-ink/60 transition-opacity" @click="showRiwayatModal = false"></div>
+            <span class="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">&#8203;</span>
+
+            <div class="relative z-10 inline-block transform overflow-hidden rounded-lg bg-surface px-4 pt-5 pb-4 text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6 sm:align-middle border border-border">
+                {{-- Header --}}
+                <div class="flex items-center justify-between border-b border-border pb-3 mb-4">
+                    <div>
+                        <h3 class="text-sm font-bold text-ink font-sans" x-text="modalTitle"></h3>
+                        <p class="text-xs text-muted font-sans mt-0.5">Pegawai: <span class="font-semibold text-ink" x-text="riwayatEmployeeName"></span></p>
+                    </div>
+                    <button @click="showRiwayatModal = false" class="text-muted hover:text-ink cursor-pointer">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                {{-- Success Message --}}
+                <template x-if="successMessage">
+                    <div class="mb-4 rounded-lg bg-success/10 border border-success/20 p-3 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-success shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                        <span class="text-xs font-semibold text-success font-sans" x-text="successMessage"></span>
+                    </div>
+                </template>
+
+                {{-- General Error --}}
+                <template x-if="errors._general">
+                    <div class="mb-4 rounded-lg bg-danger/10 border border-danger/20 p-3 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-danger shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg>
+                        <span class="text-xs font-semibold text-danger font-sans" x-text="errors._general[0]"></span>
+                    </div>
+                </template>
+
+                <form @submit.prevent="submitRiwayat()" class="space-y-4">
+                    {{-- PANGKAT FORM --}}
+                    <template x-if="riwayatType === 'pangkat'">
+                        <div class="space-y-4">
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Golongan <span class="text-danger">*</span></label>
+                                <select x-model="newPangkat.golongan_id" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <option value="">-- Pilih Golongan --</option>
+                                    @foreach($golonganRefOptions as $gol)
+                                        <option value="{{ $gol->id }}">{{ $gol->kode }} - {{ $gol->nama }}</option>
+                                    @endforeach
+                                </select>
+                                <template x-if="errors.golongan_id"><p class="text-[10px] text-danger font-sans" x-text="errors.golongan_id[0]"></p></template>
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Pangkat <span class="text-danger">*</span></label>
+                                <input type="text" x-model="newPangkat.no_sk" required placeholder="SK-321-KP-2026" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                <template x-if="errors.no_sk"><p class="text-[10px] text-danger font-sans" x-text="errors.no_sk[0]"></p></template>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK <span class="text-danger">*</span></label>
+                                    <input type="date" x-model="newPangkat.tanggal_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <template x-if="errors.tanggal_sk"><p class="text-[10px] text-danger font-sans" x-text="errors.tanggal_sk[0]"></p></template>
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Pangkat <span class="text-danger">*</span></label>
+                                    <input type="date" x-model="newPangkat.tmt_pangkat" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <template x-if="errors.tmt_pangkat"><p class="text-[10px] text-danger font-sans" x-text="errors.tmt_pangkat[0]"></p></template>
+                                </div>
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">File SK (Opsional)</label>
+                                <input type="file" x-ref="fileSkInput" accept=".pdf,.jpg,.jpeg,.png" class="w-full rounded-lg border border-border bg-white px-3 py-1.5 text-xs text-ink file:mr-2 file:rounded file:border-0 file:bg-primary/10 file:px-2 file:py-1 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/20 font-sans">
+                                <template x-if="errors.file_sk"><p class="text-[10px] text-danger font-sans" x-text="errors.file_sk[0]"></p></template>
+                            </div>
+                        </div>
+                    </template>
+
+                    {{-- JABATAN FORM --}}
+                    <template x-if="riwayatType === 'jabatan'">
+                        <div class="space-y-4">
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Jabatan <span class="text-danger">*</span></label>
+                                <input type="text" x-model="newJabatan.nama_jabatan" required placeholder="Analis Kepegawaian Muda" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                <template x-if="errors.nama_jabatan"><p class="text-[10px] text-danger font-sans" x-text="errors.nama_jabatan[0]"></p></template>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Jabatan <span class="text-danger">*</span></label>
+                                    <select x-model="newJabatan.jenis_jabatan_id" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                        <option value="">-- Pilih --</option>
+                                        @foreach($jenisJabatanOptions as $jj)
+                                            <option value="{{ $jj->id }}">{{ $jj->nama }}</option>
+                                        @endforeach
+                                    </select>
+                                    <template x-if="errors.jenis_jabatan_id"><p class="text-[10px] text-danger font-sans" x-text="errors.jenis_jabatan_id[0]"></p></template>
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Eselon (Opsional)</label>
+                                    <select x-model="newJabatan.eselon_id" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                        <option value="">-- Pilih --</option>
+                                        @foreach($eselonOptions as $esl)
+                                            <option value="{{ $esl->id }}">{{ $esl->nama }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Unit Kerja <span class="text-danger">*</span></label>
+                                <select x-model="newJabatan.unit_kerja_id" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <option value="">-- Pilih Unit Kerja --</option>
+                                    @foreach($unitKerjaOptions as $unit)
+                                        <option value="{{ $unit->id }}">{{ $unit->nama }}</option>
+                                    @endforeach
+                                </select>
+                                <template x-if="errors.unit_kerja_id"><p class="text-[10px] text-danger font-sans" x-text="errors.unit_kerja_id[0]"></p></template>
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Jabatan <span class="text-danger">*</span></label>
+                                <input type="text" x-model="newJabatan.no_sk" required placeholder="SK-910-JAB-2026" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                <template x-if="errors.no_sk"><p class="text-[10px] text-danger font-sans" x-text="errors.no_sk[0]"></p></template>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK <span class="text-danger">*</span></label>
+                                    <input type="date" x-model="newJabatan.tanggal_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <template x-if="errors.tanggal_sk"><p class="text-[10px] text-danger font-sans" x-text="errors.tanggal_sk[0]"></p></template>
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Jabatan <span class="text-danger">*</span></label>
+                                    <input type="date" x-model="newJabatan.tmt_jabatan" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <template x-if="errors.tmt_jabatan"><p class="text-[10px] text-danger font-sans" x-text="errors.tmt_jabatan[0]"></p></template>
+                                </div>
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">File SK (Opsional)</label>
+                                <input type="file" x-ref="fileSkInput" accept=".pdf,.jpg,.jpeg,.png" class="w-full rounded-lg border border-border bg-white px-3 py-1.5 text-xs text-ink file:mr-2 file:rounded file:border-0 file:bg-primary/10 file:px-2 file:py-1 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/20 font-sans">
+                                <template x-if="errors.file_sk"><p class="text-[10px] text-danger font-sans" x-text="errors.file_sk[0]"></p></template>
+                            </div>
+                        </div>
+                    </template>
+
+                    {{-- KGB FORM --}}
+                    <template x-if="riwayatType === 'kgb'">
+                        <div class="space-y-4">
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Gaji Pokok Baru <span class="text-danger">*</span></label>
+                                <input type="number" x-model="newKgb.gaji_pokok" required placeholder="4100000" min="0" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                <template x-if="errors.gaji_pokok"><p class="text-[10px] text-danger font-sans" x-text="errors.gaji_pokok[0]"></p></template>
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor Surat KGB <span class="text-danger">*</span></label>
+                                <input type="text" x-model="newKgb.no_sk" required placeholder="KGB-012-2026" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                <template x-if="errors.no_sk"><p class="text-[10px] text-danger font-sans" x-text="errors.no_sk[0]"></p></template>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Surat <span class="text-danger">*</span></label>
+                                    <input type="date" x-model="newKgb.tanggal_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <template x-if="errors.tanggal_sk"><p class="text-[10px] text-danger font-sans" x-text="errors.tanggal_sk[0]"></p></template>
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT KGB <span class="text-danger">*</span></label>
+                                    <input type="date" x-model="newKgb.tmt_kgb" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <template x-if="errors.tmt_kgb"><p class="text-[10px] text-danger font-sans" x-text="errors.tmt_kgb[0]"></p></template>
+                                </div>
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">File SK (Opsional)</label>
+                                <input type="file" x-ref="fileSkInput" accept=".pdf,.jpg,.jpeg,.png" class="w-full rounded-lg border border-border bg-white px-3 py-1.5 text-xs text-ink file:mr-2 file:rounded file:border-0 file:bg-primary/10 file:px-2 file:py-1 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/20 font-sans">
+                                <template x-if="errors.file_sk"><p class="text-[10px] text-danger font-sans" x-text="errors.file_sk[0]"></p></template>
+                            </div>
+                        </div>
+                    </template>
+
+                    {{-- BUTTONS --}}
+                    <div class="border-t border-border pt-4 flex justify-end gap-2.5 mt-6">
+                        <button type="button" @click="showRiwayatModal = false" class="inline-flex items-center justify-center rounded border border-border bg-surface px-4 py-2 text-xs font-semibold text-ink hover:bg-soft transition font-sans cursor-pointer" :disabled="isSubmitting">
+                            Batal
+                        </button>
+                        <button type="submit" class="inline-flex items-center justify-center rounded bg-primary px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition font-sans cursor-pointer disabled:opacity-50" :disabled="isSubmitting">
+                            <template x-if="isSubmitting">
+                                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            </template>
+                            <span x-text="isSubmitting ? 'Menyimpan...' : 'Simpan Riwayat'"></span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+</div> {{-- end Alpine.js x-data wrapper --}}
 
     @push('scripts')
     <script>
@@ -455,3 +772,4 @@
     @endpush
 
 </x-layouts.app>
+

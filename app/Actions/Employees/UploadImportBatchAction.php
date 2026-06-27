@@ -1,0 +1,126 @@
+<?php
+
+namespace App\Actions\Employees;
+
+use App\Models\User;
+use App\Support\EmployeeImport\CsvEmployeeReader;
+use App\Support\EmployeeImport\EmployeeRowMapper;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use RuntimeException;
+
+class UploadImportBatchAction
+{
+    public const CACHE_PREFIX = 'import_batch:';
+
+    public const CACHE_TTL_MINUTES = 30;
+
+    public const STORAGE_DIR = 'imports';
+
+    public const TEMPLATE_HEADERS = [
+        'utama' => EmployeeRowMapper::HEADERS,
+        'pelengkap' => ['NIP', 'NIK', 'No KK', 'Tempat Lahir', 'Jenis Kelamin', 'Agama', 'Status Kawin', 'Golongan Darah'],
+        'kepangkatan' => ['NIP', 'Golongan', 'TMT Pangkat', 'No SK', 'Tanggal SK'],
+        'jabatan' => ['NIP', 'Nama Jabatan', 'Jenis Jabatan', 'Unit Kerja', 'TMT Jabatan', 'No SK', 'Tanggal SK'],
+        'kgb' => ['NIP', 'TMT KGB', 'Gaji Pokok', 'No SK', 'Tanggal SK'],
+    ];
+
+    public const TEMPLATE_LABELS = [
+        'utama' => 'Data Utama',
+        'pelengkap' => 'Data Pelengkap',
+        'kepangkatan' => 'Riwayat Pangkat',
+        'jabatan' => 'Riwayat Jabatan',
+        'kgb' => 'Riwayat KGB',
+    ];
+
+    public function __construct(private readonly CsvEmployeeReader $reader) {}
+
+    /**
+     * Upload and parse the import file, cache the raw rows, and return batch metadata.
+     *
+     * @param  UploadedFile  $file
+     * @param  string|null  $requestedType
+     * @param  User|null  $user
+     * @return array
+     *
+     * @throws ValidationException
+     */
+    public function execute(UploadedFile $file, ?string $requestedType, ?User $user): array
+    {
+        try {
+            $rows = $this->reader->readRaw($file);
+        } catch (RuntimeException $exception) {
+            throw ValidationException::withMessages([
+                'file' => [$exception->getMessage()],
+            ]);
+        }
+
+        if ($rows === []) {
+            throw ValidationException::withMessages([
+                'file' => ['File tidak berisi data import (hanya header).'],
+            ]);
+        }
+
+        $firstRowData = $rows[0]['data'] ?? [];
+        $headers = array_keys($firstRowData);
+        $type = $this->detectTemplateType($headers, $requestedType);
+        $batchId = (string) Str::uuid();
+
+        $file->storeAs(self::STORAGE_DIR, $batchId.'_'.$file->getClientOriginalName(), 'local');
+
+        Cache::put(self::CACHE_PREFIX.$batchId, [
+            'filename' => $file->getClientOriginalName(),
+            'uploaded_at' => now()->toIso8601String(),
+            'user_id' => $user?->id,
+            'type' => $type,
+            'type_label' => self::TEMPLATE_LABELS[$type],
+            'headers' => $headers,
+            'total_rows' => count($rows),
+            'rows' => $rows,
+            'validation' => null,
+        ], now()->addMinutes(self::CACHE_TTL_MINUTES));
+
+        return [
+            'batch_id' => $batchId,
+            'filename' => $file->getClientOriginalName(),
+            'type' => $type,
+            'type_label' => self::TEMPLATE_LABELS[$type],
+            'total_rows' => count($rows),
+            'headers' => $headers,
+        ];
+    }
+
+    /**
+     * Detect the type of template based on CSV headers.
+     *
+     * @param  array  $headers
+     * @param  string|null  $requestedType
+     * @return string
+     *
+     * @throws ValidationException
+     */
+    private function detectTemplateType(array $headers, ?string $requestedType): string
+    {
+        $requestedType = is_string($requestedType) ? trim($requestedType) : null;
+
+        if ($requestedType !== null && isset(self::TEMPLATE_HEADERS[$requestedType])) {
+            $missing = array_values(array_diff(self::TEMPLATE_HEADERS[$requestedType], $headers));
+
+            if ($missing === []) {
+                return $requestedType;
+            }
+        }
+
+        foreach (self::TEMPLATE_HEADERS as $type => $requiredHeaders) {
+            if (array_values(array_diff($requiredHeaders, $headers)) === []) {
+                return $type;
+            }
+        }
+
+        throw ValidationException::withMessages([
+            'file' => ['Header template tidak dikenali. Gunakan template utama, pelengkap, riwayat pangkat, riwayat jabatan, atau riwayat KGB dari halaman import.'],
+        ]);
+    }
+}
