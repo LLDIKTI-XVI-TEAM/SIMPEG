@@ -8,6 +8,7 @@
         dragover: false,
         activeTemplate: 'utama',
         templateFormat: 'xlsx',
+        downloadingType: '',
         
         // Batch state dari server
         batchId: null,
@@ -66,8 +67,42 @@
         progress: 0,
         progressText: 'Memulai proses impor...',
         
-        downloadTemplate(type) {
-            window.location.href = '/pegawai/import/template/' + type + '?format=' + this.templateFormat;
+        // Unduh template via fetch+blob agar bisa menampilkan loader di kartu yang diklik.
+        // window.location.href dihindari karena navigasi browser tidak memberi hook async
+        // sehingga user tidak tahu apakah klik-nya sedang diproses.
+        async downloadTemplate(type) {
+            if (this.downloadingType) return;
+
+            this.downloadingType = type;
+            this.apiError = '';
+
+            try {
+                const res = await fetch('/pegawai/import/template/' + type + '?format=' + this.templateFormat, {
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
+                    },
+                });
+
+                if (!res.ok) {
+                    throw new Error('Gagal mengunduh template. Silakan coba lagi.');
+                }
+
+                const blob = await res.blob();
+                const filename = 'template_' + type + '.' + this.templateFormat;
+
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.setAttribute('href', url);
+                link.setAttribute('download', filename);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            } catch (e) {
+                this.apiError = e.message;
+            } finally {
+                this.downloadingType = '';
+            }
         },
         
         // Download Laporan Kesalahan
@@ -412,39 +447,39 @@
                         class="rounded-md px-3 py-1.5 transition">CSV UTF-8</button>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
-                    <button type="button" @click="activeTemplate = 'utama'; downloadTemplate('utama')"
-                        :class="activeTemplate === 'utama' ? 'border-primary/20 bg-primary/5 text-primary' : 'border-border bg-surface text-ink hover:bg-soft'"
+                    <button type="button" @click="activeTemplate = 'utama'; downloadTemplate('utama')" :disabled="downloadingType !== ''"
+                        :class="(activeTemplate === 'utama' ? 'border-primary/20 bg-primary/5 text-primary' : 'border-border bg-surface text-ink hover:bg-soft') + (downloadingType && downloadingType !== 'utama' ? ' opacity-40' : '') + (downloadingType ? ' cursor-not-allowed' : '')"
                         class="flex flex-col items-center justify-center p-3 rounded-lg text-center transition group cursor-pointer border">
                         <svg class="w-8 h-8 mb-1.5 group-hover:scale-110 transition-transform duration-300" :class="activeTemplate === 'utama' ? 'text-primary' : 'text-ink/70'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
-                        <span class="text-xs font-sans font-normal" :class="activeTemplate === 'utama' ? 'text-primary' : 'text-ink'">Template Utama</span>
+                        <span class="text-xs font-sans font-normal flex items-center gap-1" :class="activeTemplate === 'utama' ? 'text-primary' : 'text-ink'"><svg x-show="downloadingType === 'utama'" x-cloak class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg><span x-text="downloadingType === 'utama' ? 'Menyiapkan...' : 'Template Utama'"></span></span>
                         <span class="text-[9px] text-muted font-sans mt-0.5">(NIP, NIK, No KK, dll.)</span>
                     </button>
-                    <button type="button" @click="activeTemplate = 'pelengkap'; downloadTemplate('pelengkap')"
-                        :class="activeTemplate === 'pelengkap' ? 'border-primary/20 bg-primary/5 text-primary' : 'border-border bg-surface text-ink hover:bg-soft'"
+                    <button type="button" @click="activeTemplate = 'pelengkap'; downloadTemplate('pelengkap')" :disabled="downloadingType !== ''"
+                        :class="(activeTemplate === 'pelengkap' ? 'border-primary/20 bg-primary/5 text-primary' : 'border-border bg-surface text-ink hover:bg-soft') + (downloadingType && downloadingType !== 'pelengkap' ? ' opacity-40' : '') + (downloadingType ? ' cursor-not-allowed' : '')"
                         class="flex flex-col items-center justify-center p-3 rounded-lg text-center transition group cursor-pointer border">
                         <svg class="w-8 h-8 mb-1.5 group-hover:scale-110 transition-transform duration-300" :class="activeTemplate === 'pelengkap' ? 'text-primary' : 'text-ink/70'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Zm6-10.125a1.875 1.875 0 1 1-3.75 0 1.875 1.875 0 0 1 3.75 0Zm-1.2 6.477a6 6 0 0 0-3.75 0" /></svg>
-                        <span class="text-xs font-sans font-normal" :class="activeTemplate === 'pelengkap' ? 'text-primary' : 'text-ink'">Data Pelengkap</span>
+                        <span class="text-xs font-sans font-normal flex items-center gap-1" :class="activeTemplate === 'pelengkap' ? 'text-primary' : 'text-ink'"><svg x-show="downloadingType === 'pelengkap'" x-cloak class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg><span x-text="downloadingType === 'pelengkap' ? 'Menyiapkan...' : 'Data Pelengkap'"></span></span>
                         <span class="text-[9px] text-muted font-sans mt-0.5">(NIK, KK, TTL, dll.)</span>
                     </button>
-                    <button type="button" @click="activeTemplate = 'kepangkatan'; downloadTemplate('kepangkatan')"
-                        :class="activeTemplate === 'kepangkatan' ? 'border-primary/20 bg-primary/5 text-primary' : 'border-border bg-surface text-ink hover:bg-soft'"
+                    <button type="button" @click="activeTemplate = 'kepangkatan'; downloadTemplate('kepangkatan')" :disabled="downloadingType !== ''"
+                        :class="(activeTemplate === 'kepangkatan' ? 'border-primary/20 bg-primary/5 text-primary' : 'border-border bg-surface text-ink hover:bg-soft') + (downloadingType && downloadingType !== 'kepangkatan' ? ' opacity-40' : '') + (downloadingType ? ' cursor-not-allowed' : '')"
                         class="flex flex-col items-center justify-center p-3 rounded-lg text-center transition group cursor-pointer border">
                         <svg class="w-8 h-8 mb-1.5 group-hover:scale-110 transition-transform duration-300" :class="activeTemplate === 'kepangkatan' ? 'text-primary' : 'text-ink/70'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296 3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043 3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12Z" /></svg>
-                        <span class="text-xs font-sans font-normal" :class="activeTemplate === 'kepangkatan' ? 'text-primary' : 'text-ink'">Riwayat Pangkat</span>
+                        <span class="text-xs font-sans font-normal flex items-center gap-1" :class="activeTemplate === 'kepangkatan' ? 'text-primary' : 'text-ink'"><svg x-show="downloadingType === 'kepangkatan'" x-cloak class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg><span x-text="downloadingType === 'kepangkatan' ? 'Menyiapkan...' : 'Riwayat Pangkat'"></span></span>
                         <span class="text-[9px] text-muted font-sans mt-0.5">(Append-only)</span>
                     </button>
-                    <button type="button" @click="activeTemplate = 'jabatan'; downloadTemplate('jabatan')"
-                        :class="activeTemplate === 'jabatan' ? 'border-primary/20 bg-primary/5 text-primary' : 'border-border bg-surface text-ink hover:bg-soft'"
+                    <button type="button" @click="activeTemplate = 'jabatan'; downloadTemplate('jabatan')" :disabled="downloadingType !== ''"
+                        :class="(activeTemplate === 'jabatan' ? 'border-primary/20 bg-primary/5 text-primary' : 'border-border bg-surface text-ink hover:bg-soft') + (downloadingType && downloadingType !== 'jabatan' ? ' opacity-40' : '') + (downloadingType ? ' cursor-not-allowed' : '')"
                         class="flex flex-col items-center justify-center p-3 rounded-lg text-center transition group cursor-pointer border">
                         <svg class="w-8 h-8 mb-1.5 group-hover:scale-110 transition-transform duration-300" :class="activeTemplate === 'jabatan' ? 'text-primary' : 'text-ink/70'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 .621-.504 1.125-1.125 1.125H4.875c-.621 0-1.125-.504-1.125-1.125v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387m4.5 8.006c-.194.165-.453.258-.75.258H4.875" /></svg>
-                        <span class="text-xs font-sans font-normal" :class="activeTemplate === 'jabatan' ? 'text-primary' : 'text-ink'">Riwayat Jabatan</span>
+                        <span class="text-xs font-sans font-normal flex items-center gap-1" :class="activeTemplate === 'jabatan' ? 'text-primary' : 'text-ink'"><svg x-show="downloadingType === 'jabatan'" x-cloak class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg><span x-text="downloadingType === 'jabatan' ? 'Menyiapkan...' : 'Riwayat Jabatan'"></span></span>
                         <span class="text-[9px] text-muted font-sans mt-0.5">(Append-only)</span>
                     </button>
-                    <button type="button" @click="activeTemplate = 'kgb'; downloadTemplate('kgb')"
-                        :class="activeTemplate === 'kgb' ? 'border-primary/20 bg-primary/5 text-primary' : 'border-border bg-surface text-ink hover:bg-soft'"
+                    <button type="button" @click="activeTemplate = 'kgb'; downloadTemplate('kgb')" :disabled="downloadingType !== ''"
+                        :class="(activeTemplate === 'kgb' ? 'border-primary/20 bg-primary/5 text-primary' : 'border-border bg-surface text-ink hover:bg-soft') + (downloadingType && downloadingType !== 'kgb' ? ' opacity-40' : '') + (downloadingType ? ' cursor-not-allowed' : '')"
                         class="flex flex-col items-center justify-center p-3 rounded-lg text-center transition group cursor-pointer border">
                         <svg class="w-8 h-8 mb-1.5 group-hover:scale-110 transition-transform duration-300" :class="activeTemplate === 'kgb' ? 'text-primary' : 'text-ink/70'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5h16.5c.621 0 1.125.504 1.125 1.125v12.75c0 .621-.504 1.125-1.125 1.125H3.75c-.621 0-1.125-.504-1.125-1.125V5.625c0-.621.504-1.125 1.125-1.125Z" /></svg>
-                        <span class="text-xs font-sans font-normal" :class="activeTemplate === 'kgb' ? 'text-primary' : 'text-ink'">Riwayat KGB</span>
+                        <span class="text-xs font-sans font-normal flex items-center gap-1" :class="activeTemplate === 'kgb' ? 'text-primary' : 'text-ink'"><svg x-show="downloadingType === 'kgb'" x-cloak class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg><span x-text="downloadingType === 'kgb' ? 'Menyiapkan...' : 'Riwayat KGB'"></span></span>
                         <span class="text-[9px] text-muted font-sans mt-0.5">(Append-only)</span>
                     </button>
                 </div>
