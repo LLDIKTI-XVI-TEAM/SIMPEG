@@ -58,6 +58,16 @@ Route::get('/dev-login', function () {
     return redirect()->route('dashboard')->with('login_success', 'Selamat Datang! Anda berhasil masuk ke dalam sistem (Mode Dev).');
 })->name('dev-login');
 
+Route::get('/debug-permissions', function() {
+    $permission = \App\Models\Permission::firstOrCreate(['name' => 'employee_families.create'], ['module' => 'employee_families', 'description' => 'Membuat data keluarga pegawai']);
+    $role = \App\Models\Role::where('name', 'super_admin')->first();
+    if ($role) {
+        $role->permissions()->syncWithoutDetaching([$permission->id]);
+        return "Permission synced to super_admin";
+    }
+    return "Role super_admin not found";
+});
+
 Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan,atasan_langsung,pegawai'])->group(function (): void {
     Route::get('/dashboard', function () {
         return view('dashboard');

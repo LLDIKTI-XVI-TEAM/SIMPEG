@@ -473,8 +473,10 @@ class PegawaiController extends Controller
         $jenisPegawai = RefJenisPegawai::all();
         $agama = RefAgama::all();
         $statusKawin = RefStatusPerkawinan::all();
+        $unitKerja = RefUnitKerja::all();
+        $jenisJabatanOptions = \App\Models\RefJenisJabatan::all();
 
-        return view('admin.pegawai.create', compact('jenisPegawai', 'agama', 'statusKawin'));
+        return view('admin.pegawai.create', compact('jenisPegawai', 'agama', 'statusKawin', 'unitKerja', 'jenisJabatanOptions'));
     }
 
     public function inactive(Request $request, ListInactiveEmployeesAction $action)
@@ -497,8 +499,19 @@ class PegawaiController extends Controller
             DB::beginTransaction();
 
             // Handle Photo
-            if ($request->hasFile('foto')) {
-                $validated['foto'] = $request->file('foto')->store('employees/photos', 'public');
+            if ($request->hasFile('foto') && $request->file('foto')->isValid()) {
+                $file = $request->file('foto');
+                $filename = $file->hashName();
+                $file->move(storage_path('app/public/employees/photos'), $filename);
+                $path = 'employees/photos/' . $filename;
+                
+                if ($path) {
+                    $validated['foto'] = $path;
+                } else {
+                    unset($validated['foto']);
+                }
+            } else {
+                unset($validated['foto']);
             }
 
             // Create Employee
@@ -513,11 +526,27 @@ class PegawaiController extends Controller
                 'tanggal_sk' => $validated['tanggal_sk'],
             ];
 
-            if ($request->hasFile('file_sk')) {
-                $appointmentData['file_sk'] = $request->file('file_sk')->store('appointments/sk', 'public');
+            if ($request->hasFile('file_sk') && $request->file('file_sk')->isValid()) {
+                $skFile = $request->file('file_sk');
+                $skFilename = $skFile->hashName();
+                $skFile->move(storage_path('app/public/appointments/sk'), $skFilename);
+                $appointmentData['file_sk'] = 'appointments/sk/' . $skFilename;
             }
 
             Appointment::create($appointmentData);
+
+            if (!empty($validated['jabatan_terakhir']) || !empty($validated['unit_kerja_id'])) {
+                \App\Models\PositionHistory::create([
+                    'employee_id' => $employee->id,
+                    'nama_jabatan' => $validated['jabatan_terakhir'] ?? '-',
+                    'jenis_jabatan_id' => $validated['jenis_jabatan_id'] ?? \App\Models\RefJenisJabatan::first()->id,
+                    'unit_kerja_id' => $validated['unit_kerja_id'] ?? \App\Models\RefUnitKerja::first()->id,
+                    'tmt_jabatan' => $validated['tmt'] ?? now()->format('Y-m-d'),
+                    'no_sk' => $validated['nomor_sk'] ?? '-',
+                    'tanggal_sk' => $validated['tanggal_sk'] ?? now()->format('Y-m-d'),
+                    'is_latest' => true,
+                ]);
+            }
 
             AuditService::log('CREATE', 'Employee', $employee->id, null, $employee->toArray(), $request);
 
@@ -557,12 +586,14 @@ class PegawaiController extends Controller
 
     public function edit($id)
     {
-        $p = Employee::with('appointment')->findOrFail($id);
+        $p = Employee::with('appointment', 'positionHistories.unitKerja')->findOrFail($id);
         $jenisPegawai = RefJenisPegawai::all();
         $agama = RefAgama::all();
         $statusKawin = RefStatusPerkawinan::all();
+        $unitKerja = RefUnitKerja::all();
+        $jenisJabatanOptions = \App\Models\RefJenisJabatan::all();
 
-        return view('admin.pegawai.edit', compact('p', 'jenisPegawai', 'agama', 'statusKawin'));
+        return view('admin.pegawai.edit', compact('p', 'jenisPegawai', 'agama', 'statusKawin', 'unitKerja', 'jenisJabatanOptions'));
     }
 
     public function update(UpdateEmployeeRequest $request, $id)
@@ -575,11 +606,29 @@ class PegawaiController extends Controller
 
             $oldValues = $employee->toArray();
 
-            if ($request->hasFile('foto')) {
+            \Illuminate\Support\Facades\Log::info('Update Request received for employee ' . $employee->id);
+            \Illuminate\Support\Facades\Log::info('Files uploaded keys:', array_keys($request->allFiles()));
+            \Illuminate\Support\Facades\Log::info('Has foto?', ['has' => $request->hasFile('foto')]);
+            if ($request->hasFile('foto') && $request->file('foto')->isValid()) {
                 // Delete old photo if needed (omitted for brevity)
-                $validated['foto'] = $request->file('foto')->store('employees/photos', 'public');
+                $file = $request->file('foto');
+                $filename = $file->hashName();
+                $file->move(storage_path('app/public/employees/photos'), $filename);
+                $path = 'employees/photos/' . $filename;
+                
+                if ($path) {
+                    \Illuminate\Support\Facades\Log::info('Stored foto at:', ['path' => $path]);
+                    $validated['foto'] = $path;
+                } else {
+                    \Illuminate\Support\Facades\Log::error('Store foto failed');
+                    unset($validated['foto']);
+                }
+            } else {
+                \Illuminate\Support\Facades\Log::warning('Foto not valid or not present', ['error' => $request->hasFile('foto') ? $request->file('foto')->getErrorMessage() : 'No file']);
+                unset($validated['foto']);
             }
-
+            
+            // Update Employee
             $employee->update($validated);
 
             $appointment = $employee->appointment;
@@ -591,11 +640,33 @@ class PegawaiController extends Controller
                     'tanggal_sk' => $validated['tanggal_sk'] ?? $appointment->tanggal_sk,
                 ];
 
-                if ($request->hasFile('file_sk')) {
-                    $appointmentData['file_sk'] = $request->file('file_sk')->store('appointments/sk', 'public');
+                if ($request->hasFile('file_sk') && $request->file('file_sk')->isValid()) {
+                    $skFile = $request->file('file_sk');
+                    $skFilename = $skFile->hashName();
+                    $skFile->move(storage_path('app/public/appointments/sk'), $skFilename);
+                    $appointmentData['file_sk'] = 'appointments/sk/' . $skFilename;
                 }
 
                 $appointment->update($appointmentData);
+            }
+
+            $position = $employee->positionHistories()->where('is_latest', true)->first();
+            if ($position) {
+                $position->update([
+                    'nama_jabatan' => $validated['jabatan_terakhir'] ?? $position->nama_jabatan,
+                    'jenis_jabatan_id' => $validated['jenis_jabatan_id'] ?? $position->jenis_jabatan_id,
+                    'unit_kerja_id' => $validated['unit_kerja_id'] ?? $position->unit_kerja_id,
+                ]);
+            } else if (!empty($validated['jabatan_terakhir']) || !empty($validated['unit_kerja_id'])) {
+                $employee->positionHistories()->create([
+                    'nama_jabatan' => $validated['jabatan_terakhir'] ?? '-',
+                    'jenis_jabatan_id' => $validated['jenis_jabatan_id'] ?? \App\Models\RefJenisJabatan::first()->id,
+                    'unit_kerja_id' => $validated['unit_kerja_id'] ?? \App\Models\RefUnitKerja::first()->id,
+                    'tmt_jabatan' => $validated['tmt'] ?? now()->format('Y-m-d'),
+                    'no_sk' => $validated['nomor_sk'] ?? '-',
+                    'tanggal_sk' => $validated['tanggal_sk'] ?? now()->format('Y-m-d'),
+                    'is_latest' => true,
+                ]);
             }
 
             AuditService::log('UPDATE', 'Employee', $employee->id, $oldValues, $employee->toArray(), $request);

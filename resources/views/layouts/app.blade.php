@@ -456,7 +456,7 @@
 
         {{-- FLASH MESSAGES --}}
         @if(session('success') || session('error') || session('warning') || session('info') || session('auth_error'))
-        <div class="shrink-0 border-b border-border px-4 py-3 lg:px-6 space-y-2">
+        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)" x-transition.opacity.duration.500ms class="shrink-0 border-b border-border px-4 py-3 lg:px-6 space-y-2">
             @if(session('success'))
                 <div class="flex items-center gap-3 rounded-lg border border-success/20 bg-success/10 px-4 py-3">
                     <svg class="h-4 w-4 shrink-0 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>

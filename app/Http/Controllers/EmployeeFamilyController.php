@@ -29,6 +29,7 @@ class EmployeeFamilyController extends Controller
         CreateEmployeeFamilyAction $action,
         EmployeeFamilyPayload $payload,
     ): JsonResponse {
+        \Illuminate\Support\Facades\Log::info('Family payload:', $request->all());
         $family = $action->execute($employee, $request->validated(), $request);
 
         return response()->json([

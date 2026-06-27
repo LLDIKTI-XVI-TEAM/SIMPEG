@@ -500,7 +500,7 @@
 
         {{-- FLASH MESSAGES --}}
         @if(session('success') || session('error') || session('warning') || session('info') || session('auth_error'))
-        <div class="shrink-0 border-b border-border px-4 py-3 lg:px-6 space-y-2">
+        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)" x-transition.opacity.duration.500ms class="shrink-0 border-b border-border px-4 py-3 lg:px-6 space-y-2">
             @if(session('success'))
                 <div class="flex items-center gap-3 rounded-lg border border-success/20 bg-success/10 px-4 py-3">
                     <svg class="h-4 w-4 shrink-0 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
@@ -537,6 +537,34 @@
 
     </div>
 </div>
+
+{{-- TOAST NOTIFICATION: LOGIN SUCCESS --}}
+@if(session('login_success'))
+    <div 
+        x-data="{ show: false }" 
+        x-init="setTimeout(() => show = true, 100); setTimeout(() => show = false, 5000)"
+        x-show="show"
+        x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="translate-y-10 opacity-0 sm:translate-y-0 sm:translate-x-10"
+        x-transition:enter-end="translate-y-0 opacity-100 sm:translate-x-0"
+        x-transition:leave="transition ease-in duration-100"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="fixed bottom-4 right-4 z-[60] flex w-full max-w-sm items-center gap-3 rounded-xl border border-success/20 bg-surface p-4 shadow-xl sm:bottom-6 sm:right-6"
+        style="display: none;"
+    >
+        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-success/10 text-success">
+            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+        </div>
+        <div class="flex-1">
+            <p class="text-sm font-semibold text-ink">Berhasil Masuk</p>
+            <p class="mt-0.5 text-xs text-muted">{{ session('login_success') }}</p>
+        </div>
+        <button @click="show = false" class="text-muted hover:text-ink" aria-label="Tutup notifikasi">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18 18 6M6 6l12 12" /></svg>
+        </button>
+    </div>
+@endif
 
 @stack('scripts')
 <script>

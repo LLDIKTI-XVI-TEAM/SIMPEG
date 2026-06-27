@@ -52,12 +52,12 @@
         pendidikanList: {{ $p->educationHistories->map(fn($e) => ['tingkat' => $e->jenjang->nama ?? '-', 'institusi' => $e->nama_institusi, 'prodi' => $e->jurusan, 'lulus' => $e->tahun_lulus, 'no_ijazah' => $e->no_ijazah])->toJson() }},
         
         // Form states
-        newKeluarga: { nama: '', hubungan: 'Istri', tgl_lahir: '', pekerjaan: '' },
+        newKeluarga: { nama_anggota: '', hubungan: 'Istri', tanggal_lahir: '', pekerjaan: '', jenis_kelamin: 'P', status_tunjangan: false },
         newPangkat: { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '' },
         newJabatan: { nama_jabatan: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '' },
         newKgb: { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '' },
         newDisiplin: { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '' },
-        newPendidikan: { tingkat: 'Sarjana (S1)', institusi: '', prodi: '', lulus: '', no_ijazah: '' },
+        newPendidikan: { tingkat: 'D4 / S1', institusi: '', prodi: '', lulus: '', no_ijazah: '' },
         
         openModal(type, title) {
             this.modalType = type;
@@ -93,6 +93,7 @@
                 const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
+                        'Accept': 'application/json',
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': '{{ csrf_token() }}'
                     },
@@ -139,13 +140,13 @@
                         this.newPangkat = { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '' };
                     } else if (this.modalType === 'keluarga') {
                         this.keluargaList.unshift({
-                            nama: this.newKeluarga.nama,
+                            nama: this.newKeluarga.nama_anggota,
                             hubungan: this.newKeluarga.hubungan,
-                            tgl_lahir: this.newKeluarga.tgl_lahir,
+                            tgl_lahir: this.newKeluarga.tanggal_lahir,
                             pekerjaan: this.newKeluarga.pekerjaan,
-                            status: 'Tidak Ditanggung'
+                            status: this.newKeluarga.status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'
                         });
-                        this.newKeluarga = { nama: '', hubungan: 'Istri', tgl_lahir: '', pekerjaan: '' };
+                        this.newKeluarga = { nama_anggota: '', hubungan: 'Istri', tanggal_lahir: '', pekerjaan: '', jenis_kelamin: 'P', status_tunjangan: false };
                     } else if (this.modalType === 'pendidikan') {
                         this.pendidikanList.unshift({
                             tingkat: this.newPendidikan.tingkat,
@@ -162,7 +163,11 @@
                     setTimeout(() => this.toast.show = false, 3000);
                 } else {
                     const errorData = await response.json();
-                    this.toast = { show: true, message: 'Gagal: ' + (errorData.message || 'Data tidak valid'), type: 'error' };
+                    let errMsg = errorData.message || 'Data tidak valid';
+                    if (errorData.errors) {
+                        errMsg += ': ' + Object.values(errorData.errors).flat().join(', ');
+                    }
+                    this.toast = { show: true, message: 'Gagal: ' + errMsg, type: 'error' };
                     setTimeout(() => this.toast.show = false, 5000);
                 }
             } catch (error) {
@@ -184,29 +189,35 @@
                 <span class="font-medium text-ink">Detail Pegawai</span>
             </nav>
 
-            {{-- DYNAMIC ALERT (MENGGANTIKAN TOAST) --}}
+            {{-- DYNAMIC ALERT --}}
             <div x-show="toast.show" style="display: none;"
-                 class="absolute left-0 w-full mt-4 shadow-sm"
-                 x-transition:enter="transition ease-out duration-300"
+                 class="absolute -top-2 left-0 right-0 z-50 w-full shadow-md rounded-lg overflow-hidden"
+                 x-transition:enter="transition-all ease-out duration-300"
                  x-transition:enter-start="opacity-0 -translate-y-2"
                  x-transition:enter-end="opacity-100 translate-y-0"
-                 x-transition:leave="transition ease-in duration-200"
+                 x-transition:leave="transition-all ease-in duration-200"
                  x-transition:leave-start="opacity-100 translate-y-0"
                  x-transition:leave-end="opacity-0 -translate-y-2">
                 
                 <template x-if="toast.type === 'success'">
-                    <div class="flex items-center gap-3 rounded-lg border border-success/30 bg-white px-4 py-3 relative overflow-hidden shadow-md">
+                    <div class="flex items-center gap-3 rounded-lg border border-success/30 bg-white px-4 py-3 relative overflow-hidden">
                         <div class="absolute inset-0 bg-success/10 pointer-events-none"></div>
-                        <svg class="h-4 w-4 shrink-0 text-success relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                        <svg class="h-5 w-5 shrink-0 text-success relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                         <p class="text-sm font-medium text-success font-sans relative z-10" x-text="toast.message"></p>
+                        <button @click="toast.show = false" class="absolute top-3 right-3 text-success/70 hover:text-success z-20">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
                     </div>
                 </template>
                 
                 <template x-if="toast.type === 'error'">
-                    <div class="flex items-center gap-3 rounded-lg border border-danger/30 bg-white px-4 py-3 relative overflow-hidden shadow-md">
+                    <div class="flex items-center gap-3 rounded-lg border border-danger/30 bg-white px-4 py-3 relative overflow-hidden">
                         <div class="absolute inset-0 bg-danger/10 pointer-events-none"></div>
-                        <svg class="h-4 w-4 shrink-0 text-danger relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                        <svg class="h-5 w-5 shrink-0 text-danger relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                         <p class="text-sm font-medium text-danger font-sans relative z-10" x-text="toast.message"></p>
+                        <button @click="toast.show = false" class="absolute top-3 right-3 text-danger/70 hover:text-danger z-20">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
                     </div>
                 </template>
             </div>
@@ -277,7 +288,7 @@
             </div>
 
             {{-- TAB 1: PROFIL LENGKAP --}}
-            <div x-show="activeTab === 'profile'" class="space-y-6" x-transition>
+            <div x-show="activeTab === 'profile'" class="space-y-6" x-transition:enter="transition-opacity ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
                 
                 {{-- Toggle Flag Kinerja & Atasan Langsung --}}
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-soft/40 rounded-lg p-4 border border-border">
@@ -426,7 +437,7 @@
             </div>
 
             {{-- TAB 2: DATA KELUARGA --}}
-            <div x-show="activeTab === 'keluarga'" class="space-y-4" style="display: none;" x-transition>
+            <div x-show="activeTab === 'keluarga'" class="space-y-4" style="display: none;" x-transition:enter="transition-opacity ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
                 <div class="flex items-center justify-between">
                     <div>
                         <h3 class="text-sm font-bold text-ink font-sans">Susunan Anggota Keluarga</h3>
@@ -468,7 +479,7 @@
             </div>
 
             {{-- TAB 3: RIWAYAT KEPANGKATAN --}}
-            <div x-show="activeTab === 'kepangkatan'" class="space-y-4" style="display: none;" x-transition>
+            <div x-show="activeTab === 'kepangkatan'" class="space-y-4" style="display: none;" x-transition:enter="transition-opacity ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
                 <div class="flex items-center justify-between">
                     <div>
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Kepangkatan & Golongan</h3>
@@ -506,7 +517,7 @@
             </div>
 
             {{-- TAB 4: RIWAYAT JABATAN --}}
-            <div x-show="activeTab === 'jabatan'" class="space-y-4" style="display: none;" x-transition>
+            <div x-show="activeTab === 'jabatan'" class="space-y-4" style="display: none;" x-transition:enter="transition-opacity ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
                 <div class="flex items-center justify-between">
                     <div>
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Jabatan & Struktural</h3>
@@ -546,7 +557,7 @@
             </div>
 
             {{-- TAB 5: RIWAYAT KGB --}}
-            <div x-show="activeTab === 'kgb'" class="space-y-4" style="display: none;" x-transition>
+            <div x-show="activeTab === 'kgb'" class="space-y-4" style="display: none;" x-transition:enter="transition-opacity ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
                 <div class="flex items-center justify-between">
                     <div>
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Kenaikan Gaji Berkala (KGB)</h3>
@@ -584,7 +595,7 @@
             </div>
 
             {{-- TAB 6: HUKUMAN DISIPLIN --}}
-            <div x-show="activeTab === 'disiplin'" class="space-y-4" style="display: none;" x-transition>
+            <div x-show="activeTab === 'disiplin'" class="space-y-4" style="display: none;" x-transition:enter="transition-opacity ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
                 <div class="flex items-center justify-between">
                     <div>
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Hukuman Disiplin</h3>
@@ -634,7 +645,7 @@
             </div>
 
             {{-- TAB 7: RIWAYAT PENDIDIKAN --}}
-            <div x-show="activeTab === 'pendidikan'" class="space-y-4" style="display: none;" x-transition>
+            <div x-show="activeTab === 'pendidikan'" class="space-y-4" style="display: none;" x-transition:enter="transition-opacity ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
                 <div class="flex items-center justify-between">
                     <div>
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Pendidikan Formal</h3>
@@ -674,7 +685,7 @@
             </div>
 
             {{-- TAB 8: DATA PENGANGKATAN --}}
-            <div x-show="activeTab === 'pengangkatan'" class="space-y-4" style="display: none;" x-transition>
+            <div x-show="activeTab === 'pengangkatan'" class="space-y-4" style="display: none;" x-transition:enter="transition-opacity ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
                 <div>
                     <h3 class="text-sm font-bold text-ink font-sans">Data & SK Pengangkatan Pertama</h3>
                     <p class="text-xs text-muted font-sans mt-0.5">Berkas dasar penerimaan kepegawaian sebagai CPNS/PNS/PPPK.</p>
@@ -714,7 +725,7 @@
             </div>
 
             {{-- TAB 9: BERKAS DOKUMEN SK --}}
-            <div x-show="activeTab === 'docs'" style="display: none;" class="space-y-4" x-transition>
+            <div x-show="activeTab === 'docs'" style="display: none;" class="space-y-4" x-transition:enter="transition-opacity ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
                 <div>
                     <h3 class="text-sm font-bold text-ink font-sans">Daftar Berkas Fisik Kepegawaian</h3>
                     <p class="text-xs text-muted font-sans mt-0.5">Daftar berkas PDF pendukung mutasi pangkat, jabatan, dan KGB.</p>
@@ -802,24 +813,38 @@
                             <div class="space-y-4">
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Lengkap</label>
-                                    <input type="text" x-model="newKeluarga.nama" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="text" x-model="newKeluarga.nama_anggota" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Hubungan</label>
-                                    <select x-model="newKeluarga.hubungan" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                        <option value="Suami">Suami</option>
-                                        <option value="Istri">Istri</option>
-                                        <option value="Anak">Anak</option>
-                                        <option value="Orang Tua">Orang Tua</option>
-                                    </select>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="space-y-1">
+                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Hubungan</label>
+                                        <select x-model="newKeluarga.hubungan" class="w-full rounded-lg border border-border bg-white pl-3 pr-8 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                            <option value="Suami">Suami</option>
+                                            <option value="Istri">Istri</option>
+                                            <option value="Anak">Anak</option>
+                                        </select>
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Kelamin</label>
+                                        <select x-model="newKeluarga.jenis_kelamin" class="w-full rounded-lg border border-border bg-white pl-3 pr-8 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                            <option value="L">Laki-laki</option>
+                                            <option value="P">Perempuan</option>
+                                        </select>
+                                    </div>
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Lahir</label>
-                                    <input type="date" x-model="newKeluarga.tgl_lahir" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="date" x-model="newKeluarga.tanggal_lahir" max="{{ date('Y-m-d') }}" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Pekerjaan</label>
                                     <input type="text" x-model="newKeluarga.pekerjaan" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                </div>
+                                <div class="space-y-1 mt-2">
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" x-model="newKeluarga.status_tunjangan" class="w-4 h-4 text-primary bg-white border-border rounded focus:ring-primary/20 focus:ring-2">
+                                        <span class="text-xs font-bold text-ink font-sans">Masuk dalam tanggungan tunjangan keluarga?</span>
+                                    </label>
                                 </div>
                             </div>
                         </template>
@@ -829,7 +854,7 @@
                             <div class="space-y-4">
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Golongan</label>
-                                    <select x-model="newPangkat.golongan_id" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <select x-model="newPangkat.golongan_id" required class="w-full rounded-lg border border-border bg-white pl-3 pr-8 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                         <option value="">-- Pilih Golongan --</option>
                                         @foreach($golonganOptions as $gol)
                                             <option value="{{ $gol->id }}">{{ $gol->nama }} ({{ $gol->pangkat }})</option>
@@ -860,7 +885,7 @@
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Jabatan</label>
-                                    <select x-model="newJabatan.jenis_jabatan_id" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <select x-model="newJabatan.jenis_jabatan_id" required class="w-full rounded-lg border border-border bg-white pl-3 pr-8 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                         <option value="">-- Pilih Jenis Jabatan --</option>
                                         @foreach($jenisJabatanOptions as $jj)
                                             <option value="{{ $jj->id }}">{{ $jj->nama }}</option>
@@ -869,7 +894,7 @@
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Eselon (Opsional)</label>
-                                    <select x-model="newJabatan.eselon_id" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <select x-model="newJabatan.eselon_id" class="w-full rounded-lg border border-border bg-white pl-3 pr-8 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                         <option value="">-- Pilih Eselon --</option>
                                         @foreach($eselonOptions as $esl)
                                             <option value="{{ $esl->id }}">{{ $esl->nama }}</option>
@@ -878,7 +903,7 @@
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Unit Kerja</label>
-                                    <select x-model="newJabatan.unit_kerja_id" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <select x-model="newJabatan.unit_kerja_id" required class="w-full rounded-lg border border-border bg-white pl-3 pr-8 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                         <option value="">-- Pilih Unit Kerja --</option>
                                         @foreach($unitKerjaOptions as $unit)
                                             <option value="{{ $unit->id }}">{{ $unit->nama }}</option>
@@ -927,7 +952,7 @@
                             <div class="space-y-4">
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Hukuman</label>
-                                    <select x-model="newDisiplin.jenis_hukuman" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <select x-model="newDisiplin.jenis_hukuman" class="w-full rounded-lg border border-border bg-white pl-3 pr-8 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                         <option value="Ringan">Ringan</option>
                                         <option value="Sedang">Sedang</option>
                                         <option value="Berat">Berat</option>
@@ -964,11 +989,11 @@
                             <div class="space-y-4">
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tingkat Pendidikan</label>
-                                    <select x-model="newPendidikan.tingkat" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                        <option value="Diploma III (D3)">Diploma III (D3)</option>
-                                        <option value="Sarjana (S1)">Sarjana (S1)</option>
-                                        <option value="Magister (S2)">Magister (S2)</option>
-                                        <option value="Doktor (S3)">Doktor (S3)</option>
+                                    <select x-model="newPendidikan.tingkat" class="w-full rounded-lg border border-border bg-white pl-3 pr-8 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                        <option value="D3">Diploma III (D3)</option>
+                                        <option value="D4 / S1">Sarjana (S1)</option>
+                                        <option value="S2 / Profesi">Magister (S2)</option>
+                                        <option value="S3">Doktor (S3)</option>
                                     </select>
                                 </div>
                                 <div class="space-y-1">
