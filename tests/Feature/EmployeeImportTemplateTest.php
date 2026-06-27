@@ -115,4 +115,26 @@ class EmployeeImportTemplateTest extends TestCase
 
         $this->assertTrue((new EmployeeRowMapper())->isExampleRow($exampleCells));
     }
+
+    public function test_uploading_template_with_only_example_row_returns_clear_message(): void
+    {
+        $this->actingAs(User::factory()->adminKepegawaian()->create());
+
+        // Unduh template utama lalu unggah ulang apa adanya (hanya header + baris contoh).
+        $csv = $this->downloadTemplate('utama', 'csv')->streamedContent();
+        $file = \Illuminate\Http\Testing\File::createWithContent('template_utama.csv', $csv);
+
+        $res = $this->postJson('/api/pegawai/import/upload', [
+            'file' => $file,
+            'type' => 'utama',
+        ]);
+
+        // Baris contoh di-skip sehingga tidak ada data; pesan harus jelas, bukan menyesatkan.
+        $res->assertStatus(422);
+        $res->assertJsonValidationErrorFor('file');
+        $this->assertStringContainsString(
+            'Baris contoh otomatis dilewati',
+            $res->json('errors.file.0')
+        );
+    }
 }

@@ -57,9 +57,12 @@ class UploadImportBatchAction
             ]);
         }
 
+        // File tanpa baris data: bisa berarti hanya berisi header, atau hanya berisi
+        // baris contoh yang sengaja dilewati importer. Pesan diperjelas agar admin
+        // paham baris contoh otomatis di-skip dan tahu harus mengisi data asli.
         if ($rows === []) {
             throw ValidationException::withMessages([
-                'file' => ['File tidak berisi data import (hanya header).'],
+                'file' => ['File belum berisi data pegawai. Baris contoh otomatis dilewati, jadi isi data pegawai di bawah baris contoh lalu unggah ulang.'],
             ]);
         }
 
