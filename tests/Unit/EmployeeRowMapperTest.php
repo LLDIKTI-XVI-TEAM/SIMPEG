@@ -81,4 +81,19 @@ class EmployeeRowMapperTest extends TestCase
 
         $this->assertSame('Nama Pegawai', $mapper->normalizeHeader("\xEF\xBB\xBFNama Pegawai"));
     }
+
+    public function test_detects_example_marker_rows_regardless_of_column_position(): void
+    {
+        $mapper = new EmployeeRowMapper();
+
+        $this->assertTrue($mapper->isExampleRow(['CONTOH - HAPUS BARIS INI', 'x', 'y']));
+        $this->assertTrue($mapper->isExampleRow(['x', 'CONTOH - HAPUS BARIS INI', 'y']));
+        $this->assertFalse($mapper->isExampleRow(['Budi', 'budi@mail.com', '198001012006041001']));
+        $this->assertFalse($mapper->isExampleRow([null, '', '   ']));
+    }
+
+    public function test_exposes_the_example_row_marker_constant(): void
+    {
+        $this->assertSame('CONTOH - HAPUS BARIS INI', EmployeeRowMapper::EXAMPLE_ROW_MARKER);
+    }
 }
