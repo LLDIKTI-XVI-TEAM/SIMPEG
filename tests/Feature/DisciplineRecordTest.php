@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\DisciplineRecord;
 use App\Models\Employee;
 use App\Models\Permission;
@@ -83,7 +84,7 @@ class DisciplineRecordTest extends TestCase
             'event' => 'CREATE',
             'auditable_type' => 'DisciplineRecord',
         ]);
-        $audit = \App\Models\AuditLog::where('auditable_type', 'DisciplineRecord')->firstOrFail();
+        $audit = AuditLog::where('auditable_type', 'DisciplineRecord')->firstOrFail();
         $newValues = $audit->new_values;
 
         $this->assertSame('Ringan', Arr::get($newValues, 'jenis_hukuman'));

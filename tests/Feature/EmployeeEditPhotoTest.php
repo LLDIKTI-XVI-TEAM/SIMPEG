@@ -32,7 +32,7 @@ class EmployeeEditPhotoTest extends TestCase
             ->get(route('pegawai.edit', $employee->id));
 
         $response->assertOk();
-        $response->assertSee('src="' . asset('storage/' . $employee->foto) . '"', false);
+        $response->assertSee('src="'.asset('storage/'.$employee->foto).'"', false);
         $response->assertSee('alt="Foto Pegawai Dengan Foto"', false);
     }
 
@@ -48,7 +48,7 @@ class EmployeeEditPhotoTest extends TestCase
             ->get(route('pegawai.edit', $employee->id));
 
         $response->assertOk();
-        $response->assertSee('src="' . asset('storage/employees/photos/legacy-foto.jpg') . '"', false);
+        $response->assertSee('src="'.asset('storage/employees/photos/legacy-foto.jpg').'"', false);
         $response->assertDontSee(asset('storage/storage/employees/photos/legacy-foto.jpg'), false);
     }
 }

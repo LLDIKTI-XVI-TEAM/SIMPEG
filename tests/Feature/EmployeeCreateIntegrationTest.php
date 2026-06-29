@@ -2,11 +2,11 @@
 
 namespace Tests\Feature;
 
-use App\Models\User;
+use App\Models\Employee;
 use App\Models\RefAgama;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPerkawinan;
-use App\Models\Employee;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Tests\TestCase;
@@ -26,7 +26,7 @@ class EmployeeCreateIntegrationTest extends TestCase
     {
         // Arrange
         $user = User::factory()->create([
-            'role' => 'admin_kepegawaian'
+            'role' => 'admin_kepegawaian',
         ]);
 
         $agamaId = RefAgama::first()->id;
@@ -56,7 +56,7 @@ class EmployeeCreateIntegrationTest extends TestCase
         $response = $this->actingAs($user)->post(route('pegawai.store'), $postData);
 
         // Assert
-        if(session()->has('error')) {
+        if (session()->has('error')) {
             dump(session('error'));
         }
         $response->assertSessionHasNoErrors();
@@ -65,7 +65,7 @@ class EmployeeCreateIntegrationTest extends TestCase
 
         $this->assertDatabaseHas('employees', [
             'nama_lengkap' => 'Budi Santoso Uji',
-            'nip' => '199001012024011001'
+            'nip' => '199001012024011001',
         ]);
 
         $employee = Employee::where('nip', '199001012024011001')->first();
@@ -73,7 +73,7 @@ class EmployeeCreateIntegrationTest extends TestCase
         $this->assertDatabaseHas('appointments', [
             'employee_id' => $employee->id,
             'jenis_pengangkatan' => 'PNS',
-            'no_sk' => 'SK-UJI-001'
+            'no_sk' => 'SK-UJI-001',
         ]);
 
         // Check if detail page renders

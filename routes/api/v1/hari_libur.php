@@ -15,8 +15,10 @@ Route::middleware(['web', 'keycloak.auth', 'role:super_admin'])
             ->name('store');
         Route::put('/{hariLibur}', [HariLiburController::class, 'update'])
             ->middleware('permission:hari_libur.update')
+            ->whereUuid('hariLibur')
             ->name('update');
         Route::delete('/{hariLibur}', [HariLiburController::class, 'destroy'])
             ->middleware('permission:hari_libur.delete')
+            ->whereUuid('hariLibur')
             ->name('destroy');
     });

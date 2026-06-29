@@ -17,7 +17,7 @@ class CreateDisciplineRecordAction
     /**
      * Menambah riwayat disiplin lewat service append-only lalu mengembalikan payload publik terbatas.
      *
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
     public function execute(Employee $employee, array $data, ?Request $request = null): array

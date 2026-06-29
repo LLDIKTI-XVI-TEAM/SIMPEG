@@ -5,7 +5,15 @@ namespace App\Models;
 use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property string $id
+ * @property string $type
+ * @property int $interval_days
+ * @property Carbon $target_date
+ * @property-read Employee|null $employee
+ */
 class EwsAlert extends Model
 {
     use HasUuid;
@@ -29,6 +37,7 @@ class EwsAlert extends Model
         ];
     }
 
+    /** @return BelongsTo<Employee, $this> */
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);

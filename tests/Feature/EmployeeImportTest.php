@@ -509,7 +509,6 @@ class EmployeeImportTest extends TestCase
         );
     }
 
-
     private function postJsonWithCsrf(string $uri, array $data)
     {
         return $this->withSession(['_token' => 'test-token'])

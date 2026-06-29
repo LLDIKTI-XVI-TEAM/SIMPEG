@@ -37,7 +37,9 @@ class ImportEmployeesAction
 
         $validatedRows = [];
         $errors = [];
+        /** @var array<string, int> $seenNips */
         $seenNips = [];
+        /** @var array<string, int> $seenEmails */
         $seenEmails = [];
 
         foreach ($rows as $row) {
@@ -150,7 +152,7 @@ class ImportEmployeesAction
         $errors = [];
 
         if (! empty($data['nip'])) {
-            $nip = $data['nip'];
+            $nip = (string) $data['nip'];
 
             if (isset($seenNips[$nip])) {
                 $errors['nip'][] = "NIP sudah ada pada baris {$seenNips[$nip]}.";
@@ -160,7 +162,7 @@ class ImportEmployeesAction
         }
 
         if (! empty($data['email'])) {
-            $email = strtolower($data['email']);
+            $email = strtolower((string) $data['email']);
 
             if (isset($seenEmails[$email])) {
                 $errors['email'][] = "Email pegawai sudah ada pada baris {$seenEmails[$email]}.";

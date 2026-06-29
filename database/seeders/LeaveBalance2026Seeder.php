@@ -27,6 +27,6 @@ class LeaveBalance2026Seeder extends Seeder
             );
         }
 
-        $this->command->info('Seeded leave balances for ' . $employees->count() . ' employees (2026).');
+        $this->command->info('Seeded leave balances for '.$employees->count().' employees (2026).');
     }
 }

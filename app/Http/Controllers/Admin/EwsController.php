@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\EwsAlert;
 use App\Models\EwsConfig;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class EwsController extends Controller
@@ -15,7 +16,6 @@ class EwsController extends Controller
     public function index(Request $request)
     {
 
-
         $typeLabels = [
             'KENAIKAN_PANGKAT' => 'Kenaikan Pangkat',
             'KGB' => 'KGB',
@@ -24,17 +24,17 @@ class EwsController extends Controller
         ];
 
         $configDays = fn (string $key, int $default): int => (int) EwsConfig::getVal($key, (string) $default);
-        $dayLabel = fn (int $days): string => 'H-' . $days;
+        $dayLabel = fn (int $days): string => 'H-'.$days;
         $monthLabel = function (int $days): string {
             if ($days >= 365 && $days % 365 === 0) {
-                return 'H-' . ((int) ($days / 365)) . ' tahun';
+                return 'H-'.((int) ($days / 365)).' tahun';
             }
 
             if ($days >= 28) {
-                return 'H-' . ((int) round($days / 30)) . ' bulan';
+                return 'H-'.((int) round($days / 30)).' bulan';
             }
 
-            return 'H-' . $days . ' hari';
+            return 'H-'.$days.' hari';
         };
 
         $points = function (array $days, callable $labeler): array {
@@ -95,11 +95,11 @@ class EwsController extends Controller
             ->filter(fn (EwsAlert $alert) => $alert->employee !== null)
             ->map(function (EwsAlert $alert) use ($typeLabels, $thresholdMap, $points): array {
                 $employee = $alert->employee;
-                $thresholdConfig = $thresholdMap[$alert->type] ?? ['days' => [], 'labeler' => fn (int $days): string => 'H-' . $days];
+                $thresholdConfig = $thresholdMap[$alert->type] ?? ['days' => [], 'labeler' => fn (int $days): string => 'H-'.$days];
                 $thresholdPoints = $points($thresholdConfig['days'], $thresholdConfig['labeler']);
                 $thresholdSchedule = array_values($thresholdPoints);
-                $sisaHari = (int) now()->startOfDay()->diffInDays(\Carbon\Carbon::parse($alert->target_date)->startOfDay(), false);
-                $activeThreshold = $thresholdPoints[$alert->interval_days] ?? 'H-' . $alert->interval_days;
+                $sisaHari = (int) now()->startOfDay()->diffInDays(Carbon::parse($alert->target_date)->startOfDay(), false);
+                $activeThreshold = $thresholdPoints[$alert->interval_days] ?? 'H-'.$alert->interval_days;
 
                 $isEligible = true;
                 $reason = 'Perlu tindak lanjut';
@@ -108,10 +108,10 @@ class EwsController extends Controller
                 if ($alert->type === 'KENAIKAN_PANGKAT') {
                     $isKinerjaBaik = $employee->is_kinerja_baik === true;
                     $hasActiveDiscipline = $employee->disciplineRecords->contains('is_active', true);
-                    $isEligible = $isKinerjaBaik && !$hasActiveDiscipline;
+                    $isEligible = $isKinerjaBaik && ! $hasActiveDiscipline;
 
                     $passedChecks = [];
-                    if (!$isKinerjaBaik) {
+                    if (! $isKinerjaBaik) {
                         $passedChecks[] = 'Kinerja perlu ditinjau';
                     }
                     if ($hasActiveDiscipline) {
@@ -125,7 +125,7 @@ class EwsController extends Controller
                     ];
                     $eligibilityChecks[] = [
                         'label' => 'Bebas hukuman disiplin',
-                        'passed' => !$hasActiveDiscipline,
+                        'passed' => ! $hasActiveDiscipline,
                     ];
                 }
 
@@ -134,7 +134,7 @@ class EwsController extends Controller
                     'nama' => $employee->nama_lengkap,
                     'nip' => $employee->nip,
                     'jenis_event' => $typeLabels[$alert->type] ?? $alert->type,
-                    'tanggal_target' => \Carbon\Carbon::parse($alert->target_date)->format('Y-m-d'),
+                    'tanggal_target' => Carbon::parse($alert->target_date)->format('Y-m-d'),
                     'sisa_hari' => $sisaHari,
                     'threshold_label' => $activeThreshold,
                     'threshold_schedule' => $thresholdSchedule,
@@ -153,7 +153,7 @@ class EwsController extends Controller
         return view('admin.ews.aktif', [
             'alerts' => $alerts,
             'filterEvent' => $filterEvent,
-            'title' => 'EWS Aktif'
+            'title' => 'EWS Aktif',
         ]);
     }
 }

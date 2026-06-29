@@ -14,7 +14,7 @@ class CreateKgbHistoryAction
     /**
      * Menambah riwayat KGB lewat service append-only tanpa mengubah bentuk model respons.
      *
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     public function execute(Employee $employee, array $data, ?Request $request = null): SalaryHistory
     {

@@ -11,6 +11,7 @@ use App\Services\NotificationService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class NotificationInboxTest extends TestCase
@@ -258,7 +259,7 @@ class NotificationInboxTest extends TestCase
         ], $overrides));
     }
 
-    private function patchJsonWithCsrf(string $uri): \Illuminate\Testing\TestResponse
+    private function patchJsonWithCsrf(string $uri): TestResponse
     {
         return $this->withSession(['_token' => 'test-token'])
             ->patchJson($uri, [], ['X-CSRF-TOKEN' => 'test-token']);

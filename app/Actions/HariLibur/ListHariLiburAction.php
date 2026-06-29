@@ -14,11 +14,14 @@ class ListHariLiburAction
      */
     public function execute(?int $tahun): Collection
     {
-        return RefHariLibur::query()
+        /** @var Collection<int, array<string, mixed>> $hariLibur */
+        $hariLibur = RefHariLibur::query()
             ->orderBy('tanggal')
             ->when($tahun !== null, fn ($query) => $query->where('tahun', $tahun))
             ->get()
             ->map(fn (RefHariLibur $hariLibur): array => $hariLibur->toApiArray())
             ->values();
+
+        return $hariLibur;
     }
 }

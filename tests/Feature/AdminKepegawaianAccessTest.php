@@ -37,7 +37,7 @@ class AdminKepegawaianAccessTest extends TestCase
             'pengaturan',
             'data-nonaktif',
         ] as $forbiddenRoute) {
-            $response->assertDontSee('href="' . route($forbiddenRoute) . '"', false);
+            $response->assertDontSee('href="'.route($forbiddenRoute).'"', false);
         }
 
         foreach ([
@@ -50,7 +50,7 @@ class AdminKepegawaianAccessTest extends TestCase
             'laporan.cuti',
             'audit-log',
         ] as $allowedRoute) {
-            $response->assertSee('href="' . route($allowedRoute) . '"', false);
+            $response->assertSee('href="'.route($allowedRoute).'"', false);
         }
     }
 
@@ -90,7 +90,7 @@ class AdminKepegawaianAccessTest extends TestCase
         ] as $uri) {
             $response = $this->get($uri);
             if ($response->status() !== 200) {
-                dump("Failed on URI: $uri, Status: " . $response->status());
+                dump("Failed on URI: $uri, Status: ".$response->status());
             }
             $response->assertOk();
         }

@@ -19,7 +19,7 @@ class StoreEmployeeRequest extends FormRequest
     public function rules(): array
     {
         $rules = EmployeeValidationRules::create();
-        
+
         // Aturan tambahan khusus form UI web
         if (! $this->wantsJson() && ! $this->is('api/*')) {
             $rules['jenis_pengangkatan'] = ['required', 'string', 'max:100'];
@@ -27,11 +27,11 @@ class StoreEmployeeRequest extends FormRequest
             $rules['nomor_sk'] = ['required', 'string', 'max:255'];
             $rules['tanggal_sk'] = ['required', 'date'];
             $rules['file_sk'] = ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png'];
-            
+
             // Override foto khusus web (file upload)
             $rules['foto'] = ['nullable', 'image', 'max:10240', 'mimes:jpg,jpeg,png'];
         }
-        
+
         return $rules;
     }
 

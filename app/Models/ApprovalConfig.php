@@ -16,6 +16,7 @@ class ApprovalConfig extends Model
     public static function getVal(string $key, $default = null)
     {
         $config = self::where('key', $key)->first();
+
         return $config ? $config->value : $default;
     }
 

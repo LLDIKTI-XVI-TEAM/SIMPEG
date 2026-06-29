@@ -130,11 +130,14 @@ class WorkdayCalculator
      */
     private function tanggalLiburDalamRentang(Carbon $start, Carbon $end): array
     {
-        return RefHariLibur::query()
+        $tanggalLibur = RefHariLibur::query()
             ->whereBetween('tahun', [(int) $start->year, (int) $end->year])
             ->pluck('tanggal')
             ->mapWithKeys(fn (Carbon $tanggal): array => [$tanggal->toDateString() => true])
             ->all();
+
+        /** @var array<string, true> $tanggalLibur */
+        return $tanggalLibur;
     }
 
     /**

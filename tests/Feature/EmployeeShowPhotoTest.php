@@ -32,7 +32,7 @@ class EmployeeShowPhotoTest extends TestCase
             ->get(route('pegawai.show', $employee->id));
 
         $response->assertOk();
-        $response->assertSee('src="' . asset('storage/' . $employee->foto) . '"', false);
+        $response->assertSee('src="'.asset('storage/'.$employee->foto).'"', false);
         $response->assertSee('alt="Foto Detail Dengan Foto"', false);
     }
 

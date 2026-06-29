@@ -3,20 +3,19 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use App\Models\Employee;
-use App\Models\User;
-use App\Models\Role;
 use App\Models\Document;
+use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\RefUnitKerja;
+use App\Models\User;
+use Illuminate\Http\Request;
 
 class GlobalSearchController extends Controller
 {
     public function search(Request $request)
     {
         $query = $request->input('q');
-        
+
         if (empty($query) || strlen($query) < 2) {
             return response()->json([]);
         }
@@ -28,13 +27,13 @@ class GlobalSearchController extends Controller
             ->orWhere('nip', 'like', "%{$query}%")
             ->limit(5)
             ->get();
-            
+
         if ($employees->isNotEmpty()) {
             $results['Pegawai'] = $employees->map(function ($emp) {
                 return [
                     'title' => $emp->nama_lengkap,
-                    'subtitle' => 'NIP: ' . $emp->nip . ' — ' . ($emp->jabatan_terakhir ?? '-'),
-                    'url' => route('data-pegawai', ['search' => $emp->nip])
+                    'subtitle' => 'NIP: '.$emp->nip.' — '.($emp->jabatan_terakhir ?? '-'),
+                    'url' => route('data-pegawai', ['search' => $emp->nip]),
                 ];
             });
         }
@@ -50,11 +49,12 @@ class GlobalSearchController extends Controller
                         return [
                             'title' => $unit->nama,
                             'subtitle' => 'Unit Kerja / Departemen',
-                            'url' => route('data-master') . '?search=' . urlencode($unit->nama) // Fallback route
+                            'url' => route('data-master').'?search='.urlencode($unit->nama), // Fallback route
                         ];
                     });
                 }
-            } catch (\Exception $e) {}
+            } catch (\Exception $e) {
+            }
         }
 
         // 3. Search Dokumen
@@ -67,14 +67,16 @@ class GlobalSearchController extends Controller
                 if ($docs->isNotEmpty()) {
                     $results['Dokumen'] = $docs->map(function ($doc) {
                         $empName = $doc->employee ? $doc->employee->nama_lengkap : 'Unknown';
+
                         return [
                             'title' => $doc->nama_dokumen,
-                            'subtitle' => $doc->nomor_dokumen . ' — Pegawai: ' . $empName,
-                            'url' => route('dokumen') . '?search=' . urlencode($doc->nama_dokumen)
+                            'subtitle' => $doc->nomor_dokumen.' — Pegawai: '.$empName,
+                            'url' => route('dokumen').'?search='.urlencode($doc->nama_dokumen),
                         ];
                     });
                 }
-            } catch (\Exception $e) {}
+            } catch (\Exception $e) {
+            }
         }
 
         // 4. Search Cuti
@@ -86,14 +88,16 @@ class GlobalSearchController extends Controller
                 if ($leaves->isNotEmpty()) {
                     $results['Cuti'] = $leaves->map(function ($leave) {
                         $empName = $leave->employee ? $leave->employee->nama_lengkap : 'Unknown';
+
                         return [
-                            'title' => 'Pengajuan Cuti: ' . $empName,
-                            'subtitle' => 'Alasan: ' . mb_strimwidth($leave->alasan, 0, 50, '...') . ' (' . ucfirst($leave->status) . ')',
-                            'url' => route('cuti') . '?search=' . urlencode($empName)
+                            'title' => 'Pengajuan Cuti: '.$empName,
+                            'subtitle' => 'Alasan: '.mb_strimwidth($leave->alasan, 0, 50, '...').' ('.ucfirst($leave->status).')',
+                            'url' => route('cuti').'?search='.urlencode($empName),
                         ];
                     });
                 }
-            } catch (\Exception $e) {}
+            } catch (\Exception $e) {
+            }
         }
 
         // 5. Search Users (kept for completeness)
@@ -101,13 +105,13 @@ class GlobalSearchController extends Controller
             ->orWhere('email', 'like', "%{$query}%")
             ->limit(5)
             ->get();
-            
+
         if ($users->isNotEmpty()) {
             $results['Pengguna Sistem'] = $users->map(function ($u) {
                 return [
                     'title' => $u->name,
-                    'subtitle' => $u->email . ' — Role: ' . ($u->role ?? '-'),
-                    'url' => route('user-management', ['search' => $u->name])
+                    'subtitle' => $u->email.' — Role: '.($u->role ?? '-'),
+                    'url' => route('user-management', ['search' => $u->name]),
                 ];
             });
         }

@@ -14,7 +14,7 @@ class CreateRankHistoryAction
     /**
      * Menambah riwayat pangkat lewat service append-only dan memuat referensi golongan untuk respons.
      *
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     public function execute(Employee $employee, array $data, ?Request $request = null): RankHistory
     {

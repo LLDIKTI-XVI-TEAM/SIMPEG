@@ -3,13 +3,7 @@
 namespace App\Actions\Employees;
 
 use App\Models\Employee;
-use App\Models\RefAgama;
-use App\Models\RefEselon;
-use App\Models\RefGolongan;
-use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
-use App\Models\RefStatusPerkawinan;
-use App\Models\RefUnitKerja;
 use App\Models\User;
 use App\Support\EmployeeImport\EmployeeRowMapper;
 use App\Support\EmployeeValidationRules;
@@ -25,11 +19,6 @@ class ValidateImportBatchAction
 
     /**
      * Validate the import batch.
-     *
-     * @param  string  $batchId
-     * @param  array|null  $updatedRows
-     * @param  User|null  $user
-     * @return array
      */
     public function execute(string $batchId, ?array $updatedRows, ?User $user): array
     {

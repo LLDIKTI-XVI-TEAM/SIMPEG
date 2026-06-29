@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use App\Models\Employee;
 use App\Models\DisciplineRecord;
+use App\Models\Employee;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\RefGolongan;
@@ -56,7 +56,7 @@ class EmployeeHistoryService
             if ($history->file_sk) {
                 $employee->documents()->create([
                     'jenis_dokumen' => 'sk_pangkat',
-                    'nama_dokumen' => 'SK Kenaikan Pangkat ' . $golongan->kode,
+                    'nama_dokumen' => 'SK Kenaikan Pangkat '.$golongan->kode,
                     'nomor_dokumen' => $history->no_sk,
                     'tanggal_dokumen' => $history->tanggal_sk,
                     'file_path' => $history->file_sk,
@@ -116,7 +116,7 @@ class EmployeeHistoryService
             if ($history->file_sk) {
                 $employee->documents()->create([
                     'jenis_dokumen' => 'sk_jabatan',
-                    'nama_dokumen' => 'SK Kenaikan Jabatan ' . $history->nama_jabatan,
+                    'nama_dokumen' => 'SK Kenaikan Jabatan '.$history->nama_jabatan,
                     'nomor_dokumen' => $history->no_sk,
                     'tanggal_dokumen' => $history->tanggal_sk,
                     'file_path' => $history->file_sk,
@@ -164,7 +164,7 @@ class EmployeeHistoryService
             if ($history->file_sk) {
                 $employee->documents()->create([
                     'jenis_dokumen' => 'sk_kgb',
-                    'nama_dokumen' => 'SK KGB TMT ' . ($history->tmt_kgb ? $history->tmt_kgb->format('d-m-Y') : ''),
+                    'nama_dokumen' => 'SK KGB TMT '.($history->tmt_kgb ? $history->tmt_kgb->format('d-m-Y') : ''),
                     'nomor_dokumen' => $history->no_sk,
                     'tanggal_dokumen' => $history->tanggal_sk,
                     'file_path' => $history->file_sk,
@@ -221,7 +221,7 @@ class EmployeeHistoryService
     /**
      * Upload SK disimpan sebelum transaksi data agar model hanya menerima path relatif yang aman.
      *
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
     private function storeSkUpload(array $data): array

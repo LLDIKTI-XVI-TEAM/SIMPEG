@@ -373,6 +373,20 @@ class HariLiburCrudTest extends TestCase
         $response->assertNotFound();
     }
 
+    public function test_update_returns_404_for_malformed_uuid(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+
+        $this->actingAs($user);
+        $response = $this->putJsonWithCsrf(self::HARI_LIBUR_ENDPOINT.'/not-a-uuid', [
+            'tanggal' => '2026-01-02',
+            'nama' => 'Tahun Baru Diubah',
+            'tipe' => 'libur_nasional',
+        ]);
+
+        $response->assertNotFound();
+    }
+
     public function test_guest_cannot_delete_hari_libur(): void
     {
         $hariLibur = RefHariLibur::create([
@@ -396,6 +410,16 @@ class HariLiburCrudTest extends TestCase
 
         $this->actingAs($user);
         $response = $this->deleteJsonWithCsrf(self::HARI_LIBUR_ENDPOINT.'/01HZZZZZZZZZZZZZZZZZZZZZZZZ');
+
+        $response->assertNotFound();
+    }
+
+    public function test_delete_returns_404_for_malformed_uuid(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+
+        $this->actingAs($user);
+        $response = $this->deleteJsonWithCsrf(self::HARI_LIBUR_ENDPOINT.'/not-a-uuid');
 
         $response->assertNotFound();
     }

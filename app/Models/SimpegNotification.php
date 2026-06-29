@@ -6,7 +6,18 @@ use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property string $id
+ * @property string $type
+ * @property string $title
+ * @property string $body
+ * @property array<string, mixed>|null $data
+ * @property bool $is_read
+ * @property Carbon|null $read_at
+ * @property Carbon|null $created_at
+ */
 class SimpegNotification extends Model
 {
     use HasUuid;
@@ -32,6 +43,7 @@ class SimpegNotification extends Model
         ];
     }
 
+    /** @return BelongsTo<Employee, $this> */
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'user_id');

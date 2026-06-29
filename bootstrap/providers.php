@@ -1,11 +1,13 @@
 <?php
 
 use App\Providers\AppServiceProvider;
+use BladeUI\Heroicons\BladeHeroiconsServiceProvider;
+use BladeUI\Icons\BladeIconsServiceProvider;
 
 return [
     AppServiceProvider::class,
     // Blade Icons & Heroicons — didaftarkan eksplisit karena auto-discovery tidak
     // berjalan secara konsisten di environment container Podman.
-    BladeUI\Icons\BladeIconsServiceProvider::class,
-    BladeUI\Heroicons\BladeHeroiconsServiceProvider::class,
+    BladeIconsServiceProvider::class,
+    BladeHeroiconsServiceProvider::class,
 ];
