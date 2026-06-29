@@ -40,7 +40,7 @@
         activeUnit: '',
         activeStatus: '',
         searchQuery: '',
-        showUploadModal: false,
+        showUploadModal: {{ $errors->any() ? 'true' : 'false' }},
         documents: {{ json_encode($dokumen) }},
         currentPage: 1,
         perPage: 5,
@@ -359,6 +359,16 @@
                 <form action="{{ route('dokumen.store') }}" method="POST" enctype="multipart/form-data"
                     class="space-y-3">
                     @csrf
+                    
+                    @if ($errors->any())
+                        <div class="rounded-lg bg-danger/10 p-3 text-xs text-danger font-sans">
+                            <ul class="list-disc pl-4 space-y-1">
+                                @foreach ($errors->all() as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
 
                     {{-- Relasi Pegawai --}}
                     <div class="space-y-1 relative z-50" x-data="{
@@ -488,6 +498,9 @@
                         </button>
                         <button type="submit"
                             class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90 cursor-pointer focus:outline-none font-sans">
+                            <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                            </svg>
                             Mulai Unggah
                         </button>
                     </div>

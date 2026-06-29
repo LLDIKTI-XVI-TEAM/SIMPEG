@@ -70,12 +70,13 @@ class DokumenController extends Controller
             'tanggal_terbit' => 'required|date',
             'kategori_dokumen' => 'required|string',
             'pegawai_id' => 'required|uuid|exists:employees,id',
-            'berkas' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
+            'berkas' => 'required|file|extensions:pdf,doc,docx,jpg,jpeg,png|max:10240',
         ]);
 
         $employee = Employee::findOrFail($request->input('pegawai_id'));
 
         $filePath = $request->file('berkas')->store('employees/documents', 'public');
+        \Illuminate\Support\Facades\Log::info('File Path: ' . var_export($filePath, true));
 
         Document::create([
             'employee_id' => $employee->id,
@@ -99,7 +100,12 @@ class DokumenController extends Controller
             abort(404);
         }
 
-        return Storage::disk('public')->download($doc->file_path, basename($doc->file_path));
+        $extension = pathinfo($doc->file_path, PATHINFO_EXTENSION);
+        $employeeName = \Illuminate\Support\Str::slug($doc->employee->nama_lengkap ?? 'pegawai');
+        $docName = \Illuminate\Support\Str::slug($doc->nama_dokumen);
+        $filename = $employeeName . '-' . $docName . '.' . $extension;
+
+        return Storage::disk('public')->download($doc->file_path, $filename);
     }
 }
 
