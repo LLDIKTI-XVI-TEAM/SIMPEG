@@ -1,50 +1,5 @@
 <x-layouts.app title="Dashboard" subtitle="Ringkasan eksekutif dan pemantauan aktivitas kepegawaian hari ini.">
 
-    {{-- Welcome Toast Notification --}}
-    @if(session('login_success'))
-        <div
-            x-data="{ show: true }"
-            x-init="setTimeout(() => show = false, 5000)"
-            x-show="show"
-            x-transition:enter="transition ease-out duration-300 transform"
-            x-transition:enter-start="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2"
-            x-transition:enter-end="translate-y-0 opacity-100 sm:translate-x-0"
-            x-transition:leave="transition ease-in duration-200"
-            x-transition:leave-start="opacity-100"
-            x-transition:leave-end="opacity-0"
-            class="fixed bottom-5 right-5 z-50 max-w-sm w-full bg-surface/95 backdrop-blur-md border border-success/20 rounded-xl shadow-2xl p-4 flex items-start gap-4 transition-all duration-300 hover:scale-[1.02]"
-            style="display: none;"
-        >
-            <!-- Icon Container with Gradient -->
-            <div class="shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-400 to-success flex items-center justify-center shadow-md">
-                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                </svg>
-            </div>
-
-            <!-- Content -->
-            <div class="flex-1 min-w-0">
-                <h4 class="text-sm font-bold text-ink font-sans">Masuk Berhasil!</h4>
-                <p class="text-xs text-muted font-sans mt-1 leading-normal">
-                    {{ session('login_success') }}
-                </p>
-                <p class="text-[10px] text-primary/70 font-semibold font-sans mt-1.5 flex items-center gap-1">
-                    <span>Selamat datang, {{ auth()->user()->name }}</span>
-                    <span class="animate-bounce">👋</span>
-                </p>
-            </div>
-
-            <!-- Close Button -->
-            <button
-                @click="show = false"
-                class="shrink-0 text-muted hover:text-ink transition-colors cursor-pointer focus:outline-none"
-            >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-        </div>
-    @endif
 
     {{-- ================================================================ --}}
     {{-- WELCOME BANNER --}}

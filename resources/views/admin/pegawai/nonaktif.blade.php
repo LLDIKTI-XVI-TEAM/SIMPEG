@@ -170,7 +170,7 @@
                     @endif
                 </div>
                 <div class="w-full sm:w-auto">
-                    {{ $employees->links('vendor.pagination.simpeg') }}
+                    {{ $employees->onEachSide(1)->links('vendor.pagination.simpeg') }}
                 </div>
             </div>
         </section>

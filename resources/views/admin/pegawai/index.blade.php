@@ -309,7 +309,7 @@
                 @endif
             </div>
             <div class="w-full sm:w-auto">
-                {{ $pegawaiData->links('vendor.pagination.simpeg') }}
+                {{ $pegawaiData->onEachSide(1)->links('vendor.pagination.simpeg') }}
             </div>
         </div>
     </div>
