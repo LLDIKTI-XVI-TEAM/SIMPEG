@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\Employee;
 use App\Models\RefJenisCuti;
+use App\Services\LeaveApprovalService;
 use App\Services\WorkdayCalculator;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -70,6 +71,17 @@ class StoreLeaveRequestRequest extends FormRequest
                 $validator->errors()->add(
                     'tanggal_mulai',
                     'Anda belum memiliki atasan langsung aktif sehingga belum dapat mengajukan cuti.',
+                );
+
+                return;
+            }
+
+            // Rantai approval (stage 2 dan 3) wajib dikonfigurasi sebelum cuti dapat diajukan; tanpa approver
+            // terkonfigurasi pengajuan tidak akan dapat ditindaklanjuti dan akan tersangkut tanpa penyelesaian.
+            if (! app(LeaveApprovalService::class)->approvalChainIsConfigured()) {
+                $validator->errors()->add(
+                    'jenis_cuti_id',
+                    'Konfigurasi approver cuti belum lengkap. Hubungi Super Admin.',
                 );
 
                 return;

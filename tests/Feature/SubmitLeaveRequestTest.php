@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\ApprovalConfig;
 use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
@@ -35,6 +36,23 @@ class SubmitLeaveRequestTest extends TestCase
 
         // Seed RBAC agar permission cuti.create tersedia bagi gerbang route dan FormRequest.
         $this->seed(RbacSeeder::class);
+
+        // Rantai approval (stage 2 dan 3) wajib terkonfigurasi sebagai prasyarat operasional modul cuti.
+        // Tanpa ini pengajuan ditolak; happy-path di kelas ini mengasumsikan chain sudah lengkap.
+        $this->seedApprovalChain();
+    }
+
+    /**
+     * Mengisi approver stage 2 dan stage 3 di approval_configs agar pengajuan tidak ditolak
+     * karena konfigurasi belum lengkap. Approver disimpan sebagai id User yang tertaut ke Employee.
+     */
+    private function seedApprovalChain(): void
+    {
+        $verifikator = User::factory()->create(['employee_id' => Employee::factory()->create()->id]);
+        $pimpinan = User::factory()->create(['employee_id' => Employee::factory()->create()->id]);
+
+        ApprovalConfig::setVal('stage2_approver_id', (string) $verifikator->id);
+        ApprovalConfig::setVal('stage3_approver_id', (string) $pimpinan->id);
     }
 
     /**
@@ -336,6 +354,23 @@ class SubmitLeaveRequestTest extends TestCase
 
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors(['tanggal_selesai']);
+        $this->assertDatabaseCount('leave_requests', 0);
+    }
+
+    public function test_menolak_pengajuan_saat_rantai_approval_belum_dikonfigurasi(): void
+    {
+        // Hapus konfigurasi approver agar rantai approval dianggap belum lengkap.
+        ApprovalConfig::query()->delete();
+
+        $aktor = $this->makePemohon();
+        $jenis = $this->jenisCuti('Cuti Sakit');
+
+        $this->actingAs($aktor['user']);
+        $response = $this->postJson(route(self::ROUTE), $this->payload($jenis));
+
+        // Prasyarat operasional: tanpa approver stage 2/3, pengajuan ditolak dengan pesan jelas dan tidak tersimpan.
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['jenis_cuti_id']);
         $this->assertDatabaseCount('leave_requests', 0);
     }
 }

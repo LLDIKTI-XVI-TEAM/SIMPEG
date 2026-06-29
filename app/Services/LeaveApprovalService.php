@@ -140,6 +140,26 @@ class LeaveApprovalService
             return $leaveRequest->employee?->currentSupervisor()?->supervisor?->id;
         }
 
+        return $this->configuredApproverEmployeeId($stage);
+    }
+
+    /**
+     * Menentukan apakah rantai approval (stage 2 dan stage 3) sudah dikonfigurasi dan dapat di-resolve
+     * ke pegawai. Dipakai sebagai prasyarat operasional: tanpa approver terkonfigurasi, pengajuan tidak
+     * boleh masuk antrean karena tidak akan ada yang dapat menindaklanjuti dan pengajuan akan tersangkut.
+     */
+    public function approvalChainIsConfigured(): bool
+    {
+        return $this->configuredApproverEmployeeId(2) !== null
+            && $this->configuredApproverEmployeeId(3) !== null;
+    }
+
+    /**
+     * Mengembalikan employee_id approver terkonfigurasi untuk stage 2 atau stage 3 dari approval_configs.
+     * Konfigurasi menyimpan id User, lalu dijembatani ke employee_id agar konsisten dengan pencatatan approval.
+     */
+    private function configuredApproverEmployeeId(int $stage): ?string
+    {
         $configKey = $stage === 2 ? 'stage2_approver_id' : 'stage3_approver_id';
         $userId = ApprovalConfig::getVal($configKey);
 
@@ -169,7 +189,15 @@ class LeaveApprovalService
     {
         $approverId = $this->approverEmployeeIdForStage($leaveRequest, $stage);
 
-        if ($approverId === null || $approverId !== $actor->id) {
+        // Approver belum dapat di-resolve berarti rantai approval belum dikonfigurasi (mis. stage 2/3 kosong).
+        // Bedakan dari kasus "bukan approver" agar approver yang sah tidak menerima pesan yang menyesatkan.
+        if ($approverId === null) {
+            throw ValidationException::withMessages([
+                'status' => 'Konfigurasi approver cuti belum lengkap. Hubungi Super Admin.',
+            ]);
+        }
+
+        if ($approverId !== $actor->id) {
             throw new AuthorizationException('Anda bukan approver yang berwenang untuk tahap persetujuan ini.');
         }
     }

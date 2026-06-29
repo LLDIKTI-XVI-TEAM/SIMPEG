@@ -254,4 +254,25 @@ class LeaveApprovalEngineTest extends TestCase
             $this->assertSame(1, $balance->sisa);
         }
     }
+
+    public function test_approve_pada_tahap_tanpa_approver_terkonfigurasi_memberi_pesan_konfigurasi(): void
+    {
+        $pemohon = $this->makePemohon();
+
+        // Sengaja TIDAK memanggil setApprovers: rantai approval stage 2/3 belum dikonfigurasi.
+        $jenis = $this->jenisCuti('Cuti Sakit');
+        $cuti = $this->makeRequest($pemohon['employee'], $jenis, 2);
+        $cuti->update(['status' => 'Menunggu Verifikator']);
+
+        $aktor = Employee::factory()->create();
+
+        // Tahap menunggu tanpa approver terkonfigurasi harus menghasilkan pesan konfigurasi yang jelas,
+        // bukan AuthorizationException "bukan approver" yang menyesatkan.
+        try {
+            $this->service()->approve($cuti->fresh(), $aktor);
+            $this->fail('Persetujuan seharusnya gagal karena rantai approval belum dikonfigurasi.');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('Konfigurasi approver cuti belum lengkap', $e->getMessage());
+        }
+    }
 }
