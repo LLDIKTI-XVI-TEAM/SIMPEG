@@ -18,7 +18,6 @@ use App\Http\Controllers\EmployeeImportController;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
@@ -89,88 +88,8 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
     })->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
         ->name('pegawai.import');
 
-    Route::get('/pegawai/import/template/{type}', function ($type) {
-        $headers = [];
-
-        if ($type === 'utama') {
-            $headers = ['No', 'Nama Pegawai', 'Email Pegawai', 'Golongan', 'Jabatan', 'Kelas Jabatan', 'NIP', 'Nomor Telepon', 'Pangkat', 'Pendidikan Terakhir', 'Pensiun', 'Person', 'Person Formula', 'Prodi Pendidikan Terakhir', 'Status Kepegawaian', 'Tanggal Lahir'];
-        } elseif ($type === 'pelengkap') {
-            $headers = ['NIP', 'NIK', 'No KK', 'Tempat Lahir', 'Jenis Kelamin', 'Agama', 'Status Kawin', 'Golongan Darah'];
-        } elseif ($type === 'kepangkatan') {
-            $headers = ['NIP', 'Golongan', 'TMT Pangkat', 'No SK', 'Tanggal SK'];
-        } elseif ($type === 'jabatan') {
-            $headers = ['NIP', 'Nama Jabatan', 'Jenis Jabatan', 'Unit Kerja', 'TMT Jabatan', 'No SK', 'Tanggal SK'];
-        } elseif ($type === 'kgb') {
-            $headers = ['NIP', 'TMT KGB', 'Gaji Pokok', 'No SK', 'Tanggal SK'];
-        } else {
-            abort(404);
-        }
-
-        $format = strtolower((string) request('format', 'xlsx'));
-        $format = in_array($format, ['xlsx', 'csv'], true) ? $format : 'xlsx';
-        $filename = 'template_'.$type.'.'.$format;
-
-        if ($format === 'csv') {
-            return response()->streamDownload(function () use ($headers) {
-                $output = fopen('php://output', 'w');
-                echo "\xEF\xBB\xBF";
-                fputcsv($output, $headers);
-                fclose($output);
-            }, $filename, [
-                'Content-Type' => 'text/csv; charset=UTF-8',
-                'Content-Disposition' => 'attachment; filename="'.$filename.'"',
-                'Cache-Control' => 'no-cache, no-store, must-revalidate',
-                'Pragma' => 'no-cache',
-                'Expires' => '0',
-            ]);
-        }
-
-        $spreadsheet = new Spreadsheet;
-        $sheet = $spreadsheet->getActiveSheet();
-        $sheet->setTitle('Template '.ucfirst($type));
-
-        // Write headers
-        foreach ($headers as $index => $header) {
-            $colLetter = Coordinate::stringFromColumnIndex($index + 1);
-            $sheet->setCellValue($colLetter.'1', $header);
-
-            // Set header style (Primary Blue background, white bold text, centered, borders)
-            $sheet->getStyle($colLetter.'1')->applyFromArray([
-                'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 10, 'name' => 'Calibri'],
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '122E92']],
-                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => true],
-                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CACFE0']]],
-            ]);
-
-            // Auto fit column width
-            $sheet->getColumnDimension($colLetter)->setAutoSize(true);
-        }
-
-        $sheet->getRowDimension(1)->setRowHeight(30);
-
-        // Add styled blank rows (e.g. 15 blank rows) with borders for a structured layout
-        $lastColLetter = Coordinate::stringFromColumnIndex(count($headers));
-        for ($r = 2; $r <= 16; $r++) {
-            $sheet->getRowDimension($r)->setRowHeight(20);
-
-            // Set border
-            $sheet->getStyle('A'.$r.':'.$lastColLetter.$r)->applyFromArray([
-                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'E5E7EB']]],
-            ]);
-        }
-
-        // Stream download
-        return response()->streamDownload(function () use ($spreadsheet) {
-            $writer = new Xlsx($spreadsheet);
-            $writer->save('php://output');
-        }, $filename, [
-            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
-            'Cache-Control' => 'no-cache, no-store, must-revalidate',
-            'Pragma' => 'no-cache',
-            'Expires' => '0',
-        ]);
-    })->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+    Route::get('/pegawai/import/template/{type}', [EmployeeImportController::class, 'template'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
         ->name('pegawai.import-template');
 
     // Import API endpoints (dipanggil via fetch dari blade, butuh session auth)

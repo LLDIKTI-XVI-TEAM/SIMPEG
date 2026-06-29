@@ -94,6 +94,7 @@ class EmployeeValidationRules
             'prodi_pendidikan_terakhir' => ['required', 'string', 'max:255'],
             'tanggal_pensiun' => ['nullable', 'date'],
             'no_hp' => ['required', 'string', 'max:20'],
+            'role' => ['required', 'in:admin_kepegawaian,pimpinan,atasan_langsung,pegawai'],
         ];
     }
 
@@ -125,6 +126,7 @@ class EmployeeValidationRules
             'no_hp' => 'Nomor HP',
             'email' => 'Email Pegawai',
             'no_telepon_rumah' => 'No. Telepon Rumah',
+            'role' => 'Role',
         ];
     }
 }

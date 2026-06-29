@@ -137,6 +137,7 @@ class EmployeeImportTest extends TestCase
             'Teknik Informatika',
             'PNS',
             '1986-02-12',
+            'pegawai',
         ])."\n";
 
         $this->actingAs($user);
@@ -479,6 +480,7 @@ class EmployeeImportTest extends TestCase
             'Prodi Pendidikan Terakhir',
             'Status Kepegawaian',
             'Tanggal Lahir',
+            'Role',
         ])."\n".
         implode(',', [
             '1',
@@ -497,6 +499,7 @@ class EmployeeImportTest extends TestCase
             'Manajemen',
             'PNS',
             '1980-01-01',
+            'pegawai',
         ])."\n";
     }
 
@@ -518,6 +521,7 @@ class EmployeeImportTest extends TestCase
             'Prodi Pendidikan Terakhir',
             'Status Kepegawaian',
             'Tanggal Lahir',
+            'Role',
         ];
 
         return $includeNoColumn ? array_merge(['No'], $headers) : $headers;
@@ -542,6 +546,7 @@ class EmployeeImportTest extends TestCase
                 'Manajemen',
                 'PNS',
                 '1980-01-01',
+                'pegawai',
             ],
             [
                 'Siti Aminah',
@@ -559,6 +564,7 @@ class EmployeeImportTest extends TestCase
                 'Teknik Informatika',
                 'PNS',
                 '12/02/1985',
+                'pegawai',
             ],
         ];
 

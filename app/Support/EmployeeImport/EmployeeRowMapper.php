@@ -26,6 +26,7 @@ class EmployeeRowMapper
         'Prodi Pendidikan Terakhir',
         'Status Kepegawaian',
         'Tanggal Lahir',
+        'Role',
     ];
 
     /**
@@ -35,6 +36,14 @@ class EmployeeRowMapper
         'NIK',
         'No KK',
     ];
+
+    /**
+     * Penanda baris contoh pada template import.
+     * Dipakai bersama oleh penulis template dan pembaca import:
+     * penulis menaruh penanda ini pada baris contoh, pembaca melewatinya
+     * agar baris contoh tidak ikut ter-import bila admin lupa menghapusnya.
+     */
+    public const EXAMPLE_ROW_MARKER = 'CONTOH - HAPUS BARIS INI';
 
     /**
      * Mapping from Excel header to new SIMPEG field names.
@@ -56,6 +65,19 @@ class EmployeeRowMapper
         'Prodi Pendidikan Terakhir' => 'prodi_pendidikan_terakhir',
         'Status Kepegawaian' => 'jenis_pegawai',
         'Tanggal Lahir' => 'tanggal_lahir',
+        'Role' => 'role',
+    ];
+
+    /**
+     * Mapping untuk normalisasi nilai Role dari berbagai format input.
+     */
+    private const ROLE_MAP = [
+        'admin_kepegawaian' => 'admin_kepegawaian',
+        'admin kepegawaian' => 'admin_kepegawaian',
+        'pimpinan' => 'pimpinan',
+        'atasan_langsung' => 'atasan_langsung',
+        'atasan langsung' => 'atasan_langsung',
+        'pegawai' => 'pegawai',
     ];
 
     /**
@@ -111,6 +133,7 @@ class EmployeeRowMapper
         $isPhoneEducation = in_array(strtoupper($phoneVal), ['SD', 'SMP', 'SMA', 'SMK', 'D1', 'D2', 'D3', 'D4', 'S1', 'S2', 'S3'], true);
 
         if ($isNikAPhone && $isPhoneEducation) {
+            $row['Role'] = $row['Status Kepegawaian'] ?? null;
             $row['Tanggal Lahir'] = $row['Prodi Pendidikan Terakhir'] ?? null;
             $row['Status Kepegawaian'] = $row['Person Formula'] ?? null;
             $row['Prodi Pendidikan Terakhir'] = $row['Person'] ?? null;
@@ -148,6 +171,11 @@ class EmployeeRowMapper
                 $value = self::STATUS_MAP[strtolower($value)] ?? $value;
             }
 
+            // Normalisasi role ke format snake_case yang valid
+            if ($field === 'role' && $value !== null) {
+                $value = self::ROLE_MAP[strtolower($value)] ?? $value;
+            }
+
             $mapped[$field] = $value;
         }
 
@@ -163,6 +191,22 @@ class EmployeeRowMapper
         }
 
         return true;
+    }
+
+    /**
+     * Cek apakah baris merupakan baris contoh template (mengandung penanda).
+     * Pemeriksaan lintas kolom agar tetap dikenali walau urutan kolom berubah,
+     * sehingga baris contoh tidak ikut ter-import bila admin lupa menghapusnya.
+     */
+    public function isExampleRow(array $row): bool
+    {
+        foreach ($row as $value) {
+            if (is_string($value) && trim($value) === self::EXAMPLE_ROW_MARKER) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function parseDate(mixed $value): mixed

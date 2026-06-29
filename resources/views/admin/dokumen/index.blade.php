@@ -1,222 +1,38 @@
 <x-layouts.app title="Arsip Dokumen Kepegawaian">
 
     @php
-        $dokumen = [
-            [
-                'id' => 1,
-                'jenis' => 'SK Kenaikan Pangkat',
-                'nama' => 'SK Kenaikan Pangkat Penata Tkt. I',
-                'nomor' => 'SK-882-KP-2024',
-                'tanggal' => '2024-04-01',
-                'kategori' => 'sk_pangkat',
-                'kategori_label' => 'SK Kenaikan Pangkat',
-                'nama_pegawai' => 'Ahmad Fauzi',
-                'nip_pegawai' => '19850312201001 1 001',
-                'unit_pegawai' => 'Bag. Umum',
-                'file_path' => 'employees/docs/198503122010011001_sk_pangkat_2024.pdf',
-                'file_size' => '1.2 MB',
-                'status_dokumen' => 'terverifikasi',
-                'status_label' => 'Terverifikasi',
-                'deskripsi' => 'SK Kenaikan Pangkat Penata Tingkat I Golongan Ruang III/d atas nama Ahmad Fauzi.'
-            ],
-            [
-                'id' => 2,
-                'jenis' => 'SK Kenaikan Jabatan',
-                'nama' => 'SK Pengangkatan Jabatan Analis Kepegawaian',
-                'nomor' => 'SK-104-JAB-2022',
-                'tanggal' => '2022-08-15',
-                'kategori' => 'sk_jabatan',
-                'kategori_label' => 'SK Kenaikan Jabatan',
-                'nama_pegawai' => 'Ahmad Fauzi',
-                'nip_pegawai' => '19850312201001 1 001',
-                'unit_pegawai' => 'Bag. Umum',
-                'file_path' => 'employees/docs/198503122010011001_sk_jabatan_2022.pdf',
-                'file_size' => '850 KB',
-                'status_dokumen' => 'terverifikasi',
-                'status_label' => 'Terverifikasi',
-                'deskripsi' => 'SK Pengangkatan Pertama kali dalam Jabatan Fungsional Analis Kepegawaian Ahli Pertama.'
-            ],
-            [
-                'id' => 3,
-                'jenis' => 'SK KGB',
-                'nama' => 'SK Kenaikan Gaji Berkala 2025',
-                'nomor' => 'KGB-334-VII-2025',
-                'tanggal' => '2025-07-01',
-                'kategori' => 'sk_kgb',
-                'kategori_label' => 'SK KGB',
-                'nama_pegawai' => 'Ahmad Fauzi',
-                'nip_pegawai' => '19850312201001 1 001',
-                'unit_pegawai' => 'Bag. Umum',
-                'file_path' => 'employees/docs/198503122010011001_sk_kgb_2025.pdf',
-                'file_size' => '420 KB',
-                'status_dokumen' => 'aktif',
-                'status_label' => 'Aktif',
-                'deskripsi' => 'Surat Keterangan Kenaikan Gaji Berkala Reguler tahun berjalan 2025.'
-            ],
-            [
-                'id' => 4,
-                'jenis' => 'Ijazah',
-                'nama' => 'Ijazah Sarjana (S1) Manajemen',
-                'nomor' => 'IJZ-S1-MAN-2007',
-                'tanggal' => '2007-09-20',
-                'kategori' => 'ijazah',
-                'kategori_label' => 'Ijazah',
-                'nama_pegawai' => 'Ahmad Fauzi',
-                'nip_pegawai' => '19850312201001 1 001',
-                'unit_pegawai' => 'Bag. Umum',
-                'file_path' => 'employees/docs/198503122010011001_ijazah_s1.pdf',
-                'file_size' => '2.1 MB',
-                'status_dokumen' => 'terverifikasi',
-                'status_label' => 'Terverifikasi',
-                'deskripsi' => 'Ijazah Sarjana S1 Program Studi Manajemen dari Universitas Sam Ratulangi.'
-            ],
-            [
-                'id' => 5,
-                'jenis' => 'KTP',
-                'nama' => 'Kartu Tanda Penduduk (KTP)',
-                'nomor' => '3171-7403-8803-0001',
-                'tanggal' => '2021-05-10',
-                'kategori' => 'ktp_kk',
-                'kategori_label' => 'KTP & KK',
-                'nama_pegawai' => 'Siti Rahayu',
-                'nip_pegawai' => '19901120201501 2 003',
-                'unit_pegawai' => 'Bag. Keuangan',
-                'file_path' => 'employees/docs/199011202015012003_ktp.pdf',
-                'file_size' => '620 KB',
-                'status_dokumen' => 'perlu_review',
-                'status_label' => 'Perlu Review',
-                'deskripsi' => 'KTP atas nama Siti Rahayu.'
-            ],
-            [
-                'id' => 6,
-                'jenis' => 'KK',
-                'nama' => 'Kartu Keluarga (KK)',
-                'nomor' => '3171-7403-8803-0002',
-                'tanggal' => '2021-05-10',
-                'kategori' => 'ktp_kk',
-                'kategori_label' => 'KTP & KK',
-                'nama_pegawai' => 'Siti Rahayu',
-                'nip_pegawai' => '19901120201501 2 003',
-                'unit_pegawai' => 'Bag. Keuangan',
-                'file_path' => 'employees/docs/199011202015012003_kk.pdf',
-                'file_size' => '580 KB',
-                'status_dokumen' => 'perlu_review',
-                'status_label' => 'Perlu Review',
-                'deskripsi' => 'Kartu Keluarga terbaru atas nama kepala keluarga Siti Rahayu.'
-            ],
-            [
-                'id' => 7,
-                'jenis' => 'SK Pengangkatan',
-                'nama' => 'SK Pengangkatan PNS 2026',
-                'nomor' => 'SK-220-PNS-2026',
-                'tanggal' => '2026-01-01',
-                'kategori' => 'sk_pengangkatan',
-                'kategori_label' => 'SK Pengangkatan',
-                'nama_pegawai' => 'Sabrina Rossa Adriani Wibowo',
-                'nip_pegawai' => '20261210820500 0 04',
-                'unit_pegawai' => 'Bag. SDM',
-                'file_path' => 'employees/docs/20261210820500004_sk_pns.pdf',
-                'file_size' => '1.5 MB',
-                'status_dokumen' => 'aktif',
-                'status_label' => 'Aktif',
-                'deskripsi' => 'SK Pengangkatan PNS atas nama Sabrina Rossa.'
-            ],
-            [
-                'id' => 8,
-                'jenis' => 'SK KGB',
-                'nama' => 'SK Kenaikan Gaji Berkala 2026',
-                'nomor' => 'KGB-335-VIII-2026',
-                'tanggal' => '2026-08-01',
-                'kategori' => 'sk_kgb',
-                'kategori_label' => 'SK KGB',
-                'nama_pegawai' => 'Siti Rahayu',
-                'nip_pegawai' => '19901120201501 2 003',
-                'unit_pegawai' => 'Bag. Keuangan',
-                'file_path' => 'employees/docs/199011202015012003_sk_kgb.pdf',
-                'file_size' => '450 KB',
-                'status_dokumen' => 'aktif',
-                'status_label' => 'Aktif',
-                'deskripsi' => 'SK KGB tahun berjalan atas nama Siti Rahayu.'
-            ],
-            [
-                'id' => 9,
-                'jenis' => 'Ijazah',
-                'nama' => 'Ijazah Magister (S2) Manajemen',
-                'nomor' => 'IJZ-S2-MAN-2015',
-                'tanggal' => '2015-11-20',
-                'kategori' => 'ijazah',
-                'kategori_label' => 'Ijazah',
-                'nama_pegawai' => 'Ahmad Fauzi',
-                'nip_pegawai' => '19850312201001 1 001',
-                'unit_pegawai' => 'Bag. Umum',
-                'file_path' => 'employees/docs/198503122010011001_ijazah_s2.pdf',
-                'file_size' => '1.8 MB',
-                'status_dokumen' => 'terverifikasi',
-                'status_label' => 'Terverifikasi',
-                'deskripsi' => 'Ijazah S2 Universitas Indonesia.'
-            ],
-            [
-                'id' => 10,
-                'jenis' => 'SK Kenaikan Jabatan',
-                'nama' => 'SK Jabatan Fungsional Utama 2026',
-                'nomor' => 'SK-105-JAB-2026',
-                'tanggal' => '2026-03-01',
-                'kategori' => 'sk_jabatan',
-                'kategori_label' => 'SK Kenaikan Jabatan',
-                'nama_pegawai' => 'Sabrina Rossa Adriani Wibowo',
-                'nip_pegawai' => '20261210820500 0 04',
-                'unit_pegawai' => 'Bag. SDM',
-                'file_path' => 'employees/docs/20261210820500004_sk_jabatan_2026.pdf',
-                'file_size' => '1.1 MB',
-                'status_dokumen' => 'aktif',
-                'status_label' => 'Aktif',
-                'deskripsi' => 'SK Jabatan Fungsional atas nama Sabrina Rossa.'
-            ],
-            [
-                'id' => 11,
-                'jenis' => 'KTP',
-                'nama' => 'Kartu Tanda Penduduk (KTP)',
-                'nomor' => '3171-7403-8803-0003',
-                'tanggal' => '2026-02-12',
-                'kategori' => 'ktp_kk',
-                'kategori_label' => 'KTP & KK',
-                'nama_pegawai' => 'Nurarningsih Dumbea, S.P.',
-                'nip_pegawai' => '19880123202 1 005',
-                'unit_pegawai' => 'Bag. SDM',
-                'file_path' => 'employees/docs/198801232021005_ktp.pdf',
-                'file_size' => '550 KB',
-                'status_dokumen' => 'kadaluarsa',
-                'status_label' => 'Kadaluarsa',
-                'deskripsi' => 'KTP atas nama Nurarningsih Dumbea.'
-            ],
-            [
-                'id' => 12,
-                'jenis' => 'Ijazah',
-                'nama' => 'Ijazah Sarjana (S1) Pertanian',
-                'nomor' => 'IJZ-S1-AGR-2010',
-                'tanggal' => '2010-08-15',
-                'kategori' => 'ijazah',
-                'kategori_label' => 'Ijazah',
-                'nama_pegawai' => 'Nurarningsih Dumbea, S.P.',
-                'nip_pegawai' => '19880123202 1 005',
-                'unit_pegawai' => 'Bag. SDM',
-                'file_path' => 'employees/docs/198801232021005_ijazah.pdf',
-                'file_size' => '2.3 MB',
-                'status_dokumen' => 'terverifikasi',
-                'status_label' => 'Terverifikasi',
-                'deskripsi' => 'Ijazah S1 Universitas Sam Ratulangi.'
-            ]
-        ];
+        $dokumen = $documents->map(function ($doc) {
+            $currentPosition = $doc->employee->positionHistories->first();
+            $unit = $currentPosition?->unitKerja?->nama ?? '-';
 
-        $pegawaiList = [
-            ['nama' => 'Ahmad Fauzi', 'nip' => '19850312201001 1 001'],
-            ['nama' => 'Siti Rahayu', 'nip' => '19901120201501 2 003'],
-            ['nama' => 'Sabrina Rossa Adriani Wibowo', 'nip' => '20261210820500 0 04'],
-            ['nama' => 'Cimma Sari Oktariani Di Silapu', 'nip' => '26110820520600 0 04'],
-            ['nama' => 'Nurarningsih Dumbea, S.P.', 'nip' => '19880123202 1 005'],
-            ['nama' => 'Nadia Kusuma', 'nip' => '19950822202001 2 002'],
-            ['nama' => 'Yucna Dara, S.P., M.M.', 'nip' => '19840120099 2 002']
-        ];
+            $kategoriLabels = [
+                'sk_pengangkatan' => 'SK Pengangkatan',
+                'sk_pangkat' => 'SK Kenaikan Pangkat',
+                'sk_jabatan' => 'SK Kenaikan Jabatan',
+                'sk_kgb' => 'SK KGB',
+                'ijazah' => 'Ijazah',
+                'ktp_kk' => 'KTP & KK',
+                'lainnya' => 'Lainnya',
+            ];
+
+            return [
+                'id' => $doc->id,
+                'jenis' => $kategoriLabels[$doc->jenis_dokumen] ?? 'Dokumen',
+                'nama' => $doc->nama_dokumen,
+                'nomor' => $doc->nomor_dokumen ?? '-',
+                'tanggal' => $doc->tanggal_dokumen ? $doc->tanggal_dokumen->format('Y-m-d') : '-',
+                'kategori' => $doc->jenis_dokumen,
+                'kategori_label' => $kategoriLabels[$doc->jenis_dokumen] ?? 'Lainnya',
+                'nama_pegawai' => $doc->employee->nama_lengkap,
+                'nip_pegawai' => $doc->employee->nip,
+                'unit_pegawai' => $unit,
+                'file_path' => $doc->file_path,
+                'file_size' => '1.5 MB',
+                'status_dokumen' => 'terverifikasi',
+                'status_label' => 'Terverifikasi',
+                'deskripsi' => $doc->keterangan ?? '',
+            ];
+        });
     @endphp
 
     <div x-data="{
@@ -305,7 +121,7 @@
                         class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                         <option value="">Semua Pegawai</option>
                         @foreach($pegawaiList as $p)
-                            <option value="{{ $p['nip'] }}">{{ $p['nama'] }}</option>
+                            <option value="{{ $p->nip }}">{{ $p->nama_lengkap }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -549,7 +365,7 @@
                             class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                             <option value="">Pilih Pegawai...</option>
                             @foreach($pegawaiList as $p)
-                                <option value="{{ $p['nip'] }}">{{ $p['nama'] }} (NIP. {{ $p['nip'] }})</option>
+                                <option value="{{ $p->id }}">{{ $p->nama_lengkap }} (NIP. {{ $p->nip }})</option>
                             @endforeach
                         </select>
                     </div>
