@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AuditController;
+use App\Http\Controllers\Admin\CutiConfigController;
 use App\Http\Controllers\Admin\CutiController;
 use App\Http\Controllers\Admin\DokumenController;
 use App\Http\Controllers\Admin\EwsConfigController;
@@ -621,6 +622,15 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
     Route::post('/cuti/{id}/approve', [CutiController::class, 'approve'])->name('cuti.approve');
     Route::post('/cuti/{id}/postpone', [CutiController::class, 'postpone'])->name('cuti.postpone');
     Route::get('/dashboard/cuti/{id}', [CutiController::class, 'show'])->name('cuti.show');
+
+    // Konfigurasi rantai approval cuti bersifat pengaturan sistem, jadi digerbang ganda:
+    // role:super_admin sebagai pagar kasar dan permission:cuti.configure sebagai gerbang aksi.
+    Route::get('/cuti/konfigurasi-approval', [CutiConfigController::class, 'index'])
+        ->middleware(['role:super_admin', 'permission:cuti.configure'])
+        ->name('cuti.config');
+    Route::post('/cuti/konfigurasi-approval', [CutiConfigController::class, 'update'])
+        ->middleware(['role:super_admin', 'permission:cuti.configure'])
+        ->name('cuti.config.update');
 
     Route::get('/dashboard/cuti/legacy', function () {
         return redirect()->route('cuti');

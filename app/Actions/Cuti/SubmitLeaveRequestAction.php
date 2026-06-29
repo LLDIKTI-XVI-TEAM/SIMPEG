@@ -32,8 +32,8 @@ class SubmitLeaveRequestAction
      */
     public function execute(Employee $employee, array $data, Request $request): LeaveRequest
     {
-        $mulai = Carbon::createFromFormat('Y-m-d', (string) $data['tanggal_mulai']);
-        $selesai = Carbon::createFromFormat('Y-m-d', (string) $data['tanggal_selesai']);
+        $mulai = Carbon::createFromFormat('Y-m-d', (string) $data['tanggal_mulai'])->startOfDay();
+        $selesai = Carbon::createFromFormat('Y-m-d', (string) $data['tanggal_selesai'])->startOfDay();
 
         // Hari kerja selalu dihitung ulang di server agar tidak bergantung pada nilai yang dikirim klien.
         $jumlahHariKerja = $this->workdayCalculator->calculate($mulai, $selesai);
