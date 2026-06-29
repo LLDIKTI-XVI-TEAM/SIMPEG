@@ -614,7 +614,9 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
     })->name('hari-libur.index');
 
     Route::get('/dashboard/cuti', [CutiController::class, 'index'])->name('cuti');
-    Route::post('/dashboard/cuti', [CutiController::class, 'store'])->name('cuti.store');
+    Route::post('/dashboard/cuti', [CutiController::class, 'store'])
+        ->middleware('permission:cuti.create')
+        ->name('cuti.store');
     Route::get('/cuti/approval', [CutiController::class, 'approval'])->name('cuti.approval');
     Route::post('/cuti/{id}/approve', [CutiController::class, 'approve'])->name('cuti.approve');
     Route::post('/cuti/{id}/postpone', [CutiController::class, 'postpone'])->name('cuti.postpone');

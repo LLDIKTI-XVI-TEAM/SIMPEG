@@ -2,11 +2,20 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\Cuti\SubmitLeaveRequestAction;
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
+use App\Http\Requests\StoreLeaveRequestRequest;
+use App\Models\LeaveRequest;
 
 class CutiController extends Controller
 {
+    /**
+     * Data contoh lama yang masih dikonsumsi closure laporan export cuti di web.php.
+     * Dipertahankan sementara hingga fitur laporan/export cuti dimigrasi ke data nyata pada slice tersendiri;
+     * method index/show/store di bawah sudah membaca data nyata dari basis data.
+     *
+     * @var array<int, array<string, mixed>>
+     */
     public static $riwayatCuti = [
         [
             'id' => 1,
@@ -22,7 +31,7 @@ class CutiController extends Controller
             'alasan' => 'Acara keluarga di luar kota',
             'stage_atasan' => 'menunggu',
             'stage_kepala' => 'menunggu',
-            'periode' => 'Juni 2026'
+            'periode' => 'Juni 2026',
         ],
         [
             'id' => 2,
@@ -38,7 +47,7 @@ class CutiController extends Controller
             'alasan' => 'Sakit demam berdarah',
             'stage_atasan' => 'disetujui',
             'stage_kepala' => 'disetujui',
-            'periode' => 'April 2026'
+            'periode' => 'April 2026',
         ],
         [
             'id' => 3,
@@ -54,7 +63,7 @@ class CutiController extends Controller
             'alasan' => 'Menunggu konfirmasi pengganti tugas',
             'stage_atasan' => 'ditunda',
             'stage_kepala' => 'menunggu',
-            'periode' => 'Februari 2026'
+            'periode' => 'Februari 2026',
         ],
         [
             'id' => 4,
@@ -70,7 +79,7 @@ class CutiController extends Controller
             'alasan' => 'Cuti liburan tahunan',
             'stage_atasan' => 'disetujui',
             'stage_kepala' => 'disetujui',
-            'periode' => 'Juni 2026'
+            'periode' => 'Juni 2026',
         ],
         [
             'id' => 5,
@@ -86,7 +95,7 @@ class CutiController extends Controller
             'alasan' => 'Persalinan anak pertama',
             'stage_atasan' => 'disetujui',
             'stage_kepala' => 'disetujui',
-            'periode' => 'Oktober 2025'
+            'periode' => 'Oktober 2025',
         ],
         [
             'id' => 6,
@@ -102,7 +111,7 @@ class CutiController extends Controller
             'alasan' => 'Sakit migrain berat',
             'stage_atasan' => 'disetujui',
             'stage_kepala' => 'menunggu',
-            'periode' => 'Juni 2026'
+            'periode' => 'Juni 2026',
         ],
         [
             'id' => 7,
@@ -118,34 +127,63 @@ class CutiController extends Controller
             'alasan' => 'Ada audit internal keuangan',
             'stage_atasan' => 'ditunda',
             'stage_kepala' => 'menunggu',
-            'periode' => 'Juni 2026'
-        ]
+            'periode' => 'Juni 2026',
+        ],
     ];
 
+    /**
+     * Menampilkan daftar pengajuan cuti.
+     * Pegawai biasa hanya melihat pengajuannya sendiri; peran dengan hak memantau melihat seluruh pengajuan.
+     */
     public function index()
     {
-        return view('admin.cuti.index');
+        $user = request()->user();
+
+        $query = LeaveRequest::query()
+            ->with(['employee', 'jenisCuti'])
+            ->latest();
+
+        // Pemantau (mis. admin kepegawaian/pimpinan) boleh melihat semua; selain itu dibatasi milik sendiri.
+        if (! $user->hasPermission('cuti.read_all')) {
+            $query->where('employee_id', $user->employee_id);
+        }
+
+        $riwayatCuti = $query->get();
+
+        return view('admin.cuti.index', compact('riwayatCuti'));
     }
 
+    /**
+     * Menampilkan detail satu pengajuan cuti.
+     * Pegawai tanpa hak memantau hanya boleh membuka pengajuan miliknya sendiri (cegah akses lintas pegawai).
+     */
     public function show($id)
     {
-        $c = collect(self::$riwayatCuti)->firstWhere('id', (int)$id);
-        if (!$c) {
-            abort(404);
+        $user = request()->user();
+
+        $cuti = LeaveRequest::query()
+            ->with(['employee', 'jenisCuti'])
+            ->findOrFail($id);
+
+        if (! $user->hasPermission('cuti.read_all') && $cuti->employee_id !== $user->employee_id) {
+            abort(403);
         }
-        return view('admin.cuti.show', compact('c'));
+
+        return view('admin.cuti.show', ['cuti' => $cuti]);
     }
 
-    public function store(Request $request)
+    /**
+     * Menyimpan pengajuan cuti baru.
+     * Validasi domain (atasan langsung, jenis khusus PNS, kecukupan saldo) ditegakkan di FormRequest;
+     * orkestrasi penyimpanan, notifikasi, dan audit didelegasikan ke Action.
+     */
+    public function store(StoreLeaveRequestRequest $request, SubmitLeaveRequestAction $action)
     {
-        $request->validate([
-            'jenis_cuti' => 'required|string',
-            'tanggal_mulai' => 'required|date',
-            'tanggal_selesai' => 'required|date|after_or_equal:tanggal_mulai',
-            'alasan' => 'required|string|max:500',
-        ]);
+        $employee = $request->user()->employee;
+
+        $action->execute($employee, $request->validated(), $request);
 
         return redirect()->route('cuti')
-            ->with('success', 'Pengajuan cuti ' . $request->input('jenis_cuti') . ' berhasil dikirim dan menunggu persetujuan.');
+            ->with('success', 'Pengajuan cuti berhasil dikirim dan menunggu persetujuan atasan langsung.');
     }
 }
