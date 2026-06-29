@@ -38,7 +38,7 @@
     <div x-data="{
         activeKategori: '',
         activeUnit: '',
-        activePegawai: '',
+        activeStatus: '',
         searchQuery: '',
         showUploadModal: false,
         documents: {{ json_encode($dokumen) }},
@@ -53,7 +53,7 @@
             this.$watch('searchQuery', () => this.currentPage = 1);
             this.$watch('activeKategori', () => this.currentPage = 1);
             this.$watch('activeUnit', () => this.currentPage = 1);
-            this.$watch('activePegawai', () => this.currentPage = 1);
+            this.$watch('activeStatus', () => this.currentPage = 1);
         },
         get filteredDocuments() {
             return this.documents.filter(doc => {
@@ -62,8 +62,8 @@
                                        doc.jenis.toLowerCase().includes(this.searchQuery.toLowerCase());
                 const matchesKategori = !this.activeKategori || doc.kategori === this.activeKategori;
                 const matchesUnit = !this.activeUnit || doc.unit_pegawai === this.activeUnit;
-                const matchesPegawai = !this.activePegawai || doc.nip_pegawai === this.activePegawai;
-                return matchesSearch && matchesKategori && matchesUnit && matchesPegawai;
+                const matchesStatus = !this.activeStatus || doc.status_dokumen === this.activeStatus;
+                return matchesSearch && matchesKategori && matchesUnit && matchesStatus;
             });
         },
         get paginatedDocuments() {
@@ -115,16 +115,6 @@
                         class="h-full flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none font-sans">
                 </div>
 
-                {{-- Filter Pegawai --}}
-                <div class="relative col-span-1 sm:col-span-1 lg:col-span-1">
-                    <select x-model="activePegawai"
-                        class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                        <option value="">Semua Pegawai</option>
-                        @foreach($pegawaiList as $p)
-                            <option value="{{ $p->nip }}">{{ $p->nama_lengkap }}</option>
-                        @endforeach
-                    </select>
-                </div>
 
                 {{-- Filter Unit Kerja --}}
                 <div class="relative col-span-1 sm:col-span-1 lg:col-span-1">
@@ -139,7 +129,7 @@
                 </div>
 
                 {{-- Filter Kategori Dokumen --}}
-                <div class="relative col-span-1 sm:col-span-2 lg:col-span-1">
+                <div class="relative col-span-1 sm:col-span-1 lg:col-span-1">
                     <select x-model="activeKategori"
                         class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                         <option value="">Semua Kategori Dokumen</option>
@@ -150,6 +140,18 @@
                         <option value="ijazah">Ijazah / Pendidikan</option>
                         <option value="ktp_kk">Identitas Diri (KTP & KK)</option>
                         <option value="lainnya">Lampiran / Dokumen Lain</option>
+                    </select>
+                </div>
+
+                {{-- Filter Status Dokumen --}}
+                <div class="relative col-span-1 sm:col-span-2 lg:col-span-1">
+                    <select x-model="activeStatus"
+                        class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                        <option value="">Semua Status</option>
+                        <option value="terverifikasi">Terverifikasi</option>
+                        <option value="menunggu">Menunggu Verifikasi</option>
+                        <option value="ditolak">Ditolak</option>
+                        <option value="kadaluarsa">Kadaluarsa</option>
                     </select>
                 </div>
             </div>
@@ -341,10 +343,11 @@
         {{-- ================================================================ --}}
         {{-- MODAL UNGGAH DOKUMEN BARU (POPUP) --}}
         {{-- ================================================================ --}}
-        <div x-show="showUploadModal" class="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
+        <div x-show="showUploadModal" class="fixed inset-0 z-50 overflow-y-auto bg-ink/40"
             style="display: none;" x-transition>
-            <div @click.outside="showUploadModal = false"
-                class="w-full max-w-lg rounded-lg border border-border bg-surface p-6 shadow-xl space-y-6">
+            <div class="flex min-h-full items-center justify-center p-4">
+                <div @click.outside="showUploadModal = false"
+                    class="relative w-full max-w-lg rounded-lg border border-border bg-surface p-5 shadow-xl space-y-4">
 
                 {{-- Modal Header --}}
                 <div class="flex justify-between items-center border-b border-border pb-3">
@@ -354,36 +357,88 @@
                 </div>
 
                 <form action="{{ route('dokumen.store') }}" method="POST" enctype="multipart/form-data"
-                    class="space-y-4">
+                    class="space-y-3">
                     @csrf
 
                     {{-- Relasi Pegawai --}}
-                    <div class="space-y-1">
+                    <div class="space-y-1 relative z-50" x-data="{
+                        open: false,
+                        search: '',
+                        selectedId: '',
+                        selectedText: 'Pilih Pegawai...',
+                        pegawaiList: {{ json_encode($pegawaiList->map(fn($p) => ['id' => $p->id, 'label' => $p->nama_lengkap . ' (NIP. ' . $p->nip . ')'])->toArray()) }},
+                        get filteredList() {
+                            if (this.search === '') return this.pegawaiList.slice(0, 10);
+                            return this.pegawaiList.filter(i => i.label.toLowerCase().includes(this.search.toLowerCase())).slice(0, 10);
+                        },
+                        select(item) {
+                            this.selectedId = item.id;
+                            this.selectedText = item.label;
+                            this.open = false;
+                            this.search = '';
+                        }
+                    }" @click.outside="open = false">
                         <label class="text-xs font-semibold text-ink font-sans">Hubungkan ke Pegawai <span
                                 class="text-danger">*</span></label>
-                        <select name="pegawai_id" required
-                            class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                            <option value="">Pilih Pegawai...</option>
-                            @foreach($pegawaiList as $p)
-                                <option value="{{ $p->id }}">{{ $p->nama_lengkap }} (NIP. {{ $p->nip }})</option>
-                            @endforeach
-                        </select>
+                        <div class="relative">
+                            {{-- Native select for form submission & validation --}}
+                            <select name="pegawai_id" required x-model="selectedId" class="opacity-0 absolute h-0 w-0 -z-10 bottom-0 left-1/2 pointer-events-none" tabindex="-1">
+                                <option value=""></option>
+                                <template x-for="item in pegawaiList" :key="item.id">
+                                    <option :value="item.id" x-text="item.label"></option>
+                                </template>
+                            </select>
+
+                            {{-- Custom dropdown button --}}
+                            <button type="button" @click="open = !open; if(open) $nextTick(() => $refs.searchInput.focus())"
+                                class="flex items-center justify-between w-full rounded-lg border border-border bg-surface px-4 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans text-left">
+                                <span x-text="selectedText" :class="selectedId === '' ? 'text-ink' : 'text-ink font-medium'"></span>
+                                <svg class="w-4 h-4 text-muted transition-transform shrink-0" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                            </button>
+                            
+                            {{-- Dropdown list --}}
+                            <div x-show="open" x-transition
+                                style="display: none;"
+                                class="absolute z-[100] mt-1 w-full rounded-lg border border-border bg-surface shadow-xl overflow-hidden">
+                                <div class="border-b border-border bg-surface">
+                                    <input type="text" x-model="search" placeholder="Cari pegawai berdasarkan nama atau NIP..." x-ref="searchInput"
+                                        class="w-full border-0 bg-transparent py-3 px-4 text-xs text-ink placeholder-muted focus:outline-none focus:ring-0 font-sans">
+                                </div>
+                                <ul class="max-h-56 overflow-y-auto py-1">
+                                    <template x-for="item in filteredList" :key="item.id">
+                                        <li @click="select(item)"
+                                            class="cursor-pointer px-4 py-2.5 text-xs text-ink hover:bg-soft hover:text-primary transition-colors font-sans"
+                                            :class="selectedId === item.id ? 'bg-primary/10 text-primary font-semibold' : ''"
+                                            x-text="item.label">
+                                        </li>
+                                    </template>
+                                    <li x-show="filteredList.length === 0" class="px-4 py-4 text-xs text-muted text-center font-sans">
+                                        Pegawai tidak ditemukan.
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
 
                     {{-- Kategori Dokumen --}}
                     <div class="space-y-1">
                         <label class="text-xs font-semibold text-ink font-sans">Kategori Dokumen <span
                                 class="text-danger">*</span></label>
-                        <select name="kategori_dokumen" required
-                            class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                            <option value="sk_pengangkatan">SK Pengangkatan</option>
-                            <option value="sk_pangkat">SK Kenaikan Pangkat</option>
-                            <option value="sk_jabatan">SK Kenaikan Jabatan</option>
-                            <option value="sk_kgb">SK KGB (Kenaikan Gaji Berkala)</option>
-                            <option value="ijazah">Ijazah / Pendidikan</option>
-                            <option value="ktp_kk">Identitas Diri (KTP & KK)</option>
-                            <option value="lainnya">Lampiran / Dokumen Lain</option>
-                        </select>
+                        <div class="relative">
+                            <select name="kategori_dokumen" required
+                                class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-4 pr-10 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                <option value="sk_pengangkatan">SK Pengangkatan</option>
+                                <option value="sk_pangkat">SK Kenaikan Pangkat</option>
+                                <option value="sk_jabatan">SK Kenaikan Jabatan</option>
+                                <option value="sk_kgb">SK KGB (Kenaikan Gaji Berkala)</option>
+                                <option value="ijazah">Ijazah / Pendidikan</option>
+                                <option value="ktp_kk">Identitas Diri (KTP & KK)</option>
+                                <option value="lainnya">Lampiran / Dokumen Lain</option>
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4">
+                                <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="space-y-1">
@@ -391,7 +446,7 @@
                                 class="text-danger">*</span></label>
                         <input type="text" name="nama_dokumen" required
                             placeholder="Contoh: SK Kenaikan Pangkat Penata Tkt. I 2026"
-                            class="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                     </div>
 
                     <div class="grid grid-cols-2 gap-3">
@@ -399,19 +454,19 @@
                             <label class="text-xs font-semibold text-ink font-sans">Nomor Dokumen <span
                                     class="text-danger">*</span></label>
                             <input type="text" name="nomor_dokumen" required placeholder="SK-..."
-                                class="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                         </div>
                         <div class="space-y-1">
                             <label class="text-xs font-semibold text-ink font-sans">Tanggal Dokumen <span
                                     class="text-danger">*</span></label>
                             <input type="date" name="tanggal_terbit" required
-                                class="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                         </div>
                     </div>
 
                     <div class="space-y-1">
                         <label class="text-xs font-semibold text-ink font-sans">Keterangan / Deskripsi</label>
-                        <textarea name="deskripsi" rows="3"
+                        <textarea name="deskripsi" rows="2"
                             placeholder="Tulis rincian atau catatan singkat mengenai dokumen..."
                             class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none font-sans"></textarea>
                     </div>
@@ -426,13 +481,13 @@
                     </div>
 
                     {{-- Buttons --}}
-                    <div class="flex justify-end gap-3 pt-4 border-t border-border">
+                    <div class="flex justify-end gap-3 pt-3 border-t border-border">
                         <button type="button" @click="showUploadModal = false"
-                            class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-soft cursor-pointer focus:outline-none">
+                            class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-soft cursor-pointer focus:outline-none">
                             Batal
                         </button>
                         <button type="submit"
-                            class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90 cursor-pointer focus:outline-none font-sans">
+                            class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90 cursor-pointer focus:outline-none font-sans">
                             Mulai Unggah
                         </button>
                     </div>

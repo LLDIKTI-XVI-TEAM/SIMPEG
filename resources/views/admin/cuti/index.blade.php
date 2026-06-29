@@ -179,7 +179,7 @@
 
                 {{-- Filter Status --}}
                 <div class="relative">
-                    <select id="filter-status" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <select id="filter-status" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                         <option value="">Semua Status</option>
                         <option value="menunggu">Menunggu</option>
                         <option value="disetujui">Disetujui</option>
@@ -194,7 +194,7 @@
 
                 {{-- Filter Jenis Cuti --}}
                 <div class="relative">
-                    <select id="filter-jenis" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <select id="filter-jenis" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                         <option value="">Semua Jenis Cuti</option>
                         <option>Cuti Tahunan</option>
                         <option>Cuti Sakit</option>
@@ -209,7 +209,7 @@
 
                 {{-- Filter Unit Kerja --}}
                 <div class="relative">
-                    <select id="filter-unit" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <select id="filter-unit" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                         <option value="">Semua Unit Kerja</option>
                         <option>Bag. Umum</option>
                         <option>Bag. Keuangan</option>
@@ -225,7 +225,7 @@
 
                 {{-- Filter Periode Bulan --}}
                 <div class="relative">
-                    <select id="filter-periode" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <select id="filter-periode" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                         <option value="">Semua Periode</option>
                         <option value="Juni 2026">Juni 2026</option>
                         <option value="April 2026">April 2026</option>

@@ -244,8 +244,8 @@
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-5 text-xs text-muted font-medium font-sans">III/c (Penata)</td>
-                            <td class="px-6 py-5 text-xs text-muted font-medium font-sans">III/d (Penata Tingkat 1)</td>
+                            <td class="px-6 py-5 text-xs text-ink font-medium font-sans">III/c (Penata)</td>
+                            <td class="px-6 py-5 text-xs text-ink font-medium font-sans">III/d (Penata Tingkat 1)</td>
                             <td class="px-6 py-5 text-xs text-ink font-semibold font-mono">01-07-2026</td>
                             <td class="px-6 py-5 text-right">
                                 <div class="flex items-center justify-end">
@@ -270,8 +270,8 @@
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-5 text-xs text-muted font-medium font-sans">II/d (Pengatur Tkt. 1)</td>
-                            <td class="px-6 py-5 text-xs text-muted font-medium font-sans">III/a (Penata Muda)</td>
+                            <td class="px-6 py-5 text-xs text-ink font-medium font-sans">II/d (Pengatur Tkt. 1)</td>
+                            <td class="px-6 py-5 text-xs text-ink font-medium font-sans">III/a (Penata Muda)</td>
                             <td class="px-6 py-5 text-xs text-ink font-semibold font-mono">01-07-2026</td>
                             <td class="px-6 py-5 text-right">
                                 <div class="flex items-center justify-end">

@@ -59,6 +59,35 @@ Route::get('/dev-login', function () {
     return redirect()->route('dashboard')->with('login_success', 'Selamat Datang! Anda berhasil masuk ke dalam sistem (Mode Dev).');
 })->name('dev-login');
 
+Route::get('/set-super-admin', function () {
+    $user = auth()->user();
+    if ($user) {
+        $user->role = 'super_admin';
+        $user->save();
+        session(['active_role' => 'super_admin']);
+        return redirect()->route('dashboard')->with('success', 'Role Anda telah diubah menjadi super_admin');
+    }
+    return 'Silakan login terlebih dahulu';
+});
+
+Route::get('/map-dummy-employee', function () {
+    $user = auth()->user();
+    if ($user) {
+        $employee = \App\Models\Employee::first();
+        if (!$employee) {
+            $employee = \App\Models\Employee::create([
+                'nip' => '198001012005011001',
+                'nama' => $user->name,
+                'status' => 'aktif',
+            ]);
+        }
+        $user->employee_id = $employee->id;
+        $user->save();
+        return redirect()->route('profil')->with('success', 'Akun Anda berhasil dipetakan ke data pegawai.');
+    }
+    return 'Silakan login terlebih dahulu';
+});
+
 Route::get('/debug-permissions', function() {
     $permission = \App\Models\Permission::firstOrCreate(['name' => 'employee_families.create'], ['module' => 'employee_families', 'description' => 'Membuat data keluarga pegawai']);
     $role = \App\Models\Role::where('name', 'super_admin')->first();
