@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\UserMappingController;
 use App\Http\Controllers\Auth\KeycloakAuthController;
 use App\Http\Controllers\EmployeeImportController;
+use App\Http\Controllers\LeaveBalanceController;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -593,6 +594,13 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
         ->name('pegawai.riwayat.store');
+    Route::post('/pegawai/{id}/assign-atasan', [PegawaiController::class, 'assignAtasan'])
+        ->whereUuid('id')
+        ->middleware(['role:super_admin', 'permission:employees.update'])
+        ->name('pegawai.assign-atasan');
+
+    Route::get('/dashboard/cuti/saldo', [LeaveBalanceController::class, 'showMyBalanceWeb'])
+        ->name('cuti.saldo');
 
     Route::get('/pegawai/legacy', function () {
         return redirect()->route('data-pegawai');
