@@ -2,13 +2,9 @@
 
 namespace App\Actions\Employees;
 
-use App\Actions\Histories\CreateKgbHistoryAction;
-use App\Actions\Histories\CreatePositionHistoryAction;
-use App\Actions\Histories\CreateRankHistoryAction;
 use App\Models\Employee;
 use App\Models\User;
 use App\Services\AuditService;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -16,23 +12,18 @@ use Illuminate\Validation\ValidationException;
 
 class ExecuteImportBatchAction
 {
-    public function __construct(
-        private readonly CreateRankHistoryAction $createRankHistoryAction,
-        private readonly CreatePositionHistoryAction $createPositionHistoryAction,
-        private readonly CreateKgbHistoryAction $createKgbHistoryAction
-    ) {}
-
     /**
      * Execute the validated batch.
      *
      * @param  string  $batchId
      * @param  User|null  $user
-     * @param  Request  $request
+     * @param  string|null  $ipAddress
+     * @param  string|null  $userAgent
      * @return array
      *
      * @throws ValidationException
      */
-    public function execute(string $batchId, ?User $user, Request $request): array
+    public function execute(string $batchId, ?User $user, ?string $ipAddress = null, ?string $userAgent = null): array
     {
         $batch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
 
@@ -55,39 +46,91 @@ class ExecuteImportBatchAction
             $batch['validation']['results'],
             fn (array $result) => $result['status'] === 'valid' && isset($result['validated_data']),
         ));
+        $totalRows = count($validRows);
         $processedCount = 0;
 
-        if ($validRows !== []) {
-            DB::transaction(function () use ($validRows, $type, $request, &$processedCount): void {
-                foreach ($validRows as $result) {
-                    $this->executeValidatedRow($type, $result['validated_data'], $request);
-                    $processedCount++;
-                }
-            });
+        // Update status to processing
+        $batch['status'] = 'processing';
+        $batch['progress'] = 0;
+        $batch['processed_count'] = 0;
+        Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $batch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
+
+        try {
+            if ($validRows !== []) {
+                DB::transaction(function () use ($validRows, $type, $batchId, $totalRows, &$processedCount): void {
+                    foreach ($validRows as $result) {
+                        $this->executeValidatedRow($type, $result['validated_data']);
+                        $processedCount++;
+
+                        // Update progress in cache
+                        $currentBatch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
+                        if ($currentBatch) {
+                            $currentBatch['processed_count'] = $processedCount;
+                            $currentBatch['progress'] = (int) (($processedCount / $totalRows) * 100);
+                            Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $currentBatch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
+                        }
+                    }
+                });
+            }
+
+            AuditService::logAs(
+                $user?->id ?? 'system',
+                $user?->name ?? 'System Queue',
+                'IMPORT',
+                'Employee',
+                null,
+                null,
+                [
+                    'template_type' => $type,
+                    'template_label' => UploadImportBatchAction::TEMPLATE_LABELS[$type] ?? UploadImportBatchAction::TEMPLATE_LABELS['utama'],
+                    'total_inserted' => $processedCount,
+                    'total_processed' => $processedCount,
+                    'total_skipped' => $batch['validation']['skip_count'] ?? 0,
+                    'total_failed' => $batch['validation']['error_count'] ?? 0,
+                    'filename' => $batch['filename'],
+                ],
+                null,
+                $ipAddress,
+                $userAgent
+            );
+
+            $this->cleanupBatch($batchId, $batch['filename']);
+
+            // Set final completed status
+            $finalBatch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
+            if ($finalBatch) {
+                $finalBatch['status'] = 'completed';
+                $finalBatch['progress'] = 100;
+                $finalBatch['processed_count'] = $processedCount;
+                $finalBatch['result'] = [
+                    'inserted' => $processedCount,
+                    'skipped' => $batch['validation']['skip_count'] ?? 0,
+                    'failed' => $batch['validation']['error_count'] ?? 0,
+                ];
+                // Keep completed state for 10 minutes so user has time to view the result screen
+                Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $finalBatch, now()->addMinutes(10));
+            }
+
+        } catch (\Throwable $exception) {
+            $failedBatch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
+            if ($failedBatch) {
+                $failedBatch['status'] = 'failed';
+                $failedBatch['error_message'] = $exception->getMessage();
+                Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $failedBatch, now()->addMinutes(10));
+            }
+            throw $exception;
         }
-
-        AuditService::log('IMPORT', 'Employee', null, null, [
-            'template_type' => $type,
-            'template_label' => UploadImportBatchAction::TEMPLATE_LABELS[$type] ?? UploadImportBatchAction::TEMPLATE_LABELS['utama'],
-            'total_inserted' => $type === 'utama' ? $processedCount : 0,
-            'total_processed' => $processedCount,
-            'total_skipped' => $batch['validation']['skip_count'],
-            'total_failed' => $batch['validation']['error_count'],
-            'filename' => $batch['filename'],
-        ], $request);
-
-        $this->cleanupBatch($batchId, $batch['filename']);
 
         return [
             'message' => 'Import selesai.',
             'inserted' => $processedCount,
             'processed' => $processedCount,
-            'skipped' => $batch['validation']['skip_count'],
-            'failed' => $batch['validation']['error_count'],
+            'skipped' => $batch['validation']['skip_count'] ?? 0,
+            'failed' => $batch['validation']['error_count'] ?? 0,
         ];
     }
 
-    private function executeValidatedRow(string $type, array $data, Request $request): void
+    private function executeValidatedRow(string $type, array $data): void
     {
         if ($type === 'utama') {
             Employee::create($data + [
@@ -95,26 +138,11 @@ class ExecuteImportBatchAction
                 'profil_status' => 'belum_lengkap',
                 'is_kinerja_baik' => true,
             ]);
-
-            return;
         }
-
-        $employee = Employee::findOrFail($data['employee_id']);
-        unset($data['employee_id']);
-
-        match ($type) {
-            'pelengkap' => $employee->update($data),
-            'kepangkatan' => $this->createRankHistoryAction->execute($employee, $data, $request),
-            'jabatan' => $this->createPositionHistoryAction->execute($employee, $data, $request),
-            'kgb' => $this->createKgbHistoryAction->execute($employee, $data, $request),
-            default => null,
-        };
     }
 
     private function cleanupBatch(string $batchId, string $filename): void
     {
-        Cache::forget(UploadImportBatchAction::CACHE_PREFIX.$batchId);
-
         $storedName = $batchId.'_'.$filename;
         if (Storage::disk('local')->exists(UploadImportBatchAction::STORAGE_DIR.'/'.$storedName)) {
             Storage::disk('local')->delete(UploadImportBatchAction::STORAGE_DIR.'/'.$storedName);

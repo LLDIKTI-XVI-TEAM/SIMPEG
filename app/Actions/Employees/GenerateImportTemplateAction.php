@@ -57,11 +57,6 @@ class GenerateImportTemplateAction
         return $row;
     }
 
-    /**
-     * Nilai contoh per tipe; hanya panduan format, bukan data nyata.
-     *
-     * @return array<string, string>
-     */
     private function sampleValues(string $type): array
     {
         return match ($type) {
@@ -80,35 +75,6 @@ class GenerateImportTemplateAction
                 'Status Kepegawaian' => 'PNS',
                 'Tanggal Lahir' => '1980-01-01',
                 'Role' => 'pegawai',
-            ],
-            'pelengkap' => [
-                'NIK' => '0000000000000000',
-                'No KK' => '0000000000000000',
-                'Tempat Lahir' => 'Manado',
-                'Jenis Kelamin' => 'L',
-                'Agama' => 'Islam',
-                'Status Kawin' => 'Kawin',
-                'Golongan Darah' => 'O',
-            ],
-            'kepangkatan' => [
-                'Golongan' => 'III/a',
-                'TMT Pangkat' => '2020-01-01',
-                'No SK' => 'SK/0001/2020',
-                'Tanggal SK' => '2019-12-01',
-            ],
-            'jabatan' => [
-                'Nama Jabatan' => 'Analis Kepegawaian',
-                'Jenis Jabatan' => 'Fungsional',
-                'Unit Kerja' => 'Bagian Umum',
-                'TMT Jabatan' => '2020-01-01',
-                'No SK' => 'SK/0002/2020',
-                'Tanggal SK' => '2019-12-01',
-            ],
-            'kgb' => [
-                'TMT KGB' => '2022-01-01',
-                'Gaji Pokok' => '3000000',
-                'No SK' => 'SK/0003/2022',
-                'Tanggal SK' => '2021-12-01',
             ],
             default => [],
         };

@@ -99,6 +99,10 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
         ->name('pegawai.import.execute');
 
+    Route::get('/api/pegawai/import/{batchId}/status', [EmployeeImportController::class, 'status'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->name('pegawai.import.status');
+
     Route::get('/ews', [EwsController::class, 'index'])
         ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('ews');
