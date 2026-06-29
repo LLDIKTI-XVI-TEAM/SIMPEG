@@ -38,6 +38,12 @@ Route::get('/auth/keycloak/callback', [KeycloakAuthController::class, 'handleCal
 Route::post('/logout', [KeycloakAuthController::class, 'logout'])->name('logout');
 
 Route::get('/dev-login', function () {
+    // Jalur login pintas khusus pengembangan: membuat/masuk sebagai super_admin tanpa SSO.
+    // WAJIB dimatikan di luar local/testing agar tidak menjadi pintu belakang super_admin
+    // di produksi. Di produksi, autentikasi hanya melalui Keycloak SSO, dan super_admin
+    // pertama ditentukan oleh bootstrap SSO (pegawai pertama yang login), bukan akun demo.
+    abort_unless(app()->environment(['local', 'testing']), 404);
+
     $user = User::where('role', 'super_admin')->first();
     if (! $user) {
         $user = User::create([

@@ -1,0 +1,59 @@
+name: CI
+
+# Jalankan gerbang kualitas (composer qa) pada setiap pull request dan push ke
+# branch integrasi development. Ini mencegah regresi format, analisis statis,
+# dan test masuk tanpa terverifikasi otomatis.
+on:
+  pull_request:
+    branches: [development, main]
+  push:
+    branches: [development]
+
+jobs:
+  qa:
+    name: Pint + PHPStan + Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, pdo, pdo_sqlite, sqlite3, zip, bcmath, intl, gd
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Prepare application environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Build frontend assets
+        # Sebagian view Blade memakai @vite() yang butuh public/build/manifest.json.
+        # Tanpa build ini, test yang merender view gagal 500 (ViteManifestNotFoundException).
+        run: npm run build
+
+      - name: Run quality gate (format check, static analysis, tests)
+        run: composer qa
