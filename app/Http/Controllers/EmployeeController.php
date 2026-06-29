@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Employees\AssignSupervisorAction;
 use App\Actions\Employees\CreateEmployeeAction;
 use App\Actions\Employees\DeactivateEmployeeAction;
 use App\Actions\Employees\ListEmployeesAction;
@@ -96,6 +97,27 @@ class EmployeeController extends Controller
         return response()->json([
             'message' => 'Detail profil pegawai berhasil diambil.',
             'employee' => $action->execute($request->user()?->employee),
+        ]);
+    }
+
+    public function assignSupervisor(Request $request, Employee $employee, AssignSupervisorAction $action): JsonResponse
+    {
+        $request->validate([
+            'supervisor_id' => 'nullable|uuid|exists:employees,id',
+        ]);
+
+        $updatedEmployee = $action->execute($employee, $request->input('supervisor_id'), $request);
+
+        return response()->json([
+            'message' => 'Atasan langsung berhasil diperbarui.',
+            'employee' => [
+                'id' => $updatedEmployee->id,
+                'nama_lengkap' => $updatedEmployee->nama_lengkap,
+                'atasan_langsung' => $updatedEmployee->atasanLangsung ? [
+                    'id' => $updatedEmployee->atasanLangsung->id,
+                    'nama_lengkap' => $updatedEmployee->atasanLangsung->nama_lengkap,
+                ] : null,
+            ],
         ]);
     }
 

@@ -30,6 +30,7 @@ class Employee extends Model
         'foto',
         'jenis_pegawai_id',
         'status_aktif',
+        'atasan_langsung_id',
 
         // Snapshot fields
         'golongan_terakhir',
@@ -165,6 +166,18 @@ class Employee extends Model
     public function appointment(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
         return $this->hasOne(Appointment::class);
+    }
+
+    // --- Supervisor Relations ---
+
+    public function atasanLangsung(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class, 'atasan_langsung_id');
+    }
+
+    public function bawahanLangsung(): HasMany
+    {
+        return $this->hasMany(Employee::class, 'atasan_langsung_id');
     }
 
     // --- Helpers ---

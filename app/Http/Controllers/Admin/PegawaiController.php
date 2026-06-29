@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\Employees\AssignSupervisorAction;
 use App\Actions\Employees\DeactivateEmployeeAction;
 use App\Actions\Employees\ListInactiveEmployeesAction;
 use App\Actions\Employees\RestoreEmployeeAction;
@@ -810,5 +811,24 @@ class PegawaiController extends Controller
         $sheet->getPageSetup()->setRowsToRepeatAtTopByStartAndEnd(1, 1);
 
         return $spreadsheet;
+    }
+
+    public function assignAtasan(Request $request, $id, AssignSupervisorAction $action)
+    {
+        $request->validate([
+            'supervisor_id' => 'nullable|uuid|exists:employees,id',
+        ]);
+
+        $employee = Employee::findOrFail($id);
+
+        try {
+            $action->execute($employee, $request->input('supervisor_id'), $request);
+
+            return redirect()->route('pegawai.show', $id)
+                ->with('success', 'Atasan langsung untuk ' . $employee->nama_lengkap . ' berhasil diperbarui.');
+        } catch (\Exception $e) {
+            return redirect()->route('pegawai.show', $id)
+                ->with('error', 'Gagal memperbarui atasan langsung: ' . $e->getMessage());
+        }
     }
 }
