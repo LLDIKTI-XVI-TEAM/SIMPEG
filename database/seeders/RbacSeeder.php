@@ -43,6 +43,13 @@ class RbacSeeder extends Seeder
             'audit_logs.read' => ['module' => 'audit_logs', 'description' => 'Melihat audit log sistem'],
             'notifications.read' => ['module' => 'notifications', 'description' => 'Melihat notifikasi milik sendiri'],
             'notifications.update' => ['module' => 'notifications', 'description' => 'Menandai notifikasi milik sendiri sudah dibaca'],
+            // Permission cuti menjadi gerbang kasar route/menu; otorisasi inti per pengajuan tetap berbasis approver terkonfigurasi.
+            'cuti.create' => ['module' => 'cuti', 'description' => 'Mengajukan permohonan cuti'],
+            'cuti.read_all' => ['module' => 'cuti', 'description' => 'Melihat seluruh pengajuan cuti (monitor)'],
+            'cuti.approve_stage1' => ['module' => 'cuti', 'description' => 'Menyetujui/menunda cuti pada stage 1 (Atasan Langsung)'],
+            'cuti.approve_stage2' => ['module' => 'cuti', 'description' => 'Menyetujui/menunda cuti pada stage 2 (Kabag Umum)'],
+            'cuti.approve_stage3' => ['module' => 'cuti', 'description' => 'Menyetujui/menunda cuti pada stage 3 (Pimpinan/PYBMC)'],
+            'cuti.configure' => ['module' => 'cuti', 'description' => 'Mengonfigurasi approval chain cuti'],
         ];
 
         foreach ($roles as $name => $description) {
@@ -58,6 +65,9 @@ class RbacSeeder extends Seeder
 
         // Mapping permission per role dibuat eksplisit agar perubahan hak akses mudah ditelusuri saat review.
         // hari_libur tetap khusus super_admin; pimpinan/atasan/pegawai belum punya akses route admin.
+        // Catatan cuti: cuti.approve_stage2 (Kabag Umum) belum dipetakan ke role dasar karena approver stage 2
+        // bersifat person-based via approval_configs; pemetaan role penampungnya menunggu konfirmasi dan ditegakkan
+        // di approval engine. cuti.configure dibatasi khusus super_admin.
         $this->syncRolePermissions([
             'super_admin' => array_keys($permissions),
             'admin_kepegawaian' => [
@@ -78,10 +88,29 @@ class RbacSeeder extends Seeder
                 'audit_logs.read',
                 'notifications.read',
                 'notifications.update',
+                // Admin kepegawaian memonitor seluruh pengajuan cuti namun tidak boleh menyetujui.
+                'cuti.read_all',
             ],
-            'pimpinan' => ['notifications.read', 'notifications.update'],
-            'atasan_langsung' => ['notifications.read', 'notifications.update'],
-            'pegawai' => ['employees.read_self', 'notifications.read', 'notifications.update'],
+            'pimpinan' => [
+                'notifications.read',
+                'notifications.update',
+                // Pimpinan/PYBMC adalah approver final sekaligus dapat memonitor seluruh pengajuan.
+                'cuti.approve_stage3',
+                'cuti.read_all',
+            ],
+            'atasan_langsung' => [
+                'notifications.read',
+                'notifications.update',
+                // Atasan langsung memegang approval stage 1 atas pengajuan bawahannya.
+                'cuti.approve_stage1',
+            ],
+            'pegawai' => [
+                'employees.read_self',
+                'notifications.read',
+                'notifications.update',
+                // Pegawai sebagai pemohon hanya boleh membuat pengajuan cuti.
+                'cuti.create',
+            ],
         ]);
     }
 
