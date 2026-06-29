@@ -101,7 +101,7 @@ Status ✅ pada tracker ini hanya berarti **terintegrasi dalam kode dan didukung
 | Riwayat jabatan | US-2.6 | Sprint 2 | ✅ Terintegrasi | API list/create append-only, latest flag, audit dan test tersedia. Form input UI sudah terhubung ke API v1 dengan binding referensi |
 | Riwayat KGB | US-2.6 | Sprint 2 | ✅ Terintegrasi | API list/create append-only, latest flag, audit dan test tersedia. Form input UI sudah terhubung ke API v1 |
 | Hukuman disiplin | US-2.7, Issue #19 | Sprint 2 | ✅ Terintegrasi | Model, migration, dan API append-only teruji secara otomatis. Form UI telah direstrukturisasi dan tersambung penuh dengan endpoint v1. |
-| Data keluarga | US-2.8, Issue #24 | Sprint 3 | 🧱 Scaffold | Model, migration, relasi, dan tampilan tersedia. CRUD belum terintegrasi |
+| Data keluarga | US-2.8, Issue #24 | Sprint 3 | ✅ Terintegrasi | Model, migration, dan API backend telah tersedia dan diuji (TDD). Form input UI telah sepenuhnya terhubung dengan API v1 beserta validasi error dan standar notifikasinya. |
 | Pendidikan | PRD 7.3 | Pelengkap data | 🧱 Scaffold | Model, migration, dan relasi tersedia; CRUD belum terintegrasi |
 | Assign atasan langsung | US-4.11, Issue #27 | Sprint 4 | 🧱 Scaffold | Model/migration `SupervisorAssignment` tersedia; halaman dan flow assign belum terintegrasi |
 | Flag kinerja baik | US-5.4, Issue #36 | Sprint 5 | 🧱 Scaffold | Field `is_kinerja_baik` dipakai EWS, tetapi aksi update terotorisasi untuk admin belum tersedia secara lengkap |
