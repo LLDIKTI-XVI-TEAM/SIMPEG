@@ -256,7 +256,7 @@
                         $tmt = $currentPosition?->tmt_jabatan ?? $p->appointment?->tmt_pengangkatan;
                         $fotoUrl = $p->foto_url;
                     @endphp
-                    <tr class="transition-colors hover:bg-soft/50" data-nama="{{ $p->nama_lengkap }}" data-nip="{{ $p->nip }}" data-unit="{{ $currentUnit }}" data-jenis="{{ $p->jenisPegawai->nama ?? '-' }}" data-status="{{ strtolower($p->status_aktif) }}" data-golongan="{{ $p->golongan_terakhir ?? '-' }}">
+                    <tr class="transition-colors hover:bg-soft/50" data-id="{{ $p->id }}" data-nama="{{ $p->nama_lengkap }}" data-nip="{{ $p->nip }}" data-unit="{{ $currentUnit }}" data-jenis="{{ $p->jenisPegawai->nama ?? '-' }}" data-status="{{ strtolower($p->status_aktif) }}" data-golongan="{{ $p->golongan_terakhir ?? '-' }}">
                         <td class="px-4 py-3.5">
                             <input type="checkbox" class="row-check h-4 w-4 rounded border-border text-primary focus:ring-primary/20">
                         </td>
@@ -418,13 +418,13 @@
     <div id="bulk-bar" class="fixed bottom-6 left-1/2 z-40 hidden -translate-x-1/2 items-center gap-3 rounded-lg border border-border bg-surface px-6 py-3.5 shadow-lg">
         <p class="text-sm font-semibold text-ink"><span id="selected-count">0</span> pegawai dipilih</p>
         <div class="h-4 w-px bg-border"></div>
-        <button class="inline-flex items-center gap-1.5 text-xs font-semibold text-warning hover:underline transition-colors cursor-pointer">
+        <button onclick="exportSelectedData()" class="inline-flex items-center gap-1.5 text-xs font-semibold text-warning hover:underline transition-colors cursor-pointer">
             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
             </svg>
             Export Pilihan
         </button>
-        <button class="inline-flex items-center gap-1.5 text-xs font-semibold text-danger hover:underline transition-colors cursor-pointer">
+        <button onclick="deactivateSelectedData()" class="inline-flex items-center gap-1.5 text-xs font-semibold text-danger hover:underline transition-colors cursor-pointer">
             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M22 10.5h-6m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM4 19.235A10.19 10.19 0 0 1 12.75 15c2.015 0 3.907.585 5.5 1.59m-14.25 2.645A9.903 9.903 0 0 1 12.75 18a9.903 9.903 0 0 1 6.002 2.235" />
             </svg>
@@ -700,20 +700,70 @@
         updateBulk();
     }
 
-    // Export baris yang sedang terlihat melalui generator XLSX di backend.
+    // Export seluruh data yang difilter
     function exportFilteredData() {
-        const visibleNips = Array.from(document.querySelectorAll('tbody tr'))
-            .filter(row => row.style.display !== 'none' && row.dataset.nip)
-            .map(row => row.dataset.nip);
+        const urlParams = new URLSearchParams(window.location.search);
+        const exportUrl = new URL(@json(route('pegawai.export')), window.location.origin);
+        for (const [key, value] of urlParams.entries()) {
+            if (key !== 'page' && key !== 'per_page') {
+                exportUrl.searchParams.append(key, value);
+            }
+        }
+        window.location.href = exportUrl.toString();
+    }
 
-        if (visibleNips.length === 0) {
-            window.alert('Tidak ada data pegawai yang dapat diekspor.');
+    // Export baris yang dipilih (Bulk Action)
+    function exportSelectedData() {
+        const selectedNips = Array.from(document.querySelectorAll('.row-check:checked'))
+            .map(cb => cb.closest('tr').dataset.nip)
+            .filter(Boolean);
+
+        if (selectedNips.length === 0) {
+            window.alert('Tidak ada data pegawai yang dipilih.');
             return;
         }
 
         const exportUrl = new URL(@json(route('pegawai.export')), window.location.origin);
-        visibleNips.forEach(nip => exportUrl.searchParams.append('nips[]', nip));
+        selectedNips.forEach(nip => exportUrl.searchParams.append('nips[]', nip));
         window.location.href = exportUrl.toString();
+    }
+
+    // Nonaktifkan baris yang dipilih (Bulk Action)
+    function deactivateSelectedData() {
+        const selectedIds = Array.from(document.querySelectorAll('.row-check:checked'))
+            .map(cb => cb.closest('tr').dataset.id)
+            .filter(Boolean);
+
+        if (selectedIds.length === 0) {
+            window.alert('Tidak ada data pegawai yang dipilih.');
+            return;
+        }
+
+        if (!confirm('Apakah Anda yakin ingin menonaktifkan ' + selectedIds.length + ' pegawai yang dipilih?')) {
+            return;
+        }
+
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = @json(route('pegawai.bulkDestroy'));
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = '_token';
+        csrfInput.value = csrfToken;
+        form.appendChild(csrfInput);
+
+        selectedIds.forEach(id => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'ids[]';
+            input.value = id;
+            form.appendChild(input);
+        });
+
+        document.body.appendChild(form);
+        form.submit();
     }
 
     function updatePerPage(val) {

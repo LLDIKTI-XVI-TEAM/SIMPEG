@@ -592,6 +592,9 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
         ->name('pegawai.update');
+    Route::post('/pegawai/bulk-destroy', [PegawaiController::class, 'bulkDestroy'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.deactivate'])
+        ->name('pegawai.bulkDestroy');
     Route::post('/pegawai/{id}/delete', [PegawaiController::class, 'destroy'])
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.deactivate'])

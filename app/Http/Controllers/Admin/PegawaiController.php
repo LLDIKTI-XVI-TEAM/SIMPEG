@@ -730,6 +730,39 @@ class PegawaiController extends Controller
             ->with('success', 'Data pegawai '.$nama.' berhasil dinonaktifkan.');
     }
 
+    public function bulkDestroy(Request $request, DeactivateEmployeeAction $action)
+    {
+        $ids = $request->input('ids', []);
+
+        if (empty($ids)) {
+            return back()->with('error', 'Tidak ada data pegawai yang dipilih.');
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $employees = Employee::whereIn('id', $ids)->get();
+            $count = $employees->count();
+
+            if ($count === 0) {
+                DB::rollBack();
+                return back()->with('error', 'Data pegawai tidak ditemukan.');
+            }
+
+            foreach ($employees as $employee) {
+                $action->execute($employee, $request);
+            }
+
+            DB::commit();
+
+            return back()->with('success', $count . ' pegawai berhasil dinonaktifkan.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return back()->with('error', 'Terjadi kesalahan saat menonaktifkan pegawai: ' . $e->getMessage());
+        }
+    }
+
     public function restore($id, Request $request, RestoreEmployeeAction $action)
     {
         $employee = Employee::onlyTrashed()->findOrFail($id);
@@ -785,14 +818,55 @@ class PegawaiController extends Controller
             ->unique()
             ->values();
 
-        $pegawaiData = Employee::query()
-            ->with('jenisPegawai:id,nama')
-            ->when(
-                $requestedNips->isNotEmpty(),
-                fn ($query) => $query->whereIn('nip', $requestedNips->all())
-            )
-            ->orderBy('nama_lengkap')
-            ->get();
+        $query = Employee::query()->with('jenisPegawai:id,nama');
+
+        if ($requestedNips->isNotEmpty()) {
+            $query->whereIn('nip', $requestedNips->all());
+        } else {
+            $search = mb_strtolower(trim((string) $request->query('search', '')));
+            $golongan = trim((string) $request->query('golongan', ''));
+            $unitKerjaId = trim((string) $request->query('unit_kerja_id', ''));
+            $jenisPegawaiId = trim((string) $request->query('jenis_pegawai_id', ''));
+            $statusAktif = trim((string) $request->query('status_aktif', ''));
+
+            if ($unitKerjaId === '' && $request->filled('unit')) {
+                $unitKerjaId = RefUnitKerja::where('nama', $request->query('unit'))->value('id') ?? '';
+            }
+            if ($jenisPegawaiId === '' && $request->filled('jenis')) {
+                $jenisPegawaiId = RefJenisPegawai::where('nama', $request->query('jenis'))->value('id') ?? '';
+            }
+            if ($statusAktif === '' && $request->filled('status')) {
+                $statusAktif = match (strtolower((string)$request->query('status'))) {
+                    'aktif' => 'Aktif', 'nonaktif', 'non-aktif' => 'Non-Aktif', 'pensiun' => 'Pensiun', 'mutasi' => 'Mutasi', default => ''
+                };
+            }
+            if ($request->query('filter') === 'pensiun' && $statusAktif === '') {
+                $statusAktif = 'Pensiun';
+            }
+
+            if ($search !== '') {
+                $query->where(function ($q) use ($search) {
+                    $q->whereRaw('LOWER(nama_lengkap) LIKE ?', ["%{$search}%"])
+                      ->orWhereRaw('LOWER(nip) LIKE ?', ["%{$search}%"]);
+                });
+            }
+            if ($golongan !== '') {
+                $query->where('golongan_terakhir', 'like', $golongan.'%');
+            }
+            if ($unitKerjaId !== '') {
+                $query->whereHas('positionHistories', function ($q) use ($unitKerjaId) {
+                    $q->where('unit_kerja_id', $unitKerjaId)->where('is_latest', true);
+                });
+            }
+            if ($jenisPegawaiId !== '') {
+                $query->where('jenis_pegawai_id', $jenisPegawaiId);
+            }
+            if ($statusAktif !== '') {
+                $query->where('status_aktif', $statusAktif);
+            }
+        }
+
+        $pegawaiData = $query->orderBy('nama_lengkap')->get();
 
         if ($requestedNips->isNotEmpty()) {
             $requestedOrder = $requestedNips->flip();
