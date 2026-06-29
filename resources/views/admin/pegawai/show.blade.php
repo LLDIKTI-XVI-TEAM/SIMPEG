@@ -35,34 +35,39 @@
     @endphp
 
     <div x-data="{
-        activeTab: 'profile',
+        activeTab: new URLSearchParams(window.location.search).get('tab') || 'profile',
         kinerjaBaik: {{ $p->is_kinerja_baik ? 'true' : 'false' }},
         showModal: false,
         modalTitle: '',
         modalType: '',
+        modalError: '',
+        isSubmitting: false,
+        toast: { show: false, message: '', type: 'success' },
         
-        // Data list dummy untuk riwayat
-        keluargaList: {{ $p->families->map(fn($f) => ['nama' => $f->nama_anggota, 'hubungan' => $f->hubungan_keluarga, 'tgl_lahir' => $f->tanggal_lahir, 'pekerjaan' => $f->pekerjaan, 'status' => $f->status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'])->toJson() }},
+        // Mengambil data riwayat riil dari database melalui relasi model Employee
+        keluargaList: {{ $p->families->map(fn($f) => ['id' => $f->id, 'nama_anggota' => $f->nama_anggota, 'hubungan' => $f->hubungan, 'nik' => $f->nik, 'tempat_lahir' => $f->tempat_lahir, 'tanggal_lahir' => $f->tanggal_lahir ? \Carbon\Carbon::parse($f->tanggal_lahir)->format('d-m-Y') : '-', 'jenis_kelamin' => $f->jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan', 'pekerjaan' => $f->pekerjaan, 'status' => $f->status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'])->toJson() }},
         pangkatList: {{ $p->rankHistories->map(fn($r) => ['golongan' => $r->golongan->nama ?? '-', 'no_sk' => $r->no_sk, 'tgl_sk' => $r->tanggal_sk, 'tmt' => $r->tmt_pangkat])->toJson() }},
         jabatanList: {{ $p->positionHistories->map(fn($j) => ['jabatan' => $j->nama_jabatan, 'unit' => $j->unitKerja->nama ?? '-', 'no_sk' => $j->no_sk, 'tgl_sk' => $j->tanggal_sk, 'tmt' => $j->tmt_jabatan])->toJson() }},
         kgbList: {{ $p->salaryHistories->map(fn($s) => ['gaji' => 'Rp ' . number_format($s->gaji_pokok, 0, ',', '.'), 'no_sk' => $s->no_sk, 'tgl_sk' => $s->tanggal_sk, 'tmt' => $s->tmt_kgb])->toJson() }},
-        disiplinList: {{ $p->disciplineRecords->map(fn($d) => ['jenis' => $d->jenis_hukuman, 'alasan' => $d->deskripsi, 'no_sk' => $d->no_sk, 'tgl_sk' => $d->tanggal_sk, 'masa' => $d->tanggal_mulai . ' s/d ' . ($d->tanggal_berakhir ?? 'Sekarang')])->toJson() }},
+        disiplinList: {{ $p->disciplineRecords->map(fn($d) => ['jenis' => $d->jenis_hukuman, 'alasan' => $d->deskripsi, 'no_sk' => $d->no_sk, 'tgl_sk' => $d->tanggal_sk ? \Carbon\Carbon::parse($d->tanggal_sk)->format('d-m-Y') : '-', 'masa' => ($d->tanggal_mulai ? \Carbon\Carbon::parse($d->tanggal_mulai)->format('d-m-Y') : '-') . ' s/d ' . ($d->tanggal_berakhir ? \Carbon\Carbon::parse($d->tanggal_berakhir)->format('d-m-Y') : 'Sekarang'), 'is_active' => $d->is_active])->toJson() }},
         pendidikanList: {{ $p->educationHistories->map(fn($e) => ['tingkat' => $e->jenjang->nama ?? '-', 'institusi' => $e->nama_institusi, 'prodi' => $e->jurusan, 'lulus' => $e->tahun_lulus, 'no_ijazah' => $e->no_ijazah])->toJson() }},
         
         // Form states
-        newKeluarga: { nama: '', hubungan: 'Istri', tgl_lahir: '', pekerjaan: '' },
+        newKeluarga: { nama_anggota: '', hubungan: 'Istri', nik: '', tempat_lahir: '', tanggal_lahir: '', jenis_kelamin: 'P', status_tunjangan: false, pekerjaan: '' },
         newPangkat: { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '' },
         newJabatan: { nama_jabatan: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '' },
         newKgb: { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '' },
-        newDisiplin: { jenis: 'Teguran Tertulis', alasan: '', no_sk: '', tgl_sk: '', masa: '' },
+        newDisiplin: { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '' },
         newPendidikan: { tingkat: 'Sarjana (S1)', institusi: '', prodi: '', lulus: '', no_ijazah: '' },
         
         openModal(type, title) {
             this.modalType = type;
             this.modalTitle = title;
+            this.modalError = '';
             this.showModal = true;
         },
         async submitForm() {
+            this.modalError = '';
             let payload = { type: this.modalType };
             if (this.modalType === 'keluarga') {
                 payload = { ...payload, ...this.newKeluarga };
@@ -85,30 +90,109 @@
             else if (this.modalType === 'keluarga') endpoint = `/api/v1/pegawai/{{ $p->id }}/keluarga`;
             else if (this.modalType === 'disiplin') endpoint = `/api/v1/pegawai/{{ $p->id }}/disiplin`;
 
+            this.isSubmitting = true;
+
             try {
                 const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Accept': 'application/json',
                         'X-CSRF-TOKEN': '{{ csrf_token() }}'
                     },
                     body: JSON.stringify(payload)
                 });
                 
                 if (response.ok) {
-                    window.location.reload();
+                    const result = await response.json();
+                    
+                    if (this.modalType === 'disiplin') {
+                        this.disiplinList.unshift({
+                            jenis: this.newDisiplin.jenis_hukuman,
+                            alasan: this.newDisiplin.deskripsi,
+                            no_sk: this.newDisiplin.no_sk,
+                            tgl_sk: this.newDisiplin.tanggal_sk,
+                            masa: this.newDisiplin.tanggal_mulai + ' s/d ' + (this.newDisiplin.tanggal_berakhir ? this.newDisiplin.tanggal_berakhir : 'Sekarang'),
+                            is_active: true
+                        });
+                        this.newDisiplin = { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '' };
+                    } else if (this.modalType === 'kgb') {
+                        this.kgbList.unshift({
+                            gaji: 'Rp ' + parseInt(this.newKgb.gaji_pokok).toLocaleString('id-ID'),
+                            no_sk: this.newKgb.no_sk,
+                            tgl_sk: this.newKgb.tanggal_sk,
+                            tmt: this.newKgb.tmt_kgb
+                        });
+                        this.newKgb = { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '' };
+                    } else if (this.modalType === 'jabatan') {
+                        this.jabatanList.unshift({
+                            jabatan: this.newJabatan.nama_jabatan,
+                            unit: '-', // Idealnya ini ambil dari nama referensi unit kerja
+                            no_sk: this.newJabatan.no_sk,
+                            tgl_sk: this.newJabatan.tanggal_sk,
+                            tmt: this.newJabatan.tmt_jabatan
+                        });
+                        this.newJabatan = { nama_jabatan: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '' };
+                    } else if (this.modalType === 'pangkat') {
+                        this.pangkatList.unshift({
+                            golongan: '-', // Idealnya ini ambil dari nama referensi golongan
+                            no_sk: this.newPangkat.no_sk,
+                            tgl_sk: this.newPangkat.tanggal_sk,
+                            tmt: this.newPangkat.tmt_pangkat
+                        });
+                        this.newPangkat = { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '' };
+                    } else if (this.modalType === 'keluarga') {
+                        this.keluargaList.unshift({
+                            nama_anggota: this.newKeluarga.nama_anggota,
+                            hubungan: this.newKeluarga.hubungan,
+                            nik: this.newKeluarga.nik,
+                            tempat_lahir: this.newKeluarga.tempat_lahir,
+                            tanggal_lahir: this.newKeluarga.tanggal_lahir,
+                            jenis_kelamin: this.newKeluarga.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan',
+                            pekerjaan: this.newKeluarga.pekerjaan,
+                            status: this.newKeluarga.status_tunjangan === 'true' || this.newKeluarga.status_tunjangan === true ? 'Ditanggung' : 'Tidak Ditanggung'
+                        });
+                        this.newKeluarga = { nama_anggota: '', hubungan: 'Istri', nik: '', tempat_lahir: '', tanggal_lahir: '', jenis_kelamin: 'P', status_tunjangan: false, pekerjaan: '' };
+                    } else if (this.modalType === 'pendidikan') {
+                        this.pendidikanList.unshift({
+                            tingkat: this.newPendidikan.tingkat,
+                            institusi: this.newPendidikan.institusi,
+                            prodi: this.newPendidikan.prodi,
+                            lulus: this.newPendidikan.lulus,
+                            no_ijazah: this.newPendidikan.no_ijazah
+                        });
+                        this.newPendidikan = { tingkat: 'Sarjana (S1)', institusi: '', prodi: '', lulus: '', no_ijazah: '' };
+                    }
+                    
+                    this.showModal = false;
+                    this.toast = { show: true, message: 'Data berhasil disimpan!', type: 'success' };
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    setTimeout(() => this.toast.show = false, 3000);
                 } else {
                     const errorData = await response.json();
-                    alert('Gagal menyimpan: ' + (errorData.message || 'Terjadi kesalahan'));
+                    let errMsg = '';
+                    if (errorData.errors) {
+                        errMsg = '<ul class=\'list-disc pl-5 mt-1\'>';
+                        for (const key in errorData.errors) {
+                            errMsg += '<li>' + errorData.errors[key][0] + '</li>';
+                        }
+                        errMsg += '</ul>';
+                    } else {
+                        errMsg = errorData.message || 'Data tidak valid';
+                    }
+                    this.modalError = errMsg;
                 }
             } catch (error) {
-                alert('Gagal terhubung ke server');
+                this.toast = { show: true, message: 'Terjadi kesalahan jaringan', type: 'error' };
+                setTimeout(() => this.toast.show = false, 5000);
+            } finally {
+                this.isSubmitting = false;
             }
         }
     }" class="mx-auto max-w-5xl space-y-6">
         
-        {{-- BREADCRUMBS --}}
-        <div class="mb-2">
+        {{-- BREADCRUMBS & DYNAMIC ALERT --}}
+        <div class="relative z-40 mb-2">
             <nav class="flex items-center gap-1.5 text-xs text-muted">
                 <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
                 <span>/</span>
@@ -116,6 +200,40 @@
                 <span>/</span>
                 <span class="font-medium text-ink">Detail Pegawai</span>
             </nav>
+
+            {{-- DYNAMIC ALERT (MENGGANTIKAN TOAST) --}}
+            <div x-show="toast.show" style="display: none;" class="mb-4" x-transition>
+                
+                <template x-if="toast.type === 'success'">
+                    <div class="rounded-lg bg-green-50 p-4 border border-green-200">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <div class="ml-3">
+                                <h3 class="text-sm font-medium text-green-800" x-text="toast.message"></h3>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                
+                <template x-if="toast.type === 'error'">
+                    <div class="rounded-lg bg-red-50 p-4 border border-red-200">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <div class="ml-3">
+                                <h3 class="text-sm font-medium text-red-800" x-text="toast.message"></h3>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
         </div>
 
         {{-- MAIN DETAIL CARD --}}
@@ -349,23 +467,36 @@
                     <table class="w-full">
                         <thead class="bg-soft border-b border-border">
                             <tr class="text-left text-xs font-semibold text-muted uppercase tracking-wide font-sans">
-                                <th class="px-4 py-3">Nama Anggota</th>
+                                <th class="px-4 py-3">Nama Lengkap & NIK</th>
                                 <th class="px-4 py-3">Hubungan</th>
-                                <th class="px-4 py-3">Tanggal Lahir</th>
+                                <th class="px-4 py-3">TTL</th>
                                 <th class="px-4 py-3">Pekerjaan</th>
                                 <th class="px-4 py-3">Status</th>
+                                <th class="px-4 py-3 text-right">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border text-xs font-sans">
-                            <template x-for="fam in keluargaList" :key="fam.nama">
+                            <template x-for="(fam, index) in keluargaList" :key="index">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
-                                    <td class="px-4 py-3 font-bold" x-text="fam.nama"></td>
-                                    <td class="px-4 py-3" x-text="fam.hubungan"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="fam.tgl_lahir"></td>
-                                    <td class="px-4 py-3" x-text="fam.pekerjaan"></td>
                                     <td class="px-4 py-3">
-                                        <span class="inline-flex items-center gap-1 text-[10px] font-bold text-success" x-text="fam.status"></span>
+                                        <p class="font-bold font-sans" x-text="fam.nama_anggota"></p>
+                                        <p class="text-[10px] text-muted font-mono" x-text="fam.nik ? 'NIK. ' + fam.nik : 'NIK. -'"></p>
                                     </td>
+                                    <td class="px-4 py-3">
+                                        <p class="font-sans" x-text="fam.hubungan"></p>
+                                        <p class="text-[10px] text-muted font-sans" x-text="fam.jenis_kelamin"></p>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <p class="font-sans" x-text="fam.tempat_lahir || '-'"></p>
+                                        <p class="text-[10px] text-muted font-mono" x-text="fam.tanggal_lahir"></p>
+                                    </td>
+                                    <td class="px-4 py-3 font-sans" x-text="fam.pekerjaan || '-'"></td>
+                                    <td class="px-4 py-3">
+                                        <span class="inline-flex items-center gap-1 text-[10px] font-bold"
+                                              :class="fam.status === 'Ditanggung' ? 'text-success' : 'text-muted'"
+                                              x-text="fam.status"></span>
+                                    </td>
+                                    <td class="px-4 py-3 text-right text-muted">-</td>
                                 </tr>
                             </template>
                         </tbody>
@@ -515,9 +646,14 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border text-xs font-sans">
-                            <template x-for="d in disiplinList" :key="d.no_sk">
+                            <template x-for="(d, index) in disiplinList" :key="index">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
-                                    <td class="px-4 py-3 font-bold text-danger" x-text="d.jenis"></td>
+                                    <td class="px-4 py-3">
+                                        <span class="font-bold text-danger" x-text="d.jenis"></span>
+                                        <template x-if="d.is_active">
+                                            <span class="ml-1 inline-flex items-center rounded-full bg-danger/10 px-1.5 py-0.5 text-[8px] font-bold text-danger uppercase">Aktif</span>
+                                        </template>
+                                    </td>
                                     <td class="px-4 py-3" x-text="d.alasan"></td>
                                     <td class="px-4 py-3 font-mono" x-text="d.no_sk"></td>
                                     <td class="px-4 py-3 font-mono" x-text="d.tgl_sk"></td>
@@ -697,27 +833,75 @@
                         </button>
                     </div>
 
+                    {{-- Modal Error --}}
+                    <template x-if="modalError">
+                        <div class="mb-4 rounded-lg bg-red-50 p-4 border border-red-200">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
+                                    </svg>
+                                </div>
+                                <div class="ml-3">
+                                    <h3 class="text-sm font-medium text-red-800">Terdapat kesalahan pengisian form:</h3>
+                                    <div class="mt-2 text-sm text-red-700" x-html="modalError"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+
                     <form @submit.prevent="submitForm()" class="space-y-4">
                         {{-- KELUARGA FORM --}}
                         <template x-if="modalType === 'keluarga'">
                             <div class="space-y-4">
                                 <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Lengkap</label>
-                                    <input type="text" x-model="newKeluarga.nama" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Anggota Keluarga</label>
+                                    <input type="text" x-model="newKeluarga.nama_anggota" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Hubungan</label>
-                                    <select x-model="newKeluarga.hubungan" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                        <option value="Suami">Suami</option>
-                                        <option value="Istri">Istri</option>
-                                        <option value="Anak">Anak</option>
-                                        <option value="Orang Tua">Orang Tua</option>
-                                    </select>
+                                
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div class="space-y-1">
+                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Hubungan</label>
+                                        <select x-model="newKeluarga.hubungan" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                            <option value="Suami">Suami</option>
+                                            <option value="Istri">Istri</option>
+                                            <option value="Anak">Anak</option>
+                                        </select>
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">NIK (Nomor Induk Kependudukan)</label>
+                                        <input type="text" maxlength="16" x-model="newKeluarga.nik" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    </div>
                                 </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Lahir</label>
-                                    <input type="date" x-model="newKeluarga.tgl_lahir" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div class="space-y-1">
+                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tempat Lahir</label>
+                                        <input type="text" x-model="newKeluarga.tempat_lahir" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Lahir</label>
+                                        <input type="date" x-model="newKeluarga.tanggal_lahir" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    </div>
                                 </div>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div class="space-y-1">
+                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Kelamin</label>
+                                        <select x-model="newKeluarga.jenis_kelamin" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                            <option value="L">Laki-laki</option>
+                                            <option value="P">Perempuan</option>
+                                        </select>
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Status Tunjangan</label>
+                                        <select x-model="newKeluarga.status_tunjangan" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                            <option :value="true">Ditanggung</option>
+                                            <option :value="false">Tidak Ditanggung</option>
+                                        </select>
+                                    </div>
+                                </div>
+
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Pekerjaan</label>
                                     <input type="text" x-model="newKeluarga.pekerjaan" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
@@ -828,16 +1012,15 @@
                             <div class="space-y-4">
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Hukuman</label>
-                                    <select x-model="newDisiplin.jenis" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                        <option value="Teguran Lisan">Teguran Lisan</option>
-                                        <option value="Teguran Tertulis">Teguran Tertulis</option>
-                                        <option value="Pernyataan Tidak Puas secara Tertulis">Pernyataan Tidak Puas secara Tertulis</option>
-                                        <option value="Penundaan Kenaikan Pangkat">Penundaan Kenaikan Pangkat</option>
+                                    <select x-model="newDisiplin.jenis_hukuman" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                        <option value="Ringan">Ringan</option>
+                                        <option value="Sedang">Sedang</option>
+                                        <option value="Berat">Berat</option>
                                     </select>
                                 </div>
                                 <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Alasan / Pelanggaran</label>
-                                    <input type="text" x-model="newDisiplin.alasan" required placeholder="Keterlambatan absensi berulang" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Deskripsi Pelanggaran</label>
+                                    <textarea x-model="newDisiplin.deskripsi" required placeholder="Keterlambatan absensi berulang" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" rows="2"></textarea>
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Hukuman</label>
@@ -845,12 +1028,19 @@
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK Terbit</label>
-                                    <input type="date" x-model="newDisiplin.tgl_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="date" x-model="newDisiplin.tanggal_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Masa Berlaku</label>
-                                    <input type="text" x-model="newDisiplin.masa" placeholder="6 Bulan" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="space-y-1">
+                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Mulai</label>
+                                        <input type="date" x-model="newDisiplin.tanggal_mulai" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Berakhir</label>
+                                        <input type="date" x-model="newDisiplin.tanggal_berakhir" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    </div>
                                 </div>
+                                <p class="text-[10px] text-muted italic font-sans">* Kosongkan tanggal berakhir jika masa berlaku tidak ditentukan (aktif selamanya).</p>
                             </div>
                         </template>
 
@@ -886,11 +1076,22 @@
                         </template>
 
                         <div class="border-t border-border pt-4 flex justify-end gap-2.5 mt-6">
-                            <button type="button" @click="showModal = false" class="inline-flex items-center justify-center rounded border border-border bg-surface px-4 py-2 text-xs font-semibold text-ink hover:bg-soft transition font-sans cursor-pointer">
+                            <button type="button" @click="showModal = false" :disabled="isSubmitting" class="inline-flex items-center justify-center rounded border border-border bg-surface px-4 py-2 text-xs font-semibold text-ink hover:bg-soft transition font-sans cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
                                 Batal
                             </button>
-                            <button type="submit" class="inline-flex items-center justify-center rounded bg-primary px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition font-sans cursor-pointer">
-                                Simpan Riwayat
+                            <button type="submit" :disabled="isSubmitting" class="inline-flex items-center justify-center rounded bg-primary px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition font-sans cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px]">
+                                <template x-if="!isSubmitting">
+                                    <span>Simpan</span>
+                                </template>
+                                <template x-if="isSubmitting">
+                                    <span class="flex items-center justify-center gap-2">
+                                        <svg class="animate-spin h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Menyimpan...
+                                    </span>
+                                </template>
                             </button>
                         </div>
                     </form>

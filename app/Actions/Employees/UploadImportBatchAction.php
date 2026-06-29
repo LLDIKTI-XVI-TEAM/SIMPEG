@@ -32,10 +32,6 @@ class UploadImportBatchAction
     /**
      * Upload and parse the import file, cache the raw rows, and return batch metadata.
      *
-     * @param  UploadedFile  $file
-     * @param  string|null  $requestedType
-     * @param  User|null  $user
-     * @return array
      *
      * @throws ValidationException
      */
@@ -49,9 +45,12 @@ class UploadImportBatchAction
             ]);
         }
 
+        // File tanpa baris data: bisa berarti hanya berisi header, atau hanya berisi
+        // baris contoh yang sengaja dilewati importer. Pesan diperjelas agar admin
+        // paham baris contoh otomatis di-skip dan tahu harus mengisi data asli.
         if ($rows === []) {
             throw ValidationException::withMessages([
-                'file' => ['File tidak berisi data import (hanya header).'],
+                'file' => ['File belum berisi data pegawai. Baris contoh otomatis dilewati, jadi isi data pegawai di bawah baris contoh lalu unggah ulang.'],
             ]);
         }
 
@@ -87,9 +86,6 @@ class UploadImportBatchAction
     /**
      * Detect the type of template based on CSV headers.
      *
-     * @param  array  $headers
-     * @param  string|null  $requestedType
-     * @return string
      *
      * @throws ValidationException
      */

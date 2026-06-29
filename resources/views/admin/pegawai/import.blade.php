@@ -8,6 +8,7 @@
         dragover: false,
         activeTemplate: 'utama',
         templateFormat: 'xlsx',
+        downloadingType: '',
         
         // Batch state dari server
         batchId: null,
@@ -66,8 +67,42 @@
         progress: 0,
         progressText: 'Memulai proses impor...',
         
-        downloadTemplate(type) {
-            window.location.href = '/pegawai/import/template/' + type + '?format=' + this.templateFormat;
+        // Unduh template via fetch+blob agar bisa menampilkan loader di kartu yang diklik.
+        // window.location.href dihindari karena navigasi browser tidak memberi hook async
+        // sehingga user tidak tahu apakah klik-nya sedang diproses.
+        async downloadTemplate(type) {
+            if (this.downloadingType) return;
+
+            this.downloadingType = type;
+            this.apiError = '';
+
+            try {
+                const res = await fetch('/pegawai/import/template/' + type + '?format=' + this.templateFormat, {
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
+                    },
+                });
+
+                if (!res.ok) {
+                    throw new Error('Gagal mengunduh template. Silakan coba lagi.');
+                }
+
+                const blob = await res.blob();
+                const filename = 'template_' + type + '.' + this.templateFormat;
+
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.setAttribute('href', url);
+                link.setAttribute('download', filename);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            } catch (e) {
+                this.apiError = e.message;
+            } finally {
+                this.downloadingType = '';
+            }
         },
         
         // Download Laporan Kesalahan
@@ -438,11 +473,16 @@
                         class="rounded-md px-3 py-1.5 transition">CSV UTF-8</button>
                 </div>
                 <div class="flex flex-col sm:flex-row gap-3">
-                    <button type="button" @click="activeTemplate = 'utama'; downloadTemplate('utama')"
-                        class="flex items-center gap-3 border border-primary/20 bg-primary/5 text-primary p-4 rounded-lg transition hover:bg-primary/10 cursor-pointer shadow-sm w-full">
-                        <svg class="w-8 h-8 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
+                    <button type="button" @click="activeTemplate = 'utama'; downloadTemplate('utama')" :disabled="downloadingType !== ''"
+                        :class="downloadingType ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary/10 cursor-pointer'"
+                        class="flex items-center gap-3 border border-primary/20 bg-primary/5 text-primary p-4 rounded-lg transition shadow-sm w-full">
+                        <svg x-show="downloadingType === 'utama'" class="w-8 h-8 text-primary shrink-0 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                        <svg x-show="downloadingType !== 'utama'" class="w-8 h-8 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
                         <div class="text-left">
-                            <span class="text-sm font-bold block font-sans">Unduh Template Utama Pegawai</span>
+                            <span class="text-sm font-bold block font-sans">
+                                <span x-show="downloadingType === 'utama'">Menyiapkan Template...</span>
+                                <span x-show="downloadingType !== 'utama'">Unduh Template Utama Pegawai</span>
+                            </span>
                             <span class="text-xs text-primary/80 block mt-0.5 font-sans">Berisi kolom NIP, NIK, No KK, Golongan, Jabatan, Role, dll.</span>
                         </div>
                     </button>

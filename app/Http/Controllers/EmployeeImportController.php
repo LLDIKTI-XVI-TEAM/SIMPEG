@@ -2,15 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Employees\GenerateImportTemplateAction;
 use App\Actions\Employees\ImportEmployeesAction;
 use App\Actions\Employees\UploadImportBatchAction;
 use App\Actions\Employees\ValidateImportBatchAction;
 use App\Http\Requests\ImportEmployeesRequest;
 use App\Jobs\ImportEmployeeBatchJob;
+use App\Support\EmployeeImport\ImportTemplateWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use InvalidArgumentException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EmployeeImportController extends Controller
 {
@@ -131,6 +135,24 @@ class EmployeeImportController extends Controller
             'error_message' => $batch['error_message'] ?? null,
             'result' => $batch['result'] ?? null,
         ]);
+    }
+
+    /**
+     * Hasilkan dan unduh template import untuk satu tipe.
+     * Controller hanya validasi input dan koordinasi Action + Writer (thin adapter).
+     */
+    public function template(string $type, GenerateImportTemplateAction $action, ImportTemplateWriter $writer): StreamedResponse
+    {
+        try {
+            $definition = $action->execute($type);
+        } catch (InvalidArgumentException) {
+            abort(404, 'Tipe template tidak dikenal.');
+        }
+
+        $format = strtolower((string) request('format', 'xlsx'));
+        $format = in_array($format, ['xlsx', 'csv'], true) ? $format : 'xlsx';
+
+        return $writer->stream($type, $definition['headers'], $definition['example'], $format);
     }
 
     /**
