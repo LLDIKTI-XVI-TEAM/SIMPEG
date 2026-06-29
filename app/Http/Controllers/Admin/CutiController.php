@@ -2,10 +2,15 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\Cuti\ApproveLeaveAction;
+use App\Actions\Cuti\PostponeLeaveAction;
 use App\Actions\Cuti\SubmitLeaveRequestAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ApproveLeaveRequest;
+use App\Http\Requests\PostponeLeaveRequest;
 use App\Http\Requests\StoreLeaveRequestRequest;
 use App\Models\LeaveRequest;
+use App\Services\LeaveApprovalService;
 
 class CutiController extends Controller
 {
@@ -157,19 +162,28 @@ class CutiController extends Controller
      * Menampilkan detail satu pengajuan cuti.
      * Pegawai tanpa hak memantau hanya boleh membuka pengajuan miliknya sendiri (cegah akses lintas pegawai).
      */
-    public function show($id)
+    public function show($id, LeaveApprovalService $approvals)
     {
         $user = request()->user();
 
         $cuti = LeaveRequest::query()
-            ->with(['employee', 'jenisCuti'])
+            ->with(['employee', 'jenisCuti', 'approvals.approver'])
             ->findOrFail($id);
 
         if (! $user->hasPermission('cuti.read_all') && $cuti->employee_id !== $user->employee_id) {
             abort(403);
         }
 
-        return view('admin.cuti.show', ['cuti' => $cuti]);
+        // Tombol setujui/tunda hanya muncul bila pengguna ini adalah approver tahap yang sedang menunggu;
+        // otorisasi sebenarnya tetap ditegakkan ulang di service saat aksi dijalankan.
+        $stage = $approvals->pendingStage($cuti);
+        $canAct = $stage !== null
+            && $approvals->approverEmployeeIdForStage($cuti, $stage) === $user->employee_id;
+
+        return view('admin.cuti.show', [
+            'cuti' => $cuti,
+            'canAct' => $canAct,
+        ]);
     }
 
     /**
@@ -185,5 +199,72 @@ class CutiController extends Controller
 
         return redirect()->route('cuti')
             ->with('success', 'Pengajuan cuti berhasil dikirim dan menunggu persetujuan atasan langsung.');
+    }
+
+    /**
+     * Menampilkan daftar pengajuan cuti yang menunggu tindakan approver yang sedang login.
+     * Daftar dibatasi pada pengajuan yang approver tahap menunggunya adalah pegawai milik pengguna ini,
+     * sehingga seorang approver hanya melihat pengajuan yang memang menjadi tanggung jawabnya.
+     */
+    public function approval(LeaveApprovalService $approvals)
+    {
+        $employeeId = request()->user()->employee_id;
+
+        // Hanya pengajuan berstatus menunggu/ditunda yang relevan untuk antrean approver.
+        $kandidat = LeaveRequest::query()
+            ->with(['employee', 'jenisCuti'])
+            ->whereIn('status', [
+                'Menunggu Atasan Langsung',
+                'Menunggu Verifikator',
+                'Menunggu Pimpinan',
+                'Ditunda',
+            ])
+            ->latest()
+            ->get();
+
+        // Penyaringan approver bersifat person-based: cocokkan approver tahap menunggu dengan pegawai pengguna ini.
+        $pending = $kandidat->filter(function (LeaveRequest $cuti) use ($approvals, $employeeId): bool {
+            $stage = $approvals->pendingStage($cuti);
+
+            return $stage !== null
+                && $approvals->approverEmployeeIdForStage($cuti, $stage) === $employeeId;
+        })->values();
+
+        return view('admin.cuti.approval', ['pending' => $pending]);
+    }
+
+    /**
+     * Menyetujui satu pengajuan cuti pada tahap yang sedang menunggu.
+     * Kelayakan approver per-tahap dan transisi status ditegakkan di Action/Service, bukan di controller.
+     */
+    public function approve(ApproveLeaveRequest $request, $id, ApproveLeaveAction $action)
+    {
+        $leaveRequest = LeaveRequest::findOrFail($id);
+        $actor = $request->user()->employee;
+
+        // Pengguna tanpa data pegawai (mis. akun sistem) tidak dapat menjadi approver; tolak dengan jelas.
+        abort_if($actor === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat menyetujui cuti.');
+
+        $action->execute($leaveRequest, $actor, $request->validated()['komentar'] ?? null, $request);
+
+        return redirect()->route('cuti.approval')
+            ->with('success', 'Pengajuan cuti berhasil disetujui.');
+    }
+
+    /**
+     * Menunda satu pengajuan cuti pada tahap yang sedang menunggu; alasan penundaan wajib diisi.
+     */
+    public function postpone(PostponeLeaveRequest $request, $id, PostponeLeaveAction $action)
+    {
+        $leaveRequest = LeaveRequest::findOrFail($id);
+        $actor = $request->user()->employee;
+
+        // Pengguna tanpa data pegawai (mis. akun sistem) tidak dapat menjadi approver; tolak dengan jelas.
+        abort_if($actor === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat menunda cuti.');
+
+        $action->execute($leaveRequest, $actor, $request->validated()['komentar'], $request);
+
+        return redirect()->route('cuti.approval')
+            ->with('success', 'Pengajuan cuti ditunda dan pemohon telah diberi tahu.');
     }
 }

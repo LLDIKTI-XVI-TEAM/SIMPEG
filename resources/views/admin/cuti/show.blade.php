@@ -149,11 +149,75 @@
                 </div>
             </div>
 
-            {{-- Footer Action Buttons --}}
-            <div class="border-t border-border pt-6 flex justify-end gap-3">
-                <a href="{{ route('cuti') }}" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-5 py-2.5 text-sm font-semibold text-primary transition hover:bg-soft">
-                    Kembali ke Daftar
-                </a>
+            {{-- Riwayat tindakan approval nyata: tiap entri merekam siapa, tahap berapa, aksi, waktu, dan komentar. --}}
+            @if ($cuti->approvals->isNotEmpty())
+                <div class="border-t border-border pt-6 space-y-4">
+                    <h4 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Riwayat Tindakan Approval</h4>
+                    <div class="space-y-3">
+                        @php
+                            $stageLabel = [1 => 'Atasan Langsung', 2 => 'Verifikator', 3 => 'Pimpinan'];
+                        @endphp
+                        @foreach ($cuti->approvals->sortBy('acted_at') as $approval)
+                            <div class="flex items-start gap-3 rounded-lg border border-border bg-soft/30 p-3">
+                                <span class="mt-0.5 inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold {{ $approval->action === 'APPROVE' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning' }}">
+                                    {{ $approval->action === 'APPROVE' ? 'Setuju' : 'Tunda' }}
+                                </span>
+                                <div class="flex-1">
+                                    <p class="text-xs font-semibold text-ink font-sans">
+                                        {{ $approval->approver?->nama_lengkap ?? 'Approver' }}
+                                        <span class="text-muted font-normal">- Tahap {{ $approval->stage }} ({{ $stageLabel[$approval->stage] ?? '-' }})</span>
+                                    </p>
+                                    <p class="text-[10px] text-muted font-sans mt-0.5">{{ $approval->acted_at?->translatedFormat('d M Y, H:i') }}</p>
+                                    @if ($approval->komentar)
+                                        <p class="text-xs text-ink font-sans mt-1.5 italic">{{ $approval->komentar }}</p>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+            <div class="border-t border-border pt-6 space-y-4" x-data="{ showTunda: false }">
+                @if (session('success'))
+                    <div class="rounded-lg bg-success/10 border border-success/20 px-4 py-2.5 text-sm text-success">{{ session('success') }}</div>
+                @endif
+                @error('komentar')
+                    <div class="rounded-lg bg-danger/10 border border-danger/20 px-4 py-2.5 text-sm text-danger">{{ $message }}</div>
+                @enderror
+
+                @if ($canAct)
+                    {{-- Form penundaan: alasan wajib, jadi ditampilkan terpisah saat approver memilih Tunda. --}}
+                    <div x-show="showTunda" x-cloak class="rounded-lg border border-warning/25 bg-warning/5 p-4">
+                        <form action="{{ route('cuti.postpone', $cuti->id) }}" method="POST" class="space-y-3">
+                            @csrf
+                            <label for="komentar-tunda" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Alasan Penundaan <span class="text-danger">*</span></label>
+                            <textarea id="komentar-tunda" name="komentar" rows="3" required minlength="5"
+                                class="w-full resize-y rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                placeholder="Jelaskan alasan penundaan agar pemohon dapat menindaklanjuti."></textarea>
+                            <div class="flex justify-end gap-2">
+                                <button type="button" @click="showTunda = false" class="rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft cursor-pointer">Batal</button>
+                                <button type="submit" class="rounded-lg bg-warning px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 cursor-pointer">Tunda Pengajuan</button>
+                            </div>
+                        </form>
+                    </div>
+                @endif
+
+                <div class="flex justify-end gap-3">
+                    <a href="{{ route('cuti') }}" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-5 py-2.5 text-sm font-semibold text-primary transition hover:bg-soft">
+                        Kembali ke Daftar
+                    </a>
+                    @if ($canAct)
+                        <button type="button" @click="showTunda = true" class="inline-flex items-center justify-center rounded-lg bg-warning px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 cursor-pointer">
+                            Tunda
+                        </button>
+                        <form action="{{ route('cuti.approve', $cuti->id) }}" method="POST" class="inline">
+                            @csrf
+                            <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-success px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 cursor-pointer">
+                                Setujui
+                            </button>
+                        </form>
+                    @endif
+                </div>
             </div>
         </div>
     </div>

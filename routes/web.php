@@ -618,9 +618,17 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
     Route::post('/dashboard/cuti', [CutiController::class, 'store'])
         ->middleware('permission:cuti.create')
         ->name('cuti.store');
-    Route::get('/cuti/approval', [CutiController::class, 'approval'])->name('cuti.approval');
-    Route::post('/cuti/{id}/approve', [CutiController::class, 'approve'])->name('cuti.approve');
-    Route::post('/cuti/{id}/postpone', [CutiController::class, 'postpone'])->name('cuti.postpone');
+    // Antrean dan tindakan approval cuti digerbang ganda: role allowlist sebagai pagar kasar
+    // dan permission level-aksi; kelayakan approver per-tahap (person-based) ditegakkan di service.
+    Route::get('/cuti/approval', [CutiController::class, 'approval'])
+        ->middleware(['role:super_admin,pimpinan,atasan_langsung,admin_kepegawaian'])
+        ->name('cuti.approval');
+    Route::post('/cuti/{id}/approve', [CutiController::class, 'approve'])
+        ->middleware(['role:super_admin,pimpinan,atasan_langsung,admin_kepegawaian'])
+        ->name('cuti.approve');
+    Route::post('/cuti/{id}/postpone', [CutiController::class, 'postpone'])
+        ->middleware(['role:super_admin,pimpinan,atasan_langsung,admin_kepegawaian'])
+        ->name('cuti.postpone');
     Route::get('/dashboard/cuti/{id}', [CutiController::class, 'show'])->name('cuti.show');
 
     // Konfigurasi rantai approval cuti bersifat pengaturan sistem, jadi digerbang ganda:
