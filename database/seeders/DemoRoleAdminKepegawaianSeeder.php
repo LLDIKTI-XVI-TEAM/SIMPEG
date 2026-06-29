@@ -11,11 +11,18 @@ class DemoRoleAdminKepegawaianSeeder extends Seeder
 {
     public function run(): void
     {
+        // Seeder demo pengalih peran untuk pengujian RBAC manual; membuat akun dengan
+        // peran istimewa sehingga WAJIB mati di luar local/testing agar tidak menanam
+        // akun istimewa di lingkungan produksi.
+        if (! app()->environment(['local', 'testing'])) {
+            return;
+        }
+
         $username = config('services.keycloak.test_username', 'demo-klabat');
         $email = 'demo-klabat@example.test';
 
         $employee = Employee::where('email', $email)->first();
-        if (!$employee) {
+        if (! $employee) {
             $employee = Employee::factory()->create([
                 'nama_lengkap' => 'Demo Klabat (Admin Kepegawaian)',
                 'email' => $email,
@@ -34,7 +41,7 @@ class DemoRoleAdminKepegawaianSeeder extends Seeder
             'email_verified_at' => $user->email_verified_at ?? now(),
         ]);
 
-        if (!$user->exists) {
+        if (! $user->exists) {
             $user->password = Str::random(48);
         }
 

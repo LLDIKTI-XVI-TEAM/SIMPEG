@@ -10,6 +10,16 @@ class ApprovalConfigSeeder extends Seeder
 {
     public function run(): void
     {
+        // Seeder ini menanam akun demo dengan kata sandi statis untuk memudahkan
+        // pengembangan dan pengujian rantai approval cuti. Akun demo dengan kredensial
+        // statis tidak boleh dibuat di luar lingkungan pengembangan karena merupakan
+        // risiko keamanan. Gerbang ini fail-closed: hanya local dan testing yang menanam
+        // data demo; lingkungan lain (production, staging, atau APP_ENV yang salah/kosong)
+        // dilewati. Di produksi, rantai approval dikonfigurasi melalui antarmuka Super Admin.
+        if (! app()->environment(['local', 'testing'])) {
+            return;
+        }
+
         $users = [
             [
                 'name' => 'Dra. Merlina Rahman',
@@ -34,7 +44,7 @@ class ApprovalConfigSeeder extends Seeder
                 'email' => 'rainingdumbea47@gmail.com',
                 'role' => 'admin_kepegawaian',
                 'password' => bcrypt('password'),
-            ]
+            ],
         ];
 
         foreach ($users as $userData) {
