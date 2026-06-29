@@ -92,4 +92,8 @@ Route::middleware($employeeGroupMiddleware)
         Route::post('/{employee}/riwayat-kgb', [KgbHistoryController::class, 'store'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_histories.create'])
             ->name('riwayat-kgb.store');
+        Route::post('/{employee}/assign-atasan', [EmployeeController::class, 'assignSupervisor'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.update', 'role:super_admin'])
+            ->whereUuid('employee')
+            ->name('assign-atasan');
     });

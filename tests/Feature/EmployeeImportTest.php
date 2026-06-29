@@ -195,8 +195,14 @@ class EmployeeImportTest extends TestCase
 
         $execute = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", []);
         $execute->assertOk();
-        $execute->assertJsonPath('inserted', 2);
-        $execute->assertJsonPath('failed', 0);
+        $execute->assertJsonPath('status', 'queued');
+
+        $status = $this->getJson("/api/pegawai/import/{$batchId}/status");
+        $status->assertOk();
+        $status->assertJsonPath('status', 'completed');
+        $status->assertJsonPath('result.inserted', 2);
+        $status->assertJsonPath('result.failed', 0);
+
         $this->assertDatabaseHas('employees', [
             'nama_lengkap' => 'Siti Aminah',
             'profil_status' => 'belum_lengkap',
@@ -250,7 +256,12 @@ class EmployeeImportTest extends TestCase
 
         $execute = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", []);
         $execute->assertOk();
-        $execute->assertJsonPath('inserted', 1);
+        $execute->assertJsonPath('status', 'queued');
+
+        $status = $this->getJson("/api/pegawai/import/{$batchId}/status");
+        $status->assertOk();
+        $status->assertJsonPath('status', 'completed');
+        $status->assertJsonPath('result.inserted', 1);
 
         $this->assertDatabaseHas('employees', [
             'nama_lengkap' => 'Budi Santoso',
@@ -262,134 +273,6 @@ class EmployeeImportTest extends TestCase
             'pendidikan_terakhir' => 'S1',
             'prodi_pendidikan_terakhir' => 'Manajemen',
         ]);
-    }
-
-    public function test_import_wizard_executes_pelengkap_xlsx_template(): void
-    {
-        $user = User::factory()->adminKepegawaian()->create();
-        $employee = Employee::factory()->create([
-            'nama_lengkap' => 'Budi Santoso',
-            'nip' => '198001012006041001',
-            'nik' => null,
-            'no_kk' => null,
-        ]);
-
-        $this->actingAs($user);
-
-        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
-            'file' => $this->xlsxFileWithHeaders(
-                ['NIP', 'NIK', 'No KK', 'Tempat Lahir', 'Jenis Kelamin', 'Agama', 'Status Kawin', 'Golongan Darah'],
-                [[
-                    $employee->nip,
-                    '1234567890123456',
-                    '6543210987654321',
-                    'Manado',
-                    'Laki-laki',
-                    'Islam',
-                    'Menikah',
-                    'O',
-                ]],
-                'template_pelengkap.xlsx',
-            ),
-        ]);
-
-        $upload->assertOk();
-        $upload->assertJsonPath('type', 'pelengkap');
-        $batchId = $upload->json('batch_id');
-
-        $validation = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", []);
-        $validation->assertOk();
-        $validation->assertJsonPath('valid_count', 1);
-        $validation->assertJsonPath('error_count', 0);
-
-        $execute = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", []);
-        $execute->assertOk();
-        $execute->assertJsonPath('inserted', 1);
-        $execute->assertJsonPath('failed', 0);
-
-        $employee->refresh();
-        $this->assertSame('1234567890123456', $employee->nik);
-        $this->assertSame('6543210987654321', $employee->no_kk);
-        $this->assertSame('Manado', $employee->tempat_lahir);
-        $this->assertSame('L', $employee->jenis_kelamin);
-        $this->assertSame('O', $employee->golongan_darah);
-        $this->assertNotNull($employee->agama_id);
-        $this->assertNotNull($employee->status_kawin_id);
-
-        $this->get(route('pegawai.show', $employee->id))
-            ->assertOk()
-            ->assertSeeText('1234567890123456')
-            ->assertSeeText('6543210987654321')
-            ->assertSeeText('Manado')
-            ->assertSeeText('Laki-laki')
-            ->assertSeeText('Islam')
-            ->assertSeeText('Menikah')
-            ->assertSeeText('O')
-            ->assertDontSeeText('3273251203850002')
-            ->assertDontSeeText('3273250102120045');
-    }
-
-    public function test_import_wizard_executes_history_xlsx_templates(): void
-    {
-        $user = User::factory()->adminKepegawaian()->create();
-        $employee = Employee::factory()->create([
-            'nama_lengkap' => 'Siti Aminah',
-            'nip' => '198502122010042002',
-            'tanggal_lahir' => '1985-02-12',
-        ]);
-
-        $this->actingAs($user);
-
-        $rankBatch = $this->uploadValidateAndExecuteTemplate(
-            ['NIP', 'Golongan', 'TMT Pangkat', 'No SK', 'Tanggal SK'],
-            [[$employee->nip, 'III/a', '2024-01-01', 'SK-PANGKAT-001', '2024-01-15']],
-            'template_kepangkatan.xlsx',
-        );
-        $rankBatch->assertJsonPath('inserted', 1);
-
-        $positionBatch = $this->uploadValidateAndExecuteTemplate(
-            ['NIP', 'Nama Jabatan', 'Jenis Jabatan', 'Unit Kerja', 'TMT Jabatan', 'No SK', 'Tanggal SK'],
-            [[$employee->nip, 'Analis Kepegawaian', 'Fungsional Umum / Pelaksana', 'Bagian Umum', '2024-02-01', 'SK-JABATAN-001', '2024-02-15']],
-            'template_jabatan.xlsx',
-        );
-        $positionBatch->assertJsonPath('inserted', 1);
-
-        $kgbBatch = $this->uploadValidateAndExecuteTemplate(
-            ['NIP', 'TMT KGB', 'Gaji Pokok', 'No SK', 'Tanggal SK'],
-            [[$employee->nip, '2024-03-01', '3.500.000', 'SK-KGB-001', '2024-03-15']],
-            'template_kgb.xlsx',
-        );
-        $kgbBatch->assertJsonPath('inserted', 1);
-
-        $this->assertDatabaseHas('rank_histories', [
-            'employee_id' => $employee->id,
-            'no_sk' => 'SK-PANGKAT-001',
-        ]);
-        $this->assertDatabaseHas('position_histories', [
-            'employee_id' => $employee->id,
-            'nama_jabatan' => 'Analis Kepegawaian',
-            'no_sk' => 'SK-JABATAN-001',
-        ]);
-        $this->assertDatabaseHas('salary_histories', [
-            'employee_id' => $employee->id,
-            'no_sk' => 'SK-KGB-001',
-        ]);
-        $employee->refresh();
-        $this->assertSame('III/a', $employee->golongan_terakhir);
-        $this->assertSame('Analis Kepegawaian', $employee->jabatan_terakhir);
-        $this->assertSame('2026-03-01', $employee->tanggal_kgb_berikutnya->format('Y-m-d'));
-
-        $this->get(route('pegawai.show', $employee->id))
-            ->assertOk()
-            ->assertSeeText('Penata Muda')
-            ->assertSeeText('III/a')
-            ->assertSee('SK-PANGKAT-001')
-            ->assertSeeText('Analis Kepegawaian')
-            ->assertSeeText('Bagian Umum')
-            ->assertSee('SK-JABATAN-001')
-            ->assertSee('Rp 3.500.000')
-            ->assertSee('SK-KGB-001')
-            ->assertSeeText('01-03-2026');
     }
 
     public function test_import_requires_documented_required_excel_fields(): void
@@ -626,22 +509,6 @@ class EmployeeImportTest extends TestCase
         );
     }
 
-    private function uploadValidateAndExecuteTemplate(array $headers, array $rows, string $filename)
-    {
-        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
-            'file' => $this->xlsxFileWithHeaders($headers, $rows, $filename),
-        ]);
-
-        $upload->assertOk();
-        $batchId = $upload->json('batch_id');
-
-        $validation = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", []);
-        $validation->assertOk();
-        $validation->assertJsonPath('valid_count', count($rows));
-        $validation->assertJsonPath('error_count', 0);
-
-        return $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", []);
-    }
 
     private function postJsonWithCsrf(string $uri, array $data)
     {

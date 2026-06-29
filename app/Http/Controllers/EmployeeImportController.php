@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Actions\Employees\ExecuteImportBatchAction;
 use App\Actions\Employees\GenerateImportTemplateAction;
 use App\Actions\Employees\ImportEmployeesAction;
 use App\Actions\Employees\UploadImportBatchAction;
 use App\Actions\Employees\ValidateImportBatchAction;
 use App\Http\Requests\ImportEmployeesRequest;
+use App\Jobs\ImportEmployeeBatchJob;
 use App\Support\EmployeeImport\ImportTemplateWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -87,13 +87,54 @@ class EmployeeImportController extends Controller
     }
 
     /**
-     * Handle the import wizard execute step.
+     * Handle the import wizard execute step (Queue the job).
      */
-    public function execute(Request $request, string $batchId, ExecuteImportBatchAction $action): JsonResponse
+    public function execute(Request $request, string $batchId): JsonResponse
     {
-        $result = $action->execute($batchId, $request->user(), $request);
+        $batch = $this->getBatchOrFail($batchId, $request);
 
-        return response()->json($result);
+        if ($batch['validation'] === null) {
+            return response()->json([
+                'message' => 'Data belum divalidasi. Jalankan validasi terlebih dahulu.',
+            ], 422);
+        }
+
+        // Set status to queued in cache
+        $batch['status'] = 'queued';
+        $batch['progress'] = 0;
+        $batch['processed_count'] = 0;
+        Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $batch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
+
+        // Dispatch background job
+        ImportEmployeeBatchJob::dispatch(
+            $batchId,
+            $request->user()?->id,
+            $request->ip(),
+            $request->userAgent()
+        );
+
+        return response()->json([
+            'status' => 'queued',
+            'message' => 'Proses impor telah dimasukkan ke dalam antrean. Anda dapat meninggalkan halaman ini.',
+        ]);
+    }
+
+    /**
+     * Handle checking the import queue status/progress.
+     */
+    public function status(Request $request, string $batchId): JsonResponse
+    {
+        $batch = $this->getBatchOrFail($batchId, $request);
+
+        return response()->json([
+            'batch_id' => $batchId,
+            'status' => $batch['status'] ?? 'pending',
+            'progress' => $batch['progress'] ?? 0,
+            'processed_count' => $batch['processed_count'] ?? 0,
+            'total_rows' => $batch['total_rows'] ?? 0,
+            'error_message' => $batch['error_message'] ?? null,
+            'result' => $batch['result'] ?? null,
+        ]);
     }
 
     /**

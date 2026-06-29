@@ -19,6 +19,15 @@ class EmployeeFileStorageService
         return $this->store($file, 'sk');
     }
 
+    /**
+     * Menyimpan lampiran pendukung pengajuan cuti (mis. surat keterangan).
+     * Disimpan terpisah pada folder cuti agar berkas cuti tidak tercampur dengan dokumen pegawai lain.
+     */
+    public function storeLampiran(UploadedFile $file): string
+    {
+        return $this->store($file, 'cuti');
+    }
+
     public function deletePublicFile(?string $path): void
     {
         if ($path !== null && $path !== '') {

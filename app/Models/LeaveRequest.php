@@ -20,6 +20,7 @@ class LeaveRequest extends Model
         'alasan',
         'lampiran_path',
         'status',
+        'current_stage',
     ];
 
     protected function casts(): array
@@ -28,6 +29,7 @@ class LeaveRequest extends Model
             'tanggal_mulai' => 'date',
             'tanggal_selesai' => 'date',
             'jumlah_hari_kerja' => 'integer',
+            'current_stage' => 'integer',
         ];
     }
 

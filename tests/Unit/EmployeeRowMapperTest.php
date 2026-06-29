@@ -9,7 +9,7 @@ class EmployeeRowMapperTest extends TestCase
 {
     public function test_maps_headers_to_employee_fields_and_normalizes_values(): void
     {
-        $mapper = new EmployeeRowMapper();
+        $mapper = new EmployeeRowMapper;
 
         $mapped = $mapper->map([
             'Nama Pegawai' => ' Budi Santoso ',
@@ -38,7 +38,7 @@ class EmployeeRowMapperTest extends TestCase
 
     public function test_parses_english_long_month_dates(): void
     {
-        $mapper = new EmployeeRowMapper();
+        $mapper = new EmployeeRowMapper;
 
         $mapped = $mapper->map([
             'Nama Pegawai' => 'Andi',
@@ -53,7 +53,7 @@ class EmployeeRowMapperTest extends TestCase
 
     public function test_parses_short_month_and_iso_dates(): void
     {
-        $mapper = new EmployeeRowMapper();
+        $mapper = new EmployeeRowMapper;
 
         $mapped = $mapper->map([
             'Nama Pegawai' => 'Budi',
@@ -68,7 +68,7 @@ class EmployeeRowMapperTest extends TestCase
 
     public function test_validates_missing_headers(): void
     {
-        $mapper = new EmployeeRowMapper();
+        $mapper = new EmployeeRowMapper;
 
         $result = $mapper->validateHeaders(['Nama Pegawai', 'Email Pegawai']);
 
@@ -77,14 +77,14 @@ class EmployeeRowMapperTest extends TestCase
 
     public function test_normalizes_bom_header(): void
     {
-        $mapper = new EmployeeRowMapper();
+        $mapper = new EmployeeRowMapper;
 
         $this->assertSame('Nama Pegawai', $mapper->normalizeHeader("\xEF\xBB\xBFNama Pegawai"));
     }
 
     public function test_detects_example_marker_rows_regardless_of_column_position(): void
     {
-        $mapper = new EmployeeRowMapper();
+        $mapper = new EmployeeRowMapper;
 
         $this->assertTrue($mapper->isExampleRow(['CONTOH - HAPUS BARIS INI', 'x', 'y']));
         $this->assertTrue($mapper->isExampleRow(['x', 'CONTOH - HAPUS BARIS INI', 'y']));

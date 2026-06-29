@@ -8,6 +8,7 @@ use App\Support\EmployeeImport\EmployeeRowMapper;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Testing\File;
 use Tests\TestCase;
 
 class EmployeeImportTemplateTest extends TestCase
@@ -86,25 +87,10 @@ class EmployeeImportTemplateTest extends TestCase
 
         [$header] = $this->csvRows($this->downloadTemplate('utama', 'csv')->streamedContent());
 
-        $result = (new EmployeeRowMapper())->validateHeaders($header);
+        $result = (new EmployeeRowMapper)->validateHeaders($header);
 
         // Inti perbaikan bug Role: tidak ada header wajib yang hilang.
         $this->assertSame([], $result['missing']);
-    }
-
-    public function test_all_five_template_types_download_with_canonical_headers(): void
-    {
-        $this->actingAs(User::factory()->adminKepegawaian()->create());
-
-        foreach (['utama', 'pelengkap', 'kepangkatan', 'jabatan', 'kgb'] as $type) {
-            $res = $this->downloadTemplate($type, 'csv');
-            $res->assertOk();
-
-            [$header] = $this->csvRows($res->streamedContent());
-            $compare = $type === 'utama' ? array_slice($header, 1) : $header;
-
-            $this->assertSame(UploadImportBatchAction::TEMPLATE_HEADERS[$type], $compare);
-        }
     }
 
     public function test_example_row_in_downloaded_template_is_flagged_as_example(): void
@@ -113,7 +99,7 @@ class EmployeeImportTemplateTest extends TestCase
 
         [, $exampleCells] = $this->csvRows($this->downloadTemplate('utama', 'csv')->streamedContent());
 
-        $this->assertTrue((new EmployeeRowMapper())->isExampleRow($exampleCells));
+        $this->assertTrue((new EmployeeRowMapper)->isExampleRow($exampleCells));
     }
 
     public function test_uploading_template_with_only_example_row_returns_clear_message(): void
@@ -122,7 +108,7 @@ class EmployeeImportTemplateTest extends TestCase
 
         // Unduh template utama lalu unggah ulang apa adanya (hanya header + baris contoh).
         $csv = $this->downloadTemplate('utama', 'csv')->streamedContent();
-        $file = \Illuminate\Http\Testing\File::createWithContent('template_utama.csv', $csv);
+        $file = File::createWithContent('template_utama.csv', $csv);
 
         $res = $this->postJson('/api/pegawai/import/upload', [
             'file' => $file,

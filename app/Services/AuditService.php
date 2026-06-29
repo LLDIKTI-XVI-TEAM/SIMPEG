@@ -29,6 +29,8 @@ class AuditService
         ?array $oldValues = null,
         ?array $newValues = null,
         ?Request $request = null,
+        ?string $ipAddress = null,
+        ?string $userAgent = null,
     ): void {
         try {
             $user = Auth::user();
@@ -41,8 +43,8 @@ class AuditService
                 'auditable_id' => $auditableId,
                 'old_values' => $oldValues,
                 'new_values' => $newValues,
-                'ip_address' => $request?->ip(),
-                'user_agent' => $request?->userAgent(),
+                'ip_address' => $request?->ip() ?? $ipAddress,
+                'user_agent' => $request?->userAgent() ?? $userAgent,
             ]);
         } catch (\Throwable $e) {
             Log::warning('Audit log gagal ditulis', [
@@ -66,6 +68,8 @@ class AuditService
         ?array $oldValues = null,
         ?array $newValues = null,
         ?Request $request = null,
+        ?string $ipAddress = null,
+        ?string $userAgent = null,
     ): void {
         try {
             AuditLog::create([
@@ -76,8 +80,8 @@ class AuditService
                 'auditable_id' => $auditableId,
                 'old_values' => $oldValues,
                 'new_values' => $newValues,
-                'ip_address' => $request?->ip(),
-                'user_agent' => $request?->userAgent(),
+                'ip_address' => $request?->ip() ?? $ipAddress,
+                'user_agent' => $request?->userAgent() ?? $userAgent,
             ]);
         } catch (\Throwable $e) {
             Log::warning('Audit log gagal ditulis', [

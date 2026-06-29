@@ -1,172 +1,89 @@
 <x-layouts.app title="Cuti Pegawai">
 
     @php
-    $riwayatCuti = [
-        [
-            'id' => 1,
-            'nama' => 'Ahmad Fauzi',
-            'nip' => '19850312201001 1 001',
-            'unit' => 'Bag. Umum',
-            'jenis' => 'Cuti Tahunan',
-            'mulai' => '2026-06-20',
-            'selesai' => '2026-06-24',
-            'hari' => 5,
-            'status' => 'menunggu',
-            'tgl_pengajuan' => '2026-06-18',
-            'alasan' => 'Acara keluarga di luar kota',
-            'stage_atasan' => 'menunggu',
-            'stage_kepala' => 'menunggu',
-            'periode' => 'Juni 2026'
-        ],
-        [
-            'id' => 2,
-            'nama' => 'Siti Rahayu',
-            'nip' => '19901120201501 2 003',
-            'unit' => 'Bag. Keuangan',
-            'jenis' => 'Cuti Sakit',
-            'mulai' => '2026-04-10',
-            'selesai' => '2026-04-12',
-            'hari' => 3,
-            'status' => 'disetujui',
-            'tgl_pengajuan' => '2026-04-09',
-            'alasan' => 'Sakit demam berdarah',
-            'stage_atasan' => 'disetujui',
-            'stage_kepala' => 'disetujui',
-            'periode' => 'April 2026'
-        ],
-        [
-            'id' => 3,
-            'nama' => 'Sabrina Rossa Adriani Wibowo',
-            'nip' => '20261210820500 0 04',
-            'unit' => 'Bag. SDM',
-            'jenis' => 'Cuti Tahunan',
-            'mulai' => '2026-02-01',
-            'selesai' => '2026-02-05',
-            'hari' => 5,
-            'status' => 'ditunda',
-            'tgl_pengajuan' => '2026-01-28',
-            'alasan' => 'Menunggu konfirmasi pengganti tugas',
-            'stage_atasan' => 'ditunda',
-            'stage_kepala' => 'menunggu',
-            'periode' => 'Februari 2026'
-        ],
-        [
-            'id' => 4,
-            'nama' => 'Cimma Sari Oktariani Di Silapu',
-            'nip' => '26110820520600 0 04',
-            'unit' => 'Bag. IT',
-            'jenis' => 'Cuti Tahunan',
-            'mulai' => '2026-06-22',
-            'selesai' => '2026-06-26',
-            'hari' => 5,
-            'status' => 'disetujui',
-            'tgl_pengajuan' => '2026-06-19',
-            'alasan' => 'Cuti liburan tahunan',
-            'stage_atasan' => 'disetujui',
-            'stage_kepala' => 'disetujui',
-            'periode' => 'Juni 2026'
-        ],
-        [
-            'id' => 5,
-            'nama' => 'Nurarningsih Dumbea, S.P.',
-            'nip' => '19880123202 1 005',
-            'unit' => 'Bag. Umum',
-            'jenis' => 'Cuti Melahirkan',
-            'mulai' => '2025-10-01',
-            'selesai' => '2025-12-29',
-            'hari' => 90,
-            'status' => 'disetujui',
-            'tgl_pengajuan' => '2025-09-15',
-            'alasan' => 'Persalinan anak pertama',
-            'stage_atasan' => 'disetujui',
-            'stage_kepala' => 'disetujui',
-            'periode' => 'Oktober 2025'
-        ],
-        [
-            'id' => 6,
-            'nama' => 'Nadia Kusuma',
-            'nip' => '19950822202001 2 002',
-            'unit' => 'Bag. SDM',
-            'jenis' => 'Cuti Sakit',
-            'mulai' => '2026-06-25',
-            'selesai' => '2026-06-27',
-            'hari' => 3,
-            'status' => 'menunggu',
-            'tgl_pengajuan' => '2026-06-23',
-            'alasan' => 'Sakit migrain berat',
-            'stage_atasan' => 'disetujui',
-            'stage_kepala' => 'menunggu',
-            'periode' => 'Juni 2026'
-        ],
-        [
-            'id' => 7,
-            'nama' => 'Yucna Dara, S.P., M.M.',
-            'nip' => '19840120099 2 002',
-            'unit' => 'Bag. Keuangan',
-            'jenis' => 'Cuti Tahunan',
-            'mulai' => '2026-06-27',
-            'selesai' => '2026-07-01',
-            'hari' => 5,
-            'status' => 'ditunda',
-            'tgl_pengajuan' => '2026-06-24',
-            'alasan' => 'Ada audit internal keuangan',
-            'stage_atasan' => 'ditunda',
-            'stage_kepala' => 'menunggu',
-            'periode' => 'Juni 2026'
-        ]
-    ];
+        // Padatkan status enum tersimpan menjadi token tampilan agar warna/label tetap konsisten.
+        $statusToken = function (string $status): string {
+            if ($status === 'Disetujui') {
+                return 'disetujui';
+            }
+            if ($status === 'Ditunda') {
+                return 'ditunda';
+            }
 
-    $statusFilter = request()->query('status');
-    if ($statusFilter === 'pending') {
-        $riwayatCuti = array_filter($riwayatCuti, function($item) {
-            return $item['status'] === 'menunggu';
+            return 'menunggu';
+        };
+
+        // Petakan model pengajuan cuti ke bentuk baris yang dipakai markup tabel di bawah.
+        $riwayatCuti = collect($riwayatCuti)->map(function ($r) use ($statusToken) {
+            // Stage approval diturunkan dari status; rincian per-tahap menyusul saat engine approval aktif.
+            $stageAtasan = match ($r->status) {
+                'Disetujui', 'Menunggu Verifikator', 'Menunggu Pimpinan' => 'disetujui',
+                'Ditunda' => 'ditunda',
+                default => 'menunggu',
+            };
+
+            return [
+                'id' => $r->id,
+                'nama' => $r->employee?->nama_lengkap ?? '-',
+                'nip' => $r->employee?->nip ?? '-',
+                'unit' => $r->employee?->jabatan_terakhir ?? '-',
+                'jenis' => $r->jenisCuti?->nama ?? '-',
+                'mulai' => optional($r->tanggal_mulai)->toDateString(),
+                'selesai' => optional($r->tanggal_selesai)->toDateString(),
+                'hari' => $r->jumlah_hari_kerja,
+                'status' => $statusToken($r->status),
+                'alasan' => $r->alasan,
+                'stage_atasan' => $stageAtasan,
+                'stage_kepala' => $r->status === 'Disetujui' ? 'disetujui' : 'menunggu',
+                'periode' => optional($r->tanggal_mulai)->translatedFormat('F Y'),
+            ];
         });
-    }
 
-    $perPage = request()->input('per_page', 10);
-    $page = request()->input('page', 1);
-    
-    $offset = ($page - 1) * $perPage;
-    $total = count($riwayatCuti);
-    $pagedData = array_slice($riwayatCuti, $offset, $perPage);
-    
-    $riwayatCutiPaginator = new \Illuminate\Pagination\LengthAwarePaginator(
-        $pagedData,
-        $total,
-        $perPage,
-        $page,
-        ['path' => request()->url(), 'query' => request()->query()]
-    );
+        // Filter cepat dari query string (mis. tautan "menunggu persetujuan").
+        if (request()->query('status') === 'pending') {
+            $riwayatCuti = collect($riwayatCuti)->where('status', 'menunggu');
+        }
 
-    $statusClass = [
-        'menunggu'  => 'text-warning',
-        'disetujui' => 'text-success',
-        'ditunda'   => 'text-danger',
-    ];
+        $perPage = request()->input('per_page', 10);
+        $page = request()->input('page', 1);
+        
+        $offset = ($page - 1) * $perPage;
+        $total = count($riwayatCuti);
+        
+        $riwayatCutiArray = is_array($riwayatCuti) ? $riwayatCuti : collect($riwayatCuti)->all();
+        $pagedData = array_slice($riwayatCutiArray, $offset, $perPage);
+        
+        $riwayatCutiPaginator = new \Illuminate\Pagination\LengthAwarePaginator(
+            $pagedData,
+            $total,
+            $perPage,
+            $page,
+            ['path' => request()->url(), 'query' => request()->query()]
+        );
 
-    $statusDot = [
-        'menunggu'  => 'bg-warning',
-        'disetujui' => 'bg-success',
-        'ditunda'   => 'bg-danger',
-    ];
+        // Metrik ringkas dihitung dari data nyata, bukan angka statis.
+        $totalPengajuan = $riwayatCuti->count();
+        $jumlahMenunggu = $riwayatCuti->where('status', 'menunggu')->count();
+        $jumlahDisetujui = $riwayatCuti->where('status', 'disetujui')->count();
+        $jumlahDitunda = $riwayatCuti->where('status', 'ditunda')->count();
 
-    $statusLabel = [
-        'menunggu'  => 'Menunggu',
-        'disetujui' => 'Disetujui',
-        'ditunda'   => 'Ditunda',
-    ];
+        $statusClass = [
+            'menunggu'  => 'text-warning',
+            'disetujui' => 'text-success',
+            'ditunda'   => 'text-danger',
+        ];
 
-    $stageClass = [
-        'menunggu' => 'bg-soft text-muted',
-        'disetujui' => 'bg-success/10 text-success',
-        'ditunda' => 'bg-danger/10 text-danger',
-    ];
+        $statusDot = [
+            'menunggu'  => 'bg-warning',
+            'disetujui' => 'bg-success',
+            'ditunda'   => 'bg-danger',
+        ];
 
-    $stageLabel = [
-        'menunggu' => 'Menunggu',
-        'disetujui' => 'Disetujui',
-        'ditunda' => 'Ditunda',
-    ];
+        $statusLabel = [
+            'menunggu'  => 'Menunggu',
+            'disetujui' => 'Disetujui',
+            'ditunda'   => 'Ditunda',
+        ];
     @endphp
 
     <div class="space-y-6">

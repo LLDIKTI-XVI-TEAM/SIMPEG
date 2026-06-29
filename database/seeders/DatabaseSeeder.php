@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             ApprovalConfigSeeder::class,
             EwsConfigSeeder::class,
             DemoSsoUserSeeder::class,
+            LeaveBalance2026Seeder::class,
         ]);
 
     }
