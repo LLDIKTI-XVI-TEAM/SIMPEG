@@ -14,7 +14,7 @@ class CreatePositionHistoryAction
     /**
      * Menambah riwayat jabatan lewat service append-only dan memuat referensi jabatan untuk respons.
      *
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     public function execute(Employee $employee, array $data, ?Request $request = null): PositionHistory
     {

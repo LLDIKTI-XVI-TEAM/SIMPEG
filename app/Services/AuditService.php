@@ -15,12 +15,12 @@ class AuditService
      * Fire-and-forget: failures are logged but never bubble up
      * to break the main operation.
      *
-     * @param  string       $event          One of the audit_logs.event enum values
-     * @param  string       $auditableType  Short model name, e.g. 'User', 'Employee'
-     * @param  string|null  $auditableId    UUID of the affected record
-     * @param  array|null   $oldValues      Previous state (for UPDATE / DELETE)
-     * @param  array|null   $newValues      New state (for CREATE / UPDATE / IMPORT)
-     * @param  Request|null $request        Current HTTP request (for IP & UA)
+     * @param  string  $event  One of the audit_logs.event enum values
+     * @param  string  $auditableType  Short model name, e.g. 'User', 'Employee'
+     * @param  string|null  $auditableId  UUID of the affected record
+     * @param  array|null  $oldValues  Previous state (for UPDATE / DELETE)
+     * @param  array|null  $newValues  New state (for CREATE / UPDATE / IMPORT)
+     * @param  Request|null  $request  Current HTTP request (for IP & UA)
      */
     public static function log(
         string $event,

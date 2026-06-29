@@ -53,8 +53,8 @@
             "@php artisan config:clear --ansi",
             "@php artisan test"
         ],
-        "format": "pint --dirty",
-        "format:check": "pint --test --dirty",
+        "format": "pint",
+        "format:check": "pint --test",
         "analyse": "phpstan analyse --memory-limit=1G",
         "qa": [
             "@format:check",

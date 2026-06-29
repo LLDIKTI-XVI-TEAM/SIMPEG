@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Services\EmployeeHistoryService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
+use Illuminate\Foundation\Http\Middleware\TrimStrings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -298,7 +299,7 @@ class EmployeeHistoryTest extends TestCase
             'file_sk' => '/sk/kgb.pdf',
         ])->assertJsonValidationErrors(['file_sk']);
 
-        $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\TrimStrings::class)
+        $this->withoutMiddleware(TrimStrings::class)
             ->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/riwayat-kepangkatan", [
                 ...$this->validRankHistoryPayload(),
                 'file_sk' => "sk/rank.pdf\n",

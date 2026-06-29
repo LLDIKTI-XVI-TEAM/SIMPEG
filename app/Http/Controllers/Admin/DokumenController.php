@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Employee;
 use App\Models\Document;
+use App\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -88,18 +88,17 @@ class DokumenController extends Controller
         ]);
 
         return redirect()->route('dokumen')
-            ->with('success', 'Dokumen "' . $request->input('nama_dokumen') . '" berhasil diunggah.');
+            ->with('success', 'Dokumen "'.$request->input('nama_dokumen').'" berhasil diunggah.');
     }
 
     public function download($id)
     {
         $doc = Document::findOrFail($id);
 
-        if (!Storage::disk('public')->exists($doc->file_path)) {
+        if (! Storage::disk('public')->exists($doc->file_path)) {
             abort(404);
         }
 
         return Storage::disk('public')->download($doc->file_path, basename($doc->file_path));
     }
 }
-

@@ -4,9 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\Employee;
 use App\Models\User;
+use Database\Seeders\DatabaseSeeder;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Laravel\Socialite\Two\User as SocialiteUser;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\User as SocialiteUser;
 use Tests\TestCase;
 
 class KeycloakCallbackMappingTest extends TestCase
@@ -408,7 +410,7 @@ class KeycloakCallbackMappingTest extends TestCase
 
     public function test_database_seeder_does_not_create_generic_user_that_consumes_sso_bootstrap(): void
     {
-        $this->seed(\Database\Seeders\DatabaseSeeder::class);
+        $this->seed(DatabaseSeeder::class);
 
         $this->assertDatabaseMissing('users', [
             'email' => 'test@example.com',
@@ -437,7 +439,7 @@ class KeycloakCallbackMappingTest extends TestCase
         $employee = Employee::factory()->create();
         User::factory()->create(['employee_id' => $employee->id]);
 
-        $this->expectException(\Illuminate\Database\UniqueConstraintViolationException::class);
+        $this->expectException(UniqueConstraintViolationException::class);
 
         User::factory()->create(['employee_id' => $employee->id]);
     }
@@ -447,14 +449,15 @@ class KeycloakCallbackMappingTest extends TestCase
      */
     private function fakeKeycloakUser(array $attributes): void
     {
-        $user = (new SocialiteUser())->setRaw($attributes['raw'])->map([
+        $user = (new SocialiteUser)->setRaw($attributes['raw'])->map([
             'id' => $attributes['id'],
             'nickname' => $attributes['nickname'],
             'name' => $attributes['name'],
             'email' => $attributes['email'],
         ]);
 
-        $provider = new class($user) {
+        $provider = new class($user)
+        {
             public function __construct(private readonly SocialiteUser $user) {}
 
             public function user(): SocialiteUser

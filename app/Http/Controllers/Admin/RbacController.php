@@ -3,15 +3,14 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Role;
 use App\Models\Permission;
+use App\Models\Role;
 use Illuminate\Http\Request;
 
 class RbacController extends Controller
 {
     public function index()
     {
-
 
         $roles = Role::with('permissions')->get();
         $permissions = Permission::all();
@@ -20,13 +19,12 @@ class RbacController extends Controller
         return view('admin.rbac.index', [
             'roles' => $roles,
             'permissionsByModule' => $permissionsByModule,
-            'title' => 'Role & Permission / RBAC'
+            'title' => 'Role & Permission / RBAC',
         ]);
     }
 
     public function update(Request $request)
     {
-
 
         $matrix = $request->input('matrix', []);
         $roles = Role::with('permissions')->get();
@@ -55,7 +53,7 @@ class RbacController extends Controller
             }
         }
 
-        if (!empty($changedLog)) {
+        if (! empty($changedLog)) {
             // Write Audit Log
             $dynamicLogs = session('dynamic_audit_logs', []);
             $newId = count($dynamicLogs) + 1;
@@ -72,11 +70,11 @@ class RbacController extends Controller
                 'user_agent' => $request->userAgent(),
                 'old_values' => [
                     'note' => 'Perubahan hak akses peran',
-                    'changes' => array_map(fn($item) => $item['old'], $changedLog),
+                    'changes' => array_map(fn ($item) => $item['old'], $changedLog),
                 ],
                 'new_values' => [
-                    'changes' => array_map(fn($item) => $item['new'], $changedLog),
-                ]
+                    'changes' => array_map(fn ($item) => $item['new'], $changedLog),
+                ],
             ];
 
             session(['dynamic_audit_logs' => $dynamicLogs]);

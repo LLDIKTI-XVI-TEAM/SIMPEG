@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
-use App\Models\SupervisorAssignment;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
