@@ -6,7 +6,21 @@ use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property string $id
+ * @property string $employee_id
+ * @property string $status
+ * @property int $jumlah_hari_kerja
+ * @property string $alasan
+ * @property int $current_stage
+ * @property Carbon $tanggal_mulai
+ * @property Carbon $tanggal_selesai
+ * @property Carbon|null $created_at
+ * @property-read Employee|null $employee
+ * @property-read RefJenisCuti|null $jenisCuti
+ */
 class LeaveRequest extends Model
 {
     use HasUuid;
@@ -33,16 +47,19 @@ class LeaveRequest extends Model
         ];
     }
 
+    /** @return BelongsTo<Employee, $this> */
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
     }
 
+    /** @return BelongsTo<RefJenisCuti, $this> */
     public function jenisCuti(): BelongsTo
     {
         return $this->belongsTo(RefJenisCuti::class, 'jenis_cuti_id');
     }
 
+    /** @return HasMany<LeaveApproval, $this> */
     public function approvals(): HasMany
     {
         return $this->hasMany(LeaveApproval::class);

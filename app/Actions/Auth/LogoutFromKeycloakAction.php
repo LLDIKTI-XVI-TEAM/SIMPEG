@@ -7,6 +7,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
+use SocialiteProviders\Keycloak\Provider as KeycloakProvider;
 
 class LogoutFromKeycloakAction
 {
@@ -26,6 +27,9 @@ class LogoutFromKeycloakAction
         $redirectUri = config('app.url');
         $clientId = config('services.keycloak.client_id');
 
-        return redirect(Socialite::driver('keycloak')->getLogoutUrl($redirectUri, $clientId));
+        /** @var KeycloakProvider $provider */
+        $provider = Socialite::driver('keycloak');
+
+        return redirect($provider->getLogoutUrl($redirectUri, $clientId));
     }
 }

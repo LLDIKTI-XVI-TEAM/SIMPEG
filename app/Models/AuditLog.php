@@ -5,6 +5,10 @@ namespace App\Models;
 use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * @property array<string, mixed>|null $old_values
+ * @property array<string, mixed>|null $new_values
+ */
 class AuditLog extends Model
 {
     use HasUuid;

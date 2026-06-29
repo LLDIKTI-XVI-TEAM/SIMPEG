@@ -9,10 +9,11 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\RedirectResponse as SymfonyRedirectResponse;
 
 class KeycloakAuthController extends Controller
 {
-    public function redirectToKeycloak(RedirectToKeycloakAction $action): RedirectResponse
+    public function redirectToKeycloak(RedirectToKeycloakAction $action): SymfonyRedirectResponse
     {
         return $action->execute();
     }

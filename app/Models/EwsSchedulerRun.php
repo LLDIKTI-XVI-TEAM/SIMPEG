@@ -3,7 +3,15 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property string $status
+ * @property Carbon|null $started_at
+ * @property int $alerts_created
+ * @property int $employees_checked
+ * @property string|null $error_message
+ */
 class EwsSchedulerRun extends Model
 {
     protected $table = 'ews_scheduler_runs';
@@ -20,10 +28,10 @@ class EwsSchedulerRun extends Model
     protected function casts(): array
     {
         return [
-            'started_at'       => 'datetime',
-            'finished_at'      => 'datetime',
-            'alerts_created'   => 'integer',
-            'employees_checked'=> 'integer',
+            'started_at' => 'datetime',
+            'finished_at' => 'datetime',
+            'alerts_created' => 'integer',
+            'employees_checked' => 'integer',
         ];
     }
 

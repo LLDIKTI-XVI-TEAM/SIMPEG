@@ -5,6 +5,10 @@ namespace App\Models;
 use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * @property string $nama
+ * @property bool $khusus_pns
+ */
 class RefJenisCuti extends Model
 {
     use HasUuid;

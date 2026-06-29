@@ -5,7 +5,14 @@ namespace App\Models;
 use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property string|null $jenis_pengangkatan
+ * @property string|null $no_sk
+ * @property Carbon|null $tmt_pengangkatan
+ * @property Carbon|null $tanggal_sk
+ */
 class Appointment extends Model
 {
     use HasUuid;
@@ -27,6 +34,7 @@ class Appointment extends Model
         ];
     }
 
+    /** @return BelongsTo<Employee, $this> */
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);

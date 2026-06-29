@@ -17,8 +17,7 @@ class EmployeeFamilyPayload
      * Membuka field keluarga yang aman dikembalikan ke admin; relasi pegawai tidak disertakan.
      * Termasuk NIK untuk response admin.
      *
-     * @param  EmployeeFamily  $family
-     * @return array
+     * @return array<string, mixed>
      */
     public function response(EmployeeFamily $family): array
     {
@@ -42,8 +41,7 @@ class EmployeeFamilyPayload
      * NIK tidak dicatat di audit karena termasuk identitas keluarga yang sensitif.
      * Mengembalikan response payload minus NIK untuk audit log masking.
      *
-     * @param  EmployeeFamily  $family
-     * @return array
+     * @return array<string, mixed>
      */
     public function audit(EmployeeFamily $family): array
     {
