@@ -84,14 +84,6 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
 
         if ($type === 'utama') {
             $headers = ['No', 'Nama Pegawai', 'Email Pegawai', 'Golongan', 'Jabatan', 'Kelas Jabatan', 'NIP', 'Nomor Telepon', 'Pangkat', 'Pendidikan Terakhir', 'Pensiun', 'Person', 'Person Formula', 'Prodi Pendidikan Terakhir', 'Status Kepegawaian', 'Tanggal Lahir'];
-        } elseif ($type === 'pelengkap') {
-            $headers = ['NIP', 'NIK', 'No KK', 'Tempat Lahir', 'Jenis Kelamin', 'Agama', 'Status Kawin', 'Golongan Darah'];
-        } elseif ($type === 'kepangkatan') {
-            $headers = ['NIP', 'Golongan', 'TMT Pangkat', 'No SK', 'Tanggal SK'];
-        } elseif ($type === 'jabatan') {
-            $headers = ['NIP', 'Nama Jabatan', 'Jenis Jabatan', 'Unit Kerja', 'TMT Jabatan', 'No SK', 'Tanggal SK'];
-        } elseif ($type === 'kgb') {
-            $headers = ['NIP', 'TMT KGB', 'Gaji Pokok', 'No SK', 'Tanggal SK'];
         } else {
             abort(404);
         }
@@ -179,6 +171,10 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
     Route::post('/api/pegawai/import/{batchId}/execute', [EmployeeImportController::class, 'execute'])
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
         ->name('pegawai.import.execute');
+
+    Route::get('/api/pegawai/import/{batchId}/status', [EmployeeImportController::class, 'status'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->name('pegawai.import.status');
 
     Route::get('/ews', [EwsController::class, 'index'])
         ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])

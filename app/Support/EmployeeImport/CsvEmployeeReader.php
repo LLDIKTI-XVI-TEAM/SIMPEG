@@ -194,6 +194,7 @@ class CsvEmployeeReader
             return $row;
         }
 
+        $row['Role'] = $row['Status Kepegawaian'] ?? null;
         $row['Tanggal Lahir'] = $row['Prodi Pendidikan Terakhir'] ?? null;
         $row['Status Kepegawaian'] = $row['Person Formula'] ?? null;
         $row['Prodi Pendidikan Terakhir'] = $row['Person'] ?? null;

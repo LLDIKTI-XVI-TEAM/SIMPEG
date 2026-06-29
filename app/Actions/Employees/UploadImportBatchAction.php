@@ -21,18 +21,10 @@ class UploadImportBatchAction
 
     public const TEMPLATE_HEADERS = [
         'utama' => EmployeeRowMapper::HEADERS,
-        'pelengkap' => ['NIP', 'NIK', 'No KK', 'Tempat Lahir', 'Jenis Kelamin', 'Agama', 'Status Kawin', 'Golongan Darah'],
-        'kepangkatan' => ['NIP', 'Golongan', 'TMT Pangkat', 'No SK', 'Tanggal SK'],
-        'jabatan' => ['NIP', 'Nama Jabatan', 'Jenis Jabatan', 'Unit Kerja', 'TMT Jabatan', 'No SK', 'Tanggal SK'],
-        'kgb' => ['NIP', 'TMT KGB', 'Gaji Pokok', 'No SK', 'Tanggal SK'],
     ];
 
     public const TEMPLATE_LABELS = [
         'utama' => 'Data Utama',
-        'pelengkap' => 'Data Pelengkap',
-        'kepangkatan' => 'Riwayat Pangkat',
-        'jabatan' => 'Riwayat Jabatan',
-        'kgb' => 'Riwayat KGB',
     ];
 
     public function __construct(private readonly CsvEmployeeReader $reader) {}
@@ -120,7 +112,7 @@ class UploadImportBatchAction
         }
 
         throw ValidationException::withMessages([
-            'file' => ['Header template tidak dikenali. Gunakan template utama, pelengkap, riwayat pangkat, riwayat jabatan, atau riwayat KGB dari halaman import.'],
+            'file' => ['Header template tidak dikenali. Gunakan template utama dari halaman import.'],
         ]);
     }
 }
