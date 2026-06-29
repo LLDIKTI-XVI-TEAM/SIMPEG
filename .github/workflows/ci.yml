@@ -41,5 +41,19 @@ jobs:
           cp .env.example .env
           php artisan key:generate
 
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Build frontend assets
+        # Sebagian view Blade memakai @vite() yang butuh public/build/manifest.json.
+        # Tanpa build ini, test yang merender view gagal 500 (ViteManifestNotFoundException).
+        run: npm run build
+
       - name: Run quality gate (format check, static analysis, tests)
         run: composer qa
