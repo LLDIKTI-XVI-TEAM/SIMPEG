@@ -55,9 +55,8 @@
         ];
     @endphp
 
-    <div class="space-y-6" x-data="{
+    <div class="space-y-6" @confirm-rekap.window="savedCorrection = true" x-data="{
             exportType: null,
-            showConfirm: false,
             savedCorrection: false,
             activeFilters: {
                 periode: 'Juni 2026',
@@ -308,7 +307,7 @@
                         <textarea rows="3"
                             class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                             placeholder="Alasan koreksi wajib diisi"></textarea>
-                        <button type="button" @click="showConfirm = true"
+                        <button type="button" @click="$dispatch('open-confirm-rekap')"
                             class="w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90">Simpan
                             Koreksi</button>
                     </div>
@@ -396,25 +395,12 @@
             </div>
         </div>
 
-        <div x-show="showConfirm" class="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4"
-            style="display: none;">
-            <div class="w-full max-w-md rounded-lg border border-border bg-surface p-6 shadow-sm">
-                <h3 class="text-base font-semibold text-ink">Konfirmasi Koreksi Saldo</h3>
-                <p class="mt-2 text-sm text-muted">
-                    Pastikan nilai koreksi dan alasan sudah benar. Koreksi saldo akan dicatat sebagai aktivitas audit
-                    saat integrasi backend aktif.
-                </p>
-                <div class="mt-5 flex justify-end gap-2">
-                    <button type="button" @click="showConfirm = false"
-                        class="rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-muted hover:bg-soft">
-                        Batal
-                    </button>
-                    <button type="button" @click="showConfirm = false; savedCorrection = true"
-                        class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
-                        Konfirmasi Simpan
-                    </button>
-                </div>
-            </div>
-        </div>
+        <x-ui.confirm-dialog
+            id="rekap"
+            title="Konfirmasi Koreksi Saldo"
+            message="Pastikan nilai koreksi dan alasan sudah benar. Koreksi saldo akan dicatat sebagai aktivitas audit saat integrasi backend aktif."
+            confirm-text="Konfirmasi Simpan"
+            variant="primary"
+        />
     </div>
 </x-layouts.app>

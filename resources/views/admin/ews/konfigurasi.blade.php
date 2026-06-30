@@ -116,12 +116,12 @@
 
             openConfirm() {
                 if (this.reason.trim() === '' || this.thresholdWarnings.length > 0) return;
-                this.showConfirm = true;
+                $dispatch('open-confirm-ews-konfig');
             },
             submitForm() {
                 this.$refs.configForm.submit();
             }
-        }">
+        }" @confirm-ews-konfig.window="submitForm()">
 
         {{-- ================================================================ --}}
         {{-- PAGE HEADER --}}
@@ -624,89 +624,50 @@
             </div>
         </div>
 
-        {{-- ================================================================ --}}
-        {{-- CONFIRMATION MODAL --}}
-        {{-- ================================================================ --}}
-        <div x-show="showConfirm" x-transition:enter="transition ease-out duration-150"
-            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4" style="display: none;">
-            <div x-show="showConfirm" x-transition:enter="transition ease-out duration-150"
-                x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
-                @click.outside="showConfirm = false"
-                class="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-xl">
-                {{-- Modal header --}}
-                <div class="flex items-start gap-3">
-                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-warning/10">
-                        <svg class="h-5 w-5 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                            stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                        </svg>
+        <x-ui.confirm-dialog
+            id="ews-konfig"
+            title="Konfirmasi Perubahan Threshold EWS"
+            message="Pastikan threshold yang Anda masukkan sudah sesuai. Perubahan ini akan segera memengaruhi status peringatan dini seluruh pegawai."
+            confirm-text="Ya, Terapkan Perubahan"
+            variant="warning"
+        >
+            <div class="rounded-lg bg-soft/50 p-4 border border-border">
+                <dl class="space-y-3 text-xs">
+                    <div class="flex items-center justify-between gap-4 border-b border-border pb-1.5">
+                        <dt class="text-muted">Scheduler Time (WITA)</dt>
+                        <dd class="font-semibold text-ink font-mono" x-text="ews_scheduler_time"></dd>
                     </div>
-                    <div>
-                        <h3 class="text-base font-semibold text-ink">Konfirmasi Perubahan Parameter EWS</h3>
-                        <p class="mt-1 text-sm text-muted">
-                            Perubahan ini langsung berlaku untuk scheduler pengecekan EWS harian dan dicatat di log
-                            audit.
-                        </p>
+                    <div class="flex items-center justify-between gap-4 border-b border-border pb-1.5">
+                        <dt class="text-muted">Pangkat Tahap 1 / 2 / 3</dt>
+                        <dd class="font-semibold text-ink font-mono"><span x-text="pangkat_h90"></span> / <span
+                                x-text="pangkat_h60"></span> / <span x-text="pangkat_h30"></span></dd>
                     </div>
-                </div>
-
-                {{-- Ringkasan perubahan --}}
-                <div class="mt-5 rounded-lg border border-border bg-soft p-4 max-h-[250px] overflow-y-auto">
-                    <p class="text-xs font-bold uppercase tracking-wide text-muted">Ringkasan Parameter Baru</p>
-                    <dl class="mt-3 space-y-2 text-xs font-sans">
-                        <div class="flex items-center justify-between gap-4 border-b border-border pb-1.5">
-                            <dt class="text-muted">Scheduler Time (WITA)</dt>
-                            <dd class="font-semibold text-ink font-mono" x-text="ews_scheduler_time"></dd>
-                        </div>
-                        <div class="flex items-center justify-between gap-4 border-b border-border pb-1.5">
-                            <dt class="text-muted">Pangkat Tahap 1 / 2 / 3</dt>
-                            <dd class="font-semibold text-ink font-mono"><span x-text="pangkat_h90"></span> / <span
-                                    x-text="pangkat_h60"></span> / <span x-text="pangkat_h30"></span></dd>
-                        </div>
-                        <div class="flex items-center justify-between gap-4 border-b border-border pb-1.5">
-                            <dt class="text-muted">KGB Tahap 1 / 2 / 3</dt>
-                            <dd class="font-semibold text-ink font-mono"><span x-text="kgb_h60"></span> / <span
-                                    x-text="kgb_h30"></span> / <span x-text="kgb_h14"></span></dd>
-                        </div>
-                        <div class="flex items-center justify-between gap-4 border-b border-border pb-1.5">
-                            <dt class="text-muted">Pensiun (BUP) Tahap 1 / 2 / 3</dt>
-                            <dd class="font-semibold text-ink font-mono">
-                                <span x-text="pensiun_y1"></span>h / <span x-text="pensiun_m6"></span>h / <span
-                                    x-text="pensiun_m3"></span>h
-                            </dd>
-                        </div>
-                        <div class="flex items-center justify-between gap-4 border-b border-border pb-1.5">
-                            <dt class="text-muted">PPPK Kontrak Tahap 1 / 2 / 3</dt>
-                            <dd class="font-semibold text-ink font-mono">
-                                <span x-text="pppk_m6"></span>h / <span x-text="pppk_m3"></span>h / <span
-                                    x-text="pppk_m1"></span>h
-                            </dd>
-                        </div>
-                        <div class="pt-2 mt-2">
-                            <dt class="font-bold text-muted uppercase tracking-wide text-[10px]">Alasan Perubahan</dt>
-                            <dd class="mt-1 text-ink leading-relaxed italic" x-text="reason"></dd>
-                        </div>
-                    </dl>
-                </div>
-
-                {{-- Aksi modal --}}
-                <div class="mt-5 flex justify-end gap-3">
-                    <button type="button" @click="showConfirm = false"
-                        class="rounded-lg border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-muted transition-colors hover:bg-soft cursor-pointer focus:outline-none">
-                        Batal
-                    </button>
-                    <button type="button" @click="submitForm()"
-                        class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 cursor-pointer focus:outline-none">
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                        </svg>
-                        Ya, Terapkan Perubahan
-                    </button>
-                </div>
+                    <div class="flex items-center justify-between gap-4 border-b border-border pb-1.5">
+                        <dt class="text-muted">KGB Tahap 1 / 2 / 3</dt>
+                        <dd class="font-semibold text-ink font-mono"><span x-text="kgb_h60"></span> / <span
+                                x-text="kgb_h30"></span> / <span x-text="kgb_h14"></span></dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 border-b border-border pb-1.5">
+                        <dt class="text-muted">Pensiun (BUP) Tahap 1 / 2 / 3</dt>
+                        <dd class="font-semibold text-ink font-mono">
+                            <span x-text="pensiun_y1"></span>h / <span x-text="pensiun_m6"></span>h / <span
+                                x-text="pensiun_m3"></span>h
+                        </dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 border-b border-border pb-1.5">
+                        <dt class="text-muted">PPPK Kontrak Tahap 1 / 2 / 3</dt>
+                        <dd class="font-semibold text-ink font-mono">
+                            <span x-text="pppk_m6"></span>h / <span x-text="pppk_m3"></span>h / <span
+                                x-text="pppk_m1"></span>h
+                        </dd>
+                    </div>
+                    <div class="pt-2 mt-2">
+                        <dt class="font-bold text-muted uppercase tracking-wide text-[10px]">Alasan Perubahan</dt>
+                        <dd class="mt-1 text-ink leading-relaxed italic" x-text="reason"></dd>
+                    </div>
+                </dl>
             </div>
-        </div>
+        </x-ui.confirm-dialog>
 
     </div>
 </x-layouts.app>

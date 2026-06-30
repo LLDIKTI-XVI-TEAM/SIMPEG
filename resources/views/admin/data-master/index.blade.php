@@ -154,7 +154,7 @@
         tabs: {{ json_encode($tabs) }},
         openModal(mode) { this.modalMode = mode; this.isModalOpen = true; }, 
         closeModal() { this.isModalOpen = false; },
-        openDeleteConfirm(item) { this.deleteItemName = item.name || item.nama || item.kode || item.jenis; this.isDeleteModalOpen = true; },
+        openDeleteConfirm(item) { this.deleteItemName = item.name || item.nama || item.kode || item.jenis; $dispatch('open-confirm-delete-master'); },
         closeDeleteModal() { this.isDeleteModalOpen = false; }
     }" class="flex flex-col lg:flex-row gap-6 relative">
 
@@ -1153,57 +1153,31 @@
         </div>
 
         {{-- DELETE CONFIRMATION MODAL --}}
-        <div x-show="isDeleteModalOpen" style="display: none;"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 backdrop-blur-sm transition-opacity"
-            x-transition.opacity>
-            <div @click.away="closeDeleteModal()"
-                class="w-full max-w-md rounded-xl bg-surface p-6 shadow-xl" x-transition>
-
-                {{-- Header --}}
-                <div class="mb-4 flex items-center justify-between pb-2 border-b border-border">
-                    <h3 class="text-lg font-bold text-danger font-sans">Konfirmasi Hapus Data Master</h3>
-                    <button @click="closeDeleteModal()" class="text-muted hover:text-danger transition-colors">
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
-
-                {{-- Body --}}
-                <div class="space-y-4">
-                    <p class="text-sm text-ink leading-relaxed font-sans font-medium">
-                        Apakah Anda yakin ingin menghapus data referensi <strong class="text-danger" x-text="deleteItemName"></strong> ini?
-                    </p>
-                    
-                    <div class="rounded-lg border border-danger/20 bg-danger/5 p-3 text-xs text-danger flex gap-2 font-sans">
-                        <svg class="w-4.5 h-4.5 shrink-0 mt-0.5 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                        </svg>
-                        <div>
-                            <span class="font-bold">⚠️ RESTRIKSI INTEGRITAS:</span> Data master yang saat ini aktif digunakan oleh data pegawai <strong>tidak diperkenankan untuk dihapus</strong> dari sistem.
-                        </div>
+        <x-ui.confirm-dialog
+            id="delete-master"
+            title="Konfirmasi Hapus Data Master"
+            message=""
+            confirm-text="Hapus (Soft Delete)"
+            variant="danger"
+        >
+            <div class="space-y-4">
+                <p class="text-sm text-ink leading-relaxed font-sans font-medium">
+                    Apakah Anda yakin ingin menghapus data referensi <strong class="text-danger" x-text="deleteItemName"></strong> ini?
+                </p>
+                <div class="rounded-lg border border-danger/20 bg-danger/5 p-3 text-xs text-danger flex gap-2 font-sans">
+                    <svg class="w-4.5 h-4.5 shrink-0 mt-0.5 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                    </svg>
+                    <div>
+                        <span class="font-bold">⚠️ RESTRIKSI INTEGRITAS:</span> Data master yang saat ini aktif digunakan oleh data pegawai <strong>tidak diperkenankan untuk dihapus</strong> dari sistem.
                     </div>
-                    
-                    <p class="text-xs text-muted leading-relaxed font-sans">
-                        Metode penghapusan akan menerapkan **Soft Delete** guna menjaga integritas data riwayat historis kepegawaian (audit trail).
-                    </p>
                 </div>
-
-                {{-- Footer --}}
-                <div class="mt-6 flex justify-end gap-3">
-                    <button @click="closeDeleteModal()"
-                        class="rounded-lg px-4 py-2 text-sm font-semibold text-muted hover:bg-soft transition-colors font-sans">
-                        Batal
-                    </button>
-                    <button @click="closeDeleteModal()"
-                        class="rounded-lg bg-danger px-5 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90 transition-colors font-sans">
-                        Hapus (Soft Delete)
-                    </button>
-                </div>
-
+                <p class="text-xs text-muted leading-relaxed font-sans">
+                    Metode penghapusan akan menerapkan **Soft Delete** guna menjaga integritas data riwayat historis kepegawaian (audit trail).
+                </p>
             </div>
-        </div>
+        </x-ui.confirm-dialog>
+
     </div>
 
 </x-layouts.app>

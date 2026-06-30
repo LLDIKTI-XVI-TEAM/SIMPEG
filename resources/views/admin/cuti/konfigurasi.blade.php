@@ -14,12 +14,12 @@
         },
         openConfirm() {
             if (this.reason.trim() === '' || this.stage2 === '' || this.stage3 === '') return;
-            this.showConfirm = true;
+            $dispatch('open-confirm-cuti-konfig');
         },
         submitForm() {
             this.$refs.configForm.submit();
         }
-    }">
+    }" @confirm-cuti-konfig.window="submitForm()">
 
         {{-- PAGE HEADER --}}
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -225,34 +225,12 @@
         </div>
 
         {{-- MODAL KONFIRMASI --}}
-        <div x-show="showConfirm" x-transition:enter="transition ease-out duration-150"
-            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4" style="display: none;">
-            <div x-show="showConfirm" @click.outside="showConfirm = false"
-                class="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-xl">
-                <div class="flex items-start gap-3">
-                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-warning/10">
-                        <svg class="h-5 w-5 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="text-base font-semibold text-ink">Konfirmasi Perubahan Approver</h3>
-                        <p class="mt-1 text-sm text-muted">Perubahan ini langsung berlaku untuk pengajuan cuti berikutnya dan dicatat di log audit.</p>
-                    </div>
-                </div>
-
-                <div class="mt-6 flex justify-end gap-3">
-                    <button type="button" @click="showConfirm = false"
-                        class="rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft cursor-pointer">
-                        Batal
-                    </button>
-                    <button type="button" @click="submitForm()"
-                        class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 cursor-pointer">
-                        Ya, Simpan
-                    </button>
-                </div>
-            </div>
-        </div>
+        <x-ui.confirm-dialog
+            id="cuti-konfig"
+            title="Konfirmasi Perubahan Approver"
+            message="Perubahan ini langsung berlaku untuk pengajuan cuti berikutnya dan dicatat di log audit."
+            confirm-text="Ya, Simpan"
+            variant="warning"
+        />
     </div>
 </x-layouts.app>
