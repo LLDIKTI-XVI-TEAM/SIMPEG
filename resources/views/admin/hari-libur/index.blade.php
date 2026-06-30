@@ -339,33 +339,8 @@
                 </div>
 
                 {{-- Pagination Control --}}
-                <div class="flex items-center gap-1.5" x-show="totalPages > 1">
-                    {{-- Prev --}}
-                    <button @click="setPage(currentPage - 1)" :disabled="currentPage === 1"
-                            :class="currentPage === 1 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-soft hover:text-ink'"
-                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted transition cursor-pointer">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                        </svg>
-                    </button>
-                    
-                    {{-- Pages --}}
-                    <template x-for="p in totalPages" :key="p">
-                        <button @click="setPage(p)"
-                                :class="currentPage === p ? 'border-primary bg-primary text-white hover:opacity-90' : 'border-border bg-surface text-muted hover:bg-soft hover:text-ink'"
-                                class="flex h-8 w-8 items-center justify-center rounded-lg border text-sm transition font-medium cursor-pointer"
-                                x-text="p">
-                        </button>
-                    </template>
-                    
-                    {{-- Next --}}
-                    <button @click="setPage(currentPage + 1)" :disabled="currentPage === totalPages"
-                            :class="currentPage === totalPages ? 'opacity-40 cursor-not-allowed' : 'hover:bg-soft hover:text-ink'"
-                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted transition cursor-pointer">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                        </svg>
-                    </button>
+                <div class="flex items-center gap-1.5">
+                    <x-ui.pagination current="currentPage" total="totalPages" action="setPage(page)" />
                 </div>
             </div>
         </div>
