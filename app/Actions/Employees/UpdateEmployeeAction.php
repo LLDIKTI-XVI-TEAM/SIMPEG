@@ -18,7 +18,7 @@ class UpdateEmployeeAction
      */
     public function execute(Employee $employee, array $data, Request $request): Employee
     {
-        $oldValues = $employee->toArray();
+        $oldValues = $employee->getRawOriginal();
         $oldPhotoPath = $employee->foto;
 
         if ($request->hasFile('foto')) {
@@ -32,7 +32,7 @@ class UpdateEmployeeAction
             $this->files->deletePublicFile($oldPhotoPath);
         }
 
-        AuditService::log('UPDATE', 'Employee', $employee->id, $oldValues, $employee->toArray(), $request);
+        AuditService::log('UPDATE', 'Employee', $employee->id, $oldValues, $employee->getRawOriginal(), $request);
 
         return $employee;
     }

@@ -21,7 +21,7 @@
 </head>
 <body class="h-full bg-page font-sans">
 
-<div class="flex h-screen overflow-hidden" x-data="{ sidebarOpen: false, searchQuery: '', searchResults: [], isSearching: false, showDropdown: false }">
+<div class="flex h-screen overflow-hidden" x-data="{ sidebarOpen: false }">
 
     {{-- ================================================================== --}}
     {{-- MOBILE OVERLAY --}}
@@ -313,19 +313,27 @@
                 </button>
                 
                 {{-- Search Bar --}}
-                <div class="relative w-full hidden sm:block">
+                <div class="relative w-full hidden sm:block" x-data="globalSearch()">
                     <input 
                         type="text" 
                         x-model="searchQuery" 
-                        @input.debounce.500ms="if(searchQuery.length > 1) { isSearching = true; fetch('/admin/search?q=' + searchQuery).then(r => r.json()).then(data => { searchResults = data; isSearching = false; showDropdown = true; }) } else { showDropdown = false; }"
+                        @input="handleInput"
                         @click.outside="showDropdown = false"
                         @focus="if(searchQuery.length > 1) showDropdown = true"
-                        @keydown.enter="if(searchQuery.length > 1) { isSearching = true; fetch('/admin/search?q=' + searchQuery).then(r => r.json()).then(data => { searchResults = data; isSearching = false; showDropdown = true; let keys = Object.keys(data); if(keys.length === 0) { alert('Pencarian tidak ada'); } else { window.location.href = data[keys[0]][0].url; } }) }"
-                        class="w-full rounded-lg border border-border bg-soft pl-10 pr-4 py-2 text-sm text-ink focus:border-primary focus:bg-surface focus:outline-none focus:ring-1 focus:ring-primary font-sans transition-colors"
+                        @keydown.enter="handleEnter"
+                        class="w-full rounded-lg border border-border bg-surface pl-10 pr-10 py-2 text-sm text-ink focus:border-primary focus:bg-surface focus:outline-none focus:ring-1 focus:ring-primary font-sans transition-colors"
                         placeholder="Cari pegawai, NIP, dokumen, cuti, unit kerja..."
                     >
                     <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
+                    </div>
+                    
+                    {{-- Loader --}}
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3" x-show="isSearching" style="display: none;">
+                        <svg class="animate-spin w-4 h-4 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
                     </div>
 
                     {{-- Search Dropdown --}}
@@ -361,64 +369,7 @@
             {{-- Right: notif bell + profile dropdown --}}
             <div class="flex items-center gap-2">
 
-                {{-- Notification Bell --}}
-                <div class="relative" x-data="{ notifOpen: false }">
-                    <button
-                        @click="notifOpen = !notifOpen"
-                        id="notif-btn"
-                        class="relative rounded-lg p-2 text-muted transition-colors hover:bg-soft"
-                        aria-label="Notifikasi"
-                    >
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" /></svg>
-                        <span class="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-danger text-[10px] font-bold text-white">3</span>
-                    </button>
-
-                    <div
-                        x-show="notifOpen"
-                        @click.outside="notifOpen = false"
-                        x-transition:enter="transition ease-out duration-100"
-                        x-transition:enter-start="opacity-0 scale-95"
-                        x-transition:enter-end="opacity-100 scale-100"
-                        x-transition:leave="transition ease-in duration-75"
-                        x-transition:leave-start="opacity-100 scale-100"
-                        x-transition:leave-end="opacity-0 scale-95"
-                        class="absolute right-0 top-full mt-2 w-80 origin-top-right rounded-lg border border-border bg-surface shadow-lg"
-                        style="display: none;"
-                    >
-                        <div class="border-b border-border px-4 py-3">
-                            <p class="text-sm font-semibold text-ink">Notifikasi</p>
-                        </div>
-                        <div class="divide-y divide-border">
-                            <div class="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-soft">
-                                <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-danger"></span>
-                                <div>
-                                    <p class="text-sm font-medium text-ink">Dokumen kadaluarsa H-30</p>
-                                    <p class="mt-0.5 text-xs text-muted font-sans">SK Pengangkatan — Budi Santoso</p>
-                                    <span class="mt-1 inline-block text-[10px] font-semibold text-danger">H-30</span>
-                                </div>
-                            </div>
-                            <div class="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-soft">
-                                <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-warning"></span>
-                                <div>
-                                    <p class="text-sm font-medium text-ink">Masa pensiun mendekat H-60</p>
-                                    <p class="mt-0.5 text-xs text-muted font-sans">Siti Rahayu — Februari 2026</p>
-                                    <span class="mt-1 inline-block text-[10px] font-semibold text-warning">H-60</span>
-                                </div>
-                            </div>
-                            <div class="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-soft">
-                                <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-info"></span>
-                                <div>
-                                    <p class="text-sm font-medium text-ink">Pengajuan cuti baru</p>
-                                    <p class="mt-0.5 text-xs text-muted font-sans">Ahmad Fauzi — Cuti tahunan 5 hari</p>
-                                    <span class="mt-1 inline-block text-[10px] font-semibold text-info">Menunggu</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="border-t border-border px-4 py-3">
-                            <a href="{{ route('notifications.index') }}" class="text-xs font-semibold text-primary hover:underline">Lihat semua notifikasi</a>
-                        </div>
-                    </div>
-                </div>
+                <x-layouts.notification-bell />
 
                 <div class="h-6 w-px bg-border"></div>
 
@@ -466,7 +417,7 @@
                                 Profil Saya
                             </a>
                             @if($activeRole === 'super_admin')
-                                <a href="{{ route('pengaturan') }}" id="settings-link" class="flex items-center gap-2.5 rounded-lg px-4 py-2 text-sm text-ink transition-colors hover:bg-soft font-sans font-medium font-semibold">
+                                <a href="{{ route('pengaturan') }}" id="settings-link" class="flex items-center gap-2.5 rounded-lg px-4 py-2 text-sm text-ink transition-colors hover:bg-soft font-sans font-medium">
                                     {{-- heroicon: cog-6-tooth (outline) --}}
                                     <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
@@ -498,36 +449,6 @@
             </div>
         </header>
 
-        {{-- FLASH MESSAGES --}}
-        @if(session('success') || session('error') || session('warning') || session('info') || session('auth_error'))
-        <div class="shrink-0 border-b border-border px-4 py-3 lg:px-6 space-y-2">
-            @if(session('success'))
-                <div class="flex items-center gap-3 rounded-lg border border-success/20 bg-success/10 px-4 py-3">
-                    <svg class="h-4 w-4 shrink-0 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
-                    <p class="text-sm font-medium text-success font-sans">{{ session('success') }}</p>
-                </div>
-            @endif
-            @if(session('error') || session('auth_error'))
-                <div class="flex items-center gap-3 rounded-lg border border-danger/20 bg-danger/10 px-4 py-3">
-                    <svg class="h-4 w-4 shrink-0 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
-                    <p class="text-sm font-medium text-danger font-sans">{{ session('error') ?? session('auth_error') }}</p>
-                </div>
-            @endif
-            @if(session('warning'))
-                <div class="flex items-center gap-3 rounded-lg border border-warning/20 bg-warning/10 px-4 py-3">
-                    <svg class="h-4 w-4 shrink-0 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
-                    <p class="text-sm font-medium text-warning font-sans">{{ session('warning') }}</p>
-                </div>
-            @endif
-            @if(session('info'))
-                <div class="flex items-center gap-3 rounded-lg border border-info/20 bg-info/10 px-4 py-3">
-                    <svg class="h-4 w-4 shrink-0 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" /></svg>
-                    <p class="text-sm font-medium text-info font-sans">{{ session('info') }}</p>
-                </div>
-            @endif
-        </div>
-        @endif
-
         {{-- PAGE CONTENT --}}
         <main class="flex-1 overflow-y-auto bg-page">
             <div class="mx-auto max-w-7xl px-4 py-6 lg:px-6">
@@ -538,9 +459,161 @@
     </div>
 </div>
 
+{{-- TOAST NOTIFICATIONS --}}
+<div x-data="toastManager()" @notify.window="addToast($event.detail)" class="fixed bottom-4 right-4 z-[60] flex w-full max-w-sm flex-col gap-3 sm:bottom-6 sm:right-6 pointer-events-none">
+    <template x-for="toast in toasts" :key="toast.id">
+        <div 
+            x-show="toast.show"
+            x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="translate-y-10 opacity-0 sm:translate-y-0 sm:translate-x-10"
+            x-transition:enter-end="translate-y-0 opacity-100 sm:translate-x-0"
+            x-transition:leave="transition ease-in duration-100"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            :class="{
+                'border-success/20 bg-surface': toast.type === 'success',
+                'border-danger/20 bg-surface': toast.type === 'error',
+                'border-warning/20 bg-surface': toast.type === 'warning',
+                'border-info/20 bg-surface': toast.type === 'info',
+            }"
+            class="flex items-center gap-3 rounded-xl border p-4 shadow-xl pointer-events-auto"
+        >
+            <div 
+                :class="{
+                    'bg-success/10 text-success': toast.type === 'success',
+                    'bg-danger/10 text-danger': toast.type === 'error',
+                    'bg-warning/10 text-warning': toast.type === 'warning',
+                    'bg-info/10 text-info': toast.type === 'info',
+                }"
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+            >
+                <!-- Success -->
+                <template x-if="toast.type === 'success'">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                </template>
+                <!-- Error -->
+                <template x-if="toast.type === 'error'">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                </template>
+                <!-- Warning -->
+                <template x-if="toast.type === 'warning'">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
+                </template>
+                <!-- Info -->
+                <template x-if="toast.type === 'info'">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" /></svg>
+                </template>
+            </div>
+            <div class="flex-1">
+                <p class="text-sm font-semibold text-ink" x-text="toast.title"></p>
+                <p class="mt-0.5 text-xs text-muted" x-text="toast.message" x-show="toast.message"></p>
+            </div>
+            <button @click="removeToast(toast.id)" class="text-muted hover:text-ink" aria-label="Tutup notifikasi">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18 18 6M6 6l12 12" /></svg>
+            </button>
+        </div>
+    </template>
+</div>
+
 @stack('scripts')
 <script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('globalSearch', () => ({
+            searchQuery: '',
+            searchResults: {},
+            isSearching: false,
+            showDropdown: false,
+            debounceTimer: null,
+
+            handleInput() {
+                if (this.searchQuery.length <= 1) {
+                    this.showDropdown = false;
+                    this.isSearching = false;
+                    clearTimeout(this.debounceTimer);
+                    return;
+                }
+                
+                this.isSearching = true;
+                this.showDropdown = true;
+                
+                clearTimeout(this.debounceTimer);
+                this.debounceTimer = setTimeout(() => {
+                    this.fetchResults();
+                }, 500);
+            },
+
+            fetchResults() {
+                fetch('/admin/search?q=' + this.searchQuery)
+                    .then(r => r.json())
+                    .then(data => {
+                        this.searchResults = data;
+                        this.isSearching = false;
+                    })
+                    .catch(() => {
+                        this.isSearching = false;
+                    });
+            },
+
+            handleEnter() {
+                if (this.searchQuery.length > 1) {
+                    let keys = Object.keys(this.searchResults);
+                    if (keys.length === 0) {
+                        window.dispatchEvent(new CustomEvent('notify', {
+                            detail: { type: 'error', title: 'Pencarian Gagal', message: 'Data yang Anda cari tidak ditemukan.' }
+                        }));
+                    } else {
+                        window.location.href = this.searchResults[keys[0]][0].url;
+                    }
+                }
+            }
+        }));
+    });
+
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('toastManager', () => ({
+            toasts: [],
+            addToast(toast) {
+                const id = Date.now() + Math.random().toString(36).substr(2, 9);
+                this.toasts.push({ ...toast, id, show: false });
+                
+                // Trigger animation
+                setTimeout(() => {
+                    const index = this.toasts.findIndex(t => t.id === id);
+                    if (index !== -1) this.toasts[index].show = true;
+                }, 10);
+
+                // Auto remove after 5s
+                setTimeout(() => this.removeToast(id), 5000);
+            },
+            removeToast(id) {
+                const index = this.toasts.findIndex(t => t.id === id);
+                if (index !== -1) {
+                    this.toasts[index].show = false;
+                    setTimeout(() => {
+                        this.toasts = this.toasts.filter(t => t.id !== id);
+                    }, 300);
+                }
+            }
+        }));
+    });
+
+    // Handle Laravel Session Flashes -> Convert to Toasts
     document.addEventListener('DOMContentLoaded', () => {
+        const flashes = [
+            @if(session('success')) { type: 'success', title: 'Berhasil', message: @json(session('success')) }, @endif
+            @if(session('login_success')) { type: 'success', title: 'Berhasil Masuk', message: @json(session('login_success')) }, @endif
+            @if(session('error')) { type: 'error', title: 'Gagal', message: @json(session('error')) }, @endif
+            @if(session('auth_error')) { type: 'error', title: 'Gagal', message: @json(session('auth_error')) }, @endif
+            @if(session('warning')) { type: 'warning', title: 'Peringatan', message: @json(session('warning')) }, @endif
+            @if(session('info')) { type: 'info', title: 'Informasi', message: @json(session('info')) }, @endif
+        ];
+        
+        flashes.forEach((flash, index) => {
+            setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('notify', { detail: flash }));
+            }, 100 + (index * 200));
+        });
+
         const sidebarNav = document.getElementById('sidebar-nav');
         if (sidebarNav) {
             // Restore scroll position

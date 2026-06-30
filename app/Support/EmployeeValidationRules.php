@@ -32,6 +32,8 @@ class EmployeeValidationRules
             'golongan_terakhir' => ['nullable', 'string', 'max:20'],
             'pangkat_terakhir' => ['nullable', 'string', 'max:100'],
             'jabatan_terakhir' => ['nullable', 'string', 'max:255'],
+            'jenis_jabatan_id' => ['nullable', 'uuid', 'exists:ref_jenis_jabatan,id'],
+            'unit_kerja_id' => ['nullable', 'uuid', 'exists:ref_unit_kerja,id'],
             'kelas_jabatan' => ['nullable', 'string', 'max:10'],
 
             // Pendidikan snapshot

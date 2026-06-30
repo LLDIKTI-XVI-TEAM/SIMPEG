@@ -136,13 +136,15 @@ class EmployeeDocumentTest extends TestCase
         $employee = Employee::factory()->create();
 
         $this->actingAs($user);
+        $file = UploadedFile::fake()->create('ijazah.pdf', 100, 'application/pdf');
+
         $response = $this->post('/dashboard/dokumen/upload', [
             'nama_dokumen' => 'Ijazah Master Tester',
             'nomor_dokumen' => 'IJZ-M-TEST',
             'tanggal_terbit' => '2026-01-01',
             'kategori_dokumen' => 'ijazah',
             'pegawai_id' => $employee->id,
-            'berkas' => UploadedFile::fake()->create('ijazah.pdf', 100),
+            'berkas' => $file,
         ]);
 
         $response->assertRedirect('/dashboard/dokumen');
@@ -153,6 +155,55 @@ class EmployeeDocumentTest extends TestCase
             'jenis_dokumen' => 'ijazah',
             'nama_dokumen' => 'Ijazah Master Tester',
             'nomor_dokumen' => 'IJZ-M-TEST',
+        ]);
+
+        $document = Document::where('employee_id', $employee->id)->where('jenis_dokumen', 'ijazah')->firstOrFail();
+        $this->assertMatchesRegularExpression('/^'.preg_quote($employee->id, '/').'\/ijazah\/'.preg_quote($employee->id, '/').'_ijazah_\d{14}\.pdf$/', $document->file_path);
+        Storage::disk('public')->assertExists($document->file_path);
+    }
+
+    public function test_admin_can_upload_document_without_optional_number_and_date(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+
+        $this->actingAs($user);
+        $response = $this->post('/dashboard/dokumen/upload', [
+            'nama_dokumen' => 'Dokumen Tanpa Nomor',
+            'kategori_dokumen' => 'lainnya',
+            'pegawai_id' => $employee->id,
+            'berkas' => UploadedFile::fake()->create('dokumen.pdf', 100, 'application/pdf'),
+        ]);
+
+        $response->assertRedirect('/dashboard/dokumen');
+
+        $this->assertDatabaseHas('documents', [
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Dokumen Tanpa Nomor',
+            'nomor_dokumen' => null,
+            'tanggal_dokumen' => null,
+        ]);
+    }
+
+    public function test_admin_cannot_upload_document_with_disallowed_mime_type(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+
+        $this->actingAs($user);
+        $response = $this->from('/dashboard/dokumen')->post('/dashboard/dokumen/upload', [
+            'nama_dokumen' => 'Script Berbahaya',
+            'kategori_dokumen' => 'lainnya',
+            'pegawai_id' => $employee->id,
+            'berkas' => UploadedFile::fake()->create('script.sh', 5, 'text/x-shellscript'),
+        ]);
+
+        $response->assertRedirect('/dashboard/dokumen');
+        $response->assertSessionHasErrors('berkas');
+        $this->assertDatabaseMissing('documents', [
+            'employee_id' => $employee->id,
+            'nama_dokumen' => 'Script Berbahaya',
         ]);
     }
 

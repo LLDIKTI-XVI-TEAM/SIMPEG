@@ -15,12 +15,12 @@ class RestoreEmployeeAction
     public function execute(Employee $employee, Request $request): Employee
     {
         return DB::transaction(function () use ($employee, $request): Employee {
-            $oldValues = $employee->toArray();
+            $oldValues = $employee->getRawOriginal();
 
             $employee->restore();
             $employee->refresh();
 
-            AuditService::log('RESTORE', 'Employee', $employee->id, $oldValues, $employee->toArray(), $request);
+            AuditService::log('RESTORE', 'Employee', $employee->id, $oldValues, $employee->getRawOriginal(), $request);
 
             return $employee;
         });

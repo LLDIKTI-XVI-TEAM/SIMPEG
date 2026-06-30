@@ -41,8 +41,25 @@
 
         // Filter cepat dari query string (mis. tautan "menunggu persetujuan").
         if (request()->query('status') === 'pending') {
-            $riwayatCuti = $riwayatCuti->where('status', 'menunggu');
+            $riwayatCuti = collect($riwayatCuti)->where('status', 'menunggu');
         }
+
+        $perPage = request()->input('per_page', 10);
+        $page = request()->input('page', 1);
+        
+        $offset = ($page - 1) * $perPage;
+        $total = count($riwayatCuti);
+        
+        $riwayatCutiArray = is_array($riwayatCuti) ? $riwayatCuti : collect($riwayatCuti)->all();
+        $pagedData = array_slice($riwayatCutiArray, $offset, $perPage);
+        
+        $riwayatCutiPaginator = new \Illuminate\Pagination\LengthAwarePaginator(
+            $pagedData,
+            $total,
+            $perPage,
+            $page,
+            ['path' => request()->url(), 'query' => request()->query()]
+        );
 
         // Metrik ringkas dihitung dari data nyata, bukan angka statis.
         $totalPengajuan = $riwayatCuti->count();
@@ -162,7 +179,7 @@
 
                 {{-- Filter Status --}}
                 <div class="relative">
-                    <select id="filter-status" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <select id="filter-status" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                         <option value="">Semua Status</option>
                         <option value="menunggu">Menunggu</option>
                         <option value="disetujui">Disetujui</option>
@@ -177,7 +194,7 @@
 
                 {{-- Filter Jenis Cuti --}}
                 <div class="relative">
-                    <select id="filter-jenis" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <select id="filter-jenis" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                         <option value="">Semua Jenis Cuti</option>
                         <option>Cuti Tahunan</option>
                         <option>Cuti Sakit</option>
@@ -192,7 +209,7 @@
 
                 {{-- Filter Unit Kerja --}}
                 <div class="relative">
-                    <select id="filter-unit" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <select id="filter-unit" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                         <option value="">Semua Unit Kerja</option>
                         <option>Bag. Umum</option>
                         <option>Bag. Keuangan</option>
@@ -208,7 +225,7 @@
 
                 {{-- Filter Periode Bulan --}}
                 <div class="relative">
-                    <select id="filter-periode" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <select id="filter-periode" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                         <option value="">Semua Periode</option>
                         <option value="Juni 2026">Juni 2026</option>
                         <option value="April 2026">April 2026</option>
@@ -246,7 +263,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-border">
-                        @foreach($riwayatCuti as $r)
+                        @foreach($riwayatCutiPaginator as $r)
                         <tr class="transition-colors hover:bg-soft/50" data-nama="{{ $r['nama'] }}" data-nip="{{ $r['nip'] }}" data-unit="{{ $r['unit'] }}" data-jenis="{{ $r['jenis'] }}" data-status="{{ $r['status'] }}" data-periode="{{ $r['periode'] }}">
                             <td class="px-4 py-3.5">
                                 <div class="flex items-center gap-3">
@@ -268,22 +285,14 @@
                             </td>
                             <td class="px-4 py-3.5">
                                 <p class="text-sm text-ink font-mono">{{ \Carbon\Carbon::parse($r['mulai'])->translatedFormat('d M') }} - {{ \Carbon\Carbon::parse($r['selesai'])->translatedFormat('d M Y') }}</p>
-                                <p class="text-xs text-primary font-semibold mt-0.5 leading-none">{{ $r['hari'] }} Hari Kerja</p>
+                                <p class="text-xs text-ink font-semibold mt-0.5 leading-none">{{ $r['hari'] }} Hari Kerja</p>
                             </td>
                             <td class="px-4 py-3.5">
                                 <div class="flex flex-col gap-1 text-[11px] font-medium text-ink font-sans">
-                                    <div class="flex items-center gap-1.5">
-                                        @php
-                                        $dotAtasan = $r['stage_atasan'] === 'disetujui' ? 'bg-success' : ($r['stage_atasan'] === 'ditunda' ? 'bg-danger' : 'bg-muted');
-                                        @endphp
-                                        <span class="h-1.5 w-1.5 rounded-full {{ $dotAtasan }}"></span>
+                                    <div>
                                         <span>Atasan: <strong class="capitalize">{{ $r['stage_atasan'] }}</strong></span>
                                     </div>
-                                    <div class="flex items-center gap-1.5">
-                                        @php
-                                        $dotKepala = $r['stage_kepala'] === 'disetujui' ? 'bg-success' : ($r['stage_kepala'] === 'ditunda' ? 'bg-danger' : 'bg-muted');
-                                        @endphp
-                                        <span class="h-1.5 w-1.5 rounded-full {{ $dotKepala }}"></span>
+                                    <div>
                                         <span>Kepala: <strong class="capitalize">{{ $r['stage_kepala'] }}</strong></span>
                                     </div>
                                 </div>
@@ -311,36 +320,25 @@
             </div>
 
             {{-- TABLE FOOTER --}}
-            <div class="flex flex-col gap-3 border-t border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between bg-surface">
-                <div class="flex items-center gap-3">
-                    <p id="cuti-count-text" class="text-sm text-muted font-sans">Menampilkan 1 - 7 dari 7 data</p>
-                    <div class="relative">
-                        <select id="per-page" class="appearance-none rounded-lg border border-border bg-surface pl-3 pr-8 py-1 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                            <option>10 / halaman</option>
-                            <option>25 / halaman</option>
-                            <option>50 / halaman</option>
+            <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row">
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm text-muted">Tampilkan</span>
+                        <select onchange="updatePerPage(this.value)" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
+                            <option value="10" {{ request('per_page', 10) == 10 ? 'selected' : '' }}>10</option>
+                            <option value="25" {{ request('per_page') == 25 ? 'selected' : '' }}>25</option>
+                            <option value="50" {{ request('per_page') == 50 ? 'selected' : '' }}>50</option>
                         </select>
-                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                            </svg>
-                        </div>
+                        <span class="text-sm text-muted">data per halaman</span>
                     </div>
+                    @if($riwayatCutiPaginator->total() > 0)
+                    <p class="text-sm text-muted hidden sm:block">
+                        Menampilkan <span class="font-semibold text-ink">{{ $riwayatCutiPaginator->firstItem() }}</span> hingga <span class="font-semibold text-ink">{{ $riwayatCutiPaginator->lastItem() }}</span> dari <span class="font-semibold text-ink">{{ $riwayatCutiPaginator->total() }}</span> hasil
+                    </p>
+                    @endif
                 </div>
-                <div class="flex items-center gap-1.5">
-                    {{-- Prev --}}
-                    <button class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted transition hover:bg-soft hover:text-ink">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                        </svg>
-                    </button>
-                    <button class="flex h-8 w-8 items-center justify-center rounded-lg border border-primary bg-primary text-sm font-semibold text-white transition hover:opacity-90 font-sans">1</button>
-                    {{-- Next --}}
-                    <button class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted transition hover:bg-soft hover:text-ink font-sans">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                        </svg>
-                    </button>
+                <div class="w-full sm:w-auto">
+                    {{ $riwayatCutiPaginator->onEachSide(1)->links('vendor.pagination.simpeg') }}
                 </div>
             </div>
         </div>
@@ -451,6 +449,13 @@
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+    }
+
+    function updatePerPage(val) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('per_page', val);
+        url.searchParams.delete('page');
+        window.location.assign(url.href);
     }
     </script>
     @endpush

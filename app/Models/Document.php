@@ -6,6 +6,7 @@ use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * @property string $id
@@ -42,5 +43,40 @@ class Document extends Model
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
+    }
+
+    public function fileExists(): bool
+    {
+        return $this->file_path !== null && Storage::disk('public')->exists($this->file_path);
+    }
+
+    public function fileExtension(): string
+    {
+        return strtoupper(pathinfo((string) $this->file_path, PATHINFO_EXTENSION) ?: 'FILE');
+    }
+
+    public function fileSizeLabel(): string
+    {
+        if (! $this->fileExists()) {
+            return 'File tidak ditemukan';
+        }
+
+        $bytes = Storage::disk('public')->size($this->file_path);
+
+        if ($bytes >= 1048576) {
+            return number_format($bytes / 1048576, 1, ',', '.').' MB';
+        }
+
+        return max(1, (int) ceil($bytes / 1024)).' KB';
+    }
+
+    public function fileStatus(): string
+    {
+        return $this->fileExists() ? 'tersedia' : 'file_tidak_ditemukan';
+    }
+
+    public function fileStatusLabel(): string
+    {
+        return $this->fileExists() ? 'File tersedia' : 'File tidak ditemukan';
     }
 }

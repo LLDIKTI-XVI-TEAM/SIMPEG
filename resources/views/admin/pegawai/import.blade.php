@@ -474,16 +474,16 @@
                 </div>
                 <div class="flex flex-col sm:flex-row gap-3">
                     <button type="button" @click="activeTemplate = 'utama'; downloadTemplate('utama')" :disabled="downloadingType !== ''"
-                        :class="downloadingType ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary/10 cursor-pointer'"
-                        class="flex items-center gap-3 border border-primary/20 bg-primary/5 text-primary p-4 rounded-lg transition shadow-sm w-full">
-                        <svg x-show="downloadingType === 'utama'" class="w-8 h-8 text-primary shrink-0 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
-                        <svg x-show="downloadingType !== 'utama'" class="w-8 h-8 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
+                        :class="downloadingType ? 'opacity-50 cursor-not-allowed' : 'hover:bg-soft cursor-pointer'"
+                        class="flex items-center gap-3 border border-border bg-surface text-muted p-4 rounded-lg transition shadow-sm w-full">
+                        <svg x-show="downloadingType === 'utama'" class="w-8 h-8 text-muted shrink-0 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                        <svg x-show="downloadingType !== 'utama'" class="w-8 h-8 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
                         <div class="text-left">
-                            <span class="text-sm font-bold block font-sans">
+                            <span class="text-sm font-medium block font-sans text-muted">
                                 <span x-show="downloadingType === 'utama'">Menyiapkan Template...</span>
                                 <span x-show="downloadingType !== 'utama'">Unduh Template Utama Pegawai</span>
                             </span>
-                            <span class="text-xs text-primary/80 block mt-0.5 font-sans">Berisi kolom NIP, NIK, No KK, Golongan, Jabatan, Role, dll.</span>
+                            <span class="text-xs text-muted block mt-0.5 font-sans">Berisi kolom NIP, NIK, No KK, Golongan, Jabatan, Role, dll.</span>
                         </div>
                     </button>
                 </div>
@@ -522,6 +522,7 @@
                         :class="(!fileValid || isUploading) ? 'opacity-50 cursor-not-allowed bg-muted' : 'bg-primary hover:opacity-90 cursor-pointer'"
                         class="inline-flex items-center justify-center rounded-lg px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition font-sans gap-2">
                         <svg x-show="isUploading" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+                        <svg x-show="!isUploading" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
                         <span x-text="isUploading ? 'Mengupload & Memproses...' : 'Upload & Lanjutkan ke Preview'"></span>
                     </button>
                 </div>
