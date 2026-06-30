@@ -147,13 +147,19 @@
         </div>
 
         {{-- FILTER PANEL --}}
-        <div class="rounded-lg border border-border bg-surface p-6 shadow-sm mb-6 space-y-6">
-            {{-- Header & Reset --}}
-            <div class="flex items-center justify-between border-b border-border pb-3">
-                <div>
-                    <h3 class="text-sm font-semibold text-ink font-sans">Filter & Pencarian</h3>
-                    <p class="text-[10px] text-muted font-sans mt-0.5">Saring jejak audit berdasarkan kriteria spesifik di bawah ini.</p>
-                </div>
+        <x-ui.filter-bar
+            class="sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 items-end"
+            searchModel="searchQuery"
+            searchLabel="Cari"
+            searchPlaceholder="Ketik nama operator atau ID record..."
+            searchCols="col-span-1 lg:col-span-2"
+        >
+            <x-slot:header>
+                <h3 class="text-sm font-semibold text-ink font-sans">Filter & Pencarian</h3>
+                <p class="text-[10px] text-muted font-sans mt-0.5">Saring jejak audit berdasarkan kriteria spesifik di bawah ini.</p>
+            </x-slot:header>
+
+            <x-slot:actions>
                 <button @click="filterEvent = 'all'; filterUser = 'all'; filterModul = 'all'; filterStartDate = ''; filterEndDate = ''; searchQuery = '';" 
                         class="text-xs text-primary font-semibold hover:underline font-sans cursor-pointer flex items-center gap-1">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
@@ -161,99 +167,80 @@
                     </svg>
                     Reset Filter
                 </button>
-            </div>
-            
-            {{-- Baris 1: Pencarian --}}
-            <div class="max-w-md space-y-1.5">
-                <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Cari Operator / ID Record</label>
-                <div class="relative flex items-center rounded-lg border border-border bg-surface px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
-                    <svg class="w-4 h-4 text-muted shrink-0 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-                    </svg>
-                    <input
-                        type="text"
-                        x-model="searchQuery"
-                        placeholder="Ketik nama operator atau ID record..."
-                        class="w-full bg-transparent text-xs text-ink placeholder:text-muted focus:outline-none font-sans"
-                    >
-                </div>
-            </div>
+            </x-slot:actions>
 
-            {{-- Baris 2: Dropdown Filter & Periode (Grid 5 Kolom) --}}
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 items-end">
-                {{-- Dropdown Event --}}
-                <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Jenis Event</label>
-                    <div class="relative">
-                        <select x-model="filterEvent" class="w-full appearance-none rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
-                            <option value="all">Semua Event</option>
-                            <option value="LOGIN">LOGIN</option>
-                            <option value="LOGOUT">LOGOUT</option>
-                            <option value="CREATE">CREATE</option>
-                            <option value="UPDATE">UPDATE</option>
-                            <option value="SOFT_DELETE">SOFT_DELETE</option>
-                            <option value="RESTORE">RESTORE</option>
-                            <option value="APPROVE">APPROVE</option>
-                            <option value="POSTPONE">POSTPONE</option>
-                            <option value="IMPORT">IMPORT</option>
-                        </select>
-                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                            </svg>
-                        </div>
+            {{-- Dropdown Event --}}
+            <div class="space-y-1.5">
+                <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Jenis Event</label>
+                <div class="relative">
+                    <select x-model="filterEvent" class="h-10 w-full appearance-none rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
+                        <option value="all">Semua Event</option>
+                        <option value="LOGIN">LOGIN</option>
+                        <option value="LOGOUT">LOGOUT</option>
+                        <option value="CREATE">CREATE</option>
+                        <option value="UPDATE">UPDATE</option>
+                        <option value="SOFT_DELETE">SOFT_DELETE</option>
+                        <option value="RESTORE">RESTORE</option>
+                        <option value="APPROVE">APPROVE</option>
+                        <option value="POSTPONE">POSTPONE</option>
+                        <option value="IMPORT">IMPORT</option>
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                        </svg>
                     </div>
                 </div>
+            </div>
 
-                {{-- Dropdown Operator --}}
-                <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">User / Operator</label>
-                    <div class="relative">
-                        <select x-model="filterUser" class="w-full appearance-none rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
-                            <option value="all">Semua User</option>
-                            <template x-for="op in [...new Set(logs.map(l => l.operator))]" :key="op">
-                                <option :value="op" x-text="op"></option>
-                            </template>
-                        </select>
-                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                            </svg>
-                        </div>
+            {{-- Dropdown Operator --}}
+            <div class="space-y-1.5">
+                <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">User / Operator</label>
+                <div class="relative">
+                    <select x-model="filterUser" class="h-10 w-full appearance-none rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
+                        <option value="all">Semua User</option>
+                        <template x-for="op in [...new Set(logs.map(l => l.operator))]" :key="op">
+                            <option :value="op" x-text="op"></option>
+                        </template>
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                        </svg>
                     </div>
-                </div>
-
-                {{-- Dropdown Modul --}}
-                <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Modul / Tabel</label>
-                    <div class="relative">
-                        <select x-model="filterModul" class="w-full appearance-none rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
-                            <option value="all">Semua Modul</option>
-                            <template x-for="mod in [...new Set(logs.map(l => l.modul))]" :key="mod">
-                                <option :value="mod" x-text="mod"></option>
-                            </template>
-                        </select>
-                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Periode Mulai --}}
-                <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Periode Mulai</label>
-                    <input type="date" x-model="filterStartDate" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
-                </div>
-
-                {{-- Periode Selesai --}}
-                <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Periode Selesai</label>
-                    <input type="date" x-model="filterEndDate" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
                 </div>
             </div>
-        </div>
+
+            {{-- Dropdown Modul --}}
+            <div class="space-y-1.5">
+                <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Modul / Tabel</label>
+                <div class="relative">
+                    <select x-model="filterModul" class="h-10 w-full appearance-none rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
+                        <option value="all">Semua Modul</option>
+                        <template x-for="mod in [...new Set(logs.map(l => l.modul))]" :key="mod">
+                            <option :value="mod" x-text="mod"></option>
+                        </template>
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Periode Mulai --}}
+            <div class="space-y-1.5">
+                <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Periode Mulai</label>
+                <input type="date" x-model="filterStartDate" class="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
+            </div>
+
+            {{-- Periode Selesai --}}
+            <div class="space-y-1.5">
+                <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Periode Selesai</label>
+                <input type="date" x-model="filterEndDate" class="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
+            </div>
+        </x-ui.filter-bar>
 
         {{-- Table Card --}}
         <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">

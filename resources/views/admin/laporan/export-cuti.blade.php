@@ -114,93 +114,91 @@
         </div>
 
         {{-- FILTER BAR (Screen only) --}}
-        <div class="rounded-lg border border-border bg-surface p-4 flex flex-col gap-4 shadow-sm print:hidden">
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12">
-                {{-- Periode Bulan --}}
-                <div class="relative col-span-1 sm:col-span-1 lg:col-span-2">
-                    <select x-model="activeBulan" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                        <option value="">Semua Bulan</option>
-                        <option value="1">Januari</option>
-                        <option value="2">Februari</option>
-                        <option value="3">Maret</option>
-                        <option value="4">April</option>
-                        <option value="5">Mei</option>
-                        <option value="6">Juni</option>
-                        <option value="7">Juli</option>
-                        <option value="8">Agustus</option>
-                        <option value="9">September</option>
-                        <option value="10">Oktober</option>
-                        <option value="11">November</option>
-                        <option value="12">Desember</option>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
-                </div>
-
-                {{-- Periode Tahun --}}
-                <div class="relative col-span-1 sm:col-span-1 lg:col-span-2">
-                    <select x-model="activeTahun" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                        <option value="">Semua Tahun</option>
-                        <option>2026</option>
-                        <option>2025</option>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
-                </div>
-
-                {{-- Filter Unit Kerja --}}
-                <div class="relative col-span-1 sm:col-span-1 lg:col-span-3">
-                    <select x-model="activeUnit" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                        <option value="">Semua Unit Kerja</option>
-                        <option>Bag. Umum</option>
-                        <option>Bag. Keuangan</option>
-                        <option>Bag. SDM</option>
-                        <option>Bag. IT</option>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
-                </div>
-
-                {{-- Filter Pegawai --}}
-                <div class="relative col-span-1 sm:col-span-1 lg:col-span-3">
-                    <select x-model="activePegawai" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                        <option value="">Semua Pegawai</option>
-                        @foreach($pegawai as $p)
-                            <option value="{{ $p['nip'] }}">{{ $p['nama'] }}</option>
-                        @endforeach
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
-                </div>
-
-                {{-- Filter Jenis Cuti --}}
-                <div class="relative col-span-1 sm:col-span-1 lg:col-span-2">
-                    <select x-model="activeJenis" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                        <option value="">Semua Cuti</option>
-                        <option>Cuti Tahunan</option>
-                        <option>Cuti Sakit</option>
-                        <option>Cuti Melahirkan</option>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
+        <x-ui.filter-bar class="sm:grid-cols-2 lg:grid-cols-12">
+            {{-- Periode Bulan --}}
+            <div class="relative col-span-1 sm:col-span-1 lg:col-span-2">
+                <select x-model="activeBulan" class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <option value="">Semua Bulan</option>
+                    <option value="1">Januari</option>
+                    <option value="2">Februari</option>
+                    <option value="3">Maret</option>
+                    <option value="4">April</option>
+                    <option value="5">Mei</option>
+                    <option value="6">Juni</option>
+                    <option value="7">Juli</option>
+                    <option value="8">Agustus</option>
+                    <option value="9">September</option>
+                    <option value="10">Oktober</option>
+                    <option value="11">November</option>
+                    <option value="12">Desember</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                    </svg>
                 </div>
             </div>
-        </div>
+
+            {{-- Periode Tahun --}}
+            <div class="relative col-span-1 sm:col-span-1 lg:col-span-2">
+                <select x-model="activeTahun" class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <option value="">Semua Tahun</option>
+                    <option>2026</option>
+                    <option>2025</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                    </svg>
+                </div>
+            </div>
+
+            {{-- Filter Unit Kerja --}}
+            <div class="relative col-span-1 sm:col-span-1 lg:col-span-3">
+                <select x-model="activeUnit" class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <option value="">Semua Unit Kerja</option>
+                    <option>Bag. Umum</option>
+                    <option>Bag. Keuangan</option>
+                    <option>Bag. SDM</option>
+                    <option>Bag. IT</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                    </svg>
+                </div>
+            </div>
+
+            {{-- Filter Pegawai --}}
+            <div class="relative col-span-1 sm:col-span-1 lg:col-span-3">
+                <select x-model="activePegawai" class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <option value="">Semua Pegawai</option>
+                    @foreach($pegawai as $p)
+                        <option value="{{ $p['nip'] }}">{{ $p['nama'] }}</option>
+                    @endforeach
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                    </svg>
+                </div>
+            </div>
+
+            {{-- Filter Jenis Cuti --}}
+            <div class="relative col-span-1 sm:col-span-1 lg:col-span-2">
+                <select x-model="activeJenis" class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <option value="">Semua Cuti</option>
+                    <option>Cuti Tahunan</option>
+                    <option>Cuti Sakit</option>
+                    <option>Cuti Melahirkan</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                    </svg>
+                </div>
+            </div>
+        </x-ui.filter-bar>
 
         {{-- TABLE CARD --}}
         <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm print:border-none print:shadow-none print:bg-transparent">

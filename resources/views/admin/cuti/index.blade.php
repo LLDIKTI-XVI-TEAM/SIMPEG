@@ -166,80 +166,72 @@
             </div>
         </div>
 
-        {{-- FILTER BAR --}}
-        <div class="rounded-lg border border-border bg-surface p-4 flex flex-col gap-4 shadow-sm">
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                {{-- Search input --}}
-                <div class="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 col-span-1 sm:col-span-2 lg:col-span-1">
-                    <svg class="w-4 h-4 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+        <x-ui.filter-bar 
+            searchId="search-cuti" 
+            searchPlaceholder="Cari nama atau NIP..."
+            class="sm:grid-cols-2 lg:grid-cols-5"
+        >
+            {{-- Filter Status --}}
+            <div class="relative">
+                <select id="filter-status" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 h-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <option value="">Semua Status</option>
+                    <option value="menunggu">Menunggu</option>
+                    <option value="disetujui">Disetujui</option>
+                    <option value="ditunda">Ditunda</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
                     </svg>
-                    <input id="search-cuti" type="text" placeholder="Cari nama atau NIP..." class="flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none font-sans">
-                </div>
-
-                {{-- Filter Status --}}
-                <div class="relative">
-                    <select id="filter-status" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                        <option value="">Semua Status</option>
-                        <option value="menunggu">Menunggu</option>
-                        <option value="disetujui">Disetujui</option>
-                        <option value="ditunda">Ditunda</option>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
-                </div>
-
-                {{-- Filter Jenis Cuti --}}
-                <div class="relative">
-                    <select id="filter-jenis" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                        <option value="">Semua Jenis Cuti</option>
-                        <option>Cuti Tahunan</option>
-                        <option>Cuti Sakit</option>
-                        <option>Cuti Melahirkan</option>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
-                </div>
-
-                {{-- Filter Unit Kerja --}}
-                <div class="relative">
-                    <select id="filter-unit" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                        <option value="">Semua Unit Kerja</option>
-                        <option>Bag. Umum</option>
-                        <option>Bag. Keuangan</option>
-                        <option>Bag. SDM</option>
-                        <option>Bag. IT</option>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
-                </div>
-
-                {{-- Filter Periode Bulan --}}
-                <div class="relative">
-                    <select id="filter-periode" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                        <option value="">Semua Periode</option>
-                        <option value="Juni 2026">Juni 2026</option>
-                        <option value="April 2026">April 2026</option>
-                        <option value="Februari 2026">Februari 2026</option>
-                        <option value="Oktober 2025">Oktober 2025</option>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
                 </div>
             </div>
-        </div>
+
+            {{-- Filter Jenis Cuti --}}
+            <div class="relative">
+                <select id="filter-jenis" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 h-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <option value="">Semua Jenis Cuti</option>
+                    <option>Cuti Tahunan</option>
+                    <option>Cuti Sakit</option>
+                    <option>Cuti Melahirkan</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                    </svg>
+                </div>
+            </div>
+
+            {{-- Filter Unit Kerja --}}
+            <div class="relative">
+                <select id="filter-unit" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 h-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <option value="">Semua Unit Kerja</option>
+                    <option>Bag. Umum</option>
+                    <option>Bag. Keuangan</option>
+                    <option>Bag. SDM</option>
+                    <option>Bag. IT</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                    </svg>
+                </div>
+            </div>
+
+            {{-- Filter Periode Bulan --}}
+            <div class="relative">
+                <select id="filter-periode" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 h-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <option value="">Semua Periode</option>
+                    <option value="Juni 2026">Juni 2026</option>
+                    <option value="Mei 2026">Mei 2026</option>
+                    <option value="April 2026">April 2026</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                    </svg>
+                </div>
+            </div>
+        </x-ui.filter-bar>
 
         {{-- TABLE CARD --}}
         <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
