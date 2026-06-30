@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\Employees\AssignSupervisorAction;
 use App\Actions\Employees\CreateEmployeeAction;
@@ -11,6 +11,7 @@ use App\Actions\Employees\RestoreEmployeeAction;
 use App\Actions\Employees\ShowEmployeeAction;
 use App\Actions\Employees\ShowMyProfileAction;
 use App\Actions\Employees\UpdateEmployeeAction;
+use App\Http\Controllers\Controller;
 use App\Http\Requests\ListEmployeesRequest;
 use App\Http\Requests\StoreEmployeeRequest;
 use App\Http\Requests\UpdateEmployeeRequest;
