@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Actions\Histories\CreateRankHistoryAction;
 use App\Actions\Histories\ListRankHistoriesAction;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\StoreRankHistoryRequest;
+use App\Http\Requests\History\StoreRankHistoryRequest;
 use App\Models\Employee;
 use Illuminate\Http\JsonResponse;
 
