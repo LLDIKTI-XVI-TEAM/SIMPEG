@@ -251,29 +251,7 @@
                 </div>
 
                 <div class="flex items-center gap-1.5">
-                    {{-- Prev --}}
-                    <button @click="if (currentPage > 1) currentPage--"
-                            :disabled="currentPage === 1"
-                            :class="currentPage === 1 ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-soft hover:text-ink text-ink cursor-pointer'"
-                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface transition text-sm font-semibold font-sans">
-                        &lt;
-                    </button>
-                    
-                    <template x-for="page in totalPages" :key="page">
-                        <button @click="currentPage = page"
-                                :class="currentPage === page ? 'bg-primary text-white border-primary' : 'bg-surface text-ink hover:bg-soft border-border'"
-                                class="flex h-8 w-8 items-center justify-center rounded-lg border text-sm font-semibold transition font-sans cursor-pointer"
-                                x-text="page">
-                        </button>
-                    </template>
-                    
-                    {{-- Next --}}
-                    <button @click="if (currentPage < totalPages) currentPage++"
-                            :disabled="currentPage === totalPages"
-                            :class="currentPage === totalPages ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-soft hover:text-ink text-ink cursor-pointer'"
-                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface transition text-sm font-semibold font-sans">
-                        &gt;
-                    </button>
+                    <x-ui.pagination current="currentPage" total="totalPages" />
                 </div>
             </div>
         </div>
