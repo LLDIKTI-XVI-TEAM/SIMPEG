@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\Api\V1\AuditLogController;
 use Illuminate\Support\Facades\Route;
 
 /*
