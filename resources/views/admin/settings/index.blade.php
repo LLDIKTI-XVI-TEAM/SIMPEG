@@ -138,13 +138,10 @@
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between border-b border-border pb-4">
             <div>
                 <h2 class="text-2xl font-bold text-ink font-sans leading-tight">Pengaturan Sistem</h2>
-                <nav class="mt-1 flex items-center gap-1.5 text-xs text-muted">
-                    <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
-                    <span>/</span>
-                    <span class="font-medium text-ink font-sans">Pengaturan</span>
-                    <span>•</span>
-                    <span class="text-muted italic">Akses: Khusus Super Admin</span>
-                </nav>
+                <x-ui.breadcrumb :items="[
+                    ['label' => 'Dashboard', 'url' => route('dashboard')],
+                    ['label' => 'Pengaturan']
+                ]" />
             </div>
             <div class="flex flex-wrap items-center gap-2 text-xs">
                 <span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-info">

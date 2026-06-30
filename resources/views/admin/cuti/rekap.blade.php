@@ -72,13 +72,11 @@
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h2 class="text-2xl font-semibold text-ink font-sans">Rekap Cuti Pegawai</h2>
-                <nav class="mt-1 flex items-center gap-1.5 text-xs text-muted">
-                    <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
-                    <span>/</span>
-                    <a href="{{ route('cuti') }}" class="transition-colors hover:text-ink">Cuti</a>
-                    <span>/</span>
-                    <span class="font-medium text-ink">Rekap Cuti</span>
-                </nav>
+                <x-ui.breadcrumb :items="[
+                    ['label' => 'Dashboard', 'url' => route('dashboard')],
+                    ['label' => 'Cuti', 'url' => route('cuti')],
+                    ['label' => 'Rekap Cuti']
+                ]" />
             </div>
             <div class="flex shrink-0 items-center gap-2">
                 <button type="button" @click="applyExport('excel')" :disabled="exportType !== null"
