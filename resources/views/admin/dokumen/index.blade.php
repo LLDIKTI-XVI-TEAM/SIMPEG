@@ -65,56 +65,58 @@
             </div>
         </div>
 
-        {{-- FILTER BAR --}}
-        <div class="rounded-lg border border-border bg-surface p-4 flex flex-col gap-4 shadow-sm">
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {{-- Search input --}}
-                <div
-                    class="flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 col-span-1 sm:col-span-2 lg:col-span-1 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
-                    <svg class="w-4 h-4 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                        stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+        <x-ui.filter-bar 
+            searchModel="searchQuery" 
+            searchPlaceholder="Cari nama, nomor, jenis..."
+        >
+            {{-- Filter Unit Kerja --}}
+            <div class="relative col-span-1 sm:col-span-1 lg:col-span-1">
+                <select x-model="activeUnit"
+                    class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <option value="">Semua Unit Kerja</option>
+                    <option>Bag. Umum</option>
+                    <option>Bag. Keuangan</option>
+                    <option>Bag. SDM</option>
+                    <option>Bag. IT</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
                     </svg>
-                    <input type="text" x-model="searchQuery" placeholder="Cari nama, nomor, jenis..."
-                        class="h-full flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none font-sans">
-                </div>
-
-
-                {{-- Filter Unit Kerja --}}
-                <div class="relative col-span-1 sm:col-span-1 lg:col-span-1">
-                    <select x-model="activeUnit"
-                        class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                        <option value="">Semua Unit Kerja</option>
-                        <option>Bag. Umum</option>
-                        <option>Bag. Keuangan</option>
-                        <option>Bag. SDM</option>
-                        <option>Bag. IT</option>
-                    </select>
-                </div>
-
-                {{-- Filter Kategori Dokumen --}}
-                <div class="relative col-span-1 sm:col-span-1 lg:col-span-1">
-                    <select x-model="activeKategori"
-                        class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                        <option value="">Semua Kategori Dokumen</option>
-                        @foreach ($categoryLabels as $value => $label)
-                            <option value="{{ $value }}">{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                {{-- Filter Status Dokumen --}}
-                <div class="relative col-span-1 sm:col-span-2 lg:col-span-1">
-                    <select x-model="activeStatus"
-                        class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                        <option value="">Semua Status</option>
-                        <option value="tersedia">File tersedia</option>
-                        <option value="file_tidak_ditemukan">File tidak ditemukan</option>
-                    </select>
                 </div>
             </div>
-        </div>
+
+            {{-- Filter Kategori Dokumen --}}
+            <div class="relative col-span-1 sm:col-span-1 lg:col-span-1">
+                <select x-model="activeKategori"
+                    class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <option value="">Semua Kategori Dokumen</option>
+                    @foreach ($categoryLabels as $value => $label)
+                        <option value="{{ $value }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                    </svg>
+                </div>
+            </div>
+
+            {{-- Filter Status Dokumen --}}
+            <div class="relative col-span-1 sm:col-span-2 lg:col-span-1">
+                <select x-model="activeStatus"
+                    class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <option value="">Semua Status</option>
+                    <option value="tersedia">File tersedia</option>
+                    <option value="file_tidak_ditemukan">File tidak ditemukan</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                    </svg>
+                </div>
+            </div>
+        </x-ui.filter-bar>
 
         {{-- TABLE CARD --}}
         <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
