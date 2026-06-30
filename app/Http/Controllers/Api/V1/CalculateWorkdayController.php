@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\Cuti\CalculateWorkdaysAction;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\CalculateWorkdaysRequest;
+use App\Http\Requests\Cuti\CalculateWorkdaysRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon;
 

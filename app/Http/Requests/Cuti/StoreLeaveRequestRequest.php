@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Requests;
+namespace App\Http\Requests\Cuti;
 
 use App\Models\Employee;
 use App\Models\RefJenisCuti;

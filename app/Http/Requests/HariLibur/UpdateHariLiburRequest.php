@@ -1,13 +1,13 @@
 <?php
 
-namespace App\Http\Requests;
+namespace App\Http\Requests\HariLibur;
 
 use App\Models\RefHariLibur;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
-class StoreHariLiburRequest extends FormRequest
+class UpdateHariLiburRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -33,7 +33,16 @@ class StoreHariLiburRequest extends FormRequest
                     return;
                 }
 
-                if (RefHariLibur::whereDate('tanggal', $tanggal)->exists()) {
+                $hariLibur = $this->route('hariLibur');
+                $hariLiburId = $hariLibur instanceof RefHariLibur ? $hariLibur->id : null;
+
+                $query = RefHariLibur::whereDate('tanggal', $tanggal);
+
+                if ($hariLiburId !== null) {
+                    $query->whereKeyNot($hariLiburId);
+                }
+
+                if ($query->exists()) {
                     $validator->errors()->add('tanggal', 'Tanggal hari libur sudah terdaftar.');
                 }
             },
