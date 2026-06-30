@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\Employees\ImportEmployeesAction;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\ImportEmployeesRequest;
+use App\Http\Requests\Import\ImportEmployeesRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 

@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Actions\Histories\CreateKgbHistoryAction;
 use App\Actions\Histories\ListKgbHistoriesAction;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\StoreKgbHistoryRequest;
+use App\Http\Requests\History\StoreKgbHistoryRequest;
 use App\Models\Employee;
 use Illuminate\Http\JsonResponse;
 

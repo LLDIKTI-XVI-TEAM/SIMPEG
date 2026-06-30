@@ -6,7 +6,7 @@ use App\Actions\Employees\GenerateImportTemplateAction;
 use App\Actions\Employees\UploadImportBatchAction;
 use App\Actions\Employees\ValidateImportBatchAction;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\ImportEmployeesRequest;
+use App\Http\Requests\Import\ImportEmployeesRequest;
 use App\Jobs\ImportEmployeeBatchJob;
 use App\Support\EmployeeImport\ImportTemplateWriter;
 use Illuminate\Http\JsonResponse;
