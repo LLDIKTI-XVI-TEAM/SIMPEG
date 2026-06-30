@@ -11,7 +11,7 @@ class PrepareDocumentDownloadAction
     {
         $document = Document::findOrFail($id);
 
-        if (! Storage::disk('public')->exists($document->file_path)) {
+        if (! Storage::disk(Document::STORAGE_DISK)->exists($document->file_path)) {
             abort(404);
         }
 

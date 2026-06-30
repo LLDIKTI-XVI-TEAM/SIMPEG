@@ -213,7 +213,7 @@
                                         {{-- Detail --}}
                                         <a :href="'/dashboard/dokumen/' + doc.id"
                                             class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
-                                            title="Detail">
+                                            title="Detail" :aria-label="'Lihat detail ' + doc.nama">
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
                                                 viewBox="0 0 24 24" stroke-width="1.5">
                                                 <path stroke-linecap="round" stroke-linejoin="round"
@@ -225,7 +225,7 @@
                                         {{-- Unduh --}}
                                         <a :href="'/dashboard/dokumen/' + doc.id + '/download'"
                                             class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
-                                            title="Unduh">
+                                            title="Unduh" :aria-label="'Unduh ' + doc.nama">
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
                                                 viewBox="0 0 24 24" stroke-width="1.5">
                                                 <path stroke-linecap="round" stroke-linejoin="round"
@@ -269,7 +269,8 @@
                         {{-- Prev --}}
                         <button @click="if (currentPage > 1) currentPage--" :disabled="currentPage === 1"
                             :class="currentPage === 1 ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-soft hover:text-ink text-ink cursor-pointer'"
-                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface transition">
+                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface transition"
+                            aria-label="Halaman sebelumnya">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
                             </svg>
@@ -285,7 +286,8 @@
                         {{-- Next --}}
                         <button @click="if (currentPage < totalPages) currentPage++" :disabled="currentPage === totalPages"
                             :class="currentPage === totalPages ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-soft hover:text-ink text-ink cursor-pointer'"
-                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface transition">
+                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface transition"
+                            aria-label="Halaman berikutnya">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                             </svg>
@@ -302,11 +304,12 @@
             style="display: none;" x-transition>
             <div class="flex min-h-full items-center justify-center p-4">
                 <div @click.outside="showUploadModal = false"
-                    class="relative w-full max-w-lg rounded-lg border border-border bg-surface p-5 shadow-xl space-y-4">
+                    class="relative w-full max-w-lg rounded-lg border border-border bg-surface p-5 shadow-xl space-y-4"
+                    role="dialog" aria-modal="true" aria-labelledby="upload-dokumen-title">
 
                 {{-- Modal Header --}}
                 <div class="flex justify-between items-center border-b border-border pb-3">
-                    <h3 class="text-base font-semibold text-ink font-sans">Unggah Dokumen Kepegawaian</h3>
+                    <h3 id="upload-dokumen-title" class="text-base font-semibold text-ink font-sans">Unggah Dokumen Kepegawaian</h3>
                     <button @click="showUploadModal = false"
                         class="text-xs font-semibold text-muted hover:text-ink font-sans cursor-pointer focus:outline-none">Tutup</button>
                 </div>
@@ -326,61 +329,19 @@
                     @endif
 
                     {{-- Relasi Pegawai --}}
-                    <div class="space-y-1 relative z-50" x-data="{
-                        open: false,
-                        search: '',
-                        selectedId: '',
-                        selectedText: 'Pilih Pegawai...',
-                        pegawaiList: @js($pegawaiOptions),
-                        get filteredList() {
-                            if (this.search === '') return this.pegawaiList.slice(0, 10);
-                            return this.pegawaiList.filter(i => i.label.toLowerCase().includes(this.search.toLowerCase())).slice(0, 10);
-                        },
-                        select(item) {
-                            this.selectedId = item.id;
-                            this.selectedText = item.label;
-                            this.open = false;
-                            this.search = '';
-                        }
-                    }" @click.outside="open = false">
-                        <label class="text-xs font-semibold text-ink font-sans">Hubungkan ke Pegawai <span
+                    <div class="space-y-1">
+                        <label for="pegawai_id" class="text-xs font-semibold text-ink font-sans">Hubungkan ke Pegawai <span
                                 class="text-danger">*</span></label>
                         <div class="relative">
-                            {{-- Native select for form submission & validation --}}
-                            <select name="pegawai_id" required x-model="selectedId" class="opacity-0 absolute h-0 w-0 -z-10 bottom-0 left-1/2 pointer-events-none" tabindex="-1">
-                                <option value=""></option>
-                                <template x-for="item in pegawaiList" :key="item.id">
-                                    <option :value="item.id" x-text="item.label"></option>
-                                </template>
+                            <select id="pegawai_id" name="pegawai_id" required
+                                class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-4 pr-10 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                <option value="">Pilih Pegawai...</option>
+                                @foreach ($pegawaiOptions as $pegawai)
+                                    <option value="{{ $pegawai['id'] }}" @selected(old('pegawai_id') === $pegawai['id'])>{{ $pegawai['label'] }}</option>
+                                @endforeach
                             </select>
-
-                            {{-- Custom dropdown button --}}
-                            <button type="button" @click="open = !open; if(open) $nextTick(() => $refs.searchInput.focus())"
-                                class="flex items-center justify-between w-full rounded-lg border border-border bg-surface px-4 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans text-left">
-                                <span x-text="selectedText" :class="selectedId === '' ? 'text-ink' : 'text-ink font-medium'"></span>
-                                <svg class="w-4 h-4 text-muted transition-transform shrink-0" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                            </button>
-                            
-                            {{-- Dropdown list --}}
-                            <div x-show="open" x-transition
-                                style="display: none;"
-                                class="absolute z-[100] mt-1 w-full rounded-lg border border-border bg-surface shadow-xl overflow-hidden">
-                                <div class="border-b border-border bg-surface">
-                                    <input type="text" x-model="search" placeholder="Cari pegawai berdasarkan nama atau NIP..." x-ref="searchInput"
-                                        class="w-full border-0 bg-transparent py-3 px-4 text-xs text-ink placeholder-muted focus:outline-none focus:ring-0 font-sans">
-                                </div>
-                                <ul class="max-h-56 overflow-y-auto py-1">
-                                    <template x-for="item in filteredList" :key="item.id">
-                                        <li @click="select(item)"
-                                            class="cursor-pointer px-4 py-2.5 text-xs text-ink hover:bg-soft hover:text-primary transition-colors font-sans"
-                                            :class="selectedId === item.id ? 'bg-primary/10 text-primary font-semibold' : ''"
-                                            x-text="item.label">
-                                        </li>
-                                    </template>
-                                    <li x-show="filteredList.length === 0" class="px-4 py-4 text-xs text-muted text-center font-sans">
-                                        Pegawai tidak ditemukan.
-                                    </li>
-                                </ul>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4">
+                                <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                             </div>
                         </div>
                     </div>

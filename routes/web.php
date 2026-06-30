@@ -691,11 +691,15 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         ->name('cuti.approval');
     Route::post('/cuti/{id}/approve', [CutiController::class, 'approve'])
         ->middleware(['role:super_admin,pimpinan,atasan_langsung,admin_kepegawaian'])
-        ->name('cuti.approve');
+        ->name('cuti.approve')
+        ->whereUuid('id');
     Route::post('/cuti/{id}/postpone', [CutiController::class, 'postpone'])
         ->middleware(['role:super_admin,pimpinan,atasan_langsung,admin_kepegawaian'])
-        ->name('cuti.postpone');
-    Route::get('/dashboard/cuti/{id}', [CutiController::class, 'show'])->name('cuti.show');
+        ->name('cuti.postpone')
+        ->whereUuid('id');
+    Route::get('/dashboard/cuti/{id}', [CutiController::class, 'show'])
+        ->name('cuti.show')
+        ->whereUuid('id');
 
     // Konfigurasi rantai approval cuti bersifat pengaturan sistem, jadi digerbang ganda:
     // role:super_admin sebagai pagar kasar dan permission:cuti.configure sebagai gerbang aksi.
@@ -722,10 +726,12 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         ->name('dokumen.store');
     Route::get('/dashboard/dokumen/{id}', [DokumenController::class, 'show'])
         ->middleware(['role:super_admin,admin_kepegawaian'])
-        ->name('dokumen.show');
+        ->name('dokumen.show')
+        ->whereUuid('id');
     Route::get('/dashboard/dokumen/{id}/download', [DokumenController::class, 'download'])
         ->middleware(['role:super_admin,admin_kepegawaian'])
-        ->name('dokumen.download');
+        ->name('dokumen.download')
+        ->whereUuid('id');
 
     Route::get('/dashboard/dokumen/legacy', function () {
         return redirect()->route('dokumen');
@@ -740,7 +746,8 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         ->name('audit-log');
     Route::get('/dashboard/audit/{id}', [AuditController::class, 'show'])
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:audit_logs.read'])
-        ->name('audit-log.show');
+        ->name('audit-log.show')
+        ->whereUuid('id');
 
     Route::get('/dashboard/audit/legacy', function () {
         return redirect()->route('audit-log');

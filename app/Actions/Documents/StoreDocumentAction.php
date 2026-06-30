@@ -14,7 +14,7 @@ class StoreDocumentAction
         $category = $payload['kategori_dokumen'];
         $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension());
         $filename = $employee->id.'_'.$category.'_'.now()->format('YmdHis').'.'.$extension;
-        $filePath = $file->storeAs($employee->id.'/'.$category, $filename, 'public');
+        $filePath = $file->storeAs($employee->id.'/'.$category, $filename, Document::STORAGE_DISK);
 
         return Document::create([
             'employee_id' => $employee->id,

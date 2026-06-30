@@ -22,6 +22,8 @@ class Document extends Model
 {
     use HasUuid;
 
+    public const STORAGE_DISK = 'local';
+
     protected $fillable = [
         'employee_id',
         'jenis_dokumen',
@@ -47,7 +49,7 @@ class Document extends Model
 
     public function fileExists(): bool
     {
-        return $this->file_path !== null && Storage::disk('public')->exists($this->file_path);
+        return $this->file_path !== null && Storage::disk(self::STORAGE_DISK)->exists($this->file_path);
     }
 
     public function fileExtension(): string
@@ -61,7 +63,7 @@ class Document extends Model
             return 'File tidak ditemukan';
         }
 
-        $bytes = Storage::disk('public')->size($this->file_path);
+        $bytes = Storage::disk(self::STORAGE_DISK)->size($this->file_path);
 
         if ($bytes >= 1048576) {
             return number_format($bytes / 1048576, 1, ',', '.').' MB';

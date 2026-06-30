@@ -8,6 +8,7 @@ use App\Actions\Documents\ShowDocumentPageAction;
 use App\Actions\Documents\StoreDocumentAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Documents\StoreDocumentRequest;
+use App\Models\Document;
 use Illuminate\Support\Facades\Storage;
 
 class DokumenController extends Controller
@@ -34,6 +35,6 @@ class DokumenController extends Controller
     {
         $download = $action->execute($id);
 
-        return Storage::disk('public')->download($download['path'], $download['filename']);
+        return Storage::disk(Document::STORAGE_DISK)->download($download['path'], $download['filename']);
     }
 }

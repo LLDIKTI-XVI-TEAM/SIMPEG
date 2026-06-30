@@ -26,6 +26,7 @@ class EmployeeDocumentTest extends TestCase
         $this->seed(ReferenceSeeder::class);
         $this->seed(RbacSeeder::class);
 
+        Storage::fake(Document::STORAGE_DISK);
         Storage::fake('public');
     }
 
@@ -159,7 +160,8 @@ class EmployeeDocumentTest extends TestCase
 
         $document = Document::where('employee_id', $employee->id)->where('jenis_dokumen', 'ijazah')->firstOrFail();
         $this->assertMatchesRegularExpression('/^'.preg_quote($employee->id, '/').'\/ijazah\/'.preg_quote($employee->id, '/').'_ijazah_\d{14}\.pdf$/', $document->file_path);
-        Storage::disk('public')->assertExists($document->file_path);
+        Storage::disk(Document::STORAGE_DISK)->assertExists($document->file_path);
+        Storage::disk('public')->assertMissing($document->file_path);
     }
 
     public function test_admin_can_upload_document_without_optional_number_and_date(): void
@@ -213,7 +215,7 @@ class EmployeeDocumentTest extends TestCase
         $employee = Employee::factory()->create();
 
         $file = UploadedFile::fake()->create('download-test.pdf', 100);
-        $filePath = $file->store('employees/documents', 'public');
+        $filePath = $file->store('employees/documents', Document::STORAGE_DISK);
 
         $document = Document::create([
             'employee_id' => $employee->id,
@@ -229,5 +231,16 @@ class EmployeeDocumentTest extends TestCase
 
         $response->assertOk();
         $response->assertHeader('Content-Disposition', 'attachment; filename='.basename($filePath));
+    }
+
+    public function test_document_routes_reject_malformed_ids_before_controller_lookup(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        $this->get('/dashboard/dokumen/not-a-uuid')->assertNotFound();
+        $this->get('/dashboard/dokumen/not-a-uuid/download')->assertNotFound();
+        $this->get('/dashboard/dokumen/legacy')->assertRedirect(route('dokumen'));
     }
 }
