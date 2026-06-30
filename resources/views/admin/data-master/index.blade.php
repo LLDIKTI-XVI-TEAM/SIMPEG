@@ -127,13 +127,14 @@
             <div class="flex items-center gap-2">
                 <h2 class="text-2xl font-bold text-ink font-sans leading-tight">Data Master / Reference Tables</h2>
             </div>
-            <nav class="mt-1 flex items-center gap-1.5 text-xs text-muted">
-                <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
-                <span>/</span>
-                <span class="font-medium text-ink">Data Master</span>
+            <x-ui.breadcrumb :items="[
+                ['label' => 'Dashboard', 'url' => route('dashboard')],
+                ['label' => 'Data Master']
+            ]" />
+            <div class="mt-1 flex items-center gap-1.5 text-xs text-muted">
                 <span>•</span>
                 <span class="text-muted italic">Akses: Khusus Super Admin</span>
-            </nav>
+            </div>
         </div>
         <div class="flex items-center gap-3">
             <a href="{{ route('audit-log') }}" class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-muted shadow-sm transition hover:bg-soft hover:text-ink font-sans">

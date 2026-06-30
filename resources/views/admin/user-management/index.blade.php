@@ -62,13 +62,14 @@
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h2 class="text-2xl font-semibold text-ink font-sans">Kelola Akses User</h2>
-                <nav class="mt-1 flex items-center gap-1.5 text-xs text-muted">
-                    <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
-                    <span>/</span>
-                    <span class="font-medium text-ink">Kelola Akses User</span>
+                <x-ui.breadcrumb :items="[
+                    ['label' => 'Dashboard', 'url' => route('dashboard')],
+                    ['label' => 'Kelola Akses User']
+                ]" />
+                <div class="mt-1 flex items-center gap-1.5 text-xs text-muted">
                     <span>•</span>
                     <span class="text-muted italic">Akses: Khusus Super Admin</span>
-                </nav>
+                </div>
             </div>
             <div class="flex items-center gap-3">
                 <a href="{{ route('audit-log') }}" class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-muted shadow-sm transition hover:bg-soft hover:text-ink font-sans">
