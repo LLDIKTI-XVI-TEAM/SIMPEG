@@ -17,8 +17,12 @@ use App\Http\Controllers\Admin\RbacController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\UserMappingController;
 use App\Http\Controllers\Auth\KeycloakAuthController;
+use App\Models\Employee;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -37,33 +41,74 @@ Route::get('/login', [KeycloakAuthController::class, 'redirectToKeycloak'])->nam
 Route::get('/auth/keycloak/callback', [KeycloakAuthController::class, 'handleCallback'])->name('auth.keycloak.callback');
 Route::post('/logout', [KeycloakAuthController::class, 'logout'])->name('logout');
 
-Route::get('/dev-login', function () {
-    // Jalur login pintas khusus pengembangan: membuat/masuk sebagai super_admin tanpa SSO.
-    // WAJIB dimatikan di luar local/testing agar tidak menjadi pintu belakang super_admin
-    // di produksi. Di produksi, autentikasi hanya melalui Keycloak SSO, dan super_admin
-    // pertama ditentukan oleh bootstrap SSO (pegawai pertama yang login), bukan akun demo.
-    abort_unless(app()->environment(['local', 'testing']), 404);
-
-    $user = User::where('role', 'super_admin')->first();
-    if (! $user) {
-        $user = User::create([
-            'name' => 'Demo Klabat',
-            'email' => 'demo@example.com',
-            'password' => bcrypt('password'),
-            'role' => 'super_admin',
-        ]);
-    } else {
-        $user->name = 'Demo Klabat';
-        if (empty($user->role)) {
-            $user->role = 'super_admin';
+if (app()->environment(['local', 'testing'])) {
+    Route::get('/dev-login', function () {
+        $user = User::where('role', 'super_admin')->first();
+        if (! $user) {
+            $user = User::create([
+                'name' => 'Demo Klabat',
+                'email' => 'demo@example.com',
+                'password' => bcrypt('password'),
+                'role' => 'super_admin',
+            ]);
+        } else {
+            $user->name = 'Demo Klabat';
+            if (empty($user->role)) {
+                $user->role = 'super_admin';
+            }
+            $user->save();
         }
-        $user->save();
-    }
-    Auth::login($user);
-    session(['active_role' => $user->role ?? 'super_admin']);
+        Auth::login($user);
+        session(['active_role' => $user->role ?? 'super_admin']);
 
-    return redirect()->route('dashboard')->with('login_success', 'Selamat Datang! Anda berhasil masuk ke dalam sistem (Mode Dev).');
-})->name('dev-login');
+        return redirect()->route('dashboard')->with('login_success', 'Selamat Datang! Anda berhasil masuk ke dalam sistem (Mode Dev).');
+    })->name('dev-login');
+
+    Route::get('/set-super-admin', function () {
+        $user = auth()->user();
+        if ($user) {
+            $user->role = 'super_admin';
+            $user->save();
+            session(['active_role' => 'super_admin']);
+
+            return redirect()->route('dashboard')->with('success', 'Role Anda telah diubah menjadi super_admin');
+        }
+
+        return 'Silakan login terlebih dahulu';
+    });
+
+    Route::get('/map-dummy-employee', function () {
+        $user = auth()->user();
+        if ($user) {
+            $employee = Employee::first();
+            if (! $employee) {
+                $employee = Employee::create([
+                    'nip' => '198001012005011001',
+                    'nama' => $user->name,
+                    'status' => 'aktif',
+                ]);
+            }
+            $user->employee_id = $employee->id;
+            $user->save();
+
+            return redirect()->route('profil')->with('success', 'Akun Anda berhasil dipetakan ke data pegawai.');
+        }
+
+        return 'Silakan login terlebih dahulu';
+    });
+
+    Route::get('/debug-permissions', function () {
+        $permission = Permission::firstOrCreate(['name' => 'employee_families.create'], ['module' => 'employee_families', 'description' => 'Membuat data keluarga pegawai']);
+        $role = Role::where('name', 'super_admin')->first();
+        if ($role) {
+            $role->permissions()->syncWithoutDetaching([$permission->id]);
+
+            return 'Permission synced to super_admin';
+        }
+
+        return 'Role super_admin not found';
+    });
+}
 
 Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan,atasan_langsung,pegawai'])->group(function (): void {
     Route::get('/dashboard', function () {
@@ -588,6 +633,9 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
         ->name('pegawai.update');
+    Route::post('/pegawai/bulk-destroy', [PegawaiController::class, 'bulkDestroy'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.deactivate'])
+        ->name('pegawai.bulkDestroy');
     Route::post('/pegawai/{id}/delete', [PegawaiController::class, 'destroy'])
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.deactivate'])
@@ -643,11 +691,15 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         ->name('cuti.approval');
     Route::post('/cuti/{id}/approve', [CutiController::class, 'approve'])
         ->middleware(['role:super_admin,pimpinan,atasan_langsung,admin_kepegawaian'])
-        ->name('cuti.approve');
+        ->name('cuti.approve')
+        ->whereUuid('id');
     Route::post('/cuti/{id}/postpone', [CutiController::class, 'postpone'])
         ->middleware(['role:super_admin,pimpinan,atasan_langsung,admin_kepegawaian'])
-        ->name('cuti.postpone');
-    Route::get('/dashboard/cuti/{id}', [CutiController::class, 'show'])->name('cuti.show');
+        ->name('cuti.postpone')
+        ->whereUuid('id');
+    Route::get('/dashboard/cuti/{id}', [CutiController::class, 'show'])
+        ->name('cuti.show')
+        ->whereUuid('id');
 
     // Konfigurasi rantai approval cuti bersifat pengaturan sistem, jadi digerbang ganda:
     // role:super_admin sebagai pagar kasar dan permission:cuti.configure sebagai gerbang aksi.
@@ -674,10 +726,12 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         ->name('dokumen.store');
     Route::get('/dashboard/dokumen/{id}', [DokumenController::class, 'show'])
         ->middleware(['role:super_admin,admin_kepegawaian'])
-        ->name('dokumen.show');
+        ->name('dokumen.show')
+        ->whereUuid('id');
     Route::get('/dashboard/dokumen/{id}/download', [DokumenController::class, 'download'])
         ->middleware(['role:super_admin,admin_kepegawaian'])
-        ->name('dokumen.download');
+        ->name('dokumen.download')
+        ->whereUuid('id');
 
     Route::get('/dashboard/dokumen/legacy', function () {
         return redirect()->route('dokumen');
@@ -692,7 +746,8 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         ->name('audit-log');
     Route::get('/dashboard/audit/{id}', [AuditController::class, 'show'])
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:audit_logs.read'])
-        ->name('audit-log.show');
+        ->name('audit-log.show')
+        ->whereUuid('id');
 
     Route::get('/dashboard/audit/legacy', function () {
         return redirect()->route('audit-log');

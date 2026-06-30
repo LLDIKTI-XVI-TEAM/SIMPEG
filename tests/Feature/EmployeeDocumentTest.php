@@ -26,6 +26,7 @@ class EmployeeDocumentTest extends TestCase
         $this->seed(ReferenceSeeder::class);
         $this->seed(RbacSeeder::class);
 
+        Storage::fake(Document::STORAGE_DISK);
         Storage::fake('public');
     }
 
@@ -136,13 +137,15 @@ class EmployeeDocumentTest extends TestCase
         $employee = Employee::factory()->create();
 
         $this->actingAs($user);
+        $file = UploadedFile::fake()->create('ijazah.pdf', 100, 'application/pdf');
+
         $response = $this->post('/dashboard/dokumen/upload', [
             'nama_dokumen' => 'Ijazah Master Tester',
             'nomor_dokumen' => 'IJZ-M-TEST',
             'tanggal_terbit' => '2026-01-01',
             'kategori_dokumen' => 'ijazah',
             'pegawai_id' => $employee->id,
-            'berkas' => UploadedFile::fake()->create('ijazah.pdf', 100),
+            'berkas' => $file,
         ]);
 
         $response->assertRedirect('/dashboard/dokumen');
@@ -154,6 +157,56 @@ class EmployeeDocumentTest extends TestCase
             'nama_dokumen' => 'Ijazah Master Tester',
             'nomor_dokumen' => 'IJZ-M-TEST',
         ]);
+
+        $document = Document::where('employee_id', $employee->id)->where('jenis_dokumen', 'ijazah')->firstOrFail();
+        $this->assertMatchesRegularExpression('/^'.preg_quote($employee->id, '/').'\/ijazah\/'.preg_quote($employee->id, '/').'_ijazah_\d{14}\.pdf$/', $document->file_path);
+        Storage::disk(Document::STORAGE_DISK)->assertExists($document->file_path);
+        Storage::disk('public')->assertMissing($document->file_path);
+    }
+
+    public function test_admin_can_upload_document_without_optional_number_and_date(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+
+        $this->actingAs($user);
+        $response = $this->post('/dashboard/dokumen/upload', [
+            'nama_dokumen' => 'Dokumen Tanpa Nomor',
+            'kategori_dokumen' => 'lainnya',
+            'pegawai_id' => $employee->id,
+            'berkas' => UploadedFile::fake()->create('dokumen.pdf', 100, 'application/pdf'),
+        ]);
+
+        $response->assertRedirect('/dashboard/dokumen');
+
+        $this->assertDatabaseHas('documents', [
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Dokumen Tanpa Nomor',
+            'nomor_dokumen' => null,
+            'tanggal_dokumen' => null,
+        ]);
+    }
+
+    public function test_admin_cannot_upload_document_with_disallowed_mime_type(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+
+        $this->actingAs($user);
+        $response = $this->from('/dashboard/dokumen')->post('/dashboard/dokumen/upload', [
+            'nama_dokumen' => 'Script Berbahaya',
+            'kategori_dokumen' => 'lainnya',
+            'pegawai_id' => $employee->id,
+            'berkas' => UploadedFile::fake()->create('script.sh', 5, 'text/x-shellscript'),
+        ]);
+
+        $response->assertRedirect('/dashboard/dokumen');
+        $response->assertSessionHasErrors('berkas');
+        $this->assertDatabaseMissing('documents', [
+            'employee_id' => $employee->id,
+            'nama_dokumen' => 'Script Berbahaya',
+        ]);
     }
 
     public function test_admin_can_download_document(): void
@@ -162,7 +215,7 @@ class EmployeeDocumentTest extends TestCase
         $employee = Employee::factory()->create();
 
         $file = UploadedFile::fake()->create('download-test.pdf', 100);
-        $filePath = $file->store('employees/documents', 'public');
+        $filePath = $file->store('employees/documents', Document::STORAGE_DISK);
 
         $document = Document::create([
             'employee_id' => $employee->id,
@@ -178,5 +231,16 @@ class EmployeeDocumentTest extends TestCase
 
         $response->assertOk();
         $response->assertHeader('Content-Disposition', 'attachment; filename='.basename($filePath));
+    }
+
+    public function test_document_routes_reject_malformed_ids_before_controller_lookup(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        $this->get('/dashboard/dokumen/not-a-uuid')->assertNotFound();
+        $this->get('/dashboard/dokumen/not-a-uuid/download')->assertNotFound();
+        $this->get('/dashboard/dokumen/legacy')->assertRedirect(route('dokumen'));
     }
 }

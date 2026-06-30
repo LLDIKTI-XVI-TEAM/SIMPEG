@@ -155,10 +155,19 @@ class ReferenceSeeder extends Seeder
         }
 
         // §16.10 ref_unit_kerja (placeholder — perlu konfirmasi LLDIKTI)
-        RefUnitKerja::firstOrCreate(
-            ['nama' => 'Bagian Umum'],
-            ['nama' => 'Bagian Umum', 'keterangan' => 'Placeholder — perlu konfirmasi dari LLDIKTI XVI']
-        );
+        $unitKerja = [
+            ['nama' => 'Bagian Umum', 'keterangan' => 'Pusat administrasi dan umum'],
+            ['nama' => 'Bagian Keuangan', 'keterangan' => 'Pengelolaan keuangan dan anggaran'],
+            ['nama' => 'Bagian SDM', 'keterangan' => 'Sumber Daya Manusia dan Kepegawaian'],
+            ['nama' => 'Pimpinan', 'keterangan' => 'Pimpinan LLDIKTI Wilayah XVI'],
+            ['nama' => 'Pokja Akademik dan Riset', 'keterangan' => 'Kelompok Kerja Akademik dan Riset'],
+            ['nama' => 'Pokja Kelembagaan dan Sistem Informasi', 'keterangan' => 'Kelompok Kerja Kelembagaan'],
+            ['nama' => 'Pokja Kemahasiswaan', 'keterangan' => 'Kelompok Kerja Kemahasiswaan'],
+        ];
+
+        foreach ($unitKerja as $item) {
+            RefUnitKerja::firstOrCreate(['nama' => $item['nama']], $item);
+        }
 
         // §16.12 ref_bup
         $bup = [

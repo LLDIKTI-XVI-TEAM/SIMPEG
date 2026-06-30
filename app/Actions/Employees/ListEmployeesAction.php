@@ -46,7 +46,10 @@ class ListEmployeesAction
             )
             ->when(
                 $validated['golongan'] ?? null,
-                fn ($query, string $golongan) => $query->where('golongan_terakhir', $golongan)
+                fn ($query, string $golongan) => $query->where(function ($q) use ($golongan) {
+                    $q->where('golongan_terakhir', $golongan)
+                        ->orWhere('golongan_terakhir', 'LIKE', $golongan.'/%');
+                })
             )
             ->when(
                 $validated['jenis_pegawai_id'] ?? null,

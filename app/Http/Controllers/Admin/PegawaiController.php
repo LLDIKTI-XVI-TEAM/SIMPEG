@@ -23,6 +23,7 @@ use App\Models\RefUnitKerja;
 use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Shared\Date;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -482,20 +483,50 @@ class PegawaiController extends Controller
         $jenisPegawai = RefJenisPegawai::all();
         $agama = RefAgama::all();
         $statusKawin = RefStatusPerkawinan::all();
+        $unitKerja = RefUnitKerja::all();
+        $jenisJabatanOptions = RefJenisJabatan::all();
 
-        return view('admin.pegawai.create', compact('jenisPegawai', 'agama', 'statusKawin'));
+        return view('admin.pegawai.create', compact('jenisPegawai', 'agama', 'statusKawin', 'unitKerja', 'jenisJabatanOptions'));
     }
 
     public function inactive(Request $request, ListInactiveEmployeesAction $action)
     {
-        $employees = $action->execute($request->query());
+        $unitKerjaOptions = RefUnitKerja::query()
+            ->orderBy('nama')
+            ->get(['id', 'nama']);
+        $jenisPegawaiOptions = RefJenisPegawai::query()
+            ->orderBy('nama')
+            ->get(['id', 'nama']);
+        $golonganOptions = Employee::query()
+            ->whereNotNull('golongan_terakhir')
+            ->distinct()
+            ->orderBy('golongan_terakhir')
+            ->pluck('golongan_terakhir')
+            ->map(fn (?string $golongan) => $golongan ? strtok($golongan, '/') : null)
+            ->filter()
+            ->unique()
+            ->values();
 
-        return view('admin.pegawai.nonaktif', [
-            'employees' => $employees,
-            'filters' => [
-                'search' => trim((string) $request->query('search', '')),
-            ],
-        ]);
+        if ($golonganOptions->isEmpty()) {
+            $golonganOptions = collect(['II', 'III', 'IV']);
+        }
+
+        $filters = [
+            'search' => trim((string) $request->query('search', '')),
+            'golongan' => trim((string) $request->query('golongan', '')),
+            'unit_kerja_id' => trim((string) $request->query('unit_kerja_id', '')),
+            'jenis_pegawai_id' => trim((string) $request->query('jenis_pegawai_id', '')),
+        ];
+
+        $employees = $action->execute($filters);
+
+        return view('admin.pegawai.nonaktif', compact(
+            'employees',
+            'filters',
+            'unitKerjaOptions',
+            'jenisPegawaiOptions',
+            'golonganOptions'
+        ));
     }
 
     public function store(StoreEmployeeRequest $request)
@@ -506,8 +537,19 @@ class PegawaiController extends Controller
             DB::beginTransaction();
 
             // Handle Photo
-            if ($request->hasFile('foto')) {
-                $validated['foto'] = $request->file('foto')->store('employees/photos', 'public');
+            if ($request->hasFile('foto') && $request->file('foto')->isValid()) {
+                $file = $request->file('foto');
+                $filename = $file->hashName();
+                $file->move(storage_path('app/public/employees/photos'), $filename);
+                $path = 'employees/photos/'.$filename;
+
+                if ($path) {
+                    $validated['foto'] = $path;
+                } else {
+                    unset($validated['foto']);
+                }
+            } else {
+                unset($validated['foto']);
             }
 
             // Create Employee
@@ -522,11 +564,27 @@ class PegawaiController extends Controller
                 'tanggal_sk' => $validated['tanggal_sk'],
             ];
 
-            if ($request->hasFile('file_sk')) {
-                $appointmentData['file_sk'] = $request->file('file_sk')->store('appointments/sk', 'public');
+            if ($request->hasFile('file_sk') && $request->file('file_sk')->isValid()) {
+                $skFile = $request->file('file_sk');
+                $skFilename = $skFile->hashName();
+                $skFile->move(storage_path('app/public/appointments/sk'), $skFilename);
+                $appointmentData['file_sk'] = 'appointments/sk/'.$skFilename;
             }
 
             Appointment::create($appointmentData);
+
+            if (! empty($validated['jabatan_terakhir']) || ! empty($validated['unit_kerja_id'])) {
+                PositionHistory::create([
+                    'employee_id' => $employee->id,
+                    'nama_jabatan' => $validated['jabatan_terakhir'] ?? '-',
+                    'jenis_jabatan_id' => $validated['jenis_jabatan_id'] ?? RefJenisJabatan::first()->id,
+                    'unit_kerja_id' => $validated['unit_kerja_id'] ?? RefUnitKerja::first()->id,
+                    'tmt_jabatan' => $validated['tmt'] ?? now()->format('Y-m-d'),
+                    'no_sk' => $validated['nomor_sk'] ?? '-',
+                    'tanggal_sk' => $validated['tanggal_sk'] ?? now()->format('Y-m-d'),
+                    'is_latest' => true,
+                ]);
+            }
 
             AuditService::log('CREATE', 'Employee', $employee->id, null, $employee->toArray(), $request);
 
@@ -566,12 +624,14 @@ class PegawaiController extends Controller
 
     public function edit($id)
     {
-        $p = Employee::with('appointment')->findOrFail($id);
+        $p = Employee::with('appointment', 'positionHistories.unitKerja')->findOrFail($id);
         $jenisPegawai = RefJenisPegawai::all();
         $agama = RefAgama::all();
         $statusKawin = RefStatusPerkawinan::all();
+        $unitKerja = RefUnitKerja::all();
+        $jenisJabatanOptions = RefJenisJabatan::all();
 
-        return view('admin.pegawai.edit', compact('p', 'jenisPegawai', 'agama', 'statusKawin'));
+        return view('admin.pegawai.edit', compact('p', 'jenisPegawai', 'agama', 'statusKawin', 'unitKerja', 'jenisJabatanOptions'));
     }
 
     public function update(UpdateEmployeeRequest $request, $id)
@@ -584,11 +644,29 @@ class PegawaiController extends Controller
 
             $oldValues = $employee->toArray();
 
-            if ($request->hasFile('foto')) {
+            Log::info('Update Request received for employee '.$employee->id);
+            Log::info('Files uploaded keys:', array_keys($request->allFiles()));
+            Log::info('Has foto?', ['has' => $request->hasFile('foto')]);
+            if ($request->hasFile('foto') && $request->file('foto')->isValid()) {
                 // Delete old photo if needed (omitted for brevity)
-                $validated['foto'] = $request->file('foto')->store('employees/photos', 'public');
+                $file = $request->file('foto');
+                $filename = $file->hashName();
+                $file->move(storage_path('app/public/employees/photos'), $filename);
+                $path = 'employees/photos/'.$filename;
+
+                if ($path) {
+                    Log::info('Stored foto at:', ['path' => $path]);
+                    $validated['foto'] = $path;
+                } else {
+                    Log::error('Store foto failed');
+                    unset($validated['foto']);
+                }
+            } else {
+                Log::warning('Foto not valid or not present', ['error' => $request->hasFile('foto') ? $request->file('foto')->getErrorMessage() : 'No file']);
+                unset($validated['foto']);
             }
 
+            // Update Employee
             $employee->update($validated);
 
             $appointment = $employee->appointment;
@@ -600,11 +678,33 @@ class PegawaiController extends Controller
                     'tanggal_sk' => $validated['tanggal_sk'] ?? $appointment->tanggal_sk,
                 ];
 
-                if ($request->hasFile('file_sk')) {
-                    $appointmentData['file_sk'] = $request->file('file_sk')->store('appointments/sk', 'public');
+                if ($request->hasFile('file_sk') && $request->file('file_sk')->isValid()) {
+                    $skFile = $request->file('file_sk');
+                    $skFilename = $skFile->hashName();
+                    $skFile->move(storage_path('app/public/appointments/sk'), $skFilename);
+                    $appointmentData['file_sk'] = 'appointments/sk/'.$skFilename;
                 }
 
                 $appointment->update($appointmentData);
+            }
+
+            $position = $employee->positionHistories()->where('is_latest', true)->first();
+            if ($position) {
+                $position->update([
+                    'nama_jabatan' => $validated['jabatan_terakhir'] ?? $position->nama_jabatan,
+                    'jenis_jabatan_id' => $validated['jenis_jabatan_id'] ?? $position->jenis_jabatan_id,
+                    'unit_kerja_id' => $validated['unit_kerja_id'] ?? $position->unit_kerja_id,
+                ]);
+            } elseif (! empty($validated['jabatan_terakhir']) || ! empty($validated['unit_kerja_id'])) {
+                $employee->positionHistories()->create([
+                    'nama_jabatan' => $validated['jabatan_terakhir'] ?? '-',
+                    'jenis_jabatan_id' => $validated['jenis_jabatan_id'] ?? RefJenisJabatan::first()->id,
+                    'unit_kerja_id' => $validated['unit_kerja_id'] ?? RefUnitKerja::first()->id,
+                    'tmt_jabatan' => $validated['tmt'] ?? now()->format('Y-m-d'),
+                    'no_sk' => $validated['nomor_sk'] ?? '-',
+                    'tanggal_sk' => $validated['tanggal_sk'] ?? now()->format('Y-m-d'),
+                    'is_latest' => true,
+                ]);
             }
 
             AuditService::log('UPDATE', 'Employee', $employee->id, $oldValues, $employee->toArray(), $request);
@@ -629,6 +729,40 @@ class PegawaiController extends Controller
 
         return redirect()->route('data-pegawai')
             ->with('success', 'Data pegawai '.$nama.' berhasil dinonaktifkan.');
+    }
+
+    public function bulkDestroy(Request $request, DeactivateEmployeeAction $action)
+    {
+        $ids = $request->input('ids', []);
+
+        if (empty($ids)) {
+            return back()->with('error', 'Tidak ada data pegawai yang dipilih.');
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $employees = Employee::whereIn('id', $ids)->get();
+            $count = $employees->count();
+
+            if ($count === 0) {
+                DB::rollBack();
+
+                return back()->with('error', 'Data pegawai tidak ditemukan.');
+            }
+
+            foreach ($employees as $employee) {
+                $action->execute($employee, $request);
+            }
+
+            DB::commit();
+
+            return back()->with('success', $count.' pegawai berhasil dinonaktifkan.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return back()->with('error', 'Terjadi kesalahan saat menonaktifkan pegawai: '.$e->getMessage());
+        }
     }
 
     public function restore($id, Request $request, RestoreEmployeeAction $action)
@@ -686,14 +820,55 @@ class PegawaiController extends Controller
             ->unique()
             ->values();
 
-        $pegawaiData = Employee::query()
-            ->with('jenisPegawai:id,nama')
-            ->when(
-                $requestedNips->isNotEmpty(),
-                fn ($query) => $query->whereIn('nip', $requestedNips->all())
-            )
-            ->orderBy('nama_lengkap')
-            ->get();
+        $query = Employee::query()->with('jenisPegawai:id,nama');
+
+        if ($requestedNips->isNotEmpty()) {
+            $query->whereIn('nip', $requestedNips->all());
+        } else {
+            $search = mb_strtolower(trim((string) $request->query('search', '')));
+            $golongan = trim((string) $request->query('golongan', ''));
+            $unitKerjaId = trim((string) $request->query('unit_kerja_id', ''));
+            $jenisPegawaiId = trim((string) $request->query('jenis_pegawai_id', ''));
+            $statusAktif = trim((string) $request->query('status_aktif', ''));
+
+            if ($unitKerjaId === '' && $request->filled('unit')) {
+                $unitKerjaId = RefUnitKerja::where('nama', $request->query('unit'))->value('id') ?? '';
+            }
+            if ($jenisPegawaiId === '' && $request->filled('jenis')) {
+                $jenisPegawaiId = RefJenisPegawai::where('nama', $request->query('jenis'))->value('id') ?? '';
+            }
+            if ($statusAktif === '' && $request->filled('status')) {
+                $statusAktif = match (strtolower((string) $request->query('status'))) {
+                    'aktif' => 'Aktif', 'nonaktif', 'non-aktif' => 'Non-Aktif', 'pensiun' => 'Pensiun', 'mutasi' => 'Mutasi', default => ''
+                };
+            }
+            if ($request->query('filter') === 'pensiun' && $statusAktif === '') {
+                $statusAktif = 'Pensiun';
+            }
+
+            if ($search !== '') {
+                $query->where(function ($q) use ($search) {
+                    $q->whereRaw('LOWER(nama_lengkap) LIKE ?', ["%{$search}%"])
+                        ->orWhereRaw('LOWER(nip) LIKE ?', ["%{$search}%"]);
+                });
+            }
+            if ($golongan !== '') {
+                $query->where('golongan_terakhir', 'like', $golongan.'%');
+            }
+            if ($unitKerjaId !== '') {
+                $query->whereHas('positionHistories', function ($q) use ($unitKerjaId) {
+                    $q->where('unit_kerja_id', $unitKerjaId)->where('is_latest', true);
+                });
+            }
+            if ($jenisPegawaiId !== '') {
+                $query->where('jenis_pegawai_id', $jenisPegawaiId);
+            }
+            if ($statusAktif !== '') {
+                $query->where('status_aktif', $statusAktif);
+            }
+        }
+
+        $pegawaiData = $query->orderBy('nama_lengkap')->get();
 
         if ($requestedNips->isNotEmpty()) {
             $requestedOrder = $requestedNips->flip();
