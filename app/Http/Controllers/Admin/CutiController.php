@@ -136,6 +136,156 @@ class CutiController extends Controller
         ],
     ];
 
+    public function rekap(\Illuminate\Http\Request $request)
+    {
+        $periode = $request->query('periode');
+        $unit = $request->query('unit');
+        $pegawaiId = $request->query('pegawai');
+        $jenisId = $request->query('jenis');
+
+        $balancesQuery = \App\Models\LeaveBalance::with('employee');
+        
+        if ($unit) {
+            $balancesQuery->whereHas('employee', function($q) use ($unit) {
+                $q->where('jabatan_terakhir', $unit);
+            });
+        }
+        if ($pegawaiId) {
+            $balancesQuery->where('employee_id', $pegawaiId);
+        }
+        // Periode usually refers to 'tahun' in LeaveBalance if it's just a year
+        if ($periode && is_numeric($periode)) {
+            $balancesQuery->where('tahun', $periode);
+        }
+
+        $balances = $balancesQuery->get();
+        $totalPegawai = \App\Models\Employee::where('status_aktif', 'Aktif')->count();
+        $cutiTerpakai = $balances->sum('terpakai');
+        $sisaSaldo = $balances->sum('sisa');
+        $saldoKritis = $balances->where('sisa', '<=', 3)->count();
+
+        $summary = [
+            ['label' => 'Total Pegawai', 'value' => $totalPegawai, 'caption' => 'Pegawai aktif', 'tone' => 'primary'],
+            ['label' => 'Cuti Terpakai', 'value' => $cutiTerpakai, 'caption' => 'Hari kerja tahun ini', 'tone' => 'info'],
+            ['label' => 'Sisa Saldo', 'value' => $sisaSaldo, 'caption' => 'Akumulasi hari', 'tone' => 'success'],
+            ['label' => 'Saldo Kritis', 'value' => $saldoKritis, 'caption' => 'Sisa <= 3 hari', 'tone' => 'danger'],
+        ];
+
+        $leaveBalances = $balances->map(function ($b) {
+            $status = 'Aman';
+            if ($b->sisa <= 3) $status = 'Kritis';
+            elseif ($b->sisa <= 6) $status = 'Perhatian';
+
+            return [
+                'nama' => $b->employee?->nama_lengkap ?? '-',
+                'nip' => $b->employee?->nip ?? '-',
+                'unit' => $b->employee?->jabatan_terakhir ?? '-',
+                'jatah' => $b->jatah_awal,
+                'carry' => $b->carry_over,
+                'terpakai' => $b->terpakai,
+                'sisa' => $b->sisa,
+                'tahunan' => $b->terpakai,
+                'sakit' => 0,
+                'lain' => 0,
+                'status' => $status,
+            ];
+        });
+
+        $requestsQuery = \App\Models\LeaveRequest::with(['employee', 'jenisCuti'])->latest();
+        
+        if ($unit) {
+            $requestsQuery->whereHas('employee', function($q) use ($unit) {
+                $q->where('jabatan_terakhir', $unit);
+            });
+        }
+        if ($pegawaiId) {
+            $requestsQuery->where('employee_id', $pegawaiId);
+        }
+        if ($jenisId) {
+            $requestsQuery->where('jenis_cuti_id', $jenisId);
+        }
+        if ($periode) {
+            if (is_numeric($periode)) {
+                $requestsQuery->whereYear('tanggal_mulai', $periode);
+            } else {
+                // simple match for something like "Juni 2026"
+                $months = ['Januari'=>1, 'Februari'=>2, 'Maret'=>3, 'April'=>4, 'Mei'=>5, 'Juni'=>6, 'Juli'=>7, 'Agustus'=>8, 'September'=>9, 'Oktober'=>10, 'November'=>11, 'Desember'=>12];
+                $parts = explode(' ', $periode);
+                if (count($parts) === 2) {
+                    $m = $months[$parts[0]] ?? null;
+                    $y = $parts[1];
+                    if ($m && $y) {
+                        $requestsQuery->whereMonth('tanggal_mulai', $m)->whereYear('tanggal_mulai', $y);
+                    }
+                }
+            }
+        }
+
+        $usageRows = (clone $requestsQuery)->take(20)->get()->map(function ($r) {
+                return [
+                    'nama' => $r->employee?->nama_lengkap ?? '-',
+                    'nip' => $r->employee?->nip ?? '-',
+                    'jenis' => $r->jenisCuti?->nama ?? '-',
+                    'mulai' => optional($r->tanggal_mulai)->format('d M Y'),
+                    'selesai' => optional($r->tanggal_selesai)->format('d M Y'),
+                    'hari' => $r->jumlah_hari_kerja,
+                    'status' => $r->status,
+                ];
+            });
+
+        $statsQuery = \App\Models\LeaveRequest::where('status', 'Disetujui')->with('jenisCuti');
+        if ($unit) {
+            $statsQuery->whereHas('employee', function($q) use ($unit) {
+                $q->where('jabatan_terakhir', $unit);
+            });
+        }
+        if ($pegawaiId) {
+            $statsQuery->where('employee_id', $pegawaiId);
+        }
+        if ($periode) {
+            if (is_numeric($periode)) {
+                $statsQuery->whereYear('tanggal_mulai', $periode);
+            } else {
+                $parts = explode(' ', $periode);
+                if (count($parts) === 2 && isset($months[$parts[0]])) {
+                    $statsQuery->whereMonth('tanggal_mulai', $months[$parts[0]])->whereYear('tanggal_mulai', $parts[1]);
+                }
+            }
+        }
+
+        $stats = $statsQuery->get()
+            ->groupBy('jenisCuti.nama')
+            ->map(function ($group) {
+                return $group->sum('jumlah_hari_kerja');
+            });
+        
+        $totalDays = $stats->sum() ?: 1;
+        $jenisStats = [];
+        $tones = ['primary', 'info', 'secondary', 'muted'];
+        $i = 0;
+        foreach ($stats as $name => $days) {
+            $jenisStats[] = [
+                'label' => $name ?? 'Lainnya',
+                'hari' => $days,
+                'percent' => round(($days / $totalDays) * 100),
+                'tone' => $tones[$i % 4]
+            ];
+            $i++;
+        }
+
+        // Data Dropdown Filter
+        $optUnits = \App\Models\Employee::select('jabatan_terakhir')->whereNotNull('jabatan_terakhir')->distinct()->pluck('jabatan_terakhir');
+        $optPegawais = \App\Models\Employee::where('status_aktif', 'Aktif')->get(['id', 'nama_lengkap', 'nip']);
+        $optJenisCutis = \App\Models\RefJenisCuti::all();
+        $optPeriodes = ['Semua Periode', 'Juni 2026', 'Mei 2026', 'April 2026', '2026', '2025'];
+
+        return view('admin.cuti.rekap', compact(
+            'summary', 'leaveBalances', 'usageRows', 'jenisStats', 
+            'optUnits', 'optPegawais', 'optJenisCutis', 'optPeriodes',
+            'periode', 'unit', 'pegawaiId', 'jenisId'
+        ));
+    }
+
     /**
      * Menampilkan daftar pengajuan cuti.
      * Pegawai biasa hanya melihat pengajuannya sendiri; peran dengan hak memantau melihat seluruh pengajuan.
@@ -156,6 +306,28 @@ class CutiController extends Controller
         $riwayatCuti = $query->get();
 
         return view('admin.cuti.index', compact('riwayatCuti'));
+    }
+
+    /**
+     * Menampilkan form pengajuan cuti baru.
+     */
+    public function create()
+    {
+        $user = request()->user();
+        $employee = $user->employee;
+        
+        // Jenis cuti dropdown
+        $jenisCuti = \App\Models\RefJenisCuti::all();
+        
+        // Cek saldo cuti tahunan (opsional untuk ditampilkan di UI)
+        $saldoTahunan = null;
+        if ($employee) {
+            $saldoTahunan = \App\Models\LeaveBalance::where('employee_id', $employee->id)
+                ->where('tahun', now()->year)
+                ->first();
+        }
+
+        return view('admin.cuti.form-pengajuan', compact('employee', 'jenisCuti', 'saldoTahunan'));
     }
 
     /**

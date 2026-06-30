@@ -91,7 +91,7 @@
         {{-- PAGE HEADER --}}
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink font-sans">Monitoring Cuti Pegawai</h2>
+                <h2 class="text-2xl font-semibold text-ink">Monitoring Cuti Pegawai</h2>
                 <nav class="mt-1 flex items-center gap-1.5 text-xs text-muted">
                     <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
                     <span>/</span>
@@ -101,66 +101,78 @@
             <div class="flex shrink-0 items-center gap-3">
                 <button
                     onclick="exportCutiData()"
-                    class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm cursor-pointer font-sans"
+                    class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer"
                 >
-                    <svg class="w-4 h-4 mr-1.5 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                    <svg class="w-4 h-4 mr-1.5 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
                     </svg>
                     Export Laporan Cuti
                 </button>
+                @can('cuti.create')
+                <a href="{{ route('cuti.create') }}" class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
+                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                    Ajukan Cuti
+                </a>
+                @endcan
             </div>
         </div>
 
         {{-- METRICS SUMMARY CARD (GLOBAL MONITORING) --}}
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
-            {{-- Pending --}}
-            <div class="rounded-lg border border-border bg-surface p-5 shadow-sm flex flex-col justify-between">
+            {{-- Total Cuti Active --}}
+            <div class="rounded-xl border border-border border-b-[3px] border-b-primary bg-surface p-5 shadow-sm">
                 <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Menunggu Persetujuan</p>
-                        <p class="mt-1.5 text-2xl font-extrabold text-warning leading-none font-mono">2</p>
+                    <div class="overflow-hidden pr-2">
+                        <p class="text-[10px] font-bold text-muted uppercase tracking-wider truncate">Total Staf Cuti</p>
+                        <p class="mt-1.5 text-3xl font-extrabold text-primary leading-none font-mono tracking-tight">{{ $totalPengajuan }}</p>
+                        <p class="mt-1 text-[10px] text-muted truncate">Total pengajuan tercatat</p>
                     </div>
-                    <div class="rounded-lg bg-warning/10 p-2.5 shrink-0">
-                        <svg class="w-6 h-6 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                    <div class="rounded-xl bg-primary/10 p-3 shrink-0">
+                        <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
                     </div>
                 </div>
             </div>
 
             {{-- Approved --}}
-            <div class="rounded-lg border border-border bg-surface p-5 shadow-sm flex flex-col justify-between">
+            <div class="rounded-xl border border-border border-b-[3px] border-b-success bg-surface p-5 shadow-sm">
                 <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Disetujui (Bulan Ini)</p>
-                        <p class="mt-1.5 text-2xl font-extrabold text-success leading-none font-mono">3</p>
+                    <div class="overflow-hidden pr-2">
+                        <p class="text-[10px] font-bold text-muted uppercase tracking-wider truncate">Disetujui (Bulan Ini)</p>
+                        <p class="mt-1.5 text-3xl font-extrabold text-success leading-none font-mono tracking-tight">{{ $jumlahDisetujui }}</p>
+                        <p class="mt-1 text-[10px] text-muted truncate">Cuti aktif dan terjadwal</p>
                     </div>
-                    <div class="rounded-lg bg-success/10 p-2.5 shrink-0">
+                    <div class="rounded-xl bg-success/10 p-3 shrink-0">
                         <svg class="w-6 h-6 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     </div>
                 </div>
             </div>
 
-            {{-- Postponed --}}
-            <div class="rounded-lg border border-border bg-surface p-5 shadow-sm flex flex-col justify-between">
+            {{-- Pending --}}
+            <div class="rounded-xl border border-border border-b-[3px] border-b-warning bg-surface p-5 shadow-sm">
                 <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Ditunda</p>
-                        <p class="mt-1.5 text-2xl font-extrabold text-danger leading-none font-mono">2</p>
+                    <div class="overflow-hidden pr-2">
+                        <p class="text-[10px] font-bold text-muted uppercase tracking-wider truncate">Menunggu Persetujuan</p>
+                        <p class="mt-1.5 text-3xl font-extrabold text-warning leading-none font-mono tracking-tight">{{ $jumlahMenunggu }}</p>
+                        <p class="mt-1 text-[10px] text-muted truncate">Butuh verifikasi lanjutan</p>
                     </div>
-                    <div class="rounded-lg bg-danger/10 p-2.5 shrink-0">
-                        <svg class="w-6 h-6 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" /></svg>
+                    <div class="rounded-xl bg-warning/10 p-3 shrink-0">
+                        <svg class="w-6 h-6 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                     </div>
                 </div>
             </div>
 
-            {{-- Total Cuti Active --}}
-            <div class="rounded-lg border border-border bg-surface p-5 shadow-sm flex flex-col justify-between">
+            {{-- Postponed --}}
+            <div class="rounded-xl border border-border border-b-[3px] border-b-danger bg-surface p-5 shadow-sm">
                 <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Total Staf Cuti</p>
-                        <p class="mt-1.5 text-2xl font-extrabold text-primary leading-none font-mono">7</p>
+                    <div class="overflow-hidden pr-2">
+                        <p class="text-[10px] font-bold text-muted uppercase tracking-wider truncate">Ditunda</p>
+                        <p class="mt-1.5 text-3xl font-extrabold text-danger leading-none font-mono tracking-tight">{{ $jumlahDitunda }}</p>
+                        <p class="mt-1 text-[10px] text-muted truncate">Perlu penjadwalan ulang</p>
                     </div>
-                    <div class="rounded-lg bg-primary/10 p-2.5 shrink-0">
-                        <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
+                    <div class="rounded-xl bg-danger/10 p-3 shrink-0">
+                        <svg class="w-6 h-6 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" /></svg>
                     </div>
                 </div>
             </div>
@@ -174,12 +186,12 @@
                     <svg class="w-4 h-4 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                     </svg>
-                    <input id="search-cuti" type="text" placeholder="Cari nama atau NIP..." class="flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none font-sans">
+                    <input id="search-cuti" type="text" placeholder="Cari nama atau NIP..." class="flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none">
                 </div>
 
                 {{-- Filter Status --}}
                 <div class="relative">
-                    <select id="filter-status" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <select id="filter-status" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                         <option value="">Semua Status</option>
                         <option value="menunggu">Menunggu</option>
                         <option value="disetujui">Disetujui</option>
@@ -194,7 +206,7 @@
 
                 {{-- Filter Jenis Cuti --}}
                 <div class="relative">
-                    <select id="filter-jenis" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <select id="filter-jenis" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                         <option value="">Semua Jenis Cuti</option>
                         <option>Cuti Tahunan</option>
                         <option>Cuti Sakit</option>
@@ -209,7 +221,7 @@
 
                 {{-- Filter Unit Kerja --}}
                 <div class="relative">
-                    <select id="filter-unit" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <select id="filter-unit" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                         <option value="">Semua Unit Kerja</option>
                         <option>Bag. Umum</option>
                         <option>Bag. Keuangan</option>
@@ -225,7 +237,7 @@
 
                 {{-- Filter Periode Bulan --}}
                 <div class="relative">
-                    <select id="filter-periode" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <select id="filter-periode" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                         <option value="">Semua Periode</option>
                         <option value="Juni 2026">Juni 2026</option>
                         <option value="April 2026">April 2026</option>
@@ -245,21 +257,21 @@
         <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
             <div class="flex items-center justify-between border-b border-border px-6 py-4 bg-surface">
                 <div>
-                    <h3 class="text-sm font-semibold text-ink font-sans">Pemantauan Pengajuan Cuti Pegawai</h3>
-                    <p class="text-[10px] text-muted font-sans">Daftar semua pengajuan cuti yang diajukan oleh staf</p>
+                    <h3 class="text-sm font-semibold text-ink">Pemantauan Pengajuan Cuti Pegawai</h3>
+                    <p class="text-[10px] text-muted">Daftar semua pengajuan cuti yang diajukan oleh staf</p>
                 </div>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full" id="cuti-table">
                     <thead class="bg-soft border-b border-border">
                         <tr>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans select-none">Pegawai</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans select-none">Unit Kerja</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans select-none">Detail Cuti</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans select-none">Tanggal & Durasi</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans select-none">Stage Approval</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans select-none">Status Akhir</th>
-                            <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted font-sans select-none">Aksi</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted select-none">Pegawai</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted select-none">Unit Kerja</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted select-none">Detail Cuti</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted select-none">Tanggal & Durasi</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted select-none">Stage Approval</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted select-none">Status Akhir</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted select-none">Aksi</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-border">
@@ -271,24 +283,24 @@
                                         {{ strtoupper(substr($r['nama'], 0, 1)) }}
                                     </div>
                                     <div class="min-w-0">
-                                        <p class="text-sm font-semibold text-ink font-sans">{{ $r['nama'] }}</p>
+                                        <p class="text-sm font-semibold text-ink">{{ $r['nama'] }}</p>
                                         <p class="font-mono text-xs text-muted">{{ $r['nip'] }}</p>
                                     </div>
                                 </div>
                             </td>
                             <td class="px-4 py-3.5">
-                                <span class="text-sm text-ink font-sans">{{ $r['unit'] }}</span>
+                                <span class="text-sm text-ink">{{ $r['unit'] }}</span>
                             </td>
                             <td class="px-4 py-3.5">
-                                <p class="text-sm font-semibold text-ink font-sans">{{ $r['jenis'] }}</p>
-                                <p class="text-xs text-muted font-sans mt-0.5 max-w-xs truncate" title="{{ $r['alasan'] }}">{{ $r['alasan'] }}</p>
+                                <p class="text-sm font-semibold text-ink">{{ $r['jenis'] }}</p>
+                                <p class="text-xs text-muted mt-0.5 max-w-xs truncate" title="{{ $r['alasan'] }}">{{ $r['alasan'] }}</p>
                             </td>
                             <td class="px-4 py-3.5">
                                 <p class="text-sm text-ink font-mono">{{ \Carbon\Carbon::parse($r['mulai'])->translatedFormat('d M') }} - {{ \Carbon\Carbon::parse($r['selesai'])->translatedFormat('d M Y') }}</p>
                                 <p class="text-xs text-ink font-semibold mt-0.5 leading-none">{{ $r['hari'] }} Hari Kerja</p>
                             </td>
                             <td class="px-4 py-3.5">
-                                <div class="flex flex-col gap-1 text-[11px] font-medium text-ink font-sans">
+                                <div class="flex flex-col gap-1 text-[11px] font-medium text-ink">
                                     <div>
                                         <span>Atasan: <strong class="capitalize">{{ $r['stage_atasan'] }}</strong></span>
                                     </div>
@@ -298,7 +310,7 @@
                                 </div>
                             </td>
                             <td class="px-4 py-3.5">
-                                <span class="inline-flex items-center gap-1.5 text-xs font-semibold {{ $statusClass[$r['status']] }} font-sans">
+                                <span class="inline-flex items-center gap-1.5 text-xs font-semibold {{ $statusClass[$r['status']] }}">
                                     <span class="h-1.5 w-1.5 rounded-full {{ $statusDot[$r['status']] }}"></span>
                                     {{ $statusLabel[$r['status']] }}
                                 </span>
@@ -324,7 +336,7 @@
                 <div class="flex items-center gap-4">
                     <div class="flex items-center gap-2">
                         <span class="text-sm text-muted">Tampilkan</span>
-                        <select onchange="updatePerPage(this.value)" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
+                        <select onchange="updatePerPage(this.value)" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer text-center">
                             <option value="10" {{ request('per_page', 10) == 10 ? 'selected' : '' }}>10</option>
                             <option value="25" {{ request('per_page') == 25 ? 'selected' : '' }}>25</option>
                             <option value="50" {{ request('per_page') == 50 ? 'selected' : '' }}>50</option>
