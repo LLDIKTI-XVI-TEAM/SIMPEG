@@ -1,11 +1,12 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\Notifications\GetUnreadNotificationCountAction;
 use App\Actions\Notifications\ListNotificationsAction;
 use App\Actions\Notifications\MarkAllNotificationsAsReadAction;
 use App\Actions\Notifications\MarkNotificationAsReadAction;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 

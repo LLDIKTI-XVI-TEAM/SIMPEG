@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\Api\CalculateWorkdayController;
+use App\Http\Controllers\Api\V1\CalculateWorkdayController;
 use Illuminate\Support\Facades\Route;
 
 // Endpoint kalkulasi hari kerja dipakai form pengajuan cuti secara realtime (AJAX).
