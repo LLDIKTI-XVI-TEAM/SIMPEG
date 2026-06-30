@@ -5,6 +5,9 @@ namespace App\Models;
 use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * @property int $maks_usia_pensiun
+ */
 class RefJenisJabatan extends Model
 {
     use HasUuid;

@@ -3,7 +3,7 @@
 namespace App\Actions\Employees;
 
 use App\Models\Employee;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class ListInactiveEmployeesAction
 {

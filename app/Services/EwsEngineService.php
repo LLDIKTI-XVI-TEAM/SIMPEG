@@ -6,7 +6,8 @@ use App\Models\Employee;
 use App\Models\EwsAlert;
 use App\Models\EwsConfig;
 use App\Models\EwsSchedulerRun;
-use App\Services\NotificationService;
+use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
@@ -185,22 +186,20 @@ class EwsEngineService
             ]);
 
         } catch (\Throwable $e) {
-            Log::error('EWS Scheduler Run Failed: ' . $e->getMessage(), [
-                'exception' => $e
+            Log::error('EWS Scheduler Run Failed: '.$e->getMessage(), [
+                'exception' => $e,
             ]);
 
             $run->update([
                 'status' => 'gagal',
                 'finished_at' => now(),
-                'error_message' => $e->getMessage() . "\n" . $e->getTraceAsString(),
+                'error_message' => $e->getMessage()."\n".$e->getTraceAsString(),
             ]);
 
             // Notify Super Admin if scheduler fails
-            $superAdmins = \App\Models\User::where('role', 'super_admin')
+            $superAdmins = User::where('role', 'super_admin')
                 ->whereNotNull('employee_id')
                 ->get();
-
-
 
             foreach ($superAdmins as $admin) {
                 $employee = Employee::find($admin->employee_id);
@@ -209,7 +208,7 @@ class EwsEngineService
                         $employee,
                         'ews.scheduler_failed',
                         'Gagal Eksekusi Scheduler EWS',
-                        'Scheduler EWS harian gagal berjalan. Error: ' . $e->getMessage()
+                        'Scheduler EWS harian gagal berjalan. Error: '.$e->getMessage()
                     );
                 }
             }
@@ -243,7 +242,7 @@ class EwsEngineService
                 'interval_days' => $days,
                 'is_processed' => false,
             ]);
-        } catch (\Illuminate\Database\QueryException $e) {
+        } catch (QueryException $e) {
             // Already created by a concurrent run
             return false;
         }
@@ -252,20 +251,20 @@ class EwsEngineService
         $isEligible = true;
         if ($type === 'KENAIKAN_PANGKAT') {
             $hasActiveDiscipline = $employee->disciplineRecords->contains('is_active', true);
-            $isEligible = ($employee->is_kinerja_baik === true) && !$hasActiveDiscipline;
+            $isEligible = ($employee->is_kinerja_baik === true) && ! $hasActiveDiscipline;
         }
 
         // Send notification only if eligible
         if ($isEligible) {
-            $timeLabel = $days . ' hari';
+            $timeLabel = $days.' hari';
             if ($days >= 365 && $days % 365 === 0) {
-                $timeLabel = ($days / 365) . ' tahun';
+                $timeLabel = ($days / 365).' tahun';
             } elseif ($days >= 30 && $days % 30 === 0) {
-                $timeLabel = ($days / 30) . ' bulan';
+                $timeLabel = ($days / 30).' bulan';
             }
 
             $typeLabel = strtolower($type);
-            $notificationType = 'ews.' . $typeLabel;
+            $notificationType = 'ews.'.$typeLabel;
 
             $body = sprintf(
                 'Pemberitahuan EWS: Jadwal %s Anda jatuh pada %s (sisa sekitar %s). Harap lengkapi berkas.',
@@ -277,7 +276,7 @@ class EwsEngineService
             $this->notificationService->createForEmployee(
                 $employee,
                 $notificationType,
-                'Peringatan EWS: ' . $titleLabel,
+                'Peringatan EWS: '.$titleLabel,
                 $body,
                 ['ews_alert_id' => $alert->id]
             );

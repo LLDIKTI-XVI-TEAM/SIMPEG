@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Models\Employee;
 use App\Models\Document;
+use App\Models\Employee;
 use App\Models\RefGolongan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefUnitKerja;
@@ -160,7 +160,7 @@ class EmployeeDocumentTest extends TestCase
     {
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create();
-        
+
         $file = UploadedFile::fake()->create('download-test.pdf', 100);
         $filePath = $file->store('employees/documents', 'public');
 
@@ -177,6 +177,6 @@ class EmployeeDocumentTest extends TestCase
         $response = $this->get("/dashboard/dokumen/{$document->id}/download");
 
         $response->assertOk();
-        $response->assertHeader('Content-Disposition', 'attachment; filename=' . basename($filePath));
+        $response->assertHeader('Content-Disposition', 'attachment; filename='.basename($filePath));
     }
 }

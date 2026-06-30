@@ -1,9 +1,10 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\Histories\CreateDisciplineRecordAction;
 use App\Actions\Histories\ListDisciplineRecordsAction;
+use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreDisciplineRecordRequest;
 use App\Models\Employee;
 use Illuminate\Http\JsonResponse;

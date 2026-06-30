@@ -10,7 +10,6 @@ class AuditController extends Controller
     public function index()
     {
 
-
         $auditLogs = AuditLog::query()
             ->latest('created_at')
             ->get()
@@ -23,7 +22,6 @@ class AuditController extends Controller
 
     public function show(string $id)
     {
-
 
         $log = $this->mapForView(AuditLog::query()->findOrFail($id));
 

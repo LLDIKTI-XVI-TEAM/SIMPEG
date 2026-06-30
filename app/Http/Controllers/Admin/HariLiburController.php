@@ -27,13 +27,11 @@ class HariLiburController extends Controller
     public function index()
     {
 
-
         return view('admin.hari-libur.index');
     }
 
     public function store(Request $request)
     {
-
 
         $request->validate([
             'tanggal' => 'required|date',
@@ -60,29 +58,28 @@ class HariLiburController extends Controller
                 'tanggal' => $request->input('tanggal'),
                 'nama' => $request->input('nama'),
                 'tipe' => $request->input('tipe'),
-            ]
+            ],
         ];
 
         session(['dynamic_audit_logs' => $dynamicLogs]);
 
         return redirect()->route('hari-libur')
-            ->with('success', 'Hari libur "' . $request->input('nama') . '" berhasil ditambahkan.');
+            ->with('success', 'Hari libur "'.$request->input('nama').'" berhasil ditambahkan.');
     }
 
     public function edit($id)
     {
 
-
-        $hl = collect(self::$hariLiburData)->firstWhere('id', (int)$id);
-        if (!$hl) {
+        $hl = collect(self::$hariLiburData)->firstWhere('id', (int) $id);
+        if (! $hl) {
             abort(404);
         }
+
         return view('admin.hari-libur.edit', compact('hl'));
     }
 
     public function update(Request $request, $id)
     {
-
 
         $request->validate([
             'tanggal' => 'required|date',
@@ -90,7 +87,7 @@ class HariLiburController extends Controller
             'tipe' => 'required|string',
         ]);
 
-        $hl = collect(self::$hariLiburData)->firstWhere('id', (int)$id);
+        $hl = collect(self::$hariLiburData)->firstWhere('id', (int) $id);
 
         // Write Audit Log
         $dynamicLogs = session('dynamic_audit_logs', []);
@@ -115,20 +112,19 @@ class HariLiburController extends Controller
                 'tanggal' => $request->input('tanggal'),
                 'nama' => $request->input('nama'),
                 'tipe' => $request->input('tipe'),
-            ]
+            ],
         ];
 
         session(['dynamic_audit_logs' => $dynamicLogs]);
 
         return redirect()->route('hari-libur')
-            ->with('success', 'Hari libur "' . $request->input('nama') . '" berhasil diperbarui.');
+            ->with('success', 'Hari libur "'.$request->input('nama').'" berhasil diperbarui.');
     }
 
     public function destroy(Request $request, $id)
     {
 
-
-        $hl = collect(self::$hariLiburData)->firstWhere('id', (int)$id);
+        $hl = collect(self::$hariLiburData)->firstWhere('id', (int) $id);
         $nama = $hl ? $hl['nama'] : 'Hari Libur';
 
         // Write Audit Log
@@ -150,12 +146,12 @@ class HariLiburController extends Controller
                 'nama' => $hl ? $hl['nama'] : '',
                 'tipe' => $hl ? $hl['tipe'] : '',
             ],
-            'new_values' => null
+            'new_values' => null,
         ];
 
         session(['dynamic_audit_logs' => $dynamicLogs]);
 
         return redirect()->route('hari-libur')
-            ->with('success', 'Hari libur "' . $nama . '" berhasil dihapus dari daftar.');
+            ->with('success', 'Hari libur "'.$nama.'" berhasil dihapus dari daftar.');
     }
 }

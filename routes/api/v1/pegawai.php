@@ -1,12 +1,12 @@
 <?php
 
-use App\Http\Controllers\DisciplineRecordController;
-use App\Http\Controllers\EmployeeController;
-use App\Http\Controllers\EmployeeFamilyController;
+use App\Http\Controllers\Api\V1\DisciplineRecordController;
+use App\Http\Controllers\Api\V1\EmployeeController;
+use App\Http\Controllers\Api\V1\EmployeeFamilyController;
+use App\Http\Controllers\Api\V1\KgbHistoryController;
+use App\Http\Controllers\Api\V1\PositionHistoryController;
+use App\Http\Controllers\Api\V1\RankHistoryController;
 use App\Http\Controllers\EmployeeImportController;
-use App\Http\Controllers\KgbHistoryController;
-use App\Http\Controllers\PositionHistoryController;
-use App\Http\Controllers\RankHistoryController;
 use Illuminate\Support\Facades\Route;
 
 $disableEmployeeApiAuth = app()->environment('local')

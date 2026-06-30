@@ -18,10 +18,13 @@ class ListEmployeeFamiliesAction
      */
     public function execute(Employee $employee): Collection
     {
-        return $employee->families()
+        /** @var Collection<int, array<string, mixed>> $families */
+        $families = $employee->families()
             ->orderByDesc('created_at')
             ->get()
             ->map(fn (EmployeeFamily $family): array => $this->payload->response($family))
             ->values();
+
+        return $families;
     }
 }

@@ -5,7 +5,15 @@ namespace App\Models;
 use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property string $id
+ * @property string|null $no_sk
+ * @property string|null $file_sk
+ * @property Carbon $tmt_pangkat
+ * @property Carbon|null $tanggal_sk
+ */
 class RankHistory extends Model
 {
     use HasUuid;
@@ -29,11 +37,13 @@ class RankHistory extends Model
         ];
     }
 
+    /** @return BelongsTo<Employee, $this> */
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
     }
 
+    /** @return BelongsTo<RefGolongan, $this> */
     public function golongan(): BelongsTo
     {
         return $this->belongsTo(RefGolongan::class, 'golongan_id');

@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\Api\V1\NotificationController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['web', 'keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan,atasan_langsung,pegawai'])

@@ -10,6 +10,14 @@ class DemoSsoUserSeeder extends Seeder
 {
     public function run(): void
     {
+        // Akun SSO demo (mis. demo-klabat) hanya untuk pengembangan/pengujian. Jika ditanam di
+        // produksi, akun super_admin demo ini akan menempati slot bootstrap super_admin pertama
+        // sehingga pegawai asli pertama yang login via SSO tidak otomatis menjadi super_admin.
+        // Gerbang fail-closed: hanya local dan testing yang menanam akun demo ini.
+        if (! app()->environment(['local', 'testing'])) {
+            return;
+        }
+
         $username = config('services.keycloak.test_username', 'demo-klabat');
 
         if ($username === '') {

@@ -9,6 +9,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
+/**
+ * @property string $id
+ * @property string|null $name
+ * @property string|null $email
+ * @property string|null $employee_id
+ * @property string|null $role
+ * @property-read Employee|null $employee
+ */
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -53,6 +61,7 @@ class User extends Authenticatable
         ];
     }
 
+    /** @return BelongsTo<Employee, $this> */
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);

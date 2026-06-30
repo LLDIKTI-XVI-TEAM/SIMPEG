@@ -53,7 +53,8 @@ class KeycloakLogoutTest extends TestCase
 
     private function fakeKeycloakLogoutUrl(string $logoutUrl): void
     {
-        $provider = new class($logoutUrl) {
+        $provider = new class($logoutUrl)
+        {
             public function __construct(private readonly string $logoutUrl) {}
 
             public function getLogoutUrl(?string $redirectUri = null, ?string $clientId = null): string

@@ -4,7 +4,17 @@ namespace App\Models;
 
 use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property string $id
+ * @property Carbon|null $tanggal
+ * @property string $nama
+ * @property int $tahun
+ * @property bool $is_cuti_bersama
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ */
 class RefHariLibur extends Model
 {
     use HasUuid;

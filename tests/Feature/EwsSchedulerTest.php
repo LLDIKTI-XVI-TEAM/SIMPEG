@@ -11,10 +11,12 @@ use App\Models\RefJenisPegawai;
 use App\Models\SimpegNotification;
 use App\Models\User;
 use App\Services\EwsEngineService;
+use App\Services\NotificationService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Carbon;
+use Mockery\Expectation;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class EwsSchedulerTest extends TestCase
@@ -248,16 +250,22 @@ class EwsSchedulerTest extends TestCase
 
         // Resolve a real EwsEngineService but pass it a notification service mock that throws exception.
         // This will trigger the catch block in EwsEngineService, update the run status to 'gagal', and notify the Super Admin.
-        $notificationMock = $this->mock(\App\Services\NotificationService::class);
-        $notificationMock->shouldReceive('createForEmployee')
+        /** @var MockInterface&NotificationService $notificationMock */
+        $notificationMock = $this->mock(NotificationService::class);
+
+        /** @var Expectation $kgbNotificationExpectation */
+        $kgbNotificationExpectation = $notificationMock->shouldReceive('createForEmployee');
+        $kgbNotificationExpectation
             ->with(\Mockery::any(), 'ews.kgb', \Mockery::any(), \Mockery::any(), \Mockery::any())
             ->once()
             ->andThrow(new \RuntimeException('Service failure simulation'));
 
-        $notificationMock->shouldReceive('createForEmployee')
+        /** @var Expectation $failureNotificationExpectation */
+        $failureNotificationExpectation = $notificationMock->shouldReceive('createForEmployee');
+        $failureNotificationExpectation
             ->with(\Mockery::any(), 'ews.scheduler_failed', \Mockery::any(), \Mockery::any())
             ->once()
-            ->andReturn(new \App\Models\SimpegNotification());
+            ->andReturn(new SimpegNotification);
 
         try {
             // Seed an employee to trigger notification code path

@@ -23,9 +23,6 @@ class EmployeeDetailPayload
      * - Riwayat Pangkat, Jabatan, Gaji (TMT desc dengan nested select)
      * - Disiplin, Pendidikan, Dokumen (tanggal desc / latest)
      * - Atasan, Saldo Cuti, Pengajuan Cuti, Alert EWS (tanggal desc / order)
-     *
-     * @param  Employee  $employee
-     * @return Employee
      */
     public function loadRelations(Employee $employee): Employee
     {
@@ -63,9 +60,6 @@ class EmployeeDetailPayload
      * Field yang dikecualikan (sensitif): nik, no_kk, keycloak_id, role, dan lainnya.
      * Field yang diizinkan: identitas dasar, pangkat, jabatan, riwayat, saldo cuti, alert.
      * Relasi yang disertakan: agama, status kawin, jenis pegawai, keluarga, pengangkatan, dll.
-     *
-     * @param  Employee  $employee
-     * @return array
      */
     public function response(Employee $employee): array
     {

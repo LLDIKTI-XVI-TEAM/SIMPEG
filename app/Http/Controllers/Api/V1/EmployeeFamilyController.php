@@ -1,11 +1,12 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\EmployeeFamilies\CreateEmployeeFamilyAction;
 use App\Actions\EmployeeFamilies\DeleteEmployeeFamilyAction;
 use App\Actions\EmployeeFamilies\ListEmployeeFamiliesAction;
 use App\Actions\EmployeeFamilies\UpdateEmployeeFamilyAction;
+use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreEmployeeFamilyRequest;
 use App\Http\Requests\UpdateEmployeeFamilyRequest;
 use App\Models\Employee;

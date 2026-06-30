@@ -998,10 +998,10 @@ class PegawaiController extends Controller
             $action->execute($employee, $request->input('supervisor_id'), $request);
 
             return redirect()->route('pegawai.show', $id)
-                ->with('success', 'Atasan langsung untuk ' . $employee->nama_lengkap . ' berhasil diperbarui.');
+                ->with('success', 'Atasan langsung untuk '.$employee->nama_lengkap.' berhasil diperbarui.');
         } catch (\Exception $e) {
             return redirect()->route('pegawai.show', $id)
-                ->with('error', 'Gagal memperbarui atasan langsung: ' . $e->getMessage());
+                ->with('error', 'Gagal memperbarui atasan langsung: '.$e->getMessage());
         }
     }
 }

@@ -17,6 +17,7 @@ class EwsConfig extends Model
     {
         try {
             $config = self::where('key', $key)->first();
+
             return $config ? $config->value : $default;
         } catch (\Throwable $e) {
             return $default;

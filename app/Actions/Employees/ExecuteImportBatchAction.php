@@ -15,11 +15,6 @@ class ExecuteImportBatchAction
     /**
      * Execute the validated batch.
      *
-     * @param  string  $batchId
-     * @param  User|null  $user
-     * @param  string|null  $ipAddress
-     * @param  string|null  $userAgent
-     * @return array
      *
      * @throws ValidationException
      */

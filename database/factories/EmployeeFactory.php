@@ -2,11 +2,12 @@
 
 namespace Database\Factories;
 
+use App\Models\Employee;
 use App\Models\RefJenisPegawai;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends Factory<\App\Models\Employee>
+ * @extends Factory<Employee>
  */
 class EmployeeFactory extends Factory
 {

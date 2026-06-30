@@ -1,11 +1,12 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\HariLibur\CreateHariLiburAction;
 use App\Actions\HariLibur\DeleteHariLiburAction;
 use App\Actions\HariLibur\ListHariLiburAction;
 use App\Actions\HariLibur\UpdateHariLiburAction;
+use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreHariLiburRequest;
 use App\Http\Requests\UpdateHariLiburRequest;
 use App\Models\RefHariLibur;

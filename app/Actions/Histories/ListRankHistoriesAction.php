@@ -3,6 +3,7 @@
 namespace App\Actions\Histories;
 
 use App\Models\Employee;
+use App\Models\RankHistory;
 use Illuminate\Database\Eloquent\Collection;
 
 class ListRankHistoriesAction
@@ -10,7 +11,7 @@ class ListRankHistoriesAction
     /**
      * Mengambil riwayat pangkat pegawai sesuai urutan tampilan mutasi terbaru.
      *
-     * @return Collection<int, \App\Models\RankHistory>
+     * @return Collection<int, RankHistory>
      */
     public function execute(Employee $employee): Collection
     {

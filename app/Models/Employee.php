@@ -4,12 +4,35 @@ namespace App\Models;
 
 use App\Models\Concerns\HasUuid;
 use Database\Factories\EmployeeFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property string $id
+ * @property string $nama_lengkap
+ * @property string $nip
+ * @property string|null $jabatan_terakhir
+ * @property string|null $golongan_terakhir
+ * @property string|null $jenis_pegawai_id
+ * @property string|null $atasan_langsung_id
+ * @property Carbon|null $tanggal_lahir
+ * @property Carbon|null $tanggal_pensiun
+ * @property Carbon|null $tanggal_kenaikan_pangkat_berikutnya
+ * @property Carbon|null $tanggal_kgb_berikutnya
+ * @property Carbon|null $tanggal_akhir_kontrak
+ * @property Carbon|null $deleted_at
+ * @property bool $is_kinerja_baik
+ * @property-read RefJenisPegawai|null $jenisPegawai
+ * @property-read Employee|null $atasanLangsung
+ * @property-read Collection<int, PositionHistory> $positionHistories
+ * @property-read Collection<int, DisciplineRecord> $disciplineRecords
+ */
 class Employee extends Model
 {
     /** @use HasFactory<EmployeeFactory> */
@@ -81,16 +104,19 @@ class Employee extends Model
 
     // --- Reference Relations ---
 
+    /** @return BelongsTo<RefAgama, $this> */
     public function agama(): BelongsTo
     {
         return $this->belongsTo(RefAgama::class, 'agama_id');
     }
 
+    /** @return BelongsTo<RefStatusPerkawinan, $this> */
     public function statusKawin(): BelongsTo
     {
         return $this->belongsTo(RefStatusPerkawinan::class, 'status_kawin_id');
     }
 
+    /** @return BelongsTo<RefJenisPegawai, $this> */
     public function jenisPegawai(): BelongsTo
     {
         return $this->belongsTo(RefJenisPegawai::class, 'jenis_pegawai_id');
@@ -98,83 +124,99 @@ class Employee extends Model
 
     // --- Child Relations ---
 
+    /** @return HasMany<EmployeeFamily, $this> */
     public function families(): HasMany
     {
         return $this->hasMany(EmployeeFamily::class);
     }
 
+    /** @return HasMany<Appointment, $this> */
     public function appointments(): HasMany
     {
         return $this->hasMany(Appointment::class);
     }
 
+    /** @return HasMany<RankHistory, $this> */
     public function rankHistories(): HasMany
     {
         return $this->hasMany(RankHistory::class);
     }
 
+    /** @return HasMany<PositionHistory, $this> */
     public function positionHistories(): HasMany
     {
         return $this->hasMany(PositionHistory::class);
     }
 
+    /** @return HasMany<SalaryHistory, $this> */
     public function salaryHistories(): HasMany
     {
         return $this->hasMany(SalaryHistory::class);
     }
 
+    /** @return HasMany<DisciplineRecord, $this> */
     public function disciplineRecords(): HasMany
     {
         return $this->hasMany(DisciplineRecord::class);
     }
 
+    /** @return HasMany<EducationHistory, $this> */
     public function educationHistories(): HasMany
     {
         return $this->hasMany(EducationHistory::class);
     }
 
+    /** @return HasMany<Document, $this> */
     public function documents(): HasMany
     {
         return $this->hasMany(Document::class);
     }
 
+    /** @return HasMany<SupervisorAssignment, $this> */
     public function supervisorAssignments(): HasMany
     {
         return $this->hasMany(SupervisorAssignment::class);
     }
 
+    /** @return HasMany<LeaveRequest, $this> */
     public function leaveRequests(): HasMany
     {
         return $this->hasMany(LeaveRequest::class);
     }
 
+    /** @return HasMany<LeaveBalance, $this> */
     public function leaveBalances(): HasMany
     {
         return $this->hasMany(LeaveBalance::class);
     }
 
+    /** @return HasMany<EwsAlert, $this> */
     public function ewsAlerts(): HasMany
     {
         return $this->hasMany(EwsAlert::class);
     }
 
+    /** @return HasMany<SimpegNotification, $this> */
     public function notifications(): HasMany
     {
         return $this->hasMany(SimpegNotification::class, 'user_id');
     }
 
-    public function appointment(): \Illuminate\Database\Eloquent\Relations\HasOne
+    /** @return HasOne<Appointment, $this> */
+    public function appointment(): HasOne
     {
         return $this->hasOne(Appointment::class);
     }
 
     // --- Supervisor Relations ---
 
+    /** @return BelongsTo<Employee, $this> */
     public function atasanLangsung(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'atasan_langsung_id');
     }
 
+    /** @return HasMany<Employee, $this> */
     public function bawahanLangsung(): HasMany
     {
         return $this->hasMany(Employee::class, 'atasan_langsung_id');
@@ -226,7 +268,7 @@ class Employee extends Model
     public function getFotoUrlAttribute(): ?string
     {
         return $this->foto_public_path
-            ? asset('storage/' . $this->foto_public_path)
+            ? asset('storage/'.$this->foto_public_path)
             : null;
     }
 }

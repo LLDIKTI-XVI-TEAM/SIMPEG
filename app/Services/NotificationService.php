@@ -31,7 +31,7 @@ class NotificationService
     public function latestForEmployee(?string $employeeId, int $limit = 10): Collection
     {
         if ($employeeId === null) {
-            return new Collection();
+            return new Collection;
         }
 
         return SimpegNotification::query()

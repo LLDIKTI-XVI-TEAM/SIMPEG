@@ -6,6 +6,13 @@ use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property int $tahun
+ * @property int $jatah_awal
+ * @property int $carry_over
+ * @property int $terpakai
+ * @property int $sisa
+ */
 class LeaveBalance extends Model
 {
     use HasUuid;
@@ -30,6 +37,7 @@ class LeaveBalance extends Model
         ];
     }
 
+    /** @return BelongsTo<Employee, $this> */
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);

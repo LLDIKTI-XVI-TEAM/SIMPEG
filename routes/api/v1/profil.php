@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\Api\V1\EmployeeController;
 use App\Http\Controllers\LeaveBalanceController;
 use Illuminate\Support\Facades\Route;
 
