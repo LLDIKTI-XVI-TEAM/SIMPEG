@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Document;
 use App\Models\Employee;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class DokumenController extends Controller
 {
@@ -76,7 +78,7 @@ class DokumenController extends Controller
         $employee = Employee::findOrFail($request->input('pegawai_id'));
 
         $filePath = $request->file('berkas')->store('employees/documents', 'public');
-        \Illuminate\Support\Facades\Log::info('File Path: ' . var_export($filePath, true));
+        Log::info('File Path: '.var_export($filePath, true));
 
         Document::create([
             'employee_id' => $employee->id,
@@ -101,9 +103,9 @@ class DokumenController extends Controller
         }
 
         $extension = pathinfo($doc->file_path, PATHINFO_EXTENSION);
-        $employeeName = \Illuminate\Support\Str::slug($doc->employee->nama_lengkap ?? 'pegawai');
-        $docName = \Illuminate\Support\Str::slug($doc->nama_dokumen);
-        $filename = $employeeName . '-' . $docName . '.' . $extension;
+        $employeeName = Str::slug($doc->employee->nama_lengkap ?? 'pegawai');
+        $docName = Str::slug($doc->nama_dokumen);
+        $filename = $employeeName.'-'.$docName.'.'.$extension;
 
         return Storage::disk('public')->download($doc->file_path, $filename);
     }

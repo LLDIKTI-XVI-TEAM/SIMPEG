@@ -137,7 +137,7 @@ class HandleKeycloakCallbackAction
 
         AuditService::logAs($user->id, $user->name, 'LOGIN', 'User', $user->id, null, null, $request);
 
-        return redirect()->intended(route('dashboard'))->with('login_success', 'Selamat Datang, ' . $user->name . '! Anda berhasil masuk ke dalam sistem.');
+        return redirect()->intended(route('dashboard'))->with('login_success', 'Selamat Datang, '.$user->name.'! Anda berhasil masuk ke dalam sistem.');
     }
 
     private function employeeMatchField(): ?string

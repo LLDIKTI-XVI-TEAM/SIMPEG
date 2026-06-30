@@ -9,8 +9,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\ApproveLeaveRequest;
 use App\Http\Requests\PostponeLeaveRequest;
 use App\Http\Requests\StoreLeaveRequestRequest;
+use App\Models\Employee;
+use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
+use App\Models\RefJenisCuti;
 use App\Services\LeaveApprovalService;
+use Illuminate\Http\Request;
 
 class CutiController extends Controller
 {
@@ -136,17 +140,17 @@ class CutiController extends Controller
         ],
     ];
 
-    public function rekap(\Illuminate\Http\Request $request)
+    public function rekap(Request $request)
     {
         $periode = $request->query('periode');
         $unit = $request->query('unit');
         $pegawaiId = $request->query('pegawai');
         $jenisId = $request->query('jenis');
 
-        $balancesQuery = \App\Models\LeaveBalance::with('employee');
-        
+        $balancesQuery = LeaveBalance::with('employee');
+
         if ($unit) {
-            $balancesQuery->whereHas('employee', function($q) use ($unit) {
+            $balancesQuery->whereHas('employee', function ($q) use ($unit) {
                 $q->where('jabatan_terakhir', $unit);
             });
         }
@@ -159,7 +163,7 @@ class CutiController extends Controller
         }
 
         $balances = $balancesQuery->get();
-        $totalPegawai = \App\Models\Employee::where('status_aktif', 'Aktif')->count();
+        $totalPegawai = Employee::where('status_aktif', 'Aktif')->count();
         $cutiTerpakai = $balances->sum('terpakai');
         $sisaSaldo = $balances->sum('sisa');
         $saldoKritis = $balances->where('sisa', '<=', 3)->count();
@@ -173,8 +177,11 @@ class CutiController extends Controller
 
         $leaveBalances = $balances->map(function ($b) {
             $status = 'Aman';
-            if ($b->sisa <= 3) $status = 'Kritis';
-            elseif ($b->sisa <= 6) $status = 'Perhatian';
+            if ($b->sisa <= 3) {
+                $status = 'Kritis';
+            } elseif ($b->sisa <= 6) {
+                $status = 'Perhatian';
+            }
 
             return [
                 'nama' => $b->employee?->nama_lengkap ?? '-',
@@ -191,10 +198,10 @@ class CutiController extends Controller
             ];
         });
 
-        $requestsQuery = \App\Models\LeaveRequest::with(['employee', 'jenisCuti'])->latest();
-        
+        $requestsQuery = LeaveRequest::with(['employee', 'jenisCuti'])->latest();
+
         if ($unit) {
-            $requestsQuery->whereHas('employee', function($q) use ($unit) {
+            $requestsQuery->whereHas('employee', function ($q) use ($unit) {
                 $q->where('jabatan_terakhir', $unit);
             });
         }
@@ -209,7 +216,7 @@ class CutiController extends Controller
                 $requestsQuery->whereYear('tanggal_mulai', $periode);
             } else {
                 // simple match for something like "Juni 2026"
-                $months = ['Januari'=>1, 'Februari'=>2, 'Maret'=>3, 'April'=>4, 'Mei'=>5, 'Juni'=>6, 'Juli'=>7, 'Agustus'=>8, 'September'=>9, 'Oktober'=>10, 'November'=>11, 'Desember'=>12];
+                $months = ['Januari' => 1, 'Februari' => 2, 'Maret' => 3, 'April' => 4, 'Mei' => 5, 'Juni' => 6, 'Juli' => 7, 'Agustus' => 8, 'September' => 9, 'Oktober' => 10, 'November' => 11, 'Desember' => 12];
                 $parts = explode(' ', $periode);
                 if (count($parts) === 2) {
                     $m = $months[$parts[0]] ?? null;
@@ -222,20 +229,20 @@ class CutiController extends Controller
         }
 
         $usageRows = (clone $requestsQuery)->take(20)->get()->map(function ($r) {
-                return [
-                    'nama' => $r->employee?->nama_lengkap ?? '-',
-                    'nip' => $r->employee?->nip ?? '-',
-                    'jenis' => $r->jenisCuti?->nama ?? '-',
-                    'mulai' => optional($r->tanggal_mulai)->format('d M Y'),
-                    'selesai' => optional($r->tanggal_selesai)->format('d M Y'),
-                    'hari' => $r->jumlah_hari_kerja,
-                    'status' => $r->status,
-                ];
-            });
+            return [
+                'nama' => $r->employee?->nama_lengkap ?? '-',
+                'nip' => $r->employee?->nip ?? '-',
+                'jenis' => $r->jenisCuti?->nama ?? '-',
+                'mulai' => optional($r->tanggal_mulai)->format('d M Y'),
+                'selesai' => optional($r->tanggal_selesai)->format('d M Y'),
+                'hari' => $r->jumlah_hari_kerja,
+                'status' => $r->status,
+            ];
+        });
 
-        $statsQuery = \App\Models\LeaveRequest::where('status', 'Disetujui')->with('jenisCuti');
+        $statsQuery = LeaveRequest::where('status', 'Disetujui')->with('jenisCuti');
         if ($unit) {
-            $statsQuery->whereHas('employee', function($q) use ($unit) {
+            $statsQuery->whereHas('employee', function ($q) use ($unit) {
                 $q->where('jabatan_terakhir', $unit);
             });
         }
@@ -258,7 +265,7 @@ class CutiController extends Controller
             ->map(function ($group) {
                 return $group->sum('jumlah_hari_kerja');
             });
-        
+
         $totalDays = $stats->sum() ?: 1;
         $jenisStats = [];
         $tones = ['primary', 'info', 'secondary', 'muted'];
@@ -268,19 +275,19 @@ class CutiController extends Controller
                 'label' => $name ?? 'Lainnya',
                 'hari' => $days,
                 'percent' => round(($days / $totalDays) * 100),
-                'tone' => $tones[$i % 4]
+                'tone' => $tones[$i % 4],
             ];
             $i++;
         }
 
         // Data Dropdown Filter
-        $optUnits = \App\Models\Employee::select('jabatan_terakhir')->whereNotNull('jabatan_terakhir')->distinct()->pluck('jabatan_terakhir');
-        $optPegawais = \App\Models\Employee::where('status_aktif', 'Aktif')->get(['id', 'nama_lengkap', 'nip']);
-        $optJenisCutis = \App\Models\RefJenisCuti::all();
+        $optUnits = Employee::select('jabatan_terakhir')->whereNotNull('jabatan_terakhir')->distinct()->pluck('jabatan_terakhir');
+        $optPegawais = Employee::where('status_aktif', 'Aktif')->get(['id', 'nama_lengkap', 'nip']);
+        $optJenisCutis = RefJenisCuti::all();
         $optPeriodes = ['Semua Periode', 'Juni 2026', 'Mei 2026', 'April 2026', '2026', '2025'];
 
         return view('admin.cuti.rekap', compact(
-            'summary', 'leaveBalances', 'usageRows', 'jenisStats', 
+            'summary', 'leaveBalances', 'usageRows', 'jenisStats',
             'optUnits', 'optPegawais', 'optJenisCutis', 'optPeriodes',
             'periode', 'unit', 'pegawaiId', 'jenisId'
         ));
@@ -315,14 +322,14 @@ class CutiController extends Controller
     {
         $user = request()->user();
         $employee = $user->employee;
-        
+
         // Jenis cuti dropdown
-        $jenisCuti = \App\Models\RefJenisCuti::all();
-        
+        $jenisCuti = RefJenisCuti::all();
+
         // Cek saldo cuti tahunan (opsional untuk ditampilkan di UI)
         $saldoTahunan = null;
         if ($employee) {
-            $saldoTahunan = \App\Models\LeaveBalance::where('employee_id', $employee->id)
+            $saldoTahunan = LeaveBalance::where('employee_id', $employee->id)
                 ->where('tahun', now()->year)
                 ->first();
         }

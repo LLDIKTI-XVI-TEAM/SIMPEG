@@ -23,6 +23,7 @@ use App\Models\RefUnitKerja;
 use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Shared\Date;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -483,7 +484,7 @@ class PegawaiController extends Controller
         $agama = RefAgama::all();
         $statusKawin = RefStatusPerkawinan::all();
         $unitKerja = RefUnitKerja::all();
-        $jenisJabatanOptions = \App\Models\RefJenisJabatan::all();
+        $jenisJabatanOptions = RefJenisJabatan::all();
 
         return view('admin.pegawai.create', compact('jenisPegawai', 'agama', 'statusKawin', 'unitKerja', 'jenisJabatanOptions'));
     }
@@ -540,8 +541,8 @@ class PegawaiController extends Controller
                 $file = $request->file('foto');
                 $filename = $file->hashName();
                 $file->move(storage_path('app/public/employees/photos'), $filename);
-                $path = 'employees/photos/' . $filename;
-                
+                $path = 'employees/photos/'.$filename;
+
                 if ($path) {
                     $validated['foto'] = $path;
                 } else {
@@ -567,17 +568,17 @@ class PegawaiController extends Controller
                 $skFile = $request->file('file_sk');
                 $skFilename = $skFile->hashName();
                 $skFile->move(storage_path('app/public/appointments/sk'), $skFilename);
-                $appointmentData['file_sk'] = 'appointments/sk/' . $skFilename;
+                $appointmentData['file_sk'] = 'appointments/sk/'.$skFilename;
             }
 
             Appointment::create($appointmentData);
 
-            if (!empty($validated['jabatan_terakhir']) || !empty($validated['unit_kerja_id'])) {
-                \App\Models\PositionHistory::create([
+            if (! empty($validated['jabatan_terakhir']) || ! empty($validated['unit_kerja_id'])) {
+                PositionHistory::create([
                     'employee_id' => $employee->id,
                     'nama_jabatan' => $validated['jabatan_terakhir'] ?? '-',
-                    'jenis_jabatan_id' => $validated['jenis_jabatan_id'] ?? \App\Models\RefJenisJabatan::first()->id,
-                    'unit_kerja_id' => $validated['unit_kerja_id'] ?? \App\Models\RefUnitKerja::first()->id,
+                    'jenis_jabatan_id' => $validated['jenis_jabatan_id'] ?? RefJenisJabatan::first()->id,
+                    'unit_kerja_id' => $validated['unit_kerja_id'] ?? RefUnitKerja::first()->id,
                     'tmt_jabatan' => $validated['tmt'] ?? now()->format('Y-m-d'),
                     'no_sk' => $validated['nomor_sk'] ?? '-',
                     'tanggal_sk' => $validated['tanggal_sk'] ?? now()->format('Y-m-d'),
@@ -628,7 +629,7 @@ class PegawaiController extends Controller
         $agama = RefAgama::all();
         $statusKawin = RefStatusPerkawinan::all();
         $unitKerja = RefUnitKerja::all();
-        $jenisJabatanOptions = \App\Models\RefJenisJabatan::all();
+        $jenisJabatanOptions = RefJenisJabatan::all();
 
         return view('admin.pegawai.edit', compact('p', 'jenisPegawai', 'agama', 'statusKawin', 'unitKerja', 'jenisJabatanOptions'));
     }
@@ -643,28 +644,28 @@ class PegawaiController extends Controller
 
             $oldValues = $employee->toArray();
 
-            \Illuminate\Support\Facades\Log::info('Update Request received for employee ' . $employee->id);
-            \Illuminate\Support\Facades\Log::info('Files uploaded keys:', array_keys($request->allFiles()));
-            \Illuminate\Support\Facades\Log::info('Has foto?', ['has' => $request->hasFile('foto')]);
+            Log::info('Update Request received for employee '.$employee->id);
+            Log::info('Files uploaded keys:', array_keys($request->allFiles()));
+            Log::info('Has foto?', ['has' => $request->hasFile('foto')]);
             if ($request->hasFile('foto') && $request->file('foto')->isValid()) {
                 // Delete old photo if needed (omitted for brevity)
                 $file = $request->file('foto');
                 $filename = $file->hashName();
                 $file->move(storage_path('app/public/employees/photos'), $filename);
-                $path = 'employees/photos/' . $filename;
-                
+                $path = 'employees/photos/'.$filename;
+
                 if ($path) {
-                    \Illuminate\Support\Facades\Log::info('Stored foto at:', ['path' => $path]);
+                    Log::info('Stored foto at:', ['path' => $path]);
                     $validated['foto'] = $path;
                 } else {
-                    \Illuminate\Support\Facades\Log::error('Store foto failed');
+                    Log::error('Store foto failed');
                     unset($validated['foto']);
                 }
             } else {
-                \Illuminate\Support\Facades\Log::warning('Foto not valid or not present', ['error' => $request->hasFile('foto') ? $request->file('foto')->getErrorMessage() : 'No file']);
+                Log::warning('Foto not valid or not present', ['error' => $request->hasFile('foto') ? $request->file('foto')->getErrorMessage() : 'No file']);
                 unset($validated['foto']);
             }
-            
+
             // Update Employee
             $employee->update($validated);
 
@@ -681,7 +682,7 @@ class PegawaiController extends Controller
                     $skFile = $request->file('file_sk');
                     $skFilename = $skFile->hashName();
                     $skFile->move(storage_path('app/public/appointments/sk'), $skFilename);
-                    $appointmentData['file_sk'] = 'appointments/sk/' . $skFilename;
+                    $appointmentData['file_sk'] = 'appointments/sk/'.$skFilename;
                 }
 
                 $appointment->update($appointmentData);
@@ -694,11 +695,11 @@ class PegawaiController extends Controller
                     'jenis_jabatan_id' => $validated['jenis_jabatan_id'] ?? $position->jenis_jabatan_id,
                     'unit_kerja_id' => $validated['unit_kerja_id'] ?? $position->unit_kerja_id,
                 ]);
-            } else if (!empty($validated['jabatan_terakhir']) || !empty($validated['unit_kerja_id'])) {
+            } elseif (! empty($validated['jabatan_terakhir']) || ! empty($validated['unit_kerja_id'])) {
                 $employee->positionHistories()->create([
                     'nama_jabatan' => $validated['jabatan_terakhir'] ?? '-',
-                    'jenis_jabatan_id' => $validated['jenis_jabatan_id'] ?? \App\Models\RefJenisJabatan::first()->id,
-                    'unit_kerja_id' => $validated['unit_kerja_id'] ?? \App\Models\RefUnitKerja::first()->id,
+                    'jenis_jabatan_id' => $validated['jenis_jabatan_id'] ?? RefJenisJabatan::first()->id,
+                    'unit_kerja_id' => $validated['unit_kerja_id'] ?? RefUnitKerja::first()->id,
                     'tmt_jabatan' => $validated['tmt'] ?? now()->format('Y-m-d'),
                     'no_sk' => $validated['nomor_sk'] ?? '-',
                     'tanggal_sk' => $validated['tanggal_sk'] ?? now()->format('Y-m-d'),
@@ -746,6 +747,7 @@ class PegawaiController extends Controller
 
             if ($count === 0) {
                 DB::rollBack();
+
                 return back()->with('error', 'Data pegawai tidak ditemukan.');
             }
 
@@ -755,11 +757,11 @@ class PegawaiController extends Controller
 
             DB::commit();
 
-            return back()->with('success', $count . ' pegawai berhasil dinonaktifkan.');
+            return back()->with('success', $count.' pegawai berhasil dinonaktifkan.');
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return back()->with('error', 'Terjadi kesalahan saat menonaktifkan pegawai: ' . $e->getMessage());
+            return back()->with('error', 'Terjadi kesalahan saat menonaktifkan pegawai: '.$e->getMessage());
         }
     }
 
@@ -836,7 +838,7 @@ class PegawaiController extends Controller
                 $jenisPegawaiId = RefJenisPegawai::where('nama', $request->query('jenis'))->value('id') ?? '';
             }
             if ($statusAktif === '' && $request->filled('status')) {
-                $statusAktif = match (strtolower((string)$request->query('status'))) {
+                $statusAktif = match (strtolower((string) $request->query('status'))) {
                     'aktif' => 'Aktif', 'nonaktif', 'non-aktif' => 'Non-Aktif', 'pensiun' => 'Pensiun', 'mutasi' => 'Mutasi', default => ''
                 };
             }
@@ -847,7 +849,7 @@ class PegawaiController extends Controller
             if ($search !== '') {
                 $query->where(function ($q) use ($search) {
                     $q->whereRaw('LOWER(nama_lengkap) LIKE ?', ["%{$search}%"])
-                      ->orWhereRaw('LOWER(nip) LIKE ?', ["%{$search}%"]);
+                        ->orWhereRaw('LOWER(nip) LIKE ?', ["%{$search}%"]);
                 });
             }
             if ($golongan !== '') {

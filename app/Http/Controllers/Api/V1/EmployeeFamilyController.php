@@ -13,6 +13,7 @@ use App\Models\Employee;
 use App\Models\EmployeeFamily;
 use App\Support\EmployeeFamilies\EmployeeFamilyPayload;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 
 class EmployeeFamilyController extends Controller
 {
@@ -30,7 +31,7 @@ class EmployeeFamilyController extends Controller
         CreateEmployeeFamilyAction $action,
         EmployeeFamilyPayload $payload,
     ): JsonResponse {
-        \Illuminate\Support\Facades\Log::info('Family payload:', $request->all());
+        Log::info('Family payload:', $request->all());
         $family = $action->execute($employee, $request->validated(), $request);
 
         return response()->json([

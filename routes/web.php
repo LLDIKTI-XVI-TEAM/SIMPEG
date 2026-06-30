@@ -17,6 +17,9 @@ use App\Http\Controllers\Admin\UserMappingController;
 use App\Http\Controllers\Auth\KeycloakAuthController;
 use App\Http\Controllers\EmployeeImportController;
 use App\Http\Controllers\LeaveBalanceController;
+use App\Models\Employee;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -71,17 +74,19 @@ Route::get('/set-super-admin', function () {
         $user->role = 'super_admin';
         $user->save();
         session(['active_role' => 'super_admin']);
+
         return redirect()->route('dashboard')->with('success', 'Role Anda telah diubah menjadi super_admin');
     }
+
     return 'Silakan login terlebih dahulu';
 });
 
 Route::get('/map-dummy-employee', function () {
     $user = auth()->user();
     if ($user) {
-        $employee = \App\Models\Employee::first();
-        if (!$employee) {
-            $employee = \App\Models\Employee::create([
+        $employee = Employee::first();
+        if (! $employee) {
+            $employee = Employee::create([
                 'nip' => '198001012005011001',
                 'nama' => $user->name,
                 'status' => 'aktif',
@@ -89,19 +94,23 @@ Route::get('/map-dummy-employee', function () {
         }
         $user->employee_id = $employee->id;
         $user->save();
+
         return redirect()->route('profil')->with('success', 'Akun Anda berhasil dipetakan ke data pegawai.');
     }
+
     return 'Silakan login terlebih dahulu';
 });
 
-Route::get('/debug-permissions', function() {
-    $permission = \App\Models\Permission::firstOrCreate(['name' => 'employee_families.create'], ['module' => 'employee_families', 'description' => 'Membuat data keluarga pegawai']);
-    $role = \App\Models\Role::where('name', 'super_admin')->first();
+Route::get('/debug-permissions', function () {
+    $permission = Permission::firstOrCreate(['name' => 'employee_families.create'], ['module' => 'employee_families', 'description' => 'Membuat data keluarga pegawai']);
+    $role = Role::where('name', 'super_admin')->first();
     if ($role) {
         $role->permissions()->syncWithoutDetaching([$permission->id]);
-        return "Permission synced to super_admin";
+
+        return 'Permission synced to super_admin';
     }
-    return "Role super_admin not found";
+
+    return 'Role super_admin not found';
 });
 
 Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan,atasan_langsung,pegawai'])->group(function (): void {

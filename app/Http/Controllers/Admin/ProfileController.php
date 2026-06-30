@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\LeaveBalance;
 use Illuminate\Http\Request;
 
 class ProfileController extends Controller
@@ -25,9 +26,9 @@ class ProfileController extends Controller
         $tahun = date('Y');
         $saldoCuti = 0;
         if ($p) {
-            $leaveBalance = \App\Models\LeaveBalance::where('employee_id', $p->id)
-                                ->where('tahun', $tahun)
-                                ->first();
+            $leaveBalance = LeaveBalance::where('employee_id', $p->id)
+                ->where('tahun', $tahun)
+                ->first();
             if ($leaveBalance) {
                 // total_hak + sisa_tahun_sebelumnya - total_terpakai
                 $saldoCuti = $leaveBalance->total_hak + $leaveBalance->sisa_tahun_sebelumnya - $leaveBalance->total_terpakai;

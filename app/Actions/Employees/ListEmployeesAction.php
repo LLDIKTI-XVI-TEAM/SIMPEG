@@ -48,7 +48,7 @@ class ListEmployeesAction
                 $validated['golongan'] ?? null,
                 fn ($query, string $golongan) => $query->where(function ($q) use ($golongan) {
                     $q->where('golongan_terakhir', $golongan)
-                      ->orWhere('golongan_terakhir', 'LIKE', $golongan . '/%');
+                        ->orWhere('golongan_terakhir', 'LIKE', $golongan.'/%');
                 })
             )
             ->when(
