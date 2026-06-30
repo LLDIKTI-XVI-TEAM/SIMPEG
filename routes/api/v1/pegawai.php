@@ -3,10 +3,10 @@
 use App\Http\Controllers\Api\V1\DisciplineRecordController;
 use App\Http\Controllers\Api\V1\EmployeeController;
 use App\Http\Controllers\Api\V1\EmployeeFamilyController;
+use App\Http\Controllers\Api\V1\EmployeeImportController;
 use App\Http\Controllers\Api\V1\KgbHistoryController;
 use App\Http\Controllers\Api\V1\PositionHistoryController;
 use App\Http\Controllers\Api\V1\RankHistoryController;
-use App\Http\Controllers\EmployeeImportController;
 use Illuminate\Support\Facades\Route;
 
 $disableEmployeeApiAuth = app()->environment('local')

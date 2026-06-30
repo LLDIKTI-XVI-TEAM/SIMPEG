@@ -1,7 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\EmployeeController;
-use App\Http\Controllers\LeaveBalanceController;
+use App\Http\Controllers\Api\V1\LeaveBalanceController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['web', 'keycloak.auth', 'role:pegawai'])
