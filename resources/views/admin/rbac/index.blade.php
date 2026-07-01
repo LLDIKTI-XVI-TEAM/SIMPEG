@@ -128,9 +128,11 @@ $permissionPaths = [
                         <x-ui.badge :variant="$roleVariant" size="xs" uppercase>
                             {{ $role->name }}
                         </x-ui.badge>
-                        <p class="text-[10px] text-muted mt-2 font-sans line-clamp-2" title="{{ $role->description }}">
-                            {{ $role->description }}
-                        </p>
+                        <x-ui.tooltip text="{{ $role->description }}">
+                            <p class="text-[10px] text-muted mt-2 font-sans line-clamp-2">
+                                {{ $role->description }}
+                            </p>
+                        </x-ui.tooltip>
                     </div>
                     <div class="mt-4 border-t border-border/50 pt-2 flex items-baseline justify-between">
                         <span class="text-[10px] text-muted font-sans font-medium">Izin Aktif:</span>

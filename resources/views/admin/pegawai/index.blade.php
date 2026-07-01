@@ -283,33 +283,35 @@
                         <x-ui.table-td>
 
                             <div class="flex items-center gap-3">
-                                <a
-                                    href="{{ route('pegawai.show', $p->id) }}"
-                                    class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-sm font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                                    title="Buka detail profil {{ $p->nama_lengkap }}"
-                                    aria-label="Buka detail profil {{ $p->nama_lengkap }}"
-                                >
-                                    @if($fotoUrl)
-                                        <img
-                                            src="{{ $fotoUrl }}"
-                                            alt="Foto {{ $p->nama_lengkap }}"
-                                            class="h-full w-full object-cover"
-                                            loading="lazy"
-                                            onerror="this.classList.add('hidden'); this.nextElementSibling.classList.remove('hidden')"
-                                        >
-                                    @endif
-                                    <span class="{{ $fotoUrl ? 'hidden' : '' }}" aria-hidden="true">
-                                        {{ strtoupper(substr($p->nama_lengkap, 0, 1)) }}
-                                    </span>
-                                </a>
-                                <div class="min-w-0">
+                                <x-ui.tooltip text="Buka detail profil {{ $p->nama_lengkap }}" position="right">
                                     <a
                                         href="{{ route('pegawai.show', $p->id) }}"
-                                        class="block truncate text-sm font-semibold text-ink transition hover:text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/20 rounded"
-                                        title="Buka detail {{ $p->nama_lengkap }}"
+                                        class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-sm font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                        aria-label="Buka detail profil {{ $p->nama_lengkap }}"
                                     >
-                                        {{ $p->nama_lengkap }}
+                                        @if($fotoUrl)
+                                            <img
+                                                src="{{ $fotoUrl }}"
+                                                alt="Foto {{ $p->nama_lengkap }}"
+                                                class="h-full w-full object-cover"
+                                                loading="lazy"
+                                                onerror="this.classList.add('hidden'); this.nextElementSibling.classList.remove('hidden')"
+                                            >
+                                        @endif
+                                        <span class="{{ $fotoUrl ? 'hidden' : '' }}" aria-hidden="true">
+                                            {{ strtoupper(substr($p->nama_lengkap, 0, 1)) }}
+                                        </span>
                                     </a>
+                                </x-ui.tooltip>
+                                <div class="min-w-0">
+                                    <x-ui.tooltip text="Buka detail {{ $p->nama_lengkap }}" position="right">
+                                        <a
+                                            href="{{ route('pegawai.show', $p->id) }}"
+                                            class="block truncate text-sm font-semibold text-ink transition hover:text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/20 rounded"
+                                        >
+                                            {{ $p->nama_lengkap }}
+                                        </a>
+                                    </x-ui.tooltip>
                                     <p class="font-mono text-xs text-muted">{{ $p->nip }}</p>
                                 </div>
                             </div>
