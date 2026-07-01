@@ -378,8 +378,8 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
-                                            Tidak ada data anggota keluarga.
+                                        <td colspan="5" class="px-0 py-0">
+                                            <x-ui.empty-state icon="document" title="Tidak ada data anggota keluarga." />
                                         </td>
                                     </tr>
                                 @endforelse
@@ -414,8 +414,8 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="4" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
-                                            Tidak ada data riwayat kepangkatan.
+                                        <td colspan="4" class="px-0 py-0">
+                                            <x-ui.empty-state icon="document" title="Tidak ada data riwayat kepangkatan." />
                                         </td>
                                     </tr>
                                 @endforelse
@@ -452,8 +452,8 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
-                                            Tidak ada data riwayat jabatan.
+                                        <td colspan="5" class="px-0 py-0">
+                                            <x-ui.empty-state icon="document" title="Tidak ada data riwayat jabatan." />
                                         </td>
                                     </tr>
                                 @endforelse
@@ -488,8 +488,8 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="4" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
-                                            Tidak ada data riwayat KGB.
+                                        <td colspan="4" class="px-0 py-0">
+                                            <x-ui.empty-state icon="document" title="Tidak ada data riwayat KGB." />
                                         </td>
                                     </tr>
                                 @endforelse
@@ -531,8 +531,8 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
-                                            Anda tidak memiliki riwayat hukuman disiplin. Bersih (Clean Record). ✅
+                                        <td colspan="5" class="px-0 py-0">
+                                            <x-ui.empty-state icon="document" title="Anda tidak memiliki riwayat hukuman disiplin. Bersih (Clean Record). ✅" />
                                         </td>
                                     </tr>
                                 @endforelse
@@ -569,8 +569,8 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
-                                            Tidak ada data riwayat pendidikan.
+                                        <td colspan="5" class="px-0 py-0">
+                                            <x-ui.empty-state icon="document" title="Tidak ada data riwayat pendidikan." />
                                         </td>
                                     </tr>
                                 @endforelse

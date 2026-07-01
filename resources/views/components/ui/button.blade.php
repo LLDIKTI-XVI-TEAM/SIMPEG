@@ -39,18 +39,24 @@
     $tag = ($as === 'a' || $href) ? 'a' : 'button';
     $classes = [
         'inline-flex items-center justify-center font-semibold font-sans transition focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50',
-        $sizes[$size] ?? $sizes['md'],
-        $variants[$variant] ?? $variants['primary'],
+        $sizes[(string) $size] ?? $sizes['md'],
+        $variants[(string) $variant] ?? $variants['primary'],
         'w-full' => filter_var($fullWidth, FILTER_VALIDATE_BOOL),
         'pointer-events-none opacity-50' => $tag === 'a' && $isDisabled,
     ];
+
+    $title = $attributes->get('title');
 @endphp
+
+@if ($title)
+<x-ui.tooltip text="{{ $title }}">
+@endif
 
 @if ($tag === 'a')
     <a
         @if ($href) href="{{ $href }}" @endif
         @if ($isDisabled) aria-disabled="true" tabindex="-1" @endif
-        {{ $attributes->class($classes) }}
+        {{ $attributes->except('title')->class($classes) }}
     >
         {{ $slot }}
     </a>
@@ -58,8 +64,12 @@
     <button
         type="{{ $type }}"
         @disabled($isDisabled)
-        {{ $attributes->class($classes) }}
+        {{ $attributes->except('title')->class($classes) }}
     >
         {{ $slot }}
     </button>
+@endif
+
+@if ($title)
+</x-ui.tooltip>
 @endif

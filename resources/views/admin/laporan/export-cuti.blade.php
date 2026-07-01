@@ -261,8 +261,8 @@
                         </template>
 
                         <x-ui.table-row x-show="filteredCuti.length === 0">
-                            <x-ui.table-td colspan="8" align="center" class="px-6 py-8 text-muted print:border print:border-black">
-                                Tidak ada data cuti yang cocok dengan filter Anda.
+                            <x-ui.table-td colspan="8" align="center" class="px-0 py-0 text-muted print:border print:border-black">
+                                <x-ui.empty-state icon="document" title="Tidak ada data cuti yang cocok dengan filter Anda." />
                             </x-ui.table-td>
                         </x-ui.table-row>
                     </x-ui.table-body>

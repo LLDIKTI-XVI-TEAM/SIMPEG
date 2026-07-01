@@ -137,13 +137,13 @@
                     @click="open = !open"
                     @click.outside="open = false"
                     id="add-pegawai-btn"
-                    class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 animate-fade-in"
+                    class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 animate-fade-in"
                 >
-                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                     </svg>
-                    Tambah Pegawai
-                    <svg class="w-4 h-4 ml-1.5 shrink-0 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                    <span>Tambah Pegawai</span>
+                    <svg class="w-4 h-4 shrink-0 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
                     </svg>
                 </button>
@@ -268,7 +268,7 @@
                     </x-ui.table-row>
                 </x-ui.table-head>
                 <x-ui.table-body>
-                    @foreach($pegawaiData as $p)
+                    @forelse($pegawaiData as $p)
                     @php
                         $currentPosition = $p->positionHistories->first();
                         $currentUnit = $currentPosition?->unitKerja?->nama ?? '-';
@@ -283,33 +283,35 @@
                         <x-ui.table-td>
 
                             <div class="flex items-center gap-3">
-                                <a
-                                    href="{{ route('pegawai.show', $p->id) }}"
-                                    class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-sm font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                                    title="Buka detail profil {{ $p->nama_lengkap }}"
-                                    aria-label="Buka detail profil {{ $p->nama_lengkap }}"
-                                >
-                                    @if($fotoUrl)
-                                        <img
-                                            src="{{ $fotoUrl }}"
-                                            alt="Foto {{ $p->nama_lengkap }}"
-                                            class="h-full w-full object-cover"
-                                            loading="lazy"
-                                            onerror="this.classList.add('hidden'); this.nextElementSibling.classList.remove('hidden')"
-                                        >
-                                    @endif
-                                    <span class="{{ $fotoUrl ? 'hidden' : '' }}" aria-hidden="true">
-                                        {{ strtoupper(substr($p->nama_lengkap, 0, 1)) }}
-                                    </span>
-                                </a>
-                                <div class="min-w-0">
+                                <x-ui.tooltip text="Buka detail profil {{ $p->nama_lengkap }}" position="right">
                                     <a
                                         href="{{ route('pegawai.show', $p->id) }}"
-                                        class="block truncate text-sm font-semibold text-ink transition hover:text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/20 rounded"
-                                        title="Buka detail {{ $p->nama_lengkap }}"
+                                        class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-sm font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                        aria-label="Buka detail profil {{ $p->nama_lengkap }}"
                                     >
-                                        {{ $p->nama_lengkap }}
+                                        @if($fotoUrl)
+                                            <img
+                                                src="{{ $fotoUrl }}"
+                                                alt="Foto {{ $p->nama_lengkap }}"
+                                                class="h-full w-full object-cover"
+                                                loading="lazy"
+                                                onerror="this.classList.add('hidden'); this.nextElementSibling.classList.remove('hidden')"
+                                            >
+                                        @endif
+                                        <span class="{{ $fotoUrl ? 'hidden' : '' }}" aria-hidden="true">
+                                            {{ strtoupper(substr($p->nama_lengkap, 0, 1)) }}
+                                        </span>
                                     </a>
+                                </x-ui.tooltip>
+                                <div class="min-w-0">
+                                    <x-ui.tooltip text="Buka detail {{ $p->nama_lengkap }}" position="right">
+                                        <a
+                                            href="{{ route('pegawai.show', $p->id) }}"
+                                            class="block truncate text-sm font-semibold text-ink transition hover:text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/20 rounded"
+                                        >
+                                            {{ $p->nama_lengkap }}
+                                        </a>
+                                    </x-ui.tooltip>
                                     <p class="font-mono text-xs text-muted">{{ $p->nip }}</p>
                                 </div>
                             </div>
@@ -399,7 +401,13 @@
                             </div>
                         </x-ui.table-td>
                     </x-ui.table-row>
-                    @endforeach
+                    @empty
+                        <x-ui.table-row>
+                            <x-ui.table-td colspan="7" align="center" class="px-0 py-0 text-sm text-muted">
+                                <x-ui.empty-state icon="search" title="Tidak ada data pegawai yang sesuai." />
+                            </x-ui.table-td>
+                        </x-ui.table-row>
+                    @endforelse
                 </x-ui.table-body>
             </x-ui.table>
         </div>
@@ -645,7 +653,7 @@
                         </x-ui.button>
                         <x-ui.button type="submit" variant="primary" size="xs" x-bind:disabled="isSubmitting">
                             <template x-if="isSubmitting">
-                                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                <x-ui.loading size="md" color="white" class="-ml-1 mr-2" />
                             </template>
                             <span x-text="isSubmitting ? 'Menyimpan...' : 'Simpan Riwayat'"></span>
                         </x-ui.button>

@@ -293,10 +293,7 @@
                             <span class="text-xs font-bold text-ink font-sans block">Toggle Flag "Kinerja Baik"</span>
                             <p class="text-[10px] text-muted font-sans mt-0.5">Flag ini mempengaruhi kualifikasi rekomendasi promosi berkala.</p>
                         </div>
-                        <label class="relative inline-flex items-center cursor-pointer select-none">
-                            <input type="checkbox" x-model="kinerjaBaik" class="sr-only peer">
-                            <div class="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-success"></div>
-                        </label>
+                        <x-ui.toggle x-model="kinerjaBaik" class="peer-checked:bg-success" />
                     </div>
 
                     {{-- Atasan Langsung --}}
@@ -1032,10 +1029,7 @@
                                 </template>
                                 <template x-if="isSubmitting">
                                     <span class="flex items-center justify-center gap-2">
-                                        <svg class="animate-spin h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
+                                        <x-ui.loading size="sm" color="white" />
                                         Menyimpan...
                                     </span>
                                 </template>
