@@ -1,5 +1,6 @@
 <x-layouts.app title="Semua Notifikasi">
-    
+
+
     {{-- PAGE HEADER --}}
     <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -34,6 +35,7 @@
             Tandai semua dibaca
         </button>
     </div>
+
 
         {{-- Log Cards --}}
         <div
@@ -102,9 +104,11 @@
                 </div>
             @endforelse
 
+
             {{-- Pagination --}}
             <div class="mt-6">
                 {{ $notifications->onEachSide(1)->links('vendor.pagination.simpeg') }}
             </div>
         </div>
+
 </x-layouts.app>

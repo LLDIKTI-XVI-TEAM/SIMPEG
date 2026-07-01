@@ -1,20 +1,18 @@
 <x-layouts.app title="Detail Dokumen">
     <div class="mx-auto max-w-2xl space-y-6">
         
-        {{-- Breadcrumbs & Title --}}
-        <div class="flex flex-col gap-1.5">
-            <h2 class="text-2xl font-bold text-ink font-sans">Detail Dokumen Kepegawaian</h2>
-            <nav class="flex items-center gap-1.5 text-xs text-muted">
+        <x-admin.page-header title="Detail Dokumen Kepegawaian">
+            <x-slot:breadcrumb>
                 <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
                 <span>/</span>
                 <a href="{{ route('dokumen') }}" class="transition-colors hover:text-ink">Dokumen</a>
                 <span>/</span>
                 <span class="font-medium text-ink">Detail Dokumen</span>
-            </nav>
-        </div>
+            </x-slot:breadcrumb>
+        </x-admin.page-header>
 
         {{-- Detail Card --}}
-        <div class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6">
+        <x-ui.card padding="lg" class="space-y-6">
             
             {{-- Header info --}}
             <div class="border-b border-border pb-4 flex items-start gap-4">
@@ -64,20 +62,19 @@
 
             {{-- Footer actions --}}
             <div class="border-t border-border pt-6 flex justify-end gap-3">
-                <a href="{{ route('dokumen') }}" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-5 py-2.5 text-sm font-semibold text-primary transition hover:bg-soft">
-                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
-                    </svg>
-                    Kembali
-                </a>
-                <a href="{{ route('dokumen.download', $doc['id']) }}" class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
+
+                <x-ui.button href="{{ route('dokumen') }}" variant="secondary">
+                    Kembali ke Daftar
+                </x-ui.button>
+                <x-ui.button href="{{ route('dokumen.download', $doc['id']) }}" variant="primary">
                     <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                     </svg>
-                    Unduh Berkas {{ $doc['file_extension'] }}
-                </a>
+                    Unduh Berkas PDF
+                </x-ui.button>
+
             </div>
 
-        </div>
+        </x-ui.card>
     </div>
 </x-layouts.app>
