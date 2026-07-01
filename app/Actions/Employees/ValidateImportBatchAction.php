@@ -85,13 +85,14 @@ class ValidateImportBatchAction
     private function validateRow(array $row, array &$seenNips, array &$seenEmails): array
     {
         $data = $row['data'];
-        $nama = $data['Nama Pegawai'] ?? '-';
+        $nama = $data['Nama Pegawai'] ?? ($data['nama_dengan_gelar'] ?? '-');
         $mappedData = app(EmployeeRowMapper::class)->map($data);
         $validator = Validator::make($mappedData, EmployeeValidationRules::import(), [], EmployeeValidationRules::attributes());
 
         if ($validator->fails()) {
             return $this->rowError($row, $nama, $this->mapErrors($validator->errors()->toArray(), [
-                'nama_lengkap' => 'Nama Pegawai',
+                'nama_dengan_gelar' => 'Nama Pegawai',
+                'nama_lengkap'      => 'Nama Lengkap (Person)',
                 'email' => 'Email Pegawai',
                 'golongan_terakhir' => 'Golongan',
                 'jabatan_terakhir' => 'Jabatan',

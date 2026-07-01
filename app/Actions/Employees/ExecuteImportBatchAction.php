@@ -128,9 +128,15 @@ class ExecuteImportBatchAction
     private function executeValidatedRow(string $type, array $data): void
     {
         if ($type === 'utama') {
+            // Fallback: jika kolom 'Person' (nama_lengkap tanpa gelar) tidak diisi pada file Excel,
+            // gunakan nilai nama_dengan_gelar agar kolom wajib nama_lengkap tetap terisi.
+            if (empty($data['nama_lengkap']) && !empty($data['nama_dengan_gelar'])) {
+                $data['nama_lengkap'] = $data['nama_dengan_gelar'];
+            }
+
             Employee::create($data + [
-                'status_aktif' => 'Aktif',
-                'profil_status' => 'belum_lengkap',
+                'status_aktif'   => 'Aktif',
+                'profil_status'  => 'belum_lengkap',
                 'is_kinerja_baik' => true,
             ]);
         }
