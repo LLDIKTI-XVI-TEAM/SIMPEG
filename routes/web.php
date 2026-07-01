@@ -43,7 +43,9 @@ Route::post('/logout', [KeycloakAuthController::class, 'logout'])->name('logout'
 
 if (app()->environment(['local', 'testing'])) {
     Route::get('/dev-login', function () {
-        $user = User::where('role', 'super_admin')->first();
+        $user = User::where('email', 'demo@example.com')->first()
+            ?? User::where('role', 'super_admin')->first();
+
         if (! $user) {
             $user = User::create([
                 'name' => 'Demo Klabat',
@@ -53,9 +55,7 @@ if (app()->environment(['local', 'testing'])) {
             ]);
         } else {
             $user->name = 'Demo Klabat';
-            if (empty($user->role)) {
-                $user->role = 'super_admin';
-            }
+            $user->role = 'super_admin';
             $user->save();
         }
         Auth::login($user);
@@ -633,6 +633,10 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
         ->name('pegawai.update');
+    Route::post('/pegawai/{id}/kinerja-baik', [PegawaiController::class, 'updatePerformanceFlag'])
+        ->whereUuid('id')
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
+        ->name('pegawai.kinerja.update');
     Route::post('/pegawai/bulk-destroy', [PegawaiController::class, 'bulkDestroy'])
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.deactivate'])
         ->name('pegawai.bulkDestroy');
