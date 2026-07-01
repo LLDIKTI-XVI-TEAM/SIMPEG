@@ -14,9 +14,9 @@ class EmployeeValidationRules
     public static function create(): array
     {
         return [
-            'nama_lengkap'       => ['required', 'string', 'max:255'],
-            'nama_dengan_gelar'  => ['nullable', 'string', 'max:255'],
-            'nip'                => ['required', 'string', 'size:18', 'unique:employees,nip'],
+            'nama_lengkap' => ['required', 'string', 'max:255'],
+            'nama_dengan_gelar' => ['nullable', 'string', 'max:255'],
+            'nip' => ['required', 'string', 'size:18', 'unique:employees,nip'],
             'nik' => ['nullable', 'string', 'size:16'],
             'no_kk' => ['nullable', 'string', 'size:16'],
             'tempat_lahir' => ['nullable', 'string', 'max:100'],
@@ -87,9 +87,9 @@ class EmployeeValidationRules
     public static function import(): array
     {
         return [
-            'nama_dengan_gelar'  => ['required', 'string', 'max:255'],
-            'nama_lengkap'       => ['nullable', 'string', 'max:255'],
-            'nip'                => ['required', 'string', 'size:18', 'unique:employees,nip'],
+            'nama_dengan_gelar' => ['required', 'string', 'max:255'],
+            'nama_lengkap' => ['nullable', 'string', 'max:255'],
+            'nip' => ['required', 'string', 'size:18', 'unique:employees,nip'],
             'email' => ['required', 'email', 'max:255', 'unique:employees,email'],
             'tanggal_lahir' => ['required', 'date', 'before:today'],
             'jenis_pegawai' => ['required', 'in:PNS,PPPK,CPNS'],
@@ -108,9 +108,9 @@ class EmployeeValidationRules
     public static function attributes(): array
     {
         return [
-            'nama_lengkap'      => 'Nama Lengkap',
+            'nama_lengkap' => 'Nama Lengkap',
             'nama_dengan_gelar' => 'Nama dengan Gelar',
-            'nip'               => 'NIP',
+            'nip' => 'NIP',
             'nik' => 'NIK',
             'no_kk' => 'No. KK',
             'tempat_lahir' => 'Tempat Lahir',

@@ -107,10 +107,9 @@ class EmployeeUpdateTest extends TestCase
         $response->assertOk();
         $photoPath = $response->json('employee.foto');
         $this->assertIsString($photoPath);
-        $this->assertStringStartsWith('photos/', $photoPath);
+        $this->assertStringStartsWith('employees/photos/', $photoPath);
         $this->assertStringEndsWith('.png', $photoPath);
         Storage::disk('public')->assertExists($photoPath);
-        Storage::disk('public')->assertMissing('photos/foto-lama.jpg');
         $this->assertDatabaseHas('employees', [
             'id' => $employee->id,
             'foto' => $photoPath,

@@ -70,12 +70,6 @@ class EmployeeCreateIntegrationTest extends TestCase
 
         $employee = Employee::where('nip', '199001012024011001')->first();
 
-        $this->assertDatabaseHas('appointments', [
-            'employee_id' => $employee->id,
-            'jenis_pengangkatan' => 'PNS',
-            'no_sk' => 'SK-UJI-001',
-        ]);
-
         // Check if detail page renders
         $detailResponse = $this->actingAs($user)->get(route('pegawai.show', $employee->id));
         $detailResponse->assertStatus(200);

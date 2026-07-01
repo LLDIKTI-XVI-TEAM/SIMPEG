@@ -2,10 +2,14 @@
 
 namespace App\Actions\Employees;
 
+use App\Models\Document;
 use App\Models\Employee;
+use App\Models\RefGolongan;
+use App\Models\RefJenisPegawai;
 use App\Services\AuditService;
 use App\Services\EmployeeFileStorageService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class UpdateEmployeeAction
 {
@@ -18,14 +22,11 @@ class UpdateEmployeeAction
      */
     public function execute(Employee $employee, array $validated, Request $request): Employee
     {
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($employee, $validated, $request) {
+        return DB::transaction(function () use ($employee, $validated, $request) {
             $oldValues = $employee->toArray();
 
             if ($request->hasFile('foto') && $request->file('foto')->isValid()) {
-                $file = $request->file('foto');
-                $filename = $file->hashName();
-                $file->move(storage_path('app/public/employees/photos'), $filename);
-                $validated['foto'] = 'employees/photos/'.$filename;
+                $validated['foto'] = $this->files->storePhoto($request->file('foto'));
             } else {
                 unset($validated['foto']);
             }
@@ -50,19 +51,19 @@ class UpdateEmployeeAction
                     $pangkatData['file_sk'] = 'ranks/sk/'.$filename;
 
                     $golonganLabel = isset($pangkatData['golongan_id'])
-                        ? (\App\Models\RefGolongan::find($pangkatData['golongan_id'])?->kode ?? 'Pangkat Baru')
+                        ? (RefGolongan::find($pangkatData['golongan_id'])?->kode ?? 'Pangkat Baru')
                         : 'Pangkat Baru';
-                    \App\Models\Document::create([
+                    Document::create([
                         'employee_id' => $employee->id,
                         'jenis_dokumen' => 'sk_pangkat',
                         'nama_dokumen' => 'SK Kenaikan Pangkat '.$golonganLabel,
                         'nomor_dokumen' => $pangkatData['no_sk'] ?? null,
                         'tanggal_dokumen' => $pangkatData['tanggal_sk'] ?? null,
-                        'file_path' => 'ranks/sk/'.$filename,
+                        'file_path' => $pangkatData['file_sk'],
                         'keterangan' => 'Diunggah otomatis saat edit pegawai',
                     ]);
                 } elseif ($request->filled('existing_document_id_pangkat')) {
-                    $existingDoc = \App\Models\Document::where('id', $request->input('existing_document_id_pangkat'))
+                    $existingDoc = Document::where('id', $request->input('existing_document_id_pangkat'))
                         ->where('employee_id', $employee->id)
                         ->first();
                     if ($existingDoc) {
@@ -82,7 +83,7 @@ class UpdateEmployeeAction
                     if ($history) {
                         $history->update($pangkatData);
                         if ($history->is_latest) {
-                            $golongan = \App\Models\RefGolongan::find($validated['pangkat_golongan_id']);
+                            $golongan = RefGolongan::find($validated['pangkat_golongan_id']);
                             if ($golongan) {
                                 $employee->update([
                                     'golongan_terakhir' => $golongan->kode,
@@ -96,7 +97,7 @@ class UpdateEmployeeAction
                     $pangkatData['is_latest'] = true;
                     $employee->rankHistories()->create($pangkatData);
 
-                    $golongan = \App\Models\RefGolongan::find($validated['pangkat_golongan_id']);
+                    $golongan = RefGolongan::find($validated['pangkat_golongan_id']);
                     if ($golongan) {
                         $employee->update([
                             'golongan_terakhir' => $golongan->kode,
@@ -126,17 +127,17 @@ class UpdateEmployeeAction
                     $file->move(storage_path('app/public/positions/sk'), $filename);
                     $jabatanData['file_sk'] = 'positions/sk/'.$filename;
 
-                    \App\Models\Document::create([
+                    Document::create([
                         'employee_id' => $employee->id,
                         'jenis_dokumen' => 'sk_jabatan',
                         'nama_dokumen' => 'SK Jabatan '.($jabatanData['nama_jabatan'] ?? 'Baru'),
                         'nomor_dokumen' => $jabatanData['no_sk'] ?? null,
                         'tanggal_dokumen' => $jabatanData['tanggal_sk'] ?? null,
-                        'file_path' => 'positions/sk/'.$filename,
+                        'file_path' => $jabatanData['file_sk'],
                         'keterangan' => 'Diunggah otomatis saat edit pegawai',
                     ]);
                 } elseif ($request->filled('existing_document_id_jabatan')) {
-                    $existingDoc = \App\Models\Document::where('id', $request->input('existing_document_id_jabatan'))
+                    $existingDoc = Document::where('id', $request->input('existing_document_id_jabatan'))
                         ->where('employee_id', $employee->id)
                         ->first();
                     if ($existingDoc) {
@@ -188,17 +189,17 @@ class UpdateEmployeeAction
                     $file->move(storage_path('app/public/salaries/sk'), $filename);
                     $kgbData['file_sk'] = 'salaries/sk/'.$filename;
 
-                    \App\Models\Document::create([
+                    Document::create([
                         'employee_id' => $employee->id,
                         'jenis_dokumen' => 'sk_kgb',
                         'nama_dokumen' => 'SK KGB',
                         'nomor_dokumen' => $kgbData['no_sk'] ?? null,
                         'tanggal_dokumen' => $kgbData['tanggal_sk'] ?? null,
-                        'file_path' => 'salaries/sk/'.$filename,
+                        'file_path' => $kgbData['file_sk'],
                         'keterangan' => 'Diunggah otomatis saat edit pegawai',
                     ]);
                 } elseif ($request->filled('existing_document_id_kgb')) {
-                    $existingDoc = \App\Models\Document::where('id', $request->input('existing_document_id_kgb'))
+                    $existingDoc = Document::where('id', $request->input('existing_document_id_kgb'))
                         ->where('employee_id', $employee->id)
                         ->first();
                     if ($existingDoc) {
@@ -240,17 +241,17 @@ class UpdateEmployeeAction
                     $file->move(storage_path('app/public/appointments/sk'), $filename);
                     $appointmentData['file_sk'] = 'appointments/sk/'.$filename;
 
-                    \App\Models\Document::create([
+                    Document::create([
                         'employee_id' => $employee->id,
                         'jenis_dokumen' => 'sk_pengangkatan',
                         'nama_dokumen' => 'SK Pengangkatan '.($appointmentData['jenis_pengangkatan'] ?? ''),
                         'nomor_dokumen' => $appointmentData['no_sk'] ?? null,
                         'tanggal_dokumen' => $appointmentData['tanggal_sk'] ?? null,
-                        'file_path' => 'appointments/sk/'.$filename,
+                        'file_path' => $appointmentData['file_sk'],
                         'keterangan' => 'Diunggah otomatis saat edit pegawai',
                     ]);
                 } elseif ($request->filled('existing_document_id_pengangkatan')) {
-                    $existingDoc = \App\Models\Document::where('id', $request->input('existing_document_id_pengangkatan'))
+                    $existingDoc = Document::where('id', $request->input('existing_document_id_pengangkatan'))
                         ->where('employee_id', $employee->id)
                         ->first();
                     if ($existingDoc) {
@@ -271,7 +272,7 @@ class UpdateEmployeeAction
                     $employee->appointment()->create($appointmentData);
                 }
 
-                $jenisPegawai = \App\Models\RefJenisPegawai::whereRaw('UPPER(nama) = ?', [
+                $jenisPegawai = RefJenisPegawai::whereRaw('UPPER(nama) = ?', [
                     strtoupper($validated['pengangkatan_jenis_pengangkatan']),
                 ])->first();
                 if ($jenisPegawai) {

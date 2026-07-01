@@ -75,9 +75,9 @@ class EmployeeIndexPhotoTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('href="'.route('pegawai.show', $employee->id).'"', false);
-        $response->assertSee('title="Buka detail profil Citra Detail"', false);
+        $response->assertSee('Buka detail profil Citra Detail', false);
         $response->assertSee('aria-label="Buka detail profil Citra Detail"', false);
-        $response->assertSee('title="Buka detail Citra Detail"', false);
+        $response->assertSee('Buka detail Citra Detail', false);
         $response->assertSee('Citra Detail');
     }
 

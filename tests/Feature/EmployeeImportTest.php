@@ -50,12 +50,13 @@ class EmployeeImportTest extends TestCase
         $response->assertJsonPath('inserted', 2);
         $response->assertJsonPath('failed', 0);
         $this->assertDatabaseHas('employees', [
-            'nama_lengkap' => 'Budi Santoso',
+            'nama_lengkap' => 'Budi',
+            'nama_dengan_gelar' => 'Budi Santoso',
             'email' => 'budi@example.com',
             'nip' => '198001012006041001',
             'jenis_pegawai_id' => RefJenisPegawai::where('nama', 'PNS')->firstOrFail()->id,
         ]);
-        $this->assertSame('1985-02-12', Employee::where('nama_lengkap', 'Siti Aminah')->firstOrFail()->tanggal_lahir->format('Y-m-d'));
+        $this->assertSame('1985-02-12', Employee::where('nama_lengkap', 'Siti')->firstOrFail()->tanggal_lahir->format('Y-m-d'));
     }
 
     public function test_pegawai_cannot_import_employees(): void
@@ -115,7 +116,7 @@ class EmployeeImportTest extends TestCase
         $response->assertJsonPath('inserted', 0);
         $response->assertJsonPath('failed', 1);
         $response->assertJsonPath('errors.0.row', 2);
-        $this->assertDatabaseMissing('employees', ['nama_lengkap' => 'Siti Aminah']);
+        $this->assertDatabaseMissing('employees', ['nama_lengkap' => 'Siti', 'nama_dengan_gelar' => 'Siti Aminah']);
     }
 
     public function test_import_rejects_duplicate_rows_without_creating_any_rows(): void
@@ -164,7 +165,8 @@ class EmployeeImportTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('inserted', 2);
         $this->assertDatabaseHas('employees', [
-            'nama_lengkap' => 'Budi Santoso',
+            'nama_lengkap' => 'Budi',
+            'nama_dengan_gelar' => 'Budi Santoso',
             'nip' => '198001012006041001',
         ]);
     }
@@ -204,7 +206,8 @@ class EmployeeImportTest extends TestCase
         $status->assertJsonPath('result.failed', 0);
 
         $this->assertDatabaseHas('employees', [
-            'nama_lengkap' => 'Siti Aminah',
+            'nama_lengkap' => 'Siti',
+            'nama_dengan_gelar' => 'Siti Aminah',
             'profil_status' => 'belum_lengkap',
             'status_aktif' => 'Aktif',
         ]);
@@ -264,7 +267,8 @@ class EmployeeImportTest extends TestCase
         $status->assertJsonPath('result.inserted', 1);
 
         $this->assertDatabaseHas('employees', [
-            'nama_lengkap' => 'Budi Santoso',
+            'nama_lengkap' => 'Budi',
+            'nama_dengan_gelar' => 'Budi Santoso',
             'nip' => '198001012006041001',
             'nik' => null,
             'no_kk' => null,

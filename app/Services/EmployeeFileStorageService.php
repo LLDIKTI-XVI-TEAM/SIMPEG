@@ -12,7 +12,7 @@ class EmployeeFileStorageService
 {
     public function storePhoto(UploadedFile $file): string
     {
-        return $this->store($file, 'photos');
+        return $this->store($file, 'employees/photos');
     }
 
     public function storeSk(UploadedFile $file): string

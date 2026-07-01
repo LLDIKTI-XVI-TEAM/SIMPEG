@@ -86,7 +86,7 @@ class EmployeeCreationTest extends TestCase
         $response->assertCreated();
         $photoPath = $response->json('employee.foto');
         $this->assertIsString($photoPath);
-        $this->assertStringStartsWith('photos/', $photoPath);
+        $this->assertStringStartsWith('employees/photos/', $photoPath);
         $this->assertStringEndsWith('.jpg', $photoPath);
         Storage::disk('public')->assertExists($photoPath);
         $this->assertDatabaseHas('employees', [
