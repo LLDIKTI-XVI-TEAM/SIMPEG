@@ -1,6 +1,8 @@
 <x-layouts.app title="Edit Pegawai">
     @php
         $fotoUrl = $p->foto_url;
+        $golonganRefOptions = $golonganRefOptions ?? \App\Models\RefGolongan::orderBy('kode')->get();
+        $eselonOptions = $eselonOptions ?? \App\Models\RefEselon::orderBy('nama')->get();
     @endphp
 
     <div class="mx-auto max-w-7xl space-y-6">
@@ -62,6 +64,7 @@
         {{-- Form Card --}}
         <div class="rounded-lg border border-border bg-surface p-6 shadow-sm" x-data="{
             activeTab: 'utama',
+            subTab: 'pangkat',
             nip: '{{ $p->nip ?? '' }}',
             nipError: '',
             nik: '{{ $p->nik ?? '' }}',
@@ -69,11 +72,129 @@
             nikError: '',
             kkError: '',
             fotoPreview: @js($fotoUrl),
-            skFileName: '{{ $p->appointment && $p->appointment->file_sk ? "SK_Pengangkatan.pdf" : "" }}',
-            skFileSize: '',
-            skFileError: '',
+            
+            // File uploads state
+            skPangkatName: '{{ $p->latestRank() && $p->latestRank()->file_sk ? basename($p->latestRank()->file_sk) : "" }}',
+            skPangkatSize: '',
+            skPangkatError: '',
+            
+            skJabatanName: '{{ $p->latestPosition() && $p->latestPosition()->file_sk ? basename($p->latestPosition()->file_sk) : "" }}',
+            skJabatanSize: '',
+            skJabatanError: '',
+            
+            skKgbName: '{{ $p->latestSalary() && $p->latestSalary()->file_sk ? basename($p->latestSalary()->file_sk) : "" }}',
+            skKgbSize: '',
+            skKgbError: '',
+            
+            skPengangkatanName: '{{ $p->appointment && $p->appointment->file_sk ? basename($p->appointment->file_sk) : "" }}',
+            skPengangkatanSize: '',
+            skPengangkatanError: '',
+
+            pangkatHistories: @js($p->rankHistories->keyBy('id')),
+            selectedPangkatId: '{{ $p->latestRank()?->id ?? 'new' }}',
+            pangkatForm: {
+                golongan_id: '{{ $p->latestRank()?->golongan_id ?? '' }}',
+                no_sk: '{{ $p->latestRank()?->no_sk ?? '' }}',
+                tanggal_sk: '{{ $p->latestRank()?->tanggal_sk?->format('Y-m-d') ?? '' }}',
+                tmt_pangkat: '{{ $p->latestRank()?->tmt_pangkat?->format('Y-m-d') ?? '' }}',
+            },
+            
+            jabatanHistories: @js($p->positionHistories->keyBy('id')),
+            selectedJabatanId: '{{ $p->latestPosition()?->id ?? 'new' }}',
+            jabatanForm: {
+                nama_jabatan: '{{ $p->latestPosition()?->nama_jabatan ?? $p->jabatan_terakhir ?? '' }}',
+                jenis_jabatan_id: '{{ $p->latestPosition()?->jenis_jabatan_id ?? '' }}',
+                eselon_id: '{{ $p->latestPosition()?->eselon_id ?? '' }}',
+                unit_kerja_id: '{{ $p->latestPosition()?->unit_kerja_id ?? '' }}',
+                no_sk: '{{ $p->latestPosition()?->no_sk ?? '' }}',
+                tanggal_sk: '{{ $p->latestPosition()?->tanggal_sk?->format('Y-m-d') ?? '' }}',
+                tmt_jabatan: '{{ $p->latestPosition()?->tmt_jabatan?->format('Y-m-d') ?? '' }}',
+            },
+            
+            kgbHistories: @js($p->salaryHistories->keyBy('id')),
+            selectedKgbId: '{{ $p->latestSalary()?->id ?? 'new' }}',
+            kgbForm: {
+                gaji_pokok: '{{ $p->latestSalary()?->gaji_pokok ? (int) $p->latestSalary()->gaji_pokok : '' }}',
+                no_sk: '{{ $p->latestSalary()?->no_sk ?? '' }}',
+                tanggal_sk: '{{ $p->latestSalary()?->tanggal_sk?->format('Y-m-d') ?? '' }}',
+                tmt_kgb: '{{ $p->latestSalary()?->tmt_kgb?->format('Y-m-d') ?? '' }}',
+            },
+
+            loadPangkatData() {
+                if (this.selectedPangkatId === 'new') {
+                    this.pangkatForm.golongan_id = '';
+                    this.pangkatForm.no_sk = '';
+                    this.pangkatForm.tanggal_sk = '';
+                    this.pangkatForm.tmt_pangkat = '';
+                    this.skPangkatName = '';
+                    this.skPangkatSize = '';
+                    this.skPangkatError = '';
+                } else {
+                    const data = this.pangkatHistories[this.selectedPangkatId];
+                    if (data) {
+                        this.pangkatForm.golongan_id = data.golongan_id || '';
+                        this.pangkatForm.no_sk = data.no_sk || '';
+                        this.pangkatForm.tanggal_sk = data.tanggal_sk ? data.tanggal_sk.substring(0, 10) : '';
+                        this.pangkatForm.tmt_pangkat = data.tmt_pangkat ? data.tmt_pangkat.substring(0, 10) : '';
+                        this.skPangkatName = data.file_sk ? data.file_sk.split('/').pop() : '';
+                        this.skPangkatSize = '';
+                        this.skPangkatError = '';
+                    }
+                }
+            },
+            loadJabatanData() {
+                if (this.selectedJabatanId === 'new') {
+                    this.jabatanForm.nama_jabatan = '';
+                    this.jabatanForm.jenis_jabatan_id = '';
+                    this.jabatanForm.eselon_id = '';
+                    this.jabatanForm.unit_kerja_id = '';
+                    this.jabatanForm.no_sk = '';
+                    this.jabatanForm.tanggal_sk = '';
+                    this.jabatanForm.tmt_jabatan = '';
+                    this.skJabatanName = '';
+                    this.skJabatanSize = '';
+                    this.skJabatanError = '';
+                } else {
+                    const data = this.jabatanHistories[this.selectedJabatanId];
+                    if (data) {
+                        this.jabatanForm.nama_jabatan = data.nama_jabatan || '';
+                        this.jabatanForm.jenis_jabatan_id = data.jenis_jabatan_id || '';
+                        this.jabatanForm.eselon_id = data.eselon_id || '';
+                        this.jabatanForm.unit_kerja_id = data.unit_kerja_id || '';
+                        this.jabatanForm.no_sk = data.no_sk || '';
+                        this.jabatanForm.tanggal_sk = data.tanggal_sk ? data.tanggal_sk.substring(0, 10) : '';
+                        this.jabatanForm.tmt_jabatan = data.tmt_jabatan ? data.tmt_jabatan.substring(0, 10) : '';
+                        this.skJabatanName = data.file_sk ? data.file_sk.split('/').pop() : '';
+                        this.skJabatanSize = '';
+                        this.skJabatanError = '';
+                    }
+                }
+            },
+            loadKgbData() {
+                if (this.selectedKgbId === 'new') {
+                    this.kgbForm.gaji_pokok = '';
+                    this.kgbForm.no_sk = '';
+                    this.kgbForm.tanggal_sk = '';
+                    this.kgbForm.tmt_kgb = '';
+                    this.skKgbName = '';
+                    this.skKgbSize = '';
+                    this.skKgbError = '';
+                } else {
+                    const data = this.kgbHistories[this.selectedKgbId];
+                    if (data) {
+                        this.kgbForm.gaji_pokok = data.gaji_pokok ? parseInt(data.gaji_pokok) : '';
+                        this.kgbForm.no_sk = data.no_sk || '';
+                        this.kgbForm.tanggal_sk = data.tanggal_sk ? data.tanggal_sk.substring(0, 10) : '';
+                        this.kgbForm.tmt_kgb = data.tmt_kgb ? data.tmt_kgb.substring(0, 10) : '';
+                        this.skKgbName = data.file_sk ? data.file_sk.split('/').pop() : '';
+                        this.skKgbSize = '';
+                        this.skKgbError = '';
+                    }
+                }
+            },
+
             validateUtama() {
-                const requiredIds = ['nama_lengkap', 'nip', 'jenis_pegawai_id', 'tanggal_lahir', 'pangkat_terakhir', 'jabatan_terakhir', 'kelas_jabatan', 'pendidikan_terakhir', 'prodi_pendidikan_terakhir'];
+                const requiredIds = ['nama_lengkap', 'nip', 'jenis_pegawai_id', 'tanggal_lahir', 'pendidikan_terakhir', 'prodi_pendidikan_terakhir'];
                 for (let id of requiredIds) {
                     const el = document.getElementById(id);
                     if (el && !el.value.trim()) {
@@ -174,30 +295,55 @@
                     this.fotoPreview = URL.createObjectURL(file);
                 }
             },
-            handleSkChange(e) {
-                const file = e.target.files[0];
-                if (file) {
-                    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
-                    if (!allowedTypes.includes(file.type)) {
-                        this.skFileError = 'Format berkas harus PDF, JPG, JPEG, atau PNG!';
-                        this.skFileName = '';
-                        this.skFileSize = '';
-                        e.target.value = '';
-                        return;
+            validateFile(file) {
+                if (!file) return { name: '', size: '', error: '' };
+                const allowedTypes = ['application/pdf', 'application/x-pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+                const allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png'];
+                const sizeInMb = (file.size / (1024 * 1024)).toFixed(2);
+                
+                let isValidType = allowedTypes.includes(file.type);
+                if (!isValidType) {
+                    const ext = file.name.split('.').pop().toLowerCase();
+                    if (allowedExtensions.includes(ext)) {
+                        isValidType = true;
                     }
-                    this.skFileName = file.name;
-                    const sizeInMb = (file.size / (1024 * 1024)).toFixed(2);
-                    this.skFileSize = sizeInMb + ' MB';
-                    if (file.size > 10 * 1024 * 1024) {
-                        this.skFileError = 'Ukuran berkas SK melebihi batas 10MB! (Terdeteksi: ' + sizeInMb + 'MB)';
-                    } else {
-                        this.skFileError = '';
-                    }
-                } else {
-                    this.skFileName = '';
-                    this.skFileSize = '';
-                    this.skFileError = '';
                 }
+                
+                if (!isValidType) {
+                    return { name: '', size: '', error: 'Format berkas harus PDF, JPG, JPEG, atau PNG!' };
+                }
+                if (file.size > 10 * 1024 * 1024) {
+                    return { name: file.name, size: sizeInMb + ' MB', error: 'Ukuran berkas melebihi batas 10MB! (Terdeteksi: ' + sizeInMb + 'MB)' };
+                }
+                return { name: file.name, size: sizeInMb + ' MB', error: '' };
+            },
+            handleSkPangkatChange(e) {
+                const res = this.validateFile(e.target.files[0]);
+                this.skPangkatName = res.name;
+                this.skPangkatSize = res.size;
+                this.skPangkatError = res.error;
+                if (res.error) e.target.value = '';
+            },
+            handleSkJabatanChange(e) {
+                const res = this.validateFile(e.target.files[0]);
+                this.skJabatanName = res.name;
+                this.skJabatanSize = res.size;
+                this.skJabatanError = res.error;
+                if (res.error) e.target.value = '';
+            },
+            handleSkKgbChange(e) {
+                const res = this.validateFile(e.target.files[0]);
+                this.skKgbName = res.name;
+                this.skKgbSize = res.size;
+                this.skKgbError = res.error;
+                if (res.error) e.target.value = '';
+            },
+            handleSkPengangkatanChange(e) {
+                const res = this.validateFile(e.target.files[0]);
+                this.skPengangkatanName = res.name;
+                this.skPengangkatanSize = res.size;
+                this.skPengangkatanError = res.error;
+                if (res.error) e.target.value = '';
             }
         }">
             
@@ -238,7 +384,7 @@
                 "
                         :class="activeTab === 'pengangkatan' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'"
                         class="text-sm transition-colors cursor-pointer focus:outline-none font-sans">
-                    4. Berkas & SK Pengangkatan
+                    4. Berkas & SK
                 </button>
             </div>
 
@@ -285,88 +431,89 @@
                             <input id="tanggal_lahir" name="tanggal_lahir" type="date" required max="{{ date('Y-m-d') }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" value="{{ $p->tanggal_lahir ? \Carbon\Carbon::parse($p->tanggal_lahir)->format('Y-m-d') : '' }}" >
                         </div>
 
-                        {{-- Golongan --}}
-                        <div class="space-y-1" x-data="{ open: false, selected: '{{ $p->golongan_terakhir ?? 'I/a' }}' }">
-                            <label for="golongan_terakhir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Golongan <span class="text-danger">*</span></label>
-                            <div class="relative">
-                                <input type="hidden" name="golongan_terakhir" :value="selected">
-                                <button type="button" @click="open = !open" @click.away="open = false" class="w-full text-left appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <span x-text="selected"></span>
-                                </button>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                    </svg>
-                                </div>
-
-                                <div x-show="open" x-transition.opacity style="display: none;" class="absolute z-50 w-full mt-1 bg-surface border border-border rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                                    @foreach(['I/a','I/b','I/c','I/d','II/a','II/b','II/c','II/d','III/a','III/b','III/c','III/d','IV/a','IV/b','IV/c','IV/d','IV/e'] as $gol)
-                                    <div @click="selected = '{{ $gol }}'; open = false" class="px-4 py-2 text-sm text-ink cursor-pointer hover:bg-soft transition-colors" :class="selected === '{{ $gol }}' ? 'bg-primary/10 text-primary font-bold' : ''">
-                                        {{ $gol }}
-                                    </div>
-                                    @endforeach
-                                </div>
+                        {{-- Golongan (READ-ONLY - ubah melalui Berkas & SK) --}}
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Golongan</label>
+                            <input type="hidden" name="golongan_terakhir" value="{{ $p->golongan_terakhir }}">
+                            <div class="flex items-center gap-2 w-full rounded-lg border border-border bg-soft px-4 py-2 text-sm text-ink shadow-sm font-sans cursor-not-allowed">
+                                <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                                </svg>
+                                <span class="font-semibold">{{ $p->golongan_terakhir ?? '-' }}</span>
+                                <span class="ml-auto text-[10px] text-muted font-sans">Ubah via Berkas &amp; SK</span>
                             </div>
                         </div>
 
-                        {{-- Pangkat --}}
+                        {{-- Pangkat (READ-ONLY - ubah melalui Berkas & SK) --}}
                         <div class="space-y-1">
-                            <label for="pangkat_terakhir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Pangkat <span class="text-danger">*</span></label>
-                            <input id="pangkat_terakhir" name="pangkat_terakhir" type="text" required placeholder="Penata Tkt. I" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->pangkat_terakhir }}" >
-                        </div>
-
-                        {{-- Jabatan --}}
-                        <div class="space-y-1">
-                            <label for="jabatan_terakhir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jabatan <span class="text-danger">*</span></label>
-                            <input id="jabatan_terakhir" name="jabatan_terakhir" type="text" required placeholder="Analis Kepegawaian" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->jabatan_terakhir }}" >
-                        </div>
-
-                        {{-- Jenis Jabatan --}}
-                        <div class="space-y-1">
-                            <label for="jenis_jabatan_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Jabatan <span class="text-danger">*</span></label>
-                            <div class="relative">
-                                @php
-                                    $currentJenisId = $p->positionHistories->where('is_latest', true)->first()?->jenis_jabatan_id;
-                                @endphp
-                                <select id="jenis_jabatan_id" name="jenis_jabatan_id" required class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="" disabled {{ empty($currentJenisId) ? 'selected' : '' }}>Pilih Jenis Jabatan</option>
-                                    @foreach($jenisJabatanOptions as $jenis)
-                                        <option value="{{ $jenis->id }}" {{ $currentJenisId == $jenis->id ? 'selected' : '' }}>{{ $jenis->nama }}</option>
-                                    @endforeach
-                                </select>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                    </svg>
-                                </div>
+                            <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Pangkat</label>
+                            <input type="hidden" name="pangkat_terakhir" value="{{ $p->pangkat_terakhir }}">
+                            <div class="flex items-center gap-2 w-full rounded-lg border border-border bg-soft px-4 py-2 text-sm text-ink shadow-sm font-sans cursor-not-allowed">
+                                <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                                </svg>
+                                <span>{{ $p->pangkat_terakhir ?? '-' }}</span>
+                                <span class="ml-auto text-[10px] text-muted font-sans">Ubah via Berkas &amp; SK</span>
                             </div>
                         </div>
 
-                        {{-- Unit Kerja --}}
+                        {{-- Jabatan (READ-ONLY - ubah melalui Berkas & SK) --}}
                         <div class="space-y-1">
-                            <label for="unit_kerja_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Unit Kerja <span class="text-danger">*</span></label>
-                            <div class="relative">
-                                @php
-                                    $currentUnitId = $p->positionHistories->where('is_latest', true)->first()?->unit_kerja_id;
-                                @endphp
-                                <select id="unit_kerja_id" name="unit_kerja_id" required class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="" disabled {{ empty($currentUnitId) ? 'selected' : '' }}>Pilih Unit Kerja</option>
-                                    @foreach($unitKerja as $unit)
-                                        <option value="{{ $unit->id }}" {{ $currentUnitId == $unit->id ? 'selected' : '' }}>{{ $unit->nama }}</option>
-                                    @endforeach
-                                </select>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                    </svg>
-                                </div>
+                            <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jabatan Terakhir</label>
+                            <input type="hidden" name="jabatan_terakhir" value="{{ $p->jabatan_terakhir }}">
+                            <div class="flex items-center gap-2 w-full rounded-lg border border-border bg-soft px-4 py-2 text-sm text-ink shadow-sm font-sans cursor-not-allowed">
+                                <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                                </svg>
+                                <span>{{ $p->jabatan_terakhir ?? '-' }}</span>
+                                <span class="ml-auto text-[10px] text-muted font-sans">Ubah via Berkas &amp; SK</span>
                             </div>
                         </div>
 
-                        {{-- Kelas Jabatan --}}
+                        {{-- Jenis Jabatan (READ-ONLY - ubah melalui Berkas & SK) --}}
+                        @php
+                            $latestPosHistory = $p->positionHistories->where('is_latest', true)->first();
+                            $currentJenisId = $latestPosHistory?->jenis_jabatan_id;
+                            $currentJenisNama = $latestPosHistory?->jenisJabatan?->nama ?? '-';
+                            $currentUnitId = $latestPosHistory?->unit_kerja_id;
+                            $currentUnitNama = $latestPosHistory?->unitKerja?->nama ?? '-';
+                        @endphp
+                        <input type="hidden" name="jenis_jabatan_id" value="{{ $currentJenisId }}">
                         <div class="space-y-1">
-                            <label for="kelas_jabatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Kelas Jabatan <span class="text-danger">*</span></label>
-                            <input id="kelas_jabatan" name="kelas_jabatan" type="text" required placeholder="8" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->kelas_jabatan }}" >
+                            <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Jabatan</label>
+                            <div class="flex items-center gap-2 w-full rounded-lg border border-border bg-soft px-4 py-2 text-sm text-ink shadow-sm font-sans cursor-not-allowed">
+                                <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                                </svg>
+                                <span>{{ $currentJenisNama }}</span>
+                                <span class="ml-auto text-[10px] text-muted font-sans">Ubah via Berkas &amp; SK</span>
+                            </div>
+                        </div>
+
+                        {{-- Unit Kerja (READ-ONLY - ubah melalui Berkas & SK) --}}
+                        <input type="hidden" name="unit_kerja_id" value="{{ $currentUnitId }}">
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Unit Kerja</label>
+                            <div class="flex items-center gap-2 w-full rounded-lg border border-border bg-soft px-4 py-2 text-sm text-ink shadow-sm font-sans cursor-not-allowed">
+                                <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                                </svg>
+                                <span>{{ $currentUnitNama }}</span>
+                                <span class="ml-auto text-[10px] text-muted font-sans">Ubah via Berkas &amp; SK</span>
+                            </div>
+                        </div>
+
+                        {{-- Kelas Jabatan (READ-ONLY - ubah melalui Berkas & SK) --}}
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Kelas Jabatan</label>
+                            <input type="hidden" name="kelas_jabatan" value="{{ $p->kelas_jabatan }}">
+                            <div class="flex items-center gap-2 w-full rounded-lg border border-border bg-soft px-4 py-2 text-sm text-ink shadow-sm font-sans cursor-not-allowed">
+                                <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                                </svg>
+                                <span>{{ $p->kelas_jabatan ?? '-' }}</span>
+                                <span class="ml-auto text-[10px] text-muted font-sans">Ubah via Berkas &amp; SK</span>
+                            </div>
                         </div>
 
                         {{-- Pendidikan Terakhir --}}
@@ -554,65 +701,396 @@
                     </div>
                 </div>
 
-                {{-- TAB 4: BERKAS & SK PENGANGKATAN --}}
+                {{-- TAB 4: BERKAS & SK --}}
                 <div x-show="activeTab === 'pengangkatan'" class="space-y-6" style="display: none;" x-transition>
-                    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                        {{-- Jenis Pengangkatan --}}
-                        <div class="space-y-1">
-                            <label for="jenis_pengangkatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Pengangkatan <span class="text-danger">*</span></label>
+                    {{-- Sub Navigation Bar --}}
+                    <div class="border-b border-border flex flex-wrap gap-4 md:gap-6 mb-4">
+                        <button type="button" @click="subTab = 'pangkat'"
+                                :class="subTab === 'pangkat' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'"
+                                class="text-xs transition-colors cursor-pointer focus:outline-none font-sans">
+                            A. SK Pangkat
+                        </button>
+                        <button type="button" @click="subTab = 'jabatan'"
+                                :class="subTab === 'jabatan' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'"
+                                class="text-xs transition-colors cursor-pointer focus:outline-none font-sans">
+                            B. SK Jabatan
+                        </button>
+                        <button type="button" @click="subTab = 'kgb'"
+                                :class="subTab === 'kgb' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'"
+                                class="text-xs transition-colors cursor-pointer focus:outline-none font-sans">
+                            C. SK KGB
+                        </button>
+                        <button type="button" @click="subTab = 'pengangkatan'"
+                                :class="subTab === 'pengangkatan' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'"
+                                class="text-xs transition-colors cursor-pointer focus:outline-none font-sans">
+                            D. SK Pengangkatan
+                        </button>
+                    </div>
+
+                    {{-- SUB-TAB A: PANGKAT --}}
+                    <div x-show="subTab === 'pangkat'" class="space-y-6" x-transition>
+                        @php $latestRank = $p->latestRank(); @endphp
+                        
+                        <div class="space-y-1 mb-4 border-b border-border pb-4">
+                            <label for="pangkat_history_id" class="text-xs font-bold text-primary uppercase tracking-wider font-sans">Pilih Riwayat Kepangkatan</label>
                             <div class="relative">
-                                <select id="jenis_pengangkatan" name="jenis_pengangkatan" required class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="" disabled {{ empty($p->appointment->jenis_pengangkatan) ? 'selected' : '' }}>Pilih Jenis Pengangkatan</option>
-                                    <option value="CPNS" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'CPNS' ? 'selected' : '' }}>CPNS</option>
-                                    <option value="PNS" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'PNS' ? 'selected' : '' }}>PNS</option>
-                                    <option value="PPPK" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'PPPK' ? 'selected' : '' }}>PPPK</option>
+                                <select id="pangkat_history_id" name="pangkat_history_id" x-model="selectedPangkatId" @change="loadPangkatData()" class="w-full appearance-none rounded-lg border border-primary/50 bg-primary/5 px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer font-semibold">
+                                    <option value="new">-- ✨ Tambah Riwayat Baru --</option>
+                                    @foreach($p->rankHistories->sortByDesc('tmt_pangkat') as $rh)
+                                        <option value="{{ $rh->id }}">Edit Riwayat: {{ $rh->golongan->nama }} (TMT: {{ $rh->tmt_pangkat ? $rh->tmt_pangkat->format('d-m-Y') : '-' }}) {{ $rh->is_latest ? '[Terbaru]' : '' }}</option>
+                                    @endforeach
                                 </select>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-primary">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
                                     </svg>
                                 </div>
                             </div>
                         </div>
 
-                        {{-- TMT --}}
-                        <div class="space-y-1">
-                            <label for="tmt" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Pengangkatan <span class="text-danger">*</span></label>
-                            <input id="tmt" name="tmt" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" value="{{ $p->appointment ? \Carbon\Carbon::parse($p->appointment->tmt_pengangkatan)->format('Y-m-d') : '' }}" >
-                        </div>
-
-                        {{-- Nomor SK --}}
-                        <div class="space-y-1">
-                            <label for="nomor_sk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Pengangkatan <span class="text-danger">*</span></label>
-                            <input id="nomor_sk" name="nomor_sk" type="text" required placeholder="SK-882-KP-2024" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->appointment ? $p->appointment->no_sk : '' }}" >
-                        </div>
-
-                        {{-- Tanggal SK --}}
-                        <div class="space-y-1">
-                            <label for="tanggal_sk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK Terbit <span class="text-danger">*</span></label>
-                            <input id="tanggal_sk" name="tanggal_sk" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" value="{{ $p->appointment && $p->appointment->tanggal_sk ? \Carbon\Carbon::parse($p->appointment->tanggal_sk)->format('Y-m-d') : '' }}" >
-                        </div>
-
-                        {{-- Upload File SK --}}
-                        <div class="space-y-1 sm:col-span-2 border-t border-border pt-4">
-                            <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans block">File SK Pengangkatan (PDF/JPG/PNG)</label>
-                            <div class="mt-2 border-2 border-dashed border-border rounded-lg p-6 bg-soft/50 text-center relative hover:border-primary transition">
-                                <input type="file" id="file_sk" name="file_sk" accept=".pdf,image/*" @change="handleSkChange" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
-                                <svg class="mx-auto h-12 w-12 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
-                                </svg>
-                                <p class="text-xs text-ink font-semibold mt-2 font-sans">Klik atau Seret berkas di sini untuk mengunggah berkas SK</p>
-                                <p class="text-[10px] text-muted mt-1 font-sans">Mendukung format PDF, JPG, atau PNG dengan ukuran maksimal 10MB.</p>
-                                <template x-if="skFileName">
-                                    <div class="mt-4 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink font-mono shadow-sm">
-                                        <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                            {{-- Golongan --}}
+                            <div class="space-y-1">
+                                <label for="pangkat_golongan_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Golongan <span class="text-danger">*</span></label>
+                                <div class="relative">
+                                    <select id="pangkat_golongan_id" name="pangkat_golongan_id" required x-model="pangkatForm.golongan_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                        <option value="" disabled>Pilih Golongan</option>
+                                        @foreach($golonganRefOptions as $gol)
+                                            <option value="{{ $gol->id }}">{{ $gol->kode }} - {{ $gol->nama }}</option>
+                                        @endforeach
+                                    </select>
+                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
                                         </svg>
-                                        <span x-text="skFileName"></span>
-                                        <span class="text-muted" x-text="'(' + skFileSize + ')'"></span>
                                     </div>
-                                </template>
-                                <p x-show="skFileError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skFileError"></p>
+                                </div>
+                            </div>
+
+                            {{-- Nomor SK Pangkat --}}
+                            <div class="space-y-1">
+                                <label for="pangkat_no_sk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Pangkat <span class="text-danger">*</span></label>
+                                <input id="pangkat_no_sk" name="pangkat_no_sk" type="text" required placeholder="SK-PANGKAT-321-KP-2026" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" x-model="pangkatForm.no_sk">
+                            </div>
+
+                            {{-- Tanggal SK Pangkat --}}
+                            <div class="space-y-1">
+                                <label for="pangkat_tanggal_sk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK <span class="text-danger">*</span></label>
+                                <input id="pangkat_tanggal_sk" name="pangkat_tanggal_sk" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" x-model="pangkatForm.tanggal_sk">
+                            </div>
+
+                            {{-- TMT Pangkat --}}
+                            <div class="space-y-1">
+                                <label for="pangkat_tmt_pangkat" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Pangkat <span class="text-danger">*</span></label>
+                                <input id="pangkat_tmt_pangkat" name="pangkat_tmt_pangkat" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" x-model="pangkatForm.tmt_pangkat">
+                            </div>
+
+                            {{-- Upload File SK Pangkat --}}
+                            <div class="space-y-1 sm:col-span-2 border-t border-border pt-4">
+                                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans block">File SK Pangkat (PDF/JPG/PNG)</label>
+                                <div class="mt-2 border-2 border-dashed border-border rounded-lg p-6 bg-soft/50 text-center relative hover:border-primary transition">
+                                    <input type="file" id="file_sk_pangkat" name="file_sk_pangkat" accept=".pdf,image/*" @change="handleSkPangkatChange" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+                                    <svg class="mx-auto h-12 w-12 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
+                                    </svg>
+                                    <p class="text-xs text-ink font-semibold mt-2 font-sans">Klik atau Seret berkas di sini untuk mengunggah berkas SK Pangkat</p>
+                                    <p class="text-[10px] text-muted mt-1 font-sans">Mendukung format PDF, JPG, atau PNG dengan ukuran maksimal 10MB.</p>
+                                    <template x-if="skPangkatName">
+                                        <div class="mt-4 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink font-mono shadow-sm">
+                                            <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                            </svg>
+                                            <span x-text="skPangkatName"></span>
+                                            <span class="text-muted" x-show="skPangkatSize" x-text="'(' + skPangkatSize + ')'"></span>
+                                        </div>
+                                    </template>
+                                    @if($latestRank && $latestRank->file_sk)
+                                        <div class="mt-2 text-xs text-muted" x-show="!skPangkatSize">
+                                            Berkas saat ini: <a href="{{ asset('storage/' . $latestRank->file_sk) }}" target="_blank" class="text-primary hover:underline font-semibold font-mono">{{ basename($latestRank->file_sk) }}</a>
+                                        </div>
+                                    @endif
+                                    <p x-show="skPangkatError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skPangkatError"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- SUB-TAB B: JABATAN --}}
+                    <div x-show="subTab === 'jabatan'" class="space-y-6" x-transition>
+                        @php $latestPosition = $p->latestPosition(); @endphp
+                        
+                        <div class="space-y-1 mb-4 border-b border-border pb-4">
+                            <label for="jabatan_history_id" class="text-xs font-bold text-primary uppercase tracking-wider font-sans">Pilih Riwayat Jabatan</label>
+                            <div class="relative">
+                                <select id="jabatan_history_id" name="jabatan_history_id" x-model="selectedJabatanId" @change="loadJabatanData()" class="w-full appearance-none rounded-lg border border-primary/50 bg-primary/5 px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer font-semibold">
+                                    <option value="new">-- ✨ Tambah Riwayat Baru --</option>
+                                    @foreach($p->positionHistories->sortByDesc('tmt_jabatan') as $jh)
+                                        <option value="{{ $jh->id }}">Edit Riwayat: {{ $jh->nama_jabatan }} (TMT: {{ $jh->tmt_jabatan ? $jh->tmt_jabatan->format('d-m-Y') : '-' }}) {{ $jh->is_latest ? '[Terbaru]' : '' }}</option>
+                                    @endforeach
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-primary">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                            {{-- Nama Jabatan --}}
+                            <div class="space-y-1">
+                                <label for="jabatan_nama_jabatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Jabatan <span class="text-danger">*</span></label>
+                                <input id="jabatan_nama_jabatan" name="jabatan_nama_jabatan" type="text" required placeholder="Analis Kepegawaian" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" x-model="jabatanForm.nama_jabatan">
+                            </div>
+
+                            {{-- Jenis Jabatan --}}
+                            <div class="space-y-1">
+                                <label for="jabatan_jenis_jabatan_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Jabatan <span class="text-danger">*</span></label>
+                                <div class="relative">
+                                    <select id="jabatan_jenis_jabatan_id" name="jabatan_jenis_jabatan_id" required x-model="jabatanForm.jenis_jabatan_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                        <option value="" disabled>Pilih Jenis Jabatan</option>
+                                        @foreach($jenisJabatanOptions as $jj)
+                                            <option value="{{ $jj->id }}">{{ $jj->nama }}</option>
+                                        @endforeach
+                                    </select>
+                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- Eselon --}}
+                            <div class="space-y-1">
+                                <label for="jabatan_eselon_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Eselon (Opsional)</label>
+                                <div class="relative">
+                                    <select id="jabatan_eselon_id" name="jabatan_eselon_id" x-model="jabatanForm.eselon_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                        <option value="">-- Pilih --</option>
+                                        @foreach($eselonOptions as $esl)
+                                            <option value="{{ $esl->id }}">{{ $esl->nama }}</option>
+                                        @endforeach
+                                    </select>
+                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- Unit Kerja --}}
+                            <div class="space-y-1">
+                                <label for="jabatan_unit_kerja_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Unit Kerja <span class="text-danger">*</span></label>
+                                <div class="relative">
+                                    <select id="jabatan_unit_kerja_id" name="jabatan_unit_kerja_id" required x-model="jabatanForm.unit_kerja_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                        <option value="" disabled>Pilih Unit Kerja</option>
+                                        @foreach($unitKerja as $unit)
+                                            <option value="{{ $unit->id }}">{{ $unit->nama }}</option>
+                                        @endforeach
+                                    </select>
+                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- Nomor SK Jabatan --}}
+                            <div class="space-y-1">
+                                <label for="jabatan_no_sk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Jabatan <span class="text-danger">*</span></label>
+                                <input id="jabatan_no_sk" name="jabatan_no_sk" type="text" required placeholder="SK-JABATAN-910-JAB-2026" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" x-model="jabatanForm.no_sk">
+                            </div>
+
+                            {{-- Tanggal SK Jabatan --}}
+                            <div class="space-y-1">
+                                <label for="jabatan_tanggal_sk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK <span class="text-danger">*</span></label>
+                                <input id="jabatan_tanggal_sk" name="jabatan_tanggal_sk" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" x-model="jabatanForm.tanggal_sk">
+                            </div>
+
+                            {{-- TMT Jabatan --}}
+                            <div class="space-y-1 sm:col-span-2">
+                                <label for="jabatan_tmt_jabatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Jabatan <span class="text-danger">*</span></label>
+                                <input id="jabatan_tmt_jabatan" name="jabatan_tmt_jabatan" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" x-model="jabatanForm.tmt_jabatan">
+                            </div>
+
+                            {{-- Upload File SK Jabatan --}}
+                            <div class="space-y-1 sm:col-span-2 border-t border-border pt-4">
+                                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans block">File SK Jabatan (PDF/JPG/PNG)</label>
+                                <div class="mt-2 border-2 border-dashed border-border rounded-lg p-6 bg-soft/50 text-center relative hover:border-primary transition">
+                                    <input type="file" id="file_sk_jabatan" name="file_sk_jabatan" accept=".pdf,image/*" @change="handleSkJabatanChange" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+                                    <svg class="mx-auto h-12 w-12 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
+                                    </svg>
+                                    <p class="text-xs text-ink font-semibold mt-2 font-sans">Klik atau Seret berkas di sini untuk mengunggah berkas SK Jabatan</p>
+                                    <p class="text-[10px] text-muted mt-1 font-sans">Mendukung format PDF, JPG, atau PNG dengan ukuran maksimal 10MB.</p>
+                                    <template x-if="skJabatanName">
+                                        <div class="mt-4 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink font-mono shadow-sm">
+                                            <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                            </svg>
+                                            <span x-text="skJabatanName"></span>
+                                            <span class="text-muted" x-show="skJabatanSize" x-text="'(' + skJabatanSize + ')'"></span>
+                                        </div>
+                                    </template>
+                                    @if($latestPosition && $latestPosition->file_sk)
+                                        <div class="mt-2 text-xs text-muted" x-show="!skJabatanSize">
+                                            Berkas saat ini: <a href="{{ asset('storage/' . $latestPosition->file_sk) }}" target="_blank" class="text-primary hover:underline font-semibold font-mono">{{ basename($latestPosition->file_sk) }}</a>
+                                        </div>
+                                    @endif
+                                    <p x-show="skJabatanError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skJabatanError"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- SUB-TAB C: KGB --}}
+                    <div x-show="subTab === 'kgb'" class="space-y-6" x-transition>
+                        @php $latestSalary = $p->latestSalary(); @endphp
+                        
+                        <div class="space-y-1 mb-4 border-b border-border pb-4">
+                            <label for="kgb_history_id" class="text-xs font-bold text-primary uppercase tracking-wider font-sans">Pilih Riwayat KGB</label>
+                            <div class="relative">
+                                <select id="kgb_history_id" name="kgb_history_id" x-model="selectedKgbId" @change="loadKgbData()" class="w-full appearance-none rounded-lg border border-primary/50 bg-primary/5 px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer font-semibold">
+                                    <option value="new">-- ✨ Tambah Riwayat Baru --</option>
+                                    @foreach($p->salaryHistories->sortByDesc('tmt_kgb') as $sh)
+                                        <option value="{{ $sh->id }}">Edit Riwayat: Rp {{ number_format($sh->gaji_pokok, 0, ',', '.') }} (TMT: {{ $sh->tmt_kgb ? $sh->tmt_kgb->format('d-m-Y') : '-' }}) {{ $sh->is_latest ? '[Terbaru]' : '' }}</option>
+                                    @endforeach
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-primary">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                            {{-- Gaji Pokok --}}
+                            <div class="space-y-1">
+                                <label for="kgb_gaji_pokok" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Gaji Pokok Terakhir <span class="text-danger">*</span></label>
+                                <div class="relative">
+                                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                                        <span class="text-muted text-sm font-semibold">Rp</span>
+                                    </div>
+                                    <input id="kgb_gaji_pokok" name="kgb_gaji_pokok" type="number" required placeholder="5000000" class="w-full rounded-lg border border-border bg-surface pl-12 pr-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" x-model="kgbForm.gaji_pokok">
+                                </div>
+                            </div>
+
+                            {{-- Nomor SK KGB --}}
+                            <div class="space-y-1">
+                                <label for="kgb_no_sk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK KGB <span class="text-danger">*</span></label>
+                                <input id="kgb_no_sk" name="kgb_no_sk" type="text" required placeholder="SK-KGB-543-2026" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" x-model="kgbForm.no_sk">
+                            </div>
+
+                            {{-- Tanggal SK KGB --}}
+                            <div class="space-y-1">
+                                <label for="kgb_tanggal_sk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK <span class="text-danger">*</span></label>
+                                <input id="kgb_tanggal_sk" name="kgb_tanggal_sk" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" x-model="kgbForm.tanggal_sk">
+                            </div>
+
+                            {{-- TMT KGB --}}
+                            <div class="space-y-1">
+                                <label for="kgb_tmt_kgb" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT KGB <span class="text-danger">*</span></label>
+                                <input id="kgb_tmt_kgb" name="kgb_tmt_kgb" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" x-model="kgbForm.tmt_kgb">
+                            </div>
+
+                            {{-- Upload File SK KGB --}}
+                            <div class="space-y-1 sm:col-span-2 border-t border-border pt-4">
+                                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans block">File Surat KGB (PDF/JPG/PNG)</label>
+                                <div class="mt-2 border-2 border-dashed border-border rounded-lg p-6 bg-soft/50 text-center relative hover:border-primary transition">
+                                    <input type="file" id="file_sk_kgb" name="file_sk_kgb" accept=".pdf,image/*" @change="handleSkKgbChange" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+                                    <svg class="mx-auto h-12 w-12 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
+                                    </svg>
+                                    <p class="text-xs text-ink font-semibold mt-2 font-sans">Klik atau Seret berkas di sini untuk mengunggah berkas Surat KGB</p>
+                                    <p class="text-[10px] text-muted mt-1 font-sans">Mendukung format PDF, JPG, atau PNG dengan ukuran maksimal 10MB.</p>
+                                    <template x-if="skKgbName">
+                                        <div class="mt-4 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink font-mono shadow-sm">
+                                            <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                            </svg>
+                                            <span x-text="skKgbName"></span>
+                                            <span class="text-muted" x-show="skKgbSize" x-text="'(' + skKgbSize + ')'"></span>
+                                        </div>
+                                    </template>
+                                    @if($latestSalary && $latestSalary->file_sk)
+                                        <div class="mt-2 text-xs text-muted" x-show="!skKgbSize">
+                                            Berkas saat ini: <a href="{{ asset('storage/' . $latestSalary->file_sk) }}" target="_blank" class="text-primary hover:underline font-semibold font-mono">{{ basename($latestSalary->file_sk) }}</a>
+                                        </div>
+                                    @endif
+                                    <p x-show="skKgbError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skKgbError"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- SUB-TAB D: PENGANGKATAN --}}
+                    <div x-show="subTab === 'pengangkatan'" class="space-y-6" x-transition>
+                        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                            {{-- Jenis Pengangkatan --}}
+                            <div class="space-y-1">
+                                <label for="pengangkatan_jenis_pengangkatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Pengangkatan <span class="text-danger">*</span></label>
+                                <div class="relative">
+                                    <select id="pengangkatan_jenis_pengangkatan" name="pengangkatan_jenis_pengangkatan" required class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                        <option value="" disabled {{ empty($p->appointment->jenis_pengangkatan) ? 'selected' : '' }}>Pilih Jenis Pengangkatan</option>
+                                        <option value="CPNS" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'CPNS' ? 'selected' : '' }}>CPNS</option>
+                                        <option value="PNS" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'PNS' ? 'selected' : '' }}>PNS</option>
+                                        <option value="PPPK" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'PPPK' ? 'selected' : '' }}>PPPK</option>
+                                    </select>
+                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- TMT Pengangkatan --}}
+                            <div class="space-y-1">
+                                <label for="pengangkatan_tmt_pengangkatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Pengangkatan <span class="text-danger">*</span></label>
+                                <input id="pengangkatan_tmt_pengangkatan" name="pengangkatan_tmt_pengangkatan" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" value="{{ $p->appointment && $p->appointment->tmt_pengangkatan ? \Carbon\Carbon::parse($p->appointment->tmt_pengangkatan)->format('Y-m-d') : '' }}" >
+                            </div>
+
+                            {{-- Nomor SK Pengangkatan --}}
+                            <div class="space-y-1">
+                                <label for="pengangkatan_no_sk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Pengangkatan <span class="text-danger">*</span></label>
+                                <input id="pengangkatan_no_sk" name="pengangkatan_no_sk" type="text" required placeholder="SK-882-KP-2024" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->appointment ? $p->appointment->no_sk : '' }}" >
+                            </div>
+
+                            {{-- Tanggal SK --}}
+                            <div class="space-y-1">
+                                <label for="pengangkatan_tanggal_sk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK Terbit <span class="text-danger">*</span></label>
+                                <input id="pengangkatan_tanggal_sk" name="pengangkatan_tanggal_sk" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" value="{{ $p->appointment && $p->appointment->tanggal_sk ? \Carbon\Carbon::parse($p->appointment->tanggal_sk)->format('Y-m-d') : '' }}" >
+                            </div>
+
+                            {{-- Upload File SK Pengangkatan --}}
+                            <div class="space-y-1 sm:col-span-2 border-t border-border pt-4">
+                                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans block">File SK Pengangkatan (PDF/JPG/PNG)</label>
+                                <div class="mt-2 border-2 border-dashed border-border rounded-lg p-6 bg-soft/50 text-center relative hover:border-primary transition">
+                                    <input type="file" id="file_sk_pengangkatan" name="file_sk_pengangkatan" accept=".pdf,image/*" @change="handleSkPengangkatanChange" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+                                    <svg class="mx-auto h-12 w-12 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
+                                    </svg>
+                                    <p class="text-xs text-ink font-semibold mt-2 font-sans">Klik atau Seret berkas di sini untuk mengunggah berkas SK Pengangkatan</p>
+                                    <p class="text-[10px] text-muted mt-1 font-sans">Mendukung format PDF, JPG, atau PNG dengan ukuran maksimal 10MB.</p>
+                                    <template x-if="skPengangkatanName">
+                                        <div class="mt-4 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink font-mono shadow-sm">
+                                            <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                            </svg>
+                                            <span x-text="skPengangkatanName"></span>
+                                            <span class="text-muted" x-show="skPengangkatanSize" x-text="'(' + skPengangkatanSize + ')'"></span>
+                                        </div>
+                                    </template>
+                                    @if($p->appointment && $p->appointment->file_sk)
+                                        <div class="mt-2 text-xs text-muted" x-show="!skPengangkatanSize">
+                                            Berkas saat ini: <a href="{{ asset('storage/' . $p->appointment->file_sk) }}" target="_blank" class="text-primary hover:underline font-semibold font-mono">{{ basename($p->appointment->file_sk) }}</a>
+                                        </div>
+                                    @endif
+                                    <p x-show="skPengangkatanError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skPengangkatanError"></p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -664,9 +1142,8 @@
 
                         {{-- Tombol Simpan --}}
                         <button type="submit" 
-                                x-show="activeTab === 'pengangkatan'" 
-                                :disabled="nip.length < 18 || nik.length < 16 || (kk.length > 0 && kk.length < 16) || skFileError !== ''"
-                                :class="(nip.length < 18 || nik.length < 16 || (kk.length > 0 && kk.length < 16) || skFileError !== '') ? 'opacity-50 cursor-not-allowed' : ''"
+                                :disabled="nip.length < 18 || (nik.length > 0 && nik.length < 16) || (kk.length > 0 && kk.length < 16) || skPangkatError !== '' || skJabatanError !== '' || skKgbError !== '' || skPengangkatanError !== ''"
+                                :class="(nip.length < 18 || (nik.length > 0 && nik.length < 16) || (kk.length > 0 && kk.length < 16) || skPangkatError !== '' || skJabatanError !== '' || skKgbError !== '' || skPengangkatanError !== '') ? 'opacity-50 cursor-not-allowed' : ''"
                                 class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 font-sans cursor-pointer">
                             <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />

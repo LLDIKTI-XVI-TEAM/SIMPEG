@@ -227,4 +227,93 @@ class EmployeeUpdateTest extends TestCase
             'tanggal_lahir' => Carbon::parse($employee->tanggal_lahir)->format('Y-m-d'),
         ], $overrides);
     }
+
+    public function test_admin_kepegawaian_can_update_employee_with_histories_via_web_form(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+
+        $golongan = \App\Models\RefGolongan::first() ?: \App\Models\RefGolongan::create(['kode' => 'III/a', 'nama' => 'Penata Muda']);
+        $jenisJabatan = \App\Models\RefJenisJabatan::first() ?: \App\Models\RefJenisJabatan::create(['nama' => 'Fungsional']);
+        $eselon = \App\Models\RefEselon::first() ?: \App\Models\RefEselon::create(['nama' => 'Eselon I']);
+        $unitKerja = \App\Models\RefUnitKerja::first() ?: \App\Models\RefUnitKerja::create(['nama' => 'LLDIKTI']);
+
+        $payload = $this->validPayload($employee, [
+            // Pangkat
+            'pangkat_golongan_id' => $golongan->id,
+            'pangkat_no_sk' => 'SK-PANGKAT-WEB-001',
+            'pangkat_tanggal_sk' => '2026-01-01',
+            'pangkat_tmt_pangkat' => '2026-01-02',
+            'file_sk_pangkat' => UploadedFile::fake()->create('sk-pangkat.pdf', 500, 'application/pdf'),
+
+            // Jabatan
+            'jabatan_nama_jabatan' => 'Kepala Sub Bagian Web',
+            'jabatan_jenis_jabatan_id' => $jenisJabatan->id,
+            'jabatan_eselon_id' => $eselon->id,
+            'jabatan_unit_kerja_id' => $unitKerja->id,
+            'jabatan_no_sk' => 'SK-JABATAN-WEB-001',
+            'jabatan_tanggal_sk' => '2026-02-01',
+            'jabatan_tmt_jabatan' => '2026-02-02',
+            'file_sk_jabatan' => UploadedFile::fake()->create('sk-jabatan.pdf', 500, 'application/pdf'),
+
+            // KGB
+            'kgb_gaji_pokok' => '4500000',
+            'kgb_no_sk' => 'SK-KGB-WEB-001',
+            'kgb_tanggal_sk' => '2026-03-01',
+            'kgb_tmt_kgb' => '2026-03-02',
+            'file_sk_kgb' => UploadedFile::fake()->create('sk-kgb.pdf', 500, 'application/pdf'),
+
+            // Pengangkatan
+            'pengangkatan_jenis_pengangkatan' => 'PNS',
+            'pengangkatan_tmt_pengangkatan' => '2026-04-01',
+            'pengangkatan_no_sk' => 'SK-PENGANGKATAN-WEB-001',
+            'pengangkatan_tanggal_sk' => '2026-04-02',
+            'file_sk_pengangkatan' => UploadedFile::fake()->create('sk-pengangkatan.pdf', 500, 'application/pdf'),
+        ]);
+
+        $this->actingAs($user);
+        $response = $this->withSession(['_token' => 'test-token'])
+            ->post("/pegawai/{$employee->id}", $payload, ['X-CSRF-TOKEN' => 'test-token']);
+
+        $response->assertRedirect(route('data-pegawai'));
+
+        // Assert RankHistory was created
+        $this->assertDatabaseHas('rank_histories', [
+            'employee_id' => $employee->id,
+            'golongan_id' => $golongan->id,
+            'no_sk' => 'SK-PANGKAT-WEB-001',
+            'tmt_pangkat' => '2026-01-02 00:00:00',
+            'is_latest' => 1,
+        ]);
+
+        // Assert PositionHistory was created
+        $this->assertDatabaseHas('position_histories', [
+            'employee_id' => $employee->id,
+            'nama_jabatan' => 'Kepala Sub Bagian Web',
+            'jenis_jabatan_id' => $jenisJabatan->id,
+            'eselon_id' => $eselon->id,
+            'unit_kerja_id' => $unitKerja->id,
+            'no_sk' => 'SK-JABATAN-WEB-001',
+            'tmt_jabatan' => '2026-02-02 00:00:00',
+            'is_latest' => 1,
+        ]);
+
+        // Assert SalaryHistory was created
+        $this->assertDatabaseHas('salary_histories', [
+            'employee_id' => $employee->id,
+            'gaji_pokok' => '4500000',
+            'no_sk' => 'SK-KGB-WEB-001',
+            'tmt_kgb' => '2026-03-02 00:00:00',
+            'is_latest' => 1,
+        ]);
+
+        // Assert Appointment was created
+        $this->assertDatabaseHas('appointments', [
+            'employee_id' => $employee->id,
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2026-04-01 00:00:00',
+            'no_sk' => 'SK-PENGANGKATAN-WEB-001',
+        ]);
+    }
 }
