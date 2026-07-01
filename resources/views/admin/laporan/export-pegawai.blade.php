@@ -120,6 +120,7 @@
         </div>
 
         {{-- FILTER BAR (Screen only) --}}
+
         <x-ui.filter-bar
             class="sm:grid-cols-2 lg:grid-cols-12"
             searchModel="searchQuery"
@@ -138,9 +139,11 @@
                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+
                     </svg>
                 </div>
             </div>
+
 
             {{-- Filter Golongan --}}
             <div class="relative col-span-1 sm:col-span-1 lg:col-span-4">
@@ -204,8 +207,9 @@
             </div>
         </x-ui.filter-bar>
 
+
         {{-- TABLE CARD --}}
-        <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm print:border-none print:shadow-none print:bg-transparent">
+        <x-ui.card padding="none" class="overflow-hidden print:border-none print:shadow-none print:bg-transparent">
             {{-- Header (Screen only) --}}
             <div class="px-6 py-4 border-b border-border bg-surface print:hidden">
                 <h3 class="text-sm font-semibold text-ink font-sans">Pratinjau Daftar Nominatif Pegawai</h3>
@@ -214,63 +218,63 @@
 
             {{-- Table Render --}}
             <div class="overflow-x-auto print:overflow-visible">
-                <table class="w-full print:border-collapse print:border print:border-black">
-                    <thead class="bg-soft border-b border-border print:bg-gray-100">
-                        <tr>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border select-none print:border print:border-black print:text-black">No</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border select-none print:border print:border-black print:text-black">NIP</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border select-none print:border print:border-black print:text-black">Nama Pegawai</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border select-none print:border print:border-black print:text-black">Golongan</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border select-none print:border print:border-black print:text-black">Jabatan</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border select-none print:border print:border-black print:text-black">Unit Kerja</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border select-none print:border print:border-black print:text-black">Jenis Pegawai</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border select-none print:border print:border-black print:text-black">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border print:divide-y print:divide-black">
+                <x-ui.table class="print:border-collapse print:border print:border-black">
+                    <x-ui.table-head class="border-b border-border print:bg-gray-100">
+                        <x-ui.table-row>
+                            <x-ui.table-th class="select-none print:border print:border-black print:text-black">No</x-ui.table-th>
+                            <x-ui.table-th class="select-none print:border print:border-black print:text-black">NIP</x-ui.table-th>
+                            <x-ui.table-th class="select-none print:border print:border-black print:text-black">Nama Pegawai</x-ui.table-th>
+                            <x-ui.table-th class="select-none print:border print:border-black print:text-black">Golongan</x-ui.table-th>
+                            <x-ui.table-th class="select-none print:border print:border-black print:text-black">Jabatan</x-ui.table-th>
+                            <x-ui.table-th class="select-none print:border print:border-black print:text-black">Unit Kerja</x-ui.table-th>
+                            <x-ui.table-th class="select-none print:border print:border-black print:text-black">Jenis Pegawai</x-ui.table-th>
+                            <x-ui.table-th class="select-none print:border print:border-black print:text-black">Status</x-ui.table-th>
+                        </x-ui.table-row>
+                    </x-ui.table-head>
+                    <x-ui.table-body class="print:divide-y print:divide-black">
                         {{-- SCREEN VIEW --}}
                         <template x-for="(p, index) in paginatedPegawai" :key="p.id">
-                            <tr class="transition-colors hover:bg-soft/50 print:hidden">
-                                <td class="px-4 py-3.5 text-xs font-mono text-muted" x-text="(currentPage - 1) * perPage + index + 1"></td>
-                                <td class="px-4 py-3.5 text-xs font-mono text-ink" x-text="p.nip"></td>
-                                <td class="px-4 py-3.5 text-xs font-bold text-ink font-sans" x-text="p.nama"></td>
-                                <td class="px-4 py-3.5 text-xs font-mono text-muted" x-text="p.golongan"></td>
-                                <td class="px-4 py-3.5 text-xs text-ink font-sans" x-text="p.jabatan"></td>
-                                <td class="px-4 py-3.5 text-xs text-muted font-sans" x-text="p.unit"></td>
-                                <td class="px-4 py-3.5 text-xs font-sans">
+                            <x-ui.table-row :interactive="true" class="print:hidden">
+                                <x-ui.table-td x-text="(currentPage - 1) * perPage + index + 1" class="font-mono text-muted"></x-ui.table-td>
+                                <x-ui.table-td x-text="p.nip" class="font-mono"></x-ui.table-td>
+                                <x-ui.table-td x-text="p.nama" class="font-bold"></x-ui.table-td>
+                                <x-ui.table-td x-text="p.golongan" class="font-mono text-muted"></x-ui.table-td>
+                                <x-ui.table-td x-text="p.jabatan"></x-ui.table-td>
+                                <x-ui.table-td x-text="p.unit" class="text-muted"></x-ui.table-td>
+                                <x-ui.table-td>
                                     <span class="font-semibold text-xs"
                                           :class="p.jenis === 'PNS' ? 'text-primary' : 'text-secondary'"
                                           x-text="p.jenis"></span>
-                                </td>
-                                <td class="px-4 py-3.5 text-xs font-sans">
+                                </x-ui.table-td>
+                                <x-ui.table-td>
                                     <span class="font-semibold text-xs capitalize"
                                           :class="p.status === 'aktif' ? 'text-success' : 'text-warning'"
                                           x-text="p.status"></span>
-                                </td>
-                            </tr>
+                                </x-ui.table-td>
+                            </x-ui.table-row>
                         </template>
 
                         {{-- PRINT ONLY VIEW (Tampilkan semua baris terfilter sekaligus) --}}
                         <template x-for="(p, index) in filteredPegawai" :key="'print-' + p.id">
-                            <tr class="hidden print:table-row">
-                                <td class="px-4 py-2 text-xs font-mono border border-black" x-text="index + 1"></td>
-                                <td class="px-4 py-2 text-xs font-mono border border-black" x-text="p.nip"></td>
-                                <td class="px-4 py-2 text-xs font-bold border border-black" x-text="p.nama"></td>
-                                <td class="px-4 py-2 text-xs font-mono border border-black" x-text="p.golongan"></td>
-                                <td class="px-4 py-2 text-xs border border-black" x-text="p.jabatan"></td>
-                                <td class="px-4 py-2 text-xs border border-black" x-text="p.unit"></td>
-                                <td class="px-4 py-2 text-xs border border-black" x-text="p.jenis"></td>
-                                <td class="px-4 py-2 text-xs border border-black" x-text="p.status"></td>
-                            </tr>
+                            <x-ui.table-row class="hidden print:table-row">
+                                <x-ui.table-td x-text="index + 1" class="px-4 py-2 font-mono border border-black"></x-ui.table-td>
+                                <x-ui.table-td x-text="p.nip" class="px-4 py-2 font-mono border border-black"></x-ui.table-td>
+                                <x-ui.table-td x-text="p.nama" class="px-4 py-2 font-bold border border-black"></x-ui.table-td>
+                                <x-ui.table-td x-text="p.golongan" class="px-4 py-2 font-mono border border-black"></x-ui.table-td>
+                                <x-ui.table-td x-text="p.jabatan" class="px-4 py-2 border border-black"></x-ui.table-td>
+                                <x-ui.table-td x-text="p.unit" class="px-4 py-2 border border-black"></x-ui.table-td>
+                                <x-ui.table-td x-text="p.jenis" class="px-4 py-2 border border-black"></x-ui.table-td>
+                                <x-ui.table-td x-text="p.status" class="px-4 py-2 border border-black"></x-ui.table-td>
+                            </x-ui.table-row>
                         </template>
 
-                        <tr x-show="filteredPegawai.length === 0">
-                            <td colspan="8" class="px-6 py-8 text-center text-xs text-muted font-sans print:border print:border-black">
+                        <x-ui.table-row x-show="filteredPegawai.length === 0">
+                            <x-ui.table-td colspan="8" align="center" class="px-6 py-8 text-muted print:border print:border-black">
                                 Tidak ada data pegawai yang cocok dengan filter Anda.
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                            </x-ui.table-td>
+                        </x-ui.table-row>
+                    </x-ui.table-body>
+                </x-ui.table>
             </div>
 
             {{-- TABLE FOOTER (Screen only) --}}
@@ -294,10 +298,12 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-1.5">
+
                     <x-ui.pagination current="currentPage" total="totalPages" />
+
                 </div>
             </div>
-        </div>
+        </x-ui.card>
 
         {{-- PRINT ONLY FOOTER --}}
         <div id="print-footer" class="hidden print:block"></div>

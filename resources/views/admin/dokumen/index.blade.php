@@ -22,7 +22,7 @@
         },
         get filteredDocuments() {
             return this.documents.filter(doc => {
-                const matchesSearch = doc.nama.toLowerCase().includes(this.searchQuery.toLowerCase()) || 
+                const matchesSearch = doc.nama.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
                                        doc.nomor.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
                                        doc.jenis.toLowerCase().includes(this.searchQuery.toLowerCase());
                 const matchesKategori = !this.activeKategori || doc.kategori === this.activeKategori;
@@ -64,8 +64,9 @@
             </div>
         </div>
 
-        <x-ui.filter-bar 
-            searchModel="searchQuery" 
+
+        <x-ui.filter-bar
+            searchModel="searchQuery"
             searchPlaceholder="Cari nama, nomor, jenis..."
         >
             {{-- Filter Unit Kerja --}}
@@ -81,9 +82,11 @@
                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+
                     </svg>
                 </div>
             </div>
+
 
             {{-- Filter Kategori Dokumen --}}
             <div class="relative col-span-1 sm:col-span-1 lg:col-span-1">
@@ -117,8 +120,9 @@
             </div>
         </x-ui.filter-bar>
 
+
         {{-- TABLE CARD --}}
-        <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
+        <x-ui.card padding="none" class="overflow-hidden">
             <div class="px-6 py-4 border-b border-border bg-surface">
                 <h3 class="text-sm font-semibold text-ink font-sans">Daftar Arsip Dokumen & SK</h3>
                 <p class="text-[10px] text-muted font-sans mt-0.5">Menampilkan seluruh data berkas fisik pendukung
@@ -127,36 +131,31 @@
 
             {{-- Table Render --}}
             <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-soft border-b border-border">
-                        <tr>
-                            <th
-                                class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border select-none">
-                                Pegawai</th>
-                            <th
-                                class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border select-none">
-                                Nama Dokumen</th>
-                            <th
-                                class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border select-none">
-                                Kategori</th>
-                            <th
-                                class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border select-none">
-                                Nomor Dokumen</th>
-                            <th
-                                class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border select-none">
-                                Tanggal</th>
-                            <th
-                                class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border select-none">
-                                Status</th>
-                            <th
-                                class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border select-none">
-                                Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
+
+                <x-ui.table>
+                    <x-ui.table-head class="border-b border-border">
+                        <x-ui.table-row>
+                            <x-ui.table-th class="select-none">
+                                Pegawai</x-ui.table-th>
+                            <x-ui.table-th class="select-none">
+                                Nama Dokumen</x-ui.table-th>
+                            <x-ui.table-th class="select-none">
+                                Kategori</x-ui.table-th>
+                            <x-ui.table-th class="select-none">
+                                Nomor Dokumen</x-ui.table-th>
+                            <x-ui.table-th class="select-none">
+                                Tanggal</x-ui.table-th>
+                            <x-ui.table-th class="select-none">
+                                Status</x-ui.table-th>
+                            <x-ui.table-th align="right" class="select-none">
+                                Aksi</x-ui.table-th>
+                        </x-ui.table-row>
+                    </x-ui.table-head>
+                    <x-ui.table-body>
+
                         <template x-for="doc in paginatedDocuments" :key="doc.id">
-                            <tr class="transition-colors hover:bg-soft/50">
-                                <td class="px-4 py-3.5">
+                            <x-ui.table-row :interactive="true">
+                                <x-ui.table-td>
                                     <div class="flex items-center gap-2.5">
                                         <div
                                             class="flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
@@ -169,8 +168,8 @@
                                                 x-text="doc.nip_pegawai"></p>
                                         </div>
                                     </div>
-                                </td>
-                                <td class="px-4 py-3.5 max-w-xs">
+                                </x-ui.table-td>
+                                <x-ui.table-td class="max-w-xs">
                                     <div class="flex items-start gap-2.5">
                                         {{-- Document File Icon --}}
                                         <div
@@ -191,30 +190,31 @@
                                                 x-text="doc.deskripsi"></p>
                                         </div>
                                     </div>
-                                </td>
-                                <td class="px-4 py-3.5 text-xs text-muted font-sans" x-text="doc.kategori_label"></td>
-                                <td class="px-4 py-3.5 text-xs font-mono text-muted" x-text="doc.nomor"></td>
-                                <td class="px-4 py-3.5 text-xs font-mono text-muted" x-text="doc.tanggal"></td>
-                                <td class="px-4 py-3.5">
-                                    <span
-                                        class="inline-flex items-center gap-1.5 text-xs font-semibold"
-                                        :class="{
-                                            'text-success': doc.status_dokumen === 'tersedia',
-                                            'text-danger': doc.status_dokumen === 'file_tidak_ditemukan'
-                                        }">
-                                        <span class="h-1.5 w-1.5 rounded-full" :class="{
-                                                'bg-success': doc.status_dokumen === 'tersedia',
-                                                'bg-danger': doc.status_dokumen === 'file_tidak_ditemukan'
-                                            }"></span>
+
+                                </x-ui.table-td>
+                                <x-ui.table-td x-text="doc.kategori_label" class="text-muted"></x-ui.table-td>
+                                <x-ui.table-td x-text="doc.nomor" class="font-mono text-muted"></x-ui.table-td>
+                                <x-ui.table-td x-text="doc.tanggal" class="font-mono text-muted"></x-ui.table-td>
+                                <x-ui.table-td>
+                                    <x-ui.badge
+                                        variant="none"
+                                        size="md"
+                                        dot
+                                        x-bind:class="{
+                                            'border-success/20 bg-success/10 text-success': doc.status_dokumen === 'terverifikasi',
+                                            'border-primary/20 bg-primary/10 text-primary': doc.status_dokumen === 'aktif',
+                                            'border-warning/25 bg-warning/10 text-warning': doc.status_dokumen === 'perlu_review',
+                                            'border-danger/20 bg-danger/10 text-danger': doc.status_dokumen === 'kadaluarsa'
+                                        }"
+                                    >
                                         <span x-text="doc.status_label"></span>
-                                    </span>
-                                </td>
-                                <td class="px-4 py-3.5 text-left">
-                                    <div class="flex items-center justify-start gap-1.5">
+                                    </x-ui.badge>
+                                </x-ui.table-td>
+                                <x-ui.table-td align="right">
+                                    <div class="flex items-center justify-end gap-1.5">
                                         {{-- Detail --}}
-                                        <a :href="'/dashboard/dokumen/' + doc.id"
-                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
-                                            title="Detail" :aria-label="'Lihat detail ' + doc.nama">
+                                        <x-ui.button as="a" x-bind:href="'/dashboard/dokumen/' + doc.id" variant="secondary" size="icon" title="Detail" aria-label="Detail">
+
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
                                                 viewBox="0 0 24 24" stroke-width="1.5">
                                                 <path stroke-linecap="round" stroke-linejoin="round"
@@ -222,28 +222,28 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round"
                                                     d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                             </svg>
-                                        </a>
+                                        </x-ui.button>
                                         {{-- Unduh --}}
-                                        <a :href="'/dashboard/dokumen/' + doc.id + '/download'"
-                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
-                                            title="Unduh" :aria-label="'Unduh ' + doc.nama">
+
+                                        <x-ui.button as="a" x-bind:href="'/dashboard/dokumen/' + doc.id + '/download'" variant="secondary" size="icon" title="Unduh" aria-label="Unduh">
+
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
                                                 viewBox="0 0 24 24" stroke-width="1.5">
                                                 <path stroke-linecap="round" stroke-linejoin="round"
                                                     d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                                             </svg>
-                                        </a>
+                                        </x-ui.button>
                                     </div>
-                                </td>
-                            </tr>
+                                </x-ui.table-td>
+                            </x-ui.table-row>
                         </template>
-                        <tr x-show="filteredDocuments.length === 0">
-                            <td colspan="7" class="px-6 py-8 text-center text-xs text-muted font-sans">
+                        <x-ui.table-row x-show="filteredDocuments.length === 0">
+                            <x-ui.table-td colspan="7" align="center" class="px-6 py-8 text-muted">
                                 Tidak ada dokumen yang cocok dengan filter atau pencarian Anda.
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                            </x-ui.table-td>
+                        </x-ui.table-row>
+                    </x-ui.table-body>
+                </x-ui.table>
             </div>
 
             {{-- TABLE FOOTER --}}
@@ -259,41 +259,39 @@
                         </select>
                         <span class="text-sm text-muted">data per halaman</span>
                     </div>
-                    
+
                     <p class="text-sm text-muted hidden sm:block" x-show="filteredDocuments.length > 0">
                         Menampilkan <span class="font-semibold text-ink" x-text="(currentPage - 1) * perPage + 1"></span> hingga <span class="font-semibold text-ink" x-text="Math.min(currentPage * perPage, filteredDocuments.length)"></span> dari <span class="font-semibold text-ink" x-text="filteredDocuments.length"></span> hasil
                     </p>
                 </div>
-                
+
+
                 <div class="w-full sm:w-auto">
                     <div class="flex items-center justify-center gap-1.5">
                         <x-ui.pagination current="currentPage" total="totalPages" />
                     </div>
+
                 </div>
             </div>
-        </div>
+        </x-ui.card>
 
         {{-- ================================================================ --}}
         {{-- MODAL UNGGAH DOKUMEN BARU (POPUP) --}}
         {{-- ================================================================ --}}
-        <div x-show="showUploadModal" class="fixed inset-0 z-50 overflow-y-auto bg-ink/40"
-            style="display: none;" x-transition>
-            <div class="flex min-h-full items-center justify-center p-4">
-                <div @click.outside="showUploadModal = false"
-                    class="relative w-full max-w-lg rounded-lg border border-border bg-surface p-5 shadow-xl space-y-4"
-                    role="dialog" aria-modal="true" aria-labelledby="upload-dokumen-title">
 
-                {{-- Modal Header --}}
-                <div class="flex justify-between items-center border-b border-border pb-3">
-                    <h3 id="upload-dokumen-title" class="text-base font-semibold text-ink font-sans">Unggah Dokumen Kepegawaian</h3>
-                    <button @click="showUploadModal = false"
-                        class="text-xs font-semibold text-muted hover:text-ink font-sans cursor-pointer focus:outline-none">Tutup</button>
-                </div>
+        <x-ui.modal
+            show="showUploadModal"
+            title="Unggah Dokumen Kepegawaian"
+            close-action="showUploadModal = false"
+            max-width="lg"
+            body-class="p-6"
+            overlay-class="bg-ink/40"
+        >
 
                 <form action="{{ route('dokumen.store') }}" method="POST" enctype="multipart/form-data"
                     class="space-y-3">
                     @csrf
-                    
+
                     @if ($errors->any())
                         <div class="rounded-lg bg-danger/10 p-3 text-xs text-danger font-sans">
                             <ul class="list-disc pl-4 space-y-1">
@@ -305,67 +303,68 @@
                     @endif
 
                     {{-- Relasi Pegawai --}}
-                    <div class="space-y-1">
-                        <label for="pegawai_id" class="text-xs font-semibold text-ink font-sans">Hubungkan ke Pegawai <span
-                                class="text-danger">*</span></label>
-                        <div class="relative">
-                            <select id="pegawai_id" name="pegawai_id" required
-                                class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-4 pr-10 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                <option value="">Pilih Pegawai...</option>
-                                @foreach ($pegawaiOptions as $pegawai)
-                                    <option value="{{ $pegawai['id'] }}" @selected(old('pegawai_id') === $pegawai['id'])>{{ $pegawai['label'] }}</option>
-                                @endforeach
-                            </select>
-                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4">
-                                <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                            </div>
-                        </div>
-                    </div>
+
+                    <x-form.select
+                        name="pegawai_id"
+                        label="Hubungkan ke Pegawai"
+                        required
+                    >
+                        <option value="">Pilih Pegawai...</option>
+                        @foreach($pegawaiList as $p)
+                            <option value="{{ $p->id }}">{{ $p->nama_lengkap }} (NIP. {{ $p->nip }})</option>
+                        @endforeach
+                    </x-form.select>
 
                     {{-- Kategori Dokumen --}}
-                    <div class="space-y-1">
-                        <label class="text-xs font-semibold text-ink font-sans">Kategori Dokumen <span
-                                class="text-danger">*</span></label>
-                        <div class="relative">
-                            <select name="kategori_dokumen" required
-                                class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-4 pr-10 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                @foreach ($categoryLabels as $value => $label)
-                                    <option value="{{ $value }}">{{ $label }}</option>
-                                @endforeach
-                            </select>
-                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4">
-                                <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                            </div>
-                        </div>
-                    </div>
+                    <x-form.select
+                        name="kategori_dokumen"
+                        label="Kategori Dokumen"
+                        required
+                    >
+                        <option value="sk_pengangkatan">SK Pengangkatan</option>
+                        <option value="sk_pangkat">SK Kenaikan Pangkat</option>
+                        <option value="sk_jabatan">SK Kenaikan Jabatan</option>
+                        <option value="sk_kgb">SK KGB (Kenaikan Gaji Berkala)</option>
+                        <option value="ijazah">Ijazah / Pendidikan</option>
+                        <option value="ktp_kk">Identitas Diri (KTP & KK)</option>
+                        <option value="lainnya">Lampiran / Dokumen Lain</option>
+                    </x-form.select>
 
-                    <div class="space-y-1">
-                        <label class="text-xs font-semibold text-ink font-sans">Nama Dokumen <span
-                                class="text-danger">*</span></label>
-                        <input type="text" name="nama_dokumen" required
-                            placeholder="Contoh: SK Kenaikan Pangkat Penata Tkt. I 2026"
-                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                    </div>
+                    <x-form.input
+    name="nama_dokumen"
+    label="Nama Dokumen"
+    type="text"
+    placeholder="Contoh: SK Kenaikan Pangkat Penata Tkt. I 2026"
+    required
+    size="sm"
+/>
 
                     <div class="grid grid-cols-2 gap-3">
-                        <div class="space-y-1">
-                            <label class="text-xs font-semibold text-ink font-sans">Nomor Dokumen</label>
-                            <input type="text" name="nomor_dokumen" placeholder="SK-..."
-                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-xs font-semibold text-ink font-sans">Tanggal Dokumen</label>
-                            <input type="date" name="tanggal_terbit"
-                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                        </div>
+                        <x-form.input
+    name="nomor_dokumen"
+    label="Nomor Dokumen"
+    type="text"
+    placeholder="SK-..."
+    required
+    size="sm"
+/>
+                        <x-form.date
+    name="tanggal_terbit"
+    label="Tanggal Dokumen"
+    required
+    size="sm"
+/>
                     </div>
 
-                    <div class="space-y-1">
-                        <label class="text-xs font-semibold text-ink font-sans">Keterangan / Deskripsi</label>
-                        <textarea name="deskripsi" rows="2"
-                            placeholder="Tulis rincian atau catatan singkat mengenai dokumen..."
-                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none font-sans"></textarea>
-                    </div>
+                    <x-form.textarea
+                        name="deskripsi"
+                        label="Keterangan / Deskripsi"
+                        rows="3"
+                        size="sm"
+                        label-class="font-semibold normal-case tracking-normal"
+                        placeholder="Tulis rincian atau catatan singkat mengenai dokumen..."
+                    />
+
 
                     <div class="space-y-1">
                         <label class="text-xs font-semibold text-ink font-sans">Pilih File Berkas <span
@@ -390,8 +389,7 @@
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
+        </x-ui.modal>
 
     </div>
 

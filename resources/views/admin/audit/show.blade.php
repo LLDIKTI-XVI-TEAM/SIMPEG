@@ -32,20 +32,18 @@
     @endphp
     <div class="mx-auto max-w-3xl space-y-6">
         
-        {{-- Breadcrumbs & Title --}}
-        <div class="flex flex-col gap-1.5">
-            <h2 class="text-2xl font-bold text-ink font-sans">Detail Log Aktivitas</h2>
-            <nav class="flex items-center gap-1.5 text-xs text-muted">
+        <x-admin.page-header title="Detail Log Aktivitas">
+            <x-slot:breadcrumb>
                 <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
                 <span>/</span>
                 <a href="{{ route('audit-log') }}" class="transition-colors hover:text-ink">Audit Log</a>
                 <span>/</span>
                 <span class="font-medium text-ink">Detail Log #{{ $log['id'] }}</span>
-            </nav>
-        </div>
+            </x-slot:breadcrumb>
+        </x-admin.page-header>
 
         {{-- Detail Card --}}
-        <div class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6">
+        <x-ui.card padding="lg" class="space-y-6">
             
             {{-- Header info --}}
             <div class="border-b border-border pb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -54,9 +52,9 @@
                     <p class="text-xs text-muted font-sans mt-0.5">Waktu Operasional: {{ $log['timestamp'] }}</p>
                 </div>
                 <div>
-                    <span class="inline-flex items-center gap-1.5 text-xs font-bold font-sans text-primary">
+                    <x-ui.badge variant="primary" size="md">
                         Modul: {{ $log['modul'] }}
-                    </span>
+                    </x-ui.badge>
                 </div>
             </div>
 
@@ -89,30 +87,30 @@
                 <h4 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Perubahan Nilai Data</h4>
                 
                 <div class="overflow-hidden rounded-lg border border-border bg-soft">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="bg-border/40 text-[10px] uppercase font-semibold text-muted font-sans border-b border-border">
-                                <th class="px-3 py-2">Nama Field</th>
-                                <th class="px-3 py-2">Sebelum</th>
-                                <th class="px-3 py-2">Sesudah</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border text-[11px] font-sans">
+                    <x-ui.table class="text-left border-collapse">
+                        <x-ui.table-head>
+                            <x-ui.table-row class="bg-border/40 text-[10px] border-b border-border">
+                                <x-ui.table-th padding="xs">Nama Field</x-ui.table-th>
+                                <x-ui.table-th padding="xs">Sebelum</x-ui.table-th>
+                                <x-ui.table-th padding="xs">Sesudah</x-ui.table-th>
+                            </x-ui.table-row>
+                        </x-ui.table-head>
+                        <x-ui.table-body class="text-[11px] font-sans">
                             @forelse($diffs as $diff)
-                                <tr>
-                                    <td class="px-3 py-2 font-semibold text-ink font-mono">{{ $diff['field'] }}</td>
-                                    <td class="px-3 py-2 text-danger font-mono bg-danger/5">{{ $diff['old'] }}</td>
-                                    <td class="px-3 py-2 text-success font-mono bg-success/5">{{ $diff['new'] }}</td>
-                                </tr>
+                                <x-ui.table-row>
+                                    <x-ui.table-td padding="xs" class="font-semibold font-mono">{{ $diff['field'] }}</x-ui.table-td>
+                                    <x-ui.table-td padding="xs" class="text-danger font-mono bg-danger/5">{{ $diff['old'] }}</x-ui.table-td>
+                                    <x-ui.table-td padding="xs" class="text-success font-mono bg-success/5">{{ $diff['new'] }}</x-ui.table-td>
+                                </x-ui.table-row>
                             @empty
-                                <tr>
-                                    <td colspan="3" class="px-3 py-4 text-center text-muted font-sans">
+                                <x-ui.table-row>
+                                    <x-ui.table-td colspan="3" align="center" class="px-3 py-4 text-muted">
                                         Tidak ada detail perubahan nilai data (misal: event login/logout).
-                                    </td>
-                                </tr>
+                                    </x-ui.table-td>
+                                </x-ui.table-row>
                             @endforelse
-                        </tbody>
-                    </table>
+                        </x-ui.table-body>
+                    </x-ui.table>
                 </div>
             </div>
 
@@ -120,16 +118,16 @@
             <div class="border-t border-border pt-6 flex justify-between items-center gap-3">
                 <div>
                     @if($log['modul'] === 'Employee' || $log['modul'] === 'LeaveRequest')
-                        <a href="{{ $log['modul'] === 'Employee' ? '/pegawai/' . $log['record_id'] : '/dashboard/cuti/' . $log['record_id'] }}" class="inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90">
+                        <x-ui.button href="{{ $log['modul'] === 'Employee' ? '/pegawai/' . $log['record_id'] : '/dashboard/cuti/' . $log['record_id'] }}" variant="primary">
                             Lihat Record
-                        </a>
+                        </x-ui.button>
                     @endif
                 </div>
-                <a href="{{ route('audit-log') }}" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-5 py-2.5 text-sm font-semibold text-primary transition hover:bg-soft">
+                <x-ui.button href="{{ route('audit-log') }}" variant="secondary">
                     Kembali ke Log
-                </a>
+                </x-ui.button>
             </div>
 
-        </div>
+        </x-ui.card>
     </div>
 </x-layouts.app>

@@ -50,7 +50,7 @@
             $timestamp = strtotime($newVal['tanggal']);
             $days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
             $hariName = $days[date('w', $timestamp)];
-            
+
             $addedHolidays[] = [
                 'id' => $log['id'],
                 'tanggal' => $newVal['tanggal'],
@@ -81,7 +81,7 @@
         perPage: 10,
         currentPage: 1,
         holidays: {{ json_encode($allHolidays) }},
-        
+
         get filteredHolidays() {
             return this.holidays.filter(h => {
                 const date = new Date(h.tanggal);
@@ -141,7 +141,7 @@
             const form = document.createElement('form');
             form.method = 'POST';
             form.action = '/hari-libur/' + this.selectedHoliday.id + '/delete';
-            
+
             const csrfToken = document.querySelector('meta[name=csrf-token]').getAttribute('content');
             const tokenInput = document.createElement('input');
             tokenInput.type = 'hidden';
@@ -168,12 +168,12 @@
                 </nav>
             </div>
             <div class="flex items-center gap-3">
-                <a href="{{ route('audit-log') }}" class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-muted shadow-sm transition hover:bg-soft hover:text-ink font-sans">
+                <x-ui.button href="{{ route('audit-log') }}" variant="muted">
                     <svg class="w-4 h-4 mr-1.5 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
                     </svg>
                     Lihat Audit Log Master
-                </a>
+                </x-ui.button>
                 <button
                     @click="showAddForm = !showAddForm"
                     class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2.5 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm font-sans"
@@ -197,36 +197,43 @@
         </div>
 
         {{-- Form Tambah Hari Libur (Collapsible) --}}
-        <div x-show="showAddForm" class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-4" style="display: none;">
+        <x-ui.card padding="lg" x-show="showAddForm"   style="display: none;" class="space-y-4">
             <form action="{{ route('hari-libur.store') }}" method="POST" class="space-y-4">
                 @csrf
                 <h3 class="text-sm font-semibold text-primary font-sans">Tambah Hari Libur Baru</h3>
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <div class="space-y-1">
-                        <label class="text-xs font-semibold text-ink font-sans">Tanggal</label>
-                        <input type="date" name="tanggal" required class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-xs font-semibold text-ink font-sans">Nama Hari Libur</label>
-                        <input type="text" name="nama" required placeholder="Contoh: Hari Raya Idul Fitri" class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-xs font-semibold text-ink font-sans">Jenis Libur</label>
-                        <select name="tipe" required class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                            <option value="libur_nasional">Libur Nasional</option>
-                            <option value="cuti_bersama">Cuti Bersama</option>
-                        </select>
-                    </div>
+                    <x-form.date
+    name="tanggal"
+    label="Tanggal"
+    required
+    size="lg"
+/>
+                    <x-form.input
+    name="nama"
+    label="Nama Hari Libur"
+    type="text"
+    placeholder="Contoh: Hari Raya Idul Fitri"
+    required
+    size="lg"
+/>
+                    <x-form.select
+                        name="tipe"
+                        label="Jenis Libur"
+                        required
+                    >
+                        <option value="libur_nasional">Libur Nasional</option>
+                        <option value="cuti_bersama">Cuti Bersama</option>
+                    </x-form.select>
                 </div>
                 <div class="flex justify-end gap-3 pt-2">
-                    <button type="button" @click="showAddForm = false" class="text-xs font-semibold text-muted hover:text-ink font-sans">Batal</button>
-                    <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2 font-sans">Simpan</button>
+                    <x-ui.button type="button" variant="link" size="xs" @click="showAddForm = false">Batal</x-ui.button>
+                    <x-ui.button type="submit" variant="primary" size="xs">Simpan</x-ui.button>
                 </div>
             </form>
-        </div>
+        </x-ui.card>
 
         {{-- Filter Bar --}}
-        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-surface border border-border rounded-lg p-4 shadow-sm">
+        <x-ui.card padding="sm" class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             {{-- Tabs Tahun --}}
             <div class="flex items-center gap-4 border-b border-border pb-2 md:border-b-0 md:pb-0">
                 <button @click="activeYear = 2026" :class="activeYear === 2026 ? 'text-primary font-semibold border-b-2 border-primary' : 'text-muted hover:text-ink'" class="text-sm pb-1 font-sans cursor-pointer focus:outline-none">
@@ -251,7 +258,7 @@
                         </svg>
                     </div>
                 </div>
-                
+
                 {{-- Tipe Dropdown --}}
                 <div class="flex items-center gap-2">
                     <label class="text-xs text-muted font-sans font-medium whitespace-nowrap">Tipe Libur:</label>
@@ -262,61 +269,63 @@
                     </select>
                 </div>
             </div>
-        </div>
+        </x-ui.card>
 
         {{-- Table --}}
-        <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
+        <x-ui.card padding="none" class="overflow-hidden">
             <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-soft">
-                        <tr>
-                            <th class="px-6 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Tanggal</th>
-                            <th class="px-6 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Hari</th>
-                            <th class="px-6 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Nama Hari Libur</th>
-                            <th class="px-6 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Jenis Libur</th>
-                            <th class="px-6 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Tahun</th>
-                            <th class="px-6 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
+                <x-ui.table>
+                    <x-ui.table-head>
+                        <x-ui.table-row>
+                            <x-ui.table-th class="px-6 py-3.5 text-[11px]">Tanggal</x-ui.table-th>
+                            <x-ui.table-th class="px-6 py-3.5 text-[11px]">Hari</x-ui.table-th>
+                            <x-ui.table-th class="px-6 py-3.5 text-[11px]">Nama Hari Libur</x-ui.table-th>
+                            <x-ui.table-th class="px-6 py-3.5 text-[11px]">Jenis Libur</x-ui.table-th>
+                            <x-ui.table-th class="px-6 py-3.5 text-[11px]">Tahun</x-ui.table-th>
+                            <x-ui.table-th class="px-6 py-3.5 text-[11px]">Aksi</x-ui.table-th>
+                        </x-ui.table-row>
+                    </x-ui.table-head>
+                    <x-ui.table-body>
                         <template x-for="(h, index) in paginatedHolidays" :key="h.id">
-                            <tr class="transition-colors hover:bg-soft/50">
-                                <td class="px-6 py-4 text-sm font-medium text-ink font-sans" x-text="formatDate(h.tanggal)"></td>
-                                <td class="px-6 py-4 text-sm text-ink font-sans" x-text="h.hari"></td>
-                                <td class="px-6 py-4 text-sm font-medium text-ink font-sans" x-text="h.nama"></td>
-                                <td class="px-6 py-4">
+                            <x-ui.table-row :interactive="true">
+                                <x-ui.table-td x-text="formatDate(h.tanggal)" padding="comfortable" class="text-sm font-medium"></x-ui.table-td>
+                                <x-ui.table-td x-text="h.hari" padding="comfortable" class="text-sm"></x-ui.table-td>
+                                <x-ui.table-td x-text="h.nama" padding="comfortable" class="text-sm font-medium"></x-ui.table-td>
+                                <x-ui.table-td padding="comfortable">
                                     <span class="text-xs font-semibold font-sans"
                                           :class="h.tipe === 'libur_nasional' ? 'text-primary' : 'text-secondary'"
                                           x-text="h.tipe === 'libur_nasional' ? 'Libur Nasional' : 'Cuti Bersama'">
                                     </span>
-                                </td>
-                                <td class="px-6 py-4 text-sm text-muted font-sans font-mono" x-text="new Date(h.tanggal).getFullYear()"></td>
-                                <td class="px-6 py-4">
+                                </x-ui.table-td>
+                                <x-ui.table-td x-text="new Date(h.tanggal).getFullYear()" padding="comfortable" class="text-sm text-muted font-mono"></x-ui.table-td>
+                                <x-ui.table-td padding="comfortable">
                                     <div class="flex items-center gap-1.5">
                                         {{-- Edit Button --}}
-                                        <a :href="'/hari-libur/' + h.id + '/edit'" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary shadow-sm hover:bg-soft" title="Edit Hari Libur">
+                                        <x-ui.button as="a" x-bind:href="'/hari-libur/' + h.id + '/edit'" variant="secondary" size="icon" title="Edit Hari Libur" aria-label="Edit Hari Libur">
                                             <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                             </svg>
-                                        </a>
+                                        </x-ui.button>
                                         {{-- Delete Button --}}
+
                                         <button type="button" @click="selectedHoliday = h; document.getElementById('modal-title-delete-holiday').innerText = 'Hapus ' + h.nama; $dispatch('open-confirm-delete-holiday')" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-danger shadow-sm hover:bg-soft cursor-pointer" title="Hapus Hari Libur">
                                             <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                             </svg>
                                         </button>
+
                                     </div>
-                                </td>
-                            </tr>
+                                </x-ui.table-td>
+                            </x-ui.table-row>
                         </template>
                         {{-- Empty state --}}
-                        <tr x-show="totalFiltered === 0">
-                            <td colspan="6" class="px-6 py-8 text-center text-xs text-muted font-sans bg-surface">
+                        <x-ui.table-row x-show="totalFiltered === 0">
+                            <x-ui.table-td colspan="6" align="center" class="px-6 py-8 text-muted bg-surface">
                                 Tidak ada data hari libur untuk filter yang dipilih.
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                            </x-ui.table-td>
+                        </x-ui.table-row>
+                    </x-ui.table-body>
+                </x-ui.table>
             </div>
 
             {{-- TABLE FOOTER --}}
@@ -340,11 +349,13 @@
                 </div>
 
                 {{-- Pagination Control --}}
+
                 <div class="flex items-center gap-1.5">
                     <x-ui.pagination current="currentPage" total="totalPages" action="setPage(page)" />
+
                 </div>
             </div>
-        </div>
+        </x-ui.card>
 
         <x-ui.confirm-dialog
             id="delete-holiday"
