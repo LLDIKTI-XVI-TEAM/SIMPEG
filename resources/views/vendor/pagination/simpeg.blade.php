@@ -18,7 +18,7 @@
             @php
                 $currentPage = $paginator->currentPage();
                 $lastPage = $paginator->lastPage();
-                
+
                 $customElements = [];
                 if ($lastPage <= 5) {
                     $urls = [];

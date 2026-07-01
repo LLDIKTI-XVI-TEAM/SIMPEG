@@ -8,12 +8,9 @@
     </div>
 
     @if(session('auth_error'))
-        <div class="mt-4 flex items-start gap-3 rounded-lg border border-danger/20 bg-danger/10 px-4 py-3">
-            <svg class="mt-0.5 h-4 w-4 shrink-0 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            <p class="text-sm font-medium text-danger">{{ session('auth_error') }}</p>
-        </div>
+        <x-ui.alert variant="danger" class="mt-4 font-medium">
+            {{ session('auth_error') }}
+        </x-ui.alert>
     @endif
 
     <div class="mt-6">

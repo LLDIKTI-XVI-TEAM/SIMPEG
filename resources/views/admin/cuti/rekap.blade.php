@@ -98,8 +98,10 @@
             </div>
         </div>
 
-        <div class="rounded-lg border border-border bg-surface p-4 shadow-sm">
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
+
+        <x-ui.card padding="sm">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-5">
+
                 <select x-model="activeFilters.periode"
                     class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                     <option>Juni 2026</option>
@@ -131,139 +133,140 @@
                     <option>Cuti Luar Tanggungan Negara (CLTN)</option>
                 </select>
             </div>
-        </div>
+        </x-ui.card>
 
         <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
             @foreach($summary as $card)
-                <div class="rounded-lg border border-border bg-surface p-5 shadow-sm">
+                <x-ui.card>
                     <p class="text-[10px] font-bold uppercase tracking-wider text-muted">{{ $card['label'] }}</p>
                     <p class="mt-2 font-mono text-3xl font-extrabold {{ $toneText[$card['tone']] }}">{{ $card['value'] }}
                     </p>
                     <p class="mt-1 text-xs text-muted">{{ $card['caption'] }}</p>
-                </div>
+                </x-ui.card>
             @endforeach
         </div>
 
         <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
             <div class="space-y-4">
-                <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
+                <x-ui.card padding="none" class="overflow-hidden">
                     <div class="border-b border-border px-5 py-4">
                         <h3 class="text-sm font-semibold text-ink">Rekap Saldo Per Pegawai</h3>
                         <p class="text-[10px] text-muted">Nama, NIP, jatah, carry-over, terpakai, sisa, total per jenis
                             cuti, dan status saldo.</p>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="w-full">
-                            <thead class="bg-soft">
-                                <tr>
-                                    <th class="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">Pegawai</th>
-                                    <th class="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">Unit</th>
-                                    <th class="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">Jatah</th>
-                                    <th class="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">Carry</th>
-                                    <th class="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">Terpakai</th>
-                                    <th class="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">Sisa</th>
-                                    <th class="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">Tahunan</th>
-                                    <th class="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">Sakit</th>
-                                    <th class="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">Status</th>
-                                    <th class="whitespace-nowrap px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-border">
+
+                        <x-ui.table>
+                            <x-ui.table-head>
+                                <x-ui.table-row>
+                                    <x-ui.table-th>
+                                        Pegawai</x-ui.table-th>
+                                    <x-ui.table-th>
+                                        Unit</x-ui.table-th>
+                                    <x-ui.table-th align="right">
+                                        Jatah</x-ui.table-th>
+                                    <x-ui.table-th align="right">
+                                        Carry</x-ui.table-th>
+                                    <x-ui.table-th align="right">
+                                        Terpakai</x-ui.table-th>
+                                    <x-ui.table-th align="right">
+                                        Sisa</x-ui.table-th>
+                                    <x-ui.table-th align="right">
+                                        Tahunan</x-ui.table-th>
+                                    <x-ui.table-th align="right">
+                                        Sakit</x-ui.table-th>
+                                    <x-ui.table-th>
+                                        Status</x-ui.table-th>
+                                    <x-ui.table-th align="right">
+                                        Aksi</x-ui.table-th>
+                                </x-ui.table-row>
+                            </x-ui.table-head>
+                            <x-ui.table-body>
                                 @foreach($leaveBalances as $row)
-                                    <tr class="transition hover:bg-soft/40">
-                                        <td class="px-4 py-3 whitespace-nowrap">
+                                    <x-ui.table-row :interactive="true">
+                                        <x-ui.table-td padding="sm">
                                             <p class="text-sm font-semibold text-ink">{{ $row['nama'] }}</p>
                                             <p class="font-mono text-xs text-muted">{{ $row['nip'] }}</p>
-                                        </td>
-                                        <td class="whitespace-nowrap px-4 py-3 text-sm text-ink">{{ $row['unit'] }}</td>
-                                        <td class="px-4 py-3 text-left font-mono text-sm text-ink">{{ $row['jatah'] }}</td>
-                                        <td class="px-4 py-3 text-left font-mono text-sm text-ink">{{ $row['carry'] }}</td>
-                                        <td class="px-4 py-3 text-left font-mono text-sm text-ink">{{ $row['terpakai'] }}</td>
-                                        <td class="px-4 py-3 text-left font-mono text-sm font-bold text-primary">{{ $row['sisa'] }}</td>
-                                        <td class="px-4 py-3 text-left font-mono text-sm text-ink">{{ $row['tahunan'] }}</td>
-                                        <td class="px-4 py-3 text-left font-mono text-sm text-ink">{{ $row['sakit'] }}</td>
-                                        <td class="px-4 py-3">
+                                        </x-ui.table-td>
+                                        <x-ui.table-td padding="sm" class="text-sm">{{ $row['unit'] }}</x-ui.table-td>
+                                        <x-ui.table-td align="right" padding="sm" class="font-mono text-sm">{{ $row['jatah'] }}</x-ui.table-td>
+                                        <x-ui.table-td align="right" padding="sm" class="font-mono text-sm">{{ $row['carry'] }}</x-ui.table-td>
+                                        <x-ui.table-td align="right" padding="sm" class="font-mono text-sm">{{ $row['terpakai'] }}
+                                        </x-ui.table-td>
+                                        <x-ui.table-td align="right" padding="sm" class="font-mono text-sm font-bold text-primary">
+                                            {{ $row['sisa'] }}
+                                        </x-ui.table-td>
+                                        <x-ui.table-td align="right" padding="sm" class="font-mono text-sm">{{ $row['tahunan'] }}
+                                        </x-ui.table-td>
+                                        <x-ui.table-td align="right" padding="sm" class="font-mono text-sm">{{ $row['sakit'] }}</x-ui.table-td>
+                                        <x-ui.table-td padding="sm">
                                             <span
                                                 class="text-xs font-semibold {{ $statusClass[$row['status']] }}">{{ $row['status'] }}</span>
-                                        </td>
-                                        <td class="px-4 py-3 text-right">
-                                            <div class="flex items-center justify-end gap-1.5">
-                                                <button
-                                                    title="Koreksi"
-                                                    aria-label="Koreksi saldo cuti"
-                                                    class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm">
-                                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
-                                                    </svg>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                                        </x-ui.table-td>
+                                        <x-ui.table-td align="right" padding="sm">
+                                            <button
+                                                class="text-xs font-semibold text-primary hover:underline">Koreksi</button>
+                                        </x-ui.table-td>
+                                    </x-ui.table-row>
 
-                <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
+                                @endforeach
+                            </x-ui.table-body>
+                        </x-ui.table>
+                    </div>
+                </x-ui.card>
+
+                <x-ui.card padding="none" class="overflow-hidden">
                     <div class="border-b border-border px-5 py-4">
                         <h3 class="text-sm font-semibold text-ink">Detail Penggunaan Cuti</h3>
                         <p class="text-[10px] text-muted">Data detail untuk kebutuhan export Excel: No, NIP, Nama, Jenis
                             Cuti, Tanggal Mulai, Tanggal Selesai, Jumlah Hari, Status.</p>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="w-full">
-                            <thead class="bg-soft">
-                                <tr>
-                                    <th
-                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                        No</th>
-                                    <th
-                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                        Pegawai</th>
-                                    <th
-                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                        Jenis Cuti</th>
-                                    <th
-                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                        Tanggal Mulai</th>
-                                    <th
-                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                        Tanggal Selesai</th>
-                                    <th
-                                        class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted">
-                                        Hari</th>
-                                    <th
-                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                        Status</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-border">
+                        <x-ui.table>
+                            <x-ui.table-head>
+                                <x-ui.table-row>
+                                    <x-ui.table-th>
+                                        No</x-ui.table-th>
+                                    <x-ui.table-th>
+                                        Pegawai</x-ui.table-th>
+                                    <x-ui.table-th>
+                                        Jenis Cuti</x-ui.table-th>
+                                    <x-ui.table-th>
+                                        Tanggal Mulai</x-ui.table-th>
+                                    <x-ui.table-th>
+                                        Tanggal Selesai</x-ui.table-th>
+                                    <x-ui.table-th align="right">
+                                        Hari</x-ui.table-th>
+                                    <x-ui.table-th>
+                                        Status</x-ui.table-th>
+                                </x-ui.table-row>
+                            </x-ui.table-head>
+                            <x-ui.table-body>
                                 @foreach($usageRows as $row)
-                                    <tr class="transition hover:bg-soft/40">
-                                        <td class="px-4 py-3 font-mono text-sm text-muted">{{ $loop->iteration }}</td>
-                                        <td class="px-4 py-3">
+                                    <x-ui.table-row :interactive="true">
+                                        <x-ui.table-td padding="sm" class="font-mono text-sm text-muted">{{ $loop->iteration }}</x-ui.table-td>
+                                        <x-ui.table-td padding="sm">
                                             <p class="text-sm font-semibold text-ink">{{ $row['nama'] }}</p>
                                             <p class="font-mono text-xs text-muted">{{ $row['nip'] }}</p>
-                                        </td>
-                                        <td class="px-4 py-3 text-sm text-ink">{{ $row['jenis'] }}</td>
-                                        <td class="px-4 py-3 text-sm text-muted">{{ $row['mulai'] }}</td>
-                                        <td class="px-4 py-3 text-sm text-muted">{{ $row['selesai'] }}</td>
-                                        <td class="px-4 py-3 text-right font-mono text-sm text-ink">{{ $row['hari'] }}</td>
-                                        <td class="px-4 py-3">
+                                        </x-ui.table-td>
+                                        <x-ui.table-td padding="sm" class="text-sm">{{ $row['jenis'] }}</x-ui.table-td>
+                                        <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $row['mulai'] }}</x-ui.table-td>
+                                        <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $row['selesai'] }}</x-ui.table-td>
+                                        <x-ui.table-td align="right" padding="sm" class="font-mono text-sm">{{ $row['hari'] }}</x-ui.table-td>
+                                        <x-ui.table-td padding="sm">
                                             <span
                                                 class="text-xs font-semibold {{ $statusClass[$row['status']] }}">{{ $row['status'] }}</span>
-                                        </td>
-                                    </tr>
+                                        </x-ui.table-td>
+                                    </x-ui.table-row>
                                 @endforeach
-                            </tbody>
-                        </table>
+                            </x-ui.table-body>
+                        </x-ui.table>
                     </div>
-                </div>
+                </x-ui.card>
             </div>
 
             <aside class="space-y-4">
-                <div class="rounded-lg border border-border bg-surface p-5 shadow-sm">
+                <x-ui.card>
                     <h3 class="text-sm font-semibold text-ink">Komposisi Jenis Cuti</h3>
                     <div class="mt-4 space-y-4">
                         @foreach($jenisStats as $item)
@@ -279,9 +282,9 @@
                             </div>
                         @endforeach
                     </div>
-                </div>
+                </x-ui.card>
 
-                <div class="rounded-lg border border-border bg-surface p-5 shadow-sm">
+                <x-ui.card>
                     <h3 class="text-sm font-semibold text-ink">Koreksi Saldo</h3>
                     <p class="mt-1 text-xs text-muted">Alasan wajib diisi dan koreksi akan masuk audit log.</p>
                     <div x-show="savedCorrection"
@@ -302,27 +305,30 @@
                         </select>
                         <input type="number" value="1"
                             class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                        <textarea rows="3"
-                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                            placeholder="Alasan koreksi wajib diisi"></textarea>
-                        <button type="button" @click="$dispatch('open-confirm-rekap')"
+
+                        <x-form.textarea
+                            rows="3"
+                            placeholder="Alasan koreksi wajib diisi"
+                        />
+                        <button type="button" @click="showConfirm = true"
+
                             class="w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90">Simpan
                             Koreksi</button>
                     </div>
-                </div>
+                </x-ui.card>
 
-                <div class="rounded-lg border border-border bg-surface p-5 shadow-sm">
+                <x-ui.card>
                     <h3 class="text-sm font-semibold text-ink">Format Laporan</h3>
                     <div class="mt-3 space-y-2 text-xs text-muted">
                         <p>Excel: `Rekap_Cuti_Juni_2026_2026-06-22.xlsx`</p>
                         <p>PDF memuat header institusi, periode laporan, tabel rekap per pegawai, tanda tangan, dan
                             footer halaman.</p>
                     </div>
-                </div>
+                </x-ui.card>
             </aside>
         </div>
 
-        <div class="rounded-lg border border-border bg-surface p-6 shadow-sm">
+        <x-ui.card padding="lg">
             <div class="flex flex-col gap-1 border-b border-border pb-4 text-center">
                 <p class="text-sm font-bold uppercase tracking-wide text-primary">LLDIKTI Wilayah XVI</p>
                 <h3 class="text-xl font-bold text-ink">Rekap Cuti Pegawai</h3>
@@ -330,45 +336,45 @@
             </div>
 
             <div class="mt-5 overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-soft">
-                        <tr>
-                            <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">No
-                            </th>
-                            <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">NIP
-                            </th>
-                            <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                Nama</th>
-                            <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                Jenis Cuti</th>
-                            <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                Tanggal Mulai</th>
-                            <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                Tanggal Selesai</th>
-                            <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted">
-                                Hari</th>
-                            <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                Status</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
+                <x-ui.table>
+                    <x-ui.table-head>
+                        <x-ui.table-row>
+                            <x-ui.table-th class="px-3 py-3">No
+                            </x-ui.table-th>
+                            <x-ui.table-th class="px-3 py-3">NIP
+                            </x-ui.table-th>
+                            <x-ui.table-th class="px-3 py-3">
+                                Nama</x-ui.table-th>
+                            <x-ui.table-th class="px-3 py-3">
+                                Jenis Cuti</x-ui.table-th>
+                            <x-ui.table-th class="px-3 py-3">
+                                Tanggal Mulai</x-ui.table-th>
+                            <x-ui.table-th class="px-3 py-3">
+                                Tanggal Selesai</x-ui.table-th>
+                            <x-ui.table-th align="right" class="px-3 py-3">
+                                Hari</x-ui.table-th>
+                            <x-ui.table-th class="px-3 py-3">
+                                Status</x-ui.table-th>
+                        </x-ui.table-row>
+                    </x-ui.table-head>
+                    <x-ui.table-body>
                         @foreach($usageRows as $row)
-                            <tr>
-                                <td class="px-3 py-3 font-mono text-sm text-muted">{{ $loop->iteration }}</td>
-                                <td class="px-3 py-3 font-mono text-xs text-muted">{{ $row['nip'] }}</td>
-                                <td class="px-3 py-3 text-sm font-semibold text-ink">{{ $row['nama'] }}</td>
-                                <td class="px-3 py-3 text-sm text-ink">{{ $row['jenis'] }}</td>
-                                <td class="px-3 py-3 text-sm text-muted">{{ $row['mulai'] }}</td>
-                                <td class="px-3 py-3 text-sm text-muted">{{ $row['selesai'] }}</td>
-                                <td class="px-3 py-3 text-right font-mono text-sm text-ink">{{ $row['hari'] }}</td>
-                                <td class="px-3 py-3">
+                            <x-ui.table-row>
+                                <x-ui.table-td class="px-3 py-3 font-mono text-sm text-muted">{{ $loop->iteration }}</x-ui.table-td>
+                                <x-ui.table-td class="px-3 py-3 font-mono text-muted">{{ $row['nip'] }}</x-ui.table-td>
+                                <x-ui.table-td class="px-3 py-3 text-sm font-semibold">{{ $row['nama'] }}</x-ui.table-td>
+                                <x-ui.table-td class="px-3 py-3 text-sm">{{ $row['jenis'] }}</x-ui.table-td>
+                                <x-ui.table-td class="px-3 py-3 text-sm text-muted">{{ $row['mulai'] }}</x-ui.table-td>
+                                <x-ui.table-td class="px-3 py-3 text-sm text-muted">{{ $row['selesai'] }}</x-ui.table-td>
+                                <x-ui.table-td align="right" class="px-3 py-3 font-mono text-sm">{{ $row['hari'] }}</x-ui.table-td>
+                                <x-ui.table-td class="px-3 py-3">
                                     <span
                                         class="text-xs font-semibold {{ $statusClass[$row['status']] }}">{{ $row['status'] }}</span>
-                                </td>
-                            </tr>
+                                </x-ui.table-td>
+                            </x-ui.table-row>
                         @endforeach
-                    </tbody>
-                </table>
+                    </x-ui.table-body>
+                </x-ui.table>
             </div>
 
             <div class="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -391,7 +397,8 @@
             <div class="mt-6 border-t border-border pt-3 text-center text-[10px] text-muted">
                 Preview PDF resmi. Halaman 1 dari 1.
             </div>
-        </div>
+        </x-ui.card>
+
 
         <x-ui.confirm-dialog
             id="rekap"
@@ -400,5 +407,6 @@
             confirm-text="Konfirmasi Simpan"
             variant="primary"
         />
+
     </div>
 </x-layouts.app>
