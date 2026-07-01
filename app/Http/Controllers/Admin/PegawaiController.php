@@ -10,6 +10,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Employee\StoreEmployeeRequest;
 use App\Http\Requests\Employee\UpdateEmployeeRequest;
 use App\Models\Appointment;
+use App\Models\Document;
 use App\Models\Employee;
 use App\Models\PositionHistory;
 use App\Models\RefAgama;
@@ -703,6 +704,20 @@ class PegawaiController extends Controller
                     $filename = $file->hashName();
                     $file->move(storage_path('app/public/ranks/sk'), $filename);
                     $pangkatData['file_sk'] = 'ranks/sk/'.$filename;
+
+                    // Catat ke arsip dokumen
+                    $golonganLabel = isset($pangkatData['golongan_id'])
+                        ? (\App\Models\RefGolongan::find($pangkatData['golongan_id'])?->kode ?? 'Pangkat Baru')
+                        : 'Pangkat Baru';
+                    Document::create([
+                        'employee_id'    => $employee->id,
+                        'jenis_dokumen'  => 'sk_pangkat',
+                        'nama_dokumen'   => 'SK Kenaikan Pangkat '.$golonganLabel,
+                        'nomor_dokumen'  => $pangkatData['no_sk'] ?? null,
+                        'tanggal_dokumen'=> $pangkatData['tanggal_sk'] ?? null,
+                        'file_path'      => 'ranks/sk/'.$filename,
+                        'keterangan'     => 'Diunggah otomatis saat edit pegawai',
+                    ]);
                 }
 
                 $pangkatId = $request->input('pangkat_history_id');
@@ -755,6 +770,17 @@ class PegawaiController extends Controller
                     $filename = $file->hashName();
                     $file->move(storage_path('app/public/positions/sk'), $filename);
                     $jabatanData['file_sk'] = 'positions/sk/'.$filename;
+
+                    // Catat ke arsip dokumen
+                    Document::create([
+                        'employee_id'    => $employee->id,
+                        'jenis_dokumen'  => 'sk_jabatan',
+                        'nama_dokumen'   => 'SK Jabatan '.($jabatanData['nama_jabatan'] ?? 'Baru'),
+                        'nomor_dokumen'  => $jabatanData['no_sk'] ?? null,
+                        'tanggal_dokumen'=> $jabatanData['tanggal_sk'] ?? null,
+                        'file_path'      => 'positions/sk/'.$filename,
+                        'keterangan'     => 'Diunggah otomatis saat edit pegawai',
+                    ]);
                 }
 
                 $jabatanId = $request->input('jabatan_history_id');
@@ -795,6 +821,17 @@ class PegawaiController extends Controller
                     $filename = $file->hashName();
                     $file->move(storage_path('app/public/salaries/sk'), $filename);
                     $kgbData['file_sk'] = 'salaries/sk/'.$filename;
+
+                    // Catat ke arsip dokumen
+                    Document::create([
+                        'employee_id'    => $employee->id,
+                        'jenis_dokumen'  => 'sk_kgb',
+                        'nama_dokumen'   => 'SK KGB',
+                        'nomor_dokumen'  => $kgbData['no_sk'] ?? null,
+                        'tanggal_dokumen'=> $kgbData['tanggal_sk'] ?? null,
+                        'file_path'      => 'salaries/sk/'.$filename,
+                        'keterangan'     => 'Diunggah otomatis saat edit pegawai',
+                    ]);
                 }
 
                 $kgbId = $request->input('kgb_history_id');
@@ -824,6 +861,17 @@ class PegawaiController extends Controller
                     $filename = $file->hashName();
                     $file->move(storage_path('app/public/appointments/sk'), $filename);
                     $appointmentData['file_sk'] = 'appointments/sk/'.$filename;
+
+                    // Catat ke arsip dokumen
+                    Document::create([
+                        'employee_id'    => $employee->id,
+                        'jenis_dokumen'  => 'sk_pengangkatan',
+                        'nama_dokumen'   => 'SK Pengangkatan '.($appointmentData['jenis_pengangkatan'] ?? ''),
+                        'nomor_dokumen'  => $appointmentData['no_sk'] ?? null,
+                        'tanggal_dokumen'=> $appointmentData['tanggal_sk'] ?? null,
+                        'file_path'      => 'appointments/sk/'.$filename,
+                        'keterangan'     => 'Diunggah otomatis saat edit pegawai',
+                    ]);
                 }
 
                 $appointment = $employee->appointment;
