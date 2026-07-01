@@ -286,24 +286,27 @@
                         @if($fotoUrl)
                             <img
                                 src="{{ $fotoUrl }}"
-                                alt="Foto {{ $p->nama_lengkap }}"
+                                alt="Foto {{ $p->nama_dengan_gelar ?? $p->nama_lengkap }}"
                                 class="h-full w-full object-cover"
                             >
                         @else
                             <div class="flex h-full w-full items-center justify-center bg-primary/10 text-xl font-bold text-primary font-sans uppercase">
-                                {{ strtoupper(substr($p->nama_lengkap, 0, 1)) }}
+                                {{ strtoupper(substr($p->nama_dengan_gelar ?? $p->nama_lengkap, 0, 1)) }}
                             </div>
                         @endif
                     </div>
                     <div class="min-w-0">
                         <div class="flex flex-wrap items-center gap-2">
-                            <h2 class="text-xl font-bold text-ink font-sans leading-tight">{{ $p->nama_lengkap }}</h2>
+                            <h2 class="text-xl font-bold text-ink font-sans leading-tight">{{ $p->nama_dengan_gelar ?? $p->nama_lengkap }}</h2>
                             <template x-if="kinerjaBaik">
                                 <span class="inline-flex items-center gap-1 text-[10px] font-bold text-success font-sans">
                                     KINERJA BAIK
                                 </span>
                             </template>
                         </div>
+                        @if($p->nama_dengan_gelar)
+                            <p class="text-xs text-muted font-sans mt-0.5">{{ $p->nama_lengkap }}</p>
+                        @endif
                         <p class="text-xs text-muted font-sans font-mono mt-0.5">NIP. {{ $p->nip }}</p>
                         <span class="inline-block mt-1.5 rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-semibold font-sans uppercase">{{ $p->jenisPegawai->nama ?? '-' }}</span>
                     </div>
@@ -399,6 +402,14 @@
                     <div class="space-y-4">
                         <h3 class="text-xs font-bold text-ink uppercase tracking-wider font-sans border-b border-border pb-1.5">Identitas & Data Pribadi</h3>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                            <div class="space-y-0.5 sm:col-span-2">
+                                <span class="font-semibold text-muted font-sans">Nama dengan Gelar</span>
+                                <p class="text-ink font-sans font-semibold">{{ $p->nama_dengan_gelar ?? '-' }}</p>
+                            </div>
+                            <div class="space-y-0.5 sm:col-span-2">
+                                <span class="font-semibold text-muted font-sans">Nama Lengkap (tanpa gelar)</span>
+                                <p class="text-ink font-sans">{{ $p->nama_lengkap }}</p>
+                            </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">NIK (KTP)</span>
                                 <p class="text-ink font-mono font-bold">{{ $p->nik ?? '-' }}</p>
@@ -551,12 +562,6 @@
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Kepangkatan & Golongan</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Catatan kenaikan pangkat reguler maupun pilihan selama masa dinas.</p>
                     </div>
-                    <button type="button" @click="openModal('pangkat', 'Tambah Riwayat Kepangkatan')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
-                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                        Tambah Pangkat
-                    </button>
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-border">
                     <table class="w-full">
@@ -589,12 +594,6 @@
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Jabatan & Struktural</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Catatan penugasan jabatan fungsional maupun struktural.</p>
                     </div>
-                    <button type="button" @click="openModal('jabatan', 'Tambah Riwayat Jabatan')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
-                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                        Tambah Jabatan
-                    </button>
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-border">
                     <table class="w-full">
@@ -629,12 +628,6 @@
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Kenaikan Gaji Berkala (KGB)</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Catatan penyesuaian gaji berkala setiap 2 tahun sekali.</p>
                     </div>
-                    <button type="button" @click="openModal('kgb', 'Tambah Riwayat KGB')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
-                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                        Tambah KGB
-                    </button>
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-border">
                     <table class="w-full">
@@ -816,26 +809,26 @@
                                     <div class="flex items-start gap-2.5">
                                         <div class="flex h-8 w-6 shrink-0 flex-col items-center justify-between rounded border border-border bg-soft p-0.5 shadow-sm relative">
                                             <div class="w-full bg-primary/10 text-primary text-[5px] font-bold text-center py-0.5 uppercase tracking-wide">
-                                                PDF
+                                                {{ pathinfo($doc->file_path, PATHINFO_EXTENSION) ?: 'PDF' }}
                                             </div>
                                         </div>
                                         <div class="min-w-0">
-                                            <p class="font-bold font-sans truncate">{{ $doc['nama'] }}</p>
-                                            <p class="text-[10px] text-muted font-sans mt-0.5 truncate">{{ $doc['deskripsi'] }}</p>
+                                            <p class="font-bold font-sans truncate">{{ $doc->nama_dokumen }}</p>
+                                            <p class="text-[10px] text-muted font-sans mt-0.5 truncate">{{ $doc->keterangan ?? '-' }}</p>
                                         </div>
                                     </div>
                                 </td>
-                                <td class="px-4 py-3 text-muted font-sans">{{ $doc['kategori_label'] }}</td>
-                                <td class="px-4 py-3 font-mono text-muted">{{ $doc['nomor'] }}</td>
-                                <td class="px-4 py-3 font-mono text-muted">{{ $doc['tanggal'] }}</td>
-                                <td class="px-4 py-3 font-mono text-muted">{{ $doc['file_size'] }}</td>
+                                <td class="px-4 py-3 text-muted font-sans">{{ \App\Support\Documents\DocumentCategory::label($doc->jenis_dokumen) }}</td>
+                                <td class="px-4 py-3 font-mono text-muted">{{ $doc->nomor_dokumen ?? '-' }}</td>
+                                <td class="px-4 py-3 font-mono text-muted">{{ $doc->tanggal_dokumen ? \Carbon\Carbon::parse($doc->tanggal_dokumen)->format('d-m-Y') : '-' }}</td>
+                                <td class="px-4 py-3 font-mono text-muted">{{ $doc->fileSizeLabel() }}</td>
                                 <td class="px-4 py-3 text-right">
                                     <div class="flex items-center justify-end gap-2.5">
-                                        <a href="/dashboard/dokumen/{{ $doc['id'] }}" class="inline-flex items-center gap-1 font-semibold text-primary hover:underline font-sans">
+                                        <a href="{{ route('dokumen.show', $doc->id) }}" class="inline-flex items-center gap-1 font-semibold text-primary hover:underline font-sans">
                                             Detail
                                         </a>
                                         <span class="text-border">|</span>
-                                        <a href="/dashboard/dokumen/{{ $doc['id'] }}/download" class="inline-flex items-center gap-1 font-semibold text-primary hover:underline font-sans">
+                                        <a href="{{ route('dokumen.download', $doc->id) }}" class="inline-flex items-center gap-1 font-semibold text-primary hover:underline font-sans">
                                             Unduh
                                         </a>
                                     </div>

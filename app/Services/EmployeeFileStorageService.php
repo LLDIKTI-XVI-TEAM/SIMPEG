@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Document;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
@@ -11,7 +12,7 @@ class EmployeeFileStorageService
 {
     public function storePhoto(UploadedFile $file): string
     {
-        return $this->store($file, 'photos');
+        return $this->store($file, 'employees/photos');
     }
 
     public function storeSk(UploadedFile $file): string
@@ -42,7 +43,7 @@ class EmployeeFileStorageService
 
     private function storePrivate(UploadedFile $file, string $directory): string
     {
-        return $this->storeOnDisk($file, $directory, 'local');
+        return $this->storeOnDisk($file, $directory, Document::STORAGE_DISK);
     }
 
     private function storeOnDisk(UploadedFile $file, string $directory, string $disk): string

@@ -31,7 +31,7 @@
             if (log.event === 'APPROVE' || log.event === 'POSTPONE') {
                 return `${log.event}: Mengubah status pengajuan cuti`;
             }
-            
+
             let target = log.modul;
             if (log.event === 'CREATE') {
                 return `CREATE: Membuat data ${target} #${log.record_id}`;
@@ -47,20 +47,20 @@
             if (log.event === 'RESTORE') {
                 return `RESTORE: Mengaktifkan kembali data ${target} #${log.record_id}`;
             }
-            
+
             return `${log.event}: ${log.event} pada ${target} #${log.record_id}`;
         },
         get filteredLogs() {
             let filtered = this.logs.filter(log => {
                 const query = this.searchQuery.toLowerCase().trim();
-                const matchesSearch = !query || 
-                                      (log.operator && log.operator.toLowerCase().includes(query)) || 
+                const matchesSearch = !query ||
+                                      (log.operator && log.operator.toLowerCase().includes(query)) ||
                                       (log.record_id && log.record_id.toLowerCase().includes(query));
-                
+
                 const matchesEvent = this.filterEvent === 'all' || log.event === this.filterEvent;
                 const matchesUser = this.filterUser === 'all' || log.operator === this.filterUser;
                 const matchesModul = this.filterModul === 'all' || log.modul === this.filterModul;
-                
+
                 let matchesPeriode = true;
                 if (log.timestamp) {
                     const logDateStr = log.timestamp.split(' ')[0];
@@ -71,14 +71,14 @@
                         if (logDateStr > this.filterEndDate) matchesPeriode = false;
                     }
                 }
-                
+
                 return matchesSearch && matchesEvent && matchesUser && matchesModul && matchesPeriode;
             });
 
             return [...filtered].sort((a, b) => {
                 let valA = a[this.sortField];
                 let valB = b[this.sortField];
-                
+
                 if (this.sortField === 'timestamp') {
                     valA = new Date(valA || 0);
                     valB = new Date(valB || 0);
@@ -86,7 +86,7 @@
                     valA = valA.toLowerCase();
                     valB = (valB || '').toLowerCase();
                 }
-                
+
                 if (valA < valB) return this.sortDirection === 'asc' ? -1 : 1;
                 if (valA > valB) return this.sortDirection === 'asc' ? 1 : -1;
                 return 0;
@@ -108,13 +108,13 @@
             const diffs = [];
             const oldVals = log.old_values || {};
             const newVals = log.new_values || {};
-            
+
             const allKeys = Array.from(new Set([...Object.keys(oldVals), ...Object.keys(newVals)]));
-            
+
             for (const key of allKeys) {
                 const oldVal = oldVals[key];
                 const newVal = newVals[key];
-                
+
                 if (log.event === 'UPDATE') {
                     if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
                         diffs.push({
@@ -160,7 +160,7 @@
             </x-slot:header>
 
             <x-slot:actions>
-                <button @click="filterEvent = 'all'; filterUser = 'all'; filterModul = 'all'; filterStartDate = ''; filterEndDate = ''; searchQuery = '';" 
+                <button @click="filterEvent = 'all'; filterUser = 'all'; filterModul = 'all'; filterStartDate = ''; filterEndDate = ''; searchQuery = '';"
                         class="text-xs text-primary font-semibold hover:underline font-sans cursor-pointer flex items-center gap-1">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
@@ -245,7 +245,7 @@
 
         {{-- Table Card --}}
         <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
-            
+
             {{-- Toolbar --}}
             <div class="px-6 py-4 border-b border-border flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-surface">
                 <div>
@@ -338,9 +338,9 @@
                                 <td class="px-4 py-3.5 text-xs text-ink font-sans" x-text="getRingkasan(log)"></td>
                                 <td class="px-4 py-3.5" @click.stop>
                                     <div class="flex items-center gap-1.5">
-                                        <button 
-                                            @click.stop="selectedLogId = log.id; showDrawer = true" 
-                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/30 shadow-sm cursor-pointer" 
+                                        <button
+                                            @click.stop="selectedLogId = log.id; showDrawer = true"
+                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/30 shadow-sm cursor-pointer"
                                             title="Detail Drawer"
                                         >
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -348,10 +348,10 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                             </svg>
                                         </button>
-                                        <a 
+                                        <a
                                             @click.stop
-                                            :href="'/dashboard/audit/' + log.id" 
-                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted transition hover:bg-soft hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/30 shadow-sm" 
+                                            :href="'/dashboard/audit/' + log.id"
+                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted transition hover:bg-soft hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/30 shadow-sm"
                                             title="Halaman Detail"
                                         >
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -375,9 +375,9 @@
             <div class="flex flex-col gap-3 border-t border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between bg-surface">
                 <div class="flex items-center gap-3">
                     <p class="text-sm text-muted font-sans">
-                        Menampilkan 
-                        <span x-text="filteredLogs.length === 0 ? 0 : (currentPage - 1) * perPage + 1"></span> - 
-                        <span x-text="Math.min(currentPage * perPage, filteredLogs.length)"></span> dari 
+                        Menampilkan
+                        <span x-text="filteredLogs.length === 0 ? 0 : (currentPage - 1) * perPage + 1"></span> -
+                        <span x-text="Math.min(currentPage * perPage, filteredLogs.length)"></span> dari
                         <span x-text="filteredLogs.length"></span> data
                     </p>
                     <div class="relative">
@@ -405,7 +405,7 @@
             <div class="absolute inset-0 bg-ink/30 transition-opacity z-40" @click="showDrawer = false"></div>
             <div class="fixed inset-y-0 right-0 pl-10 max-w-full flex z-50">
                 <div class="w-screen max-w-md bg-surface border-l border-border shadow-xl flex flex-col justify-between relative z-50" x-transition:enter="transform transition ease-in-out duration-300 sm:duration-300" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0" x-transition:leave="transform transition ease-in-out duration-300 sm:duration-300" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full">
-                    
+
                     {{-- Drawer Header --}}
                     <div class="px-6 py-5 border-b border-border flex items-center justify-between bg-surface">
                         <div>
@@ -421,7 +421,7 @@
 
                     {{-- Drawer Body --}}
                     <div class="flex-1 overflow-y-auto p-6 space-y-6">
-                        
+
                         {{-- Info List --}}
                         <div class="grid grid-cols-2 gap-4 text-xs">
                             <div class="space-y-0.5">
@@ -457,7 +457,7 @@
                         {{-- Diff Data Panel --}}
                         <div class="space-y-3 pt-4 border-t border-border">
                             <h4 class="text-xs font-bold text-ink font-sans uppercase tracking-wider">Perubahan Nilai Data</h4>
-                            
+
                             <div class="overflow-hidden rounded-lg border border-border bg-soft">
                                 <table class="w-full text-left border-collapse">
                                     <thead>

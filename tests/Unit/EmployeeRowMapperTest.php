@@ -29,7 +29,8 @@ class EmployeeRowMapperTest extends TestCase
             'Tanggal Lahir' => '01-01-1980',
         ]);
 
-        $this->assertSame('Budi Santoso', $mapped['nama_lengkap']);
+        $this->assertSame('Budi Santoso', $mapped['nama_dengan_gelar']);
+        $this->assertNull($mapped['nama_lengkap']);
         $this->assertSame('budi@example.com', $mapped['email']);
         $this->assertArrayNotHasKey('person', $mapped);
         $this->assertSame('2038-01-01', $mapped['tanggal_pensiun']);

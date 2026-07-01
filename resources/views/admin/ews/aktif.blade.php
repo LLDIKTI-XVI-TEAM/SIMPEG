@@ -35,7 +35,7 @@
                 $countTotal = count($alerts);
             @endphp
             
-            <div class="rounded-lg border border-border bg-surface p-5 shadow-sm flex items-center gap-4">
+            <x-ui.card class="flex items-center gap-4">
                 <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-soft text-ink font-bold text-lg">
                     {{ $countTotal }}
                 </div>
@@ -43,9 +43,9 @@
                     <p class="text-xs font-semibold uppercase tracking-wider text-muted font-sans">Total Peringatan</p>
                     <h3 class="text-base font-bold text-ink">{{ $countTotal }} Kasus Aktif</h3>
                 </div>
-            </div>
+            </x-ui.card>
 
-            <div class="rounded-lg border border-border bg-surface p-5 shadow-sm flex items-center gap-4">
+            <x-ui.card class="flex items-center gap-4">
                 <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-danger/10 text-danger font-bold text-lg">
                     {{ $countMerah }}
                 </div>
@@ -53,9 +53,9 @@
                     <p class="text-xs font-semibold uppercase tracking-wider text-muted font-sans">Sangat Mendesak</p>
                     <h3 class="text-base font-bold text-danger">{{ $countMerah }} (&lt; 30 Hari)</h3>
                 </div>
-            </div>
+            </x-ui.card>
 
-            <div class="rounded-lg border border-border bg-surface p-5 shadow-sm flex items-center gap-4">
+            <x-ui.card class="flex items-center gap-4">
                 <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-warning/10 text-warning font-bold text-lg">
                     {{ $countKuning }}
                 </div>
@@ -63,9 +63,9 @@
                     <p class="text-xs font-semibold uppercase tracking-wider text-muted font-sans">Perlu Perhatian</p>
                     <h3 class="text-base font-bold text-warning">{{ $countKuning }} (30-90 Hari)</h3>
                 </div>
-            </div>
+            </x-ui.card>
 
-            <div class="rounded-lg border border-border bg-surface p-5 shadow-sm flex items-center gap-4">
+            <x-ui.card class="flex items-center gap-4">
                 <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success font-bold text-lg">
                     {{ $countHijau }}
                 </div>
@@ -73,14 +73,14 @@
                     <p class="text-xs font-semibold uppercase tracking-wider text-muted font-sans">Pemantauan Rutin</p>
                     <h3 class="text-base font-bold text-success">{{ $countHijau }} (&gt; 90 Hari)</h3>
                 </div>
-            </div>
+            </x-ui.card>
         </div>
 
 
 
         {{-- FILTER & SEARCH AREA --}}
         {{-- ================================================================ --}}
-        <div class="rounded-lg border border-border bg-surface shadow-sm overflow-hidden">
+        <x-ui.card padding="none" class="overflow-hidden">
             <div class="border-b border-border bg-soft/30 px-6 py-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 
                 {{-- Event Filter Links --}}
@@ -121,18 +121,18 @@
             {{-- TABLE --}}
             {{-- ================================================================ --}}
             <div class="overflow-x-auto">
-                <table class="w-full min-w-[1040px] table-fixed">
-                    <thead class="bg-soft">
-                        <tr>
-                            <th class="w-14 px-5 py-3.5 text-center text-xs font-semibold uppercase tracking-wider text-muted font-sans">No</th>
-                            <th class="w-[260px] px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted font-sans">Pegawai</th>
-                            <th class="w-[260px] px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted font-sans">Event & Ambang</th>
-                            <th class="w-[150px] px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted font-sans">Target</th>
-                            <th class="w-[140px] px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted font-sans">Urgensi</th>
-                            <th class="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted font-sans">Eligibility</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
+                <x-ui.table class="min-w-[1040px] table-fixed">
+                    <x-ui.table-head>
+                        <x-ui.table-row>
+                            <x-ui.table-th align="center" padding="wide" class="w-14">No</x-ui.table-th>
+                            <x-ui.table-th padding="wide" class="w-[260px]">Pegawai</x-ui.table-th>
+                            <x-ui.table-th padding="wide" class="w-[260px]">Event & Ambang</x-ui.table-th>
+                            <x-ui.table-th padding="wide" class="w-[150px]">Target</x-ui.table-th>
+                            <x-ui.table-th padding="wide" class="w-[140px]">Urgensi</x-ui.table-th>
+                            <x-ui.table-th padding="wide">Eligibility</x-ui.table-th>
+                        </x-ui.table-row>
+                    </x-ui.table-head>
+                    <x-ui.table-body>
                         @forelse($alerts as $index => $alert)
                             @php
                                 // Assign colors dynamically based on sisa_hari (AC-3)
@@ -149,20 +149,17 @@
                                     $sisaBadgeClass = 'text-success';
                                 }
                             @endphp
-                            <tr 
-                                class="align-top transition-colors {{ $rowColorClass }}"
-                                x-show="search === '' || '{{ strtolower($alert['nama']) }}'.includes(search.toLowerCase()) || '{{ str_replace(' ', '', $alert['nip']) }}'.includes(search.replace(/\s+/g, ''))"
-                            >
-                                <td class="px-5 py-4 text-center font-mono text-sm font-semibold text-muted">{{ $index + 1 }}</td>
-                                <td class="px-5 py-4 text-sm">
+                            <x-ui.table-row x-show="search === '' || '{{ strtolower($alert['nama']) }}'.includes(search.toLowerCase()) || '{{ str_replace(' ', '', $alert['nip']) }}'.includes(search.replace(/\s+/g, ''))" :interactive="true" class="align-top {{ $rowColorClass }}">
+                                <x-ui.table-td align="center" padding="lg" class="font-mono text-sm font-semibold text-muted">{{ $index + 1 }}</x-ui.table-td>
+                                <x-ui.table-td padding="lg" class="text-sm">
                                     <div class="font-semibold leading-snug text-ink transition-colors hover:text-primary">
                                         <a href="{{ route('pegawai.show', $alert['pegawai_id']) }}">{{ $alert['nama'] }}</a>
                                     </div>
                                     <div class="mt-1 font-mono text-xs text-muted">{{ $alert['nip'] }}</div>
-                                </td>
-                                <td class="px-5 py-4 text-sm">
+                                </x-ui.table-td>
+                                <x-ui.table-td padding="lg" class="text-sm">
                                     <div class="space-y-1.5">
-                                        <span class="inline-flex items-center gap-1.5 rounded-md border border-border bg-soft px-2.5 py-1 text-xs font-semibold text-ink">
+                                        <x-ui.badge variant="ink" size="md" :pill="false">
                                             @if($alert['jenis_event'] === 'Kenaikan Pangkat')
                                                 <svg class="w-3.5 h-3.5 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18 9 11.25l4.306 4.306a11.95 11.95 0 0 1 5.814-5.518l2.74-1.22m0 0-5.94-2.281m5.94 2.28-2.28 5.941" />
@@ -181,25 +178,24 @@
                                                 </svg>
                                             @endif
                                             {{ $alert['jenis_event'] }}
-                                        </span>
+                                        </x-ui.badge>
                                         <div class="flex flex-wrap gap-1.5">
-                                            <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-primary">
-                                                <span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
+                                            <x-ui.badge variant="primary" size="sm" dot>
                                                 {{ $alert['threshold_label'] }}
-                                            </span>
+                                            </x-ui.badge>
                                             @foreach($alert['threshold_schedule'] as $threshold)
-                                                <span class="rounded-full border border-border bg-surface px-2 py-0.5 text-[10px] font-semibold text-muted">
+                                                <x-ui.badge variant="muted" size="sm">
                                                     {{ $threshold }}
-                                                </span>
+                                                </x-ui.badge>
                                             @endforeach
                                         </div>
                                     </div>
-                                </td>
-                                <td class="px-5 py-4 text-sm">
+                                </x-ui.table-td>
+                                <x-ui.table-td padding="lg" class="text-sm">
                                     <div class="font-mono text-sm font-semibold text-ink">{{ date('d M Y', strtotime($alert['tanggal_target'])) }}</div>
                                     <div class="mt-1 text-[11px] font-medium text-muted">Tanggal target</div>
-                                </td>
-                                <td class="px-5 py-4 text-sm">
+                                </x-ui.table-td>
+                                <x-ui.table-td padding="lg" class="text-sm">
                                     <span class="inline-flex items-center text-xs font-semibold {{ $sisaBadgeClass }}">
                                         {{ $alert['sisa_hari'] }} Hari
                                     </span>
@@ -212,8 +208,8 @@
                                             Pemantauan rutin
                                         @endif
                                     </div>
-                                </td>
-                                <td class="px-5 py-4 text-sm">
+                                </x-ui.table-td>
+                                <x-ui.table-td padding="lg" class="text-sm">
                                     @if($alert['jenis_event'] === 'Kenaikan Pangkat')
                                         <div class="max-w-[240px] rounded-lg border {{ $alert['is_eligible'] ? 'border-success/20 bg-success/5' : 'border-danger/20 bg-danger/5' }} p-2.5">
                                             <div class="mb-2 flex flex-wrap items-center gap-2 text-xs font-semibold {{ $alert['is_eligible'] ? 'text-success' : 'text-danger' }}">
@@ -267,18 +263,18 @@
                                             {{ $alert['eligibility_reason'] }}
                                         </div>
                                     @endif
-                                </td>
-                            </tr>
+                                </x-ui.table-td>
+                            </x-ui.table-row>
                         @empty
-                            <tr>
-                                <td colspan="6" class="px-6 py-12 text-center text-muted text-sm">
+                            <x-ui.table-row>
+                                <x-ui.table-td colspan="6" align="center" class="px-6 py-12 text-muted text-sm">
                                     Tidak ada peringatan EWS aktif untuk kategori ini.
-                                </td>
-                            </tr>
+                                </x-ui.table-td>
+                            </x-ui.table-row>
                         @endforelse
-                    </tbody>
-                </table>
+                    </x-ui.table-body>
+                </x-ui.table>
             </div>
-        </div>
+        </x-ui.card>
     </div>
 </x-layouts.app>

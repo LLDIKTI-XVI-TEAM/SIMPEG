@@ -10,6 +10,11 @@ class StoreDisciplineRecordRequest extends FormRequest
 {
     public function authorize(): bool
     {
+        // Bypass otorisasi di environment lokal saat flag disable auth aktif.
+        if (app()->environment('local') && config('services.simpeg.disable_employee_api_auth')) {
+            return true;
+        }
+
         // Mutasi hukuman disiplin hanya boleh dilakukan pengelola data kepegawaian.
         $user = $this->user();
 

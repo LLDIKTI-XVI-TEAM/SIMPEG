@@ -12,7 +12,8 @@ class CreateEmployeeAction
     public function __construct(private readonly EmployeeFileStorageService $files) {}
 
     /**
-     * Membuat pegawai baru, termasuk penyimpanan foto dan audit create.
+     * Membuat pegawai baru, termasuk penyimpanan foto, dokumen SK pengangkatan,
+     * riwayat jabatan awal, dan audit create.
      *
      * @param  array<string, mixed>  $data
      */

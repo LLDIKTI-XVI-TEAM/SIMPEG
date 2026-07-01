@@ -65,7 +65,7 @@
         <nav id="sidebar-nav" class="flex-1 overflow-y-auto px-3 py-4 space-y-1">
             @php
             $activeRole = auth()->user()?->role ?? 'pegawai';
-            
+
             // Menu terlarang/dikunci untuk masing-masing role
             $lockedMenus = [
                 'super_admin' => [],
@@ -134,7 +134,6 @@
                     'group' => 'Kepegawaian',
                     'items' => [
                         ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users'],
-                        ['label' => 'Import Pegawai', 'route' => 'pegawai.import', 'icon' => 'arrow-up-tray'],
                         ['label' => 'Data Nonaktif', 'route' => 'data-nonaktif', 'icon' => 'user-minus'],
                         ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open'],
                     ]
@@ -311,12 +310,12 @@
                 >
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
                 </button>
-                
+
                 {{-- Search Bar --}}
                 <div class="relative w-full hidden sm:block" x-data="globalSearch()">
-                    <input 
-                        type="text" 
-                        x-model="searchQuery" 
+                    <input
+                        type="text"
+                        x-model="searchQuery"
                         @input="handleInput"
                         @click.outside="showDropdown = false"
                         @focus="if(searchQuery.length > 1) showDropdown = true"
@@ -327,17 +326,14 @@
                     <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
                     </div>
-                    
+
                     {{-- Loader --}}
                     <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3" x-show="isSearching" style="display: none;">
-                        <svg class="animate-spin w-4 h-4 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
+                        <x-ui.loading size="md" color="primary" />
                     </div>
 
                     {{-- Search Dropdown --}}
-                    <div 
+                    <div
                         x-show="showDropdown && (Object.keys(searchResults).length > 0 || isSearching)"
                         class="absolute top-full left-0 mt-1 w-full max-h-96 overflow-y-auto rounded-lg border border-border bg-surface shadow-lg z-50 p-2"
                         style="display: none;"
@@ -449,6 +445,8 @@
             </div>
         </header>
 
+
+
         {{-- PAGE CONTENT --}}
         <main class="flex-1 overflow-y-auto bg-page">
             <div class="mx-auto max-w-7xl px-4 py-6 lg:px-6">
@@ -469,7 +467,7 @@
 {{-- TOAST NOTIFICATIONS --}}
 <div x-data="toastManager()" @notify.window="addToast($event.detail)" class="fixed bottom-4 right-4 z-[60] flex w-full max-w-sm flex-col gap-3 sm:bottom-6 sm:right-6 pointer-events-none">
     <template x-for="toast in toasts" :key="toast.id">
-        <div 
+        <div
             x-show="toast.show"
             x-transition:enter="transition ease-out duration-300"
             x-transition:enter-start="translate-y-10 opacity-0 sm:translate-y-0 sm:translate-x-10"
@@ -485,7 +483,7 @@
             }"
             class="flex items-center gap-3 rounded-xl border p-4 shadow-xl pointer-events-auto"
         >
-            <div 
+            <div
                 :class="{
                     'bg-success/10 text-success': toast.type === 'success',
                     'bg-danger/10 text-danger': toast.type === 'error',
@@ -539,10 +537,10 @@
                     clearTimeout(this.debounceTimer);
                     return;
                 }
-                
+
                 this.isSearching = true;
                 this.showDropdown = true;
-                
+
                 clearTimeout(this.debounceTimer);
                 this.debounceTimer = setTimeout(() => {
                     this.fetchResults();
@@ -582,7 +580,7 @@
             addToast(toast) {
                 const id = Date.now() + Math.random().toString(36).substr(2, 9);
                 this.toasts.push({ ...toast, id, show: false });
-                
+
                 // Trigger animation
                 setTimeout(() => {
                     const index = this.toasts.findIndex(t => t.id === id);
@@ -614,7 +612,7 @@
             @if(session('warning')) { type: 'warning', title: 'Peringatan', message: @json(session('warning')) }, @endif
             @if(session('info')) { type: 'info', title: 'Informasi', message: @json(session('info')) }, @endif
         ];
-        
+
         flashes.forEach((flash, index) => {
             setTimeout(() => {
                 window.dispatchEvent(new CustomEvent('notify', { detail: flash }));
