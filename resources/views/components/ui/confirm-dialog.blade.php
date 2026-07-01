@@ -25,7 +25,7 @@
 <div x-data="{ open: false }"
      @open-confirm-{{ $id }}.window="open = true"
      @keydown.escape.window="open = false"
-     class="relative z-50">
+     class="inline-block">
 
     {{-- Trigger Slot --}}
     @isset($trigger)
@@ -34,8 +34,10 @@
         </div>
     @endisset
 
-    {{-- Backdrop --}}
-    <div x-show="open"
+    <template x-teleport="body">
+        <div class="relative z-50">
+            {{-- Backdrop --}}
+            <div x-show="open"
          style="display: none;"
          x-transition:enter="ease-out duration-300"
          x-transition:enter-start="opacity-0"
@@ -125,4 +127,6 @@
             </div>
         </div>
     </div>
+        </div>
+    </template>
 </div>

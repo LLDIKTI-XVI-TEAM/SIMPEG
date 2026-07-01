@@ -19,15 +19,14 @@
          x-transition:leave-end="opacity-0 scale-95"
          class="absolute z-50 px-2.5 py-1.5 text-xs font-medium text-white bg-ink rounded shadow-sm whitespace-nowrap pointer-events-none"
          @if($position === 'top')
-            style="bottom: 100%; left: 50%; transform: translate(-50%, -8px);"
+            style="bottom: 100%; left: 50%; transform: translate(-50%, -8px); display: none;"
          @elseif($position === 'bottom')
-            style="top: 100%; left: 50%; transform: translate(-50%, 8px);"
+            style="top: 100%; left: 50%; transform: translate(-50%, 8px); display: none;"
          @elseif($position === 'left')
-            style="top: 50%; right: 100%; transform: translate(-8px, -50%);"
+            style="top: 50%; right: 100%; transform: translate(-8px, -50%); display: none;"
          @elseif($position === 'right')
-            style="top: 50%; left: 100%; transform: translate(8px, -50%);"
+            style="top: 50%; left: 100%; transform: translate(8px, -50%); display: none;"
          @endif
-         style="display: none;"
          x-cloak>
          {{ $text }}
          
