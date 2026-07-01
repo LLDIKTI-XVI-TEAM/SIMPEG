@@ -46,4 +46,21 @@ class DashboardRoleGateTest extends TestCase
 
         $response->assertOk();
     }
+
+    public function test_dev_login_reuses_existing_demo_email_when_role_was_changed(): void
+    {
+        User::factory()->pegawai()->create([
+            'email' => 'demo@example.com',
+            'name' => 'Demo Klabat',
+        ]);
+
+        $response = $this->get('/dev-login');
+
+        $response->assertRedirect(route('dashboard'));
+        $this->assertDatabaseHas('users', [
+            'email' => 'demo@example.com',
+            'role' => 'super_admin',
+        ]);
+        $this->assertSame(1, User::where('email', 'demo@example.com')->count());
+    }
 }

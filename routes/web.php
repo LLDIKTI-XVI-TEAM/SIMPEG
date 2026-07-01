@@ -43,7 +43,9 @@ Route::post('/logout', [KeycloakAuthController::class, 'logout'])->name('logout'
 
 if (app()->environment(['local', 'testing'])) {
     Route::get('/dev-login', function () {
-        $user = User::where('role', 'super_admin')->first();
+        $user = User::where('email', 'demo@example.com')->first()
+            ?? User::where('role', 'super_admin')->first();
+
         if (! $user) {
             $user = User::create([
                 'name' => 'Demo Klabat',
@@ -53,9 +55,7 @@ if (app()->environment(['local', 'testing'])) {
             ]);
         } else {
             $user->name = 'Demo Klabat';
-            if (empty($user->role)) {
-                $user->role = 'super_admin';
-            }
+            $user->role = 'super_admin';
             $user->save();
         }
         Auth::login($user);
