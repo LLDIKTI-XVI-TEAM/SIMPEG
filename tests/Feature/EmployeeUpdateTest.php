@@ -3,7 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\RefEselon;
+use App\Models\RefGolongan;
+use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
+use App\Models\RefUnitKerja;
 use App\Models\User;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
@@ -234,10 +238,10 @@ class EmployeeUpdateTest extends TestCase
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create();
 
-        $golongan = \App\Models\RefGolongan::first() ?: \App\Models\RefGolongan::create(['kode' => 'III/a', 'nama' => 'Penata Muda']);
-        $jenisJabatan = \App\Models\RefJenisJabatan::first() ?: \App\Models\RefJenisJabatan::create(['nama' => 'Fungsional']);
-        $eselon = \App\Models\RefEselon::first() ?: \App\Models\RefEselon::create(['nama' => 'Eselon I']);
-        $unitKerja = \App\Models\RefUnitKerja::first() ?: \App\Models\RefUnitKerja::create(['nama' => 'LLDIKTI']);
+        $golongan = RefGolongan::first() ?: RefGolongan::create(['kode' => 'III/a', 'nama' => 'Penata Muda']);
+        $jenisJabatan = RefJenisJabatan::first() ?: RefJenisJabatan::create(['nama' => 'Fungsional']);
+        $eselon = RefEselon::first() ?: RefEselon::create(['nama' => 'Eselon I']);
+        $unitKerja = RefUnitKerja::first() ?: RefUnitKerja::create(['nama' => 'LLDIKTI']);
 
         $payload = $this->validPayload($employee, [
             // Pangkat

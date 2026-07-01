@@ -648,12 +648,12 @@ class PegawaiController extends Controller
             ->orderByDesc('tanggal_dokumen')
             ->get()
             ->map(fn ($d) => [
-                'id'            => $d->id,
-                'label'         => ($d->nomor_dokumen ?? 'Tanpa No.').($d->tanggal_dokumen ? ' — '.date('d/m/Y', strtotime($d->tanggal_dokumen)) : ''),
+                'id' => $d->id,
+                'label' => ($d->nomor_dokumen ?? 'Tanpa No.').($d->tanggal_dokumen ? ' — '.date('d/m/Y', strtotime($d->tanggal_dokumen)) : ''),
                 'nomor_dokumen' => $d->nomor_dokumen,
                 'tanggal_dokumen' => $d->tanggal_dokumen ? date('Y-m-d', strtotime($d->tanggal_dokumen)) : null,
-                'file_path'     => $d->file_path,
-                'nama_dokumen'  => $d->nama_dokumen,
+                'file_path' => $d->file_path,
+                'nama_dokumen' => $d->nama_dokumen,
             ]);
 
         $arsipJabatan = $p->documents()
@@ -661,12 +661,12 @@ class PegawaiController extends Controller
             ->orderByDesc('tanggal_dokumen')
             ->get()
             ->map(fn ($d) => [
-                'id'            => $d->id,
-                'label'         => ($d->nomor_dokumen ?? 'Tanpa No.').($d->tanggal_dokumen ? ' — '.date('d/m/Y', strtotime($d->tanggal_dokumen)) : ''),
+                'id' => $d->id,
+                'label' => ($d->nomor_dokumen ?? 'Tanpa No.').($d->tanggal_dokumen ? ' — '.date('d/m/Y', strtotime($d->tanggal_dokumen)) : ''),
                 'nomor_dokumen' => $d->nomor_dokumen,
                 'tanggal_dokumen' => $d->tanggal_dokumen ? date('Y-m-d', strtotime($d->tanggal_dokumen)) : null,
-                'file_path'     => $d->file_path,
-                'nama_dokumen'  => $d->nama_dokumen,
+                'file_path' => $d->file_path,
+                'nama_dokumen' => $d->nama_dokumen,
             ]);
 
         $arsipKgb = $p->documents()
@@ -674,12 +674,12 @@ class PegawaiController extends Controller
             ->orderByDesc('tanggal_dokumen')
             ->get()
             ->map(fn ($d) => [
-                'id'            => $d->id,
-                'label'         => ($d->nomor_dokumen ?? 'Tanpa No.').($d->tanggal_dokumen ? ' — '.date('d/m/Y', strtotime($d->tanggal_dokumen)) : ''),
+                'id' => $d->id,
+                'label' => ($d->nomor_dokumen ?? 'Tanpa No.').($d->tanggal_dokumen ? ' — '.date('d/m/Y', strtotime($d->tanggal_dokumen)) : ''),
                 'nomor_dokumen' => $d->nomor_dokumen,
                 'tanggal_dokumen' => $d->tanggal_dokumen ? date('Y-m-d', strtotime($d->tanggal_dokumen)) : null,
-                'file_path'     => $d->file_path,
-                'nama_dokumen'  => $d->nama_dokumen,
+                'file_path' => $d->file_path,
+                'nama_dokumen' => $d->nama_dokumen,
             ]);
 
         $arsipPengangkatan = $p->documents()
@@ -687,12 +687,12 @@ class PegawaiController extends Controller
             ->orderByDesc('tanggal_dokumen')
             ->get()
             ->map(fn ($d) => [
-                'id'            => $d->id,
-                'label'         => ($d->nomor_dokumen ?? 'Tanpa No.').($d->tanggal_dokumen ? ' — '.date('d/m/Y', strtotime($d->tanggal_dokumen)) : ''),
+                'id' => $d->id,
+                'label' => ($d->nomor_dokumen ?? 'Tanpa No.').($d->tanggal_dokumen ? ' — '.date('d/m/Y', strtotime($d->tanggal_dokumen)) : ''),
                 'nomor_dokumen' => $d->nomor_dokumen,
                 'tanggal_dokumen' => $d->tanggal_dokumen ? date('Y-m-d', strtotime($d->tanggal_dokumen)) : null,
-                'file_path'     => $d->file_path,
-                'nama_dokumen'  => $d->nama_dokumen,
+                'file_path' => $d->file_path,
+                'nama_dokumen' => $d->nama_dokumen,
             ]);
 
         return view('admin.pegawai.edit', compact(
@@ -765,16 +765,16 @@ class PegawaiController extends Controller
 
                     // Catat ke arsip dokumen
                     $golonganLabel = isset($pangkatData['golongan_id'])
-                        ? (\App\Models\RefGolongan::find($pangkatData['golongan_id'])?->kode ?? 'Pangkat Baru')
+                        ? (RefGolongan::find($pangkatData['golongan_id'])?->kode ?? 'Pangkat Baru')
                         : 'Pangkat Baru';
                     Document::create([
-                        'employee_id'    => $employee->id,
-                        'jenis_dokumen'  => 'sk_pangkat',
-                        'nama_dokumen'   => 'SK Kenaikan Pangkat '.$golonganLabel,
-                        'nomor_dokumen'  => $pangkatData['no_sk'] ?? null,
-                        'tanggal_dokumen'=> $pangkatData['tanggal_sk'] ?? null,
-                        'file_path'      => 'ranks/sk/'.$filename,
-                        'keterangan'     => 'Diunggah otomatis saat edit pegawai',
+                        'employee_id' => $employee->id,
+                        'jenis_dokumen' => 'sk_pangkat',
+                        'nama_dokumen' => 'SK Kenaikan Pangkat '.$golonganLabel,
+                        'nomor_dokumen' => $pangkatData['no_sk'] ?? null,
+                        'tanggal_dokumen' => $pangkatData['tanggal_sk'] ?? null,
+                        'file_path' => 'ranks/sk/'.$filename,
+                        'keterangan' => 'Diunggah otomatis saat edit pegawai',
                     ]);
                 } elseif ($request->filled('existing_document_id_pangkat')) {
                     // Pilih dari arsip yang sudah ada
@@ -812,7 +812,7 @@ class PegawaiController extends Controller
                     $employee->rankHistories()->update(['is_latest' => false]);
                     $pangkatData['is_latest'] = true;
                     $employee->rankHistories()->create($pangkatData);
-                    
+
                     $golongan = RefGolongan::find($validated['pangkat_golongan_id']);
                     if ($golongan) {
                         $employee->update([
@@ -846,13 +846,13 @@ class PegawaiController extends Controller
 
                     // Catat ke arsip dokumen
                     Document::create([
-                        'employee_id'    => $employee->id,
-                        'jenis_dokumen'  => 'sk_jabatan',
-                        'nama_dokumen'   => 'SK Jabatan '.($jabatanData['nama_jabatan'] ?? 'Baru'),
-                        'nomor_dokumen'  => $jabatanData['no_sk'] ?? null,
-                        'tanggal_dokumen'=> $jabatanData['tanggal_sk'] ?? null,
-                        'file_path'      => 'positions/sk/'.$filename,
-                        'keterangan'     => 'Diunggah otomatis saat edit pegawai',
+                        'employee_id' => $employee->id,
+                        'jenis_dokumen' => 'sk_jabatan',
+                        'nama_dokumen' => 'SK Jabatan '.($jabatanData['nama_jabatan'] ?? 'Baru'),
+                        'nomor_dokumen' => $jabatanData['no_sk'] ?? null,
+                        'tanggal_dokumen' => $jabatanData['tanggal_sk'] ?? null,
+                        'file_path' => 'positions/sk/'.$filename,
+                        'keterangan' => 'Diunggah otomatis saat edit pegawai',
                     ]);
                 } elseif ($request->filled('existing_document_id_jabatan')) {
                     $existingDoc = Document::where('id', $request->input('existing_document_id_jabatan'))
@@ -884,7 +884,7 @@ class PegawaiController extends Controller
                     $employee->positionHistories()->update(['is_latest' => false]);
                     $jabatanData['is_latest'] = true;
                     $employee->positionHistories()->create($jabatanData);
-                    
+
                     $employee->update([
                         'jabatan_terakhir' => $validated['jabatan_nama_jabatan'],
                     ]);
@@ -910,13 +910,13 @@ class PegawaiController extends Controller
 
                     // Catat ke arsip dokumen
                     Document::create([
-                        'employee_id'    => $employee->id,
-                        'jenis_dokumen'  => 'sk_kgb',
-                        'nama_dokumen'   => 'SK KGB',
-                        'nomor_dokumen'  => $kgbData['no_sk'] ?? null,
-                        'tanggal_dokumen'=> $kgbData['tanggal_sk'] ?? null,
-                        'file_path'      => 'salaries/sk/'.$filename,
-                        'keterangan'     => 'Diunggah otomatis saat edit pegawai',
+                        'employee_id' => $employee->id,
+                        'jenis_dokumen' => 'sk_kgb',
+                        'nama_dokumen' => 'SK KGB',
+                        'nomor_dokumen' => $kgbData['no_sk'] ?? null,
+                        'tanggal_dokumen' => $kgbData['tanggal_sk'] ?? null,
+                        'file_path' => 'salaries/sk/'.$filename,
+                        'keterangan' => 'Diunggah otomatis saat edit pegawai',
                     ]);
                 } elseif ($request->filled('existing_document_id_kgb')) {
                     $existingDoc = Document::where('id', $request->input('existing_document_id_kgb'))
@@ -963,13 +963,13 @@ class PegawaiController extends Controller
 
                     // Catat ke arsip dokumen
                     Document::create([
-                        'employee_id'    => $employee->id,
-                        'jenis_dokumen'  => 'sk_pengangkatan',
-                        'nama_dokumen'   => 'SK Pengangkatan '.($appointmentData['jenis_pengangkatan'] ?? ''),
-                        'nomor_dokumen'  => $appointmentData['no_sk'] ?? null,
-                        'tanggal_dokumen'=> $appointmentData['tanggal_sk'] ?? null,
-                        'file_path'      => 'appointments/sk/'.$filename,
-                        'keterangan'     => 'Diunggah otomatis saat edit pegawai',
+                        'employee_id' => $employee->id,
+                        'jenis_dokumen' => 'sk_pengangkatan',
+                        'nama_dokumen' => 'SK Pengangkatan '.($appointmentData['jenis_pengangkatan'] ?? ''),
+                        'nomor_dokumen' => $appointmentData['no_sk'] ?? null,
+                        'tanggal_dokumen' => $appointmentData['tanggal_sk'] ?? null,
+                        'file_path' => 'appointments/sk/'.$filename,
+                        'keterangan' => 'Diunggah otomatis saat edit pegawai',
                     ]);
                 } elseif ($request->filled('existing_document_id_pengangkatan')) {
                     $existingDoc = Document::where('id', $request->input('existing_document_id_pengangkatan'))
@@ -995,7 +995,7 @@ class PegawaiController extends Controller
 
                 // Sync jenis_pegawai_id on employee based on jenis_pengangkatan (PNS/PPPK/CPNS)
                 $jenisPegawai = RefJenisPegawai::whereRaw('UPPER(nama) = ?', [
-                    strtoupper($validated['pengangkatan_jenis_pengangkatan'])
+                    strtoupper($validated['pengangkatan_jenis_pengangkatan']),
                 ])->first();
                 if ($jenisPegawai) {
                     $employee->update(['jenis_pegawai_id' => $jenisPegawai->id]);
