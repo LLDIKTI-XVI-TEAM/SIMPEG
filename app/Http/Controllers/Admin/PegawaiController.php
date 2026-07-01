@@ -832,6 +832,14 @@ class PegawaiController extends Controller
                 } else {
                     $employee->appointment()->create($appointmentData);
                 }
+
+                // Sync jenis_pegawai_id on employee based on jenis_pengangkatan (PNS/PPPK/CPNS)
+                $jenisPegawai = RefJenisPegawai::whereRaw('UPPER(nama) = ?', [
+                    strtoupper($validated['pengangkatan_jenis_pengangkatan'])
+                ])->first();
+                if ($jenisPegawai) {
+                    $employee->update(['jenis_pegawai_id' => $jenisPegawai->id]);
+                }
             }
 
             AuditService::log('UPDATE', 'Employee', $employee->id, $oldValues, $employee->toArray(), $request);

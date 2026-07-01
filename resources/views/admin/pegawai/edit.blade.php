@@ -194,7 +194,7 @@
             },
 
             validateUtama() {
-                const requiredIds = ['nama_lengkap', 'nip', 'jenis_pegawai_id', 'tanggal_lahir', 'pendidikan_terakhir', 'prodi_pendidikan_terakhir'];
+                const requiredIds = ['nama_lengkap', 'nip', 'tanggal_lahir', 'pendidikan_terakhir', 'prodi_pendidikan_terakhir'];
                 for (let id of requiredIds) {
                     const el = document.getElementById(id);
                     if (el && !el.value.trim()) {
@@ -407,22 +407,37 @@
                             <p x-show="nipError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="nipError"></p>
                         </div>
 
-                        {{-- Status Kepegawaian (Jenis) --}}
+                        {{-- Status Kepegawaian (READ-ONLY - ubah melalui SK Pengangkatan di Berkas & SK) --}}
+                        @php
+                            $currentJenisPegawai = $jenisPegawai->firstWhere('id', $p->jenis_pegawai_id);
+                        @endphp
+                        <input type="hidden" name="jenis_pegawai_id" value="{{ $p->jenis_pegawai_id }}">
                         <div class="space-y-1">
-                            <label for="jenis_pegawai_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Status Kepegawaian <span class="text-danger">*</span></label>
-                            <div class="relative">
-                                <select id="jenis_pegawai_id" name="jenis_pegawai_id" required class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="" disabled {{ empty($p->jenis_pegawai_id) ? 'selected' : '' }}>Pilih Status Kepegawaian</option>
-                                    @foreach($jenisPegawai as $jenis)
-                                        <option value="{{ $jenis->id }}" {{ $p->jenis_pegawai_id == $jenis->id ? 'selected' : '' }}>{{ $jenis->nama }}</option>
-                                    @endforeach
-                                </select>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                    </svg>
-                                </div>
+                            <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Status Kepegawaian</label>
+                            <div class="flex items-center gap-2 w-full rounded-lg border border-border bg-soft px-4 py-2 text-sm text-ink shadow-sm font-sans cursor-not-allowed">
+                                <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                                </svg>
+                                @if($currentJenisPegawai)
+                                    @php
+                                        $badgeClass = match($currentJenisPegawai->nama) {
+                                            'PNS'  => 'bg-blue-100 text-blue-700',
+                                            'PPPK' => 'bg-green-100 text-green-700',
+                                            'CPNS' => 'bg-yellow-100 text-yellow-700',
+                                            default => 'bg-surface text-ink border border-border',
+                                        };
+                                    @endphp
+                                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold {{ $badgeClass }}">{{ $currentJenisPegawai->nama }}</span>
+                                @else
+                                    <span class="text-muted">-</span>
+                                @endif
+                                <span class="ml-auto text-[10px] text-muted font-sans">Ubah via SK Pengangkatan</span>
                             </div>
+                            <p class="text-[10px] text-muted font-sans mt-1">
+                                Perubahan status kepegawaian harus disertai SK Pengangkatan. Buka tab
+                                <button type="button" @click="activeTab = 'pengangkatan'; subTab = 'pengangkatan'" class="text-primary font-semibold hover:underline cursor-pointer">Berkas &amp; SK → Pengangkatan</button>
+                                untuk mengunggah SK.
+                            </p>
                         </div>
 
                         {{-- Tanggal Lahir --}}
