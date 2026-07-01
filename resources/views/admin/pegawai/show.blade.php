@@ -293,10 +293,7 @@
                             <span class="text-xs font-bold text-ink font-sans block">Toggle Flag "Kinerja Baik"</span>
                             <p class="text-[10px] text-muted font-sans mt-0.5">Flag ini mempengaruhi kualifikasi rekomendasi promosi berkala.</p>
                         </div>
-                        <label class="relative inline-flex items-center cursor-pointer select-none">
-                            <input type="checkbox" x-model="kinerjaBaik" class="sr-only peer">
-                            <div class="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-success"></div>
-                        </label>
+                        <x-ui.toggle x-model="kinerjaBaik" class="peer-checked:bg-success" />
                     </div>
 
                     {{-- Atasan Langsung --}}
