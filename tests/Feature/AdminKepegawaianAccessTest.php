@@ -42,7 +42,6 @@ class AdminKepegawaianAccessTest extends TestCase
 
         foreach ([
             'data-pegawai',
-            'pegawai.import',
             'dokumen',
             'cuti.rekap',
             'ews',

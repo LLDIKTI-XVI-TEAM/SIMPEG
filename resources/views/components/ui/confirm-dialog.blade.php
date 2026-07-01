@@ -22,11 +22,11 @@
     ];
 @endphp
 
-<div x-data="{ open: false }" 
-     @open-confirm-{{ $id }}.window="open = true" 
-     @keydown.escape.window="open = false" 
-     class="relative z-50">
-     
+<div x-data="{ open: false }"
+     @open-confirm-{{ $id }}.window="open = true"
+     @keydown.escape.window="open = false"
+     class="inline-block">
+
     {{-- Trigger Slot --}}
     @isset($trigger)
         <div @click="open = true" class="inline-block">
@@ -34,31 +34,33 @@
         </div>
     @endisset
 
-    {{-- Backdrop --}}
-    <div x-show="open" 
+    <template x-teleport="body">
+        <div class="relative z-50">
+            {{-- Backdrop --}}
+            <div x-show="open"
          style="display: none;"
-         x-transition:enter="ease-out duration-300" 
-         x-transition:enter-start="opacity-0" 
-         x-transition:enter-end="opacity-100" 
-         x-transition:leave="ease-in duration-200" 
-         x-transition:leave-start="opacity-100" 
-         x-transition:leave-end="opacity-0" 
+         x-transition:enter="ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
          class="fixed inset-0 bg-ink/60 transition-opacity"></div>
 
     {{-- Modal Panel --}}
     <div x-show="open" style="display: none;" class="fixed inset-0 z-10 w-screen overflow-y-auto">
         <div class="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
-            <div x-show="open" 
-                 x-transition:enter="ease-out duration-300" 
-                 x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
-                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
-                 x-transition:leave="ease-in duration-200" 
-                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" 
-                 x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
+            <div x-show="open"
+                 x-transition:enter="ease-out duration-300"
+                 x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                 x-transition:leave="ease-in duration-200"
+                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                 x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
                  class="relative transform overflow-hidden rounded-xl bg-surface p-6 text-left shadow-xl transition-all w-full sm:max-w-md border border-border"
                  style="max-width: 400px; margin-left: auto; margin-right: auto;"
                  @click.away="open = false">
-                 
+
                 {{-- Icon Top Center --}}
                 <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full {{ $iconColors[(string)$variant] ?? $iconColors['primary'] }}">
                     @if($variant === 'danger')
@@ -95,7 +97,7 @@
 
                 {{-- Actions --}}
                 <div class="mt-8 flex flex-col-reverse sm:flex-row justify-center gap-3">
-                    <button type="button" 
+                    <button type="button"
                             @click="open = false"
                             class="inline-flex w-full sm:w-auto items-center justify-center rounded-lg px-5 py-3 text-sm font-semibold text-muted hover:bg-soft transition-colors font-sans focus:outline-none">
                         {{ $cancelText }}
@@ -107,22 +109,24 @@
                             @if(!in_array(strtoupper($method), ['GET', 'POST']))
                                 @method($method)
                             @endif
-                            <button type="submit" 
+                            <button type="submit"
                                     class="inline-flex w-full sm:w-auto items-center justify-center rounded-lg px-5 py-3 text-sm font-semibold transition-colors focus:outline-none {{ $buttonVariants[(string)$variant] ?? $buttonVariants['primary'] }}">
                                 {{ $confirmText }}
                             </button>
                         </form>
                     @else
                         {{-- Dispatch event when confirm button clicked --}}
-                        <button type="button" 
+                        <button type="button"
                                 @click="open = false; $dispatch('confirm-{{ $id }}')"
                                 class="inline-flex w-full sm:w-auto items-center justify-center rounded-lg px-5 py-3 text-sm font-semibold transition-colors focus:outline-none {{ $buttonVariants[(string)$variant] ?? $buttonVariants['primary'] }}">
                             {{ $confirmText }}
                         </button>
                     @endif
                 </div>
-                
+
             </div>
         </div>
     </div>
+        </div>
+    </template>
 </div>

@@ -72,12 +72,12 @@
                 </div>
             </div>
             <div class="flex items-center gap-3">
-                <a href="{{ route('audit-log') }}" class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-muted shadow-sm transition hover:bg-soft hover:text-ink font-sans">
+                <x-ui.button href="{{ route('audit-log') }}" variant="muted">
                     <svg class="w-4 h-4 mr-1.5 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
                     </svg>
                     Lihat Audit Log Akses
-                </a>
+                </x-ui.button>
             </div>
         </div>
 
@@ -93,21 +93,15 @@
 
         {{-- NOTIFICATIONS --}}
         @if(session('success'))
-            <div class="rounded-lg border border-success/20 bg-success/10 p-4 text-sm font-semibold text-success flex items-center gap-2">
-                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span>{{ session('success') }}</span>
-            </div>
+            <x-ui.alert variant="success" class="font-semibold">{{ session('success') }}</x-ui.alert>
         @endif
 
         @if(session('error'))
-            <div class="rounded-lg border border-danger/20 bg-danger/10 p-4 text-sm font-semibold text-danger flex items-center gap-2">
-                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span>{{ session('error') }}</span>
-            </div>
+            <x-ui.alert variant="danger" class="font-semibold">{{ session('error') }}</x-ui.alert>
         @endif
 
         {{-- FILTER BAR --}}
-        <div class="rounded-lg border border-border bg-surface p-4 shadow-sm flex flex-col gap-4">
+        <x-ui.card padding="sm" class="flex flex-col gap-4">
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12">
                 {{-- Search Bar --}}
                 <div class="col-span-1 sm:col-span-2 lg:col-span-6 relative">
@@ -155,80 +149,85 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </x-ui.card>
 
         {{-- TABLE CARD --}}
-        <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
+        <x-ui.card padding="none" class="overflow-hidden">
             <div class="px-6 py-4 border-b border-border bg-surface">
                 <h3 class="text-sm font-semibold text-ink font-sans">Pemetaan Akun SSO & Otorisasi RBAC</h3>
                 <p class="text-[10px] text-muted font-sans mt-0.5">Hubungkan email Keycloak SSO dengan data pegawai internal serta kelola role.</p>
             </div>            <div class="overflow-x-auto">
-                <table class="w-full border-collapse">
-                    <thead class="bg-soft border-b border-border">
-                        <tr>
-                            <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border whitespace-nowrap">NO</th>
-                            <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border whitespace-nowrap">NAMA PEGAWAI</th>
-                            <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border whitespace-nowrap">NIP</th>
-                            <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border whitespace-nowrap">EMAIL PEGAWAI</th>
-                            <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border whitespace-nowrap">KEYCLOAK ID</th>
-                            <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border whitespace-nowrap">ROLE</th>
-                            <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border whitespace-nowrap">STATUS SSO</th>
-                            <th class="px-4 py-2.5 text-right text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border whitespace-nowrap">AKSI</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
+                <x-ui.table class="border-collapse">
+                    <x-ui.table-head class="border-b border-border">
+                        <x-ui.table-row>
+                            <x-ui.table-th padding="sm" class="whitespace-nowrap">NO</x-ui.table-th>
+                            <x-ui.table-th padding="sm" class="whitespace-nowrap">NAMA PEGAWAI</x-ui.table-th>
+                            <x-ui.table-th padding="sm" class="whitespace-nowrap">NIP</x-ui.table-th>
+                            <x-ui.table-th padding="sm" class="whitespace-nowrap">EMAIL PEGAWAI</x-ui.table-th>
+                            <x-ui.table-th padding="sm" class="whitespace-nowrap">KEYCLOAK ID</x-ui.table-th>
+                            <x-ui.table-th padding="sm" class="whitespace-nowrap">ROLE</x-ui.table-th>
+                            <x-ui.table-th padding="sm" class="whitespace-nowrap">STATUS SSO</x-ui.table-th>
+                            <x-ui.table-th align="right" padding="sm" class="whitespace-nowrap">AKSI</x-ui.table-th>
+                        </x-ui.table-row>
+                    </x-ui.table-head>
+                    <x-ui.table-body>
                         <template x-for="(emp, index) in paginatedEmployees" :key="emp.nip">
-                            <tr class="transition-colors hover:bg-soft/50">
-                                <td class="px-4 py-3.5 text-xs font-mono text-muted whitespace-nowrap" x-text="(currentPage - 1) * perPage + index + 1"></td>
-                                <td class="px-4 py-3.5 text-xs font-bold text-ink font-sans whitespace-nowrap" x-text="emp.nama"></td>
-                                <td class="px-4 py-3.5 text-xs font-mono text-muted whitespace-nowrap" x-text="emp.nip"></td>
-                                <td class="px-4 py-3.5 text-xs text-ink font-mono whitespace-nowrap" x-text="emp.mapped_email"></td>
-                                <td class="px-4 py-3.5 text-xs font-mono whitespace-nowrap"
-                                    :class="emp.keycloak_id ? 'text-primary font-bold' : 'text-muted'"
-                                    x-text="emp.keycloak_id || '-'"></td>
-                                <td class="px-4 py-3.5 text-xs whitespace-nowrap">
-                                     <span class="text-[10px] font-bold uppercase tracking-wide"
-                                           :class="{
-                                               'text-danger': emp.role === 'super_admin',
-                                               'text-primary': emp.role === 'admin_kepegawaian',
-                                               'text-secondary': emp.role === 'pimpinan',
-                                               'text-warning': emp.role === 'atasan_langsung',
-                                               'text-success': emp.role === 'pegawai'
+                            <x-ui.table-row :interactive="true">
+                                <x-ui.table-td x-text="(currentPage - 1) * perPage + index + 1" class="font-mono text-muted whitespace-nowrap"></x-ui.table-td>
+                                <x-ui.table-td x-text="emp.nama" class="font-bold whitespace-nowrap"></x-ui.table-td>
+                                <x-ui.table-td x-text="emp.nip" class="font-mono text-muted whitespace-nowrap"></x-ui.table-td>
+                                <x-ui.table-td x-text="emp.mapped_email" class="font-mono whitespace-nowrap"></x-ui.table-td>
+                                <x-ui.table-td : x-text="emp.keycloak_id || '-'" class="font-mono whitespace-nowrap"></x-ui.table-td>
+                                <x-ui.table-td class="whitespace-nowrap">
+                                     <x-ui.badge
+                                           variant="none"
+                                           size="xs"
+                                           uppercase
+                                           x-bind:class="{
+                                               'border-danger/20 bg-danger/10 text-danger': emp.role === 'super_admin',
+                                               'border-primary/20 bg-primary/10 text-primary': emp.role === 'admin_kepegawaian',
+                                               'border-border bg-soft text-muted': emp.role === 'pimpinan',
+                                               'border-warning/25 bg-warning/10 text-warning': emp.role === 'atasan_langsung',
+                                               'border-success/20 bg-success/10 text-success': emp.role === 'pegawai'
                                            }"
                                            x-text="emp.role"
-                                     ></span>
-                                </td>
-                                <td class="px-4 py-3.5 text-xs font-sans whitespace-nowrap">
-                                    <span class="inline-flex items-center gap-1 font-bold text-[10px]"
-                                          :class="emp.is_connected ? 'text-success' : 'text-danger'">
-                                        <span class="h-1 w-1 rounded-full" :class="emp.is_connected ? 'bg-success' : 'bg-danger'"></span>
+                                     ></x-ui.badge>
+                                </x-ui.table-td>
+                                <x-ui.table-td class="whitespace-nowrap">
+                                    <x-ui.badge
+                                          variant="none"
+                                          size="xs"
+                                          dot
+                                          x-bind:class="emp.is_connected ? 'border-success/20 bg-success/10 text-success' : 'border-danger/20 bg-danger/10 text-danger'">
                                         <span x-text="emp.is_connected ? 'Terhubung' : 'Belum Terhubung'"></span>
-                                    </span>
-                                </td>
-                                <td class="px-4 py-3.5 text-right whitespace-nowrap">
+                                    </x-ui.badge>
+                                </x-ui.table-td>
+                                <x-ui.table-td align="right" class="whitespace-nowrap">
                                     <div class="flex items-center justify-end">
-                                        <button
+                                        <x-ui.button
                                             type="button"
+                                            variant="secondary"
+                                            size="icon"
                                             @click="openEdit(emp)"
-                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm cursor-pointer focus:outline-none"
                                             title="Edit Pemetaan"
+                                            aria-label="Edit Pemetaan"
                                         >
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                             </svg>
-                                        </button>
+                                        </x-ui.button>
                                     </div>
-                                </td>
-                            </tr>
+                                </x-ui.table-td>
+                            </x-ui.table-row>
                         </template>
 
-                        <tr x-show="filteredEmployees.length === 0">
-                            <td colspan="8" class="px-6 py-8 text-center text-xs text-muted font-sans">
+                        <x-ui.table-row x-show="filteredEmployees.length === 0">
+                            <x-ui.table-td colspan="8" align="center" class="px-6 py-8 text-muted">
                                 Tidak ada pegawai yang cocok dengan filter pencarian Anda.
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                            </x-ui.table-td>
+                        </x-ui.table-row>
+                    </x-ui.table-body>
+                </x-ui.table>
             </div>
 
             {{-- TABLE FOOTER / PAGINATION --}}
@@ -252,10 +251,12 @@
                 </div>
 
                 <div class="flex items-center gap-1.5">
+
                     <x-ui.pagination current="currentPage" total="totalPages" />
+
                 </div>
             </div>
-        </div>
+        </x-ui.card>
 
         {{-- EDIT PEMETAAN MODAL --}}
         <div x-show="showEditModal" class="fixed inset-0 z-50 overflow-hidden" style="display: none;" x-transition>
@@ -319,12 +320,12 @@
 
                     {{-- Footer --}}
                     <div class="px-6 py-4 border-t border-border bg-soft flex justify-end gap-3">
-                        <button type="button" @click="showEditModal = false" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2.5 text-xs font-semibold text-primary transition-colors hover:bg-soft cursor-pointer focus:outline-none font-sans">
+                        <x-ui.button type="button" variant="secondary" size="xs" @click="showEditModal = false">
                             Batal
-                        </button>
-                        <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 cursor-pointer focus:outline-none font-sans">
+                        </x-ui.button>
+                        <x-ui.button type="submit" variant="primary" size="xs">
                             Simpan Pemetaan
-                        </button>
+                        </x-ui.button>
                     </div>
 
                 </form>
