@@ -305,19 +305,64 @@
                     @endif
 
                     {{-- Relasi Pegawai --}}
-                    <div class="space-y-1">
-                        <label for="pegawai_id" class="text-xs font-semibold text-ink font-sans">Hubungkan ke Pegawai <span
+                    <div class="space-y-1" x-data="{
+                        open: false,
+                        search: '',
+                        selectedId: '{{ old('pegawai_id') }}',
+                        selectedLabel: 'Pilih Pegawai...',
+                        options: @js($pegawaiOptions),
+                        get filteredOptions() {
+                            if (this.search === '') return this.options;
+                            return this.options.filter(opt => opt.label.toLowerCase().includes(this.search.toLowerCase()));
+                        },
+                        init() {
+                            if (this.selectedId) {
+                                const found = this.options.find(opt => opt.id === this.selectedId);
+                                if (found) this.selectedLabel = found.label;
+                            }
+                        },
+                        selectOption(opt) {
+                            this.selectedId = opt.id;
+                            this.selectedLabel = opt.label;
+                            this.open = false;
+                            this.search = '';
+                        }
+                    }">
+                        <label class="text-xs font-semibold text-ink font-sans">Hubungkan ke Pegawai <span
                                 class="text-danger">*</span></label>
                         <div class="relative">
-                            <select id="pegawai_id" name="pegawai_id" required
-                                class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-4 pr-10 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                <option value="">Pilih Pegawai...</option>
-                                @foreach ($pegawaiOptions as $pegawai)
-                                    <option value="{{ $pegawai['id'] }}" @selected(old('pegawai_id') === $pegawai['id'])>{{ $pegawai['label'] }}</option>
-                                @endforeach
-                            </select>
+                            <input type="hidden" name="pegawai_id" x-model="selectedId" required>
+                            
+                            {{-- Dropdown Trigger --}}
+                            <button type="button" @click="open = !open" @click.outside="open = false"
+                                class="w-full flex items-center justify-between rounded-lg border border-border bg-surface pl-4 pr-10 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans text-left">
+                                <span x-text="selectedLabel" class="truncate" :class="!selectedId ? 'text-muted' : 'text-ink'"></span>
+                            </button>
                             <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4">
                                 <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                            </div>
+
+                            {{-- Dropdown Panel --}}
+                            <div x-show="open" style="display: none;" x-transition
+                                class="absolute z-10 w-full mt-1 bg-surface border border-border rounded-lg shadow-lg overflow-hidden">
+                                <div class="p-2 border-b border-border bg-soft/50">
+                                    <input type="text" x-model="search" placeholder="Cari nama atau NIP..."
+                                        class="w-full rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-ink focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans"
+                                        @click.stop>
+                                </div>
+                                <ul class="max-h-56 overflow-y-auto py-1">
+                                    <template x-for="opt in filteredOptions" :key="opt.id">
+                                        <li @click="selectOption(opt)"
+                                            class="px-3 py-2 text-xs cursor-pointer hover:bg-soft transition-colors text-ink font-sans flex items-center justify-between"
+                                            :class="selectedId === opt.id ? 'bg-primary/5 font-semibold text-primary' : ''">
+                                            <span x-text="opt.label"></span>
+                                            <svg x-show="selectedId === opt.id" class="w-3.5 h-3.5 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                        </li>
+                                    </template>
+                                    <li x-show="filteredOptions.length === 0" class="px-4 py-3 text-xs text-muted text-center italic font-sans">
+                                        Pegawai tidak ditemukan
+                                    </li>
+                                </ul>
                             </div>
                         </div>
                     </div>
