@@ -16,6 +16,7 @@ use Illuminate\Support\Carbon;
 /**
  * @property string $id
  * @property string $nama_lengkap
+ * @property string|null $nama_dengan_gelar
  * @property string $nip
  * @property string|null $jabatan_terakhir
  * @property string|null $golongan_terakhir
@@ -41,6 +42,7 @@ class Employee extends Model
     protected $fillable = [
         // Data Pribadi
         'nama_lengkap',
+        'nama_dengan_gelar',
         'nip',
         'nik',
         'no_kk',

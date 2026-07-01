@@ -231,24 +231,27 @@
                         @if($fotoUrl)
                             <img
                                 src="{{ $fotoUrl }}"
-                                alt="Foto {{ $p->nama_lengkap }}"
+                                alt="Foto {{ $p->nama_dengan_gelar ?? $p->nama_lengkap }}"
                                 class="h-full w-full object-cover"
                             >
                         @else
                             <div class="flex h-full w-full items-center justify-center bg-primary/10 text-xl font-bold text-primary font-sans uppercase">
-                                {{ strtoupper(substr($p->nama_lengkap, 0, 1)) }}
+                                {{ strtoupper(substr($p->nama_dengan_gelar ?? $p->nama_lengkap, 0, 1)) }}
                             </div>
                         @endif
                     </div>
                     <div class="min-w-0">
                         <div class="flex flex-wrap items-center gap-2">
-                            <h2 class="text-xl font-bold text-ink font-sans leading-tight">{{ $p->nama_lengkap }}</h2>
+                            <h2 class="text-xl font-bold text-ink font-sans leading-tight">{{ $p->nama_dengan_gelar ?? $p->nama_lengkap }}</h2>
                             <template x-if="kinerjaBaik">
                                 <span class="inline-flex items-center gap-1 text-[10px] font-bold text-success font-sans">
                                     KINERJA BAIK
                                 </span>
                             </template>
                         </div>
+                        @if($p->nama_dengan_gelar)
+                            <p class="text-xs text-muted font-sans mt-0.5">{{ $p->nama_lengkap }}</p>
+                        @endif
                         <p class="text-xs text-muted font-sans font-mono mt-0.5">NIP. {{ $p->nip }}</p>
                             <x-ui.badge variant="primary" size="md" uppercase class="mt-1.5">{{ $p->jenisPegawai->nama ?? '-' }}</x-ui.badge>
                     </div>
@@ -338,6 +341,14 @@
                     <div class="space-y-4">
                         <h3 class="text-xs font-bold text-ink uppercase tracking-wider font-sans border-b border-border pb-1.5">Identitas & Data Pribadi</h3>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                            <div class="space-y-0.5 sm:col-span-2">
+                                <span class="font-semibold text-muted font-sans">Nama dengan Gelar</span>
+                                <p class="text-ink font-sans font-semibold">{{ $p->nama_dengan_gelar ?? '-' }}</p>
+                            </div>
+                            <div class="space-y-0.5 sm:col-span-2">
+                                <span class="font-semibold text-muted font-sans">Nama Lengkap (tanpa gelar)</span>
+                                <p class="text-ink font-sans">{{ $p->nama_lengkap }}</p>
+                            </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">NIK (KTP)</span>
                                 <p class="text-ink font-mono font-bold">{{ $p->nik ?? '-' }}</p>
