@@ -55,23 +55,23 @@ class EmployeeRowMapper
      *   tidak di-map secara eksplisit; hanya dipakai dalam shift-detection.
      */
     private const MAP = [
-        'Nama Pegawai'        => 'nama_dengan_gelar',
-        'Person'              => 'nama_lengkap',
-        'Email Pegawai'       => 'email',
-        'Golongan'            => 'golongan_terakhir',
-        'Jabatan'             => 'jabatan_terakhir',
-        'Kelas Jabatan'       => 'kelas_jabatan',
-        'NIP'                 => 'nip',
-        'NIK'                 => 'nik',
-        'No KK'               => 'no_kk',
-        'Nomor Telepon'       => 'no_hp',
-        'Pangkat'             => 'pangkat_terakhir',
+        'Nama Pegawai' => 'nama_dengan_gelar',
+        'Person' => 'nama_lengkap',
+        'Email Pegawai' => 'email',
+        'Golongan' => 'golongan_terakhir',
+        'Jabatan' => 'jabatan_terakhir',
+        'Kelas Jabatan' => 'kelas_jabatan',
+        'NIP' => 'nip',
+        'NIK' => 'nik',
+        'No KK' => 'no_kk',
+        'Nomor Telepon' => 'no_hp',
+        'Pangkat' => 'pangkat_terakhir',
         'Pendidikan Terakhir' => 'pendidikan_terakhir',
-        'Pensiun'             => 'tanggal_pensiun',
+        'Pensiun' => 'tanggal_pensiun',
         'Prodi Pendidikan Terakhir' => 'prodi_pendidikan_terakhir',
-        'Status Kepegawaian'  => 'jenis_pegawai',
-        'Tanggal Lahir'       => 'tanggal_lahir',
-        'Role'                => 'role',
+        'Status Kepegawaian' => 'jenis_pegawai',
+        'Tanggal Lahir' => 'tanggal_lahir',
+        'Role' => 'role',
     ];
 
     /**

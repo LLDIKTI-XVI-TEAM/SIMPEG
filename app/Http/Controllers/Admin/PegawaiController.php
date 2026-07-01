@@ -5,15 +5,16 @@ namespace App\Http\Controllers\Admin;
 use App\Actions\Employees\AssignSupervisorAction;
 use App\Actions\Employees\CreateEmployeeAction;
 use App\Actions\Employees\DeactivateEmployeeAction;
+use App\Actions\Employees\ExportEmployeeAction;
 use App\Actions\Employees\ListInactiveEmployeesAction;
 use App\Actions\Employees\PrepareEmployeeEditFormDataAction;
 use App\Actions\Employees\RestoreEmployeeAction;
+use App\Actions\Employees\StoreEmployeeHistoryAction;
 use App\Actions\Employees\UpdateEmployeeAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Employee\StoreEmployeeRequest;
 use App\Http\Requests\Employee\UpdateEmployeeRequest;
 use App\Models\Appointment;
-use App\Models\Document;
 use App\Models\Employee;
 use App\Models\PositionHistory;
 use App\Models\RefAgama;
@@ -21,26 +22,14 @@ use App\Models\RefEselon;
 use App\Models\RefGolongan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
-use App\Models\RefJenjangPendidikan;
 use App\Models\RefStatusPerkawinan;
 use App\Models\RefUnitKerja;
-use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use PhpOffice\PhpSpreadsheet\Cell\DataType;
-use PhpOffice\PhpSpreadsheet\Shared\Date;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Style\Alignment;
-use PhpOffice\PhpSpreadsheet\Style\Border;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
-use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PegawaiController extends Controller
 {
-
     public function index(Request $request)
     {
         $perPage = (int) $request->query('per_page', 10);
@@ -58,7 +47,7 @@ class PegawaiController extends Controller
             ->distinct()
             ->orderBy('golongan_terakhir')
             ->pluck('golongan_terakhir')
-            ->map(fn(?string $golongan) => $golongan ? strtok($golongan, '/') : null)
+            ->map(fn (?string $golongan) => $golongan ? strtok($golongan, '/') : null)
             ->filter()
             ->unique()
             ->values();
@@ -103,19 +92,19 @@ class PegawaiController extends Controller
             $filters['status_aktif'] = 'Pensiun';
         }
 
-        if (!$unitKerjaOptions->contains('id', $filters['unit_kerja_id'])) {
+        if (! $unitKerjaOptions->contains('id', $filters['unit_kerja_id'])) {
             $filters['unit_kerja_id'] = '';
         }
 
-        if (!$jenisPegawaiOptions->contains('id', $filters['jenis_pegawai_id'])) {
+        if (! $jenisPegawaiOptions->contains('id', $filters['jenis_pegawai_id'])) {
             $filters['jenis_pegawai_id'] = '';
         }
 
-        if (!in_array($filters['status_aktif'], $statusOptions, true)) {
+        if (! in_array($filters['status_aktif'], $statusOptions, true)) {
             $filters['status_aktif'] = '';
         }
 
-        if ($filters['golongan'] !== '' && !$golonganOptions->contains($filters['golongan'])) {
+        if ($filters['golongan'] !== '' && ! $golonganOptions->contains($filters['golongan'])) {
             $filters['golongan'] = '';
         }
 
@@ -130,7 +119,7 @@ class PegawaiController extends Controller
             ->with([
                 'jenisPegawai',
                 'appointment',
-                'positionHistories' => fn($query) => $query
+                'positionHistories' => fn ($query) => $query
                     ->with('unitKerja')
                     ->orderByDesc('is_latest')
                     ->orderByDesc('tmt_jabatan'),
@@ -146,7 +135,7 @@ class PegawaiController extends Controller
         }
 
         if ($filters['golongan'] !== '') {
-            $pegawaiQuery->where('golongan_terakhir', 'like', $filters['golongan'] . '%');
+            $pegawaiQuery->where('golongan_terakhir', 'like', $filters['golongan'].'%');
         }
 
         if ($filters['unit_kerja_id'] !== '') {
@@ -245,7 +234,7 @@ class PegawaiController extends Controller
             ->distinct()
             ->orderBy('golongan_terakhir')
             ->pluck('golongan_terakhir')
-            ->map(fn(?string $golongan) => $golongan ? strtok($golongan, '/') : null)
+            ->map(fn (?string $golongan) => $golongan ? strtok($golongan, '/') : null)
             ->filter()
             ->unique()
             ->values();
@@ -278,9 +267,9 @@ class PegawaiController extends Controller
             $employee = $action->execute($request->validated(), $request);
 
             return redirect()->route('data-pegawai')
-                ->with('success', 'Data pegawai ' . $employee->nama_lengkap . ' berhasil ditambahkan.');
+                ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil ditambahkan.');
         } catch (\Exception $e) {
-            return back()->withInput()->with('error', 'Gagal menambahkan pegawai: ' . $e->getMessage());
+            return back()->withInput()->with('error', 'Gagal menambahkan pegawai: '.$e->getMessage());
         }
     }
 
@@ -322,9 +311,9 @@ class PegawaiController extends Controller
             $employee = $action->execute($employee, $request->validated(), $request);
 
             return redirect()->route('data-pegawai')
-                ->with('success', 'Data pegawai ' . $employee->nama_lengkap . ' berhasil diperbarui.');
+                ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil diperbarui.');
         } catch (\Exception $e) {
-            return back()->withInput()->with('error', 'Gagal memperbarui pegawai: ' . $e->getMessage());
+            return back()->withInput()->with('error', 'Gagal memperbarui pegawai: '.$e->getMessage());
         }
     }
 
@@ -336,7 +325,7 @@ class PegawaiController extends Controller
         $action->execute($employee, $request);
 
         return redirect()->route('data-pegawai')
-            ->with('success', 'Data pegawai ' . $nama . ' berhasil dinonaktifkan.');
+            ->with('success', 'Data pegawai '.$nama.' berhasil dinonaktifkan.');
     }
 
     public function bulkDestroy(Request $request, DeactivateEmployeeAction $action)
@@ -365,11 +354,11 @@ class PegawaiController extends Controller
 
             DB::commit();
 
-            return back()->with('success', $count . ' pegawai berhasil dinonaktifkan.');
+            return back()->with('success', $count.' pegawai berhasil dinonaktifkan.');
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return back()->with('error', 'Terjadi kesalahan saat menonaktifkan pegawai: ' . $e->getMessage());
+            return back()->with('error', 'Terjadi kesalahan saat menonaktifkan pegawai: '.$e->getMessage());
         }
     }
 
@@ -381,10 +370,10 @@ class PegawaiController extends Controller
         $action->execute($employee, $request);
 
         return redirect()->route('data-nonaktif')
-            ->with('success', 'Data pegawai ' . $nama . ' berhasil diaktifkan kembali.');
+            ->with('success', 'Data pegawai '.$nama.' berhasil diaktifkan kembali.');
     }
 
-    public function storeRiwayat($id, Request $request, \App\Actions\Employees\StoreEmployeeHistoryAction $action)
+    public function storeRiwayat($id, Request $request, StoreEmployeeHistoryAction $action)
     {
         $employee = Employee::findOrFail($id);
 
@@ -400,11 +389,10 @@ class PegawaiController extends Controller
     /**
      * @return StreamedResponse
      */
-    public function export(Request $request, \App\Actions\Employees\ExportEmployeeAction $action)
+    public function export(Request $request, ExportEmployeeAction $action)
     {
         return $action->execute($request);
     }
-
 
     public function assignAtasan(Request $request, $id, AssignSupervisorAction $action)
     {
@@ -418,10 +406,10 @@ class PegawaiController extends Controller
             $action->execute($employee, $request->input('supervisor_id'), $request);
 
             return redirect()->route('pegawai.show', $id)
-                ->with('success', 'Atasan langsung untuk ' . $employee->nama_lengkap . ' berhasil diperbarui.');
+                ->with('success', 'Atasan langsung untuk '.$employee->nama_lengkap.' berhasil diperbarui.');
         } catch (\Exception $e) {
             return redirect()->route('pegawai.show', $id)
-                ->with('error', 'Gagal memperbarui atasan langsung: ' . $e->getMessage());
+                ->with('error', 'Gagal memperbarui atasan langsung: '.$e->getMessage());
         }
     }
 }

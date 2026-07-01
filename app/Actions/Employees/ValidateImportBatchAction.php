@@ -92,7 +92,7 @@ class ValidateImportBatchAction
         if ($validator->fails()) {
             return $this->rowError($row, $nama, $this->mapErrors($validator->errors()->toArray(), [
                 'nama_dengan_gelar' => 'Nama Pegawai',
-                'nama_lengkap'      => 'Nama Lengkap (Person)',
+                'nama_lengkap' => 'Nama Lengkap (Person)',
                 'email' => 'Email Pegawai',
                 'golongan_terakhir' => 'Golongan',
                 'jabatan_terakhir' => 'Jabatan',

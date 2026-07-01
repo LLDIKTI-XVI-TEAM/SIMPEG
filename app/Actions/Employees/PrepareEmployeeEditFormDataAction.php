@@ -16,7 +16,7 @@ class PrepareEmployeeEditFormDataAction
     /**
      * Prepare data needed for the employee edit form.
      *
-     * @param int|string $id
+     * @param  int|string  $id
      * @return array<string, mixed>
      */
     public function execute($id): array
