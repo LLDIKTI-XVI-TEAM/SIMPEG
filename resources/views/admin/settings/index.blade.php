@@ -110,14 +110,15 @@
             this.showEditModal = true;
         },
         saveUser() {
-            if (confirm('Apakah Anda yakin ingin mengubah pemetaan SSO & role user ini?')) {
-                const idx = this.users.findIndex(u => u.id === this.selectedUser.id);
-                if (idx !== -1) {
-                    this.selectedUser.status = this.selectedUser.keycloak_id.trim() ? 'Terhubung' : 'Belum Terhubung';
-                    this.users[idx] = this.selectedUser;
-                }
-                this.showEditModal = false;
+            $dispatch('open-confirm-sso');
+        },
+        executeSaveUser() {
+            const idx = this.users.findIndex(u => u.id === this.selectedUser.id);
+            if (idx !== -1) {
+                this.selectedUser.status = this.selectedUser.keycloak_id.trim() ? 'Terhubung' : 'Belum Terhubung';
+                this.users[idx] = this.selectedUser;
             }
+            this.showEditModal = false;
         },
         updateStage2(val) {
             const parts = val.split('|');
@@ -129,7 +130,10 @@
             this.cutiConfig.stage3_approver = parts[0];
             this.cutiConfig.stage3_nip = parts[1];
         }
-    }" class="space-y-6">
+    }" @confirm-sso.window="executeSaveUser()"
+       @confirm-instansi.window="$refs.formUmum.submit()"
+       @confirm-cuti.window="$refs.formCuti.submit()" class="space-y-6">
+
 
         <x-admin.page-header title="Pengaturan Sistem" class="border-b border-border pb-4">
             <x-slot:breadcrumb>
@@ -140,6 +144,7 @@
                     <span class="text-muted italic">Akses: Khusus Super Admin</span>
             </x-slot:breadcrumb>
             <x-slot:actions>
+
                 <span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-info">
                     🔒 Audit Trail Aktif
                 </span>
@@ -195,8 +200,10 @@
             <main class="flex-1 min-w-0">
                 
                 {{-- TAB: UMUM & INSTANSI --}}
-                <x-ui.card padding="lg" x-show="activeTab === 'umum'" class="space-y-6">
-                    <form action="{{ route('settings.update') }}" method="POST" @submit.prevent="if (confirm('Apakah Anda yakin ingin menyimpan perubahan konfigurasi instansi & server SMTP ini?')) $el.submit()" class="space-y-6">
+
+                <div x-show="activeTab === 'umum'" class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6">
+                    <form x-ref="formUmum" action="{{ route('settings.update') }}" method="POST" @submit.prevent="$dispatch('open-confirm-instansi')" class="space-y-6">
+
                         @csrf
                         <div class="border-b border-border pb-4">
                             <h2 class="text-lg font-bold text-ink font-sans leading-tight">Pengaturan Umum & Instansi</h2>
@@ -259,8 +266,10 @@
                 </x-ui.card>
 
                 {{-- TAB: ALUR APPROVAL CUTI --}}
-                <x-ui.card padding="lg" x-show="activeTab === 'cuti'"   style="display: none;" class="space-y-6">
-                    <form action="{{ route('settings.update') }}" method="POST" @submit.prevent="if (confirm('Apakah Anda yakin ingin memperbarui kebijakan alur persetujuan cuti? Perubahan ini hanya akan berdampak pada pengajuan cuti baru.')) $el.submit()" class="space-y-6">
+
+                <div x-show="activeTab === 'cuti'" class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6" style="display: none;">
+                    <form x-ref="formCuti" action="{{ route('settings.update') }}" method="POST" @submit.prevent="$dispatch('open-confirm-cuti')" class="space-y-6">
+
                         @csrf
                         <div class="border-b border-border pb-4">
                             <h2 class="text-lg font-bold text-ink font-sans leading-tight">Alur Persetujuan Cuti</h2>
@@ -537,6 +546,30 @@
                 </div>
             </div>
         </div>
+
+        <x-ui.confirm-dialog
+            id="sso"
+            title="Ubah Pemetaan SSO"
+            message="Apakah Anda yakin ingin mengubah pemetaan SSO & role user ini?"
+            confirm-text="Ya, Simpan"
+            variant="warning"
+        />
+
+        <x-ui.confirm-dialog
+            id="instansi"
+            title="Simpan Pengaturan Instansi"
+            message="Apakah Anda yakin ingin menyimpan perubahan konfigurasi instansi & server SMTP ini?"
+            confirm-text="Simpan Perubahan"
+            variant="warning"
+        />
+
+        <x-ui.confirm-dialog
+            id="cuti"
+            title="Perbarui Alur Cuti"
+            message="Apakah Anda yakin ingin memperbarui kebijakan alur persetujuan cuti? Perubahan ini hanya akan berdampak pada pengajuan cuti baru."
+            confirm-text="Perbarui"
+            variant="warning"
+        />
 
     </div>
 

@@ -59,19 +59,20 @@ $permissionPaths = [
             this.currentData = JSON.parse(JSON.stringify(this.originalData));
             this.isDirty = false;
         }
-    }" class="space-y-6">
+    }" @confirm-rbac.window="$refs.rbacForm.submit()" class="space-y-6">
 
         {{-- PAGE HEADER & BREADCRUMBS --}}
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h2 class="text-2xl font-semibold text-ink font-sans">Role & Permission / RBAC</h2>
-                <nav class="mt-1 flex items-center gap-1.5 text-xs text-muted">
-                    <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
-                    <span>/</span>
-                    <span class="font-medium text-ink">Role & Permission</span>
+                <x-ui.breadcrumb :items="[
+                    ['label' => 'Dashboard', 'url' => route('dashboard')],
+                    ['label' => 'Role & Permission']
+                ]" />
+                <div class="mt-1 flex items-center text-xs text-muted">
                     <span>•</span>
-                    <span class="text-muted italic">Akses: Khusus Super Admin</span>
-                </nav>
+                    <span class="ml-1 text-muted italic">Akses: Khusus Super Admin</span>
+                </div>
             </div>
             <div class="flex items-center gap-3">
                 <x-ui.button href="{{ route('audit-log') }}" variant="muted">
@@ -140,7 +141,7 @@ $permissionPaths = [
         </div>
 
         {{-- MATRIX CARD --}}
-        <form action="{{ route('rbac.update') }}" method="POST" class="relative">
+        <form x-ref="rbacForm" action="{{ route('rbac.update') }}" method="POST" class="relative">
             @csrf
 
             <x-ui.card padding="none" class="overflow-hidden">
@@ -316,7 +317,7 @@ $permissionPaths = [
                     </button>
                     <button
                         type="button"
-                        @click="showConfirmModal = true"
+                        @click="$dispatch('open-confirm-rbac')"
                         class="inline-flex items-center justify-center rounded-lg bg-secondary px-5 py-2.5 text-xs font-bold text-ink shadow-sm transition hover:opacity-90 cursor-pointer font-sans"
                     >
                         Simpan Perubahan
@@ -325,34 +326,29 @@ $permissionPaths = [
             </div>
 
             {{-- CONFIRMATION MODAL --}}
-            <x-ui.modal
-                show="showConfirmModal"
+
+            <x-ui.confirm-dialog
+                id="rbac"
                 title="Konfirmasi Perubahan Otorisasi"
-                close-action="showConfirmModal = false"
-                max-width="md"
-                body-class="p-6 space-y-4 bg-surface"
-                footer-class="flex justify-end gap-3"
-                overlay-class="bg-ink/30"
+                message="Harap tinjau kembali perubahan hak akses sebelum menyimpan."
+                confirm-text="Ya, Simpan Perubahan"
+                variant="primary"
             >
-                <p class="text-[11px] text-muted font-sans">Harap tinjau kembali perubahan hak akses sebelum menyimpan.</p>
+                <div class="space-y-4">
+                    <div class="rounded-lg border border-warning/20 bg-warning/5 p-4 text-xs text-warning flex gap-3">
+                        <svg class="w-5 h-5 shrink-0 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                        </svg>
+                        <div>
+                            <span class="font-bold">⚠️ TINDAKAN SENSITIF:</span> Mengubah matriks RBAC (Role-Based Access Control) akan berdampak secara real-time dan langsung mempengaruhi hak akses seluruh pengguna aktif di sistem SIMPEG.
+                        </div>
+                    </div>
+                    <p class="text-xs text-ink/80 leading-relaxed font-sans">
+                        Perubahan pada hak akses modul sensitif (seperti <strong>User Management</strong>, <strong>Role & Permission</strong>, <strong>Audit Log</strong>, atau <strong>Konfigurasi EWS</strong>) berisiko tinggi. Pastikan wewenang yang diberikan telah sesuai dengan instruksi kedinasan.
+                    </p>
+                </div>
+            </x-ui.confirm-dialog>
 
-                <x-ui.alert variant="warning" size="sm" class="text-xs">
-                    <span class="font-bold">TINDAKAN SENSITIF:</span> Mengubah matriks RBAC (Role-Based Access Control) akan berdampak secara real-time dan langsung mempengaruhi hak akses seluruh pengguna aktif di sistem SIMPEG.
-                </x-ui.alert>
-
-                <p class="text-xs text-ink/80 leading-relaxed font-sans">
-                    Perubahan pada hak akses modul sensitif (seperti <strong>User Management</strong>, <strong>Role & Permission</strong>, <strong>Audit Log</strong>, atau <strong>Konfigurasi EWS</strong>) berisiko tinggi. Pastikan wewenang yang diberikan telah sesuai dengan instruksi kedinasan.
-                </p>
-
-                <x-slot:footer>
-                    <x-ui.button type="button" variant="secondary" size="xs" @click="showConfirmModal = false">
-                        Batal
-                    </x-ui.button>
-                    <x-ui.button type="submit" variant="primary" size="xs">
-                        Ya, Simpan Perubahan
-                    </x-ui.button>
-                </x-slot:footer>
-            </x-ui.modal>
 
         </form>
 

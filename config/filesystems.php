@@ -42,7 +42,7 @@ return [
             'driver' => 'local',
             'root' => storage_path('app/public'),
             'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
-            'visibility' => 'public',
+            // 'visibility' => 'public', // Disabled to prevent chmod issues on Docker volume
             'throw' => false,
             'report' => false,
         ],

@@ -24,7 +24,7 @@ class CreateEmployeeAction
 
         $employee = Employee::create($data);
 
-        AuditService::log('CREATE', 'Employee', $employee->id, null, $employee->toArray(), $request);
+        AuditService::log('CREATE', 'Employee', $employee->id, null, $employee->getRawOriginal(), $request);
 
         return $employee;
     }

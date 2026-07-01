@@ -55,9 +55,8 @@
         ];
     @endphp
 
-    <div class="space-y-6" x-data="{
+    <div class="space-y-6" @confirm-rekap.window="savedCorrection = true" x-data="{
             exportType: null,
-            showConfirm: false,
             savedCorrection: false,
             activeFilters: {
                 periode: 'Juni 2026',
@@ -73,30 +72,36 @@
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h2 class="text-2xl font-semibold text-ink font-sans">Rekap Cuti Pegawai</h2>
-                <nav class="mt-1 flex items-center gap-1.5 text-xs text-muted">
-                    <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
-                    <span>/</span>
-                    <a href="{{ route('cuti') }}" class="transition-colors hover:text-ink">Cuti</a>
-                    <span>/</span>
-                    <span class="font-medium text-ink">Rekap Cuti</span>
-                </nav>
+                <x-ui.breadcrumb :items="[
+                    ['label' => 'Dashboard', 'url' => route('dashboard')],
+                    ['label' => 'Cuti', 'url' => route('cuti')],
+                    ['label' => 'Rekap Cuti']
+                ]" />
             </div>
             <div class="flex shrink-0 items-center gap-2">
                 <button type="button" @click="applyExport('excel')" :disabled="exportType !== null"
-                    class="rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition hover:bg-soft disabled:cursor-not-allowed disabled:opacity-60">
+                    class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition hover:bg-soft disabled:cursor-not-allowed disabled:opacity-60">
+                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                    </svg>
                     <span x-show="exportType !== 'excel'">Export Excel</span>
                     <span x-show="exportType === 'excel'" style="display: none;">Menyiapkan Excel...</span>
                 </button>
                 <button type="button" @click="applyExport('pdf')" :disabled="exportType !== null"
-                    class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">
+                    class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">
+                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3-3m0 0l-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                    </svg>
                     <span x-show="exportType !== 'pdf'">Export PDF</span>
                     <span x-show="exportType === 'pdf'" style="display: none;">Menyiapkan PDF...</span>
                 </button>
             </div>
         </div>
 
+
         <x-ui.card padding="sm">
             <div class="grid grid-cols-1 gap-3 md:grid-cols-5">
+
                 <select x-model="activeFilters.periode"
                     class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                     <option>Juni 2026</option>
@@ -127,10 +132,6 @@
                     <option>Cuti Besar</option>
                     <option>Cuti Luar Tanggungan Negara (CLTN)</option>
                 </select>
-                <button
-                    class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90">
-                    Terapkan Filter
-                </button>
             </div>
         </x-ui.card>
 
@@ -154,6 +155,7 @@
                             cuti, dan status saldo.</p>
                     </div>
                     <div class="overflow-x-auto">
+
                         <x-ui.table>
                             <x-ui.table-head>
                                 <x-ui.table-row>
@@ -206,6 +208,7 @@
                                                 class="text-xs font-semibold text-primary hover:underline">Koreksi</button>
                                         </x-ui.table-td>
                                     </x-ui.table-row>
+
                                 @endforeach
                             </x-ui.table-body>
                         </x-ui.table>
@@ -302,11 +305,13 @@
                         </select>
                         <input type="number" value="1"
                             class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+
                         <x-form.textarea
                             rows="3"
                             placeholder="Alasan koreksi wajib diisi"
                         />
                         <button type="button" @click="showConfirm = true"
+
                             class="w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90">Simpan
                             Koreksi</button>
                     </div>
@@ -394,30 +399,14 @@
             </div>
         </x-ui.card>
 
-        <x-ui.modal
-            show="showConfirm"
-            title="Konfirmasi Koreksi Saldo"
-            close-action="showConfirm = false"
-            max-width="md"
-            body-class="p-6"
-            footer-class="flex justify-end gap-2"
-            overlay-class="bg-ink/40"
-        >
-            <p class="text-sm text-muted">
-                Pastikan nilai koreksi dan alasan sudah benar. Koreksi saldo akan dicatat sebagai aktivitas audit
-                saat integrasi backend aktif.
-            </p>
 
-            <x-slot:footer>
-                <button type="button" @click="showConfirm = false"
-                    class="rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-muted hover:bg-soft">
-                    Batal
-                </button>
-                <button type="button" @click="showConfirm = false; savedCorrection = true"
-                    class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
-                    Konfirmasi Simpan
-                </button>
-            </x-slot:footer>
-        </x-ui.modal>
+        <x-ui.confirm-dialog
+            id="rekap"
+            title="Konfirmasi Koreksi Saldo"
+            message="Pastikan nilai koreksi dan alasan sudah benar. Koreksi saldo akan dicatat sebagai aktivitas audit saat integrasi backend aktif."
+            confirm-text="Konfirmasi Simpan"
+            variant="primary"
+        />
+
     </div>
 </x-layouts.app>

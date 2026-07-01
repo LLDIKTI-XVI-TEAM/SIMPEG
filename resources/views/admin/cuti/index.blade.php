@@ -41,8 +41,25 @@
 
         // Filter cepat dari query string (mis. tautan "menunggu persetujuan").
         if (request()->query('status') === 'pending') {
-            $riwayatCuti = $riwayatCuti->where('status', 'menunggu');
+            $riwayatCuti = collect($riwayatCuti)->where('status', 'menunggu');
         }
+
+        $perPage = request()->input('per_page', 10);
+        $page = request()->input('page', 1);
+
+        $offset = ($page - 1) * $perPage;
+        $total = count($riwayatCuti);
+
+        $riwayatCutiArray = is_array($riwayatCuti) ? $riwayatCuti : collect($riwayatCuti)->all();
+        $pagedData = array_slice($riwayatCutiArray, $offset, $perPage);
+
+        $riwayatCutiPaginator = new \Illuminate\Pagination\LengthAwarePaginator(
+            $pagedData,
+            $total,
+            $perPage,
+            $page,
+            ['path' => request()->url(), 'query' => request()->query()]
+        );
 
         // Metrik ringkas dihitung dari data nyata, bukan angka statis.
         $totalPengajuan = $riwayatCuti->count();
@@ -69,11 +86,10 @@
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h2 class="text-2xl font-semibold text-ink font-sans">Monitoring Cuti Pegawai</h2>
-                <nav class="mt-1 flex items-center gap-1.5 text-xs text-muted">
-                    <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
-                    <span>/</span>
-                    <span class="font-medium text-ink">Cuti</span>
-                </nav>
+                <x-ui.breadcrumb :items="[
+                    ['label' => 'Dashboard', 'url' => route('dashboard')],
+                    ['label' => 'Cuti']
+                ]" />
             </div>
             <div class="flex shrink-0 items-center gap-3">
                 <button
@@ -119,80 +135,76 @@
             </x-ui.stat-card>
         </div>
 
-        {{-- FILTER BAR --}}
-        <x-ui.card padding="sm" class="flex flex-col gap-4">
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                {{-- Search input --}}
-                <div class="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 col-span-1 sm:col-span-2 lg:col-span-1">
-                    <svg class="w-4 h-4 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+
+        <x-ui.filter-bar
+            searchId="search-cuti"
+            searchPlaceholder="Cari nama atau NIP..."
+            class="sm:grid-cols-2 lg:grid-cols-5"
+        >
+            {{-- Filter Status --}}
+            <div class="relative">
+                <select id="filter-status" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 h-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <option value="">Semua Status</option>
+                    <option value="menunggu">Menunggu</option>
+                    <option value="disetujui">Disetujui</option>
+                    <option value="ditunda">Ditunda</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+
                     </svg>
-                    <input id="search-cuti" type="text" placeholder="Cari nama atau NIP..." class="flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none font-sans">
-                </div>
-
-                {{-- Filter Status --}}
-                <div class="relative">
-                    <select id="filter-status" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                        <option value="">Semua Status</option>
-                        <option value="menunggu">Menunggu</option>
-                        <option value="disetujui">Disetujui</option>
-                        <option value="ditunda">Ditunda</option>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
-                </div>
-
-                {{-- Filter Jenis Cuti --}}
-                <div class="relative">
-                    <select id="filter-jenis" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                        <option value="">Semua Jenis Cuti</option>
-                        <option>Cuti Tahunan</option>
-                        <option>Cuti Sakit</option>
-                        <option>Cuti Melahirkan</option>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
-                </div>
-
-                {{-- Filter Unit Kerja --}}
-                <div class="relative">
-                    <select id="filter-unit" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                        <option value="">Semua Unit Kerja</option>
-                        <option>Bag. Umum</option>
-                        <option>Bag. Keuangan</option>
-                        <option>Bag. SDM</option>
-                        <option>Bag. IT</option>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
-                </div>
-
-                {{-- Filter Periode Bulan --}}
-                <div class="relative">
-                    <select id="filter-periode" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                        <option value="">Semua Periode</option>
-                        <option value="Juni 2026">Juni 2026</option>
-                        <option value="April 2026">April 2026</option>
-                        <option value="Februari 2026">Februari 2026</option>
-                        <option value="Oktober 2025">Oktober 2025</option>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
                 </div>
             </div>
-        </x-ui.card>
+
+
+            {{-- Filter Jenis Cuti --}}
+            <div class="relative">
+                <select id="filter-jenis" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 h-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <option value="">Semua Jenis Cuti</option>
+                    <option>Cuti Tahunan</option>
+                    <option>Cuti Sakit</option>
+                    <option>Cuti Melahirkan</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                    </svg>
+                </div>
+            </div>
+
+            {{-- Filter Unit Kerja --}}
+            <div class="relative">
+                <select id="filter-unit" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 h-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <option value="">Semua Unit Kerja</option>
+                    <option>Bag. Umum</option>
+                    <option>Bag. Keuangan</option>
+                    <option>Bag. SDM</option>
+                    <option>Bag. IT</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                    </svg>
+                </div>
+            </div>
+
+            {{-- Filter Periode Bulan --}}
+            <div class="relative">
+                <select id="filter-periode" class="w-full appearance-none bg-none rounded-lg border border-border bg-surface pl-3 pr-10 h-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <option value="">Semua Periode</option>
+                    <option value="Juni 2026">Juni 2026</option>
+                    <option value="Mei 2026">Mei 2026</option>
+                    <option value="April 2026">April 2026</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                    </svg>
+                </div>
+            </div>
+        </x-ui.filter-bar>
+
 
         {{-- TABLE CARD --}}
         <x-ui.card padding="none" class="overflow-hidden">
@@ -203,6 +215,7 @@
                 </div>
             </div>
             <div class="overflow-x-auto">
+
                 <x-ui.table id="cuti-table">
                     <x-ui.table-head class="border-b border-border">
                         <x-ui.table-row>
@@ -219,6 +232,7 @@
                         @foreach($riwayatCuti as $r)
                         <x-ui.table-row data-nama="{{ $r['nama'] }}" data-nip="{{ $r['nip'] }}" data-unit="{{ $r['unit'] }}" data-jenis="{{ $r['jenis'] }}" data-status="{{ $r['status'] }}" data-periode="{{ $r['periode'] }}" :interactive="true">
                             <x-ui.table-td>
+
                                 <div class="flex items-center gap-3">
                                     <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
                                         {{ strtoupper(substr($r['nama'], 0, 1)) }}
@@ -238,22 +252,16 @@
                             </x-ui.table-td>
                             <x-ui.table-td>
                                 <p class="text-sm text-ink font-mono">{{ \Carbon\Carbon::parse($r['mulai'])->translatedFormat('d M') }} - {{ \Carbon\Carbon::parse($r['selesai'])->translatedFormat('d M Y') }}</p>
+
                                 <p class="text-xs text-primary font-semibold mt-0.5 leading-none">{{ $r['hari'] }} Hari Kerja</p>
                             </x-ui.table-td>
                             <x-ui.table-td>
+
                                 <div class="flex flex-col gap-1 text-[11px] font-medium text-ink font-sans">
-                                    <div class="flex items-center gap-1.5">
-                                        @php
-                                        $dotAtasan = $r['stage_atasan'] === 'disetujui' ? 'bg-success' : ($r['stage_atasan'] === 'ditunda' ? 'bg-danger' : 'bg-muted');
-                                        @endphp
-                                        <span class="h-1.5 w-1.5 rounded-full {{ $dotAtasan }}"></span>
+                                    <div>
                                         <span>Atasan: <strong class="capitalize">{{ $r['stage_atasan'] }}</strong></span>
                                     </div>
-                                    <div class="flex items-center gap-1.5">
-                                        @php
-                                        $dotKepala = $r['stage_kepala'] === 'disetujui' ? 'bg-success' : ($r['stage_kepala'] === 'ditunda' ? 'bg-danger' : 'bg-muted');
-                                        @endphp
-                                        <span class="h-1.5 w-1.5 rounded-full {{ $dotKepala }}"></span>
+                                    <div>
                                         <span>Kepala: <strong class="capitalize">{{ $r['stage_kepala'] }}</strong></span>
                                     </div>
                                 </div>
@@ -265,7 +273,9 @@
                             </x-ui.table-td>
                             <x-ui.table-td align="right">
                                 <div class="flex items-center justify-end gap-1.5">
+
                                     <x-ui.button href="{{ route('cuti.show', $r['id']) }}" variant="secondary" size="icon" title="Detail" aria-label="Detail">
+
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
@@ -280,36 +290,27 @@
             </div>
 
             {{-- TABLE FOOTER --}}
-            <div class="flex flex-col gap-3 border-t border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between bg-surface">
-                <div class="flex items-center gap-3">
-                    <p id="cuti-count-text" class="text-sm text-muted font-sans">Menampilkan 1 - 7 dari 7 data</p>
-                    <div class="relative">
-                        <select id="per-page" class="appearance-none rounded-lg border border-border bg-surface pl-3 pr-8 py-1 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                            <option>10 / halaman</option>
-                            <option>25 / halaman</option>
-                            <option>50 / halaman</option>
+            <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row">
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm text-muted">Tampilkan</span>
+                        <select onchange="updatePerPage(this.value)" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
+                            <option value="10" {{ request('per_page', 10) == 10 ? 'selected' : '' }}>10</option>
+                            <option value="25" {{ request('per_page') == 25 ? 'selected' : '' }}>25</option>
+                            <option value="50" {{ request('per_page') == 50 ? 'selected' : '' }}>50</option>
                         </select>
-                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                            </svg>
-                        </div>
+                        <span class="text-sm text-muted">data per halaman</span>
                     </div>
+                    @if($riwayatCutiPaginator->total() > 0)
+                    <p class="text-sm text-muted hidden sm:block">
+                        Menampilkan <span class="font-semibold text-ink">{{ $riwayatCutiPaginator->firstItem() }}</span> hingga <span class="font-semibold text-ink">{{ $riwayatCutiPaginator->lastItem() }}</span> dari <span class="font-semibold text-ink">{{ $riwayatCutiPaginator->total() }}</span> hasil
+                    </p>
+                    @endif
                 </div>
-                <div class="flex items-center gap-1.5">
-                    {{-- Prev --}}
-                    <x-ui.button type="button" variant="muted" size="icon" aria-label="Halaman sebelumnya">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                        </svg>
-                    </x-ui.button>
-                    <button class="flex h-8 w-8 items-center justify-center rounded-lg border border-primary bg-primary text-sm font-semibold text-white transition hover:opacity-90 font-sans">1</button>
-                    {{-- Next --}}
-                    <x-ui.button type="button" variant="muted" size="icon" aria-label="Halaman berikutnya">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                        </svg>
-                    </x-ui.button>
+
+                <div class="w-full sm:w-auto">
+                    {{ $riwayatCutiPaginator->onEachSide(1)->links('vendor.pagination.simpeg') }}
+
                 </div>
             </div>
         </x-ui.card>
@@ -384,10 +385,10 @@
     function exportCutiData() {
         const rows = document.querySelectorAll('#cuti-table tbody tr');
         let csvContent = "data:text/csv;charset=utf-8,";
-        
+
         // Header
         csvContent += "No,Nama,NIP,Unit Kerja,Jenis Cuti,Tanggal Mulai,Tanggal Selesai,Durasi (Hari Kerja),Status\n";
-        
+
         let count = 1;
         rows.forEach(row => {
             if (row.style.display !== 'none' && row.getAttribute('data-nama')) {
@@ -396,7 +397,7 @@
                 const unit = row.getAttribute('data-unit');
                 const jenis = row.getAttribute('data-jenis');
                 const status = row.getAttribute('data-status');
-                
+
                 // Cari durasi
                 const durasiEl = row.querySelector('td:nth-child(4) p:last-child');
                 const durasi = durasiEl ? durasiEl.textContent.replace(' Hari Kerja', '').trim() : '';
@@ -420,6 +421,13 @@
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+    }
+
+    function updatePerPage(val) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('per_page', val);
+        url.searchParams.delete('page');
+        window.location.assign(url.href);
     }
     </script>
     @endpush

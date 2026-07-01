@@ -50,7 +50,7 @@
             $timestamp = strtotime($newVal['tanggal']);
             $days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
             $hariName = $days[date('w', $timestamp)];
-            
+
             $addedHolidays[] = [
                 'id' => $log['id'],
                 'tanggal' => $newVal['tanggal'],
@@ -81,7 +81,7 @@
         perPage: 10,
         currentPage: 1,
         holidays: {{ json_encode($allHolidays) }},
-        
+
         get filteredHolidays() {
             return this.holidays.filter(h => {
                 const date = new Date(h.tanggal);
@@ -133,17 +133,36 @@
             const monthIndex = parseInt(parts[1], 10) - 1;
             const day = parseInt(parts[2], 10);
             return `${day.toString().padStart(2, '0')} ${months[monthIndex]} ${year}`;
+        },
+
+        selectedHoliday: null,
+        executeDeleteHoliday() {
+            if (!this.selectedHoliday) return;
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/hari-libur/' + this.selectedHoliday.id + '/delete';
+
+            const csrfToken = document.querySelector('meta[name=csrf-token]').getAttribute('content');
+            const tokenInput = document.createElement('input');
+            tokenInput.type = 'hidden';
+            tokenInput.name = '_token';
+            tokenInput.value = csrfToken;
+            form.appendChild(tokenInput);
+
+            document.body.appendChild(form);
+            form.submit();
         }
-    }" x-init="$watch('activeYear', () => { currentPage = 1; }); $watch('activeTipe', () => { currentPage = 1; }); $watch('searchQuery', () => { currentPage = 1; }); $watch('perPage', () => { currentPage = 1; });" class="space-y-6">
+    }" @confirm-delete-holiday.window="executeDeleteHoliday()" x-init="$watch('activeYear', () => { currentPage = 1; }); $watch('activeTipe', () => { currentPage = 1; }); $watch('searchQuery', () => { currentPage = 1; }); $watch('perPage', () => { currentPage = 1; });" class="space-y-6">
 
         {{-- PAGE HEADER --}}
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h2 class="text-2xl font-semibold text-ink font-sans">Hari Libur</h2>
+                <x-ui.breadcrumb :items="[
+                    ['label' => 'Dashboard', 'url' => route('dashboard')],
+                    ['label' => 'Hari Libur']
+                ]" />
                 <nav class="mt-1 flex items-center gap-1.5 text-xs text-muted">
-                    <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink font-sans">Dashboard</a>
-                    <span>/</span>
-                    <span class="font-medium text-ink font-sans">Hari Libur</span>
                     <span>•</span>
                     <span class="text-muted italic font-sans">Akses: Khusus Super Admin</span>
                 </nav>
@@ -239,7 +258,7 @@
                         </svg>
                     </div>
                 </div>
-                
+
                 {{-- Tipe Dropdown --}}
                 <div class="flex items-center gap-2">
                     <label class="text-xs text-muted font-sans font-medium whitespace-nowrap">Tipe Libur:</label>
@@ -288,14 +307,13 @@
                                             </svg>
                                         </x-ui.button>
                                         {{-- Delete Button --}}
-                                        <form :action="'/hari-libur/' + h.id + '/delete'" method="POST" class="inline" @submit="return confirm('Apakah Anda yakin ingin menghapus hari libur \'' + h.nama + '\'?')">
-                                            @csrf
-                                            <x-ui.button type="submit" variant="danger" size="icon" title="Hapus Hari Libur" aria-label="Hapus Hari Libur">
-                                                <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                                                </svg>
-                                            </x-ui.button>
-                                        </form>
+
+                                        <button type="button" @click="selectedHoliday = h; document.getElementById('modal-title-delete-holiday').innerText = 'Hapus ' + h.nama; $dispatch('open-confirm-delete-holiday')" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-danger shadow-sm hover:bg-soft cursor-pointer" title="Hapus Hari Libur">
+                                            <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                            </svg>
+                                        </button>
+
                                     </div>
                                 </x-ui.table-td>
                             </x-ui.table-row>
@@ -331,36 +349,21 @@
                 </div>
 
                 {{-- Pagination Control --}}
-                <div class="flex items-center gap-1.5" x-show="totalPages > 1">
-                    {{-- Prev --}}
-                    <x-ui.button type="button" variant="muted" size="icon" @click="setPage(currentPage - 1)" x-bind:disabled="currentPage === 1"
-                            x-bind:class="currentPage === 1 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-soft hover:text-ink'"
-                            aria-label="Halaman sebelumnya">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                        </svg>
-                    </x-ui.button>
-                    
-                    {{-- Pages --}}
-                    <template x-for="p in totalPages" :key="p">
-                        <button @click="setPage(p)"
-                                :class="currentPage === p ? 'border-primary bg-primary text-white hover:opacity-90' : 'border-border bg-surface text-muted hover:bg-soft hover:text-ink'"
-                                class="flex h-8 w-8 items-center justify-center rounded-lg border text-sm transition font-medium cursor-pointer"
-                                x-text="p">
-                        </button>
-                    </template>
-                    
-                    {{-- Next --}}
-                    <x-ui.button type="button" variant="muted" size="icon" @click="setPage(currentPage + 1)" x-bind:disabled="currentPage === totalPages"
-                            x-bind:class="currentPage === totalPages ? 'opacity-40 cursor-not-allowed' : 'hover:bg-soft hover:text-ink'"
-                            aria-label="Halaman berikutnya">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                        </svg>
-                    </x-ui.button>
+
+                <div class="flex items-center gap-1.5">
+                    <x-ui.pagination current="currentPage" total="totalPages" action="setPage(page)" />
+
                 </div>
             </div>
         </x-ui.card>
+
+        <x-ui.confirm-dialog
+            id="delete-holiday"
+            title="Hapus Hari Libur"
+            message="Apakah Anda yakin ingin menghapus hari libur ini?"
+            confirm-text="Hapus"
+            variant="danger"
+        />
 
     </div>
 

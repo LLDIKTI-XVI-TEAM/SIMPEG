@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AuditLog;
 use App\Models\DisciplineRecord;
+use App\Models\Document;
 use App\Models\Employee;
 use App\Models\Permission;
 use App\Models\Role;
@@ -112,6 +113,7 @@ class DisciplineRecordTest extends TestCase
 
     public function test_admin_can_create_discipline_record_with_sk_upload(): void
     {
+        Storage::fake(Document::STORAGE_DISK);
         Storage::fake('public');
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create();
@@ -126,7 +128,8 @@ class DisciplineRecordTest extends TestCase
         $this->assertIsString($skPath);
         $this->assertStringStartsWith('sk/', $skPath);
         $this->assertStringEndsWith('.pdf', $skPath);
-        Storage::disk('public')->assertExists($skPath);
+        Storage::disk(Document::STORAGE_DISK)->assertExists($skPath);
+        Storage::disk('public')->assertMissing($skPath);
         $this->assertDatabaseHas('discipline_records', [
             'employee_id' => $employee->id,
             'file_sk' => $skPath,

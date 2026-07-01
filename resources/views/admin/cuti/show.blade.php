@@ -1,5 +1,5 @@
 <x-layouts.app title="Detail Cuti">
-    <div class="mx-auto max-w-3xl space-y-6">
+    <div class="mx-auto max-w-7xl space-y-6">
 
         @php
             // Status tersimpan berupa enum panjang; dipetakan ke token tampilan agar warna/label konsisten.
@@ -213,9 +213,11 @@
                 @endif
 
                 <div class="flex justify-end gap-3">
+
                     <x-ui.button href="{{ route('cuti') }}" variant="secondary">
                         Kembali ke Daftar
                     </x-ui.button>
+
                     @if ($canAct)
                         <x-ui.button type="button" variant="warning" @click="showTunda = true">
                             Tunda

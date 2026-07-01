@@ -14,12 +14,12 @@
         },
         openConfirm() {
             if (this.reason.trim() === '' || this.stage2 === '' || this.stage3 === '') return;
-            this.showConfirm = true;
+            $dispatch('open-confirm-cuti-konfig');
         },
         submitForm() {
             this.$refs.configForm.submit();
         }
-    }">
+    }" @confirm-cuti-konfig.window="submitForm()">
 
         {{-- PAGE HEADER --}}
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -222,27 +222,14 @@
         </div>
 
         {{-- MODAL KONFIRMASI --}}
-        <x-ui.modal
-            show="showConfirm"
-            title="Konfirmasi Perubahan Approver"
-            close-action="showConfirm = false"
-            max-width="md"
-            body-class="p-6"
-            footer-class="flex justify-end gap-3"
-            overlay-class="bg-ink/40"
-        >
-            <p class="text-sm text-muted">Perubahan ini langsung berlaku untuk pengajuan cuti berikutnya dan dicatat di log audit.</p>
 
-            <x-slot:footer>
-                <button type="button" @click="showConfirm = false"
-                    class="rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft cursor-pointer">
-                    Batal
-                </button>
-                <button type="button" @click="submitForm()"
-                    class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 cursor-pointer">
-                    Ya, Simpan
-                </button>
-            </x-slot:footer>
-        </x-ui.modal>
+        <x-ui.confirm-dialog
+            id="cuti-konfig"
+            title="Konfirmasi Perubahan Approver"
+            message="Perubahan ini langsung berlaku untuk pengajuan cuti berikutnya dan dicatat di log audit."
+            confirm-text="Ya, Simpan"
+            variant="warning"
+        />
+
     </div>
 </x-layouts.app>

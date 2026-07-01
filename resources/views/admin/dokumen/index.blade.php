@@ -1,47 +1,12 @@
 <x-layouts.app title="Arsip Dokumen Kepegawaian">
 
-    @php
-        $dokumen = $documents->map(function ($doc) {
-            $currentPosition = $doc->employee->positionHistories->first();
-            $unit = $currentPosition?->unitKerja?->nama ?? '-';
-
-            $kategoriLabels = [
-                'sk_pengangkatan' => 'SK Pengangkatan',
-                'sk_pangkat' => 'SK Kenaikan Pangkat',
-                'sk_jabatan' => 'SK Kenaikan Jabatan',
-                'sk_kgb' => 'SK KGB',
-                'ijazah' => 'Ijazah',
-                'ktp_kk' => 'KTP & KK',
-                'lainnya' => 'Lainnya',
-            ];
-
-            return [
-                'id' => $doc->id,
-                'jenis' => $kategoriLabels[$doc->jenis_dokumen] ?? 'Dokumen',
-                'nama' => $doc->nama_dokumen,
-                'nomor' => $doc->nomor_dokumen ?? '-',
-                'tanggal' => $doc->tanggal_dokumen ? $doc->tanggal_dokumen->format('Y-m-d') : '-',
-                'kategori' => $doc->jenis_dokumen,
-                'kategori_label' => $kategoriLabels[$doc->jenis_dokumen] ?? 'Lainnya',
-                'nama_pegawai' => $doc->employee->nama_lengkap,
-                'nip_pegawai' => $doc->employee->nip,
-                'unit_pegawai' => $unit,
-                'file_path' => $doc->file_path,
-                'file_size' => '1.5 MB',
-                'status_dokumen' => 'terverifikasi',
-                'status_label' => 'Terverifikasi',
-                'deskripsi' => $doc->keterangan ?? '',
-            ];
-        });
-    @endphp
-
     <div x-data="{
         activeKategori: '',
         activeUnit: '',
-        activePegawai: '',
+        activeStatus: '',
         searchQuery: '',
-        showUploadModal: false,
-        documents: {{ json_encode($dokumen) }},
+        showUploadModal: {{ $errors->any() ? 'true' : 'false' }},
+        documents: @js($documentsForTable),
         currentPage: 1,
         perPage: 5,
         init() {
@@ -53,17 +18,17 @@
             this.$watch('searchQuery', () => this.currentPage = 1);
             this.$watch('activeKategori', () => this.currentPage = 1);
             this.$watch('activeUnit', () => this.currentPage = 1);
-            this.$watch('activePegawai', () => this.currentPage = 1);
+            this.$watch('activeStatus', () => this.currentPage = 1);
         },
         get filteredDocuments() {
             return this.documents.filter(doc => {
-                const matchesSearch = doc.nama.toLowerCase().includes(this.searchQuery.toLowerCase()) || 
+                const matchesSearch = doc.nama.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
                                        doc.nomor.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
                                        doc.jenis.toLowerCase().includes(this.searchQuery.toLowerCase());
                 const matchesKategori = !this.activeKategori || doc.kategori === this.activeKategori;
                 const matchesUnit = !this.activeUnit || doc.unit_pegawai === this.activeUnit;
-                const matchesPegawai = !this.activePegawai || doc.nip_pegawai === this.activePegawai;
-                return matchesSearch && matchesKategori && matchesUnit && matchesPegawai;
+                const matchesStatus = !this.activeStatus || doc.status_dokumen === this.activeStatus;
+                return matchesSearch && matchesKategori && matchesUnit && matchesStatus;
             });
         },
         get paginatedDocuments() {
@@ -80,11 +45,10 @@
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h2 class="text-2xl font-semibold text-ink font-sans">Arsip Dokumen Kepegawaian</h2>
-                <nav class="mt-1 flex items-center gap-1.5 text-xs text-muted">
-                    <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
-                    <span>/</span>
-                    <span class="font-medium text-ink">Arsip Dokumen</span>
-                </nav>
+                <x-ui.breadcrumb :items="[
+                    ['label' => 'Dashboard', 'url' => route('dashboard')],
+                    ['label' => 'Arsip Dokumen']
+                ]" />
             </div>
             <div class="flex shrink-0 items-center gap-3">
                 {{-- Upload Button --}}
@@ -100,75 +64,62 @@
             </div>
         </div>
 
-        {{-- FILTER BAR --}}
-        <x-ui.card padding="sm" class="flex flex-col gap-4">
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {{-- Search input --}}
-                <div
-                    class="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 col-span-1 sm:col-span-2 lg:col-span-1 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
-                    <svg class="w-4 h-4 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                        stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+
+        <x-ui.filter-bar
+            searchModel="searchQuery"
+            searchPlaceholder="Cari nama, nomor, jenis..."
+        >
+            {{-- Filter Unit Kerja --}}
+            <div class="relative col-span-1 sm:col-span-1 lg:col-span-1">
+                <select x-model="activeUnit"
+                    class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <option value="">Semua Unit Kerja</option>
+                    <option>Bag. Umum</option>
+                    <option>Bag. Keuangan</option>
+                    <option>Bag. SDM</option>
+                    <option>Bag. IT</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+
                     </svg>
-                    <input type="text" x-model="searchQuery" placeholder="Cari nama, nomor, jenis..."
-                        class="flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none font-sans">
-                </div>
-
-                {{-- Filter Pegawai --}}
-                <div class="relative col-span-1 sm:col-span-1 lg:col-span-1">
-                    <select x-model="activePegawai"
-                        class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                        <option value="">Semua Pegawai</option>
-                        @foreach($pegawaiList as $p)
-                            <option value="{{ $p->nip }}">{{ $p->nama_lengkap }}</option>
-                        @endforeach
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
-                </div>
-
-                {{-- Filter Unit Kerja --}}
-                <div class="relative col-span-1 sm:col-span-1 lg:col-span-1">
-                    <select x-model="activeUnit"
-                        class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                        <option value="">Semua Unit Kerja</option>
-                        <option>Bag. Umum</option>
-                        <option>Bag. Keuangan</option>
-                        <option>Bag. SDM</option>
-                        <option>Bag. IT</option>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
-                </div>
-
-                {{-- Filter Kategori Dokumen --}}
-                <div class="relative col-span-1 sm:col-span-2 lg:col-span-1">
-                    <select x-model="activeKategori"
-                        class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                        <option value="">Semua Kategori Dokumen</option>
-                        <option value="sk_pengangkatan">SK Pengangkatan</option>
-                        <option value="sk_pangkat">SK Kenaikan Pangkat</option>
-                        <option value="sk_jabatan">SK Kenaikan Jabatan</option>
-                        <option value="sk_kgb">SK KGB (Kenaikan Gaji Berkala)</option>
-                        <option value="ijazah">Ijazah / Pendidikan</option>
-                        <option value="ktp_kk">Identitas Diri (KTP & KK)</option>
-                        <option value="lainnya">Lampiran / Dokumen Lain</option>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
                 </div>
             </div>
-        </x-ui.card>
+
+
+            {{-- Filter Kategori Dokumen --}}
+            <div class="relative col-span-1 sm:col-span-1 lg:col-span-1">
+                <select x-model="activeKategori"
+                    class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <option value="">Semua Kategori Dokumen</option>
+                    @foreach ($categoryLabels as $value => $label)
+                        <option value="{{ $value }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                    </svg>
+                </div>
+            </div>
+
+            {{-- Filter Status Dokumen --}}
+            <div class="relative col-span-1 sm:col-span-2 lg:col-span-1">
+                <select x-model="activeStatus"
+                    class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <option value="">Semua Status</option>
+                    <option value="tersedia">File tersedia</option>
+                    <option value="file_tidak_ditemukan">File tidak ditemukan</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                    </svg>
+                </div>
+            </div>
+        </x-ui.filter-bar>
+
 
         {{-- TABLE CARD --}}
         <x-ui.card padding="none" class="overflow-hidden">
@@ -180,6 +131,7 @@
 
             {{-- Table Render --}}
             <div class="overflow-x-auto">
+
                 <x-ui.table>
                     <x-ui.table-head class="border-b border-border">
                         <x-ui.table-row>
@@ -200,6 +152,7 @@
                         </x-ui.table-row>
                     </x-ui.table-head>
                     <x-ui.table-body>
+
                         <template x-for="doc in paginatedDocuments" :key="doc.id">
                             <x-ui.table-row :interactive="true">
                                 <x-ui.table-td>
@@ -237,6 +190,7 @@
                                                 x-text="doc.deskripsi"></p>
                                         </div>
                                     </div>
+
                                 </x-ui.table-td>
                                 <x-ui.table-td x-text="doc.kategori_label" class="text-muted"></x-ui.table-td>
                                 <x-ui.table-td x-text="doc.nomor" class="font-mono text-muted"></x-ui.table-td>
@@ -260,6 +214,7 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         {{-- Detail --}}
                                         <x-ui.button as="a" x-bind:href="'/dashboard/dokumen/' + doc.id" variant="secondary" size="icon" title="Detail" aria-label="Detail">
+
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
                                                 viewBox="0 0 24 24" stroke-width="1.5">
                                                 <path stroke-linecap="round" stroke-linejoin="round"
@@ -269,7 +224,9 @@
                                             </svg>
                                         </x-ui.button>
                                         {{-- Unduh --}}
+
                                         <x-ui.button as="a" x-bind:href="'/dashboard/dokumen/' + doc.id + '/download'" variant="secondary" size="icon" title="Unduh" aria-label="Unduh">
+
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
                                                 viewBox="0 0 24 24" stroke-width="1.5">
                                                 <path stroke-linecap="round" stroke-linejoin="round"
@@ -290,57 +247,30 @@
             </div>
 
             {{-- TABLE FOOTER --}}
-            <div
-                class="flex flex-col gap-3 border-t border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between bg-surface">
-                <div class="flex items-center gap-3">
-                    <p class="text-sm text-muted font-sans">
-                        Menampilkan <span
-                            x-text="filteredDocuments.length === 0 ? 0 : (currentPage - 1) * perPage + 1"></span> -
-                        <span x-text="Math.min(currentPage * perPage, filteredDocuments.length)"></span> dari <span
-                            x-text="filteredDocuments.length"></span> data
-                    </p>
-                    <div class="relative">
+            <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row">
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm text-muted">Tampilkan</span>
                         <select id="per-page" x-model.number="perPage" @change="currentPage = 1"
-                            class="appearance-none rounded-lg border border-border bg-surface pl-3 pr-8 py-1 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                            <option value="5">5 / halaman</option>
-                            <option value="10">10 / halaman</option>
-                            <option value="25">25 / halaman</option>
-                            <option value="50">50 / halaman</option>
+                            class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
                         </select>
-                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                            </svg>
-                        </div>
+                        <span class="text-sm text-muted">data per halaman</span>
                     </div>
+
+                    <p class="text-sm text-muted hidden sm:block" x-show="filteredDocuments.length > 0">
+                        Menampilkan <span class="font-semibold text-ink" x-text="(currentPage - 1) * perPage + 1"></span> hingga <span class="font-semibold text-ink" x-text="Math.min(currentPage * perPage, filteredDocuments.length)"></span> dari <span class="font-semibold text-ink" x-text="filteredDocuments.length"></span> hasil
+                    </p>
                 </div>
-                <div class="flex items-center gap-1.5">
-                    {{-- Prev --}}
-                    <x-ui.button type="button" variant="muted" size="icon" @click="if (currentPage > 1) currentPage--" x-bind:disabled="currentPage === 1"
-                        x-bind:class="currentPage === 1 ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-soft hover:text-ink text-ink cursor-pointer'"
-                        aria-label="Halaman sebelumnya">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                        </svg>
-                    </x-ui.button>
 
-                    <template x-for="page in totalPages" :key="page">
-                        <button @click="currentPage = page"
-                            :class="currentPage === page ? 'bg-primary text-white border-primary' : 'bg-surface text-ink hover:bg-soft border-border'"
-                            class="flex h-8 w-8 items-center justify-center rounded-lg border text-sm font-semibold transition font-sans cursor-pointer"
-                            x-text="page">
-                        </button>
-                    </template>
 
-                    {{-- Next --}}
-                    <x-ui.button type="button" variant="muted" size="icon" @click="if (currentPage < totalPages) currentPage++" x-bind:disabled="currentPage === totalPages"
-                        x-bind:class="currentPage === totalPages ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-soft hover:text-ink text-ink cursor-pointer'"
-                        aria-label="Halaman berikutnya">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                        </svg>
-                    </x-ui.button>
+                <div class="w-full sm:w-auto">
+                    <div class="flex items-center justify-center gap-1.5">
+                        <x-ui.pagination current="currentPage" total="totalPages" />
+                    </div>
+
                 </div>
             </div>
         </x-ui.card>
@@ -348,6 +278,7 @@
         {{-- ================================================================ --}}
         {{-- MODAL UNGGAH DOKUMEN BARU (POPUP) --}}
         {{-- ================================================================ --}}
+
         <x-ui.modal
             show="showUploadModal"
             title="Unggah Dokumen Kepegawaian"
@@ -356,11 +287,23 @@
             body-class="p-6"
             overlay-class="bg-ink/40"
         >
+
                 <form action="{{ route('dokumen.store') }}" method="POST" enctype="multipart/form-data"
-                    class="space-y-4">
+                    class="space-y-3">
                     @csrf
 
+                    @if ($errors->any())
+                        <div class="rounded-lg bg-danger/10 p-3 text-xs text-danger font-sans">
+                            <ul class="list-disc pl-4 space-y-1">
+                                @foreach ($errors->all() as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+
                     {{-- Relasi Pegawai --}}
+
                     <x-form.select
                         name="pegawai_id"
                         label="Hubungkan ke Pegawai"
@@ -422,23 +365,26 @@
                         placeholder="Tulis rincian atau catatan singkat mengenai dokumen..."
                     />
 
+
                     <div class="space-y-1">
                         <label class="text-xs font-semibold text-ink font-sans">Pilih File Berkas <span
                                 class="text-danger">*</span></label>
                         <input type="file" name="berkas" required accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                             class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                        <p class="text-[10px] text-muted mt-1 font-sans">Format yang diizinkan: **PDF, DOC, DOCX, JPG,
-                            JPEG, PNG**. Ukuran maksimal 10MB.</p>
+                        <p class="text-[10px] text-muted mt-1 font-sans">Format yang diizinkan: PDF, DOC, DOCX, JPG, JPEG, PNG. Ukuran maksimal 10MB.</p>
                     </div>
 
                     {{-- Buttons --}}
-                    <div class="flex justify-end gap-3 pt-4 border-t border-border">
+                    <div class="flex justify-end gap-3 pt-3 border-t border-border">
                         <button type="button" @click="showUploadModal = false"
-                            class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-soft cursor-pointer focus:outline-none">
+                            class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-soft cursor-pointer focus:outline-none">
                             Batal
                         </button>
                         <button type="submit"
-                            class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90 cursor-pointer focus:outline-none font-sans">
+                            class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90 cursor-pointer focus:outline-none font-sans">
+                            <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                            </svg>
                             Mulai Unggah
                         </button>
                     </div>

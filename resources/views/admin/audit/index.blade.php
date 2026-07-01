@@ -30,7 +30,7 @@
             if (log.event === 'APPROVE' || log.event === 'POSTPONE') {
                 return `${log.event}: Mengubah status pengajuan cuti`;
             }
-            
+
             let target = log.modul;
             if (log.event === 'CREATE') {
                 return `CREATE: Membuat data ${target} #${log.record_id}`;
@@ -46,20 +46,20 @@
             if (log.event === 'RESTORE') {
                 return `RESTORE: Mengaktifkan kembali data ${target} #${log.record_id}`;
             }
-            
+
             return `${log.event}: ${log.event} pada ${target} #${log.record_id}`;
         },
         get filteredLogs() {
             let filtered = this.logs.filter(log => {
                 const query = this.searchQuery.toLowerCase().trim();
-                const matchesSearch = !query || 
-                                      (log.operator && log.operator.toLowerCase().includes(query)) || 
+                const matchesSearch = !query ||
+                                      (log.operator && log.operator.toLowerCase().includes(query)) ||
                                       (log.record_id && log.record_id.toLowerCase().includes(query));
-                
+
                 const matchesEvent = this.filterEvent === 'all' || log.event === this.filterEvent;
                 const matchesUser = this.filterUser === 'all' || log.operator === this.filterUser;
                 const matchesModul = this.filterModul === 'all' || log.modul === this.filterModul;
-                
+
                 let matchesPeriode = true;
                 if (log.timestamp) {
                     const logDateStr = log.timestamp.split(' ')[0];
@@ -70,14 +70,14 @@
                         if (logDateStr > this.filterEndDate) matchesPeriode = false;
                     }
                 }
-                
+
                 return matchesSearch && matchesEvent && matchesUser && matchesModul && matchesPeriode;
             });
 
             return [...filtered].sort((a, b) => {
                 let valA = a[this.sortField];
                 let valB = b[this.sortField];
-                
+
                 if (this.sortField === 'timestamp') {
                     valA = new Date(valA || 0);
                     valB = new Date(valB || 0);
@@ -85,7 +85,7 @@
                     valA = valA.toLowerCase();
                     valB = (valB || '').toLowerCase();
                 }
-                
+
                 if (valA < valB) return this.sortDirection === 'asc' ? -1 : 1;
                 if (valA > valB) return this.sortDirection === 'asc' ? 1 : -1;
                 return 0;
@@ -107,13 +107,13 @@
             const diffs = [];
             const oldVals = log.old_values || {};
             const newVals = log.new_values || {};
-            
+
             const allKeys = Array.from(new Set([...Object.keys(oldVals), ...Object.keys(newVals)]));
-            
+
             for (const key of allKeys) {
                 const oldVal = oldVals[key];
                 const newVal = newVals[key];
-                
+
                 if (log.event === 'UPDATE') {
                     if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
                         diffs.push({
@@ -134,131 +134,116 @@
         }
     }" class="space-y-6">
 
-        <x-admin.page-header title="Audit Log" class="mb-6">
-            <x-slot:breadcrumb>
-                    <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
-                    <span>/</span>
-                    <span class="font-medium text-ink">Audit Log</span>
-            </x-slot:breadcrumb>
-        </x-admin.page-header>
+        {{-- PAGE HEADER --}}
+        <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+                <h2 class="text-2xl font-bold text-primary font-sans">Audit Log</h2>
+                <x-ui.breadcrumb :items="[
+                    ['label' => 'Dashboard', 'url' => route('dashboard')],
+                    ['label' => 'Audit Log']
+                ]" />
+            </div>
+        </div>
 
         {{-- FILTER PANEL --}}
-        <x-ui.card padding="lg" class="mb-6 space-y-6">
-            {{-- Header & Reset --}}
-            <div class="flex items-center justify-between border-b border-border pb-3">
-                <div>
-                    <h3 class="text-sm font-semibold text-ink font-sans">Filter & Pencarian</h3>
-                    <p class="text-[10px] text-muted font-sans mt-0.5">Saring jejak audit berdasarkan kriteria spesifik di bawah ini.</p>
-                </div>
-                <button @click="filterEvent = 'all'; filterUser = 'all'; filterModul = 'all'; filterStartDate = ''; filterEndDate = ''; searchQuery = '';" 
+        <x-ui.filter-bar
+            class="sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 items-end"
+            searchModel="searchQuery"
+            searchLabel="Cari"
+            searchPlaceholder="Ketik nama operator atau ID record..."
+            searchCols="col-span-1 lg:col-span-2"
+        >
+            <x-slot:header>
+                <h3 class="text-sm font-semibold text-ink font-sans">Filter & Pencarian</h3>
+                <p class="text-[10px] text-muted font-sans mt-0.5">Saring jejak audit berdasarkan kriteria spesifik di bawah ini.</p>
+            </x-slot:header>
+
+            <x-slot:actions>
+                <button @click="filterEvent = 'all'; filterUser = 'all'; filterModul = 'all'; filterStartDate = ''; filterEndDate = ''; searchQuery = '';"
                         class="text-xs text-primary font-semibold hover:underline font-sans cursor-pointer flex items-center gap-1">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
                     </svg>
                     Reset Filter
                 </button>
-            </div>
-            
-            {{-- Baris 1: Pencarian --}}
-            <div class="max-w-md space-y-1.5">
-                <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Cari Operator / ID Record</label>
-                <div class="relative flex items-center rounded-lg border border-border bg-surface px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
-                    <svg class="w-4 h-4 text-muted shrink-0 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-                    </svg>
-                    <input
-                        type="text"
-                        x-model="searchQuery"
-                        placeholder="Ketik nama operator atau ID record..."
-                        class="w-full bg-transparent text-xs text-ink placeholder:text-muted focus:outline-none font-sans"
-                    >
-                </div>
-            </div>
+            </x-slot:actions>
 
-            {{-- Baris 2: Dropdown Filter & Periode (Grid 5 Kolom) --}}
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 items-end">
-                {{-- Dropdown Event --}}
-                <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Jenis Event</label>
-                    <div class="relative">
-                        <select x-model="filterEvent" class="w-full appearance-none rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
-                            <option value="all">Semua Event</option>
-                            <option value="LOGIN">LOGIN</option>
-                            <option value="LOGOUT">LOGOUT</option>
-                            <option value="CREATE">CREATE</option>
-                            <option value="UPDATE">UPDATE</option>
-                            <option value="SOFT_DELETE">SOFT_DELETE</option>
-                            <option value="RESTORE">RESTORE</option>
-                            <option value="APPROVE">APPROVE</option>
-                            <option value="POSTPONE">POSTPONE</option>
-                            <option value="IMPORT">IMPORT</option>
-                        </select>
-                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                            </svg>
-                        </div>
+            {{-- Dropdown Event --}}
+            <div class="space-y-1.5">
+                <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Jenis Event</label>
+                <div class="relative">
+                    <select x-model="filterEvent" class="h-10 w-full appearance-none rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
+                        <option value="all">Semua Event</option>
+                        <option value="LOGIN">LOGIN</option>
+                        <option value="LOGOUT">LOGOUT</option>
+                        <option value="CREATE">CREATE</option>
+                        <option value="UPDATE">UPDATE</option>
+                        <option value="SOFT_DELETE">SOFT_DELETE</option>
+                        <option value="RESTORE">RESTORE</option>
+                        <option value="APPROVE">APPROVE</option>
+                        <option value="POSTPONE">POSTPONE</option>
+                        <option value="IMPORT">IMPORT</option>
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                        </svg>
                     </div>
                 </div>
-
-                {{-- Dropdown Operator --}}
-                <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">User / Operator</label>
-                    <div class="relative">
-                        <select x-model="filterUser" class="w-full appearance-none rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
-                            <option value="all">Semua User</option>
-                            <template x-for="op in [...new Set(logs.map(l => l.operator))]" :key="op">
-                                <option :value="op" x-text="op"></option>
-                            </template>
-                        </select>
-                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Dropdown Modul --}}
-                <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Modul / Tabel</label>
-                    <div class="relative">
-                        <select x-model="filterModul" class="w-full appearance-none rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
-                            <option value="all">Semua Modul</option>
-                            <template x-for="mod in [...new Set(logs.map(l => l.modul))]" :key="mod">
-                                <option :value="mod" x-text="mod"></option>
-                            </template>
-                        </select>
-                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Periode Mulai --}}
-                <x-form.date
-                    label="Periode Mulai"
-                    size="sm"
-                    label-sr-only="false"
-                    wrapper-class="space-y-1.5"
-                    x-model="filterStartDate"
-                />
-
-                {{-- Periode Selesai --}}
-                <x-form.date
-                    label="Periode Selesai"
-                    size="sm"
-                    wrapper-class="space-y-1.5"
-                    x-model="filterEndDate"
-                />
             </div>
-        </x-ui.card>
+
+            {{-- Dropdown Operator --}}
+            <div class="space-y-1.5">
+                <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">User / Operator</label>
+                <div class="relative">
+                    <select x-model="filterUser" class="h-10 w-full appearance-none rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
+                        <option value="all">Semua User</option>
+                        <template x-for="op in [...new Set(logs.map(l => l.operator))]" :key="op">
+                            <option :value="op" x-text="op"></option>
+                        </template>
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Dropdown Modul --}}
+            <div class="space-y-1.5">
+                <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Modul / Tabel</label>
+                <div class="relative">
+                    <select x-model="filterModul" class="h-10 w-full appearance-none rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
+                        <option value="all">Semua Modul</option>
+                        <template x-for="mod in [...new Set(logs.map(l => l.modul))]" :key="mod">
+                            <option :value="mod" x-text="mod"></option>
+                        </template>
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Periode Mulai --}}
+            <div class="space-y-1.5">
+                <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Periode Mulai</label>
+                <input type="date" x-model="filterStartDate" class="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
+            </div>
+
+            {{-- Periode Selesai --}}
+            <div class="space-y-1.5">
+                <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Periode Selesai</label>
+                <input type="date" x-model="filterEndDate" class="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
+            </div>
+        </x-ui.filter-bar>
 
         {{-- Table Card --}}
-        <x-ui.card padding="none" class="overflow-hidden">
-            
+        <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
+
             {{-- Toolbar --}}
             <div class="px-6 py-4 border-b border-border flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-surface">
                 <div>
@@ -269,10 +254,10 @@
 
             {{-- Table render --}}
             <div class="overflow-x-auto">
-                <x-ui.table>
-                    <x-ui.table-head class="border-b border-border">
-                        <x-ui.table-row>
-                            <x-ui.table-th @click="toggleSort('timestamp')" class="text-[11px] cursor-pointer hover:text-primary transition-colors select-none">
+                <table class="w-full">
+                    <thead class="bg-soft border-b border-border">
+                        <tr>
+                            <th @click="toggleSort('timestamp')" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans cursor-pointer hover:text-primary transition-colors select-none">
                                 <div class="flex items-center gap-1.5">
                                     Waktu
                                     <template x-if="sortField === 'timestamp'">
@@ -285,8 +270,8 @@
                                         <svg class="w-3 h-3 text-muted/40 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
                                     </template>
                                 </div>
-                            </x-ui.table-th>
-                            <x-ui.table-th @click="toggleSort('operator')" class="text-[11px] cursor-pointer hover:text-primary transition-colors select-none">
+                            </th>
+                            <th @click="toggleSort('operator')" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans cursor-pointer hover:text-primary transition-colors select-none">
                                 <div class="flex items-center gap-1.5">
                                     User
                                     <template x-if="sortField === 'operator'">
@@ -299,8 +284,8 @@
                                         <svg class="w-3 h-3 text-muted/40 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
                                     </template>
                                 </div>
-                            </x-ui.table-th>
-                            <x-ui.table-th @click="toggleSort('event')" class="text-[11px] cursor-pointer hover:text-primary transition-colors select-none">
+                            </th>
+                            <th @click="toggleSort('event')" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans cursor-pointer hover:text-primary transition-colors select-none">
                                 <div class="flex items-center gap-1.5">
                                     Jenis Event
                                     <template x-if="sortField === 'event'">
@@ -313,8 +298,8 @@
                                         <svg class="w-3 h-3 text-muted/40 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
                                     </template>
                                 </div>
-                            </x-ui.table-th>
-                            <x-ui.table-th @click="toggleSort('modul')" class="text-[11px] cursor-pointer hover:text-primary transition-colors select-none">
+                            </th>
+                            <th @click="toggleSort('modul')" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans cursor-pointer hover:text-primary transition-colors select-none">
                                 <div class="flex items-center gap-1.5">
                                     Modul/Tabel
                                     <template x-if="sortField === 'modul'">
@@ -327,76 +312,70 @@
                                         <svg class="w-3 h-3 text-muted/40 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
                                     </template>
                                 </div>
-                            </x-ui.table-th>
-                            <x-ui.table-th class="text-[11px] select-none">Ringkasan Perubahan</x-ui.table-th>
-                            <x-ui.table-th class="text-[11px] select-none">Aksi</x-ui.table-th>
-                        </x-ui.table-row>
-                    </x-ui.table-head>
-                    <x-ui.table-body>
+                            </th>
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans select-none">Ringkasan Perubahan</th>
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans select-none">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-border">
                         <template x-for="log in paginatedLogs" :key="log.id">
-                            <x-ui.table-row @click="selectedLogId = log.id; showDrawer = true" :interactive="true" class="cursor-pointer">
-                                <x-ui.table-td x-text="log.timestamp" class="font-mono"></x-ui.table-td>
-                                <x-ui.table-td x-text="log.operator" class="text-sm font-semibold"></x-ui.table-td>
-                                <x-ui.table-td>
-                                    <x-ui.badge
-                                        variant="none"
-                                        size="md"
-                                        dot
-                                        x-bind:class="log.event === 'CREATE' || log.event === 'IMPORT' || log.event === 'APPROVE' || log.event === 'RESTORE' ? 'border-success/20 bg-success/10 text-success' : (log.event === 'LOGIN' ? 'border-primary/20 bg-primary/10 text-primary' : (log.event === 'SOFT_DELETE' || log.event === 'LOGOUT' ? 'border-danger/20 bg-danger/10 text-danger' : 'border-warning/25 bg-warning/10 text-warning'))"
+                            <tr @click="selectedLogId = log.id; showDrawer = true" class="transition-colors hover:bg-soft/50 cursor-pointer">
+                                <td class="px-4 py-3.5 text-xs font-mono text-ink" x-text="log.timestamp"></td>
+                                <td class="px-4 py-3.5 text-sm font-semibold text-ink font-sans" x-text="log.operator"></td>
+                                <td class="px-4 py-3.5">
+                                    <span class="inline-flex items-center gap-1.5 text-xs font-semibold font-sans"
+                                        :class="log.event === 'CREATE' || log.event === 'IMPORT' || log.event === 'APPROVE' || log.event === 'RESTORE' ? 'text-success' : (log.event === 'LOGIN' ? 'text-primary' : (log.event === 'SOFT_DELETE' || log.event === 'LOGOUT' ? 'text-danger' : 'text-warning'))"
                                     >
+                                        <span class="h-1.5 w-1.5 rounded-full"
+                                            :class="log.event === 'CREATE' || log.event === 'IMPORT' || log.event === 'APPROVE' || log.event === 'RESTORE' ? 'bg-success' : (log.event === 'LOGIN' ? 'bg-primary' : (log.event === 'SOFT_DELETE' || log.event === 'LOGOUT' ? 'bg-danger' : 'bg-warning'))"
+                                        ></span>
                                         <span x-text="log.event"></span>
-                                    </x-ui.badge>
-                                </x-ui.table-td>
-                                <x-ui.table-td x-text="log.modul" class="text-muted"></x-ui.table-td>
-                                <x-ui.table-td x-text="getRingkasan(log)"></x-ui.table-td>
-                                <x-ui.table-td @click.stop>
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3.5 text-xs text-muted font-sans" x-text="log.modul"></td>
+                                <td class="px-4 py-3.5 text-xs text-ink font-sans" x-text="getRingkasan(log)"></td>
+                                <td class="px-4 py-3.5" @click.stop>
                                     <div class="flex items-center gap-1.5">
-                                        <x-ui.button
-                                            type="button"
-                                            variant="secondary"
-                                            size="icon"
+                                        <button
                                             @click.stop="selectedLogId = log.id; showDrawer = true"
+                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/30 shadow-sm cursor-pointer"
                                             title="Detail Drawer"
-                                            aria-label="Detail Drawer"
                                         >
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                             </svg>
-                                        </x-ui.button>
-                                        <x-ui.button
-                                            as="a"
-                                            variant="muted"
-                                            size="icon"
+                                        </button>
+                                        <a
                                             @click.stop
-                                            x-bind:href="'/dashboard/audit/' + log.id"
+                                            :href="'/dashboard/audit/' + log.id"
+                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted transition hover:bg-soft hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/30 shadow-sm"
                                             title="Halaman Detail"
-                                            aria-label="Halaman Detail"
                                         >
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
                                             </svg>
-                                        </x-ui.button>
+                                        </a>
                                     </div>
-                                </x-ui.table-td>
-                            </x-ui.table-row>
+                                </td>
+                            </tr>
                         </template>
-                        <x-ui.table-row x-show="filteredLogs.length === 0">
-                            <x-ui.table-td colspan="6" align="center" class="px-6 py-8 text-muted">
+                        <tr x-show="filteredLogs.length === 0">
+                            <td colspan="6" class="px-6 py-8 text-center text-xs text-muted font-sans">
                                 Tidak ada log aktivitas yang cocok dengan filter pencarian.
-                            </x-ui.table-td>
-                        </x-ui.table-row>
-                    </x-ui.table-body>
-                </x-ui.table>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
 
             {{-- TABLE FOOTER --}}
             <div class="flex flex-col gap-3 border-t border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between bg-surface">
                 <div class="flex items-center gap-3">
                     <p class="text-sm text-muted font-sans">
-                        Menampilkan 
-                        <span x-text="filteredLogs.length === 0 ? 0 : (currentPage - 1) * perPage + 1"></span> - 
-                        <span x-text="Math.min(currentPage * perPage, filteredLogs.length)"></span> dari 
+                        Menampilkan
+                        <span x-text="filteredLogs.length === 0 ? 0 : (currentPage - 1) * perPage + 1"></span> -
+                        <span x-text="Math.min(currentPage * perPage, filteredLogs.length)"></span> dari
                         <span x-text="filteredLogs.length"></span> data
                     </p>
                     <div class="relative">
@@ -413,52 +392,18 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-1.5">
-                    {{-- Prev --}}
-                    <x-ui.button
-                            type="button"
-                            variant="muted"
-                            size="icon"
-                            @click="if (currentPage > 1) currentPage--"
-                            x-bind:disabled="currentPage === 1"
-                            x-bind:class="currentPage === 1 ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-soft hover:text-ink text-ink'"
-                            aria-label="Halaman sebelumnya">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                        </svg>
-                    </x-ui.button>
-                    
-                    <template x-for="page in totalPages" :key="page">
-                        <button @click="currentPage = page" 
-                                :class="currentPage === page ? 'bg-primary text-white border-primary' : 'bg-surface text-ink hover:bg-soft border-border'"
-                                class="flex h-8 w-8 items-center justify-center rounded-lg border text-sm font-semibold transition font-sans cursor-pointer"
-                                x-text="page">
-                        </button>
-                    </template>
-                    
-                    {{-- Next --}}
-                    <x-ui.button
-                            type="button"
-                            variant="muted"
-                            size="icon"
-                            @click="if (currentPage < totalPages) currentPage++"
-                            x-bind:disabled="currentPage === totalPages"
-                            x-bind:class="currentPage === totalPages ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-soft hover:text-ink text-ink'"
-                            aria-label="Halaman berikutnya">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                        </svg>
-                    </x-ui.button>
+                    <x-ui.pagination current="currentPage" total="totalPages" />
                 </div>
             </div>
 
-        </x-ui.card>
+        </div>
 
         {{-- Slide-over Drawer --}}
         <div x-show="showDrawer" class="fixed inset-0 z-50 overflow-hidden" style="display: none;" x-transition>
             <div class="absolute inset-0 bg-ink/30 transition-opacity z-40" @click="showDrawer = false"></div>
             <div class="fixed inset-y-0 right-0 pl-10 max-w-full flex z-50">
                 <div class="w-screen max-w-md bg-surface border-l border-border shadow-xl flex flex-col justify-between relative z-50" x-transition:enter="transform transition ease-in-out duration-300 sm:duration-300" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0" x-transition:leave="transform transition ease-in-out duration-300 sm:duration-300" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full">
-                    
+
                     {{-- Drawer Header --}}
                     <div class="px-6 py-5 border-b border-border flex items-center justify-between bg-surface">
                         <div>
@@ -474,7 +419,7 @@
 
                     {{-- Drawer Body --}}
                     <div class="flex-1 overflow-y-auto p-6 space-y-6">
-                        
+
                         {{-- Info List --}}
                         <div class="grid grid-cols-2 gap-4 text-xs">
                             <div class="space-y-0.5">
@@ -510,33 +455,33 @@
                         {{-- Diff Data Panel --}}
                         <div class="space-y-3 pt-4 border-t border-border">
                             <h4 class="text-xs font-bold text-ink font-sans uppercase tracking-wider">Perubahan Nilai Data</h4>
-                            
+
                             <div class="overflow-hidden rounded-lg border border-border bg-soft">
-                                <x-ui.table class="text-left border-collapse">
-                                    <x-ui.table-head>
-                                        <x-ui.table-row class="bg-primary/10 text-[10px] border-b border-border">
-                                            <x-ui.table-th padding="xs">Nama Field</x-ui.table-th>
-                                            <x-ui.table-th padding="xs">Sebelum</x-ui.table-th>
-                                            <x-ui.table-th padding="xs">Sesudah</x-ui.table-th>
-                                        </x-ui.table-row>
-                                    </x-ui.table-head>
-                                    <x-ui.table-body class="text-[11px] font-sans">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="bg-primary/10 text-[10px] uppercase font-semibold text-muted font-sans border-b border-border">
+                                            <th class="px-3 py-2">Nama Field</th>
+                                            <th class="px-3 py-2">Sebelum</th>
+                                            <th class="px-3 py-2">Sesudah</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-border text-[11px] font-sans">
                                         <template x-for="item in getDiffFields(selectedLog)" :key="item.field">
-                                            <x-ui.table-row>
-                                                <x-ui.table-td x-text="item.field" padding="xs" class="font-semibold font-mono"></x-ui.table-td>
-                                                <x-ui.table-td x-text="typeof item.old === 'object' ? JSON.stringify(item.old) : item.old" padding="xs" class="text-danger font-mono bg-danger/5"></x-ui.table-td>
-                                                <x-ui.table-td x-text="typeof item.new === 'object' ? JSON.stringify(item.new) : item.new" padding="xs" class="text-success font-mono bg-success/5"></x-ui.table-td>
-                                            </x-ui.table-row>
+                                            <tr>
+                                                <td class="px-3 py-2 font-semibold text-ink font-mono" x-text="item.field"></td>
+                                                <td class="px-3 py-2 text-danger font-mono bg-danger/5" x-text="typeof item.old === 'object' ? JSON.stringify(item.old) : item.old"></td>
+                                                <td class="px-3 py-2 text-success font-mono bg-success/5" x-text="typeof item.new === 'object' ? JSON.stringify(item.new) : item.new"></td>
+                                            </tr>
                                         </template>
                                         <template x-if="getDiffFields(selectedLog).length === 0">
-                                            <x-ui.table-row>
-                                                <x-ui.table-td colspan="3" align="center" class="px-3 py-4 text-muted">
+                                            <tr>
+                                                <td colspan="3" class="px-3 py-4 text-center text-muted font-sans">
                                                     Tidak ada detail perubahan nilai data (misal: event login/logout).
-                                                </x-ui.table-td>
-                                            </x-ui.table-row>
+                                                </td>
+                                            </tr>
                                         </template>
-                                    </x-ui.table-body>
-                                </x-ui.table>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
 

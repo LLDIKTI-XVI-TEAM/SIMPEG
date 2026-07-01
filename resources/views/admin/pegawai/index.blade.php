@@ -105,11 +105,10 @@
     <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
             <h2 class="text-2xl font-semibold text-ink">Data Pegawai</h2>
-            <nav class="mt-1 flex items-center gap-1.5 text-xs text-muted">
-                <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
-                <span>/</span>
-                <span class="font-medium text-ink">Data Pegawai</span>
-            </nav>
+            <x-ui.breadcrumb :items="[
+                ['label' => 'Dashboard', 'url' => route('dashboard')],
+                ['label' => 'Data Pegawai']
+            ]" />
         </div>
         <div class="flex shrink-0 items-center gap-3">
             {{-- Export button --}}
@@ -169,11 +168,6 @@
                         <option value="{{ $golongan }}" @selected($filters['golongan'] === $golongan)>Golongan {{ $golongan }}</option>
                     @endforeach
                 </select>
-                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                    </svg>
-                </div>
             </div>
 
             {{-- Filter Unit --}}
@@ -184,11 +178,6 @@
                         <option value="{{ $unit->id }}" @selected($filters['unit_kerja_id'] === $unit->id)>{{ $unit->nama }}</option>
                     @endforeach
                 </select>
-                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                    </svg>
-                </div>
             </div>
 
             {{-- Filter Jenis --}}
@@ -199,11 +188,6 @@
                         <option value="{{ $jenis->id }}" @selected($filters['jenis_pegawai_id'] === $jenis->id)>{{ $jenis->nama }}</option>
                     @endforeach
                 </select>
-                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                    </svg>
-                </div>
             </div>
 
             {{-- Filter Status --}}
@@ -214,11 +198,6 @@
                         <option value="{{ $status }}" @selected($filters['status_aktif'] === $status)>{{ $status }}</option>
                     @endforeach
                 </select>
-                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                    </svg>
-                </div>
             </div>
             </div>
         </form>
@@ -278,11 +257,13 @@
                         $tmt = $currentPosition?->tmt_jabatan ?? $p->appointment?->tmt_pengangkatan;
                         $fotoUrl = $p->foto_url;
                     @endphp
-                    <x-ui.table-row :interactive="true" data-nama="{{ $p->nama_lengkap }}" data-nip="{{ $p->nip }}" data-unit="{{ $currentUnit }}" data-jenis="{{ $p->jenisPegawai->nama ?? '-' }}" data-status="{{ strtolower($p->status_aktif) }}" data-golongan="{{ $p->golongan_terakhir ?? '-' }}">
+
+                    <x-ui.table-row :interactive="true" data-id="{{ $p->id }}" data-nama="{{ $p->nama_lengkap }}" data-nip="{{ $p->nip }}" data-unit="{{ $currentUnit }}" data-jenis="{{ $p->jenisPegawai->nama ?? '-' }}" data-status="{{ strtolower($p->status_aktif) }}" data-golongan="{{ $p->golongan_terakhir ?? '-' }}">
                         <x-ui.table-td>
                             <x-form.checkbox size="sm" class="row-check" />
                         </x-ui.table-td>
                         <x-ui.table-td>
+
                             <div class="flex items-center gap-3">
                                 <a
                                     href="{{ route('pegawai.show', $p->id) }}"
@@ -378,14 +359,25 @@
                                 </x-ui.button>
 
                                 {{-- Nonaktifkan --}}
-                                <form action="{{ route('pegawai.destroy', $p->id) }}" method="POST" class="inline" onsubmit="return confirm('Apakah Anda yakin ingin menonaktifkan pegawai ini?')">
-                                    @csrf
-                                    <x-ui.button type="submit" variant="danger" size="icon" title="Nonaktifkan" aria-label="Nonaktifkan">
-                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M22 10.5h-6m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM4 19.235A10.19 10.19 0 0 1 12.75 15c2.015 0 3.907.585 5.5 1.59m-14.25 2.645A9.903 9.903 0 0 1 12.75 18a9.903 9.903 0 0 1 6.002 2.235" />
-                                        </svg>
-                                    </x-ui.button>
-                                </form>
+
+                                <x-ui.confirm-dialog
+                                    id="delete-{{ $p->id }}"
+                                    title="Nonaktifkan Pegawai"
+                                    message="Apakah Anda yakin ingin menonaktifkan pegawai ini?"
+                                    confirm-text="Nonaktifkan"
+                                    variant="danger"
+                                    action="{{ route('pegawai.destroy', $p->id) }}"
+                                    method="POST"
+                                >
+                                    <x-slot:trigger>
+                                        <x-ui.button type="button" variant="danger" size="icon" title="Nonaktifkan" aria-label="Nonaktifkan">
+                                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M22 10.5h-6m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM4 19.235A10.19 10.19 0 0 1 12.75 15c2.015 0 3.907.585 5.5 1.59m-14.25 2.645A9.903 9.903 0 0 1 12.75 18a9.903 9.903 0 0 1 6.002 2.235" />
+                                            </svg>
+                                        </x-ui.button>
+                                    </x-slot:trigger>
+                                </x-ui.confirm-dialog>
+
                             </div>
                         </x-ui.table-td>
                     </x-ui.table-row>
@@ -399,7 +391,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2">
                     <span class="text-sm text-muted">Tampilkan</span>
-                    <select onchange="updatePerPage(this.value)" class="appearance-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer">
+                    <select onchange="updatePerPage(this.value)" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
                         <option value="10" {{ request('per_page', 10) == 10 ? 'selected' : '' }}>10</option>
                         <option value="25" {{ request('per_page') == 25 ? 'selected' : '' }}>25</option>
                         <option value="50" {{ request('per_page') == 50 ? 'selected' : '' }}>50</option>
@@ -413,7 +405,7 @@
                 @endif
             </div>
             <div class="w-full sm:w-auto">
-                {{ $pegawaiData->links('vendor.pagination.simpeg') }}
+                {{ $pegawaiData->onEachSide(1)->links('vendor.pagination.simpeg') }}
             </div>
         </div>
     </x-ui.card>
@@ -422,13 +414,21 @@
     <div id="bulk-bar" class="fixed bottom-6 left-1/2 z-40 hidden -translate-x-1/2 items-center gap-3 rounded-lg border border-border bg-surface px-6 py-3.5 shadow-lg">
         <p class="text-sm font-semibold text-ink"><span id="selected-count">0</span> pegawai dipilih</p>
         <div class="h-4 w-px bg-border"></div>
-        <button class="inline-flex items-center gap-1.5 text-xs font-semibold text-warning hover:underline transition-colors cursor-pointer">
+        <button onclick="exportSelectedData()" class="inline-flex items-center gap-1.5 text-xs font-semibold text-warning hover:underline transition-colors cursor-pointer">
             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
             </svg>
             Export Pilihan
         </button>
-        <button class="inline-flex items-center gap-1.5 text-xs font-semibold text-danger hover:underline transition-colors cursor-pointer">
+        <button @click="
+            const count = document.querySelectorAll('.row-check:checked').length;
+            if (count === 0) {
+                window.alert('Tidak ada data pegawai yang dipilih.');
+                return;
+            }
+            document.getElementById('modal-title-bulk-delete').innerText = 'Nonaktifkan ' + count + ' Pegawai Terpilih';
+            $dispatch('open-confirm-bulk-delete');
+        " class="inline-flex items-center gap-1.5 text-xs font-semibold text-danger hover:underline transition-colors cursor-pointer">
             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M22 10.5h-6m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM4 19.235A10.19 10.19 0 0 1 12.75 15c2.015 0 3.907.585 5.5 1.59m-14.25 2.645A9.903 9.903 0 0 1 12.75 18a9.903 9.903 0 0 1 6.002 2.235" />
             </svg>
@@ -441,6 +441,14 @@
             Batal
         </button>
     </div>
+
+    <x-ui.confirm-dialog
+        id="bulk-delete"
+        title="Nonaktifkan Pegawai Terpilih"
+        message="Apakah Anda yakin ingin menonaktifkan pegawai yang dipilih?"
+        confirm-text="Nonaktifkan"
+        variant="danger"
+    />
 
     {{-- MODAL TAMBAH RIWAYAT --}}
     <div x-show="showRiwayatModal" @open-riwayat.window="openRiwayatModal($event.detail.type, $event.detail.id, $event.detail.name)" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;" x-transition>
@@ -702,21 +710,67 @@
         updateBulk();
     }
 
-    // Export baris yang sedang terlihat melalui generator XLSX di backend.
+    // Export seluruh data yang difilter
     function exportFilteredData() {
-        const visibleNips = Array.from(document.querySelectorAll('tbody tr'))
-            .filter(row => row.style.display !== 'none' && row.dataset.nip)
-            .map(row => row.dataset.nip);
+        const urlParams = new URLSearchParams(window.location.search);
+        const exportUrl = new URL(@json(route('pegawai.export')), window.location.origin);
+        for (const [key, value] of urlParams.entries()) {
+            if (key !== 'page' && key !== 'per_page') {
+                exportUrl.searchParams.append(key, value);
+            }
+        }
+        window.location.href = exportUrl.toString();
+    }
 
-        if (visibleNips.length === 0) {
-            window.alert('Tidak ada data pegawai yang dapat diekspor.');
+    // Export baris yang dipilih (Bulk Action)
+    function exportSelectedData() {
+        const selectedNips = Array.from(document.querySelectorAll('.row-check:checked'))
+            .map(cb => cb.closest('tr').dataset.nip)
+            .filter(Boolean);
+
+        if (selectedNips.length === 0) {
+            window.alert('Tidak ada data pegawai yang dipilih.');
             return;
         }
 
         const exportUrl = new URL(@json(route('pegawai.export')), window.location.origin);
-        visibleNips.forEach(nip => exportUrl.searchParams.append('nips[]', nip));
+        selectedNips.forEach(nip => exportUrl.searchParams.append('nips[]', nip));
         window.location.href = exportUrl.toString();
     }
+
+    // Nonaktifkan baris yang dipilih (Bulk Action)
+    window.addEventListener('confirm-bulk-delete', () => {
+        const selectedIds = Array.from(document.querySelectorAll('.row-check:checked'))
+            .map(cb => cb.closest('tr').dataset.id)
+            .filter(Boolean);
+
+        if (selectedIds.length === 0) {
+            window.alert('Tidak ada data pegawai yang dipilih.');
+            return;
+        }
+
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = @json(route('pegawai.bulkDestroy'));
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = '_token';
+        csrfInput.value = csrfToken;
+        form.appendChild(csrfInput);
+
+        selectedIds.forEach(id => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'ids[]';
+            input.value = id;
+            form.appendChild(input);
+        });
+
+        document.body.appendChild(form);
+        form.submit();
+    });
 
     function updatePerPage(val) {
         const url = new URL(window.location.href);
