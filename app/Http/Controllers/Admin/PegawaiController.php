@@ -630,7 +630,8 @@ class PegawaiController extends Controller
             'positionHistories.unitKerja',
             'positionHistories.jenisJabatan',
             'rankHistories.golongan',
-            'salaryHistories'
+            'salaryHistories',
+            'documents',
         ])->findOrFail($id);
 
         $jenisPegawai = RefJenisPegawai::all();
@@ -641,6 +642,59 @@ class PegawaiController extends Controller
         $golonganRefOptions = RefGolongan::orderBy('kode')->get();
         $eselonOptions = RefEselon::orderBy('nama')->get();
 
+        // Dokumen arsip per kategori untuk fitur "Pilih dari Arsip"
+        $arsipPangkat = $p->documents()
+            ->where('jenis_dokumen', 'sk_pangkat')
+            ->orderByDesc('tanggal_dokumen')
+            ->get()
+            ->map(fn ($d) => [
+                'id'            => $d->id,
+                'label'         => ($d->nomor_dokumen ?? 'Tanpa No.').($d->tanggal_dokumen ? ' — '.date('d/m/Y', strtotime($d->tanggal_dokumen)) : ''),
+                'nomor_dokumen' => $d->nomor_dokumen,
+                'tanggal_dokumen' => $d->tanggal_dokumen ? date('Y-m-d', strtotime($d->tanggal_dokumen)) : null,
+                'file_path'     => $d->file_path,
+                'nama_dokumen'  => $d->nama_dokumen,
+            ]);
+
+        $arsipJabatan = $p->documents()
+            ->where('jenis_dokumen', 'sk_jabatan')
+            ->orderByDesc('tanggal_dokumen')
+            ->get()
+            ->map(fn ($d) => [
+                'id'            => $d->id,
+                'label'         => ($d->nomor_dokumen ?? 'Tanpa No.').($d->tanggal_dokumen ? ' — '.date('d/m/Y', strtotime($d->tanggal_dokumen)) : ''),
+                'nomor_dokumen' => $d->nomor_dokumen,
+                'tanggal_dokumen' => $d->tanggal_dokumen ? date('Y-m-d', strtotime($d->tanggal_dokumen)) : null,
+                'file_path'     => $d->file_path,
+                'nama_dokumen'  => $d->nama_dokumen,
+            ]);
+
+        $arsipKgb = $p->documents()
+            ->where('jenis_dokumen', 'sk_kgb')
+            ->orderByDesc('tanggal_dokumen')
+            ->get()
+            ->map(fn ($d) => [
+                'id'            => $d->id,
+                'label'         => ($d->nomor_dokumen ?? 'Tanpa No.').($d->tanggal_dokumen ? ' — '.date('d/m/Y', strtotime($d->tanggal_dokumen)) : ''),
+                'nomor_dokumen' => $d->nomor_dokumen,
+                'tanggal_dokumen' => $d->tanggal_dokumen ? date('Y-m-d', strtotime($d->tanggal_dokumen)) : null,
+                'file_path'     => $d->file_path,
+                'nama_dokumen'  => $d->nama_dokumen,
+            ]);
+
+        $arsipPengangkatan = $p->documents()
+            ->where('jenis_dokumen', 'sk_pengangkatan')
+            ->orderByDesc('tanggal_dokumen')
+            ->get()
+            ->map(fn ($d) => [
+                'id'            => $d->id,
+                'label'         => ($d->nomor_dokumen ?? 'Tanpa No.').($d->tanggal_dokumen ? ' — '.date('d/m/Y', strtotime($d->tanggal_dokumen)) : ''),
+                'nomor_dokumen' => $d->nomor_dokumen,
+                'tanggal_dokumen' => $d->tanggal_dokumen ? date('Y-m-d', strtotime($d->tanggal_dokumen)) : null,
+                'file_path'     => $d->file_path,
+                'nama_dokumen'  => $d->nama_dokumen,
+            ]);
+
         return view('admin.pegawai.edit', compact(
             'p',
             'jenisPegawai',
@@ -649,7 +703,11 @@ class PegawaiController extends Controller
             'unitKerja',
             'jenisJabatanOptions',
             'golonganRefOptions',
-            'eselonOptions'
+            'eselonOptions',
+            'arsipPangkat',
+            'arsipJabatan',
+            'arsipKgb',
+            'arsipPengangkatan',
         ));
     }
 
@@ -718,6 +776,21 @@ class PegawaiController extends Controller
                         'file_path'      => 'ranks/sk/'.$filename,
                         'keterangan'     => 'Diunggah otomatis saat edit pegawai',
                     ]);
+                } elseif ($request->filled('existing_document_id_pangkat')) {
+                    // Pilih dari arsip yang sudah ada
+                    $existingDoc = Document::where('id', $request->input('existing_document_id_pangkat'))
+                        ->where('employee_id', $employee->id)
+                        ->first();
+                    if ($existingDoc) {
+                        $pangkatData['file_sk'] = $existingDoc->file_path;
+                        // Auto-fill no_sk & tanggal_sk jika belum diisi
+                        if (empty($pangkatData['no_sk']) && $existingDoc->nomor_dokumen) {
+                            $pangkatData['no_sk'] = $existingDoc->nomor_dokumen;
+                        }
+                        if (empty($pangkatData['tanggal_sk']) && $existingDoc->tanggal_dokumen) {
+                            $pangkatData['tanggal_sk'] = $existingDoc->tanggal_dokumen;
+                        }
+                    }
                 }
 
                 $pangkatId = $request->input('pangkat_history_id');
@@ -781,6 +854,19 @@ class PegawaiController extends Controller
                         'file_path'      => 'positions/sk/'.$filename,
                         'keterangan'     => 'Diunggah otomatis saat edit pegawai',
                     ]);
+                } elseif ($request->filled('existing_document_id_jabatan')) {
+                    $existingDoc = Document::where('id', $request->input('existing_document_id_jabatan'))
+                        ->where('employee_id', $employee->id)
+                        ->first();
+                    if ($existingDoc) {
+                        $jabatanData['file_sk'] = $existingDoc->file_path;
+                        if (empty($jabatanData['no_sk']) && $existingDoc->nomor_dokumen) {
+                            $jabatanData['no_sk'] = $existingDoc->nomor_dokumen;
+                        }
+                        if (empty($jabatanData['tanggal_sk']) && $existingDoc->tanggal_dokumen) {
+                            $jabatanData['tanggal_sk'] = $existingDoc->tanggal_dokumen;
+                        }
+                    }
                 }
 
                 $jabatanId = $request->input('jabatan_history_id');
@@ -832,6 +918,19 @@ class PegawaiController extends Controller
                         'file_path'      => 'salaries/sk/'.$filename,
                         'keterangan'     => 'Diunggah otomatis saat edit pegawai',
                     ]);
+                } elseif ($request->filled('existing_document_id_kgb')) {
+                    $existingDoc = Document::where('id', $request->input('existing_document_id_kgb'))
+                        ->where('employee_id', $employee->id)
+                        ->first();
+                    if ($existingDoc) {
+                        $kgbData['file_sk'] = $existingDoc->file_path;
+                        if (empty($kgbData['no_sk']) && $existingDoc->nomor_dokumen) {
+                            $kgbData['no_sk'] = $existingDoc->nomor_dokumen;
+                        }
+                        if (empty($kgbData['tanggal_sk']) && $existingDoc->tanggal_dokumen) {
+                            $kgbData['tanggal_sk'] = $existingDoc->tanggal_dokumen;
+                        }
+                    }
                 }
 
                 $kgbId = $request->input('kgb_history_id');
@@ -872,6 +971,19 @@ class PegawaiController extends Controller
                         'file_path'      => 'appointments/sk/'.$filename,
                         'keterangan'     => 'Diunggah otomatis saat edit pegawai',
                     ]);
+                } elseif ($request->filled('existing_document_id_pengangkatan')) {
+                    $existingDoc = Document::where('id', $request->input('existing_document_id_pengangkatan'))
+                        ->where('employee_id', $employee->id)
+                        ->first();
+                    if ($existingDoc) {
+                        $appointmentData['file_sk'] = $existingDoc->file_path;
+                        if (empty($appointmentData['no_sk']) && $existingDoc->nomor_dokumen) {
+                            $appointmentData['no_sk'] = $existingDoc->nomor_dokumen;
+                        }
+                        if (empty($appointmentData['tanggal_sk']) && $existingDoc->tanggal_dokumen) {
+                            $appointmentData['tanggal_sk'] = $existingDoc->tanggal_dokumen;
+                        }
+                    }
                 }
 
                 $appointment = $employee->appointment;

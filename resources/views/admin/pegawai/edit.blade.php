@@ -77,18 +77,30 @@
             skPangkatName: '{{ $p->latestRank() && $p->latestRank()->file_sk ? basename($p->latestRank()->file_sk) : "" }}',
             skPangkatSize: '',
             skPangkatError: '',
+            skPangkatMode: 'upload', // 'upload' | 'arsip'
+            selectedArsipPangkatId: '',
+            arsipPangkatList: @js($arsipPangkat),
             
             skJabatanName: '{{ $p->latestPosition() && $p->latestPosition()->file_sk ? basename($p->latestPosition()->file_sk) : "" }}',
             skJabatanSize: '',
             skJabatanError: '',
+            skJabatanMode: 'upload',
+            selectedArsipJabatanId: '',
+            arsipJabatanList: @js($arsipJabatan),
             
             skKgbName: '{{ $p->latestSalary() && $p->latestSalary()->file_sk ? basename($p->latestSalary()->file_sk) : "" }}',
             skKgbSize: '',
             skKgbError: '',
+            skKgbMode: 'upload',
+            selectedArsipKgbId: '',
+            arsipKgbList: @js($arsipKgb),
             
             skPengangkatanName: '{{ $p->appointment && $p->appointment->file_sk ? basename($p->appointment->file_sk) : "" }}',
             skPengangkatanSize: '',
             skPengangkatanError: '',
+            skPengangkatanMode: 'upload',
+            selectedArsipPengangkatanId: '',
+            arsipPengangkatanList: @js($arsipPengangkatan),
 
             pangkatHistories: @js($p->rankHistories->keyBy('id')),
             selectedPangkatId: '{{ $p->latestRank()?->id ?? 'new' }}',
@@ -344,6 +356,47 @@
                 this.skPengangkatanSize = res.size;
                 this.skPengangkatanError = res.error;
                 if (res.error) e.target.value = '';
+            },
+            // Pilih dari arsip: autofill No SK & Tanggal SK
+            onSelectArsipPangkat() {
+                const doc = this.arsipPangkatList.find(d => d.id === this.selectedArsipPangkatId);
+                if (doc) {
+                    this.skPangkatName = doc.nama_dokumen;
+                    this.skPangkatSize = '';
+                    this.skPangkatError = '';
+                    if (doc.nomor_dokumen) this.pangkatForm.no_sk = doc.nomor_dokumen;
+                    if (doc.tanggal_dokumen) this.pangkatForm.tanggal_sk = doc.tanggal_dokumen;
+                }
+            },
+            onSelectArsipJabatan() {
+                const doc = this.arsipJabatanList.find(d => d.id === this.selectedArsipJabatanId);
+                if (doc) {
+                    this.skJabatanName = doc.nama_dokumen;
+                    this.skJabatanSize = '';
+                    this.skJabatanError = '';
+                    if (doc.nomor_dokumen) this.jabatanForm.no_sk = doc.nomor_dokumen;
+                    if (doc.tanggal_dokumen) this.jabatanForm.tanggal_sk = doc.tanggal_dokumen;
+                }
+            },
+            onSelectArsipKgb() {
+                const doc = this.arsipKgbList.find(d => d.id === this.selectedArsipKgbId);
+                if (doc) {
+                    this.skKgbName = doc.nama_dokumen;
+                    this.skKgbSize = '';
+                    this.skKgbError = '';
+                    if (doc.nomor_dokumen) this.kgbForm.no_sk = doc.nomor_dokumen;
+                    if (doc.tanggal_dokumen) this.kgbForm.tanggal_sk = doc.tanggal_dokumen;
+                }
+            },
+            onSelectArsipPengangkatan() {
+                const doc = this.arsipPengangkatanList.find(d => d.id === this.selectedArsipPengangkatanId);
+                if (doc) {
+                    this.skPengangkatanName = doc.nama_dokumen;
+                    this.skPengangkatanSize = '';
+                    this.skPengangkatanError = '';
+                    if (doc.nomor_dokumen) document.getElementById('pengangkatan_no_sk').value = doc.nomor_dokumen;
+                    if (doc.tanggal_dokumen) document.getElementById('pengangkatan_tanggal_sk').value = doc.tanggal_dokumen;
+                }
             }
         }">
             
@@ -800,31 +853,64 @@
                                 <input id="pangkat_tmt_pangkat" name="pangkat_tmt_pangkat" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" x-model="pangkatForm.tmt_pangkat">
                             </div>
 
-                            {{-- Upload File SK Pangkat --}}
-                            <div class="space-y-1 sm:col-span-2 border-t border-border pt-4">
-                                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans block">File SK Pangkat (PDF/JPG/PNG)</label>
-                                <div class="mt-2 border-2 border-dashed border-border rounded-lg p-6 bg-soft/50 text-center relative hover:border-primary transition">
-                                    <input type="file" id="file_sk_pangkat" name="file_sk_pangkat" accept=".pdf,image/*" @change="handleSkPangkatChange" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
-                                    <svg class="mx-auto h-12 w-12 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
-                                    </svg>
-                                    <p class="text-xs text-ink font-semibold mt-2 font-sans">Klik atau Seret berkas di sini untuk mengunggah berkas SK Pangkat</p>
-                                    <p class="text-[10px] text-muted mt-1 font-sans">Mendukung format PDF, JPG, atau PNG dengan ukuran maksimal 10MB.</p>
-                                    <template x-if="skPangkatName">
-                                        <div class="mt-4 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink font-mono shadow-sm">
-                                            <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                                            </svg>
-                                            <span x-text="skPangkatName"></span>
-                                            <span class="text-muted" x-show="skPangkatSize" x-text="'(' + skPangkatSize + ')'"></span>
+                            {{-- Upload / Pilih Arsip SK Pangkat --}}
+                            <div class="space-y-2 sm:col-span-2 border-t border-border pt-4">
+                                <div class="flex items-center justify-between">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">File SK Pangkat</label>
+                                    {{-- Toggle Upload / Arsip --}}
+                                    <div class="flex rounded-lg border border-border overflow-hidden text-xs font-sans" x-show="arsipPangkatList.length > 0">
+                                        <button type="button" @click="skPangkatMode = 'upload'"
+                                            :class="skPangkatMode === 'upload' ? 'bg-primary text-white' : 'bg-surface text-muted hover:text-ink'"
+                                            class="px-3 py-1 transition font-semibold cursor-pointer">Upload Baru</button>
+                                        <button type="button" @click="skPangkatMode = 'arsip'"
+                                            :class="skPangkatMode === 'arsip' ? 'bg-primary text-white' : 'bg-surface text-muted hover:text-ink'"
+                                            class="px-3 py-1 transition font-semibold cursor-pointer">Pilih dari Arsip</button>
+                                    </div>
+                                </div>
+
+                                {{-- Mode: Upload Baru --}}
+                                <div x-show="skPangkatMode === 'upload'" class="mt-1">
+                                    <div class="border-2 border-dashed border-border rounded-lg p-6 bg-soft/50 text-center relative hover:border-primary transition">
+                                        <input type="file" id="file_sk_pangkat" name="file_sk_pangkat" accept=".pdf,image/*" @change="handleSkPangkatChange" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+                                        <svg class="mx-auto h-10 w-10 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
+                                        </svg>
+                                        <p class="text-xs text-ink font-semibold mt-2 font-sans">Klik atau Seret berkas SK Pangkat (PDF/JPG/PNG, maks 10MB)</p>
+                                        <template x-if="skPangkatName && skPangkatMode === 'upload'">
+                                            <div class="mt-3 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink font-mono shadow-sm">
+                                                <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                                                <span x-text="skPangkatName"></span>
+                                                <span class="text-muted" x-show="skPangkatSize" x-text="'(' + skPangkatSize + ')'"></span>
+                                            </div>
+                                        </template>
+                                        @if($latestRank && $latestRank->file_sk)
+                                            <div class="mt-2 text-xs text-muted" x-show="!skPangkatSize">
+                                                Berkas saat ini: <a href="{{ asset('storage/' . $latestRank->file_sk) }}" target="_blank" class="text-primary hover:underline font-semibold font-mono">{{ basename($latestRank->file_sk) }}</a>
+                                            </div>
+                                        @endif
+                                        <p x-show="skPangkatError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skPangkatError"></p>
+                                    </div>
+                                </div>
+
+                                {{-- Mode: Pilih dari Arsip --}}
+                                <div x-show="skPangkatMode === 'arsip'" class="mt-1 space-y-2">
+                                    <input type="hidden" name="existing_document_id_pangkat" :value="selectedArsipPangkatId">
+                                    <div class="relative">
+                                        <select x-model="selectedArsipPangkatId" @change="onSelectArsipPangkat()"
+                                            class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                            <option value="">-- Pilih dokumen dari arsip --</option>
+                                            <template x-for="doc in arsipPangkatList" :key="doc.id">
+                                                <option :value="doc.id" x-text="doc.label"></option>
+                                            </template>
+                                        </select>
+                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
                                         </div>
+                                    </div>
+                                    <template x-if="selectedArsipPangkatId">
+                                        <p class="text-xs text-success font-semibold font-sans">✓ Dokumen arsip dipilih. No. SK dan Tanggal SK telah terisi otomatis.</p>
                                     </template>
-                                    @if($latestRank && $latestRank->file_sk)
-                                        <div class="mt-2 text-xs text-muted" x-show="!skPangkatSize">
-                                            Berkas saat ini: <a href="{{ asset('storage/' . $latestRank->file_sk) }}" target="_blank" class="text-primary hover:underline font-semibold font-mono">{{ basename($latestRank->file_sk) }}</a>
-                                        </div>
-                                    @endif
-                                    <p x-show="skPangkatError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skPangkatError"></p>
+                                    <p class="text-xs text-muted font-sans" x-show="arsipPangkatList.length === 0">Tidak ada dokumen SK Pangkat di arsip untuk pegawai ini.</p>
                                 </div>
                             </div>
                         </div>
@@ -930,31 +1016,49 @@
                                 <input id="jabatan_tmt_jabatan" name="jabatan_tmt_jabatan" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" x-model="jabatanForm.tmt_jabatan">
                             </div>
 
-                            {{-- Upload File SK Jabatan --}}
-                            <div class="space-y-1 sm:col-span-2 border-t border-border pt-4">
-                                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans block">File SK Jabatan (PDF/JPG/PNG)</label>
-                                <div class="mt-2 border-2 border-dashed border-border rounded-lg p-6 bg-soft/50 text-center relative hover:border-primary transition">
-                                    <input type="file" id="file_sk_jabatan" name="file_sk_jabatan" accept=".pdf,image/*" @change="handleSkJabatanChange" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
-                                    <svg class="mx-auto h-12 w-12 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
-                                    </svg>
-                                    <p class="text-xs text-ink font-semibold mt-2 font-sans">Klik atau Seret berkas di sini untuk mengunggah berkas SK Jabatan</p>
-                                    <p class="text-[10px] text-muted mt-1 font-sans">Mendukung format PDF, JPG, atau PNG dengan ukuran maksimal 10MB.</p>
-                                    <template x-if="skJabatanName">
-                                        <div class="mt-4 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink font-mono shadow-sm">
-                                            <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                                            </svg>
-                                            <span x-text="skJabatanName"></span>
-                                            <span class="text-muted" x-show="skJabatanSize" x-text="'(' + skJabatanSize + ')'"></span>
-                                        </div>
+                            {{-- Upload / Pilih Arsip SK Jabatan --}}
+                            <div class="space-y-2 sm:col-span-2 border-t border-border pt-4">
+                                <div class="flex items-center justify-between">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">File SK Jabatan</label>
+                                    <div class="flex rounded-lg border border-border overflow-hidden text-xs font-sans" x-show="arsipJabatanList.length > 0">
+                                        <button type="button" @click="skJabatanMode = 'upload'" :class="skJabatanMode === 'upload' ? 'bg-primary text-white' : 'bg-surface text-muted hover:text-ink'" class="px-3 py-1 transition font-semibold cursor-pointer">Upload Baru</button>
+                                        <button type="button" @click="skJabatanMode = 'arsip'" :class="skJabatanMode === 'arsip' ? 'bg-primary text-white' : 'bg-surface text-muted hover:text-ink'" class="px-3 py-1 transition font-semibold cursor-pointer">Pilih dari Arsip</button>
+                                    </div>
+                                </div>
+                                <div x-show="skJabatanMode === 'upload'" class="mt-1">
+                                    <div class="border-2 border-dashed border-border rounded-lg p-6 bg-soft/50 text-center relative hover:border-primary transition">
+                                        <input type="file" id="file_sk_jabatan" name="file_sk_jabatan" accept=".pdf,image/*" @change="handleSkJabatanChange" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+                                        <svg class="mx-auto h-10 w-10 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" /></svg>
+                                        <p class="text-xs text-ink font-semibold mt-2 font-sans">Klik atau Seret berkas SK Jabatan (PDF/JPG/PNG, maks 10MB)</p>
+                                        <template x-if="skJabatanName && skJabatanMode === 'upload'">
+                                            <div class="mt-3 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink font-mono shadow-sm">
+                                                <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                                                <span x-text="skJabatanName"></span>
+                                                <span class="text-muted" x-show="skJabatanSize" x-text="'(' + skJabatanSize + ')'"></span>
+                                            </div>
+                                        </template>
+                                        @if($latestPosition && $latestPosition->file_sk)
+                                            <div class="mt-2 text-xs text-muted" x-show="!skJabatanSize">
+                                                Berkas saat ini: <a href="{{ asset('storage/' . $latestPosition->file_sk) }}" target="_blank" class="text-primary hover:underline font-semibold font-mono">{{ basename($latestPosition->file_sk) }}</a>
+                                            </div>
+                                        @endif
+                                        <p x-show="skJabatanError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skJabatanError"></p>
+                                    </div>
+                                </div>
+                                <div x-show="skJabatanMode === 'arsip'" class="mt-1 space-y-2">
+                                    <input type="hidden" name="existing_document_id_jabatan" :value="selectedArsipJabatanId">
+                                    <div class="relative">
+                                        <select x-model="selectedArsipJabatanId" @change="onSelectArsipJabatan()" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                            <option value="">-- Pilih dokumen dari arsip --</option>
+                                            <template x-for="doc in arsipJabatanList" :key="doc.id">
+                                                <option :value="doc.id" x-text="doc.label"></option>
+                                            </template>
+                                        </select>
+                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></div>
+                                    </div>
+                                    <template x-if="selectedArsipJabatanId">
+                                        <p class="text-xs text-success font-semibold font-sans">✓ Dokumen arsip dipilih. No. SK dan Tanggal SK telah terisi otomatis.</p>
                                     </template>
-                                    @if($latestPosition && $latestPosition->file_sk)
-                                        <div class="mt-2 text-xs text-muted" x-show="!skJabatanSize">
-                                            Berkas saat ini: <a href="{{ asset('storage/' . $latestPosition->file_sk) }}" target="_blank" class="text-primary hover:underline font-semibold font-mono">{{ basename($latestPosition->file_sk) }}</a>
-                                        </div>
-                                    @endif
-                                    <p x-show="skJabatanError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skJabatanError"></p>
                                 </div>
                             </div>
                         </div>
@@ -1011,31 +1115,49 @@
                                 <input id="kgb_tmt_kgb" name="kgb_tmt_kgb" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" x-model="kgbForm.tmt_kgb">
                             </div>
 
-                            {{-- Upload File SK KGB --}}
-                            <div class="space-y-1 sm:col-span-2 border-t border-border pt-4">
-                                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans block">File Surat KGB (PDF/JPG/PNG)</label>
-                                <div class="mt-2 border-2 border-dashed border-border rounded-lg p-6 bg-soft/50 text-center relative hover:border-primary transition">
-                                    <input type="file" id="file_sk_kgb" name="file_sk_kgb" accept=".pdf,image/*" @change="handleSkKgbChange" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
-                                    <svg class="mx-auto h-12 w-12 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
-                                    </svg>
-                                    <p class="text-xs text-ink font-semibold mt-2 font-sans">Klik atau Seret berkas di sini untuk mengunggah berkas Surat KGB</p>
-                                    <p class="text-[10px] text-muted mt-1 font-sans">Mendukung format PDF, JPG, atau PNG dengan ukuran maksimal 10MB.</p>
-                                    <template x-if="skKgbName">
-                                        <div class="mt-4 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink font-mono shadow-sm">
-                                            <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                                            </svg>
-                                            <span x-text="skKgbName"></span>
-                                            <span class="text-muted" x-show="skKgbSize" x-text="'(' + skKgbSize + ')'"></span>
-                                        </div>
+                            {{-- Upload / Pilih Arsip SK KGB --}}
+                            <div class="space-y-2 sm:col-span-2 border-t border-border pt-4">
+                                <div class="flex items-center justify-between">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">File SK KGB</label>
+                                    <div class="flex rounded-lg border border-border overflow-hidden text-xs font-sans" x-show="arsipKgbList.length > 0">
+                                        <button type="button" @click="skKgbMode = 'upload'" :class="skKgbMode === 'upload' ? 'bg-primary text-white' : 'bg-surface text-muted hover:text-ink'" class="px-3 py-1 transition font-semibold cursor-pointer">Upload Baru</button>
+                                        <button type="button" @click="skKgbMode = 'arsip'" :class="skKgbMode === 'arsip' ? 'bg-primary text-white' : 'bg-surface text-muted hover:text-ink'" class="px-3 py-1 transition font-semibold cursor-pointer">Pilih dari Arsip</button>
+                                    </div>
+                                </div>
+                                <div x-show="skKgbMode === 'upload'" class="mt-1">
+                                    <div class="border-2 border-dashed border-border rounded-lg p-6 bg-soft/50 text-center relative hover:border-primary transition">
+                                        <input type="file" id="file_sk_kgb" name="file_sk_kgb" accept=".pdf,image/*" @change="handleSkKgbChange" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+                                        <svg class="mx-auto h-10 w-10 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" /></svg>
+                                        <p class="text-xs text-ink font-semibold mt-2 font-sans">Klik atau Seret berkas SK KGB (PDF/JPG/PNG, maks 10MB)</p>
+                                        <template x-if="skKgbName && skKgbMode === 'upload'">
+                                            <div class="mt-3 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink font-mono shadow-sm">
+                                                <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                                                <span x-text="skKgbName"></span>
+                                                <span class="text-muted" x-show="skKgbSize" x-text="'(' + skKgbSize + ')'"></span>
+                                            </div>
+                                        </template>
+                                        @if($latestSalary && $latestSalary->file_sk)
+                                            <div class="mt-2 text-xs text-muted" x-show="!skKgbSize">
+                                                Berkas saat ini: <a href="{{ asset('storage/' . $latestSalary->file_sk) }}" target="_blank" class="text-primary hover:underline font-semibold font-mono">{{ basename($latestSalary->file_sk) }}</a>
+                                            </div>
+                                        @endif
+                                        <p x-show="skKgbError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skKgbError"></p>
+                                    </div>
+                                </div>
+                                <div x-show="skKgbMode === 'arsip'" class="mt-1 space-y-2">
+                                    <input type="hidden" name="existing_document_id_kgb" :value="selectedArsipKgbId">
+                                    <div class="relative">
+                                        <select x-model="selectedArsipKgbId" @change="onSelectArsipKgb()" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                            <option value="">-- Pilih dokumen dari arsip --</option>
+                                            <template x-for="doc in arsipKgbList" :key="doc.id">
+                                                <option :value="doc.id" x-text="doc.label"></option>
+                                            </template>
+                                        </select>
+                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></div>
+                                    </div>
+                                    <template x-if="selectedArsipKgbId">
+                                        <p class="text-xs text-success font-semibold font-sans">✓ Dokumen arsip dipilih. No. SK dan Tanggal SK telah terisi otomatis.</p>
                                     </template>
-                                    @if($latestSalary && $latestSalary->file_sk)
-                                        <div class="mt-2 text-xs text-muted" x-show="!skKgbSize">
-                                            Berkas saat ini: <a href="{{ asset('storage/' . $latestSalary->file_sk) }}" target="_blank" class="text-primary hover:underline font-semibold font-mono">{{ basename($latestSalary->file_sk) }}</a>
-                                        </div>
-                                    @endif
-                                    <p x-show="skKgbError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skKgbError"></p>
                                 </div>
                             </div>
                         </div>
@@ -1080,31 +1202,49 @@
                                 <input id="pengangkatan_tanggal_sk" name="pengangkatan_tanggal_sk" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" value="{{ $p->appointment && $p->appointment->tanggal_sk ? \Carbon\Carbon::parse($p->appointment->tanggal_sk)->format('Y-m-d') : '' }}" >
                             </div>
 
-                            {{-- Upload File SK Pengangkatan --}}
-                            <div class="space-y-1 sm:col-span-2 border-t border-border pt-4">
-                                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans block">File SK Pengangkatan (PDF/JPG/PNG)</label>
-                                <div class="mt-2 border-2 border-dashed border-border rounded-lg p-6 bg-soft/50 text-center relative hover:border-primary transition">
-                                    <input type="file" id="file_sk_pengangkatan" name="file_sk_pengangkatan" accept=".pdf,image/*" @change="handleSkPengangkatanChange" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
-                                    <svg class="mx-auto h-12 w-12 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
-                                    </svg>
-                                    <p class="text-xs text-ink font-semibold mt-2 font-sans">Klik atau Seret berkas di sini untuk mengunggah berkas SK Pengangkatan</p>
-                                    <p class="text-[10px] text-muted mt-1 font-sans">Mendukung format PDF, JPG, atau PNG dengan ukuran maksimal 10MB.</p>
-                                    <template x-if="skPengangkatanName">
-                                        <div class="mt-4 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink font-mono shadow-sm">
-                                            <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                                            </svg>
-                                            <span x-text="skPengangkatanName"></span>
-                                            <span class="text-muted" x-show="skPengangkatanSize" x-text="'(' + skPengangkatanSize + ')'"></span>
-                                        </div>
+                            {{-- Upload / Pilih Arsip SK Pengangkatan --}}
+                            <div class="space-y-2 sm:col-span-2 border-t border-border pt-4">
+                                <div class="flex items-center justify-between">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">File SK Pengangkatan</label>
+                                    <div class="flex rounded-lg border border-border overflow-hidden text-xs font-sans" x-show="arsipPengangkatanList.length > 0">
+                                        <button type="button" @click="skPengangkatanMode = 'upload'" :class="skPengangkatanMode === 'upload' ? 'bg-primary text-white' : 'bg-surface text-muted hover:text-ink'" class="px-3 py-1 transition font-semibold cursor-pointer">Upload Baru</button>
+                                        <button type="button" @click="skPengangkatanMode = 'arsip'" :class="skPengangkatanMode === 'arsip' ? 'bg-primary text-white' : 'bg-surface text-muted hover:text-ink'" class="px-3 py-1 transition font-semibold cursor-pointer">Pilih dari Arsip</button>
+                                    </div>
+                                </div>
+                                <div x-show="skPengangkatanMode === 'upload'" class="mt-1">
+                                    <div class="border-2 border-dashed border-border rounded-lg p-6 bg-soft/50 text-center relative hover:border-primary transition">
+                                        <input type="file" id="file_sk_pengangkatan" name="file_sk_pengangkatan" accept=".pdf,image/*" @change="handleSkPengangkatanChange" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+                                        <svg class="mx-auto h-10 w-10 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" /></svg>
+                                        <p class="text-xs text-ink font-semibold mt-2 font-sans">Klik atau Seret berkas SK Pengangkatan (PDF/JPG/PNG, maks 10MB)</p>
+                                        <template x-if="skPengangkatanName && skPengangkatanMode === 'upload'">
+                                            <div class="mt-3 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink font-mono shadow-sm">
+                                                <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                                                <span x-text="skPengangkatanName"></span>
+                                                <span class="text-muted" x-show="skPengangkatanSize" x-text="'(' + skPengangkatanSize + ')'"></span>
+                                            </div>
+                                        </template>
+                                        @if($p->appointment && $p->appointment->file_sk)
+                                            <div class="mt-2 text-xs text-muted" x-show="!skPengangkatanSize">
+                                                Berkas saat ini: <a href="{{ asset('storage/' . $p->appointment->file_sk) }}" target="_blank" class="text-primary hover:underline font-semibold font-mono">{{ basename($p->appointment->file_sk) }}</a>
+                                            </div>
+                                        @endif
+                                        <p x-show="skPengangkatanError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skPengangkatanError"></p>
+                                    </div>
+                                </div>
+                                <div x-show="skPengangkatanMode === 'arsip'" class="mt-1 space-y-2">
+                                    <input type="hidden" name="existing_document_id_pengangkatan" :value="selectedArsipPengangkatanId">
+                                    <div class="relative">
+                                        <select x-model="selectedArsipPengangkatanId" @change="onSelectArsipPengangkatan()" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                            <option value="">-- Pilih dokumen dari arsip --</option>
+                                            <template x-for="doc in arsipPengangkatanList" :key="doc.id">
+                                                <option :value="doc.id" x-text="doc.label"></option>
+                                            </template>
+                                        </select>
+                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></div>
+                                    </div>
+                                    <template x-if="selectedArsipPengangkatanId">
+                                        <p class="text-xs text-success font-semibold font-sans">✓ Dokumen arsip dipilih. No. SK dan Tanggal SK telah terisi otomatis.</p>
                                     </template>
-                                    @if($p->appointment && $p->appointment->file_sk)
-                                        <div class="mt-2 text-xs text-muted" x-show="!skPengangkatanSize">
-                                            Berkas saat ini: <a href="{{ asset('storage/' . $p->appointment->file_sk) }}" target="_blank" class="text-primary hover:underline font-semibold font-mono">{{ basename($p->appointment->file_sk) }}</a>
-                                        </div>
-                                    @endif
-                                    <p x-show="skPengangkatanError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skPengangkatanError"></p>
                                 </div>
                             </div>
                         </div>
