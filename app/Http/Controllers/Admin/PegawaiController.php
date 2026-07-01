@@ -6,6 +6,7 @@ use App\Actions\Employees\AssignSupervisorAction;
 use App\Actions\Employees\CreateEmployeeAction;
 use App\Actions\Employees\DeactivateEmployeeAction;
 use App\Actions\Employees\ListInactiveEmployeesAction;
+use App\Actions\Employees\PrepareEmployeeEditFormDataAction;
 use App\Actions\Employees\RestoreEmployeeAction;
 use App\Actions\Employees\UpdateEmployeeAction;
 use App\Http\Controllers\Controller;
@@ -57,7 +58,7 @@ class PegawaiController extends Controller
             ->distinct()
             ->orderBy('golongan_terakhir')
             ->pluck('golongan_terakhir')
-            ->map(fn (?string $golongan) => $golongan ? strtok($golongan, '/') : null)
+            ->map(fn(?string $golongan) => $golongan ? strtok($golongan, '/') : null)
             ->filter()
             ->unique()
             ->values();
@@ -102,19 +103,19 @@ class PegawaiController extends Controller
             $filters['status_aktif'] = 'Pensiun';
         }
 
-        if (! $unitKerjaOptions->contains('id', $filters['unit_kerja_id'])) {
+        if (!$unitKerjaOptions->contains('id', $filters['unit_kerja_id'])) {
             $filters['unit_kerja_id'] = '';
         }
 
-        if (! $jenisPegawaiOptions->contains('id', $filters['jenis_pegawai_id'])) {
+        if (!$jenisPegawaiOptions->contains('id', $filters['jenis_pegawai_id'])) {
             $filters['jenis_pegawai_id'] = '';
         }
 
-        if (! in_array($filters['status_aktif'], $statusOptions, true)) {
+        if (!in_array($filters['status_aktif'], $statusOptions, true)) {
             $filters['status_aktif'] = '';
         }
 
-        if ($filters['golongan'] !== '' && ! $golonganOptions->contains($filters['golongan'])) {
+        if ($filters['golongan'] !== '' && !$golonganOptions->contains($filters['golongan'])) {
             $filters['golongan'] = '';
         }
 
@@ -129,7 +130,7 @@ class PegawaiController extends Controller
             ->with([
                 'jenisPegawai',
                 'appointment',
-                'positionHistories' => fn ($query) => $query
+                'positionHistories' => fn($query) => $query
                     ->with('unitKerja')
                     ->orderByDesc('is_latest')
                     ->orderByDesc('tmt_jabatan'),
@@ -145,7 +146,7 @@ class PegawaiController extends Controller
         }
 
         if ($filters['golongan'] !== '') {
-            $pegawaiQuery->where('golongan_terakhir', 'like', $filters['golongan'].'%');
+            $pegawaiQuery->where('golongan_terakhir', 'like', $filters['golongan'] . '%');
         }
 
         if ($filters['unit_kerja_id'] !== '') {
@@ -244,7 +245,7 @@ class PegawaiController extends Controller
             ->distinct()
             ->orderBy('golongan_terakhir')
             ->pluck('golongan_terakhir')
-            ->map(fn (?string $golongan) => $golongan ? strtok($golongan, '/') : null)
+            ->map(fn(?string $golongan) => $golongan ? strtok($golongan, '/') : null)
             ->filter()
             ->unique()
             ->values();
@@ -277,9 +278,9 @@ class PegawaiController extends Controller
             $employee = $action->execute($request->validated(), $request);
 
             return redirect()->route('data-pegawai')
-                ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil ditambahkan.');
+                ->with('success', 'Data pegawai ' . $employee->nama_lengkap . ' berhasil ditambahkan.');
         } catch (\Exception $e) {
-            return back()->withInput()->with('error', 'Gagal menambahkan pegawai: '.$e->getMessage());
+            return back()->withInput()->with('error', 'Gagal menambahkan pegawai: ' . $e->getMessage());
         }
     }
 
@@ -306,92 +307,11 @@ class PegawaiController extends Controller
         return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions'));
     }
 
-    public function edit($id)
+    public function edit($id, PrepareEmployeeEditFormDataAction $action)
     {
-        $p = Employee::with([
-            'appointment',
-            'positionHistories.unitKerja',
-            'positionHistories.jenisJabatan',
-            'rankHistories.golongan',
-            'salaryHistories',
-            'documents',
-        ])->findOrFail($id);
+        $data = $action->execute($id);
 
-        $jenisPegawai = RefJenisPegawai::all();
-        $agama = RefAgama::all();
-        $statusKawin = RefStatusPerkawinan::all();
-        $unitKerja = RefUnitKerja::all();
-        $jenisJabatanOptions = RefJenisJabatan::all();
-        $golonganRefOptions = RefGolongan::orderBy('kode')->get();
-        $eselonOptions = RefEselon::orderBy('nama')->get();
-
-        // Dokumen arsip per kategori untuk fitur "Pilih dari Arsip"
-        $arsipPangkat = $p->documents()
-            ->where('jenis_dokumen', 'sk_pangkat')
-            ->orderByDesc('tanggal_dokumen')
-            ->get()
-            ->map(fn ($d) => [
-                'id' => $d->id,
-                'label' => ($d->nomor_dokumen ?? 'Tanpa No.').($d->tanggal_dokumen ? ' — '.date('d/m/Y', strtotime($d->tanggal_dokumen)) : ''),
-                'nomor_dokumen' => $d->nomor_dokumen,
-                'tanggal_dokumen' => $d->tanggal_dokumen ? date('Y-m-d', strtotime($d->tanggal_dokumen)) : null,
-                'file_path' => $d->file_path,
-                'nama_dokumen' => $d->nama_dokumen,
-            ]);
-
-        $arsipJabatan = $p->documents()
-            ->where('jenis_dokumen', 'sk_jabatan')
-            ->orderByDesc('tanggal_dokumen')
-            ->get()
-            ->map(fn ($d) => [
-                'id' => $d->id,
-                'label' => ($d->nomor_dokumen ?? 'Tanpa No.').($d->tanggal_dokumen ? ' — '.date('d/m/Y', strtotime($d->tanggal_dokumen)) : ''),
-                'nomor_dokumen' => $d->nomor_dokumen,
-                'tanggal_dokumen' => $d->tanggal_dokumen ? date('Y-m-d', strtotime($d->tanggal_dokumen)) : null,
-                'file_path' => $d->file_path,
-                'nama_dokumen' => $d->nama_dokumen,
-            ]);
-
-        $arsipKgb = $p->documents()
-            ->where('jenis_dokumen', 'sk_kgb')
-            ->orderByDesc('tanggal_dokumen')
-            ->get()
-            ->map(fn ($d) => [
-                'id' => $d->id,
-                'label' => ($d->nomor_dokumen ?? 'Tanpa No.').($d->tanggal_dokumen ? ' — '.date('d/m/Y', strtotime($d->tanggal_dokumen)) : ''),
-                'nomor_dokumen' => $d->nomor_dokumen,
-                'tanggal_dokumen' => $d->tanggal_dokumen ? date('Y-m-d', strtotime($d->tanggal_dokumen)) : null,
-                'file_path' => $d->file_path,
-                'nama_dokumen' => $d->nama_dokumen,
-            ]);
-
-        $arsipPengangkatan = $p->documents()
-            ->where('jenis_dokumen', 'sk_pengangkatan')
-            ->orderByDesc('tanggal_dokumen')
-            ->get()
-            ->map(fn ($d) => [
-                'id' => $d->id,
-                'label' => ($d->nomor_dokumen ?? 'Tanpa No.').($d->tanggal_dokumen ? ' — '.date('d/m/Y', strtotime($d->tanggal_dokumen)) : ''),
-                'nomor_dokumen' => $d->nomor_dokumen,
-                'tanggal_dokumen' => $d->tanggal_dokumen ? date('Y-m-d', strtotime($d->tanggal_dokumen)) : null,
-                'file_path' => $d->file_path,
-                'nama_dokumen' => $d->nama_dokumen,
-            ]);
-
-        return view('admin.pegawai.edit', compact(
-            'p',
-            'jenisPegawai',
-            'agama',
-            'statusKawin',
-            'unitKerja',
-            'jenisJabatanOptions',
-            'golonganRefOptions',
-            'eselonOptions',
-            'arsipPangkat',
-            'arsipJabatan',
-            'arsipKgb',
-            'arsipPengangkatan',
-        ));
+        return view('admin.pegawai.edit', $data);
     }
 
     public function update(UpdateEmployeeRequest $request, $id, UpdateEmployeeAction $action)
@@ -402,9 +322,9 @@ class PegawaiController extends Controller
             $employee = $action->execute($employee, $request->validated(), $request);
 
             return redirect()->route('data-pegawai')
-                ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil diperbarui.');
+                ->with('success', 'Data pegawai ' . $employee->nama_lengkap . ' berhasil diperbarui.');
         } catch (\Exception $e) {
-            return back()->withInput()->with('error', 'Gagal memperbarui pegawai: '.$e->getMessage());
+            return back()->withInput()->with('error', 'Gagal memperbarui pegawai: ' . $e->getMessage());
         }
     }
 
@@ -416,7 +336,7 @@ class PegawaiController extends Controller
         $action->execute($employee, $request);
 
         return redirect()->route('data-pegawai')
-            ->with('success', 'Data pegawai '.$nama.' berhasil dinonaktifkan.');
+            ->with('success', 'Data pegawai ' . $nama . ' berhasil dinonaktifkan.');
     }
 
     public function bulkDestroy(Request $request, DeactivateEmployeeAction $action)
@@ -445,11 +365,11 @@ class PegawaiController extends Controller
 
             DB::commit();
 
-            return back()->with('success', $count.' pegawai berhasil dinonaktifkan.');
+            return back()->with('success', $count . ' pegawai berhasil dinonaktifkan.');
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return back()->with('error', 'Terjadi kesalahan saat menonaktifkan pegawai: '.$e->getMessage());
+            return back()->with('error', 'Terjadi kesalahan saat menonaktifkan pegawai: ' . $e->getMessage());
         }
     }
 
@@ -461,7 +381,7 @@ class PegawaiController extends Controller
         $action->execute($employee, $request);
 
         return redirect()->route('data-nonaktif')
-            ->with('success', 'Data pegawai '.$nama.' berhasil diaktifkan kembali.');
+            ->with('success', 'Data pegawai ' . $nama . ' berhasil diaktifkan kembali.');
     }
 
     public function storeRiwayat($id, Request $request, \App\Actions\Employees\StoreEmployeeHistoryAction $action)
@@ -498,10 +418,10 @@ class PegawaiController extends Controller
             $action->execute($employee, $request->input('supervisor_id'), $request);
 
             return redirect()->route('pegawai.show', $id)
-                ->with('success', 'Atasan langsung untuk '.$employee->nama_lengkap.' berhasil diperbarui.');
+                ->with('success', 'Atasan langsung untuk ' . $employee->nama_lengkap . ' berhasil diperbarui.');
         } catch (\Exception $e) {
             return redirect()->route('pegawai.show', $id)
-                ->with('error', 'Gagal memperbarui atasan langsung: '.$e->getMessage());
+                ->with('error', 'Gagal memperbarui atasan langsung: ' . $e->getMessage());
         }
     }
 }
