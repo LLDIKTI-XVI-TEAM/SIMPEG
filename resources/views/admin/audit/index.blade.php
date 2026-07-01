@@ -27,6 +27,7 @@
             if (!log) return '';
             if (log.event === 'LOGIN') return 'LOGIN: Login berhasil';
             if (log.event === 'LOGOUT') return 'LOGOUT: Logout dari sistem';
+            if (log.event === 'SESSION_TIMEOUT') return 'SESSION_TIMEOUT: Sesi berakhir karena idle timeout';
             if (log.event === 'APPROVE' || log.event === 'POSTPONE') {
                 return `${log.event}: Mengubah status pengajuan cuti`;
             }
@@ -176,6 +177,7 @@
                         <option value="all">Semua Event</option>
                         <option value="LOGIN">LOGIN</option>
                         <option value="LOGOUT">LOGOUT</option>
+                        <option value="SESSION_TIMEOUT">SESSION_TIMEOUT</option>
                         <option value="CREATE">CREATE</option>
                         <option value="UPDATE">UPDATE</option>
                         <option value="SOFT_DELETE">SOFT_DELETE</option>

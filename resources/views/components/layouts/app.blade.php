@@ -452,6 +452,13 @@
         {{-- PAGE CONTENT --}}
         <main class="flex-1 overflow-y-auto bg-page">
             <div class="mx-auto max-w-7xl px-4 py-6 lg:px-6">
+                @php($sessionTimeoutMessage = session()->pull('simpeg_session_timeout_message'))
+                @if ($sessionTimeoutMessage)
+                    <div class="mb-4 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm font-semibold text-warning">
+                        {{ $sessionTimeoutMessage }}
+                    </div>
+                @endif
+
                 {{ $slot }}
             </div>
         </main>

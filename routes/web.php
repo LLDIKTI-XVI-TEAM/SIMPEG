@@ -110,7 +110,7 @@ if (app()->environment(['local', 'testing'])) {
     });
 }
 
-Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan,atasan_langsung,pegawai'])->group(function (): void {
+Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_kepegawaian,pimpinan,atasan_langsung,pegawai'])->group(function (): void {
     Route::get('/dashboard', function () {
         return view('dashboard');
     })->name('dashboard');

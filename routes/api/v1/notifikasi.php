@@ -3,7 +3,7 @@
 use App\Http\Controllers\Api\V1\NotificationController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['web', 'keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan,atasan_langsung,pegawai'])
+Route::middleware(['web', 'keycloak.auth', 'session.timeout', 'role:super_admin,admin_kepegawaian,pimpinan,atasan_langsung,pegawai'])
     ->prefix('notifikasi')
     ->name('notifikasi.')
     ->group(function (): void {
