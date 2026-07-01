@@ -400,28 +400,16 @@
         @if(session('success') || session('error') || session('warning') || session('info') || session('auth_error'))
         <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)" x-transition.opacity.duration.500ms class="shrink-0 border-b border-border px-4 py-3 lg:px-6 space-y-2">
             @if(session('success'))
-                <div class="flex items-center gap-3 rounded-lg border border-success/20 bg-success/10 px-4 py-3">
-                    <svg class="h-4 w-4 shrink-0 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
-                    <p class="text-sm font-medium text-success font-sans">{{ session('success') }}</p>
-                </div>
+                <x-ui.alert variant="success">{{ session('success') }}</x-ui.alert>
             @endif
             @if(session('error') || session('auth_error'))
-                <div class="flex items-center gap-3 rounded-lg border border-danger/20 bg-danger/10 px-4 py-3">
-                    <svg class="h-4 w-4 shrink-0 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
-                    <p class="text-sm font-medium text-danger font-sans">{{ session('error') ?? session('auth_error') }}</p>
-                </div>
+                <x-ui.alert variant="danger">{{ session('error') ?? session('auth_error') }}</x-ui.alert>
             @endif
             @if(session('warning'))
-                <div class="flex items-center gap-3 rounded-lg border border-warning/20 bg-warning/10 px-4 py-3">
-                    <svg class="h-4 w-4 shrink-0 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
-                    <p class="text-sm font-medium text-warning font-sans">{{ session('warning') }}</p>
-                </div>
+                <x-ui.alert variant="warning">{{ session('warning') }}</x-ui.alert>
             @endif
             @if(session('info'))
-                <div class="flex items-center gap-3 rounded-lg border border-info/20 bg-info/10 px-4 py-3">
-                    <svg class="h-4 w-4 shrink-0 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" /></svg>
-                    <p class="text-sm font-medium text-info font-sans">{{ session('info') }}</p>
-                </div>
+                <x-ui.alert variant="info">{{ session('info') }}</x-ui.alert>
             @endif
         </div>
         @endif
