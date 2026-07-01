@@ -272,7 +272,7 @@ class CutiController extends Controller
         $i = 0;
         foreach ($stats as $name => $days) {
             $jenisStats[] = [
-                'label' => $name ?? 'Lainnya',
+                'label' => $name ?: 'Lainnya',
                 'hari' => $days,
                 'percent' => round(($days / $totalDays) * 100),
                 'tone' => $tones[$i % 4],

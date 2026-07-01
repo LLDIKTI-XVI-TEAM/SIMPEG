@@ -30,8 +30,7 @@ class ProfileController extends Controller
                 ->where('tahun', $tahun)
                 ->first();
             if ($leaveBalance) {
-                // total_hak + sisa_tahun_sebelumnya - total_terpakai
-                $saldoCuti = $leaveBalance->total_hak + $leaveBalance->sisa_tahun_sebelumnya - $leaveBalance->total_terpakai;
+                $saldoCuti = $leaveBalance->sisa;
             } else {
                 $saldoCuti = 12; // default jatah cuti tahunan jika belum dibuat row-nya
             }

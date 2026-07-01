@@ -177,6 +177,8 @@ class EmployeeDocumentTest extends TestCase
         $response = $this->get("/dashboard/dokumen/{$document->id}/download");
 
         $response->assertOk();
-        $response->assertHeader('Content-Disposition', 'attachment; filename='.basename($filePath));
+        
+        $expectedFilename = \Illuminate\Support\Str::slug($employee->nama_lengkap ?? 'pegawai') . '-' . \Illuminate\Support\Str::slug($document->nama_dokumen) . '.pdf';
+        $response->assertDownload($expectedFilename);
     }
 }
