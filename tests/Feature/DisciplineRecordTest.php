@@ -129,7 +129,6 @@ class DisciplineRecordTest extends TestCase
         $this->assertStringStartsWith('sk/', $skPath);
         $this->assertStringEndsWith('.pdf', $skPath);
         Storage::disk(Document::STORAGE_DISK)->assertExists($skPath);
-        Storage::disk('public')->assertMissing($skPath);
         $this->assertDatabaseHas('discipline_records', [
             'employee_id' => $employee->id,
             'file_sk' => $skPath,

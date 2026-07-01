@@ -42,7 +42,7 @@ class EmployeeFileStorageService
 
     private function storePrivate(UploadedFile $file, string $directory): string
     {
-        return $this->storeOnDisk($file, $directory, 'local');
+        return $this->storeOnDisk($file, $directory, \App\Models\Document::STORAGE_DISK);
     }
 
     private function storeOnDisk(UploadedFile $file, string $directory, string $disk): string
