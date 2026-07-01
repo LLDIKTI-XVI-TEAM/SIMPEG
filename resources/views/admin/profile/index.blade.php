@@ -1,11 +1,13 @@
 <x-layouts.app title="Profil Saya">
 
+
     @if(!$p)
         <div class="space-y-6">
             {{-- Header --}}
             <div class="flex items-center gap-4">
                 <div class="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
                     <span class="text-2xl font-bold text-primary">{{ strtoupper(substr(auth()->user()->name ?? 'U', 0, 1)) }}</span>
+
                 </div>
                 <div>
                     <h1 class="text-2xl font-semibold text-ink">{{ auth()->user()->name }}</h1>
@@ -40,6 +42,7 @@
                     </div>
                 </div>
             </div>
+
 
             {{-- Card Ganti Password --}}
             <div class="rounded-lg border border-border bg-surface shadow-sm">
@@ -78,7 +81,7 @@
         <div x-data="{
             activeTab: new URLSearchParams(window.location.search).get('tab') || 'profile'
         }" class="mx-auto max-w-5xl space-y-6">
-            
+
             {{-- PAGE HEADER --}}
             <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
@@ -175,7 +178,7 @@
 
                 {{-- TAB 1: PROFIL LENGKAP --}}
                 <div x-show="activeTab === 'profile'" class="space-y-6" x-transition>
-                    
+
                     {{-- Atasan Langsung --}}
                     <div class="bg-soft/40 rounded-lg p-4 border border-border">
                         <div class="flex items-center gap-3">
@@ -319,7 +322,7 @@
                             <p class="text-xs text-muted font-sans mt-0.5">Menampilkan sisa jatah cuti tahunan berjalan Anda.</p>
                         </div>
                     </div>
-                    
+
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div class="rounded-lg border border-border bg-surface p-4 shadow-sm text-center">
                             <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans block">Sisa Saldo</span>
@@ -375,8 +378,8 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
-                                            Tidak ada data anggota keluarga.
+                                        <td colspan="5" class="px-0 py-0">
+                                            <x-ui.empty-state icon="document" title="Tidak ada data anggota keluarga." />
                                         </td>
                                     </tr>
                                 @endforelse
@@ -411,8 +414,8 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="4" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
-                                            Tidak ada data riwayat kepangkatan.
+                                        <td colspan="4" class="px-0 py-0">
+                                            <x-ui.empty-state icon="document" title="Tidak ada data riwayat kepangkatan." />
                                         </td>
                                     </tr>
                                 @endforelse
@@ -449,8 +452,8 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
-                                            Tidak ada data riwayat jabatan.
+                                        <td colspan="5" class="px-0 py-0">
+                                            <x-ui.empty-state icon="document" title="Tidak ada data riwayat jabatan." />
                                         </td>
                                     </tr>
                                 @endforelse
@@ -485,8 +488,8 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="4" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
-                                            Tidak ada data riwayat KGB.
+                                        <td colspan="4" class="px-0 py-0">
+                                            <x-ui.empty-state icon="document" title="Tidak ada data riwayat KGB." />
                                         </td>
                                     </tr>
                                 @endforelse
@@ -528,8 +531,8 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
-                                            Anda tidak memiliki riwayat hukuman disiplin. Bersih (Clean Record). ✅
+                                        <td colspan="5" class="px-0 py-0">
+                                            <x-ui.empty-state icon="document" title="Anda tidak memiliki riwayat hukuman disiplin. Bersih (Clean Record). ✅" />
                                         </td>
                                     </tr>
                                 @endforelse
@@ -566,8 +569,8 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
-                                            Tidak ada data riwayat pendidikan.
+                                        <td colspan="5" class="px-0 py-0">
+                                            <x-ui.empty-state icon="document" title="Tidak ada data riwayat pendidikan." />
                                         </td>
                                     </tr>
                                 @endforelse
@@ -692,7 +695,7 @@
                             <p class="text-[11px] text-muted mt-1 leading-relaxed">Konfigurasi variabel global, nama instansi, logo, dan preferensi aplikasi.</p>
                         </div>
                     </a>
-                    
+
                     <a href="{{ route('data-master') }}" class="flex h-full items-start gap-4 p-5 rounded-xl border border-border bg-surface hover:border-primary hover:shadow-lg transition-all duration-300 group">
                         <div class="h-12 w-12 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -741,9 +744,12 @@
                             <p class="text-[11px] text-muted mt-1 leading-relaxed">Manajemen Soft Delete untuk pegawai yang diberhentikan atau mutasi.</p>
                         </div>
                     </a>
+
                 </div>
             </div>
             @endif
+
         </div>
     @endif
+
 </x-layouts.app>

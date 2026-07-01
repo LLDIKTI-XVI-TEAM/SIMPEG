@@ -1,15 +1,17 @@
 <x-layouts.app title="Data Nonaktif / Restore Pegawai">
     <div class="mx-auto max-w-7xl space-y-6">
-        <div class="flex flex-col gap-1.5">
-            <h2 class="font-sans text-2xl font-bold text-ink">Pegawai Nonaktif</h2>
-            <nav class="flex items-center gap-1.5 text-xs text-muted">
+
+        <x-admin.page-header title="Pegawai Nonaktif & Restore">
+            <x-slot:breadcrumb>
+
                 <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
                 <span>/</span>
                 <a href="{{ route('data-pegawai') }}" class="transition-colors hover:text-ink">Data Pegawai</a>
                 <span>/</span>
                 <span class="font-medium text-ink">Data Nonaktif</span>
-            </nav>
-        </div>
+            </x-slot:breadcrumb>
+        </x-admin.page-header>
+
 
         <form id="filter-form" method="GET" action="{{ route('data-nonaktif') }}" class="rounded-lg border border-border bg-surface p-4 shadow-sm">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -21,7 +23,7 @@
                         placeholder="Cari nama atau NIP..."
                         class="h-full flex-1 bg-transparent font-sans text-sm text-ink placeholder:text-muted focus:outline-none">
                 </div>
-                
+
                 {{-- Filter Golongan --}}
                 <div class="relative">
                     <select id="filter-golongan" name="golongan" class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
@@ -54,23 +56,26 @@
             </div>
         </form>
 
-        <section class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
+
+        <x-ui.card as="section" padding="none" class="overflow-hidden">
             <div class="border-b border-border px-6 py-4">
                 <h3 class="font-sans text-sm font-bold uppercase tracking-wider text-ink">Daftar Pegawai Non-Aktif</h3>
             </div>
 
             <div class="overflow-x-auto">
-                <table class="w-full min-w-[760px]">
-                    <thead class="bg-soft/80">
-                        <tr>
-                            <th class="px-6 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-muted">Pegawai</th>
-                            <th class="px-6 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-muted">Jabatan & Unit</th>
-                            <th class="px-6 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-muted">Gol. / Jenis</th>
-                            <th class="px-6 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-muted">Status</th>
-                            <th class="px-6 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-muted">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
+
+                <x-ui.table class="min-w-[760px]">
+                    <x-ui.table-head class="bg-soft/80">
+                        <x-ui.table-row>
+                            <x-ui.table-th class="px-6 py-3.5">Pegawai</x-ui.table-th>
+                            <x-ui.table-th class="px-6 py-3.5">Jabatan & Unit</x-ui.table-th>
+                            <x-ui.table-th class="px-6 py-3.5">Gol. / Jenis</x-ui.table-th>
+                            <x-ui.table-th class="px-6 py-3.5">Status</x-ui.table-th>
+                            <x-ui.table-th align="right" class="px-6 py-3.5">Aksi</x-ui.table-th>
+                        </x-ui.table-row>
+                    </x-ui.table-head>
+                    <x-ui.table-body>
+
                         @forelse ($employees as $employee)
                             @php
                                 $latestPosition = $employee->positionHistories->first();
@@ -78,10 +83,9 @@
                                 $initial = mb_substr($employee->nama_lengkap, 0, 1);
                                 $fotoUrl = $employee->foto_url;
                             @endphp
-                            <tr class="nonaktif-record transition-colors hover:bg-soft/50"
-                                data-nama="{{ mb_strtolower($employee->nama_lengkap) }}"
+                            <x-ui.table-row :interactive="true" class="nonaktif-record" data-nama="{{ mb_strtolower($employee->nama_lengkap) }}"
                                 data-nip="{{ mb_strtolower($employee->nip) }}">
-                                <td class="px-6 py-5">
+                                <x-ui.table-td padding="xl">
                                     <div class="flex items-center gap-3">
                                         <div class="flex h-10 w-10 shrink-0 overflow-hidden items-center justify-center rounded-full bg-danger/10 text-sm font-bold text-danger">
                                             @if($fotoUrl)
@@ -108,23 +112,26 @@
                                             <p class="font-mono text-xs text-muted">{{ $employee->nip }}</p>
                                         </div>
                                     </div>
-                                </td>
-                                <td class="px-6 py-5">
+                                </x-ui.table-td>
+                                <x-ui.table-td padding="xl">
                                     <p class="font-sans text-sm font-semibold text-ink">{{ $employee->jabatan_terakhir ?? '-' }}</p>
                                     <p class="mt-0.5 text-xs text-muted">{{ $unitKerja }}</p>
-                                </td>
-                                <td class="px-6 py-5">
-                                    <span class="text-sm font-medium text-ink">{{ $employee->golongan_terakhir ?? '-' }} / {{ $employee->jenisPegawai?->nama ?? '-' }}</span>
-                                </td>
-                                <td class="px-6 py-5">
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-bold text-danger">
-                                        <span class="h-1.5 w-1.5 rounded-full bg-danger"></span>
+
+                                </x-ui.table-td>
+                                <x-ui.table-td padding="xl">
+                                    <p class="text-sm font-bold leading-tight text-ink">{{ $employee->golongan_terakhir ?? '-' }}</p>
+                                    <p class="mt-0.5 text-xs font-bold leading-tight text-primary">{{ $employee->jenisPegawai?->nama ?? '-' }}</p>
+                                </x-ui.table-td>
+                                <x-ui.table-td padding="xl">
+                                    <x-ui.badge variant="danger" size="md" dot>
+
                                         Non-Aktif
-                                    </span>
+                                    </x-ui.badge>
                                     <p class="mt-1 text-xs text-muted">{{ optional($employee->deleted_at)->format('d/m/Y H:i') }}</p>
-                                </td>
-                                <td class="px-6 py-5 text-left">
-                                    <div class="inline-flex items-center justify-start gap-2">
+
+                                </x-ui.table-td>
+                                <x-ui.table-td align="right" padding="xl">
+                                    <div class="inline-flex items-center justify-end gap-2">
                                         <x-ui.confirm-dialog
                                             id="restore-{{ $employee->id }}"
                                             title="Aktifkan Kembali Pegawai"
@@ -135,28 +142,26 @@
                                             method="POST"
                                         >
                                             <x-slot:trigger>
-                                                <button type="button"
-                                                    class="inline-flex h-9 items-center gap-2 rounded-lg border border-success/20 bg-surface px-3.5 text-xs font-bold text-success shadow-sm transition hover:bg-success/5"
-                                                    title="Aktifkan Kembali - Admin Kepegawaian/Super Admin">
-                                                    <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
-                                                    </svg>
-                                                    Aktifkan Kembali
-                                                </button>
+                                                <x-ui.button type="button" variant="success" size="sm" title="Aktifkan Kembali - Admin Kepegawaian/Super Admin">
+                                                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                                                </svg>
+                                                Aktifkan Kembali
+                                                </x-ui.button>
                                             </x-slot:trigger>
                                         </x-ui.confirm-dialog>
                                     </div>
-                                </td>
-                            </tr>
+                                </x-ui.table-td>
+                            </x-ui.table-row>
                         @empty
-                            <tr id="empty-state">
-                                <td colspan="5" class="px-6 py-10 text-center text-sm text-muted">
-                                    Tidak ada data pegawai non-aktif.
-                                </td>
-                            </tr>
+                            <x-ui.table-row id="empty-state">
+                                <x-ui.table-td colspan="5" align="center" class="px-0 py-0 text-sm text-muted">
+                                    <x-ui.empty-state icon="document" title="Tidak ada data pegawai non-aktif." />
+                                </x-ui.table-td>
+                            </x-ui.table-row>
                         @endforelse
-                    </tbody>
-                </table>
+                    </x-ui.table-body>
+                </x-ui.table>
             </div>
 
             {{-- TABLE FOOTER --}}
@@ -177,11 +182,13 @@
                     </p>
                     @endif
                 </div>
+
                 <div class="w-full sm:w-auto">
                     {{ $employees->onEachSide(1)->links('vendor.pagination.simpeg') }}
                 </div>
             </div>
-        </section>
+        </x-ui.card>
+
     </div>
 
     <script>
@@ -200,7 +207,7 @@
             filterTimeout = setTimeout(() => {
                 const url = new URL(form.action);
                 const formData = new FormData(form);
-                
+
                 for (let [key, value] of formData.entries()) {
                     if (value) {
                         url.searchParams.set(key, value);
@@ -208,9 +215,9 @@
                         url.searchParams.delete(key);
                     }
                 }
-                
+
                 url.searchParams.delete('page');
-                
+
                 window.location.href = url.toString();
             }, delay);
         }
