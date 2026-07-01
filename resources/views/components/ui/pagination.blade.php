@@ -5,9 +5,13 @@
 ])
 
 @php
-    $prevAction = $action ? str_replace('page', $current.' - 1', $action) : "if ({$current} > 1) {$current}--";
-    $nextAction = $action ? str_replace('page', $current.' + 1', $action) : "if ({$current} < {$total}) {$current}++";
-    $pageAction = $action ? $action : "{$current} = page";
+    $currentStr = (string) $current;
+    $totalStr = (string) $total;
+    $actionStr = $action ? (string) $action : null;
+
+    $prevAction = $actionStr ? str_replace('page', $currentStr.' - 1', $actionStr) : "if ({$currentStr} > 1) {$currentStr}--";
+    $nextAction = $actionStr ? str_replace('page', $currentStr.' + 1', $actionStr) : "if ({$currentStr} < {$totalStr}) {$currentStr}++";
+    $pageAction = $actionStr ? $actionStr : "{$currentStr} = page";
 @endphp
 
 <div class="flex items-center gap-1.5" x-show="{{ $total }} > 1" style="display: none;">
