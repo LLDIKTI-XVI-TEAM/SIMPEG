@@ -320,8 +320,8 @@
                         </template>
                         {{-- Empty state --}}
                         <x-ui.table-row x-show="totalFiltered === 0">
-                            <x-ui.table-td colspan="6" align="center" class="px-6 py-8 text-muted bg-surface">
-                                Tidak ada data hari libur untuk filter yang dipilih.
+                            <x-ui.table-td colspan="6" align="center" class="px-0 py-0 text-muted bg-surface">
+                                <x-ui.empty-state icon="document" title="Tidak ada data hari libur untuk filter yang dipilih." />
                             </x-ui.table-td>
                         </x-ui.table-row>
                     </x-ui.table-body>

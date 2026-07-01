@@ -155,8 +155,8 @@
                             </x-ui.table-row>
                         @empty
                             <x-ui.table-row id="empty-state">
-                                <x-ui.table-td colspan="5" align="center" class="px-6 py-10 text-sm text-muted">
-                                    Tidak ada data pegawai non-aktif.
+                                <x-ui.table-td colspan="5" align="center" class="px-0 py-0 text-sm text-muted">
+                                    <x-ui.empty-state icon="document" title="Tidak ada data pegawai non-aktif." />
                                 </x-ui.table-td>
                             </x-ui.table-row>
                         @endforelse

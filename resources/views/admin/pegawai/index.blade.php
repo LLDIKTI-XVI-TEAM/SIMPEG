@@ -268,7 +268,7 @@
                     </x-ui.table-row>
                 </x-ui.table-head>
                 <x-ui.table-body>
-                    @foreach($pegawaiData as $p)
+                    @forelse($pegawaiData as $p)
                     @php
                         $currentPosition = $p->positionHistories->first();
                         $currentUnit = $currentPosition?->unitKerja?->nama ?? '-';
@@ -399,7 +399,13 @@
                             </div>
                         </x-ui.table-td>
                     </x-ui.table-row>
-                    @endforeach
+                    @empty
+                        <x-ui.table-row>
+                            <x-ui.table-td colspan="7" align="center" class="px-0 py-0 text-sm text-muted">
+                                <x-ui.empty-state icon="search" title="Tidak ada data pegawai yang sesuai." />
+                            </x-ui.table-td>
+                        </x-ui.table-row>
+                    @endforelse
                 </x-ui.table-body>
             </x-ui.table>
         </div>
