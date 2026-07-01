@@ -88,63 +88,29 @@
             <div class="border-t border-border pt-6 space-y-4">
                 <h4 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Alur Persetujuan Cuti</h4>
 
-                <div class="relative pl-6 space-y-6 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-border">
-
+                <x-ui.timeline>
                     {{-- Step 1: pengajuan oleh pegawai selalu sudah terjadi --}}
-                    <div class="relative">
-                        <div class="absolute -left-[22px] top-1.5 h-3 w-3 rounded-full border-2 border-success bg-surface flex items-center justify-center">
-                            <div class="h-1 w-1 rounded-full bg-success"></div>
-                        </div>
-                        <div class="pl-3">
-                            <p class="text-xs font-bold text-ink font-sans">Diajukan oleh Pegawai</p>
-                            <p class="text-[10px] text-muted font-sans mt-0.5">{{ $cuti->created_at?->translatedFormat('d M Y, H:i') }}</p>
-                        </div>
-                    </div>
+                    <x-ui.timeline-item
+                        title="Diajukan oleh Pegawai"
+                        :description="$cuti->created_at?->translatedFormat('d M Y, H:i')"
+                    />
 
                     {{-- Step 2: persetujuan atasan langsung --}}
-                    <div class="relative">
-                        @if ($atasanSelesai)
-                            <div class="absolute -left-[22px] top-1.5 h-3 w-3 rounded-full border-2 border-success bg-surface flex items-center justify-center">
-                                <div class="h-1 w-1 rounded-full bg-success"></div>
-                            </div>
-                            <div class="pl-3">
-                                <p class="text-xs font-bold text-ink font-sans">Disetujui oleh Atasan Langsung</p>
-                            </div>
-                        @elseif ($atasanDitunda)
-                            <div class="absolute -left-[22px] top-1.5 h-3 w-3 rounded-full border-2 border-danger bg-surface flex items-center justify-center">
-                                <div class="h-1 w-1 rounded-full bg-danger"></div>
-                            </div>
-                            <div class="pl-3">
-                                <p class="text-xs font-bold text-danger font-sans">Ditunda oleh Atasan Langsung</p>
-                            </div>
-                        @else
-                            <div class="absolute -left-[22px] top-1.5 h-3 w-3 rounded-full border-2 border-warning bg-surface flex items-center justify-center">
-                                <div class="h-1 w-1 rounded-full bg-warning animate-pulse"></div>
-                            </div>
-                            <div class="pl-3">
-                                <p class="text-xs font-bold text-warning font-sans">Menunggu Persetujuan Atasan Langsung</p>
-                            </div>
-                        @endif
-                    </div>
+                    @if ($atasanSelesai)
+                        <x-ui.timeline-item title="Disetujui oleh Atasan Langsung" />
+                    @elseif ($atasanDitunda)
+                        <x-ui.timeline-item variant="danger" title="Ditunda oleh Atasan Langsung" />
+                    @else
+                        <x-ui.timeline-item variant="warning" title="Menunggu Persetujuan Atasan Langsung" pulse />
+                    @endif
 
                     {{-- Step 3: pengesahan pimpinan/kepala lembaga --}}
-                    <div class="relative">
-                        @if ($finalDisetujui)
-                            <div class="absolute -left-[22px] top-1.5 h-3 w-3 rounded-full border-2 border-success bg-surface flex items-center justify-center">
-                                <div class="h-1 w-1 rounded-full bg-success"></div>
-                            </div>
-                            <div class="pl-3">
-                                <p class="text-xs font-bold text-ink font-sans">Disahkan oleh Pimpinan</p>
-                            </div>
-                        @else
-                            <div class="absolute -left-[22px] top-1.5 h-3 w-3 rounded-full border-2 border-border bg-surface flex items-center justify-center"></div>
-                            <div class="pl-3">
-                                <p class="text-xs font-medium text-muted font-sans">Verifikasi & Pengesahan Cuti</p>
-                            </div>
-                        @endif
-                    </div>
-
-                </div>
+                    @if ($finalDisetujui)
+                        <x-ui.timeline-item title="Disahkan oleh Pimpinan" />
+                    @else
+                        <x-ui.timeline-item variant="muted" title="Verifikasi & Pengesahan Cuti" />
+                    @endif
+                </x-ui.timeline>
             </div>
 
             {{-- Riwayat tindakan approval nyata: tiap entri merekam siapa, tahap berapa, aksi, waktu, dan komentar. --}}
