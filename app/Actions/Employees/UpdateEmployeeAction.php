@@ -12,28 +12,277 @@ class UpdateEmployeeAction
     public function __construct(private readonly EmployeeFileStorageService $files) {}
 
     /**
-     * Memperbarui pegawai dan menghapus foto lama hanya setelah foto pengganti tersimpan.
+     * Memperbarui pegawai, termasuk dokumen pengangkatan, riwayat pangkat, jabatan, dan KGB.
      *
-     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $validated
      */
-    public function execute(Employee $employee, array $data, Request $request): Employee
+    public function execute(Employee $employee, array $validated, Request $request): Employee
     {
-        $oldValues = $employee->getRawOriginal();
-        $oldPhotoPath = $employee->foto;
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($employee, $validated, $request) {
+            $oldValues = $employee->toArray();
 
-        if ($request->hasFile('foto')) {
-            $data['foto'] = $this->files->storePhoto($request->file('foto'));
-        }
+            if ($request->hasFile('foto') && $request->file('foto')->isValid()) {
+                $file = $request->file('foto');
+                $filename = $file->hashName();
+                $file->move(storage_path('app/public/employees/photos'), $filename);
+                $validated['foto'] = 'employees/photos/'.$filename;
+            } else {
+                unset($validated['foto']);
+            }
 
-        $employee->update($data);
-        $employee->refresh();
+            // Update Employee Basic Info
+            $employee->update($validated);
 
-        if ($request->hasFile('foto')) {
-            $this->files->deletePublicFile($oldPhotoPath);
-        }
+            // 1. Pangkat (RankHistory)
+            if ($request->filled('pangkat_golongan_id') && $request->filled('pangkat_no_sk')
+                && $request->filled('pangkat_tanggal_sk') && $request->filled('pangkat_tmt_pangkat')) {
+                $pangkatData = [
+                    'golongan_id' => $validated['pangkat_golongan_id'],
+                    'no_sk' => $validated['pangkat_no_sk'] ?? null,
+                    'tanggal_sk' => $validated['pangkat_tanggal_sk'] ?? null,
+                    'tmt_pangkat' => $validated['pangkat_tmt_pangkat'] ?? null,
+                ];
 
-        AuditService::log('UPDATE', 'Employee', $employee->id, $oldValues, $employee->getRawOriginal(), $request);
+                if ($request->hasFile('file_sk_pangkat') && $request->file('file_sk_pangkat')->isValid()) {
+                    $file = $request->file('file_sk_pangkat');
+                    $filename = $file->hashName();
+                    $file->move(storage_path('app/public/ranks/sk'), $filename);
+                    $pangkatData['file_sk'] = 'ranks/sk/'.$filename;
 
-        return $employee;
+                    $golonganLabel = isset($pangkatData['golongan_id'])
+                        ? (\App\Models\RefGolongan::find($pangkatData['golongan_id'])?->kode ?? 'Pangkat Baru')
+                        : 'Pangkat Baru';
+                    \App\Models\Document::create([
+                        'employee_id' => $employee->id,
+                        'jenis_dokumen' => 'sk_pangkat',
+                        'nama_dokumen' => 'SK Kenaikan Pangkat '.$golonganLabel,
+                        'nomor_dokumen' => $pangkatData['no_sk'] ?? null,
+                        'tanggal_dokumen' => $pangkatData['tanggal_sk'] ?? null,
+                        'file_path' => 'ranks/sk/'.$filename,
+                        'keterangan' => 'Diunggah otomatis saat edit pegawai',
+                    ]);
+                } elseif ($request->filled('existing_document_id_pangkat')) {
+                    $existingDoc = \App\Models\Document::where('id', $request->input('existing_document_id_pangkat'))
+                        ->where('employee_id', $employee->id)
+                        ->first();
+                    if ($existingDoc) {
+                        $pangkatData['file_sk'] = $existingDoc->file_path;
+                        if (empty($pangkatData['no_sk']) && $existingDoc->nomor_dokumen) {
+                            $pangkatData['no_sk'] = $existingDoc->nomor_dokumen;
+                        }
+                        if (empty($pangkatData['tanggal_sk']) && $existingDoc->tanggal_dokumen) {
+                            $pangkatData['tanggal_sk'] = $existingDoc->tanggal_dokumen;
+                        }
+                    }
+                }
+
+                $pangkatId = $request->input('pangkat_history_id');
+                if ($pangkatId && $pangkatId !== 'new') {
+                    $history = $employee->rankHistories()->find($pangkatId);
+                    if ($history) {
+                        $history->update($pangkatData);
+                        if ($history->is_latest) {
+                            $golongan = \App\Models\RefGolongan::find($validated['pangkat_golongan_id']);
+                            if ($golongan) {
+                                $employee->update([
+                                    'golongan_terakhir' => $golongan->kode,
+                                    'pangkat_terakhir' => $golongan->nama,
+                                ]);
+                            }
+                        }
+                    }
+                } else {
+                    $employee->rankHistories()->update(['is_latest' => false]);
+                    $pangkatData['is_latest'] = true;
+                    $employee->rankHistories()->create($pangkatData);
+
+                    $golongan = \App\Models\RefGolongan::find($validated['pangkat_golongan_id']);
+                    if ($golongan) {
+                        $employee->update([
+                            'golongan_terakhir' => $golongan->kode,
+                            'pangkat_terakhir' => $golongan->nama,
+                        ]);
+                    }
+                }
+            }
+
+            // 2. Jabatan (PositionHistory)
+            if ($request->filled('jabatan_nama_jabatan') && $request->filled('jabatan_jenis_jabatan_id')
+                && $request->filled('jabatan_unit_kerja_id') && $request->filled('jabatan_no_sk')
+                && $request->filled('jabatan_tanggal_sk') && $request->filled('jabatan_tmt_jabatan')) {
+                $jabatanData = [
+                    'nama_jabatan' => $validated['jabatan_nama_jabatan'],
+                    'jenis_jabatan_id' => $validated['jabatan_jenis_jabatan_id'],
+                    'eselon_id' => $validated['jabatan_eselon_id'] ?? null,
+                    'unit_kerja_id' => $validated['jabatan_unit_kerja_id'],
+                    'no_sk' => $validated['jabatan_no_sk'],
+                    'tanggal_sk' => $validated['jabatan_tanggal_sk'],
+                    'tmt_jabatan' => $validated['jabatan_tmt_jabatan'],
+                ];
+
+                if ($request->hasFile('file_sk_jabatan') && $request->file('file_sk_jabatan')->isValid()) {
+                    $file = $request->file('file_sk_jabatan');
+                    $filename = $file->hashName();
+                    $file->move(storage_path('app/public/positions/sk'), $filename);
+                    $jabatanData['file_sk'] = 'positions/sk/'.$filename;
+
+                    \App\Models\Document::create([
+                        'employee_id' => $employee->id,
+                        'jenis_dokumen' => 'sk_jabatan',
+                        'nama_dokumen' => 'SK Jabatan '.($jabatanData['nama_jabatan'] ?? 'Baru'),
+                        'nomor_dokumen' => $jabatanData['no_sk'] ?? null,
+                        'tanggal_dokumen' => $jabatanData['tanggal_sk'] ?? null,
+                        'file_path' => 'positions/sk/'.$filename,
+                        'keterangan' => 'Diunggah otomatis saat edit pegawai',
+                    ]);
+                } elseif ($request->filled('existing_document_id_jabatan')) {
+                    $existingDoc = \App\Models\Document::where('id', $request->input('existing_document_id_jabatan'))
+                        ->where('employee_id', $employee->id)
+                        ->first();
+                    if ($existingDoc) {
+                        $jabatanData['file_sk'] = $existingDoc->file_path;
+                        if (empty($jabatanData['no_sk']) && $existingDoc->nomor_dokumen) {
+                            $jabatanData['no_sk'] = $existingDoc->nomor_dokumen;
+                        }
+                        if (empty($jabatanData['tanggal_sk']) && $existingDoc->tanggal_dokumen) {
+                            $jabatanData['tanggal_sk'] = $existingDoc->tanggal_dokumen;
+                        }
+                    }
+                }
+
+                $jabatanId = $request->input('jabatan_history_id');
+                if ($jabatanId && $jabatanId !== 'new') {
+                    $history = $employee->positionHistories()->find($jabatanId);
+                    if ($history) {
+                        $history->update($jabatanData);
+                        if ($history->is_latest) {
+                            $employee->update([
+                                'jabatan_terakhir' => $validated['jabatan_nama_jabatan'],
+                            ]);
+                        }
+                    }
+                } else {
+                    $employee->positionHistories()->update(['is_latest' => false]);
+                    $jabatanData['is_latest'] = true;
+                    $employee->positionHistories()->create($jabatanData);
+
+                    $employee->update([
+                        'jabatan_terakhir' => $validated['jabatan_nama_jabatan'],
+                    ]);
+                }
+            }
+
+            // 3. KGB (SalaryHistory)
+            if ($request->filled('kgb_gaji_pokok') && $request->filled('kgb_no_sk')
+                && $request->filled('kgb_tanggal_sk') && $request->filled('kgb_tmt_kgb')) {
+                $kgbData = [
+                    'gaji_pokok' => $validated['kgb_gaji_pokok'] ?? null,
+                    'no_sk' => $validated['kgb_no_sk'] ?? null,
+                    'tanggal_sk' => $validated['kgb_tanggal_sk'] ?? null,
+                    'tmt_kgb' => $validated['kgb_tmt_kgb'] ?? null,
+                ];
+
+                if ($request->hasFile('file_sk_kgb') && $request->file('file_sk_kgb')->isValid()) {
+                    $file = $request->file('file_sk_kgb');
+                    $filename = $file->hashName();
+                    $file->move(storage_path('app/public/salaries/sk'), $filename);
+                    $kgbData['file_sk'] = 'salaries/sk/'.$filename;
+
+                    \App\Models\Document::create([
+                        'employee_id' => $employee->id,
+                        'jenis_dokumen' => 'sk_kgb',
+                        'nama_dokumen' => 'SK KGB',
+                        'nomor_dokumen' => $kgbData['no_sk'] ?? null,
+                        'tanggal_dokumen' => $kgbData['tanggal_sk'] ?? null,
+                        'file_path' => 'salaries/sk/'.$filename,
+                        'keterangan' => 'Diunggah otomatis saat edit pegawai',
+                    ]);
+                } elseif ($request->filled('existing_document_id_kgb')) {
+                    $existingDoc = \App\Models\Document::where('id', $request->input('existing_document_id_kgb'))
+                        ->where('employee_id', $employee->id)
+                        ->first();
+                    if ($existingDoc) {
+                        $kgbData['file_sk'] = $existingDoc->file_path;
+                        if (empty($kgbData['no_sk']) && $existingDoc->nomor_dokumen) {
+                            $kgbData['no_sk'] = $existingDoc->nomor_dokumen;
+                        }
+                        if (empty($kgbData['tanggal_sk']) && $existingDoc->tanggal_dokumen) {
+                            $kgbData['tanggal_sk'] = $existingDoc->tanggal_dokumen;
+                        }
+                    }
+                }
+
+                $kgbId = $request->input('kgb_history_id');
+                if ($kgbId && $kgbId !== 'new') {
+                    $history = $employee->salaryHistories()->find($kgbId);
+                    if ($history) {
+                        $history->update($kgbData);
+                    }
+                } else {
+                    $employee->salaryHistories()->update(['is_latest' => false]);
+                    $kgbData['is_latest'] = true;
+                    $employee->salaryHistories()->create($kgbData);
+                }
+            }
+
+            // 4. Pengangkatan (Appointment)
+            if ($request->filled('pengangkatan_jenis_pengangkatan')) {
+                $appointmentData = [
+                    'jenis_pengangkatan' => $validated['pengangkatan_jenis_pengangkatan'],
+                    'tmt_pengangkatan' => $validated['pengangkatan_tmt_pengangkatan'] ?? null,
+                    'no_sk' => $validated['pengangkatan_no_sk'] ?? null,
+                    'tanggal_sk' => $validated['pengangkatan_tanggal_sk'] ?? null,
+                ];
+
+                if ($request->hasFile('file_sk_pengangkatan') && $request->file('file_sk_pengangkatan')->isValid()) {
+                    $file = $request->file('file_sk_pengangkatan');
+                    $filename = $file->hashName();
+                    $file->move(storage_path('app/public/appointments/sk'), $filename);
+                    $appointmentData['file_sk'] = 'appointments/sk/'.$filename;
+
+                    \App\Models\Document::create([
+                        'employee_id' => $employee->id,
+                        'jenis_dokumen' => 'sk_pengangkatan',
+                        'nama_dokumen' => 'SK Pengangkatan '.($appointmentData['jenis_pengangkatan'] ?? ''),
+                        'nomor_dokumen' => $appointmentData['no_sk'] ?? null,
+                        'tanggal_dokumen' => $appointmentData['tanggal_sk'] ?? null,
+                        'file_path' => 'appointments/sk/'.$filename,
+                        'keterangan' => 'Diunggah otomatis saat edit pegawai',
+                    ]);
+                } elseif ($request->filled('existing_document_id_pengangkatan')) {
+                    $existingDoc = \App\Models\Document::where('id', $request->input('existing_document_id_pengangkatan'))
+                        ->where('employee_id', $employee->id)
+                        ->first();
+                    if ($existingDoc) {
+                        $appointmentData['file_sk'] = $existingDoc->file_path;
+                        if (empty($appointmentData['no_sk']) && $existingDoc->nomor_dokumen) {
+                            $appointmentData['no_sk'] = $existingDoc->nomor_dokumen;
+                        }
+                        if (empty($appointmentData['tanggal_sk']) && $existingDoc->tanggal_dokumen) {
+                            $appointmentData['tanggal_sk'] = $existingDoc->tanggal_dokumen;
+                        }
+                    }
+                }
+
+                $appointment = $employee->appointment;
+                if ($appointment) {
+                    $appointment->update($appointmentData);
+                } else {
+                    $employee->appointment()->create($appointmentData);
+                }
+
+                $jenisPegawai = \App\Models\RefJenisPegawai::whereRaw('UPPER(nama) = ?', [
+                    strtoupper($validated['pengangkatan_jenis_pengangkatan']),
+                ])->first();
+                if ($jenisPegawai) {
+                    $employee->update(['jenis_pegawai_id' => $jenisPegawai->id]);
+                }
+            }
+
+            $employee->refresh();
+            AuditService::log('UPDATE', 'Employee', $employee->id, $oldValues, $employee->toArray(), $request);
+
+            return $employee;
+        });
     }
 }
