@@ -767,10 +767,10 @@
                                         </div>
                                     </div>
                                 </x-ui.table-td>
-                                <x-ui.table-td padding="sm" class="text-muted">{{ $doc['kategori_label'] }}</x-ui.table-td>
-                                <x-ui.table-td padding="sm" class="font-mono text-muted">{{ $doc['nomor'] }}</x-ui.table-td>
-                                <x-ui.table-td padding="sm" class="font-mono text-muted">{{ $doc['tanggal'] }}</x-ui.table-td>
-                                <x-ui.table-td padding="sm" class="font-mono text-muted">{{ $doc['file_size'] }}</x-ui.table-td>
+                                <x-ui.table-td padding="sm" class="text-muted">{{ \App\Support\Documents\DocumentCategory::label($doc->jenis_dokumen) }}</x-ui.table-td>
+                                <x-ui.table-td padding="sm" class="font-mono text-muted">{{ $doc->nomor_dokumen ?? '-' }}</x-ui.table-td>
+                                <x-ui.table-td padding="sm" class="font-mono text-muted">{{ $doc->tanggal_dokumen ? \Carbon\Carbon::parse($doc->tanggal_dokumen)->format('d-m-Y') : '-' }}</x-ui.table-td>
+                                <x-ui.table-td padding="sm" class="font-mono text-muted">{{ $doc->fileSizeLabel() }}</x-ui.table-td>
                                 <x-ui.table-td align="right" padding="sm">
                                     <div class="flex items-center justify-end gap-2.5">
                                         <a href="/dashboard/dokumen/{{ $doc['id'] }}" class="inline-flex items-center gap-1 font-semibold text-primary hover:underline font-sans">

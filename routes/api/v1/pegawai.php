@@ -76,21 +76,27 @@ Route::middleware($employeeGroupMiddleware)
             ->name('disiplin.store');
         Route::get('/{employee}/riwayat-kepangkatan', [RankHistoryController::class, 'index'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_histories.read'])
+            ->whereUuid('employee')
             ->name('riwayat-kepangkatan.index');
         Route::post('/{employee}/riwayat-kepangkatan', [RankHistoryController::class, 'store'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_histories.create'])
+            ->whereUuid('employee')
             ->name('riwayat-kepangkatan.store');
         Route::get('/{employee}/riwayat-jabatan', [PositionHistoryController::class, 'index'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_histories.read'])
+            ->whereUuid('employee')
             ->name('riwayat-jabatan.index');
         Route::post('/{employee}/riwayat-jabatan', [PositionHistoryController::class, 'store'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_histories.create'])
+            ->whereUuid('employee')
             ->name('riwayat-jabatan.store');
         Route::get('/{employee}/riwayat-kgb', [KgbHistoryController::class, 'index'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_histories.read'])
+            ->whereUuid('employee')
             ->name('riwayat-kgb.index');
         Route::post('/{employee}/riwayat-kgb', [KgbHistoryController::class, 'store'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_histories.create'])
+            ->whereUuid('employee')
             ->name('riwayat-kgb.store');
         Route::post('/{employee}/assign-atasan', [EmployeeController::class, 'assignSupervisor'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.update', 'role:super_admin'])

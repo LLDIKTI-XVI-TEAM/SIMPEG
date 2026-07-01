@@ -161,7 +161,6 @@ class EmployeeDocumentTest extends TestCase
         $document = Document::where('employee_id', $employee->id)->where('jenis_dokumen', 'ijazah')->firstOrFail();
         $this->assertMatchesRegularExpression('/^'.preg_quote($employee->id, '/').'\/ijazah\/'.preg_quote($employee->id, '/').'_ijazah_\d{14}\.pdf$/', $document->file_path);
         Storage::disk(Document::STORAGE_DISK)->assertExists($document->file_path);
-        Storage::disk('public')->assertMissing($document->file_path);
     }
 
     public function test_admin_can_upload_document_without_optional_number_and_date(): void

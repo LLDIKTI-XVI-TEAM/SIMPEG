@@ -134,7 +134,6 @@
                     'group' => 'Kepegawaian',
                     'items' => [
                         ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users'],
-                        ['label' => 'Import Pegawai', 'route' => 'pegawai.import', 'icon' => 'arrow-up-tray'],
                         ['label' => 'Data Nonaktif', 'route' => 'data-nonaktif', 'icon' => 'user-minus'],
                         ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open'],
                     ]

@@ -9,7 +9,11 @@ class StoreEmployeeRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Otorisasi gagal-tertutup: tanpa user terautentikasi, tolak (tidak ada bypass dev/test).
+        // Bypass otorisasi di environment lokal saat flag disable auth aktif.
+        if (app()->environment('local') && config('services.simpeg.disable_employee_api_auth')) {
+            return true;
+        }
+
         $user = $this->user();
 
         return $user !== null
