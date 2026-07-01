@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureKeycloakAuthenticated;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsureRole;
+use App\Http\Middleware\SessionTimeoutMessage;
 use App\Models\EwsConfig;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
@@ -27,6 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'keycloak.auth' => EnsureKeycloakAuthenticated::class,
             'permission' => EnsurePermission::class,
             'role' => EnsureRole::class,
+            'session.timeout' => SessionTimeoutMessage::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

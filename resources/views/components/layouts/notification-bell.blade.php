@@ -5,21 +5,30 @@
         loading: false,
         unreadCount: 0,
         notifications: [],
+        pollingTimer: null,
         endpoint: @js(route('api.v1.notifikasi.index')),
         markAllEndpoint: @js(route('api.v1.notifikasi.tandai-semua-dibaca')),
         markEndpointTemplate: @js(route('api.v1.notifikasi.tandai-dibaca', ['notificationId' => '__ID__'])),
         csrf: document.querySelector('meta[name=csrf-token]')?.content ?? '',
         init() {
             this.load();
-            setInterval(() => this.load(), 30000);
+            this.pollingTimer = setInterval(() => this.load(), 30000);
         },
         async load() {
+            if (this.pollingTimer === false) return;
+
             this.loading = true;
             try {
                 const response = await fetch(this.endpoint, {
                     headers: { Accept: 'application/json' },
                     credentials: 'same-origin'
                 });
+                if (response.status === 401) {
+                    // Session timeout sudah diproses server; hentikan polling agar fetch berikutnya tidak mengikuti redirect SSO.
+                    clearInterval(this.pollingTimer);
+                    this.pollingTimer = false;
+                    return;
+                }
                 if (!response.ok) return;
                 const payload = await response.json();
                 this.notifications = (payload.data ?? []).slice(0, 10);
