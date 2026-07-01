@@ -2,27 +2,63 @@
 
 namespace App\Services;
 
+use App\Jobs\SendSimpegNotificationEmailJob;
 use App\Models\Employee;
 use App\Models\SimpegNotification;
+use App\Services\Notifications\NotificationRecipientResolver;
 use Illuminate\Database\Eloquent\Collection;
 
 class NotificationService
 {
+    public function __construct(private readonly NotificationRecipientResolver $recipients) {}
+
     /**
-     * Membuat notifikasi in-app untuk satu pegawai penerima.
-     * Email/queue sengaja belum dikirim di Sprint 1 agar channel tidak tercampur.
+     * Membuat notifikasi in-app untuk satu pegawai penerima dan menjadwalkan email bila event memiliki channel email.
+     * Email dikirim lewat queue agar request utama tidak menunggu SMTP.
      *
      * @param  array<string, mixed>|null  $data
      */
     public function createForEmployee(Employee $employee, string $type, string $title, string $body, ?array $data = null): SimpegNotification
     {
-        return SimpegNotification::create([
+        $notification = SimpegNotification::create([
             'user_id' => $employee->id,
             'type' => $type,
             'title' => $title,
             'body' => $body,
             'data' => $data,
         ]);
+
+        $this->dispatchEmails($employee, $type, $title, $body, $data);
+
+        return $notification;
+    }
+
+    /**
+     * Menjadwalkan email untuk event yang aktif channel email tanpa mengubah kontrak in-app notification.
+     *
+     * @param  array<string, mixed>|null  $data
+     */
+    private function dispatchEmails(Employee $primaryRecipient, string $type, string $title, string $body, ?array $data): void
+    {
+        if (! $this->recipients->emailEnabled($type)) {
+            return;
+        }
+
+        $emailRecipients = collect();
+
+        if ($this->recipients->shouldEmailPrimaryRecipient($type, $data)) {
+            $emailRecipients->push($primaryRecipient);
+        }
+
+        $emailRecipients = $emailRecipients
+            ->merge($this->recipients->additionalRecipients($primaryRecipient, $type, $data))
+            ->filter(fn (Employee $employee): bool => $employee->email !== null && $employee->email !== '')
+            ->unique('id')
+            ->values();
+
+        foreach ($emailRecipients as $recipient) {
+            SendSimpegNotificationEmailJob::dispatch($recipient->id, $title, $body, $data)->afterCommit();
+        }
     }
 
     /**
