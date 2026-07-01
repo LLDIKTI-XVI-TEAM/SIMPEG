@@ -12,7 +12,7 @@ class StoreEmployeeHistoryAction
     /**
      * Menyimpan riwayat pegawai tambahan, seperti pendidikan.
      */
-    public function execute(Employee , Request )
+    public function execute(Employee $employee, Request $request)
     {
         return DB::transaction(function () use ($employee, $request) {
             $type = $request->input('type');
