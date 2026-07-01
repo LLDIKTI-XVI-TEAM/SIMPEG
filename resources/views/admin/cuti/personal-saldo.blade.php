@@ -15,68 +15,44 @@
         <!-- Metrics Grid -->
         <div class="grid gap-5 md:grid-cols-4">
             <!-- Jatah Awal -->
-            <div class="relative overflow-hidden rounded-xl border border-border bg-surface p-5 shadow-sm transition-all duration-200 hover:shadow-md">
-                <div class="flex items-center justify-between">
-                    <p class="text-sm font-medium text-muted">Jatah Cuti</p>
-                    <div class="rounded-lg bg-primary/10 p-2 text-primary">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                    </div>
-                </div>
-                <div class="mt-4 flex items-baseline gap-2">
-                    <span class="text-3xl font-bold text-ink">{{ $balance->jatah_awal }}</span>
-                    <span class="text-sm text-muted">hari kerja</span>
-                </div>
-            </div>
+            <x-ui.stat-card label="Jatah Cuti" value="{{ $balance->jatah_awal }}" variant="primary" size="lg" label-class="normal-case tracking-normal text-sm font-medium" value-class="text-ink">
+                <x-slot:icon>
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                </x-slot:icon>
+                <span class="text-sm text-muted normal-case tracking-normal">hari kerja</span>
+            </x-ui.stat-card>
 
             <!-- Carry Over -->
-            <div class="relative overflow-hidden rounded-xl border border-border bg-surface p-5 shadow-sm transition-all duration-200 hover:shadow-md">
-                <div class="flex items-center justify-between">
-                    <p class="text-sm font-medium text-muted">Carry Over ({{ $balance->tahun - 1 }})</p>
-                    <div class="rounded-lg bg-info/10 p-2 text-info">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </div>
-                </div>
-                <div class="mt-4 flex items-baseline gap-2">
-                    <span class="text-3xl font-bold text-ink">{{ $balance->carry_over }}</span>
-                    <span class="text-sm text-muted">hari</span>
-                </div>
-            </div>
+            <x-ui.stat-card label="Carry Over ({{ $balance->tahun - 1 }})" value="{{ $balance->carry_over }}" variant="info" size="lg" label-class="normal-case tracking-normal text-sm font-medium" value-class="text-ink">
+                <x-slot:icon>
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </x-slot:icon>
+                <span class="text-sm text-muted normal-case tracking-normal">hari</span>
+            </x-ui.stat-card>
 
             <!-- Terpakai -->
-            <div class="relative overflow-hidden rounded-xl border border-border bg-surface p-5 shadow-sm transition-all duration-200 hover:shadow-md">
-                <div class="flex items-center justify-between">
-                    <p class="text-sm font-medium text-muted">Cuti Terpakai</p>
-                    <div class="rounded-lg bg-warning/10 p-2 text-warning">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </div>
-                </div>
-                <div class="mt-4 flex items-baseline gap-2">
-                    <span class="text-3xl font-bold text-ink text-warning">{{ $balance->terpakai }}</span>
-                    <span class="text-sm text-muted">hari</span>
-                </div>
-            </div>
+            <x-ui.stat-card label="Cuti Terpakai" value="{{ $balance->terpakai }}" variant="warning" size="lg" label-class="normal-case tracking-normal text-sm font-medium">
+                <x-slot:icon>
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </x-slot:icon>
+                <span class="text-sm text-muted normal-case tracking-normal">hari</span>
+            </x-ui.stat-card>
 
             <!-- Sisa -->
-            <div class="relative overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-surface to-primary/5 p-5 shadow-sm transition-all duration-200 hover:shadow-md">
-                <div class="flex items-center justify-between">
-                    <p class="text-sm font-semibold text-primary">Sisa Saldo Cuti</p>
-                    <div class="rounded-lg bg-primary p-2 text-white">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </div>
-                </div>
-                <div class="mt-4 flex items-baseline gap-2">
-                    <span class="text-3xl font-extrabold text-primary">{{ $balance->sisa }}</span>
-                    <span class="text-sm font-semibold text-primary/80">hari</span>
-                </div>
-            </div>
+            <x-ui.stat-card label="Sisa Saldo Cuti" value="{{ $balance->sisa }}" variant="primary" size="lg" surface="soft" label-class="normal-case tracking-normal text-sm font-semibold text-primary">
+                <x-slot:icon>
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </x-slot:icon>
+                <span class="text-sm font-semibold text-primary/80 normal-case tracking-normal">hari</span>
+            </x-ui.stat-card>
         </div>
 
         <!-- History -->
@@ -87,59 +63,55 @@
             </div>
 
             <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="bg-muted/5 text-xs font-semibold text-muted border-b border-border">
-                            <th class="px-5 py-3">Jenis Cuti</th>
-                            <th class="px-5 py-3">Tanggal Pelaksanaan</th>
-                            <th class="px-5 py-3 text-center">Durasi</th>
-                            <th class="px-5 py-3">Alasan</th>
-                            <th class="px-5 py-3 text-center">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border text-sm text-ink">
+                <x-ui.table class="text-left border-collapse">
+                    <x-ui.table-head>
+                        <x-ui.table-row class="bg-muted/5 border-b border-border">
+                            <x-ui.table-th class="px-5 py-3">Jenis Cuti</x-ui.table-th>
+                            <x-ui.table-th class="px-5 py-3">Tanggal Pelaksanaan</x-ui.table-th>
+                            <x-ui.table-th align="center" class="px-5 py-3">Durasi</x-ui.table-th>
+                            <x-ui.table-th class="px-5 py-3">Alasan</x-ui.table-th>
+                            <x-ui.table-th align="center" class="px-5 py-3">Status</x-ui.table-th>
+                        </x-ui.table-row>
+                    </x-ui.table-head>
+                    <x-ui.table-body class="text-sm text-ink">
                         @forelse($history as $r)
-                            <tr class="hover:bg-muted/5 transition-colors">
-                                <td class="px-5 py-3.5 font-medium">{{ $r->jenisCuti?->nama }}</td>
-                                <td class="px-5 py-3.5">
+                            <x-ui.table-row :interactive="true" class="hover:bg-muted/5">
+                                <x-ui.table-td padding="wide" class="font-medium">{{ $r->jenisCuti?->nama }}</x-ui.table-td>
+                                <x-ui.table-td padding="wide">
                                     <div class="font-semibold">{{ $r->tanggal_mulai->translatedFormat('d M Y') }}</div>
                                     <div class="text-xs text-muted">s/d {{ $r->tanggal_selesai->translatedFormat('d M Y') }}</div>
-                                </td>
-                                <td class="px-5 py-3.5 text-center font-medium">{{ $r->jumlah_hari_kerja }} hari</td>
-                                <td class="px-5 py-3.5 max-w-xs truncate" title="{{ $r->alasan }}">{{ $r->alasan }}</td>
-                                <td class="px-5 py-3.5 text-center">
-                                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold
-                                        @if($r->status === 'Disetujui') bg-success/10 text-success
-                                        @elseif($r->status === 'Ditunda') bg-warning/10 text-warning
-                                        @elseif($r->status === 'Draft') bg-muted text-muted-foreground
-                                        @else bg-primary/10 text-primary
-                                        @endif
-                                    ">
-                                        <span class="h-1.5 w-1.5 rounded-full
-                                            @if($r->status === 'Disetujui') bg-success
-                                            @elseif($r->status === 'Ditunda') bg-warning
-                                            @elseif($r->status === 'Draft') bg-muted-foreground
-                                            @else bg-primary
-                                            @endif
-                                        "></span>
+                                </x-ui.table-td>
+                                <x-ui.table-td align="center" padding="wide" class="font-medium">{{ $r->jumlah_hari_kerja }} hari</x-ui.table-td>
+                                <x-ui.table-td title="{{ $r->alasan }}" padding="wide" class="max-w-xs truncate">{{ $r->alasan }}</x-ui.table-td>
+                                <x-ui.table-td align="center" padding="wide">
+                                    <x-ui.badge
+                                        :variant="match ($r->status) {
+                                            'Disetujui' => 'success',
+                                            'Ditunda' => 'warning',
+                                            'Draft' => 'muted',
+                                            default => 'primary',
+                                        }"
+                                        size="md"
+                                        dot
+                                    >
                                         {{ $r->status }}
-                                    </span>
-                                </td>
-                            </tr>
+                                    </x-ui.badge>
+                                </x-ui.table-td>
+                            </x-ui.table-row>
                         @empty
-                            <tr>
-                                <td colspan="5" class="px-5 py-10 text-center text-muted">
+                            <x-ui.table-row>
+                                <x-ui.table-td colspan="5" align="center" class="px-5 py-10 text-muted">
                                     <div class="flex flex-col items-center justify-center gap-2">
                                         <svg class="h-8 w-8 text-muted/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                                         </svg>
                                         <p>Belum ada riwayat pengajuan cuti.</p>
                                     </div>
-                                </td>
-                            </tr>
+                                </x-ui.table-td>
+                            </x-ui.table-row>
                         @endforelse
-                    </tbody>
-                </table>
+                    </x-ui.table-body>
+                </x-ui.table>
             </div>
 
             @if($history->hasPages())

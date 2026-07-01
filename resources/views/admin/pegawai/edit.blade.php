@@ -5,62 +5,37 @@
 
     <div class="mx-auto max-w-7xl space-y-6">
         
-        {{-- Breadcrumbs & Title --}}
-        <div class="flex flex-col gap-1.5">
-            <h2 class="text-2xl font-bold text-ink font-sans">Edit Data Pegawai</h2>
-            <nav class="flex items-center gap-1.5 text-xs text-muted">
+        <x-admin.page-header title="Edit Data Pegawai">
+            <x-slot:breadcrumb>
                 <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
                 <span>/</span>
                 <a href="{{ route('data-pegawai') }}" class="transition-colors hover:text-ink">Data Pegawai</a>
                 <span>/</span>
                 <span class="font-medium text-ink">Edit</span>
-            </nav>
-        </div>
+            </x-slot:breadcrumb>
+        </x-admin.page-header>
 
         {{-- Session Error --}}
         @if (session('error'))
-            <div class="rounded-lg bg-red-50 p-4 border border-red-200">
-                <div class="flex">
-                    <div class="flex-shrink-0">
-                        <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
-                        </svg>
-                    </div>
-                    <div class="ml-3">
-                        <h3 class="text-sm font-medium text-red-800">Gagal Menyimpan:</h3>
-                        <div class="mt-2 text-sm text-red-700">
-                            <p>{{ session('error') }}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <x-ui.alert variant="danger" title="Gagal Menyimpan">
+                {{ session('error') }}
+            </x-ui.alert>
         @endif
 
         {{-- Validation Errors --}}
         @if ($errors->any())
-            <div class="rounded-lg bg-red-50 p-4 border border-red-200">
-                <div class="flex">
-                    <div class="flex-shrink-0">
-                        <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
-                        </svg>
-                    </div>
-                    <div class="ml-3">
-                        <h3 class="text-sm font-medium text-red-800">Terdapat kesalahan pengisian form:</h3>
-                        <div class="mt-2 text-sm text-red-700">
-                            <ul role="list" class="list-disc space-y-1 pl-5">
-                                @foreach ($errors->all() as $error)
-                                    <li>{{ $error }}</li>
-                                @endforeach
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <x-ui.alert variant="danger" title="Terdapat kesalahan pengisian form">
+                <ul role="list" class="list-disc space-y-1 pl-5">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </x-ui.alert>
         @endif
 
         {{-- Form Card --}}
-        <div class="rounded-lg border border-border bg-surface p-6 shadow-sm" x-data="{
+        <x-ui.card padding="lg">
+            <div x-data="{
             activeTab: 'utama',
             nip: '{{ $p->nip ?? '' }}',
             nipError: '',
@@ -202,45 +177,37 @@
         }">
             
             {{-- Tab Bar Navigasi --}}
-            <div class="border-b border-border flex flex-wrap gap-4 md:gap-6 mb-6">
-                <button type="button" @click="
+            <x-ui.tabs label="Tahapan form pegawai" class="mb-6 flex-wrap">
+                <x-ui.tab active="activeTab === 'utama'" click="
                     if (activeTab === 'pelengkap' && !validatePelengkap()) return;
                     if (activeTab === 'kontak' && !validateKontak()) return;
                     activeTab = 'utama';
-                "
-                        :class="activeTab === 'utama' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'"
-                        class="text-sm transition-colors cursor-pointer focus:outline-none font-sans">
+                ">
                     1. Data Utama
-                </button>
-                <button type="button" @click="
+                </x-ui.tab>
+                <x-ui.tab active="activeTab === 'pelengkap'" click="
                     if (activeTab === 'utama' && !validateUtama()) return;
                     if (activeTab === 'kontak' && !validateKontak()) return;
                     activeTab = 'pelengkap';
-                "
-                        :class="activeTab === 'pelengkap' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'"
-                        class="text-sm transition-colors cursor-pointer focus:outline-none font-sans">
+                ">
                     2. Data Pelengkap
-                </button>
-                <button type="button" @click="
+                </x-ui.tab>
+                <x-ui.tab active="activeTab === 'kontak'" click="
                     if (activeTab === 'utama' && !validateUtama()) return;
                     if (activeTab === 'pelengkap' && !validatePelengkap()) return;
                     activeTab = 'kontak';
-                "
-                        :class="activeTab === 'kontak' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'"
-                        class="text-sm transition-colors cursor-pointer focus:outline-none font-sans">
+                ">
                     3. Data Kontak
-                </button>
-                <button type="button" @click="
+                </x-ui.tab>
+                <x-ui.tab active="activeTab === 'pengangkatan'" click="
                     if (activeTab === 'utama' && !validateUtama()) return;
                     if (activeTab === 'pelengkap' && !validatePelengkap()) return;
                     if (activeTab === 'kontak' && !validateKontak()) return;
                     activeTab = 'pengangkatan';
-                "
-                        :class="activeTab === 'pengangkatan' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'"
-                        class="text-sm transition-colors cursor-pointer focus:outline-none font-sans">
+                ">
                     4. Berkas & SK Pengangkatan
-                </button>
-            </div>
+                </x-ui.tab>
+            </x-ui.tabs>
 
             <form action="{{ route('pegawai.update', $p->id) }}" method="POST" enctype="multipart/form-data" class="space-y-6" novalidate>
                 @csrf
@@ -249,41 +216,54 @@
                 <div x-show="activeTab === 'utama'" class="space-y-6" x-transition>
                     <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                         {{-- Nama Lengkap --}}
-                        <div class="space-y-1">
-                            <label for="nama_lengkap" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Lengkap <span class="text-danger">*</span></label>
-                            <input id="nama_lengkap" name="nama_lengkap" type="text" required placeholder="Ahmad Fauzi, S.Kom." class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->nama_lengkap }}" >
-                        </div>
+                        <x-form.input
+                            name="nama_lengkap"
+                            label="Nama Lengkap"
+                            type="text"
+                            id="nama_lengkap"
+                            value="{{ $p->nama_lengkap }}"
+                            placeholder="Ahmad Fauzi, S.Kom."
+                            required
+                        />
 
                         {{-- NIP --}}
-                        <div class="space-y-1">
-                            <label for="nip" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">NIP <span class="text-danger">*</span></label>
-                            <input id="nip" name="nip" type="text" required maxlength="18" x-model="nip" @input="validateNip" value="{{ $p->nip }}" placeholder="198503122010011001" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                        <x-form.input
+                            name="nip"
+                            label="NIP"
+                            type="text"
+                            id="nip"
+                            value="{{ $p->nip }}"
+                            placeholder="198503122010011001"
+                            maxlength="18"
+                            x-model="nip"
+                            x-on:input="validateNip"
+                            required
+                        >
                             <p x-show="nipError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="nipError"></p>
-                        </div>
+                        </x-form.input>
 
                         {{-- Status Kepegawaian (Jenis) --}}
-                        <div class="space-y-1">
-                            <label for="jenis_pegawai_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Status Kepegawaian <span class="text-danger">*</span></label>
-                            <div class="relative">
-                                <select id="jenis_pegawai_id" name="jenis_pegawai_id" required class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="" disabled {{ empty($p->jenis_pegawai_id) ? 'selected' : '' }}>Pilih Status Kepegawaian</option>
-                                    @foreach($jenisPegawai as $jenis)
-                                        <option value="{{ $jenis->id }}" {{ $p->jenis_pegawai_id == $jenis->id ? 'selected' : '' }}>{{ $jenis->nama }}</option>
-                                    @endforeach
-                                </select>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
+                        <x-form.select
+                            name="jenis_pegawai_id"
+                            label="Status Kepegawaian"
+                            id="jenis_pegawai_id"
+                            required
+                        >
+                            <option value="" disabled {{ empty($p->jenis_pegawai_id) ? 'selected' : '' }}>Pilih Status Kepegawaian</option>
+                            @foreach($jenisPegawai as $jenis)
+                                <option value="{{ $jenis->id }}" {{ $p->jenis_pegawai_id == $jenis->id ? 'selected' : '' }}>{{ $jenis->nama }}</option>
+                            @endforeach
+                        </x-form.select>
 
                         {{-- Tanggal Lahir --}}
-                        <div class="space-y-1">
-                            <label for="tanggal_lahir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Lahir <span class="text-danger">*</span></label>
-                            <input id="tanggal_lahir" name="tanggal_lahir" type="date" required max="{{ date('Y-m-d') }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" value="{{ $p->tanggal_lahir ? \Carbon\Carbon::parse($p->tanggal_lahir)->format('Y-m-d') : '' }}" >
-                        </div>
+                        <x-form.date
+                            name="tanggal_lahir"
+                            label="Tanggal Lahir"
+                            id="tanggal_lahir"
+                            value="{{ $p->tanggal_lahir ? \Carbon\Carbon::parse($p->tanggal_lahir)->format('Y-m-d') : '' }}"
+                            max="{{ date('Y-m-d') }}"
+                            required
+                        />
 
                         {{-- Golongan --}}
                         <div class="space-y-1" x-data="{ open: false, selected: '{{ $p->golongan_terakhir ?? 'I/a' }}' }">
@@ -310,55 +290,72 @@
                         </div>
 
                         {{-- Pangkat --}}
-                        <div class="space-y-1">
-                            <label for="pangkat_terakhir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Pangkat <span class="text-danger">*</span></label>
-                            <input id="pangkat_terakhir" name="pangkat_terakhir" type="text" required placeholder="Penata Tkt. I" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->pangkat_terakhir }}" >
-                        </div>
+                        <x-form.input
+                            name="pangkat_terakhir"
+                            label="Pangkat"
+                            type="text"
+                            id="pangkat_terakhir"
+                            value="{{ $p->pangkat_terakhir }}"
+                            placeholder="Penata Tkt. I"
+                            required
+                        />
 
                         {{-- Jabatan --}}
-                        <div class="space-y-1">
-                            <label for="jabatan_terakhir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jabatan <span class="text-danger">*</span></label>
-                            <input id="jabatan_terakhir" name="jabatan_terakhir" type="text" required placeholder="Analis Kepegawaian" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->jabatan_terakhir }}" >
-                        </div>
+                        <x-form.input
+                            name="jabatan_terakhir"
+                            label="Jabatan"
+                            type="text"
+                            id="jabatan_terakhir"
+                            value="{{ $p->jabatan_terakhir }}"
+                            placeholder="Analis Kepegawaian"
+                            required
+                        />
 
                         {{-- Kelas Jabatan --}}
-                        <div class="space-y-1">
-                            <label for="kelas_jabatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Kelas Jabatan <span class="text-danger">*</span></label>
-                            <input id="kelas_jabatan" name="kelas_jabatan" type="text" required placeholder="8" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->kelas_jabatan }}" >
-                        </div>
+                        <x-form.input
+                            name="kelas_jabatan"
+                            label="Kelas Jabatan"
+                            type="text"
+                            id="kelas_jabatan"
+                            value="{{ $p->kelas_jabatan }}"
+                            placeholder="8"
+                            required
+                        />
 
                         {{-- Pendidikan Terakhir --}}
-                        <div class="space-y-1">
-                            <label for="pendidikan_terakhir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Pendidikan Terakhir <span class="text-danger">*</span></label>
-                            <div class="relative">
-                                <select id="pendidikan_terakhir" name="pendidikan_terakhir" required class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="Diploma III (D3)" {{ $p->pendidikan_terakhir == 'Diploma III (D3)' ? 'selected' : '' }}>Diploma III (D3)</option>
-                                    <option value="Sarjana (S1)" {{ $p->pendidikan_terakhir == 'Sarjana (S1)' ? 'selected' : '' }}>Sarjana (S1)</option>
-                                    <option value="Magister (S2)" {{ $p->pendidikan_terakhir == 'Magister (S2)' ? 'selected' : '' }}>Magister (S2)</option>
-                                    <option value="Doktor (S3)" {{ $p->pendidikan_terakhir == 'Doktor (S3)' ? 'selected' : '' }}>Doktor (S3)</option>
-                                    <option value="SMA / Sederajat" {{ $p->pendidikan_terakhir == 'SMA / Sederajat' ? 'selected' : '' }}>SMA / Sederajat</option>
-                                </select>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
+                        <x-form.select
+                            name="pendidikan_terakhir"
+                            label="Pendidikan Terakhir"
+                            id="pendidikan_terakhir"
+                            required
+                        >
+                            <option value="Diploma III (D3)" {{ $p->pendidikan_terakhir == 'Diploma III (D3)' ? 'selected' : '' }}>Diploma III (D3)</option>
+                            <option value="Sarjana (S1)" {{ $p->pendidikan_terakhir == 'Sarjana (S1)' ? 'selected' : '' }}>Sarjana (S1)</option>
+                            <option value="Magister (S2)" {{ $p->pendidikan_terakhir == 'Magister (S2)' ? 'selected' : '' }}>Magister (S2)</option>
+                            <option value="Doktor (S3)" {{ $p->pendidikan_terakhir == 'Doktor (S3)' ? 'selected' : '' }}>Doktor (S3)</option>
+                            <option value="SMA / Sederajat" {{ $p->pendidikan_terakhir == 'SMA / Sederajat' ? 'selected' : '' }}>SMA / Sederajat</option>
+                        </x-form.select>
 
                         {{-- Program Studi --}}
-                        <div class="space-y-1">
-                            <label for="prodi_pendidikan_terakhir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Program Studi <span class="text-danger">*</span></label>
-                            <input id="prodi_pendidikan_terakhir" name="prodi_pendidikan_terakhir" type="text" required placeholder="Teknik Informatika" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->prodi_pendidikan_terakhir }}" >
-                        </div>
+                        <x-form.input
+                            name="prodi_pendidikan_terakhir"
+                            label="Program Studi"
+                            type="text"
+                            id="prodi_pendidikan_terakhir"
+                            value="{{ $p->prodi_pendidikan_terakhir }}"
+                            placeholder="Teknik Informatika"
+                            required
+                        />
 
                         
 
                         {{-- Tanggal Pensiun --}}
-                        <div class="space-y-1">
-                            <label for="tanggal_pensiun" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Pensiun</label>
-                            <input id="tanggal_pensiun" name="tanggal_pensiun" type="date" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" value="{{ $p->tanggal_pensiun ? \Carbon\Carbon::parse($p->tanggal_pensiun)->format('Y-m-d') : '' }}" >
-                        </div>
+                        <x-form.date
+                            name="tanggal_pensiun"
+                            label="Tanggal Pensiun"
+                            id="tanggal_pensiun"
+                            value="{{ $p->tanggal_pensiun ? \Carbon\Carbon::parse($p->tanggal_pensiun)->format('Y-m-d') : '' }}"
+                        />
                     </div>
                 </div>
 
@@ -366,94 +363,89 @@
                 <div x-show="activeTab === 'pelengkap'" class="space-y-6" style="display: none;" x-transition>
                     <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                         {{-- NIK --}}
-                        <div class="space-y-1">
-                            <label for="nik" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">NIK (No. KTP) <span class="text-danger">*</span></label>
-                            <input id="nik" name="nik" type="text" required maxlength="16" x-model="nik" @input="validateNik" placeholder="3273251203850002" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                        <x-form.input
+                            name="nik"
+                            label="NIK (No. KTP)"
+                            type="text"
+                            id="nik"
+                            placeholder="3273251203850002"
+                            maxlength="16"
+                            x-model="nik"
+                            x-on:input="validateNik"
+                            required
+                        >
                             <p x-show="nikError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="nikError"></p>
-                        </div>
+                        </x-form.input>
 
                         {{-- KK --}}
-                        <div class="space-y-1">
-                            <label for="no_kk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor Kartu Keluarga (KK)</label>
-                            <input id="no_kk" name="no_kk" type="text" maxlength="16" x-model="kk" @input="validateKk" placeholder="3273250102120045" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                        <x-form.input
+                            name="no_kk"
+                            label="Nomor Kartu Keluarga (KK)"
+                            type="text"
+                            id="no_kk"
+                            placeholder="3273250102120045"
+                            maxlength="16"
+                            x-model="kk"
+                            x-on:input="validateKk"
+                        >
                             <p x-show="kkError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="kkError"></p>
-                        </div>
+                        </x-form.input>
 
                         {{-- Tempat Lahir --}}
-                        <div class="space-y-1">
-                            <label for="tempat_lahir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tempat Lahir</label>
-                            <input id="tempat_lahir" name="tempat_lahir" type="text" placeholder="Bandung" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->tempat_lahir }}" >
-                        </div>
+                        <x-form.input
+                            name="tempat_lahir"
+                            label="Tempat Lahir"
+                            type="text"
+                            id="tempat_lahir"
+                            value="{{ $p->tempat_lahir }}"
+                            placeholder="Bandung"
+                        />
 
                         {{-- Jenis Kelamin --}}
-                        <div class="space-y-1">
-                            <label for="jenis_kelamin" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Kelamin</label>
-                            <div class="relative">
-                                <select id="jenis_kelamin" name="jenis_kelamin" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="L" {{ $p->jenis_kelamin == 'L' ? 'selected' : '' }}>Laki-laki</option>
-                                    <option value="P" {{ $p->jenis_kelamin == 'P' ? 'selected' : '' }}>Perempuan</option>
-                                </select>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
+                        <x-form.select
+                            name="jenis_kelamin"
+                            label="Jenis Kelamin"
+                            id="jenis_kelamin"
+                        >
+                            <option value="L" {{ $p->jenis_kelamin == 'L' ? 'selected' : '' }}>Laki-laki</option>
+                            <option value="P" {{ $p->jenis_kelamin == 'P' ? 'selected' : '' }}>Perempuan</option>
+                        </x-form.select>
 
                         {{-- Agama --}}
-                        <div class="space-y-1">
-                            <label for="agama_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Agama</label>
-                            <div class="relative">
-                                <select id="agama_id" name="agama_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="" disabled {{ empty($p->agama_id) ? 'selected' : '' }}>Pilih Agama</option>
-                                    @foreach($agama as $a)
-                                        <option value="{{ $a->id }}" {{ $p->agama_id == $a->id ? 'selected' : '' }}>{{ $a->nama }}</option>
-                                    @endforeach
-                                </select>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
+                        <x-form.select
+                            name="agama_id"
+                            label="Agama"
+                            id="agama_id"
+                        >
+                            <option value="" disabled {{ empty($p->agama_id) ? 'selected' : '' }}>Pilih Agama</option>
+                            @foreach($agama as $a)
+                                <option value="{{ $a->id }}" {{ $p->agama_id == $a->id ? 'selected' : '' }}>{{ $a->nama }}</option>
+                            @endforeach
+                        </x-form.select>
 
                         {{-- Status Pernikahan --}}
-                        <div class="space-y-1">
-                            <label for="status_kawin_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Status Kawin</label>
-                            <div class="relative">
-                                <select id="status_kawin_id" name="status_kawin_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="" disabled {{ empty($p->status_kawin_id) ? 'selected' : '' }}>Pilih Status Kawin</option>
-                                    @foreach($statusKawin as $sk)
-                                        <option value="{{ $sk->id }}" {{ $p->status_kawin_id == $sk->id ? 'selected' : '' }}>{{ $sk->nama }}</option>
-                                    @endforeach
-                                </select>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
+                        <x-form.select
+                            name="status_kawin_id"
+                            label="Status Kawin"
+                            id="status_kawin_id"
+                        >
+                            <option value="" disabled {{ empty($p->status_kawin_id) ? 'selected' : '' }}>Pilih Status Kawin</option>
+                            @foreach($statusKawin as $sk)
+                                <option value="{{ $sk->id }}" {{ $p->status_kawin_id == $sk->id ? 'selected' : '' }}>{{ $sk->nama }}</option>
+                            @endforeach
+                        </x-form.select>
 
                         {{-- Golongan Darah --}}
-                        <div class="space-y-1">
-                            <label for="golongan_darah" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Golongan Darah</label>
-                            <div class="relative">
-                                <select id="golongan_darah" name="golongan_darah" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="A" {{ $p->golongan_darah == 'A' ? 'selected' : '' }}>A</option>
-                                    <option value="B" {{ $p->golongan_darah == 'B' ? 'selected' : '' }}>B</option>
-                                    <option value="AB" {{ $p->golongan_darah == 'AB' ? 'selected' : '' }}>AB</option>
-                                    <option value="O" {{ $p->golongan_darah == 'O' ? 'selected' : '' }}>O</option>
-                                </select>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
+                        <x-form.select
+                            name="golongan_darah"
+                            label="Golongan Darah"
+                            id="golongan_darah"
+                        >
+                            <option value="A" {{ $p->golongan_darah == 'A' ? 'selected' : '' }}>A</option>
+                            <option value="B" {{ $p->golongan_darah == 'B' ? 'selected' : '' }}>B</option>
+                            <option value="AB" {{ $p->golongan_darah == 'AB' ? 'selected' : '' }}>AB</option>
+                            <option value="O" {{ $p->golongan_darah == 'O' ? 'selected' : '' }}>O</option>
+                        </x-form.select>
 
                         {{-- Upload Foto Profil --}}
                         <div class="space-y-2 sm:col-span-2 border-t border-border pt-4">
@@ -487,28 +479,48 @@
                 <div x-show="activeTab === 'kontak'" class="space-y-6" style="display: none;" x-transition>
                     <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                         {{-- Telepon Handphone --}}
-                        <div class="space-y-1">
-                            <label for="no_hp" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor HP <span class="text-danger">*</span></label>
-                            <input id="no_hp" name="no_hp" type="tel" required placeholder="081234567890" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->no_hp }}" >
-                        </div>
+                        <x-form.input
+                            name="no_hp"
+                            label="Nomor HP"
+                            type="tel"
+                            id="no_hp"
+                            value="{{ $p->no_hp }}"
+                            placeholder="081234567890"
+                            required
+                        />
 
                         {{-- Telepon Rumah --}}
-                        <div class="space-y-1">
-                            <label for="no_telepon_rumah" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Telepon Rumah</label>
-                            <input id="no_telepon_rumah" name="no_telepon_rumah" type="tel" placeholder="0227301234" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->no_telepon_rumah }}" >
-                        </div>
+                        <x-form.input
+                            name="no_telepon_rumah"
+                            label="Telepon Rumah"
+                            type="tel"
+                            id="no_telepon_rumah"
+                            value="{{ $p->no_telepon_rumah }}"
+                            placeholder="0227301234"
+                        />
 
                         {{-- Email Pribadi --}}
-                        <div class="space-y-1 sm:col-span-2">
-                            <label for="email" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Email Pribadi</label>
-                            <input id="email" name="email" type="email" placeholder="pegawai@domain.com" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->email }}" >
-                        </div>
+                        <x-form.input
+                            name="email"
+                            label="Email Pribadi"
+                            type="email"
+                            id="email"
+                            value="{{ $p->email }}"
+                            placeholder="pegawai@domain.com"
+                            wrapper-class="sm:col-span-2"
+                        />
 
                         {{-- Alamat Lengkap --}}
-                        <div class="space-y-1 sm:col-span-2">
-                            <label for="alamat" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Alamat Tempat Tinggal <span class="text-danger">*</span></label>
-                            <textarea id="alamat" name="alamat" rows="3" required placeholder="Jl. Buah Batu No. 120, Lengkong, Bandung" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans resize-none">{{ $p->alamat }}</textarea>
-                        </div>
+                        <x-form.textarea
+                            name="alamat"
+                            label="Alamat Tempat Tinggal"
+                            id="alamat"
+                            rows="3"
+                            value="{{ $p->alamat }}"
+                            placeholder="Jl. Buah Batu No. 120, Lengkong, Bandung"
+                            wrapper-class="sm:col-span-2"
+                            required
+                        />
                     </div>
                 </div>
 
@@ -516,40 +528,46 @@
                 <div x-show="activeTab === 'pengangkatan'" class="space-y-6" style="display: none;" x-transition>
                     <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                         {{-- Jenis Pengangkatan --}}
-                        <div class="space-y-1">
-                            <label for="jenis_pengangkatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Pengangkatan <span class="text-danger">*</span></label>
-                            <div class="relative">
-                                <select id="jenis_pengangkatan" name="jenis_pengangkatan" required class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="" disabled {{ empty($p->appointment->jenis_pengangkatan) ? 'selected' : '' }}>Pilih Jenis Pengangkatan</option>
-                                    <option value="CPNS" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'CPNS' ? 'selected' : '' }}>CPNS</option>
-                                    <option value="PNS" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'PNS' ? 'selected' : '' }}>PNS</option>
-                                    <option value="PPPK" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'PPPK' ? 'selected' : '' }}>PPPK</option>
-                                </select>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
+                        <x-form.select
+                            name="jenis_pengangkatan"
+                            label="Jenis Pengangkatan"
+                            id="jenis_pengangkatan"
+                            required
+                        >
+                            <option value="" disabled {{ empty($p->appointment->jenis_pengangkatan) ? 'selected' : '' }}>Pilih Jenis Pengangkatan</option>
+                            <option value="CPNS" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'CPNS' ? 'selected' : '' }}>CPNS</option>
+                            <option value="PNS" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'PNS' ? 'selected' : '' }}>PNS</option>
+                            <option value="PPPK" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'PPPK' ? 'selected' : '' }}>PPPK</option>
+                        </x-form.select>
 
                         {{-- TMT --}}
-                        <div class="space-y-1">
-                            <label for="tmt" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Pengangkatan <span class="text-danger">*</span></label>
-                            <input id="tmt" name="tmt" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" value="{{ $p->appointment ? \Carbon\Carbon::parse($p->appointment->tmt_pengangkatan)->format('Y-m-d') : '' }}" >
-                        </div>
+                        <x-form.date
+                            name="tmt"
+                            label="TMT Pengangkatan"
+                            id="tmt"
+                            value="{{ $p->appointment ? \Carbon\Carbon::parse($p->appointment->tmt_pengangkatan)->format('Y-m-d') : '' }}"
+                            required
+                        />
 
                         {{-- Nomor SK --}}
-                        <div class="space-y-1">
-                            <label for="nomor_sk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Pengangkatan <span class="text-danger">*</span></label>
-                            <input id="nomor_sk" name="nomor_sk" type="text" required placeholder="SK-882-KP-2024" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->appointment ? $p->appointment->no_sk : '' }}" >
-                        </div>
+                        <x-form.input
+                            name="nomor_sk"
+                            label="Nomor SK Pengangkatan"
+                            type="text"
+                            id="nomor_sk"
+                            value="{{ $p->appointment ? $p->appointment->no_sk : '' }}"
+                            placeholder="SK-882-KP-2024"
+                            required
+                        />
 
                         {{-- Tanggal SK --}}
-                        <div class="space-y-1">
-                            <label for="tanggal_sk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK Terbit <span class="text-danger">*</span></label>
-                            <input id="tanggal_sk" name="tanggal_sk" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" value="{{ $p->appointment && $p->appointment->tanggal_sk ? \Carbon\Carbon::parse($p->appointment->tanggal_sk)->format('Y-m-d') : '' }}" >
-                        </div>
+                        <x-form.date
+                            name="tanggal_sk"
+                            label="Tanggal SK Terbit"
+                            id="tanggal_sk"
+                            value="{{ $p->appointment && $p->appointment->tanggal_sk ? \Carbon\Carbon::parse($p->appointment->tanggal_sk)->format('Y-m-d') : '' }}"
+                            required
+                        />
 
                         {{-- Upload File SK --}}
                         <div class="space-y-1 sm:col-span-2 border-t border-border pt-4">
@@ -634,7 +652,8 @@
                     </div>
                 </div>
             </form>
-        </div>
+            </div>
+        </x-ui.card>
     </div>
 
     @push('scripts')

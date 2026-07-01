@@ -131,71 +131,50 @@
         }
     }" class="space-y-6">
 
-        {{-- PAGE HEADER --}}
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between border-b border-border pb-4">
-            <div>
-                <h2 class="text-2xl font-bold text-ink font-sans leading-tight">Pengaturan Sistem</h2>
-                <nav class="mt-1 flex items-center gap-1.5 text-xs text-muted">
+        <x-admin.page-header title="Pengaturan Sistem" class="border-b border-border pb-4">
+            <x-slot:breadcrumb>
                     <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
                     <span>/</span>
                     <span class="font-medium text-ink font-sans">Pengaturan</span>
                     <span>•</span>
                     <span class="text-muted italic">Akses: Khusus Super Admin</span>
-                </nav>
-            </div>
-            <div class="flex flex-wrap items-center gap-2 text-xs">
+            </x-slot:breadcrumb>
+            <x-slot:actions>
                 <span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-info">
                     🔒 Audit Trail Aktif
                 </span>
-            </div>
-        </div>
+            </x-slot:actions>
+        </x-admin.page-header>
 
         {{-- NOTIFICATIONS --}}
         @if(session('success'))
-            <div class="rounded-lg border border-success/20 bg-success/10 p-4 text-sm font-semibold text-success flex items-center gap-2 shadow-sm">
-                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span>{{ session('success') }}</span>
-            </div>
+            <x-ui.alert variant="success" class="font-semibold shadow-sm">{{ session('success') }}</x-ui.alert>
         @endif
 
         <div class="flex flex-col lg:flex-row gap-6">
             
             {{-- Tab Sidebar Kiri --}}
             <aside class="w-full lg:w-64 shrink-0">
-                <div class="rounded-lg border border-border bg-surface p-4 shadow-sm space-y-1">
+                <x-ui.card padding="sm" class="space-y-1">
                     <p class="text-[10px] font-bold text-muted uppercase tracking-wide px-3 pb-2 border-b border-border mb-2 font-sans">Kategori Pengaturan</p>
                     
-                    <button
-                        @click="activeTab = 'umum'"
-                        :class="activeTab === 'umum' ? 'bg-primary text-white font-semibold' : 'text-muted hover:bg-soft hover:text-ink font-medium'"
-                        class="w-full text-left px-4 py-3 text-sm rounded-lg transition-colors duration-200 focus:outline-none cursor-pointer flex items-center justify-between"
-                    >
-                        <span>Umum & Instansi</span>
-                    </button>
-                    
-                    <button
-                        @click="activeTab = 'cuti'"
-                        :class="activeTab === 'cuti' ? 'bg-primary text-white font-semibold' : 'text-muted hover:bg-soft hover:text-ink font-medium'"
-                        class="w-full text-left px-4 py-3 text-sm rounded-lg transition-colors duration-200 focus:outline-none cursor-pointer flex items-center justify-between"
-                    >
-                        <span>Alur Approval Cuti</span>
-                    </button>
-                    
-                    <button
-                        @click="activeTab = 'rbac'"
-                        :class="activeTab === 'rbac' ? 'bg-primary text-white font-semibold' : 'text-muted hover:bg-soft hover:text-ink font-medium'"
-                        class="w-full text-left px-4 py-3 text-sm rounded-lg transition-colors duration-200 focus:outline-none cursor-pointer flex items-center justify-between"
-                    >
-                        <span>Pemetaan SSO & RBAC</span>
-                    </button>
-                    
-                    <button
-                        @click="activeTab = 'master'"
-                        :class="activeTab === 'master' ? 'bg-primary text-white font-semibold' : 'text-muted hover:bg-soft hover:text-ink font-medium'"
-                        class="w-full text-left px-4 py-3 text-sm rounded-lg transition-colors duration-200 focus:outline-none cursor-pointer flex items-center justify-between"
-                    >
-                        <span>Kamus Data Master</span>
-                    </button>
+                    <x-ui.tabs variant="sidebar" label="Kategori pengaturan sistem">
+                        <x-ui.tab variant="sidebar" active="activeTab === 'umum'" click="activeTab = 'umum'">
+                            <span>Umum & Instansi</span>
+                        </x-ui.tab>
+
+                        <x-ui.tab variant="sidebar" active="activeTab === 'cuti'" click="activeTab = 'cuti'">
+                            <span>Alur Approval Cuti</span>
+                        </x-ui.tab>
+
+                        <x-ui.tab variant="sidebar" active="activeTab === 'rbac'" click="activeTab = 'rbac'">
+                            <span>Pemetaan SSO & RBAC</span>
+                        </x-ui.tab>
+
+                        <x-ui.tab variant="sidebar" active="activeTab === 'master'" click="activeTab = 'master'">
+                            <span>Kamus Data Master</span>
+                        </x-ui.tab>
+                    </x-ui.tabs>
 
                     <hr class="border-border my-2" />
 
@@ -209,14 +188,14 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
                         </svg>
                     </a>
-                </div>
+                </x-ui.card>
             </aside>
 
             {{-- Form Panel Kanan --}}
             <main class="flex-1 min-w-0">
                 
                 {{-- TAB: UMUM & INSTANSI --}}
-                <div x-show="activeTab === 'umum'" class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6">
+                <x-ui.card padding="lg" x-show="activeTab === 'umum'" class="space-y-6">
                     <form action="{{ route('settings.update') }}" method="POST" @submit.prevent="if (confirm('Apakah Anda yakin ingin menyimpan perubahan konfigurasi instansi & server SMTP ini?')) $el.submit()" class="space-y-6">
                         @csrf
                         <div class="border-b border-border pb-4">
@@ -241,10 +220,14 @@
                                 <label class="text-xs font-semibold text-ink font-sans">Session Lifetime (Menit)</label>
                                 <input type="number" x-model="instansi.session_lifetime" class="h-[44px] w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                             </div>
-                            <div class="col-span-1 md:col-span-2 space-y-1">
-                                <label class="text-xs font-semibold text-ink font-sans">Alamat Kantor</label>
-                                <textarea rows="3" x-model="instansi.alamat" class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans resize-none"></textarea>
-                            </div>
+                            <x-form.textarea
+                                label="Alamat Kantor"
+                                rows="3"
+                                size="sm"
+                                wrapper-class="col-span-1 md:col-span-2"
+                                label-class="font-semibold normal-case tracking-normal"
+                                x-model="instansi.alamat"
+                            />
                         </div>
 
                         <div class="border-t border-border pt-6 space-y-4">
@@ -268,15 +251,15 @@
                                 </svg>
                                 🔒 Perubahan ini akan dicatat ke dalam Audit Log sistem secara real-time.
                             </p>
-                            <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2 font-sans cursor-pointer">
+                            <x-ui.button type="submit" variant="primary" size="lg">
                                 Simpan Perubahan
-                            </button>
+                            </x-ui.button>
                         </div>
                     </form>
-                </div>
+                </x-ui.card>
 
                 {{-- TAB: ALUR APPROVAL CUTI --}}
-                <div x-show="activeTab === 'cuti'" class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6" style="display: none;">
+                <x-ui.card padding="lg" x-show="activeTab === 'cuti'"   style="display: none;" class="space-y-6">
                     <form action="{{ route('settings.update') }}" method="POST" @submit.prevent="if (confirm('Apakah Anda yakin ingin memperbarui kebijakan alur persetujuan cuti? Perubahan ini hanya akan berdampak pada pengajuan cuti baru.')) $el.submit()" class="space-y-6">
                         @csrf
                         <div class="border-b border-border pb-4">
@@ -372,7 +355,7 @@
                                         <p class="text-muted text-[10px] font-sans leading-normal">Jika atasan langsung pengaju cuti kebetulan menjabat sebagai verifikator kepegawaian, lewati stage duplikat.</p>
                                     </div>
                                     <div class="flex items-center h-5">
-                                        <input type="checkbox" x-model="cutiConfig.skip_duplicate" class="rounded border-primary/20 text-primary focus:ring-primary/30 h-4.5 w-4.5 cursor-pointer">
+                                        <x-form.checkbox x-model="cutiConfig.skip_duplicate" class="border-primary/20 focus:ring-primary/30" />
                                     </div>
                                 </div>
 
@@ -396,15 +379,15 @@
                                 </svg>
                                 🔒 Perubahan ini akan dicatat ke dalam Audit Log sistem secara real-time.
                             </p>
-                            <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2 font-sans cursor-pointer">
+                            <x-ui.button type="submit" variant="primary" size="lg">
                                 Simpan Kebijakan Cuti
-                            </button>
+                            </x-ui.button>
                         </div>
                     </form>
-                </div>
+                </x-ui.card>
 
                 {{-- TAB: PEMETAAN SSO & RBAC --}}
-                <div x-show="activeTab === 'rbac'" class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6" style="display: none;">
+                <x-ui.card padding="lg" x-show="activeTab === 'rbac'"   style="display: none;" class="space-y-6">
                     <div class="border-b border-border pb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <h2 class="text-lg font-bold text-ink font-sans leading-tight">Pemetaan Akun SSO & Otorisasi RBAC</h2>
@@ -422,55 +405,58 @@
 
                     {{-- Table --}}
                     <div class="overflow-x-auto border border-border rounded-lg shadow-sm">
-                        <table class="w-full">
-                            <thead class="bg-soft/40">
-                                <tr>
-                                    <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Nama Pegawai</th>
-                                    <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">NIP</th>
-                                    <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Keycloak ID / Email SSO</th>
-                                    <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Role Internal</th>
-                                    <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Status</th>
-                                    <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-border">
+                        <x-ui.table>
+                            <x-ui.table-head variant="muted">
+                                <x-ui.table-row>
+                                    <x-ui.table-th>Nama Pegawai</x-ui.table-th>
+                                    <x-ui.table-th>NIP</x-ui.table-th>
+                                    <x-ui.table-th>Keycloak ID / Email SSO</x-ui.table-th>
+                                    <x-ui.table-th>Role Internal</x-ui.table-th>
+                                    <x-ui.table-th>Status</x-ui.table-th>
+                                    <x-ui.table-th>Aksi</x-ui.table-th>
+                                </x-ui.table-row>
+                            </x-ui.table-head>
+                            <x-ui.table-body>
                                 <template x-for="user in filteredUsers" :key="user.id">
-                                    <tr class="hover:bg-soft/30 transition-colors">
-                                        <td class="px-4 py-3 text-sm font-semibold text-ink font-sans" x-text="user.name"></td>
-                                        <td class="px-4 py-3 text-xs font-mono text-muted" x-text="user.nip"></td>
-                                        <td class="px-4 py-3 text-xs text-ink">
+                                    <x-ui.table-row :interactive="true">
+                                        <x-ui.table-td x-text="user.name" padding="sm" class="text-sm font-semibold"></x-ui.table-td>
+                                        <x-ui.table-td x-text="user.nip" padding="sm" class="font-mono text-muted"></x-ui.table-td>
+                                        <x-ui.table-td padding="sm">
                                             <div class="font-semibold" x-text="user.keycloak_id || '-'"></div>
                                             <div class="text-[10px] text-muted font-mono mt-0.5" x-text="user.email"></div>
-                                        </td>
-                                        <td class="px-4 py-3 text-xs">
-                                            <span class="text-[10px] font-bold uppercase tracking-wide"
-                                                :class="{
-                                                    'bg-danger/10 text-danger': user.role === 'super_admin',
-                                                    'bg-primary/10 text-primary': user.role === 'admin_kepegawaian',
-                                                    'bg-info/10 text-info': user.role === 'pimpinan',
-                                                    'bg-warning/10 text-warning': user.role === 'atasan_langsung',
-                                                    'bg-success/10 text-success': user.role === 'pegawai'
+                                        </x-ui.table-td>
+                                        <x-ui.table-td padding="sm">
+                                            <x-ui.badge
+                                                variant="none"
+                                                size="xs"
+                                                uppercase
+                                                x-bind:class="{
+                                                    'border-danger/20 bg-danger/10 text-danger': user.role === 'super_admin',
+                                                    'border-primary/20 bg-primary/10 text-primary': user.role === 'admin_kepegawaian',
+                                                    'border-info/25 bg-info/10 text-info': user.role === 'pimpinan',
+                                                    'border-warning/25 bg-warning/10 text-warning': user.role === 'atasan_langsung',
+                                                    'border-success/20 bg-success/10 text-success': user.role === 'pegawai'
                                                 }"
                                                 x-text="user.role"
-                                            ></span>
-                                        </td>
-                                        <td class="px-4 py-3 text-xs font-sans">
+                                            ></x-ui.badge>
+                                        </x-ui.table-td>
+                                        <x-ui.table-td padding="sm">
                                             <span :class="user.status === 'Terhubung' ? 'text-success font-semibold' : 'text-danger font-semibold'" x-text="user.status"></span>
-                                        </td>
-                                        <td class="px-4 py-3">
+                                        </x-ui.table-td>
+                                        <x-ui.table-td padding="sm">
                                             <button @click="openEditUser(user)" class="text-xs font-semibold text-primary hover:underline cursor-pointer focus:outline-none font-sans">
                                                 Edit Pemetaan
                                             </button>
-                                        </td>
-                                    </tr>
+                                        </x-ui.table-td>
+                                    </x-ui.table-row>
                                 </template>
-                            </tbody>
-                        </table>
+                            </x-ui.table-body>
+                        </x-ui.table>
                     </div>
-                </div>
+                </x-ui.card>
 
                 {{-- TAB: DATA MASTER REFERENSI --}}
-                <div x-show="activeTab === 'master'" class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6" style="display: none;">
+                <x-ui.card padding="lg" x-show="activeTab === 'master'"   style="display: none;" class="space-y-6">
                     <div class="border-b border-border pb-4">
                         <h2 class="text-lg font-bold text-primary font-sans leading-tight">Data Master Kamus Referensi</h2>
                         <p class="text-[11px] text-muted mt-0.5 font-sans leading-normal">Kelola record data referensi sistem (static seeder tables).</p>
@@ -495,7 +481,7 @@
                             </div>
                         </template>
                     </div>
-                </div>
+                </x-ui.card>
 
             </main>
         </div>
@@ -540,12 +526,12 @@
 
                     {{-- Footer --}}
                     <div class="px-6 py-4 border-t border-border bg-soft flex justify-end gap-3">
-                        <button @click="showEditModal = false" class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2.5 text-xs font-semibold text-primary transition hover:border-primary/30 hover:bg-soft/40 cursor-pointer focus:outline-none font-sans">
+                        <x-ui.button type="button" variant="secondary" size="xs" @click="showEditModal = false">
                             Batal
-                        </button>
-                        <button @click="saveUser" class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2 font-sans">
+                        </x-ui.button>
+                        <x-ui.button type="button" variant="primary" size="xs" @click="saveUser">
                             Simpan Pemetaan
-                        </button>
+                        </x-ui.button>
                     </div>
 
                 </div>

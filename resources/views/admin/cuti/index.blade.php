@@ -50,16 +50,10 @@
         $jumlahDisetujui = $riwayatCuti->where('status', 'disetujui')->count();
         $jumlahDitunda = $riwayatCuti->where('status', 'ditunda')->count();
 
-        $statusClass = [
-            'menunggu'  => 'text-warning',
-            'disetujui' => 'text-success',
-            'ditunda'   => 'text-danger',
-        ];
-
-        $statusDot = [
-            'menunggu'  => 'bg-warning',
-            'disetujui' => 'bg-success',
-            'ditunda'   => 'bg-danger',
+        $statusVariant = [
+            'menunggu'  => 'warning',
+            'disetujui' => 'success',
+            'ditunda'   => 'danger',
         ];
 
         $statusLabel = [
@@ -97,60 +91,36 @@
         {{-- METRICS SUMMARY CARD (GLOBAL MONITORING) --}}
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
             {{-- Pending --}}
-            <div class="rounded-lg border border-border bg-surface p-5 shadow-sm flex flex-col justify-between">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Menunggu Persetujuan</p>
-                        <p class="mt-1.5 text-2xl font-extrabold text-warning leading-none font-mono">2</p>
-                    </div>
-                    <div class="rounded-lg bg-warning/10 p-2.5 shrink-0">
-                        <svg class="w-6 h-6 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
-                    </div>
-                </div>
-            </div>
+            <x-ui.stat-card label="Menunggu Persetujuan" value="2" variant="warning">
+                <x-slot:icon>
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                </x-slot:icon>
+            </x-ui.stat-card>
 
             {{-- Approved --}}
-            <div class="rounded-lg border border-border bg-surface p-5 shadow-sm flex flex-col justify-between">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Disetujui (Bulan Ini)</p>
-                        <p class="mt-1.5 text-2xl font-extrabold text-success leading-none font-mono">3</p>
-                    </div>
-                    <div class="rounded-lg bg-success/10 p-2.5 shrink-0">
-                        <svg class="w-6 h-6 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    </div>
-                </div>
-            </div>
+            <x-ui.stat-card label="Disetujui (Bulan Ini)" value="3" variant="success">
+                <x-slot:icon>
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </x-slot:icon>
+            </x-ui.stat-card>
 
             {{-- Postponed --}}
-            <div class="rounded-lg border border-border bg-surface p-5 shadow-sm flex flex-col justify-between">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Ditunda</p>
-                        <p class="mt-1.5 text-2xl font-extrabold text-danger leading-none font-mono">2</p>
-                    </div>
-                    <div class="rounded-lg bg-danger/10 p-2.5 shrink-0">
-                        <svg class="w-6 h-6 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" /></svg>
-                    </div>
-                </div>
-            </div>
+            <x-ui.stat-card label="Ditunda" value="2" variant="danger">
+                <x-slot:icon>
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" /></svg>
+                </x-slot:icon>
+            </x-ui.stat-card>
 
             {{-- Total Cuti Active --}}
-            <div class="rounded-lg border border-border bg-surface p-5 shadow-sm flex flex-col justify-between">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Total Staf Cuti</p>
-                        <p class="mt-1.5 text-2xl font-extrabold text-primary leading-none font-mono">7</p>
-                    </div>
-                    <div class="rounded-lg bg-primary/10 p-2.5 shrink-0">
-                        <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
-                    </div>
-                </div>
-            </div>
+            <x-ui.stat-card label="Total Staf Cuti" value="7" variant="primary">
+                <x-slot:icon>
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 0 015.25 0z" /></svg>
+                </x-slot:icon>
+            </x-ui.stat-card>
         </div>
 
         {{-- FILTER BAR --}}
-        <div class="rounded-lg border border-border bg-surface p-4 flex flex-col gap-4 shadow-sm">
+        <x-ui.card padding="sm" class="flex flex-col gap-4">
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 {{-- Search input --}}
                 <div class="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 col-span-1 sm:col-span-2 lg:col-span-1">
@@ -222,10 +192,10 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </x-ui.card>
 
         {{-- TABLE CARD --}}
-        <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
+        <x-ui.card padding="none" class="overflow-hidden">
             <div class="flex items-center justify-between border-b border-border px-6 py-4 bg-surface">
                 <div>
                     <h3 class="text-sm font-semibold text-ink font-sans">Pemantauan Pengajuan Cuti Pegawai</h3>
@@ -233,22 +203,22 @@
                 </div>
             </div>
             <div class="overflow-x-auto">
-                <table class="w-full" id="cuti-table">
-                    <thead class="bg-soft border-b border-border">
-                        <tr>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans select-none">Pegawai</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans select-none">Unit Kerja</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans select-none">Detail Cuti</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans select-none">Tanggal & Durasi</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans select-none">Stage Approval</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans select-none">Status Akhir</th>
-                            <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted font-sans select-none">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
+                <x-ui.table id="cuti-table">
+                    <x-ui.table-head class="border-b border-border">
+                        <x-ui.table-row>
+                            <x-ui.table-th class="select-none">Pegawai</x-ui.table-th>
+                            <x-ui.table-th class="select-none">Unit Kerja</x-ui.table-th>
+                            <x-ui.table-th class="select-none">Detail Cuti</x-ui.table-th>
+                            <x-ui.table-th class="select-none">Tanggal & Durasi</x-ui.table-th>
+                            <x-ui.table-th class="select-none">Stage Approval</x-ui.table-th>
+                            <x-ui.table-th class="select-none">Status Akhir</x-ui.table-th>
+                            <x-ui.table-th align="right" class="select-none">Aksi</x-ui.table-th>
+                        </x-ui.table-row>
+                    </x-ui.table-head>
+                    <x-ui.table-body>
                         @foreach($riwayatCuti as $r)
-                        <tr class="transition-colors hover:bg-soft/50" data-nama="{{ $r['nama'] }}" data-nip="{{ $r['nip'] }}" data-unit="{{ $r['unit'] }}" data-jenis="{{ $r['jenis'] }}" data-status="{{ $r['status'] }}" data-periode="{{ $r['periode'] }}">
-                            <td class="px-4 py-3.5">
+                        <x-ui.table-row data-nama="{{ $r['nama'] }}" data-nip="{{ $r['nip'] }}" data-unit="{{ $r['unit'] }}" data-jenis="{{ $r['jenis'] }}" data-status="{{ $r['status'] }}" data-periode="{{ $r['periode'] }}" :interactive="true">
+                            <x-ui.table-td>
                                 <div class="flex items-center gap-3">
                                     <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
                                         {{ strtoupper(substr($r['nama'], 0, 1)) }}
@@ -258,19 +228,19 @@
                                         <p class="font-mono text-xs text-muted">{{ $r['nip'] }}</p>
                                     </div>
                                 </div>
-                            </td>
-                            <td class="px-4 py-3.5">
+                            </x-ui.table-td>
+                            <x-ui.table-td>
                                 <span class="text-sm text-ink font-sans">{{ $r['unit'] }}</span>
-                            </td>
-                            <td class="px-4 py-3.5">
+                            </x-ui.table-td>
+                            <x-ui.table-td>
                                 <p class="text-sm font-semibold text-ink font-sans">{{ $r['jenis'] }}</p>
                                 <p class="text-xs text-muted font-sans mt-0.5 max-w-xs truncate" title="{{ $r['alasan'] }}">{{ $r['alasan'] }}</p>
-                            </td>
-                            <td class="px-4 py-3.5">
+                            </x-ui.table-td>
+                            <x-ui.table-td>
                                 <p class="text-sm text-ink font-mono">{{ \Carbon\Carbon::parse($r['mulai'])->translatedFormat('d M') }} - {{ \Carbon\Carbon::parse($r['selesai'])->translatedFormat('d M Y') }}</p>
                                 <p class="text-xs text-primary font-semibold mt-0.5 leading-none">{{ $r['hari'] }} Hari Kerja</p>
-                            </td>
-                            <td class="px-4 py-3.5">
+                            </x-ui.table-td>
+                            <x-ui.table-td>
                                 <div class="flex flex-col gap-1 text-[11px] font-medium text-ink font-sans">
                                     <div class="flex items-center gap-1.5">
                                         @php
@@ -287,27 +257,26 @@
                                         <span>Kepala: <strong class="capitalize">{{ $r['stage_kepala'] }}</strong></span>
                                     </div>
                                 </div>
-                            </td>
-                            <td class="px-4 py-3.5">
-                                <span class="inline-flex items-center gap-1.5 text-xs font-semibold {{ $statusClass[$r['status']] }} font-sans">
-                                    <span class="h-1.5 w-1.5 rounded-full {{ $statusDot[$r['status']] }}"></span>
+                            </x-ui.table-td>
+                            <x-ui.table-td>
+                                <x-ui.badge :variant="$statusVariant[$r['status']] ?? 'muted'" size="md" dot>
                                     {{ $statusLabel[$r['status']] }}
-                                </span>
-                            </td>
-                            <td class="px-4 py-3.5 text-right">
+                                </x-ui.badge>
+                            </x-ui.table-td>
+                            <x-ui.table-td align="right">
                                 <div class="flex items-center justify-end gap-1.5">
-                                    <a href="{{ route('cuti.show', $r['id']) }}" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Detail">
+                                    <x-ui.button href="{{ route('cuti.show', $r['id']) }}" variant="secondary" size="icon" title="Detail" aria-label="Detail">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                         </svg>
-                                    </a>
+                                    </x-ui.button>
                                 </div>
-                            </td>
-                        </tr>
+                            </x-ui.table-td>
+                        </x-ui.table-row>
                         @endforeach
-                    </tbody>
-                </table>
+                    </x-ui.table-body>
+                </x-ui.table>
             </div>
 
             {{-- TABLE FOOTER --}}
@@ -329,21 +298,21 @@
                 </div>
                 <div class="flex items-center gap-1.5">
                     {{-- Prev --}}
-                    <button class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted transition hover:bg-soft hover:text-ink">
+                    <x-ui.button type="button" variant="muted" size="icon" aria-label="Halaman sebelumnya">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
                         </svg>
-                    </button>
+                    </x-ui.button>
                     <button class="flex h-8 w-8 items-center justify-center rounded-lg border border-primary bg-primary text-sm font-semibold text-white transition hover:opacity-90 font-sans">1</button>
                     {{-- Next --}}
-                    <button class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted transition hover:bg-soft hover:text-ink font-sans">
+                    <x-ui.button type="button" variant="muted" size="icon" aria-label="Halaman berikutnya">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                         </svg>
-                    </button>
+                    </x-ui.button>
                 </div>
             </div>
-        </div>
+        </x-ui.card>
 
     </div>
 

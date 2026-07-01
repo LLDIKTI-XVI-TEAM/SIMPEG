@@ -205,39 +205,21 @@
             <div x-show="toast.show" style="display: none;" class="mb-4" x-transition>
                 
                 <template x-if="toast.type === 'success'">
-                    <div class="rounded-lg bg-green-50 p-4 border border-green-200">
-                        <div class="flex">
-                            <div class="flex-shrink-0">
-                                <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
-                                </svg>
-                            </div>
-                            <div class="ml-3">
-                                <h3 class="text-sm font-medium text-green-800" x-text="toast.message"></h3>
-                            </div>
-                        </div>
-                    </div>
+                    <x-ui.alert variant="success" class="font-medium">
+                        <span x-text="toast.message"></span>
+                    </x-ui.alert>
                 </template>
                 
                 <template x-if="toast.type === 'error'">
-                    <div class="rounded-lg bg-red-50 p-4 border border-red-200">
-                        <div class="flex">
-                            <div class="flex-shrink-0">
-                                <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
-                                </svg>
-                            </div>
-                            <div class="ml-3">
-                                <h3 class="text-sm font-medium text-red-800" x-text="toast.message"></h3>
-                            </div>
-                        </div>
-                    </div>
+                    <x-ui.alert variant="danger" class="font-medium">
+                        <span x-text="toast.message"></span>
+                    </x-ui.alert>
                 </template>
             </div>
         </div>
 
         {{-- MAIN DETAIL CARD --}}
-        <div class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6">
+        <x-ui.card padding="lg" class="space-y-6">
             @php
                 $fotoUrl = $p->foto_url;
             @endphp
@@ -268,7 +250,7 @@
                             </template>
                         </div>
                         <p class="text-xs text-muted font-sans font-mono mt-0.5">NIP. {{ $p->nip }}</p>
-                        <span class="inline-block mt-1.5 rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-semibold font-sans uppercase">{{ $p->jenisPegawai->nama ?? '-' }}</span>
+                            <x-ui.badge variant="primary" size="md" uppercase class="mt-1.5">{{ $p->jenisPegawai->nama ?? '-' }}</x-ui.badge>
                     </div>
                 </div>
                 <div class="flex items-center gap-3 shrink-0">
@@ -288,17 +270,17 @@
             </div>
 
             {{-- TAB NAVIGATION --}}
-            <div class="border-b border-border flex gap-4 md:gap-6 overflow-x-auto pb-1 select-none">
-                <button @click="activeTab = 'profile'" :class="activeTab === 'profile' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Profil</button>
-                <button @click="activeTab = 'keluarga'" :class="activeTab === 'keluarga' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Keluarga</button>
-                <button @click="activeTab = 'kepangkatan'" :class="activeTab === 'kepangkatan' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Kepangkatan</button>
-                <button @click="activeTab = 'jabatan'" :class="activeTab === 'jabatan' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Jabatan</button>
-                <button @click="activeTab = 'kgb'" :class="activeTab === 'kgb' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">KGB</button>
-                <button @click="activeTab = 'disiplin'" :class="activeTab === 'disiplin' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Hukuman Disiplin</button>
-                <button @click="activeTab = 'pendidikan'" :class="activeTab === 'pendidikan' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Pendidikan</button>
-                <button @click="activeTab = 'pengangkatan'" :class="activeTab === 'pengangkatan' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Pengangkatan</button>
-                <button @click="activeTab = 'docs'" :class="activeTab === 'docs' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Dokumen SK</button>
-            </div>
+            <x-ui.tabs label="Navigasi detail pegawai">
+                <x-ui.tab active="activeTab === 'profile'" click="activeTab = 'profile'">Profil</x-ui.tab>
+                <x-ui.tab active="activeTab === 'keluarga'" click="activeTab = 'keluarga'">Keluarga</x-ui.tab>
+                <x-ui.tab active="activeTab === 'kepangkatan'" click="activeTab = 'kepangkatan'">Kepangkatan</x-ui.tab>
+                <x-ui.tab active="activeTab === 'jabatan'" click="activeTab = 'jabatan'">Jabatan</x-ui.tab>
+                <x-ui.tab active="activeTab === 'kgb'" click="activeTab = 'kgb'">KGB</x-ui.tab>
+                <x-ui.tab active="activeTab === 'disiplin'" click="activeTab = 'disiplin'">Hukuman Disiplin</x-ui.tab>
+                <x-ui.tab active="activeTab === 'pendidikan'" click="activeTab = 'pendidikan'">Pendidikan</x-ui.tab>
+                <x-ui.tab active="activeTab === 'pengangkatan'" click="activeTab = 'pengangkatan'">Pengangkatan</x-ui.tab>
+                <x-ui.tab active="activeTab === 'docs'" click="activeTab = 'docs'">Dokumen SK</x-ui.tab>
+            </x-ui.tabs>
 
             {{-- TAB 1: PROFIL LENGKAP --}}
             <div x-show="activeTab === 'profile'" class="space-y-6" x-transition>
@@ -336,21 +318,21 @@
                         Estimasi Jadwal Kepegawaian <span class="text-[9px] text-primary lowercase font-normal">(kalkulator otomatis)</span>
                     </h3>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div class="rounded-lg border border-border bg-surface p-3 shadow-sm text-center">
+                        <x-ui.card padding="none" class="p-3 text-center">
                             <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Kenaikan Pangkat Terdekat</span>
                             <p class="text-sm font-bold text-ink font-sans mt-1">{{ $estimasiPangkatNext }}</p>
                             <p class="text-[9px] text-muted font-sans mt-0.5">(Estimasi 4 tahun sejak TMT)</p>
-                        </div>
-                        <div class="rounded-lg border border-border bg-surface p-3 shadow-sm text-center">
+                        </x-ui.card>
+                        <x-ui.card padding="none" class="p-3 text-center">
                             <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">KGB Terdekat</span>
                             <p class="text-sm font-bold text-ink font-sans mt-1">{{ $estimasiKgbNext }}</p>
                             <p class="text-[9px] text-muted font-sans mt-0.5">(Estimasi 2 tahun sejak TMT)</p>
-                        </div>
-                        <div class="rounded-lg border border-border bg-surface p-3 shadow-sm text-center">
+                        </x-ui.card>
+                        <x-ui.card padding="none" class="p-3 text-center">
                             <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Estimasi Tanggal Pensiun</span>
                             <p class="text-sm font-bold text-ink font-sans mt-1">{{ $estimasiPensiun }}</p>
                             <p class="text-[9px] text-danger font-semibold mt-0.5" x-text="'Sisa: ' + '{{ $sisaPensiunStr }}'"></p>
-                        </div>
+                        </x-ui.card>
                     </div>
                 </div>
 
@@ -456,51 +438,51 @@
                         <h3 class="text-sm font-bold text-ink font-sans">Susunan Anggota Keluarga</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Daftar istri/suami dan anak yang tercatat sebagai tanggungan.</p>
                     </div>
-                    <button type="button" @click="openModal('keluarga', 'Tambah Anggota Keluarga')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
+                    <x-ui.button type="button" variant="primary" size="sm" @click="openModal('keluarga', 'Tambah Anggota Keluarga')">
                         <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                         </svg>
                         Tambah Keluarga
-                    </button>
+                    </x-ui.button>
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-border">
-                    <table class="w-full">
-                        <thead class="bg-soft border-b border-border">
-                            <tr class="text-left text-xs font-semibold text-muted uppercase tracking-wide font-sans">
-                                <th class="px-4 py-3">Nama Lengkap & NIK</th>
-                                <th class="px-4 py-3">Hubungan</th>
-                                <th class="px-4 py-3">TTL</th>
-                                <th class="px-4 py-3">Pekerjaan</th>
-                                <th class="px-4 py-3">Status</th>
-                                <th class="px-4 py-3 text-right">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border text-xs font-sans">
+                    <x-ui.table>
+                        <x-ui.table-head class="border-b border-border">
+                            <x-ui.table-row>
+                                <x-ui.table-th>Nama Lengkap & NIK</x-ui.table-th>
+                                <x-ui.table-th>Hubungan</x-ui.table-th>
+                                <x-ui.table-th>TTL</x-ui.table-th>
+                                <x-ui.table-th>Pekerjaan</x-ui.table-th>
+                                <x-ui.table-th>Status</x-ui.table-th>
+                                <x-ui.table-th align="right">Aksi</x-ui.table-th>
+                            </x-ui.table-row>
+                        </x-ui.table-head>
+                        <x-ui.table-body class="text-xs font-sans">
                             <template x-for="(fam, index) in keluargaList" :key="index">
-                                <tr class="transition-colors hover:bg-soft/30 text-ink">
-                                    <td class="px-4 py-3">
+                                <x-ui.table-row :interactive="true" class="text-ink">
+                                    <x-ui.table-td padding="sm">
                                         <p class="font-bold font-sans" x-text="fam.nama_anggota"></p>
                                         <p class="text-[10px] text-muted font-mono" x-text="fam.nik ? 'NIK. ' + fam.nik : 'NIK. -'"></p>
-                                    </td>
-                                    <td class="px-4 py-3">
+                                    </x-ui.table-td>
+                                    <x-ui.table-td padding="sm">
                                         <p class="font-sans" x-text="fam.hubungan"></p>
                                         <p class="text-[10px] text-muted font-sans" x-text="fam.jenis_kelamin"></p>
-                                    </td>
-                                    <td class="px-4 py-3">
+                                    </x-ui.table-td>
+                                    <x-ui.table-td padding="sm">
                                         <p class="font-sans" x-text="fam.tempat_lahir || '-'"></p>
                                         <p class="text-[10px] text-muted font-mono" x-text="fam.tanggal_lahir"></p>
-                                    </td>
-                                    <td class="px-4 py-3 font-sans" x-text="fam.pekerjaan || '-'"></td>
-                                    <td class="px-4 py-3">
+                                    </x-ui.table-td>
+                                    <x-ui.table-td x-text="fam.pekerjaan || '-'" padding="sm"></x-ui.table-td>
+                                    <x-ui.table-td padding="sm">
                                         <span class="inline-flex items-center gap-1 text-[10px] font-bold"
                                               :class="fam.status === 'Ditanggung' ? 'text-success' : 'text-muted'"
                                               x-text="fam.status"></span>
-                                    </td>
-                                    <td class="px-4 py-3 text-right text-muted">-</td>
-                                </tr>
+                                    </x-ui.table-td>
+                                    <x-ui.table-td align="right" padding="sm" class="text-muted">-</x-ui.table-td>
+                                </x-ui.table-row>
                             </template>
-                        </tbody>
-                    </table>
+                        </x-ui.table-body>
+                    </x-ui.table>
                 </div>
             </div>
 
@@ -511,34 +493,34 @@
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Kepangkatan & Golongan</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Catatan kenaikan pangkat reguler maupun pilihan selama masa dinas.</p>
                     </div>
-                    <button type="button" @click="openModal('pangkat', 'Tambah Riwayat Kepangkatan')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
+                    <x-ui.button type="button" variant="primary" size="sm" @click="openModal('pangkat', 'Tambah Riwayat Kepangkatan')">
                         <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                         </svg>
                         Tambah Pangkat
-                    </button>
+                    </x-ui.button>
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-border">
-                    <table class="w-full">
-                        <thead class="bg-soft border-b border-border">
-                            <tr class="text-left text-xs font-semibold text-muted uppercase tracking-wide font-sans">
-                                <th class="px-4 py-3">Golongan</th>
-                                <th class="px-4 py-3">Nomor SK Pangkat</th>
-                                <th class="px-4 py-3">Tanggal SK</th>
-                                <th class="px-4 py-3">TMT Pangkat</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border text-xs font-sans">
+                    <x-ui.table>
+                        <x-ui.table-head class="border-b border-border">
+                            <x-ui.table-row>
+                                <x-ui.table-th>Golongan</x-ui.table-th>
+                                <x-ui.table-th>Nomor SK Pangkat</x-ui.table-th>
+                                <x-ui.table-th>Tanggal SK</x-ui.table-th>
+                                <x-ui.table-th>TMT Pangkat</x-ui.table-th>
+                            </x-ui.table-row>
+                        </x-ui.table-head>
+                        <x-ui.table-body class="text-xs font-sans">
                             <template x-for="p in pangkatList" :key="p.no_sk">
-                                <tr class="transition-colors hover:bg-soft/30 text-ink">
-                                    <td class="px-4 py-3 font-bold" x-text="p.golongan"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="p.no_sk"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="p.tgl_sk"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="p.tmt"></td>
-                                </tr>
+                                <x-ui.table-row :interactive="true" class="text-ink">
+                                    <x-ui.table-td x-text="p.golongan" padding="sm" class="font-bold"></x-ui.table-td>
+                                    <x-ui.table-td x-text="p.no_sk" padding="sm" class="font-mono"></x-ui.table-td>
+                                    <x-ui.table-td x-text="p.tgl_sk" padding="sm" class="font-mono"></x-ui.table-td>
+                                    <x-ui.table-td x-text="p.tmt" padding="sm" class="font-mono"></x-ui.table-td>
+                                </x-ui.table-row>
                             </template>
-                        </tbody>
-                    </table>
+                        </x-ui.table-body>
+                    </x-ui.table>
                 </div>
             </div>
 
@@ -549,36 +531,36 @@
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Jabatan & Struktural</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Catatan penugasan jabatan fungsional maupun struktural.</p>
                     </div>
-                    <button type="button" @click="openModal('jabatan', 'Tambah Riwayat Jabatan')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
+                    <x-ui.button type="button" variant="primary" size="sm" @click="openModal('jabatan', 'Tambah Riwayat Jabatan')">
                         <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                         </svg>
                         Tambah Jabatan
-                    </button>
+                    </x-ui.button>
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-border">
-                    <table class="w-full">
-                        <thead class="bg-soft border-b border-border">
-                            <tr class="text-left text-xs font-semibold text-muted uppercase tracking-wide font-sans">
-                                <th class="px-4 py-3">Nama Jabatan</th>
-                                <th class="px-4 py-3">Unit Kerja</th>
-                                <th class="px-4 py-3">Nomor SK Jabatan</th>
-                                <th class="px-4 py-3">Tanggal SK</th>
-                                <th class="px-4 py-3">TMT Jabatan</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border text-xs font-sans">
+                    <x-ui.table>
+                        <x-ui.table-head class="border-b border-border">
+                            <x-ui.table-row>
+                                <x-ui.table-th>Nama Jabatan</x-ui.table-th>
+                                <x-ui.table-th>Unit Kerja</x-ui.table-th>
+                                <x-ui.table-th>Nomor SK Jabatan</x-ui.table-th>
+                                <x-ui.table-th>Tanggal SK</x-ui.table-th>
+                                <x-ui.table-th>TMT Jabatan</x-ui.table-th>
+                            </x-ui.table-row>
+                        </x-ui.table-head>
+                        <x-ui.table-body class="text-xs font-sans">
                             <template x-for="j in jabatanList" :key="j.no_sk">
-                                <tr class="transition-colors hover:bg-soft/30 text-ink">
-                                    <td class="px-4 py-3 font-bold" x-text="j.jabatan"></td>
-                                    <td class="px-4 py-3" x-text="j.unit"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="j.no_sk"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="j.tgl_sk"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="j.tmt"></td>
-                                </tr>
+                                <x-ui.table-row :interactive="true" class="text-ink">
+                                    <x-ui.table-td x-text="j.jabatan" padding="sm" class="font-bold"></x-ui.table-td>
+                                    <x-ui.table-td x-text="j.unit" padding="sm"></x-ui.table-td>
+                                    <x-ui.table-td x-text="j.no_sk" padding="sm" class="font-mono"></x-ui.table-td>
+                                    <x-ui.table-td x-text="j.tgl_sk" padding="sm" class="font-mono"></x-ui.table-td>
+                                    <x-ui.table-td x-text="j.tmt" padding="sm" class="font-mono"></x-ui.table-td>
+                                </x-ui.table-row>
                             </template>
-                        </tbody>
-                    </table>
+                        </x-ui.table-body>
+                    </x-ui.table>
                 </div>
             </div>
 
@@ -589,34 +571,34 @@
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Kenaikan Gaji Berkala (KGB)</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Catatan penyesuaian gaji berkala setiap 2 tahun sekali.</p>
                     </div>
-                    <button type="button" @click="openModal('kgb', 'Tambah Riwayat KGB')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
+                    <x-ui.button type="button" variant="primary" size="sm" @click="openModal('kgb', 'Tambah Riwayat KGB')">
                         <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                         </svg>
                         Tambah KGB
-                    </button>
+                    </x-ui.button>
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-border">
-                    <table class="w-full">
-                        <thead class="bg-soft border-b border-border">
-                            <tr class="text-left text-xs font-semibold text-muted uppercase tracking-wide font-sans">
-                                <th class="px-4 py-3">Gaji Pokok Baru</th>
-                                <th class="px-4 py-3">Nomor Surat KGB</th>
-                                <th class="px-4 py-3">Tanggal Surat</th>
-                                <th class="px-4 py-3">TMT KGB</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border text-xs font-sans">
+                    <x-ui.table>
+                        <x-ui.table-head class="border-b border-border">
+                            <x-ui.table-row>
+                                <x-ui.table-th>Gaji Pokok Baru</x-ui.table-th>
+                                <x-ui.table-th>Nomor Surat KGB</x-ui.table-th>
+                                <x-ui.table-th>Tanggal Surat</x-ui.table-th>
+                                <x-ui.table-th>TMT KGB</x-ui.table-th>
+                            </x-ui.table-row>
+                        </x-ui.table-head>
+                        <x-ui.table-body class="text-xs font-sans">
                             <template x-for="k in kgbList" :key="k.no_sk">
-                                <tr class="transition-colors hover:bg-soft/30 text-ink">
-                                    <td class="px-4 py-3 font-bold" x-text="k.gaji"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="k.no_sk"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="k.tgl_sk"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="k.tmt"></td>
-                                </tr>
+                                <x-ui.table-row :interactive="true" class="text-ink">
+                                    <x-ui.table-td x-text="k.gaji" padding="sm" class="font-bold"></x-ui.table-td>
+                                    <x-ui.table-td x-text="k.no_sk" padding="sm" class="font-mono"></x-ui.table-td>
+                                    <x-ui.table-td x-text="k.tgl_sk" padding="sm" class="font-mono"></x-ui.table-td>
+                                    <x-ui.table-td x-text="k.tmt" padding="sm" class="font-mono"></x-ui.table-td>
+                                </x-ui.table-row>
                             </template>
-                        </tbody>
-                    </table>
+                        </x-ui.table-body>
+                    </x-ui.table>
                 </div>
             </div>
 
@@ -627,46 +609,46 @@
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Hukuman Disiplin</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Catatan sanksi disiplin pegawai yang mempengaruhi promosi kepegawaian.</p>
                     </div>
-                    <button type="button" @click="openModal('disiplin', 'Tambah Hukuman Disiplin')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
+                    <x-ui.button type="button" variant="primary" size="sm" @click="openModal('disiplin', 'Tambah Hukuman Disiplin')">
                         <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                         </svg>
                         Tambah Hukuman
-                    </button>
+                    </x-ui.button>
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-border">
-                    <table class="w-full">
-                        <thead class="bg-soft border-b border-border">
-                            <tr class="text-left text-xs font-semibold text-muted uppercase tracking-wide font-sans">
-                                <th class="px-4 py-3">Jenis Hukuman</th>
-                                <th class="px-4 py-3">Alasan / Pelanggaran</th>
-                                <th class="px-4 py-3">Nomor SK</th>
-                                <th class="px-4 py-3">Tanggal SK</th>
-                                <th class="px-4 py-3">Masa Berlaku</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border text-xs font-sans">
+                    <x-ui.table>
+                        <x-ui.table-head class="border-b border-border">
+                            <x-ui.table-row>
+                                <x-ui.table-th>Jenis Hukuman</x-ui.table-th>
+                                <x-ui.table-th>Alasan / Pelanggaran</x-ui.table-th>
+                                <x-ui.table-th>Nomor SK</x-ui.table-th>
+                                <x-ui.table-th>Tanggal SK</x-ui.table-th>
+                                <x-ui.table-th>Masa Berlaku</x-ui.table-th>
+                            </x-ui.table-row>
+                        </x-ui.table-head>
+                        <x-ui.table-body class="text-xs font-sans">
                             <template x-for="(d, index) in disiplinList" :key="index">
-                                <tr class="transition-colors hover:bg-soft/30 text-ink">
-                                    <td class="px-4 py-3">
+                                <x-ui.table-row :interactive="true" class="text-ink">
+                                    <x-ui.table-td padding="sm">
                                         <span class="font-bold text-danger" x-text="d.jenis"></span>
                                         <template x-if="d.is_active">
-                                            <span class="ml-1 inline-flex items-center rounded-full bg-danger/10 px-1.5 py-0.5 text-[8px] font-bold text-danger uppercase">Aktif</span>
+                                            <x-ui.badge variant="danger" size="xs" uppercase class="ml-1">Aktif</x-ui.badge>
                                         </template>
-                                    </td>
-                                    <td class="px-4 py-3" x-text="d.alasan"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="d.no_sk"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="d.tgl_sk"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="d.masa"></td>
-                                </tr>
+                                    </x-ui.table-td>
+                                    <x-ui.table-td x-text="d.alasan" padding="sm"></x-ui.table-td>
+                                    <x-ui.table-td x-text="d.no_sk" padding="sm" class="font-mono"></x-ui.table-td>
+                                    <x-ui.table-td x-text="d.tgl_sk" padding="sm" class="font-mono"></x-ui.table-td>
+                                    <x-ui.table-td x-text="d.masa" padding="sm" class="font-mono"></x-ui.table-td>
+                                </x-ui.table-row>
                             </template>
-                            <tr x-show="disiplinList.length === 0">
-                                <td colspan="5" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
+                            <x-ui.table-row x-show="disiplinList.length === 0">
+                                <x-ui.table-td colspan="5" align="center" class="px-4 py-6 text-muted font-semibold">
                                     Pegawai ini tidak memiliki riwayat hukuman disiplin. Bersih (Clean Record). ✅
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                                </x-ui.table-td>
+                            </x-ui.table-row>
+                        </x-ui.table-body>
+                    </x-ui.table>
                 </div>
             </div>
 
@@ -677,36 +659,36 @@
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Pendidikan Formal</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Riwayat kualifikasi akademis tertinggi staf.</p>
                     </div>
-                    <button type="button" @click="openModal('pendidikan', 'Tambah Riwayat Pendidikan')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
+                    <x-ui.button type="button" variant="primary" size="sm" @click="openModal('pendidikan', 'Tambah Riwayat Pendidikan')">
                         <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                         </svg>
                         Tambah Pendidikan
-                    </button>
+                    </x-ui.button>
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-border">
-                    <table class="w-full">
-                        <thead class="bg-soft border-b border-border">
-                            <tr class="text-left text-xs font-semibold text-muted uppercase tracking-wide font-sans">
-                                <th class="px-4 py-3">Tingkat</th>
-                                <th class="px-4 py-3">Nama Institusi</th>
-                                <th class="px-4 py-3">Program Studi</th>
-                                <th class="px-4 py-3">Tahun Lulus</th>
-                                <th class="px-4 py-3">Nomor Ijazah</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border text-xs font-sans">
+                    <x-ui.table>
+                        <x-ui.table-head class="border-b border-border">
+                            <x-ui.table-row>
+                                <x-ui.table-th>Tingkat</x-ui.table-th>
+                                <x-ui.table-th>Nama Institusi</x-ui.table-th>
+                                <x-ui.table-th>Program Studi</x-ui.table-th>
+                                <x-ui.table-th>Tahun Lulus</x-ui.table-th>
+                                <x-ui.table-th>Nomor Ijazah</x-ui.table-th>
+                            </x-ui.table-row>
+                        </x-ui.table-head>
+                        <x-ui.table-body class="text-xs font-sans">
                             <template x-for="p in pendidikanList" :key="p.no_ijazah">
-                                <tr class="transition-colors hover:bg-soft/30 text-ink">
-                                    <td class="px-4 py-3 font-bold" x-text="p.tingkat"></td>
-                                    <td class="px-4 py-3" x-text="p.institusi"></td>
-                                    <td class="px-4 py-3" x-text="p.prodi"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="p.lulus"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="p.no_ijazah"></td>
-                                </tr>
+                                <x-ui.table-row :interactive="true" class="text-ink">
+                                    <x-ui.table-td x-text="p.tingkat" padding="sm" class="font-bold"></x-ui.table-td>
+                                    <x-ui.table-td x-text="p.institusi" padding="sm"></x-ui.table-td>
+                                    <x-ui.table-td x-text="p.prodi" padding="sm"></x-ui.table-td>
+                                    <x-ui.table-td x-text="p.lulus" padding="sm" class="font-mono"></x-ui.table-td>
+                                    <x-ui.table-td x-text="p.no_ijazah" padding="sm" class="font-mono"></x-ui.table-td>
+                                </x-ui.table-row>
                             </template>
-                        </tbody>
-                    </table>
+                        </x-ui.table-body>
+                    </x-ui.table>
                 </div>
             </div>
 
@@ -743,7 +725,7 @@
                             </div>
                             <div class="flex justify-between border-b border-border pb-1">
                                 <span class="font-semibold text-muted">Status Dokumen:</span>
-                                <span class="inline-flex items-center gap-1 rounded bg-success/15 px-1.5 py-0.2 text-[9px] font-bold text-success uppercase">VERIFIED</span>
+                                <x-ui.badge variant="success" size="xs" :pill="false" uppercase>Verified</x-ui.badge>
                             </div>
                         </div>
                     </div>
@@ -758,21 +740,21 @@
                 </div>
 
                 <div class="overflow-x-auto rounded-lg border border-border">
-                    <table class="w-full">
-                        <thead class="bg-soft border-b border-border">
-                            <tr>
-                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Nama Dokumen</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Kategori</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Nomor Dokumen</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Tanggal Terbit</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Ukuran</th>
-                                <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border text-xs font-sans text-ink">
+                    <x-ui.table>
+                        <x-ui.table-head class="border-b border-border">
+                            <x-ui.table-row>
+                                <x-ui.table-th>Nama Dokumen</x-ui.table-th>
+                                <x-ui.table-th>Kategori</x-ui.table-th>
+                                <x-ui.table-th>Nomor Dokumen</x-ui.table-th>
+                                <x-ui.table-th>Tanggal Terbit</x-ui.table-th>
+                                <x-ui.table-th>Ukuran</x-ui.table-th>
+                                <x-ui.table-th align="right">Aksi</x-ui.table-th>
+                            </x-ui.table-row>
+                        </x-ui.table-head>
+                        <x-ui.table-body class="text-xs font-sans text-ink">
                             @forelse($riwayatDokumen as $doc)
-                            <tr class="transition-colors hover:bg-soft/30">
-                                <td class="px-4 py-3 max-w-xs">
+                            <x-ui.table-row :interactive="true">
+                                <x-ui.table-td padding="sm" class="max-w-xs">
                                     <div class="flex items-start gap-2.5">
                                         <div class="flex h-8 w-6 shrink-0 flex-col items-center justify-between rounded border border-border bg-soft p-0.5 shadow-sm relative">
                                             <div class="w-full bg-primary/10 text-primary text-[5px] font-bold text-center py-0.5 uppercase tracking-wide">
@@ -784,12 +766,12 @@
                                             <p class="text-[10px] text-muted font-sans mt-0.5 truncate">{{ $doc['deskripsi'] }}</p>
                                         </div>
                                     </div>
-                                </td>
-                                <td class="px-4 py-3 text-muted font-sans">{{ $doc['kategori_label'] }}</td>
-                                <td class="px-4 py-3 font-mono text-muted">{{ $doc['nomor'] }}</td>
-                                <td class="px-4 py-3 font-mono text-muted">{{ $doc['tanggal'] }}</td>
-                                <td class="px-4 py-3 font-mono text-muted">{{ $doc['file_size'] }}</td>
-                                <td class="px-4 py-3 text-right">
+                                </x-ui.table-td>
+                                <x-ui.table-td padding="sm" class="text-muted">{{ $doc['kategori_label'] }}</x-ui.table-td>
+                                <x-ui.table-td padding="sm" class="font-mono text-muted">{{ $doc['nomor'] }}</x-ui.table-td>
+                                <x-ui.table-td padding="sm" class="font-mono text-muted">{{ $doc['tanggal'] }}</x-ui.table-td>
+                                <x-ui.table-td padding="sm" class="font-mono text-muted">{{ $doc['file_size'] }}</x-ui.table-td>
+                                <x-ui.table-td align="right" padding="sm">
                                     <div class="flex items-center justify-end gap-2.5">
                                         <a href="/dashboard/dokumen/{{ $doc['id'] }}" class="inline-flex items-center gap-1 font-semibold text-primary hover:underline font-sans">
                                             Detail
@@ -799,21 +781,21 @@
                                             Unduh
                                         </a>
                                     </div>
-                                </td>
-                            </tr>
+                                </x-ui.table-td>
+                            </x-ui.table-row>
                             @empty
-                            <tr>
-                                <td colspan="6" class="px-4 py-6 text-center text-muted font-sans">
+                            <x-ui.table-row>
+                                <x-ui.table-td colspan="6" align="center" class="px-4 py-6 text-muted">
                                     Belum ada dokumen atau SK kepegawaian yang diunggah untuk staf ini.
-                                </td>
-                            </tr>
+                                </x-ui.table-td>
+                            </x-ui.table-row>
                             @endforelse
-                        </tbody>
-                    </table>
+                        </x-ui.table-body>
+                    </x-ui.table>
                 </div>
             </div>
 
-        </div>
+        </x-ui.card>
 
         {{-- MODAL DYNAMIC FORM --}}
         <div x-show="showModal" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;" x-transition>
@@ -835,19 +817,9 @@
 
                     {{-- Modal Error --}}
                     <template x-if="modalError">
-                        <div class="mb-4 rounded-lg bg-red-50 p-4 border border-red-200">
-                            <div class="flex">
-                                <div class="flex-shrink-0">
-                                    <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
-                                    </svg>
-                                </div>
-                                <div class="ml-3">
-                                    <h3 class="text-sm font-medium text-red-800">Terdapat kesalahan pengisian form:</h3>
-                                    <div class="mt-2 text-sm text-red-700" x-html="modalError"></div>
-                                </div>
-                            </div>
-                        </div>
+                        <x-ui.alert variant="danger" title="Terdapat kesalahan pengisian form" class="mb-4">
+                            <div x-html="modalError"></div>
+                        </x-ui.alert>
                     </template>
 
                     <form @submit.prevent="submitForm()" class="space-y-4">
@@ -879,10 +851,7 @@
                                         <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tempat Lahir</label>
                                         <input type="text" x-model="newKeluarga.tempat_lahir" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                     </div>
-                                    <div class="space-y-1">
-                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Lahir</label>
-                                        <input type="date" x-model="newKeluarga.tanggal_lahir" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                    </div>
+                                    <x-form.date label="Tanggal Lahir" required size="sm" class="bg-white" x-model="newKeluarga.tanggal_lahir" />
                                 </div>
 
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -925,14 +894,8 @@
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Pangkat</label>
                                     <input type="text" x-model="newPangkat.no_sk" required placeholder="SK-321-KP-2026" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK Terbit</label>
-                                    <input type="date" x-model="newPangkat.tanggal_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Golongan</label>
-                                    <input type="date" x-model="newPangkat.tmt_pangkat" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                </div>
+                                <x-form.date label="Tanggal SK Terbit" required size="sm" class="bg-white" x-model="newPangkat.tanggal_sk" />
+                                <x-form.date label="TMT Golongan" required size="sm" class="bg-white" x-model="newPangkat.tmt_pangkat" />
                             </div>
                         </template>
 
@@ -974,14 +937,8 @@
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Jabatan</label>
                                     <input type="text" x-model="newJabatan.no_sk" required placeholder="SK-910-JAB-2026" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK Terbit</label>
-                                    <input type="date" x-model="newJabatan.tanggal_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Jabatan</label>
-                                    <input type="date" x-model="newJabatan.tmt_jabatan" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                </div>
+                                <x-form.date label="Tanggal SK Terbit" required size="sm" class="bg-white" x-model="newJabatan.tanggal_sk" />
+                                <x-form.date label="TMT Jabatan" required size="sm" class="bg-white" x-model="newJabatan.tmt_jabatan" />
                             </div>
                         </template>
 
@@ -996,14 +953,8 @@
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor Surat KGB</label>
                                     <input type="text" x-model="newKgb.no_sk" required placeholder="KGB-012-2026" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Surat Terbit</label>
-                                    <input type="date" x-model="newKgb.tanggal_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT KGB</label>
-                                    <input type="date" x-model="newKgb.tmt_kgb" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                </div>
+                                <x-form.date label="Tanggal Surat Terbit" required size="sm" class="bg-white" x-model="newKgb.tanggal_sk" />
+                                <x-form.date label="TMT KGB" required size="sm" class="bg-white" x-model="newKgb.tmt_kgb" />
                             </div>
                         </template>
 
@@ -1018,27 +969,23 @@
                                         <option value="Berat">Berat</option>
                                     </select>
                                 </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Deskripsi Pelanggaran</label>
-                                    <textarea x-model="newDisiplin.deskripsi" required placeholder="Keterlambatan absensi berulang" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" rows="2"></textarea>
-                                </div>
+                                <x-form.textarea
+                                    label="Deskripsi Pelanggaran"
+                                    rows="2"
+                                    size="sm"
+                                    placeholder="Keterlambatan absensi berulang"
+                                    class="bg-white"
+                                    x-model="newDisiplin.deskripsi"
+                                    required
+                                />
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Hukuman</label>
                                     <input type="text" x-model="newDisiplin.no_sk" required placeholder="SK-HD-023-2026" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK Terbit</label>
-                                    <input type="date" x-model="newDisiplin.tanggal_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                </div>
+                                <x-form.date label="Tanggal SK Terbit" required size="sm" class="bg-white" x-model="newDisiplin.tanggal_sk" />
                                 <div class="grid grid-cols-2 gap-4">
-                                    <div class="space-y-1">
-                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Mulai</label>
-                                        <input type="date" x-model="newDisiplin.tanggal_mulai" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                    </div>
-                                    <div class="space-y-1">
-                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Berakhir</label>
-                                        <input type="date" x-model="newDisiplin.tanggal_berakhir" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                    </div>
+                                    <x-form.date label="Tanggal Mulai" required size="sm" class="bg-white" x-model="newDisiplin.tanggal_mulai" />
+                                    <x-form.date label="Tanggal Berakhir" size="sm" class="bg-white" x-model="newDisiplin.tanggal_berakhir" />
                                 </div>
                                 <p class="text-[10px] text-muted italic font-sans">* Kosongkan tanggal berakhir jika masa berlaku tidak ditentukan (aktif selamanya).</p>
                             </div>
@@ -1076,10 +1023,10 @@
                         </template>
 
                         <div class="border-t border-border pt-4 flex justify-end gap-2.5 mt-6">
-                            <button type="button" @click="showModal = false" :disabled="isSubmitting" class="inline-flex items-center justify-center rounded border border-border bg-surface px-4 py-2 text-xs font-semibold text-ink hover:bg-soft transition font-sans cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                            <x-ui.button type="button" variant="muted" size="xs" @click="showModal = false" x-bind:disabled="isSubmitting">
                                 Batal
-                            </button>
-                            <button type="submit" :disabled="isSubmitting" class="inline-flex items-center justify-center rounded bg-primary px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition font-sans cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px]">
+                            </x-ui.button>
+                            <x-ui.button type="submit" variant="primary" size="xs" x-bind:disabled="isSubmitting" class="min-w-[120px]">
                                 <template x-if="!isSubmitting">
                                     <span>Simpan</span>
                                 </template>
@@ -1092,7 +1039,7 @@
                                         Menyimpan...
                                     </span>
                                 </template>
-                            </button>
+                            </x-ui.button>
                         </div>
                     </form>
                 </div>

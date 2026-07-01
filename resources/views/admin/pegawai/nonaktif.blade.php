@@ -1,17 +1,16 @@
 <x-layouts.app title="Data Nonaktif / Restore Pegawai">
     <div class="mx-auto max-w-7xl space-y-6">
-        <div class="flex flex-col gap-1.5">
-            <h2 class="font-sans text-2xl font-bold text-ink">Pegawai Nonaktif & Restore</h2>
-            <nav class="flex items-center gap-1.5 text-xs text-muted">
+        <x-admin.page-header title="Pegawai Nonaktif & Restore">
+            <x-slot:breadcrumb>
                 <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
                 <span>/</span>
                 <a href="{{ route('data-pegawai') }}" class="transition-colors hover:text-ink">Data Pegawai</a>
                 <span>/</span>
                 <span class="font-medium text-ink">Data Nonaktif</span>
-            </nav>
-        </div>
+            </x-slot:breadcrumb>
+        </x-admin.page-header>
 
-        <section class="rounded-lg border border-border bg-surface p-5 shadow-sm">
+        <x-ui.card as="section">
             <form method="GET" action="{{ route('data-nonaktif') }}"
                 class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div class="flex-1 space-y-1.5">
@@ -33,35 +32,34 @@
                     Terapkan Filter
                 </button>
             </form>
-        </section>
+        </x-ui.card>
 
-        <section class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
+        <x-ui.card as="section" padding="none" class="overflow-hidden">
             <div class="border-b border-border px-6 py-4">
                 <h3 class="font-sans text-sm font-bold uppercase tracking-wider text-ink">Daftar Pegawai Non-Aktif</h3>
             </div>
 
             <div class="overflow-x-auto">
-                <table class="w-full min-w-[760px]">
-                    <thead class="bg-soft/80">
-                        <tr>
-                            <th class="px-6 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-muted">Pegawai</th>
-                            <th class="px-6 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-muted">Jabatan & Unit</th>
-                            <th class="px-6 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-muted">Gol. / Jenis</th>
-                            <th class="px-6 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-muted">Status</th>
-                            <th class="px-6 py-3.5 text-right text-xs font-bold uppercase tracking-wider text-muted">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
+                <x-ui.table class="min-w-[760px]">
+                    <x-ui.table-head class="bg-soft/80">
+                        <x-ui.table-row>
+                            <x-ui.table-th class="px-6 py-3.5">Pegawai</x-ui.table-th>
+                            <x-ui.table-th class="px-6 py-3.5">Jabatan & Unit</x-ui.table-th>
+                            <x-ui.table-th class="px-6 py-3.5">Gol. / Jenis</x-ui.table-th>
+                            <x-ui.table-th class="px-6 py-3.5">Status</x-ui.table-th>
+                            <x-ui.table-th align="right" class="px-6 py-3.5">Aksi</x-ui.table-th>
+                        </x-ui.table-row>
+                    </x-ui.table-head>
+                    <x-ui.table-body>
                         @forelse ($employees as $employee)
                             @php
                                 $latestPosition = $employee->positionHistories->first();
                                 $unitKerja = $latestPosition?->unitKerja?->nama ?? '-';
                                 $initial = mb_substr($employee->nama_lengkap, 0, 1);
                             @endphp
-                            <tr class="nonaktif-record transition-colors hover:bg-soft/50"
-                                data-nama="{{ mb_strtolower($employee->nama_lengkap) }}"
+                            <x-ui.table-row :interactive="true" class="nonaktif-record" data-nama="{{ mb_strtolower($employee->nama_lengkap) }}"
                                 data-nip="{{ mb_strtolower($employee->nip) }}">
-                                <td class="px-6 py-5">
+                                <x-ui.table-td padding="xl">
                                     <div class="flex items-center gap-3">
                                         <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-danger/10 text-sm font-bold text-danger">
                                             {{ $initial }}
@@ -71,23 +69,22 @@
                                             <p class="mt-0.5 font-mono text-xs text-muted">NIP. {{ $employee->nip }}</p>
                                         </div>
                                     </div>
-                                </td>
-                                <td class="px-6 py-5">
+                                </x-ui.table-td>
+                                <x-ui.table-td padding="xl">
                                     <p class="font-sans text-sm font-semibold text-ink">{{ $employee->jabatan_terakhir ?? '-' }}</p>
                                     <p class="mt-0.5 text-xs text-muted">{{ $unitKerja }}</p>
-                                </td>
-                                <td class="px-6 py-5">
+                                </x-ui.table-td>
+                                <x-ui.table-td padding="xl">
                                     <p class="text-sm font-bold leading-tight text-ink">{{ $employee->golongan_terakhir ?? '-' }}</p>
                                     <p class="mt-0.5 text-xs font-bold leading-tight text-primary">{{ $employee->jenisPegawai?->nama ?? '-' }}</p>
-                                </td>
-                                <td class="px-6 py-5">
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-bold text-danger">
-                                        <span class="h-1.5 w-1.5 rounded-full bg-danger"></span>
+                                </x-ui.table-td>
+                                <x-ui.table-td padding="xl">
+                                    <x-ui.badge variant="danger" size="md" dot>
                                         Non-Aktif
-                                    </span>
+                                    </x-ui.badge>
                                     <p class="mt-1 text-xs text-muted">{{ optional($employee->deleted_at)->format('d/m/Y H:i') }}</p>
-                                </td>
-                                <td class="px-6 py-5 text-right">
+                                </x-ui.table-td>
+                                <x-ui.table-td align="right" padding="xl">
                                     <div class="inline-flex items-center justify-end gap-2">
                                         <form method="POST" action="{{ route('pegawai.restore', $employee->id) }}"
                                             onsubmit="return confirm('Aktifkan kembali pegawai ini?')">
@@ -102,17 +99,17 @@
                                             </button>
                                         </form>
                                     </div>
-                                </td>
-                            </tr>
+                                </x-ui.table-td>
+                            </x-ui.table-row>
                         @empty
-                            <tr id="empty-state">
-                                <td colspan="5" class="px-6 py-10 text-center text-sm text-muted">
+                            <x-ui.table-row id="empty-state">
+                                <x-ui.table-td colspan="5" align="center" class="px-6 py-10 text-sm text-muted">
                                     Tidak ada data pegawai non-aktif.
-                                </td>
-                            </tr>
+                                </x-ui.table-td>
+                            </x-ui.table-row>
                         @endforelse
-                    </tbody>
-                </table>
+                    </x-ui.table-body>
+                </x-ui.table>
             </div>
 
             @if ($employees->hasPages())
@@ -120,7 +117,7 @@
                     {{ $employees->links() }}
                 </div>
             @endif
-        </section>
+        </x-ui.card>
     </div>
 
     <script>

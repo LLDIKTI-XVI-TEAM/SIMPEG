@@ -1,15 +1,15 @@
 <x-layouts.app title="Semua Notifikasi">
     <div class="space-y-6 max-w-4xl mx-auto">
 
-        {{-- Breadcrumbs & Title --}}
-        <div class="flex flex-col gap-1.5 bg-surface border border-border rounded-lg p-6 shadow-sm">
-            <h2 class="text-2xl font-bold text-ink font-sans">Pusat Notifikasi & Peringatan</h2>
-            <nav class="mt-2 flex items-center gap-1.5 text-xs text-muted">
-                <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
-                <span>/</span>
-                <span class="font-medium text-ink">Notifikasi</span>
-            </nav>
-        </div>
+        <x-ui.card padding="lg">
+            <x-admin.page-header title="Pusat Notifikasi & Peringatan">
+                <x-slot:breadcrumb>
+                    <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
+                    <span>/</span>
+                    <span class="font-medium text-ink">Notifikasi</span>
+                </x-slot:breadcrumb>
+            </x-admin.page-header>
+        </x-ui.card>
 
         {{-- Log Cards --}}
         <div class="space-y-4">
@@ -25,8 +25,7 @@
                 </div>
                 <div class="min-w-0 flex-1 space-y-1">
                     <div class="flex items-center justify-between">
-                        <span class="text-[10px] font-bold uppercase tracking-wider text-danger font-sans">Dokumen
-                            Kadaluarsa (H-30)</span>
+                        <x-ui.badge variant="danger" size="xs" uppercase>Dokumen Kadaluarsa (H-30)</x-ui.badge>
                         <span class="text-[10px] text-muted font-sans font-mono shrink-0">19 Juni 2026, 11:25</span>
                     </div>
                     <h3 class="text-sm font-bold text-ink font-sans leading-snug">Berkas SK Pengangkatan Budi Santoso
@@ -55,8 +54,7 @@
                 </div>
                 <div class="min-w-0 flex-1 space-y-1">
                     <div class="flex items-center justify-between">
-                        <span class="text-[10px] font-bold uppercase tracking-wider text-warning font-sans">Masa Pensiun
-                            Mendekat (H-60)</span>
+                        <x-ui.badge variant="warning" size="xs" uppercase>Masa Pensiun Mendekat (H-60)</x-ui.badge>
                         <span class="text-[10px] text-muted font-sans font-mono shrink-0">18 Juni 2026, 14:10</span>
                     </div>
                     <h3 class="text-sm font-bold text-ink font-sans leading-snug">Persiapan Pensiun Batas Usia Pensiun
@@ -83,8 +81,7 @@
                 </div>
                 <div class="min-w-0 flex-1 space-y-1">
                     <div class="flex items-center justify-between">
-                        <span class="text-[10px] font-bold uppercase tracking-wider text-info font-sans">Kontrak PPPK
-                            (H-90)</span>
+                        <x-ui.badge variant="info" size="xs" uppercase>Kontrak PPPK (H-90)</x-ui.badge>
                         <span class="text-[10px] text-muted font-sans font-mono shrink-0">15 Juni 2026, 09:30</span>
                     </div>
                     <h3 class="text-sm font-bold text-ink font-sans leading-snug">Peninjauan Perpanjangan Kontrak PPPK

@@ -74,21 +74,18 @@ $permissionPaths = [
                 </nav>
             </div>
             <div class="flex items-center gap-3">
-                <a href="{{ route('audit-log') }}" class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-muted shadow-sm transition hover:bg-soft hover:text-ink font-sans">
+                <x-ui.button href="{{ route('audit-log') }}" variant="muted">
                     <svg class="w-4 h-4 mr-1.5 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
                     </svg>
                     Lihat Audit Log Otorisasi
-                </a>
+                </x-ui.button>
             </div>
         </div>
 
         {{-- NOTIFICATIONS --}}
         @if(session('success'))
-            <div class="rounded-lg border border-success/20 bg-success/10 p-4 text-sm font-semibold text-success flex items-center gap-2">
-                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span>{{ session('success') }}</span>
-            </div>
+            <x-ui.alert variant="success" class="font-semibold">{{ session('success') }}</x-ui.alert>
         @endif
 
         {{-- SYNC & CONCEPT EXPLANATION CARD --}}
@@ -116,17 +113,20 @@ $permissionPaths = [
         {{-- SUMMARY ROLES CARDS --}}
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-5">
             @foreach($roles as $role)
-                <div class="rounded-lg border border-border bg-surface p-4 shadow-sm flex flex-col justify-between hover:border-primary/25 transition-all duration-300">
+                <x-ui.card padding="sm" class="flex flex-col justify-between hover:border-primary/25 transition-all duration-300">
                     <div>
-                        <span class="text-[10px] font-bold uppercase tracking-wide
-                            {{ $role->name === 'super_admin' ? 'text-danger' : '' }}
-                            {{ $role->name === 'admin_kepegawaian' ? 'text-primary' : '' }}
-                            {{ $role->name === 'pimpinan' ? 'text-secondary' : '' }}
-                            {{ $role->name === 'atasan_langsung' ? 'text-warning' : '' }}
-                            {{ $role->name === 'pegawai' ? 'text-success' : '' }}
-                        ">
+                        @php
+                            $roleVariant = match ($role->name) {
+                                'super_admin' => 'danger',
+                                'admin_kepegawaian' => 'primary',
+                                'atasan_langsung' => 'warning',
+                                'pegawai' => 'success',
+                                default => 'muted',
+                            };
+                        @endphp
+                        <x-ui.badge :variant="$roleVariant" size="xs" uppercase>
                             {{ $role->name }}
-                        </span>
+                        </x-ui.badge>
                         <p class="text-[10px] text-muted mt-2 font-sans line-clamp-2" title="{{ $role->description }}">
                             {{ $role->description }}
                         </p>
@@ -135,7 +135,7 @@ $permissionPaths = [
                         <span class="text-[10px] text-muted font-sans font-medium">Izin Aktif:</span>
                         <span class="text-base font-bold text-ink font-mono">{{ $role->permissions->count() }}</span>
                     </div>
-                </div>
+                </x-ui.card>
             @endforeach
         </div>
 
@@ -143,7 +143,7 @@ $permissionPaths = [
         <form action="{{ route('rbac.update') }}" method="POST" class="relative">
             @csrf
 
-            <div class="rounded-lg border border-border bg-surface shadow-sm overflow-hidden">
+            <x-ui.card padding="none" class="overflow-hidden">
                 {{-- TABLE HEADER SEARCH --}}
                 <div class="px-6 py-4 border-b border-border bg-surface flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
@@ -188,19 +188,19 @@ $permissionPaths = [
 
                 {{-- TABLE CONTENT --}}
                 <div class="overflow-x-auto">
-                    <table class="w-full border-collapse">
-                        <thead class="bg-soft border-b border-border">
-                            <tr>
-                                <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans w-[5%] border-b border-border">NO</th>
-                                <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans w-[45%] border-b border-border">MODUL / IZIN FITUR</th>
+                    <x-ui.table class="border-collapse">
+                        <x-ui.table-head class="border-b border-border">
+                            <x-ui.table-row>
+                                <x-ui.table-th class="w-[5%]">NO</x-ui.table-th>
+                                <x-ui.table-th class="w-[45%]">MODUL / IZIN FITUR</x-ui.table-th>
                                 @foreach($roles as $role)
-                                    <th class="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wide text-muted font-sans w-[10%] border-b border-border">
+                                    <x-ui.table-th align="center" class="w-[10%]">
                                         {{ $role->name }}
-                                    </th>
+                                    </x-ui.table-th>
                                 @endforeach
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border">
+                            </x-ui.table-row>
+                        </x-ui.table-head>
+                        <x-ui.table-body>
                             @php $globalIndex = 1; @endphp
                             @foreach($permissionsByModule as $moduleName => $perms)
                                 @php
@@ -212,19 +212,17 @@ $permissionPaths = [
                                         ];
                                     })->toArray());
                                 @endphp
-                                <tbody class="divide-y divide-border border-b border-border" 
-                                       x-show="moduleFilter === '' || moduleFilter === '{{ $moduleName }}'"
-                                       x-data="{ perms: {{ $permsJson }} }">
+                                <x-ui.table-body x-show="moduleFilter === '' || moduleFilter === '{{ $moduleName }}'" x-data="{ perms: {{ $permsJson }} }" class="border-b border-border">
                                     {{-- Module Header Row --}}
-                                    <tr x-show="(moduleFilter === '' || moduleFilter === '{{ $moduleName }}') && (searchQuery === '' || perms.some(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.display.toLowerCase().includes(searchQuery.toLowerCase()) || (p.description || '').toLowerCase().includes(searchQuery.toLowerCase())))" 
+                                    <x-ui.table-row x-show="(moduleFilter === '' || moduleFilter === '{{ $moduleName }}') && (searchQuery === '' || perms.some(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.display.toLowerCase().includes(searchQuery.toLowerCase()) || (p.description || '').toLowerCase().includes(searchQuery.toLowerCase())))"
                                         class="bg-soft/50 font-semibold">
-                                        <td class="px-4 py-2 text-xs font-bold text-ink uppercase tracking-wider font-sans border-b border-border" colspan="2">
+                                        <x-ui.table-td colspan="2" class="px-4 py-2 font-bold uppercase tracking-wider border-b border-border">
                                             📁 &nbsp;{{ $moduleName }}
-                                        </td>
+                                        </x-ui.table-td>
                                         @foreach($roles as $role)
-                                            <td class="px-4 py-2 border-b border-border" colspan="1"></td>
+                                            <x-ui.table-td colspan="1" class="px-4 py-2 border-b border-border"></x-ui.table-td>
                                         @endforeach
-                                    </tr>
+                                    </x-ui.table-row>
                                     
                                     {{-- Permission Rows --}}
                                     @foreach($perms as $permission)
@@ -232,10 +230,10 @@ $permissionPaths = [
                                             $displayPath = $permissionPaths[$permission->name] ?? $permission->name;
                                             $isSensitive = in_array($permission->name, ['manage_user_mapping', 'manage_rbac', 'view_audit_log', 'configure_ews']);
                                         @endphp
-                                        <tr x-show="(moduleFilter === '' || moduleFilter === '{{ $moduleName }}') && (searchQuery === '' || '{{ strtolower($permission->name) }}'.includes(searchQuery.toLowerCase()) || '{{ strtolower($displayPath) }}'.includes(searchQuery.toLowerCase()) || '{{ strtolower($permission->description) }}'.includes(searchQuery.toLowerCase()))"
+                                        <x-ui.table-row x-show="(moduleFilter === '' || moduleFilter === '{{ $moduleName }}') && (searchQuery === '' || '{{ strtolower($permission->name) }}'.includes(searchQuery.toLowerCase()) || '{{ strtolower($displayPath) }}'.includes(searchQuery.toLowerCase()) || '{{ strtolower($permission->description) }}'.includes(searchQuery.toLowerCase()))"
                                             class="hover:bg-soft/30 transition-colors">
-                                            <td class="px-4 py-3.5 text-xs font-mono text-muted">{{ $globalIndex++ }}</td>
-                                            <td class="px-4 py-3.5 text-xs font-sans">
+                                            <x-ui.table-td class="font-mono text-muted">{{ $globalIndex++ }}</x-ui.table-td>
+                                            <x-ui.table-td>
                                                 <div class="flex items-center gap-1.5 flex-wrap">
                                                     <span class="font-bold text-primary font-mono text-[11px]">{{ $displayPath }}</span>
                                                     @if($isSensitive)
@@ -249,43 +247,41 @@ $permissionPaths = [
                                                         {{ $permission->description }}
                                                     @endif
                                                 </div>
-                                            </td>
+                                            </x-ui.table-td>
                                             @foreach($roles as $role)
-                                                <td class="px-4 py-3.5 text-center align-middle hover:bg-soft/40 transition">
+                                                <x-ui.table-td align="center" class="align-middle hover:bg-soft/40 transition">
                                                     @if($role->name === 'super_admin')
                                                         {{-- Super Admin is always checked and disabled to prevent lockout --}}
                                                         <div class="flex items-center justify-center">
-                                                            <input
-                                                                type="checkbox"
+                                                            <x-form.checkbox
                                                                 checked
                                                                 disabled
-                                                                class="h-4.5 w-4.5 rounded border-border text-primary/45 bg-soft cursor-not-allowed focus:ring-0"
-                                                            >
+                                                                class="text-primary/45 bg-soft focus:ring-0"
+                                                            />
                                                             {{-- Standard hidden inputs for checked values to send back --}}
                                                             <input type="hidden" name="matrix[{{ $role->id }}][]" value="{{ $permission->id }}">
                                                         </div>
                                                     @else
                                                         <div class="flex items-center justify-center">
-                                                            <input
-                                                                type="checkbox"
+                                                            <x-form.checkbox
                                                                 name="matrix[{{ $role->id }}][]"
                                                                 value="{{ $permission->id }}"
                                                                 x-model="currentData[{{ $role->id }}]"
                                                                 @change="checkDirty()"
-                                                                class="h-4.5 w-4.5 rounded border-border text-primary focus:ring-primary/20 cursor-pointer transition"
-                                                            >
+                                                                class="transition"
+                                                            />
                                                         </div>
                                                     @endif
-                                                </td>
+                                                </x-ui.table-td>
                                             @endforeach
-                                        </tr>
+                                        </x-ui.table-row>
                                     @endforeach
-                                </tbody>
+                                </x-ui.table-body>
                             @endforeach
-                        </tbody>
-                    </table>
+                        </x-ui.table-body>
+                    </x-ui.table>
                 </div>
-            </div>
+            </x-ui.card>
 
             {{-- STICKY SAVE BAR --}}
             <div
@@ -329,50 +325,34 @@ $permissionPaths = [
             </div>
 
             {{-- CONFIRMATION MODAL --}}
-            <div x-show="showConfirmModal" class="fixed inset-0 z-50 overflow-hidden" style="display: none;" x-transition>
-                {{-- Backdrop --}}
-                <div class="absolute inset-0 bg-ink/30 transition-opacity" @click="showConfirmModal = false"></div>
-                
-                <div class="fixed inset-0 flex items-center justify-center p-4">
-                    <div class="w-full max-w-md bg-surface border border-border rounded-lg shadow-xl flex flex-col overflow-hidden">
-                        {{-- Header --}}
-                        <div class="px-6 py-5 border-b border-border flex items-center justify-between bg-surface">
-                            <div>
-                                <h3 class="text-sm font-bold text-ink font-sans">Konfirmasi Perubahan Otorisasi</h3>
-                                <p class="text-[11px] text-muted font-sans mt-0.5">Harap tinjau kembali perubahan hak akses sebelum menyimpan.</p>
-                            </div>
-                            <button type="button" @click="showConfirmModal = false" class="text-xs font-semibold text-muted hover:text-ink font-sans cursor-pointer focus:outline-none">
-                                Tutup
-                            </button>
-                        </div>
+            <x-ui.modal
+                show="showConfirmModal"
+                title="Konfirmasi Perubahan Otorisasi"
+                close-action="showConfirmModal = false"
+                max-width="md"
+                body-class="p-6 space-y-4 bg-surface"
+                footer-class="flex justify-end gap-3"
+                overlay-class="bg-ink/30"
+            >
+                <p class="text-[11px] text-muted font-sans">Harap tinjau kembali perubahan hak akses sebelum menyimpan.</p>
 
-                        {{-- Body --}}
-                        <div class="p-6 space-y-4 bg-surface">
-                            <div class="rounded-lg border border-warning/20 bg-warning/5 p-4 text-xs text-warning flex gap-3">
-                                <svg class="w-5 h-5 shrink-0 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                                </svg>
-                                <div>
-                                    <span class="font-bold">⚠️ TINDAKAN SENSITIF:</span> Mengubah matriks RBAC (Role-Based Access Control) akan berdampak secara real-time dan langsung mempengaruhi hak akses seluruh pengguna aktif di sistem SIMPEG.
-                                </div>
-                            </div>
-                            <p class="text-xs text-ink/80 leading-relaxed font-sans">
-                                Perubahan pada hak akses modul sensitif (seperti <strong>User Management</strong>, <strong>Role & Permission</strong>, <strong>Audit Log</strong>, atau <strong>Konfigurasi EWS</strong>) berisiko tinggi. Pastikan wewenang yang diberikan telah sesuai dengan instruksi kedinasan.
-                            </p>
-                        </div>
+                <x-ui.alert variant="warning" size="sm" class="text-xs">
+                    <span class="font-bold">TINDAKAN SENSITIF:</span> Mengubah matriks RBAC (Role-Based Access Control) akan berdampak secara real-time dan langsung mempengaruhi hak akses seluruh pengguna aktif di sistem SIMPEG.
+                </x-ui.alert>
 
-                        {{-- Footer --}}
-                        <div class="px-6 py-4 border-t border-border bg-soft flex justify-end gap-3">
-                            <button type="button" @click="showConfirmModal = false" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2.5 text-xs font-semibold text-primary transition-colors hover:bg-soft cursor-pointer focus:outline-none font-sans">
-                                Batal
-                            </button>
-                            <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 cursor-pointer focus:outline-none font-sans">
-                                Ya, Simpan Perubahan
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+                <p class="text-xs text-ink/80 leading-relaxed font-sans">
+                    Perubahan pada hak akses modul sensitif (seperti <strong>User Management</strong>, <strong>Role & Permission</strong>, <strong>Audit Log</strong>, atau <strong>Konfigurasi EWS</strong>) berisiko tinggi. Pastikan wewenang yang diberikan telah sesuai dengan instruksi kedinasan.
+                </p>
+
+                <x-slot:footer>
+                    <x-ui.button type="button" variant="secondary" size="xs" @click="showConfirmModal = false">
+                        Batal
+                    </x-ui.button>
+                    <x-ui.button type="submit" variant="primary" size="xs">
+                        Ya, Simpan Perubahan
+                    </x-ui.button>
+                </x-slot:footer>
+            </x-ui.modal>
 
         </form>
 

@@ -121,29 +121,23 @@
         ];
     @endphp
 
-    {{-- Page Header --}}
-    <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-            <div class="flex items-center gap-2">
-                <h2 class="text-2xl font-bold text-ink font-sans leading-tight">Data Master / Reference Tables</h2>
-            </div>
-            <nav class="mt-1 flex items-center gap-1.5 text-xs text-muted">
+    <x-admin.page-header title="Data Master / Reference Tables" class="mb-6">
+        <x-slot:breadcrumb>
                 <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
                 <span>/</span>
                 <span class="font-medium text-ink">Data Master</span>
                 <span>•</span>
                 <span class="text-muted italic">Akses: Khusus Super Admin</span>
-            </nav>
-        </div>
-        <div class="flex items-center gap-3">
-            <a href="{{ route('audit-log') }}" class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-muted shadow-sm transition hover:bg-soft hover:text-ink font-sans">
-                <svg class="w-4 h-4 mr-1.5 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+        </x-slot:breadcrumb>
+        <x-slot:actions>
+            <x-ui.button href="{{ route('audit-log') }}" variant="muted">
+                <svg class="w-4 h-4 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
                 </svg>
                 Lihat Audit Log Master
-            </a>
-        </div>
-    </div>
+            </x-ui.button>
+        </x-slot:actions>
+    </x-admin.page-header>
 
     <div x-data="{ 
         activeTab: 'golongan', 
@@ -165,17 +159,17 @@
                     class="text-[10px] font-bold text-muted uppercase tracking-wide px-3 pb-2 mb-2 font-sans">
                     Kategori Referensi</p>
 
-                @foreach($tabs as $key => $label)
-                    <button @click="activeTab = '{{ $key }}'"
-                        :class="activeTab === '{{ $key }}' ? 'bg-primary/10 text-primary font-semibold' : 'text-muted hover:bg-soft hover:text-ink font-medium'"
-                        class="w-full text-left flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors">
+                <x-ui.tabs variant="sidebar-soft" label="Kategori referensi">
+                    @foreach($tabs as $key => $label)
+                    <x-ui.tab variant="sidebar-soft" active="activeTab === '{{ $key }}'" click="activeTab = '{{ $key }}'">
                         {{ $label }}
                         <svg x-show="activeTab === '{{ $key }}'" class="w-4 h-4 ml-auto" fill="none" stroke="currentColor"
                             viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                         </svg>
-                    </button>
-                @endforeach
+                    </x-ui.tab>
+                    @endforeach
+                </x-ui.tabs>
             </div>
         </aside>
 
@@ -216,49 +210,46 @@
                     </button>
                 </div>
                 <div class="rounded-lg overflow-hidden">
-                    <table class="w-full">
-                        <thead class="bg-soft">
-                            <tr>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                    Kode</th>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                    Nama Pangkat</th>
-                                <th
-                                    class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted select-none">
+                    <x-ui.table>
+                        <x-ui.table-head>
+                            <x-ui.table-row>
+                                <x-ui.table-th>
+                                    Kode</x-ui.table-th>
+                                <x-ui.table-th>
+                                    Nama Pangkat</x-ui.table-th>
+                                <x-ui.table-th align="right" class="select-none">
                                     <div class="flex justify-end">
                                         <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.936 6.936 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                         </svg>
                                     </div>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody class="">
+                                </x-ui.table-th>
+                            </x-ui.table-row>
+                        </x-ui.table-head>
+                        <x-ui.table-body>
                             @foreach($dataGolongan as $item)
-                                <tr class="hover:bg-soft/50 transition-colors">
-                                    <td class="px-4 py-3 text-sm font-medium text-ink">{{ $item['kode'] }}</td>
-                                    <td class="px-4 py-3 text-sm text-muted">{{ $item['nama'] }}</td>
-                                    <td class="px-4 py-3 text-right">
+                                <x-ui.table-row :interactive="true">
+                                    <x-ui.table-td padding="sm" class="text-sm font-medium">{{ $item['kode'] }}</x-ui.table-td>
+                                    <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item['nama'] }}</x-ui.table-td>
+                                    <x-ui.table-td align="right" padding="sm">
                                         <div class="flex items-center justify-end gap-1.5">
-                                            <button @click="openModal('edit')" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Edit">
+                                            <x-ui.button type="button" @click="openModal('edit')" variant="secondary" size="icon" title="Edit">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                                 </svg>
-                                            </button>
-                                            <button @click="openDeleteConfirm({ name: '{{ $item['kode'] }} - {{ $item['nama'] }}' })" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-danger transition hover:bg-danger/5 shadow-sm cursor-pointer" title="Hapus">
+                                            </x-ui.button>
+                                            <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['kode'] }} - {{ $item['nama'] }}' })" variant="danger" size="icon" title="Hapus">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                                 </svg>
-                                            </button>
+                                            </x-ui.button>
                                         </div>
-                                    </td>
-                                </tr>
+                                    </x-ui.table-td>
+                                </x-ui.table-row>
                             @endforeach
-                        </tbody>
-                    </table>
+                        </x-ui.table-body>
+                    </x-ui.table>
                 </div>
             </div>
 
@@ -280,59 +271,54 @@
                     </button>
                 </div>
                 <div class="rounded-lg overflow-hidden">
-                    <table class="w-full">
-                        <thead class="bg-soft">
-                            <tr>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                    ID</th>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                    Nama Jabatan</th>
-                                <th
-                                    class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted">
-                                    Maks Usia</th>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                    Catatan</th>
-                                <th
-                                    class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted select-none">
+                    <x-ui.table>
+                        <x-ui.table-head>
+                            <x-ui.table-row>
+                                <x-ui.table-th>
+                                    ID</x-ui.table-th>
+                                <x-ui.table-th>
+                                    Nama Jabatan</x-ui.table-th>
+                                <x-ui.table-th align="center">
+                                    Maks Usia</x-ui.table-th>
+                                <x-ui.table-th>
+                                    Catatan</x-ui.table-th>
+                                <x-ui.table-th align="right" class="select-none">
                                     <div class="flex justify-end">
                                         <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.936 6.936 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                         </svg>
                                     </div>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody class="">
+                                </x-ui.table-th>
+                            </x-ui.table-row>
+                        </x-ui.table-head>
+                        <x-ui.table-body>
                             @foreach($dataJenisJabatan as $item)
-                                <tr class="hover:bg-soft/50 transition-colors">
-                                    <td class="px-4 py-3 text-sm text-muted">{{ $item['id'] }}</td>
-                                    <td class="px-4 py-3 text-sm font-medium text-ink">{{ $item['nama'] }}</td>
-                                    <td class="px-4 py-3 text-sm text-center font-medium text-warning">
+                                <x-ui.table-row :interactive="true">
+                                    <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item['id'] }}</x-ui.table-td>
+                                    <x-ui.table-td padding="sm" class="text-sm font-medium">{{ $item['nama'] }}</x-ui.table-td>
+                                    <x-ui.table-td align="center" padding="sm" class="text-sm font-medium text-warning">
                                         {{ $item['maks_usia'] }}
-                                    </td>
-                                    <td class="px-4 py-3 text-sm text-muted">{{ $item['catatan'] }}</td>
-                                    <td class="px-4 py-3 text-right">
+                                    </x-ui.table-td>
+                                    <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item['catatan'] }}</x-ui.table-td>
+                                    <x-ui.table-td align="right" padding="sm">
                                         <div class="flex items-center justify-end gap-1.5">
-                                            <button @click="openModal('edit')" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Edit">
+                                            <x-ui.button type="button" @click="openModal('edit')" variant="secondary" size="icon" title="Edit">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                                 </svg>
-                                            </button>
-                                            <button @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-danger transition hover:bg-danger/5 shadow-sm cursor-pointer" title="Hapus">
+                                            </x-ui.button>
+                                            <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" variant="danger" size="icon" title="Hapus">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                                 </svg>
-                                            </button>
+                                            </x-ui.button>
                                         </div>
-                                    </td>
-                                </tr>
+                                    </x-ui.table-td>
+                                </x-ui.table-row>
                             @endforeach
-                        </tbody>
-                    </table>
+                        </x-ui.table-body>
+                    </x-ui.table>
                 </div>
             </div>
 
@@ -354,49 +340,46 @@
                     </button>
                 </div>
                 <div class="rounded-lg overflow-hidden">
-                    <table class="w-full">
-                        <thead class="bg-soft">
-                            <tr>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                    Kode</th>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                    Nama Eselon</th>
-                                <th
-                                    class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted select-none">
+                    <x-ui.table>
+                        <x-ui.table-head>
+                            <x-ui.table-row>
+                                <x-ui.table-th>
+                                    Kode</x-ui.table-th>
+                                <x-ui.table-th>
+                                    Nama Eselon</x-ui.table-th>
+                                <x-ui.table-th align="right" class="select-none">
                                     <div class="flex justify-end">
                                         <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.936 6.936 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                         </svg>
                                     </div>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody class="">
+                                </x-ui.table-th>
+                            </x-ui.table-row>
+                        </x-ui.table-head>
+                        <x-ui.table-body>
                             @foreach($dataEselon as $item)
-                                <tr class="hover:bg-soft/50 transition-colors">
-                                    <td class="px-4 py-3 text-sm font-medium text-ink">{{ $item['kode'] }}</td>
-                                    <td class="px-4 py-3 text-sm text-muted">{{ $item['nama'] }}</td>
-                                    <td class="px-4 py-3 text-right">
+                                <x-ui.table-row :interactive="true">
+                                    <x-ui.table-td padding="sm" class="text-sm font-medium">{{ $item['kode'] }}</x-ui.table-td>
+                                    <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item['nama'] }}</x-ui.table-td>
+                                    <x-ui.table-td align="right" padding="sm">
                                         <div class="flex items-center justify-end gap-1.5">
-                                            <button @click="openModal('edit')" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Edit">
+                                            <x-ui.button type="button" @click="openModal('edit')" variant="secondary" size="icon" title="Edit">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                                 </svg>
-                                            </button>
-                                            <button @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-danger transition hover:bg-danger/5 shadow-sm cursor-pointer" title="Hapus">
+                                            </x-ui.button>
+                                            <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" variant="danger" size="icon" title="Hapus">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                                 </svg>
-                                            </button>
+                                            </x-ui.button>
                                         </div>
-                                    </td>
-                                </tr>
+                                    </x-ui.table-td>
+                                </x-ui.table-row>
                             @endforeach
-                        </tbody>
-                    </table>
+                        </x-ui.table-body>
+                    </x-ui.table>
                 </div>
             </div>
 
@@ -418,35 +401,31 @@
                     </button>
                 </div>
                 <div class="rounded-lg overflow-hidden">
-                    <table class="w-full">
-                        <thead class="bg-soft">
-                            <tr>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                    ID</th>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                    Nama Jenis Cuti</th>
-                                <th
-                                    class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted">
-                                    Khusus PNS</th>
-                                <th
-                                    class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted select-none">
+                    <x-ui.table>
+                        <x-ui.table-head>
+                            <x-ui.table-row>
+                                <x-ui.table-th>
+                                    ID</x-ui.table-th>
+                                <x-ui.table-th>
+                                    Nama Jenis Cuti</x-ui.table-th>
+                                <x-ui.table-th align="center">
+                                    Khusus PNS</x-ui.table-th>
+                                <x-ui.table-th align="right" class="select-none">
                                     <div class="flex justify-end">
                                         <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.936 6.936 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                         </svg>
                                     </div>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody class="">
+                                </x-ui.table-th>
+                            </x-ui.table-row>
+                        </x-ui.table-head>
+                        <x-ui.table-body>
                             @foreach($dataJenisCuti as $item)
-                                <tr class="hover:bg-soft/50 transition-colors">
-                                    <td class="px-4 py-3 text-sm text-muted">{{ $item['id'] }}</td>
-                                    <td class="px-4 py-3 text-sm font-medium text-ink">{{ $item['nama'] }}</td>
-                                    <td class="px-4 py-3 text-center">
+                                <x-ui.table-row :interactive="true">
+                                    <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item['id'] }}</x-ui.table-td>
+                                    <x-ui.table-td padding="sm" class="text-sm font-medium">{{ $item['nama'] }}</x-ui.table-td>
+                                    <x-ui.table-td align="center" padding="sm">
                                         @if($item['khusus_pns'] === 'Ya')
                                             <span
                                                 class="text-[11px] font-semibold text-primary">Ya</span>
@@ -454,25 +433,25 @@
                                             <span
                                                 class="text-[11px] font-semibold text-muted">Tidak</span>
                                         @endif
-                                    </td>
-                                    <td class="px-4 py-3 text-right">
+                                    </x-ui.table-td>
+                                    <x-ui.table-td align="right" padding="sm">
                                         <div class="flex items-center justify-end gap-1.5">
-                                            <button @click="openModal('edit')" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Edit">
+                                            <x-ui.button type="button" @click="openModal('edit')" variant="secondary" size="icon" title="Edit">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                                 </svg>
-                                            </button>
-                                            <button @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-danger transition hover:bg-danger/5 shadow-sm cursor-pointer" title="Hapus">
+                                            </x-ui.button>
+                                            <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" variant="danger" size="icon" title="Hapus">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                                 </svg>
-                                            </button>
+                                            </x-ui.button>
                                         </div>
-                                    </td>
-                                </tr>
+                                    </x-ui.table-td>
+                                </x-ui.table-row>
                             @endforeach
-                        </tbody>
-                    </table>
+                        </x-ui.table-body>
+                    </x-ui.table>
                 </div>
             </div>
 
@@ -494,49 +473,46 @@
                     </button>
                 </div>
                 <div class="rounded-lg overflow-hidden">
-                    <table class="w-full">
-                        <thead class="bg-soft">
-                            <tr>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                    ID</th>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                    Nama Agama</th>
-                                <th
-                                    class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted select-none">
+                    <x-ui.table>
+                        <x-ui.table-head>
+                            <x-ui.table-row>
+                                <x-ui.table-th>
+                                    ID</x-ui.table-th>
+                                <x-ui.table-th>
+                                    Nama Agama</x-ui.table-th>
+                                <x-ui.table-th align="right" class="select-none">
                                     <div class="flex justify-end">
                                         <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.936 6.936 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                         </svg>
                                     </div>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody class="">
+                                </x-ui.table-th>
+                            </x-ui.table-row>
+                        </x-ui.table-head>
+                        <x-ui.table-body>
                             @foreach($dataAgama as $item)
-                                <tr class="hover:bg-soft/50 transition-colors">
-                                    <td class="px-4 py-3 text-sm text-muted">{{ $item['id'] }}</td>
-                                    <td class="px-4 py-3 text-sm font-medium text-ink">{{ $item['nama'] }}</td>
-                                    <td class="px-4 py-3 text-right">
+                                <x-ui.table-row :interactive="true">
+                                    <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item['id'] }}</x-ui.table-td>
+                                    <x-ui.table-td padding="sm" class="text-sm font-medium">{{ $item['nama'] }}</x-ui.table-td>
+                                    <x-ui.table-td align="right" padding="sm">
                                         <div class="flex items-center justify-end gap-1.5">
-                                            <button @click="openModal('edit')" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Edit">
+                                            <x-ui.button type="button" @click="openModal('edit')" variant="secondary" size="icon" title="Edit">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                                 </svg>
-                                            </button>
-                                            <button @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-danger transition hover:bg-danger/5 shadow-sm cursor-pointer" title="Hapus">
+                                            </x-ui.button>
+                                            <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" variant="danger" size="icon" title="Hapus">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                                 </svg>
-                                            </button>
+                                            </x-ui.button>
                                         </div>
-                                    </td>
-                                </tr>
+                                    </x-ui.table-td>
+                                </x-ui.table-row>
                             @endforeach
-                        </tbody>
-                    </table>
+                        </x-ui.table-body>
+                    </x-ui.table>
                 </div>
             </div>
 
@@ -558,53 +534,49 @@
                     </button>
                 </div>
                 <div class="rounded-lg overflow-hidden">
-                    <table class="w-full">
-                        <thead class="bg-soft">
-                            <tr>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                    ID</th>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                    Kode</th>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                    Nama</th>
-                                <th
-                                    class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted select-none">
+                    <x-ui.table>
+                        <x-ui.table-head>
+                            <x-ui.table-row>
+                                <x-ui.table-th>
+                                    ID</x-ui.table-th>
+                                <x-ui.table-th>
+                                    Kode</x-ui.table-th>
+                                <x-ui.table-th>
+                                    Nama</x-ui.table-th>
+                                <x-ui.table-th align="right" class="select-none">
                                     <div class="flex justify-end">
                                         <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.936 6.936 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                         </svg>
                                     </div>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody class="">
+                                </x-ui.table-th>
+                            </x-ui.table-row>
+                        </x-ui.table-head>
+                        <x-ui.table-body>
                             @foreach($dataJenisKelamin as $item)
-                                <tr class="hover:bg-soft/50 transition-colors">
-                                    <td class="px-4 py-3 text-sm text-muted">{{ $item['id'] }}</td>
-                                    <td class="px-4 py-3 text-sm font-medium text-ink">{{ $item['kode'] }}</td>
-                                    <td class="px-4 py-3 text-sm text-muted">{{ $item['nama'] }}</td>
-                                    <td class="px-4 py-3 text-right">
+                                <x-ui.table-row :interactive="true">
+                                    <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item['id'] }}</x-ui.table-td>
+                                    <x-ui.table-td padding="sm" class="text-sm font-medium">{{ $item['kode'] }}</x-ui.table-td>
+                                    <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item['nama'] }}</x-ui.table-td>
+                                    <x-ui.table-td align="right" padding="sm">
                                         <div class="flex items-center justify-end gap-1.5">
-                                            <button @click="openModal('edit')" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Edit">
+                                            <x-ui.button type="button" @click="openModal('edit')" variant="secondary" size="icon" title="Edit">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                                 </svg>
-                                            </button>
-                                            <button @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-danger transition hover:bg-danger/5 shadow-sm cursor-pointer" title="Hapus">
+                                            </x-ui.button>
+                                            <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" variant="danger" size="icon" title="Hapus">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                                 </svg>
-                                            </button>
+                                            </x-ui.button>
                                         </div>
-                                    </td>
-                                </tr>
+                                    </x-ui.table-td>
+                                </x-ui.table-row>
                             @endforeach
-                        </tbody>
-                    </table>
+                        </x-ui.table-body>
+                    </x-ui.table>
                 </div>
             </div>
 
@@ -626,49 +598,46 @@
                     </button>
                 </div>
                 <div class="rounded-lg overflow-hidden">
-                    <table class="w-full">
-                        <thead class="bg-soft">
-                            <tr>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                    ID</th>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                    Status</th>
-                                <th
-                                    class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted select-none">
+                    <x-ui.table>
+                        <x-ui.table-head>
+                            <x-ui.table-row>
+                                <x-ui.table-th>
+                                    ID</x-ui.table-th>
+                                <x-ui.table-th>
+                                    Status</x-ui.table-th>
+                                <x-ui.table-th align="right" class="select-none">
                                     <div class="flex justify-end">
                                         <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.936 6.936 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                         </svg>
                                     </div>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody class="">
+                                </x-ui.table-th>
+                            </x-ui.table-row>
+                        </x-ui.table-head>
+                        <x-ui.table-body>
                             @foreach($dataStatusPerkawinan as $item)
-                                <tr class="hover:bg-soft/50 transition-colors">
-                                    <td class="px-4 py-3 text-sm text-muted">{{ $item['id'] }}</td>
-                                    <td class="px-4 py-3 text-sm font-medium text-ink">{{ $item['nama'] }}</td>
-                                    <td class="px-4 py-3 text-right">
+                                <x-ui.table-row :interactive="true">
+                                    <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item['id'] }}</x-ui.table-td>
+                                    <x-ui.table-td padding="sm" class="text-sm font-medium">{{ $item['nama'] }}</x-ui.table-td>
+                                    <x-ui.table-td align="right" padding="sm">
                                         <div class="flex items-center justify-end gap-1.5">
-                                            <button @click="openModal('edit')" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Edit">
+                                            <x-ui.button type="button" @click="openModal('edit')" variant="secondary" size="icon" title="Edit">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                                 </svg>
-                                            </button>
-                                            <button @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-danger transition hover:bg-danger/5 shadow-sm cursor-pointer" title="Hapus">
+                                            </x-ui.button>
+                                            <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" variant="danger" size="icon" title="Hapus">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                                 </svg>
-                                            </button>
+                                            </x-ui.button>
                                         </div>
-                                    </td>
-                                </tr>
+                                    </x-ui.table-td>
+                                </x-ui.table-row>
                             @endforeach
-                        </tbody>
-                    </table>
+                        </x-ui.table-body>
+                    </x-ui.table>
                 </div>
             </div>
 
@@ -690,49 +659,46 @@
                     </button>
                 </div>
                 <div class="rounded-lg overflow-hidden">
-                    <table class="w-full">
-                        <thead class="bg-soft">
-                            <tr>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                    ID</th>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                    Jenjang Pendidikan</th>
-                                <th
-                                    class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted select-none">
+                    <x-ui.table>
+                        <x-ui.table-head>
+                            <x-ui.table-row>
+                                <x-ui.table-th>
+                                    ID</x-ui.table-th>
+                                <x-ui.table-th>
+                                    Jenjang Pendidikan</x-ui.table-th>
+                                <x-ui.table-th align="right" class="select-none">
                                     <div class="flex justify-end">
                                         <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.936 6.936 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                         </svg>
                                     </div>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody class="">
+                                </x-ui.table-th>
+                            </x-ui.table-row>
+                        </x-ui.table-head>
+                        <x-ui.table-body>
                             @foreach($dataPendidikan as $item)
-                                <tr class="hover:bg-soft/50 transition-colors">
-                                    <td class="px-4 py-3 text-sm text-muted">{{ $item['id'] }}</td>
-                                    <td class="px-4 py-3 text-sm font-medium text-ink">{{ $item['nama'] }}</td>
-                                    <td class="px-4 py-3 text-right">
+                                <x-ui.table-row :interactive="true">
+                                    <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item['id'] }}</x-ui.table-td>
+                                    <x-ui.table-td padding="sm" class="text-sm font-medium">{{ $item['nama'] }}</x-ui.table-td>
+                                    <x-ui.table-td align="right" padding="sm">
                                         <div class="flex items-center justify-end gap-1.5">
-                                            <button @click="openModal('edit')" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Edit">
+                                            <x-ui.button type="button" @click="openModal('edit')" variant="secondary" size="icon" title="Edit">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                                 </svg>
-                                            </button>
-                                            <button @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-danger transition hover:bg-danger/5 shadow-sm cursor-pointer" title="Hapus">
+                                            </x-ui.button>
+                                            <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" variant="danger" size="icon" title="Hapus">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                                 </svg>
-                                            </button>
+                                            </x-ui.button>
                                         </div>
-                                    </td>
-                                </tr>
+                                    </x-ui.table-td>
+                                </x-ui.table-row>
                             @endforeach
-                        </tbody>
-                    </table>
+                        </x-ui.table-body>
+                    </x-ui.table>
                 </div>
             </div>
 
@@ -754,53 +720,49 @@
                     </button>
                 </div>
                 <div class="rounded-lg overflow-hidden">
-                    <table class="w-full">
-                        <thead class="bg-soft">
-                            <tr>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                    ID</th>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                    Nama Unit Kerja</th>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                    Keterangan</th>
-                                <th
-                                    class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted select-none">
+                    <x-ui.table>
+                        <x-ui.table-head>
+                            <x-ui.table-row>
+                                <x-ui.table-th>
+                                    ID</x-ui.table-th>
+                                <x-ui.table-th>
+                                    Nama Unit Kerja</x-ui.table-th>
+                                <x-ui.table-th>
+                                    Keterangan</x-ui.table-th>
+                                <x-ui.table-th align="right" class="select-none">
                                     <div class="flex justify-end">
                                         <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.936 6.936 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                         </svg>
                                     </div>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody class="">
+                                </x-ui.table-th>
+                            </x-ui.table-row>
+                        </x-ui.table-head>
+                        <x-ui.table-body>
                             @foreach($dataUnitKerja as $item)
-                                <tr class="hover:bg-soft/50 transition-colors">
-                                    <td class="px-4 py-3 text-sm text-muted">{{ $item['id'] }}</td>
-                                    <td class="px-4 py-3 text-sm font-medium text-ink">{{ $item['nama'] }}</td>
-                                    <td class="px-4 py-3 text-sm text-muted">{{ $item['keterangan'] }}</td>
-                                    <td class="px-4 py-3 text-right">
+                                <x-ui.table-row :interactive="true">
+                                    <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item['id'] }}</x-ui.table-td>
+                                    <x-ui.table-td padding="sm" class="text-sm font-medium">{{ $item['nama'] }}</x-ui.table-td>
+                                    <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item['keterangan'] }}</x-ui.table-td>
+                                    <x-ui.table-td align="right" padding="sm">
                                         <div class="flex items-center justify-end gap-1.5">
-                                            <button @click="openModal('edit')" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Edit">
+                                            <x-ui.button type="button" @click="openModal('edit')" variant="secondary" size="icon" title="Edit">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                                 </svg>
-                                            </button>
-                                            <button @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-danger transition hover:bg-danger/5 shadow-sm cursor-pointer" title="Hapus">
+                                            </x-ui.button>
+                                            <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" variant="danger" size="icon" title="Hapus">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                                 </svg>
-                                            </button>
+                                            </x-ui.button>
                                         </div>
-                                    </td>
-                                </tr>
+                                    </x-ui.table-td>
+                                </x-ui.table-row>
                             @endforeach
-                        </tbody>
-                    </table>
+                        </x-ui.table-body>
+                    </x-ui.table>
                 </div>
             </div>
 
@@ -823,49 +785,46 @@
                     </button>
                 </div>
                 <div class="rounded-lg overflow-hidden">
-                    <table class="w-full">
-                        <thead class="bg-soft">
-                            <tr>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                                    Jenis Jabatan BUP</th>
-                                <th
-                                    class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted">
-                                    BUP (Tahun)</th>
-                                <th
-                                    class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted select-none">
+                    <x-ui.table>
+                        <x-ui.table-head>
+                            <x-ui.table-row>
+                                <x-ui.table-th>
+                                    Jenis Jabatan BUP</x-ui.table-th>
+                                <x-ui.table-th align="center">
+                                    BUP (Tahun)</x-ui.table-th>
+                                <x-ui.table-th align="right" class="select-none">
                                     <div class="flex justify-end">
                                         <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.936 6.936 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                         </svg>
                                     </div>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody class="">
+                                </x-ui.table-th>
+                            </x-ui.table-row>
+                        </x-ui.table-head>
+                        <x-ui.table-body>
                             @foreach($dataBUP as $item)
-                                <tr class="hover:bg-soft/50 transition-colors">
-                                    <td class="px-4 py-3 text-sm font-medium text-ink">{{ $item['jenis'] }}</td>
-                                    <td class="px-4 py-3 text-sm text-center font-bold text-danger">{{ $item['bup'] }}</td>
-                                    <td class="px-4 py-3 text-right">
+                                <x-ui.table-row :interactive="true">
+                                    <x-ui.table-td padding="sm" class="text-sm font-medium">{{ $item['jenis'] }}</x-ui.table-td>
+                                    <x-ui.table-td align="center" padding="sm" class="text-sm font-bold text-danger">{{ $item['bup'] }}</x-ui.table-td>
+                                    <x-ui.table-td align="right" padding="sm">
                                         <div class="flex items-center justify-end gap-1.5">
-                                            <button @click="openModal('edit')" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Edit">
+                                            <x-ui.button type="button" @click="openModal('edit')" variant="secondary" size="icon" title="Edit">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                                 </svg>
-                                            </button>
-                                            <button @click="openDeleteConfirm({ name: '{{ $item['jenis'] }}' })" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-danger transition hover:bg-danger/5 shadow-sm cursor-pointer" title="Hapus">
+                                            </x-ui.button>
+                                            <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['jenis'] }}' })" variant="danger" size="icon" title="Hapus">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                                 </svg>
-                                            </button>
+                                            </x-ui.button>
                                         </div>
-                                    </td>
-                                </tr>
+                                    </x-ui.table-td>
+                                </x-ui.table-row>
                             @endforeach
-                        </tbody>
-                    </table>
+                        </x-ui.table-body>
+                    </x-ui.table>
                 </div>
             </div>
 
@@ -886,52 +845,52 @@
                     </button>
                 </div>
                 <div class="rounded-lg overflow-hidden">
-                    <table class="w-full">
-                        <thead class="bg-soft">
-                            <tr>
-                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">Tanggal</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">Nama Hari Libur / Cuti Bersama</th>
-                                <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted">Jenis</th>
-                                <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted select-none">
+                    <x-ui.table>
+                        <x-ui.table-head>
+                            <x-ui.table-row>
+                                <x-ui.table-th>Tanggal</x-ui.table-th>
+                                <x-ui.table-th>Nama Hari Libur / Cuti Bersama</x-ui.table-th>
+                                <x-ui.table-th align="center">Jenis</x-ui.table-th>
+                                <x-ui.table-th align="right" class="select-none">
                                     <div class="flex justify-end">
                                         <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.936 6.936 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                         </svg>
                                     </div>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody class="">
+                                </x-ui.table-th>
+                            </x-ui.table-row>
+                        </x-ui.table-head>
+                        <x-ui.table-body>
                             @foreach($dataHariLibur as $item)
-                                <tr class="hover:bg-soft/50 transition-colors">
-                                    <td class="px-4 py-3 text-sm font-medium text-ink">{{ \Carbon\Carbon::parse($item['tanggal'])->format('d M Y') }}</td>
-                                    <td class="px-4 py-3 text-sm text-muted">{{ $item['nama'] }}</td>
-                                    <td class="px-4 py-3 text-sm text-center">
+                                <x-ui.table-row :interactive="true">
+                                    <x-ui.table-td padding="sm" class="text-sm font-medium">{{ \Carbon\Carbon::parse($item['tanggal'])->format('d M Y') }}</x-ui.table-td>
+                                    <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item['nama'] }}</x-ui.table-td>
+                                    <x-ui.table-td align="center" padding="sm" class="text-sm">
                                         @if($item['jenis'] === 'Cuti Bersama')
                                             <span class="text-[11px] font-semibold text-secondary">Cuti Bersama</span>
                                         @else
                                             <span class="text-[11px] font-semibold text-danger">Libur Nasional</span>
                                         @endif
-                                    </td>
-                                    <td class="px-4 py-3 text-right">
+                                    </x-ui.table-td>
+                                    <x-ui.table-td align="right" padding="sm">
                                         <div class="flex items-center justify-end gap-1.5">
-                                            <button @click="openModal('edit')" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Edit">
+                                            <x-ui.button type="button" @click="openModal('edit')" variant="secondary" size="icon" title="Edit">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                                 </svg>
-                                            </button>
-                                            <button @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-danger transition hover:bg-danger/5 shadow-sm cursor-pointer" title="Hapus">
+                                            </x-ui.button>
+                                            <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" variant="danger" size="icon" title="Hapus">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                                 </svg>
-                                            </button>
+                                            </x-ui.button>
                                         </div>
-                                    </td>
-                                </tr>
+                                    </x-ui.table-td>
+                                </x-ui.table-row>
                             @endforeach
-                        </tbody>
-                    </table>
+                        </x-ui.table-body>
+                    </x-ui.table>
                 </div>
             </div>
 
@@ -992,12 +951,13 @@
                                     placeholder="Contoh: 60">
                             </div>
                         </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-semibold text-ink">Catatan</label>
-                            <textarea
-                                class="w-full rounded-lg border border-primary/15 bg-transparent px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
-                                rows="2" placeholder="Catatan opsional..."></textarea>
-                        </div>
+                        <x-form.textarea
+                            label="Catatan"
+                            rows="2"
+                            label-class="mb-1 block text-sm font-semibold normal-case tracking-normal"
+                            placeholder="Catatan opsional..."
+                            class="border-primary/15 bg-transparent focus:ring-1 focus:ring-primary/30"
+                        />
                     </div>
 
                     {{-- Form Eselon --}}
@@ -1088,12 +1048,13 @@
                                 class="w-full rounded-lg border border-primary/15 bg-transparent px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
                                 placeholder="Masukkan nama unit">
                         </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-semibold text-ink">Keterangan</label>
-                            <textarea
-                                class="w-full rounded-lg border border-primary/15 bg-transparent px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
-                                rows="2" placeholder="Penjelasan unit kerja..."></textarea>
-                        </div>
+                        <x-form.textarea
+                            label="Keterangan"
+                            rows="2"
+                            label-class="mb-1 block text-sm font-semibold normal-case tracking-normal"
+                            placeholder="Penjelasan unit kerja..."
+                            class="border-primary/15 bg-transparent focus:ring-1 focus:ring-primary/30"
+                        />
                     </div>
 
                     {{-- Form BUP --}}
@@ -1114,11 +1075,11 @@
 
                     {{-- Form Hari Libur --}}
                     <div x-show="activeTab === 'hari_libur'" class="space-y-4">
-                        <div>
-                            <label class="mb-1 block text-sm font-semibold text-ink">Tanggal</label>
-                            <input type="date"
-                                class="w-full rounded-lg border border-primary/15 bg-transparent px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30">
-                        </div>
+                        <x-form.date
+                            label="Tanggal"
+                            size="lg"
+                            class="border-primary/15 bg-transparent focus:ring-1 focus:ring-primary/30"
+                        />
                         <div>
                             <label class="mb-1 block text-sm font-semibold text-ink">Nama Hari Libur / Cuti Bersama</label>
                             <input type="text"
@@ -1153,57 +1114,38 @@
         </div>
 
         {{-- DELETE CONFIRMATION MODAL --}}
-        <div x-show="isDeleteModalOpen" style="display: none;"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 backdrop-blur-sm transition-opacity"
-            x-transition.opacity>
-            <div @click.away="closeDeleteModal()"
-                class="w-full max-w-md rounded-xl bg-surface p-6 shadow-xl" x-transition>
+        <x-ui.modal
+            show="isDeleteModalOpen"
+            title="Konfirmasi Hapus Data Master"
+            close-action="closeDeleteModal()"
+            max-width="md"
+            body-class="p-6 space-y-4"
+            footer-class="flex justify-end gap-3"
+            overlay-class="bg-ink/50 backdrop-blur-sm"
+        >
+            <p class="text-sm text-ink leading-relaxed font-sans font-medium">
+                Apakah Anda yakin ingin menghapus data referensi <strong class="text-danger" x-text="deleteItemName"></strong> ini?
+            </p>
 
-                {{-- Header --}}
-                <div class="mb-4 flex items-center justify-between pb-2 border-b border-border">
-                    <h3 class="text-lg font-bold text-danger font-sans">Konfirmasi Hapus Data Master</h3>
-                    <button @click="closeDeleteModal()" class="text-muted hover:text-danger transition-colors">
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
+            <x-ui.alert variant="danger" size="sm" class="text-xs">
+                <span class="font-bold">RESTRIKSI INTEGRITAS:</span> Data master yang saat ini aktif digunakan oleh data pegawai <strong>tidak diperkenankan untuk dihapus</strong> dari sistem.
+            </x-ui.alert>
 
-                {{-- Body --}}
-                <div class="space-y-4">
-                    <p class="text-sm text-ink leading-relaxed font-sans font-medium">
-                        Apakah Anda yakin ingin menghapus data referensi <strong class="text-danger" x-text="deleteItemName"></strong> ini?
-                    </p>
-                    
-                    <div class="rounded-lg border border-danger/20 bg-danger/5 p-3 text-xs text-danger flex gap-2 font-sans">
-                        <svg class="w-4.5 h-4.5 shrink-0 mt-0.5 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                        </svg>
-                        <div>
-                            <span class="font-bold">⚠️ RESTRIKSI INTEGRITAS:</span> Data master yang saat ini aktif digunakan oleh data pegawai <strong>tidak diperkenankan untuk dihapus</strong> dari sistem.
-                        </div>
-                    </div>
-                    
-                    <p class="text-xs text-muted leading-relaxed font-sans">
-                        Metode penghapusan akan menerapkan **Soft Delete** guna menjaga integritas data riwayat historis kepegawaian (audit trail).
-                    </p>
-                </div>
+            <p class="text-xs text-muted leading-relaxed font-sans">
+                Metode penghapusan akan menerapkan **Soft Delete** guna menjaga integritas data riwayat historis kepegawaian (audit trail).
+            </p>
 
-                {{-- Footer --}}
-                <div class="mt-6 flex justify-end gap-3">
-                    <button @click="closeDeleteModal()"
-                        class="rounded-lg px-4 py-2 text-sm font-semibold text-muted hover:bg-soft transition-colors font-sans">
-                        Batal
-                    </button>
-                    <button @click="closeDeleteModal()"
-                        class="rounded-lg bg-danger px-5 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90 transition-colors font-sans">
-                        Hapus (Soft Delete)
-                    </button>
-                </div>
-
-            </div>
-        </div>
+            <x-slot:footer>
+                <button @click="closeDeleteModal()"
+                    class="rounded-lg px-4 py-2 text-sm font-semibold text-muted hover:bg-soft transition-colors font-sans">
+                    Batal
+                </button>
+                <button @click="closeDeleteModal()"
+                    class="rounded-lg bg-danger px-5 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90 transition-colors font-sans">
+                    Hapus (Soft Delete)
+                </button>
+            </x-slot:footer>
+        </x-ui.modal>
     </div>
 
 </x-layouts.app>

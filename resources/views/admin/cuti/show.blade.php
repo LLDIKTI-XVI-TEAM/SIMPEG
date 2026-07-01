@@ -4,10 +4,10 @@
         @php
             // Status tersimpan berupa enum panjang; dipetakan ke token tampilan agar warna/label konsisten.
             $status = $cuti->status;
-            $statusClass = match ($status) {
-                'Disetujui' => 'text-success',
-                'Ditunda' => 'text-danger',
-                default => 'text-warning',
+            $statusVariant = match ($status) {
+                'Disetujui' => 'success',
+                'Ditunda' => 'danger',
+                default => 'warning',
             };
 
             // Tahap atasan langsung dianggap lewat bila pengajuan sudah melaju ke tahap verifikator/pimpinan atau disetujui.
@@ -18,20 +18,18 @@
             $pemohon = $cuti->employee?->nama_lengkap ?? 'Pegawai';
         @endphp
 
-        {{-- Breadcrumbs & Title --}}
-        <div class="flex flex-col gap-1.5">
-            <h2 class="text-2xl font-bold text-ink font-sans">Detail Pengajuan Cuti</h2>
-            <nav class="flex items-center gap-1.5 text-xs text-muted">
+        <x-admin.page-header title="Detail Pengajuan Cuti">
+            <x-slot:breadcrumb>
                 <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
                 <span>/</span>
                 <a href="{{ route('cuti') }}" class="transition-colors hover:text-ink">Cuti</a>
                 <span>/</span>
                 <span class="font-medium text-ink">Detail Pengajuan</span>
-            </nav>
-        </div>
+            </x-slot:breadcrumb>
+        </x-admin.page-header>
 
         {{-- Detail Card --}}
-        <div class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6">
+        <x-ui.card padding="lg" class="space-y-6">
 
             {{-- Header info --}}
             <div class="border-b border-border pb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -45,9 +43,9 @@
                     </div>
                 </div>
                 <div>
-                    <span class="inline-flex items-center text-xs font-bold {{ $statusClass }} font-sans">
+                    <x-ui.badge :variant="$statusVariant" size="md" dot>
                         {{ $status }}
-                    </span>
+                    </x-ui.badge>
                 </div>
             </div>
 
@@ -159,9 +157,15 @@
                         @endphp
                         @foreach ($cuti->approvals->sortBy('acted_at') as $approval)
                             <div class="flex items-start gap-3 rounded-lg border border-border bg-soft/30 p-3">
-                                <span class="mt-0.5 inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold {{ $approval->action === 'APPROVE' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning' }}">
+                                <x-ui.badge
+                                    :variant="$approval->action === 'APPROVE' ? 'success' : 'warning'"
+                                    size="sm"
+                                    :pill="false"
+                                    uppercase
+                                    class="mt-0.5"
+                                >
                                     {{ $approval->action === 'APPROVE' ? 'Setuju' : 'Tunda' }}
-                                </span>
+                                </x-ui.badge>
                                 <div class="flex-1">
                                     <p class="text-xs font-semibold text-ink font-sans">
                                         {{ $approval->approver?->nama_lengkap ?? 'Approver' }}
@@ -179,10 +183,10 @@
             @endif
             <div class="border-t border-border pt-6 space-y-4" x-data="{ showTunda: false }">
                 @if (session('success'))
-                    <div class="rounded-lg bg-success/10 border border-success/20 px-4 py-2.5 text-sm text-success">{{ session('success') }}</div>
+                    <x-ui.alert variant="success" size="sm">{{ session('success') }}</x-ui.alert>
                 @endif
                 @error('komentar')
-                    <div class="rounded-lg bg-danger/10 border border-danger/20 px-4 py-2.5 text-sm text-danger">{{ $message }}</div>
+                    <x-ui.alert variant="danger" size="sm">{{ $message }}</x-ui.alert>
                 @enderror
 
                 @if ($canAct)
@@ -190,35 +194,41 @@
                     <div x-show="showTunda" x-cloak class="rounded-lg border border-warning/25 bg-warning/5 p-4">
                         <form action="{{ route('cuti.postpone', $cuti->id) }}" method="POST" class="space-y-3">
                             @csrf
-                            <label for="komentar-tunda" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Alasan Penundaan <span class="text-danger">*</span></label>
-                            <textarea id="komentar-tunda" name="komentar" rows="3" required minlength="5"
-                                class="w-full resize-y rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                placeholder="Jelaskan alasan penundaan agar pemohon dapat menindaklanjuti."></textarea>
+                            <x-form.textarea
+                                name="komentar"
+                                label="Alasan Penundaan"
+                                id="komentar-tunda"
+                                rows="3"
+                                minlength="5"
+                                placeholder="Jelaskan alasan penundaan agar pemohon dapat menindaklanjuti."
+                                class="resize-y"
+                                required
+                            />
                             <div class="flex justify-end gap-2">
-                                <button type="button" @click="showTunda = false" class="rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft cursor-pointer">Batal</button>
-                                <button type="submit" class="rounded-lg bg-warning px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 cursor-pointer">Tunda Pengajuan</button>
+                                <x-ui.button type="button" variant="muted" size="md" @click="showTunda = false">Batal</x-ui.button>
+                                <x-ui.button type="submit" variant="warning" size="md">Tunda Pengajuan</x-ui.button>
                             </div>
                         </form>
                     </div>
                 @endif
 
                 <div class="flex justify-end gap-3">
-                    <a href="{{ route('cuti') }}" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-5 py-2.5 text-sm font-semibold text-primary transition hover:bg-soft">
+                    <x-ui.button href="{{ route('cuti') }}" variant="secondary">
                         Kembali ke Daftar
-                    </a>
+                    </x-ui.button>
                     @if ($canAct)
-                        <button type="button" @click="showTunda = true" class="inline-flex items-center justify-center rounded-lg bg-warning px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 cursor-pointer">
+                        <x-ui.button type="button" variant="warning" @click="showTunda = true">
                             Tunda
-                        </button>
+                        </x-ui.button>
                         <form action="{{ route('cuti.approve', $cuti->id) }}" method="POST" class="inline">
                             @csrf
-                            <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-success px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 cursor-pointer">
+                            <x-ui.button type="submit" variant="success">
                                 Setujui
-                            </button>
+                            </x-ui.button>
                         </form>
                     @endif
                 </div>
             </div>
-        </div>
+        </x-ui.card>
     </div>
 </x-layouts.app>

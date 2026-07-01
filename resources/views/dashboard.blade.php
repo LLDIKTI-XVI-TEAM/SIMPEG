@@ -169,84 +169,48 @@
     <div class="mb-6 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
 
         {{-- W1: Total Pegawai Aktif --}}
-        <a href="{{ route('data-pegawai') }}" class="rounded-xl border border-border border-b-[3px] border-b-primary bg-surface p-5 shadow-sm flex flex-col justify-between cursor-pointer hover:bg-soft/40 transition-colors">
-            <div class="flex items-start justify-between">
-                <div>
-                    <div class="flex items-center gap-1.5">
-                        <p class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Total Pegawai Aktif</p>
-                        <svg class="w-3.5 h-3.5 text-muted/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
-                    </div>
-                    <p class="mt-1 text-3xl font-extrabold text-primary leading-none font-mono tracking-tight">228</p>
-                </div>
-                <div class="rounded-xl bg-primary/10 p-3 shrink-0">
-                    <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
-                </div>
-            </div>
-            <div class="mt-4 pt-3 border-t border-border flex flex-col gap-1.5 text-[10px] text-muted font-sans">
+        <x-ui.stat-card href="{{ route('data-pegawai') }}" label="Total Pegawai Aktif" value="228" variant="primary" size="lg" accent>
+            <x-slot:icon>
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
+            </x-slot:icon>
+            <x-slot:meta>
                 <span class="font-medium text-ink">186 PNS · 42 PPPK</span>
                 <span>Per {{ now()->translatedFormat('d F Y') }}</span>
-            </div>
-        </a>
+            </x-slot:meta>
+        </x-ui.stat-card>
 
         {{-- W2: Kenaikan Pangkat --}}
-        <a href="{{ route('data-pegawai', ['filter' => 'pangkat']) }}" class="rounded-xl border border-border border-b-[3px] border-b-success bg-surface p-5 shadow-sm flex flex-col justify-between cursor-pointer hover:bg-soft/40 transition-colors">
-            <div class="flex items-start justify-between">
-                <div>
-                    <div class="flex items-center gap-1.5">
-                        <p class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Kenaikan Pangkat</p>
-                        <svg class="w-3.5 h-3.5 text-muted/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
-                    </div>
-                    <p class="mt-1 text-3xl font-extrabold text-success leading-none font-mono tracking-tight">2</p>
-                </div>
-                <div class="rounded-xl bg-success/10 p-3 shrink-0">
-                    <svg class="w-6 h-6 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.25 18 9 11.25l4.306 4.307a11.95 11.95 0 0 1 5.814-5.519l2.74-1.22m0 0-5.94-2.28m5.94 2.28-2.28 5.94" /></svg>
-                </div>
-            </div>
-            <div class="mt-4 pt-3 border-t border-border flex flex-col gap-1.5 text-[10px] text-muted font-sans">
+        <x-ui.stat-card href="{{ route('data-pegawai', ['filter' => 'pangkat']) }}" label="Kenaikan Pangkat" value="2" variant="success" size="lg" accent>
+            <x-slot:icon>
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.25 18 9 11.25l4.306 4.307a11.95 11.95 0 0 1 5.814-5.519l2.74-1.22m0 0-5.94-2.28m5.94 2.28-2.28 5.94" /></svg>
+            </x-slot:icon>
+            <x-slot:meta>
                 <span class="font-medium text-ink">2 Bulan Ini · 8 Tahun Ini</span>
                 <span>Per {{ now()->translatedFormat('d F Y') }}</span>
-            </div>
-        </a>
+            </x-slot:meta>
+        </x-ui.stat-card>
 
         {{-- W3: Status Cuti --}}
-        <a href="{{ route('cuti') }}" class="rounded-xl border border-border border-b-[3px] border-b-warning bg-surface p-5 shadow-sm flex flex-col justify-between cursor-pointer hover:bg-soft/40 transition-colors">
-            <div class="flex items-start justify-between">
-                <div>
-                    <div class="flex items-center gap-1.5">
-                        <p class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Status Cuti</p>
-                        <svg class="w-3.5 h-3.5 text-muted/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
-                    </div>
-                    <p class="mt-1 text-3xl font-extrabold text-warning leading-none font-mono tracking-tight">3</p>
-                </div>
-                <div class="rounded-xl bg-warning/10 p-3 shrink-0">
-                    <svg class="w-6 h-6 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
-                </div>
-            </div>
-            <div class="mt-4 pt-3 border-t border-border flex flex-col gap-1.5 text-[10px] text-muted font-sans">
+        <x-ui.stat-card href="{{ route('cuti') }}" label="Status Cuti" value="3" variant="warning" size="lg" accent>
+            <x-slot:icon>
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
+            </x-slot:icon>
+            <x-slot:meta>
                 <span class="font-medium text-ink">3 Pending · 15 Disetujui · 2 Ditunda</span>
                 <span>Per {{ now()->translatedFormat('d F Y') }}</span>
-            </div>
-        </a>
+            </x-slot:meta>
+        </x-ui.stat-card>
 
         {{-- W4: EWS Aktif --}}
-        <a href="#ews-section" class="rounded-xl border border-border border-b-[3px] border-b-danger bg-surface p-5 shadow-sm flex flex-col justify-between cursor-pointer hover:bg-soft/40 transition-colors">
-            <div class="flex items-start justify-between">
-                <div>
-                    <div class="flex items-center gap-1.5">
-                        <p class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">EWS Aktif</p>
-                        <svg class="w-3.5 h-3.5 text-muted/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
-                    </div>
-                    <p class="mt-1 text-3xl font-extrabold text-danger leading-none font-mono tracking-tight">5</p>
-                </div>
-                <div class="rounded-xl bg-danger/10 p-3 shrink-0">
-                    <svg class="w-6 h-6 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
-                </div>
-            </div>
-            <div class="mt-4 pt-3 border-t border-border flex flex-col gap-1.5 text-[10px] text-muted font-sans">
+        <x-ui.stat-card href="#ews-section" label="EWS Aktif" value="5" variant="danger" size="lg" accent>
+            <x-slot:icon>
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
+            </x-slot:icon>
+            <x-slot:meta>
                 <span class="font-semibold text-danger">1 Urgent · 3 Warning · 1 Info</span>
                 <span>Per {{ now()->translatedFormat('d F Y') }}</span>
-            </div>
-        </a>
+            </x-slot:meta>
+        </x-ui.stat-card>
     </div>
 
     {{-- ================================================================ --}}
@@ -255,7 +219,7 @@
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         
         {{-- W2: Kenaikan Pangkat Detail --}}
-        <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm lg:col-span-2">
+        <x-ui.card padding="none" class="overflow-hidden lg:col-span-2">
             <div class="flex items-center justify-between border-b border-border px-6 py-4 bg-surface">
                 <div>
                     <h3 class="text-sm font-bold text-ink font-sans">Kenaikan Pangkat Terdekat</h3>
@@ -266,19 +230,19 @@
                 </a>
             </div>
             <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-soft">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Pegawai</th>
-                            <th class="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Golongan Asal</th>
-                            <th class="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Golongan Baru</th>
-                            <th class="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">TMT Kenaikan</th>
-                            <th class="px-6 py-3 text-right text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
-                        <tr class="transition-colors hover:bg-soft/30 cursor-pointer">
-                            <td class="px-6 py-5">
+                <x-ui.table>
+                    <x-ui.table-head>
+                        <x-ui.table-row>
+                            <x-ui.table-th padding="lg">Pegawai</x-ui.table-th>
+                            <x-ui.table-th padding="lg">Golongan Asal</x-ui.table-th>
+                            <x-ui.table-th padding="lg">Golongan Baru</x-ui.table-th>
+                            <x-ui.table-th padding="lg">TMT Kenaikan</x-ui.table-th>
+                            <x-ui.table-th align="right" padding="lg">Aksi</x-ui.table-th>
+                        </x-ui.table-row>
+                    </x-ui.table-head>
+                    <x-ui.table-body>
+                        <x-ui.table-row :interactive="true" class="cursor-pointer">
+                            <x-ui.table-td padding="xl">
                                 <div class="flex items-center gap-3">
                                     <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
                                         <span class="text-xs font-bold text-primary">A</span>
@@ -288,23 +252,23 @@
                                         <p class="text-[10px] text-muted font-sans leading-none mt-0.5">NIP. 19850312 201001 1 001</p>
                                     </div>
                                 </div>
-                            </td>
-                            <td class="px-6 py-5 text-xs text-muted font-medium font-sans">III/c (Penata)</td>
-                            <td class="px-6 py-5 text-xs text-muted font-medium font-sans">III/d (Penata Tingkat 1)</td>
-                            <td class="px-6 py-5 text-xs text-ink font-semibold font-mono">01-07-2026</td>
-                            <td class="px-6 py-5 text-right">
+                            </x-ui.table-td>
+                            <x-ui.table-td padding="xl" class="text-muted font-medium">III/c (Penata)</x-ui.table-td>
+                            <x-ui.table-td padding="xl" class="text-muted font-medium">III/d (Penata Tingkat 1)</x-ui.table-td>
+                            <x-ui.table-td padding="xl" class="font-semibold font-mono">01-07-2026</x-ui.table-td>
+                            <x-ui.table-td align="right" padding="xl">
                                 <div class="flex items-center justify-end">
-                                    <a href="{{ route('pegawai.show', ['id' => 1]) }}" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Detail">
+                                    <x-ui.button href="{{ route('pegawai.show', ['id' => 1]) }}" variant="secondary" size="icon" title="Detail" aria-label="Detail">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                         </svg>
-                                    </a>
+                                    </x-ui.button>
                                 </div>
-                            </td>
-                        </tr>
-                        <tr class="transition-colors hover:bg-soft/30 cursor-pointer">
-                            <td class="px-6 py-5">
+                            </x-ui.table-td>
+                        </x-ui.table-row>
+                        <x-ui.table-row :interactive="true" class="cursor-pointer">
+                            <x-ui.table-td padding="xl">
                                 <div class="flex items-center gap-3">
                                     <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
                                         <span class="text-xs font-bold text-primary">S</span>
@@ -314,28 +278,28 @@
                                         <p class="text-[10px] text-muted font-sans leading-none mt-0.5">NIP. 19901120 201501 2 003</p>
                                     </div>
                                 </div>
-                            </td>
-                            <td class="px-6 py-5 text-xs text-muted font-medium font-sans">II/d (Pengatur Tkt. 1)</td>
-                            <td class="px-6 py-5 text-xs text-muted font-medium font-sans">III/a (Penata Muda)</td>
-                            <td class="px-6 py-5 text-xs text-ink font-semibold font-mono">01-07-2026</td>
-                            <td class="px-6 py-5 text-right">
+                            </x-ui.table-td>
+                            <x-ui.table-td padding="xl" class="text-muted font-medium">II/d (Pengatur Tkt. 1)</x-ui.table-td>
+                            <x-ui.table-td padding="xl" class="text-muted font-medium">III/a (Penata Muda)</x-ui.table-td>
+                            <x-ui.table-td padding="xl" class="font-semibold font-mono">01-07-2026</x-ui.table-td>
+                            <x-ui.table-td align="right" padding="xl">
                                 <div class="flex items-center justify-end">
-                                    <a href="{{ route('pegawai.show', ['id' => 2]) }}" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Detail">
+                                    <x-ui.button href="{{ route('pegawai.show', ['id' => 2]) }}" variant="secondary" size="icon" title="Detail" aria-label="Detail">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                         </svg>
-                                    </a>
+                                    </x-ui.button>
                                 </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                            </x-ui.table-td>
+                        </x-ui.table-row>
+                    </x-ui.table-body>
+                </x-ui.table>
             </div>
-        </div>
+        </x-ui.card>
 
         {{-- W1: Komposisi Pegawai PNS vs PPPK (SVG Pie/Donut Chart) --}}
-        <div class="rounded-lg border border-border bg-surface p-6 shadow-sm flex flex-col justify-between">
+        <x-ui.card padding="lg" class="flex flex-col justify-between">
             <div>
                 <h3 class="text-sm font-bold text-ink font-sans mb-1">Komposisi Kepegawaian</h3>
                 <p class="text-[10px] text-muted font-sans mb-5">Rasio Pegawai PNS vs PPPK</p>
@@ -376,7 +340,7 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </x-ui.card>
 
     </div>
 
@@ -386,7 +350,7 @@
     <div id="ews-section" class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         
         {{-- W4: EWS Aktif --}}
-        <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm lg:col-span-2">
+        <x-ui.card padding="none" class="overflow-hidden lg:col-span-2">
             <div class="flex items-center justify-between border-b border-border px-6 py-4 bg-surface">
                 <div>
                     <h3 class="text-sm font-bold text-ink font-sans">Daftar EWS Aktif</h3>
@@ -397,20 +361,20 @@
                 </a>
             </div>
             <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-soft">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Pegawai</th>
-                            <th class="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Pemicu EWS</th>
-                            <th class="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Sisa Waktu</th>
-                            <th class="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Prioritas</th>
-                            <th class="px-6 py-3 text-right text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
+                <x-ui.table>
+                    <x-ui.table-head>
+                        <x-ui.table-row>
+                            <x-ui.table-th padding="lg">Pegawai</x-ui.table-th>
+                            <x-ui.table-th padding="lg">Pemicu EWS</x-ui.table-th>
+                            <x-ui.table-th padding="lg">Sisa Waktu</x-ui.table-th>
+                            <x-ui.table-th padding="lg">Prioritas</x-ui.table-th>
+                            <x-ui.table-th align="right" padding="lg">Aksi</x-ui.table-th>
+                        </x-ui.table-row>
+                    </x-ui.table-head>
+                    <x-ui.table-body>
                         {{-- EWS Item 1: Merah (<30 Hari) --}}
-                        <tr class="transition-colors hover:bg-soft/30 cursor-pointer">
-                            <td class="px-6 py-3.5">
+                        <x-ui.table-row :interactive="true" class="cursor-pointer">
+                            <x-ui.table-td class="px-6 py-3.5">
                                 <div class="flex items-center gap-3">
                                     <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
                                         <span class="text-xs font-bold text-primary">B</span>
@@ -420,31 +384,28 @@
                                         <p class="text-[9px] text-muted font-sans leading-none mt-0.5">NIP. 19780601 200312 1 002</p>
                                     </div>
                                 </div>
-                            </td>
-                            <td class="px-6 py-3.5 text-xs text-ink font-medium font-sans">Masa Berlaku SK Pengangkatan</td>
-                            <td class="px-6 py-3.5 text-xs text-ink font-sans font-medium">12 Hari Lagi</td>
-                            <td class="px-6 py-3.5">
-                                <span class="inline-flex items-center gap-1.5 rounded border border-danger/20 bg-danger/5 px-2 py-0.5 text-xs font-semibold text-danger">
-                                    <svg class="w-3 h-3 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                                    </svg>
+                            </x-ui.table-td>
+                            <x-ui.table-td class="px-6 py-3.5 font-medium">Masa Berlaku SK Pengangkatan</x-ui.table-td>
+                            <x-ui.table-td class="px-6 py-3.5 font-medium">12 Hari Lagi</x-ui.table-td>
+                            <x-ui.table-td class="px-6 py-3.5">
+                                <x-ui.badge variant="danger" size="md" :pill="false" dot>
                                     Urgent
-                                </span>
-                            </td>
-                            <td class="px-6 py-3.5 text-right">
+                                </x-ui.badge>
+                            </x-ui.table-td>
+                            <x-ui.table-td align="right" class="px-6 py-3.5">
                                 <div class="flex items-center justify-end">
-                                    <a href="{{ route('dokumen') }}" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Tinjau">
+                                    <x-ui.button href="{{ route('dokumen') }}" variant="secondary" size="icon" title="Tinjau" aria-label="Tinjau">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                         </svg>
-                                    </a>
+                                    </x-ui.button>
                                 </div>
-                            </td>
-                        </tr>
+                            </x-ui.table-td>
+                        </x-ui.table-row>
                         {{-- EWS Item 2: Kuning (30-90 Hari) --}}
-                        <tr class="transition-colors hover:bg-soft/30 cursor-pointer">
-                            <td class="px-6 py-3.5">
+                        <x-ui.table-row :interactive="true" class="cursor-pointer">
+                            <x-ui.table-td class="px-6 py-3.5">
                                 <div class="flex items-center gap-3">
                                     <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
                                         <span class="text-xs font-bold text-primary">S</span>
@@ -454,31 +415,28 @@
                                         <p class="text-[9px] text-muted font-sans leading-none mt-0.5">NIP. 19901120 201501 2 003</p>
                                     </div>
                                 </div>
-                            </td>
-                            <td class="px-6 py-3.5 text-xs text-ink font-medium font-sans">Persiapan Administrasi Pensiun</td>
-                            <td class="px-6 py-3.5 text-xs text-ink font-sans font-medium">45 Hari Lagi</td>
-                            <td class="px-6 py-3.5">
-                                <span class="inline-flex items-center gap-1.5 rounded border border-warning/35 bg-warning/10 px-2 py-0.5 text-xs font-semibold text-warning">
-                                    <svg class="w-3 h-3 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                                    </svg>
+                            </x-ui.table-td>
+                            <x-ui.table-td class="px-6 py-3.5 font-medium">Persiapan Administrasi Pensiun</x-ui.table-td>
+                            <x-ui.table-td class="px-6 py-3.5 font-medium">45 Hari Lagi</x-ui.table-td>
+                            <x-ui.table-td class="px-6 py-3.5">
+                                <x-ui.badge variant="warning" size="md" :pill="false" dot>
                                     Warning
-                                </span>
-                            </td>
-                            <td class="px-6 py-3.5 text-right">
+                                </x-ui.badge>
+                            </x-ui.table-td>
+                            <x-ui.table-td align="right" class="px-6 py-3.5">
                                 <div class="flex items-center justify-end">
-                                    <a href="{{ route('data-pegawai', ['filter' => 'pensiun']) }}" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Tinjau">
+                                    <x-ui.button href="{{ route('data-pegawai', ['filter' => 'pensiun']) }}" variant="secondary" size="icon" title="Tinjau" aria-label="Tinjau">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                         </svg>
-                                    </a>
+                                    </x-ui.button>
                                 </div>
-                            </td>
-                        </tr>
+                            </x-ui.table-td>
+                        </x-ui.table-row>
                         {{-- EWS Item 3: Kuning --}}
-                        <tr class="transition-colors hover:bg-soft/30 cursor-pointer">
-                            <td class="px-6 py-3.5">
+                        <x-ui.table-row :interactive="true" class="cursor-pointer">
+                            <x-ui.table-td class="px-6 py-3.5">
                                 <div class="flex items-center gap-3">
                                     <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
                                         <span class="text-xs font-bold text-primary">A</span>
@@ -488,31 +446,28 @@
                                         <p class="text-[9px] text-muted font-sans leading-none mt-0.5">NIP. 19850312 201001 1 001</p>
                                     </div>
                                 </div>
-                            </td>
-                            <td class="px-6 py-3.5 text-xs text-ink font-medium font-sans">Kenaikan Gaji Berkala (KGB)</td>
-                            <td class="px-6 py-3.5 text-xs text-ink font-sans font-medium">55 Hari Lagi</td>
-                            <td class="px-6 py-3.5">
-                                <span class="inline-flex items-center gap-1.5 rounded border border-warning/35 bg-warning/10 px-2 py-0.5 text-xs font-semibold text-warning">
-                                    <svg class="w-3 h-3 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                                    </svg>
+                            </x-ui.table-td>
+                            <x-ui.table-td class="px-6 py-3.5 font-medium">Kenaikan Gaji Berkala (KGB)</x-ui.table-td>
+                            <x-ui.table-td class="px-6 py-3.5 font-medium">55 Hari Lagi</x-ui.table-td>
+                            <x-ui.table-td class="px-6 py-3.5">
+                                <x-ui.badge variant="warning" size="md" :pill="false" dot>
                                     Warning
-                                </span>
-                            </td>
-                            <td class="px-6 py-3.5 text-right">
+                                </x-ui.badge>
+                            </x-ui.table-td>
+                            <x-ui.table-td align="right" class="px-6 py-3.5">
                                 <div class="flex items-center justify-end">
-                                    <a href="{{ route('data-pegawai') }}" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Tinjau">
+                                    <x-ui.button href="{{ route('data-pegawai') }}" variant="secondary" size="icon" title="Tinjau" aria-label="Tinjau">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                         </svg>
-                                    </a>
+                                    </x-ui.button>
                                 </div>
-                            </td>
-                        </tr>
+                            </x-ui.table-td>
+                        </x-ui.table-row>
                         {{-- EWS Item 4: Kuning --}}
-                        <tr class="transition-colors hover:bg-soft/30 cursor-pointer">
-                            <td class="px-6 py-3.5">
+                        <x-ui.table-row :interactive="true" class="cursor-pointer">
+                            <x-ui.table-td class="px-6 py-3.5">
                                 <div class="flex items-center gap-3">
                                     <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
                                         <span class="text-xs font-bold text-primary">D</span>
@@ -522,31 +477,28 @@
                                         <p class="text-[9px] text-muted font-sans leading-none mt-0.5">NIP. 19931205 201901 2 001</p>
                                     </div>
                                 </div>
-                            </td>
-                            <td class="px-6 py-3.5 text-xs text-ink font-medium font-sans">Peninjauan Kontrak PPPK</td>
-                            <td class="px-6 py-3.5 text-xs text-ink font-sans font-medium">80 Hari Lagi</td>
-                            <td class="px-6 py-3.5">
-                                <span class="inline-flex items-center gap-1.5 rounded border border-warning/35 bg-warning/10 px-2 py-0.5 text-xs font-semibold text-warning">
-                                    <svg class="w-3 h-3 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                                    </svg>
+                            </x-ui.table-td>
+                            <x-ui.table-td class="px-6 py-3.5 font-medium">Peninjauan Kontrak PPPK</x-ui.table-td>
+                            <x-ui.table-td class="px-6 py-3.5 font-medium">80 Hari Lagi</x-ui.table-td>
+                            <x-ui.table-td class="px-6 py-3.5">
+                                <x-ui.badge variant="warning" size="md" :pill="false" dot>
                                     Warning
-                                </span>
-                            </td>
-                            <td class="px-6 py-3.5 text-right">
+                                </x-ui.badge>
+                            </x-ui.table-td>
+                            <x-ui.table-td align="right" class="px-6 py-3.5">
                                 <div class="flex items-center justify-end">
-                                    <a href="{{ route('data-pegawai') }}" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Tinjau">
+                                    <x-ui.button href="{{ route('data-pegawai') }}" variant="secondary" size="icon" title="Tinjau" aria-label="Tinjau">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                         </svg>
-                                    </a>
+                                    </x-ui.button>
                                 </div>
-                            </td>
-                        </tr>
+                            </x-ui.table-td>
+                        </x-ui.table-row>
                         {{-- EWS Item 5: Hijau (>90 Hari) --}}
-                        <tr class="transition-colors hover:bg-soft/30 cursor-pointer">
-                            <td class="px-6 py-3.5">
+                        <x-ui.table-row :interactive="true" class="cursor-pointer">
+                            <x-ui.table-td class="px-6 py-3.5">
                                 <div class="flex items-center gap-3">
                                     <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
                                         <span class="text-xs font-bold text-primary">R</span>
@@ -556,35 +508,32 @@
                                         <p class="text-[9px] text-muted font-sans leading-none mt-0.5">NIP. 19751010 199903 1 004</p>
                                     </div>
                                 </div>
-                            </td>
-                            <td class="px-6 py-3.5 text-xs text-ink font-medium font-sans">Pembaruan SK Jabatan Struktural</td>
-                            <td class="px-6 py-3.5 text-xs text-ink font-sans font-medium">110 Hari Lagi</td>
-                            <td class="px-6 py-3.5">
-                                <span class="inline-flex items-center gap-1.5 rounded border border-info/35 bg-info/10 px-2 py-0.5 text-xs font-semibold text-info">
-                                    <svg class="w-3 h-3 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 11.25v5m0-7.5h.008v.008H12V8.75Zm9 3.25a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                                    </svg>
+                            </x-ui.table-td>
+                            <x-ui.table-td class="px-6 py-3.5 font-medium">Pembaruan SK Jabatan Struktural</x-ui.table-td>
+                            <x-ui.table-td class="px-6 py-3.5 font-medium">110 Hari Lagi</x-ui.table-td>
+                            <x-ui.table-td class="px-6 py-3.5">
+                                <x-ui.badge variant="info" size="md" :pill="false" dot>
                                     Informasi
-                                </span>
-                            </td>
-                            <td class="px-6 py-3.5 text-right">
+                                </x-ui.badge>
+                            </x-ui.table-td>
+                            <x-ui.table-td align="right" class="px-6 py-3.5">
                                 <div class="flex items-center justify-end">
-                                    <a href="{{ route('dokumen') }}" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Tinjau">
+                                    <x-ui.button href="{{ route('dokumen') }}" variant="secondary" size="icon" title="Tinjau" aria-label="Tinjau">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                         </svg>
-                                    </a>
+                                    </x-ui.button>
                                 </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                            </x-ui.table-td>
+                        </x-ui.table-row>
+                    </x-ui.table-body>
+                </x-ui.table>
             </div>
-        </div>
+        </x-ui.card>
 
         {{-- W3: Status Cuti & Cuti Pending List --}}
-        <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm flex flex-col justify-between">
+        <x-ui.card padding="none" class="overflow-hidden flex flex-col justify-between">
             <div>
                 <div class="flex items-center justify-between border-b border-border px-6 py-4 bg-surface">
                     <div>
@@ -628,7 +577,7 @@
                     Kelola Seluruh Pengajuan Cuti
                 </a>
             </div>
-        </div>
+        </x-ui.card>
 
     </div>
 
@@ -638,7 +587,7 @@
     <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         
         {{-- W5: Distribusi Golongan (Horizontal Bar Chart) --}}
-        <div class="rounded-lg border border-border bg-surface p-6 shadow-sm flex flex-col justify-between">
+        <x-ui.card padding="lg" class="flex flex-col justify-between">
             <div>
                 <h3 class="text-sm font-bold text-ink font-sans mb-1">Distribusi Golongan</h3>
                 <p class="text-[10px] text-muted font-sans mb-5">Statistik jumlah pegawai per tingkat golongan</p>
@@ -665,10 +614,10 @@
                     @endforeach
                 </div>
             </div>
-        </div>
+        </x-ui.card>
 
         {{-- W7: Tren Pegawai Aktif (SVG Line Chart) --}}
-        <div class="rounded-lg border border-border bg-surface p-6 shadow-sm lg:col-span-2 flex flex-col justify-between">
+        <x-ui.card padding="lg" class="lg:col-span-2 flex flex-col justify-between">
             <div>
                 <h3 class="text-sm font-bold text-ink font-sans mb-1">Tren Pegawai Aktif</h3>
                 <p class="text-[10px] text-muted font-sans mb-4">Grafik jumlah pegawai aktif bulanan (12 Bulan Terakhir)</p>
@@ -725,7 +674,7 @@
                     </svg>
                 </div>
             </div>
-        </div>
+        </x-ui.card>
 
     </div>
 
@@ -735,7 +684,7 @@
     <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         
         {{-- Pegawai Terbaru --}}
-        <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm lg:col-span-2">
+        <x-ui.card padding="none" class="overflow-hidden lg:col-span-2">
             <div class="flex items-center justify-between border-b border-border px-6 py-4 bg-surface">
                 <div>
                     <h3 class="text-sm font-bold text-ink font-sans">Pegawai Terbaru</h3>
@@ -746,17 +695,17 @@
                 </a>
             </div>
             <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-soft">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Pegawai</th>
-                            <th class="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Jabatan</th>
-                            <th class="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Unit Kerja</th>
-                            <th class="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Status</th>
-                            <th class="px-6 py-3 text-right text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
+                <x-ui.table>
+                    <x-ui.table-head>
+                        <x-ui.table-row>
+                            <x-ui.table-th padding="lg">Pegawai</x-ui.table-th>
+                            <x-ui.table-th padding="lg">Jabatan</x-ui.table-th>
+                            <x-ui.table-th padding="lg">Unit Kerja</x-ui.table-th>
+                            <x-ui.table-th padding="lg">Status</x-ui.table-th>
+                            <x-ui.table-th align="right" padding="lg">Aksi</x-ui.table-th>
+                        </x-ui.table-row>
+                    </x-ui.table-head>
+                    <x-ui.table-body>
                         @php
                         $pegawaiList = [
                             ['id' => 1, 'nama' => 'Ahmad Fauzi',                  'nip' => '19850312 201001 1 001', 'jabatan' => 'Analis Kepegawaian',             'unit' => 'Bag. Umum',     'jenis' => 'PNS',   'golongan' => 'III/c', 'status' => 'aktif'],
@@ -767,8 +716,8 @@
                         ];
                         @endphp
                         @foreach($pegawaiList as $p)
-                        <tr class="transition-colors hover:bg-soft/30 cursor-pointer">
-                            <td class="px-6 py-3.5">
+                        <x-ui.table-row :interactive="true" class="cursor-pointer">
+                            <x-ui.table-td class="px-6 py-3.5">
                                 <div class="flex items-center gap-3">
                                     <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
                                         <span class="text-xs font-bold text-primary">{{ strtoupper(substr($p['nama'], 0, 1)) }}</span>
@@ -778,40 +727,37 @@
                                         <p class="text-[10px] text-muted font-sans leading-none mt-0.5">NIP. {{ $p['nip'] }}</p>
                                     </div>
                                 </div>
-                            </td>
-                            <td class="px-6 py-3.5">
+                            </x-ui.table-td>
+                            <x-ui.table-td class="px-6 py-3.5">
                                 <p class="text-xs font-medium text-ink font-sans">{{ $p['jabatan'] }}</p>
-                            </td>
-                            <td class="px-6 py-3.5">
+                            </x-ui.table-td>
+                            <x-ui.table-td class="px-6 py-3.5">
                                 <p class="text-xs font-medium text-ink font-sans">{{ $p['unit'] }}</p>
-                            </td>
-                            <td class="px-6 py-3.5">
-                                <span class="inline-flex items-center gap-1.5 rounded border border-success/20 bg-success/5 px-2 py-0.5 text-xs font-semibold text-success">
-                                    <svg class="w-3 h-3 text-success shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                                    </svg>
+                            </x-ui.table-td>
+                            <x-ui.table-td class="px-6 py-3.5">
+                                <x-ui.badge variant="success" size="md" :pill="false" dot>
                                     Aktif
-                                </span>
-                            </td>
-                            <td class="px-6 py-3.5 text-right">
+                                </x-ui.badge>
+                            </x-ui.table-td>
+                            <x-ui.table-td align="right" class="px-6 py-3.5">
                                 <div class="flex items-center justify-end">
-                                    <a href="{{ route('pegawai.show', ['id' => $p['id']]) }}" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Detail">
+                                    <x-ui.button href="{{ route('pegawai.show', ['id' => $p['id']]) }}" variant="secondary" size="icon" title="Detail" aria-label="Detail">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                         </svg>
-                                    </a>
+                                    </x-ui.button>
                                 </div>
-                            </td>
-                        </tr>
+                            </x-ui.table-td>
+                        </x-ui.table-row>
                         @endforeach
-                    </tbody>
-                </table>
+                    </x-ui.table-body>
+                </x-ui.table>
             </div>
-        </div>
+        </x-ui.card>
 
         {{-- W6: Statistik Audit Log (5 Terbaru) --}}
-        <div id="audit-log" class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
+        <x-ui.card padding="none" id="audit-log" class="overflow-hidden">
             <div class="flex items-center justify-between border-b border-border px-6 py-4 bg-surface">
                 <div>
                     <h3 class="text-sm font-bold text-ink font-sans">Aktivitas Terkini</h3>
@@ -851,14 +797,14 @@
                 </div>
                 @endforeach
             </div>
-        </div>
+        </x-ui.card>
 
     </div>
 
     {{-- ================================================================ --}}
     {{-- ROW 5: HARI LIBUR MENDATANG                                      --}}
     {{-- ================================================================ --}}
-    <div class="mt-6 rounded-lg border border-border bg-surface p-6 shadow-sm flex flex-col">
+    <x-ui.card padding="lg" class="mt-6 flex flex-col">
         <div class="flex items-center justify-between border-b border-border pb-4 mb-5">
             <div>
                 <h3 class="text-sm font-bold text-ink font-sans">Hari Libur Mendatang</h3>
@@ -930,6 +876,6 @@
             </div>
             @endforeach
         </div>
-    </div>
+    </x-ui.card>
 
 </x-layouts.app>

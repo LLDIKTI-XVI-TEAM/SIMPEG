@@ -114,48 +114,34 @@
         
         {{-- Tab Sidebar Kiri --}}
         <aside class="w-full lg:w-64 shrink-0">
-            <div class="rounded-lg border border-border bg-surface p-4 shadow-sm space-y-1">
+            <x-ui.card padding="sm" class="space-y-1">
                 <p class="text-[10px] font-bold text-muted uppercase tracking-wide px-3 pb-2 border-b border-border mb-2 font-sans">Kategori Pengaturan</p>
                 
-                <button
-                    @click="activeTab = 'umum'"
-                    :class="activeTab === 'umum' ? 'bg-soft text-primary font-semibold border-l-4 border-primary pl-2 rounded-r-lg' : 'text-muted hover:bg-soft/50 hover:text-ink font-medium pl-3 rounded-lg'"
-                    class="w-full text-left py-2.5 text-sm transition-all focus:outline-none cursor-pointer flex items-center justify-between"
-                >
-                    <span>Umum & Instansi</span>
-                </button>
-                
-                <button
-                    @click="activeTab = 'cuti'"
-                    :class="activeTab === 'cuti' ? 'bg-soft text-primary font-semibold border-l-4 border-primary pl-2 rounded-r-lg' : 'text-muted hover:bg-soft/50 hover:text-ink font-medium pl-3 rounded-lg'"
-                    class="w-full text-left py-2.5 text-sm transition-all focus:outline-none cursor-pointer flex items-center justify-between"
-                >
-                    <span>Alur Approval Cuti</span>
-                </button>
-                
-                <button
-                    @click="activeTab = 'rbac'"
-                    :class="activeTab === 'rbac' ? 'bg-soft text-primary font-semibold border-l-4 border-primary pl-2 rounded-r-lg' : 'text-muted hover:bg-soft/50 hover:text-ink font-medium pl-3 rounded-lg'"
-                    class="w-full text-left py-2.5 text-sm transition-all focus:outline-none cursor-pointer flex items-center justify-between"
-                >
-                    <span>Pemetaan SSO & RBAC</span>
-                </button>
-                
-                <button
-                    @click="activeTab = 'master'"
-                    :class="activeTab === 'master' ? 'bg-soft text-primary font-semibold border-l-4 border-primary pl-2 rounded-r-lg' : 'text-muted hover:bg-soft/50 hover:text-ink font-medium pl-3 rounded-lg'"
-                    class="w-full text-left py-2.5 text-sm transition-all focus:outline-none cursor-pointer flex items-center justify-between"
-                >
-                    <span>Kamus Data Master</span>
-                </button>
-            </div>
+                <x-ui.tabs variant="sidebar-soft" label="Kategori pengaturan">
+                    <x-ui.tab variant="sidebar-soft" active="activeTab === 'umum'" click="activeTab = 'umum'">
+                        <span>Umum & Instansi</span>
+                    </x-ui.tab>
+
+                    <x-ui.tab variant="sidebar-soft" active="activeTab === 'cuti'" click="activeTab = 'cuti'">
+                        <span>Alur Approval Cuti</span>
+                    </x-ui.tab>
+
+                    <x-ui.tab variant="sidebar-soft" active="activeTab === 'rbac'" click="activeTab = 'rbac'">
+                        <span>Pemetaan SSO & RBAC</span>
+                    </x-ui.tab>
+
+                    <x-ui.tab variant="sidebar-soft" active="activeTab === 'master'" click="activeTab = 'master'">
+                        <span>Kamus Data Master</span>
+                    </x-ui.tab>
+                </x-ui.tabs>
+            </x-ui.card>
         </aside>
 
         {{-- Form Panel Kanan --}}
         <main class="flex-1 min-w-0">
             
             {{-- TAB: UMUM & INSTANSI --}}
-            <div x-show="activeTab === 'umum'" class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6">
+            <x-ui.card padding="lg" x-show="activeTab === 'umum'" class="space-y-6">
                 <div class="border-b border-border pb-4">
                     <h2 class="text-base font-bold text-ink font-sans leading-tight">Pengaturan Umum & Instansi</h2>
                     <p class="text-[11px] text-muted mt-0.5 font-sans leading-normal">Kelola profil lembaga LLDIKTI XVI dan parameter dasar server.</p>
@@ -178,10 +164,14 @@
                         <label class="text-xs font-semibold text-ink font-sans">Session Lifetime (Menit)</label>
                         <input type="number" x-model="instansi.session_lifetime" class="h-[44px] w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                     </div>
-                    <div class="col-span-1 md:col-span-2 space-y-1">
-                        <label class="text-xs font-semibold text-ink font-sans">Alamat Kantor</label>
-                        <textarea rows="3" x-model="instansi.alamat" class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans resize-none"></textarea>
-                    </div>
+                    <x-form.textarea
+                        label="Alamat Kantor"
+                        rows="3"
+                        size="sm"
+                        wrapper-class="col-span-1 md:col-span-2"
+                        label-class="font-semibold normal-case tracking-normal"
+                        x-model="instansi.alamat"
+                    />
                 </div>
 
                 <div class="border-t border-border pt-6 space-y-4">
@@ -203,10 +193,10 @@
                         Simpan Perubahan
                     </button>
                 </div>
-            </div>
+            </x-ui.card>
 
             {{-- TAB: ALUR APPROVAL CUTI --}}
-            <div x-show="activeTab === 'cuti'" class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6" style="display: none;">
+            <x-ui.card padding="lg" x-show="activeTab === 'cuti'"   style="display: none;" class="space-y-6">
                 <div class="border-b border-border pb-4">
                     <h2 class="text-base font-bold text-ink font-sans leading-tight">Alur Persetujuan Cuti</h2>
                     <p class="text-[11px] text-muted mt-0.5 font-sans leading-normal">Konfigurasi rantai otorisasi bertingkat (3 Stage) untuk pengajuan cuti pegawai.</p>
@@ -274,7 +264,7 @@
                                 <p class="text-muted text-[10px] font-sans leading-normal">Jika atasan langsung pengaju cuti kebetulan menjabat sebagai verifikator kepegawaian, lewati stage duplikat.</p>
                             </div>
                             <div class="flex items-center h-5">
-                                <input type="checkbox" x-model="cutiConfig.skip_duplicate" class="rounded border-border text-primary focus:ring-primary h-4.5 w-4.5 cursor-pointer">
+                                <x-form.checkbox x-model="cutiConfig.skip_duplicate" />
                             </div>
                         </div>
 
@@ -296,10 +286,10 @@
                         Simpan Kebijakan Cuti
                     </button>
                 </div>
-            </div>
+            </x-ui.card>
 
             {{-- TAB: PEMETAAN SSO & RBAC --}}
-            <div x-show="activeTab === 'rbac'" class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6" style="display: none;">
+            <x-ui.card padding="lg" x-show="activeTab === 'rbac'"   style="display: none;" class="space-y-6">
                 <div class="border-b border-border pb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h2 class="text-base font-bold text-ink font-sans leading-tight">Pemetaan Akun SSO & Otorisasi RBAC</h2>
@@ -317,27 +307,27 @@
 
                 {{-- Table --}}
                 <div class="overflow-x-auto border border-border rounded-lg">
-                    <table class="w-full">
-                        <thead class="bg-soft">
-                            <tr>
-                                <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Nama Pegawai</th>
-                                <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">NIP</th>
-                                <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Keycloak ID / Email SSO</th>
-                                <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Role Internal</th>
-                                <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Status</th>
-                                <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wide text-muted font-sans border-b border-border">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border">
+                    <x-ui.table>
+                        <x-ui.table-head>
+                            <x-ui.table-row>
+                                <x-ui.table-th padding="sm">Nama Pegawai</x-ui.table-th>
+                                <x-ui.table-th padding="sm">NIP</x-ui.table-th>
+                                <x-ui.table-th padding="sm">Keycloak ID / Email SSO</x-ui.table-th>
+                                <x-ui.table-th padding="sm">Role Internal</x-ui.table-th>
+                                <x-ui.table-th padding="sm">Status</x-ui.table-th>
+                                <x-ui.table-th padding="sm">Aksi</x-ui.table-th>
+                            </x-ui.table-row>
+                        </x-ui.table-head>
+                        <x-ui.table-body>
                             <template x-for="user in filteredUsers" :key="user.id">
-                                <tr class="hover:bg-soft/30 transition-colors">
-                                    <td class="px-4 py-3 text-sm font-semibold text-ink font-sans" x-text="user.name"></td>
-                                    <td class="px-4 py-3 text-xs font-mono text-muted" x-text="user.nip"></td>
-                                    <td class="px-4 py-3 text-xs text-ink">
+                                <x-ui.table-row :interactive="true">
+                                    <x-ui.table-td x-text="user.name" padding="sm" class="text-sm font-semibold"></x-ui.table-td>
+                                    <x-ui.table-td x-text="user.nip" padding="sm" class="font-mono text-muted"></x-ui.table-td>
+                                    <x-ui.table-td padding="sm">
                                         <div class="font-semibold" x-text="user.keycloak_id || '-'"></div>
                                         <div class="text-[10px] text-muted font-mono mt-0.5" x-text="user.email"></div>
-                                    </td>
-                                    <td class="px-4 py-3 text-xs">
+                                    </x-ui.table-td>
+                                    <x-ui.table-td padding="sm">
                                         <span class="text-[10px] font-bold uppercase tracking-wide"
                                             :class="{
                                                 'bg-primary/10 text-primary': user.role === 'admin_kepegawaian',
@@ -346,24 +336,24 @@
                                             }"
                                             x-text="user.role"
                                         ></span>
-                                    </td>
-                                    <td class="px-4 py-3 text-xs font-sans">
+                                    </x-ui.table-td>
+                                    <x-ui.table-td padding="sm">
                                         <span :class="user.status === 'Terhubung' ? 'text-success font-semibold' : 'text-danger font-semibold'" x-text="user.status"></span>
-                                    </td>
-                                    <td class="px-4 py-3">
+                                    </x-ui.table-td>
+                                    <x-ui.table-td padding="sm">
                                         <button @click="openEditUser(user)" class="text-xs font-semibold text-primary hover:underline cursor-pointer focus:outline-none font-sans">
                                             Edit Pemetaan
                                         </button>
-                                    </td>
-                                </tr>
+                                    </x-ui.table-td>
+                                </x-ui.table-row>
                             </template>
-                        </tbody>
-                    </table>
+                        </x-ui.table-body>
+                    </x-ui.table>
                 </div>
-            </div>
+            </x-ui.card>
 
             {{-- TAB: DATA MASTER REFERENSI --}}
-            <div x-show="activeTab === 'master'" class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6" style="display: none;">
+            <x-ui.card padding="lg" x-show="activeTab === 'master'"   style="display: none;" class="space-y-6">
                 <div class="border-b border-border pb-4">
                     <h2 class="text-base font-bold text-ink font-sans leading-tight">Data Master Kamus Referensi</h2>
                     <p class="text-[11px] text-muted mt-0.5 font-sans leading-normal">Kelola record data referensi sistem (static seeder tables).</p>
@@ -388,7 +378,7 @@
                         </div>
                     </template>
                 </div>
-            </div>
+            </x-ui.card>
 
         </main>
 

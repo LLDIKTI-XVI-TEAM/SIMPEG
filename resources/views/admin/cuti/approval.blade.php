@@ -1,21 +1,23 @@
 <x-layouts.app title="Persetujuan Cuti">
     <div class="space-y-6">
         
-        {{-- Breadcrumbs & Title --}}
-        <div class="flex flex-col gap-1.5 bg-surface border border-border rounded-lg p-6 shadow-sm">
-            <h2 class="text-2xl font-bold text-ink font-sans">Persetujuan Cuti Pegawai</h2>
-            <p class="text-xs text-muted mt-0.5 font-sans">Tinjau dan lakukan keputusan setujui atau tunda atas permohonan cuti dari staf.</p>
-            <nav class="mt-2 flex items-center gap-1.5 text-xs text-muted">
-                <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
-                <span>/</span>
-                <a href="{{ route('cuti') }}" class="transition-colors hover:text-ink">Cuti</a>
-                <span>/</span>
-                <span class="font-medium text-ink">Persetujuan</span>
-            </nav>
-        </div>
+        <x-ui.card padding="lg">
+            <x-admin.page-header
+                title="Persetujuan Cuti Pegawai"
+                description="Tinjau dan lakukan keputusan setujui atau tunda atas permohonan cuti dari staf."
+            >
+                <x-slot:breadcrumb>
+                    <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
+                    <span>/</span>
+                    <a href="{{ route('cuti') }}" class="transition-colors hover:text-ink">Cuti</a>
+                    <span>/</span>
+                    <span class="font-medium text-ink">Persetujuan</span>
+                </x-slot:breadcrumb>
+            </x-admin.page-header>
+        </x-ui.card>
 
         {{-- Table Card --}}
-        <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
+        <x-ui.card padding="none" class="overflow-hidden">
             <div class="flex items-center justify-between border-b border-border px-6 py-4 bg-surface">
                 <div>
                     <h3 class="text-sm font-semibold text-ink font-sans">Daftar Permohonan Menunggu</h3>
@@ -24,20 +26,20 @@
             </div>
             
             <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-soft border-b border-border">
-                        <tr>
-                            <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Pegawai</th>
-                            <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Jenis Cuti</th>
-                            <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Durasi</th>
-                            <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Alasan</th>
-                            <th class="px-6 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Aksi Keputusan</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
+                <x-ui.table>
+                    <x-ui.table-head class="border-b border-border">
+                        <x-ui.table-row>
+                            <x-ui.table-th class="px-6 py-3.5">Pegawai</x-ui.table-th>
+                            <x-ui.table-th class="px-6 py-3.5">Jenis Cuti</x-ui.table-th>
+                            <x-ui.table-th class="px-6 py-3.5">Durasi</x-ui.table-th>
+                            <x-ui.table-th class="px-6 py-3.5">Alasan</x-ui.table-th>
+                            <x-ui.table-th align="right" class="px-6 py-3.5">Aksi Keputusan</x-ui.table-th>
+                        </x-ui.table-row>
+                    </x-ui.table-head>
+                    <x-ui.table-body>
                         @forelse($pending as $r)
-                        <tr class="transition-colors hover:bg-soft/30">
-                            <td class="px-6 py-4">
+                        <x-ui.table-row :interactive="true">
+                            <x-ui.table-td padding="comfortable">
                                 <div class="flex items-center gap-3">
                                     <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
                                         {{ strtoupper(substr($r->employee->nama_lengkap ?? 'P', 0, 1)) }}
@@ -47,19 +49,19 @@
                                         <p class="text-[10px] text-muted font-sans mt-0.5">Pengajuan: {{ $r->created_at?->translatedFormat('d M Y') }}</p>
                                     </div>
                                 </div>
-                            </td>
-                            <td class="px-6 py-4 text-sm font-medium text-ink font-sans">{{ $r->jenisCuti->nama ?? '-' }}</td>
-                            <td class="px-6 py-4 text-sm text-ink font-mono">{{ $r->jumlah_hari_kerja }} Hari Kerja<br><span class="text-[10px] text-muted font-sans">{{ $r->tanggal_mulai?->translatedFormat('d M') }} - {{ $r->tanggal_selesai?->translatedFormat('d M Y') }}</span></td>
-                            <td class="px-6 py-4 text-xs text-muted font-sans max-w-xs truncate" title="{{ $r->alasan }}">{{ $r->alasan }}</td>
-                            <td class="px-6 py-4 text-right">
+                            </x-ui.table-td>
+                            <x-ui.table-td padding="comfortable" class="text-sm font-medium">{{ $r->jenisCuti->nama ?? '-' }}</x-ui.table-td>
+                            <x-ui.table-td padding="comfortable" class="text-sm font-mono">{{ $r->jumlah_hari_kerja }} Hari Kerja<br><span class="text-[10px] text-muted font-sans">{{ $r->tanggal_mulai?->translatedFormat('d M') }} - {{ $r->tanggal_selesai?->translatedFormat('d M Y') }}</span></x-ui.table-td>
+                            <x-ui.table-td title="{{ $r->alasan }}" padding="comfortable" class="text-muted max-w-xs truncate">{{ $r->alasan }}</x-ui.table-td>
+                            <x-ui.table-td align="right" padding="comfortable">
                                 <div class="flex items-center justify-end gap-2.5">
                                     {{-- Detail --}}
-                                    <a href="{{ route('cuti.show', $r->id) }}" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm" title="Tinjau Detail">
+                                    <x-ui.button href="{{ route('cuti.show', $r->id) }}" variant="secondary" size="icon" title="Tinjau Detail" aria-label="Tinjau Detail">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                         </svg>
-                                    </a>
+                                    </x-ui.button>
 
                                     {{-- Setuju --}}
                                     <form action="{{ route('cuti.approve', $r->id) }}" method="POST" class="inline">
@@ -74,18 +76,18 @@
                                         Tunda
                                     </a>
                                 </div>
-                            </td>
-                        </tr>
+                            </x-ui.table-td>
+                        </x-ui.table-row>
                         @empty
-                        <tr>
-                            <td colspan="5" class="px-6 py-8 text-center text-xs text-muted font-sans">
+                        <x-ui.table-row>
+                            <x-ui.table-td colspan="5" align="center" class="px-6 py-8 text-muted">
                                 Tidak ada pengajuan cuti yang memerlukan otorisasi persetujuan saat ini.
-                            </td>
-                        </tr>
+                            </x-ui.table-td>
+                        </x-ui.table-row>
                         @endforelse
-                    </tbody>
-                </table>
+                    </x-ui.table-body>
+                </x-ui.table>
             </div>
-        </div>
+        </x-ui.card>
     </div>
 </x-layouts.app>

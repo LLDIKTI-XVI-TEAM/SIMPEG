@@ -43,12 +43,7 @@
         </div>
 
         @if(session('success'))
-            <div class="rounded-lg bg-success/10 border border-success/20 px-5 py-3 text-sm text-success flex items-center gap-2">
-                <svg class="w-5 h-5 shrink-0 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                </svg>
-                <span>{{ session('success') }}</span>
-            </div>
+            <x-ui.alert variant="success">{{ session('success') }}</x-ui.alert>
         @endif
 
         {{-- FORM KONFIGURASI APPROVER --}}
@@ -118,12 +113,15 @@
                         <p class="text-xs text-muted mt-1 leading-relaxed">Sebutkan alasan perubahan approver untuk dicatat dalam log audit kepegawaian.</p>
                     </div>
                     <div class="flex-1 max-w-xl space-y-3">
-                        <textarea id="cfg-reason" name="reason" x-model="reason" rows="3"
+                        <x-form.textarea
+                            name="reason"
+                            id="cfg-reason"
+                            rows="3"
+                            value="{{ old('reason') }}"
                             placeholder="Contoh: Pergantian pejabat verifikator karena mutasi jabatan"
-                            class="w-full resize-y rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">{{ old('reason') }}</textarea>
-                        @error('reason')
-                            <p class="text-xs text-danger mt-1">{{ $message }}</p>
-                        @enderror
+                            class="resize-y transition-colors"
+                            x-model="reason"
+                        />
 
                         <button type="button" @click="openConfirm()"
                             class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 active:opacity-80 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
@@ -145,24 +143,24 @@
                     <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Log Perubahan Konfigurasi</h3>
                     <p class="mt-0.5 text-xs text-muted">Riwayat perubahan approver. Klik baris untuk detail.</p>
                 </div>
-                <span class="text-[10px] font-semibold text-muted bg-soft px-2.5 py-1 rounded-full border border-border">{{ $auditRows->count() }} entri</span>
+                <x-ui.badge variant="muted" size="md">{{ $auditRows->count() }} entri</x-ui.badge>
             </div>
 
             <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse text-xs">
-                    <thead>
-                        <tr class="bg-soft border-b border-border">
-                            <th class="px-5 py-3 font-semibold text-muted w-8"></th>
-                            <th class="px-5 py-3 font-semibold text-muted">Waktu</th>
-                            <th class="px-5 py-3 font-semibold text-muted">Pengguna</th>
-                            <th class="px-5 py-3 font-semibold text-muted">Tahap</th>
-                            <th class="px-5 py-3 font-semibold text-muted text-right">Approver Lama</th>
-                            <th class="px-3 py-3 text-center text-muted"></th>
-                            <th class="px-5 py-3 font-semibold text-muted">Approver Baru</th>
-                            <th class="px-5 py-3 font-semibold text-muted">Catatan</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
+                <x-ui.table class="text-left border-collapse text-xs">
+                    <x-ui.table-head>
+                        <x-ui.table-row class="bg-soft border-b border-border">
+                            <x-ui.table-th class="px-5 py-3 w-8"></x-ui.table-th>
+                            <x-ui.table-th class="px-5 py-3">Waktu</x-ui.table-th>
+                            <x-ui.table-th class="px-5 py-3">Pengguna</x-ui.table-th>
+                            <x-ui.table-th class="px-5 py-3">Tahap</x-ui.table-th>
+                            <x-ui.table-th align="right" class="px-5 py-3">Approver Lama</x-ui.table-th>
+                            <x-ui.table-th align="center" class="px-3 py-3"></x-ui.table-th>
+                            <x-ui.table-th class="px-5 py-3">Approver Baru</x-ui.table-th>
+                            <x-ui.table-th class="px-5 py-3">Catatan</x-ui.table-th>
+                        </x-ui.table-row>
+                    </x-ui.table-head>
+                    <x-ui.table-body>
                         @forelse($auditRows as $idx => $row)
                             @php
                                 // Label tahap diturunkan dari kunci konfigurasi yang disimpan di dalam payload audit
@@ -173,29 +171,28 @@
                                 $newName = $row->new_values['approver_name'] ?? 'Tidak ada';
                                 $reasonText = $row->new_values['reason'] ?? '-';
                             @endphp
-                            <tr class="hover:bg-soft/30 transition-colors cursor-pointer"
-                                @click="expandedAudit = expandedAudit === {{ $idx }} ? null : {{ $idx }}">
-                                <td class="px-5 py-3.5 text-center">
+                            <x-ui.table-row @click="expandedAudit = expandedAudit === {{ $idx }} ? null : {{ $idx }}" :interactive="true" class="cursor-pointer">
+                                <x-ui.table-td align="center" padding="wide">
                                     <svg class="w-3.5 h-3.5 text-muted transition-transform duration-200"
                                         :class="expandedAudit === {{ $idx }} ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                                     </svg>
-                                </td>
-                                <td class="px-5 py-3.5 text-muted whitespace-nowrap">{{ $row->created_at?->format('d M Y, H:i') }}</td>
-                                <td class="px-5 py-3.5">
+                                </x-ui.table-td>
+                                <x-ui.table-td padding="wide" class="text-muted whitespace-nowrap">{{ $row->created_at?->format('d M Y, H:i') }}</x-ui.table-td>
+                                <x-ui.table-td padding="wide">
                                     <span class="font-semibold text-ink block">{{ $row->user_name ?? 'Sistem' }}</span>
                                     <span class="text-[9px] text-muted block font-mono">{{ $row->ip_address }}</span>
-                                </td>
-                                <td class="px-5 py-3.5 text-ink font-medium">{{ $tahap }}</td>
-                                <td class="px-5 py-3.5 text-right font-mono text-muted">{{ $oldName }}</td>
-                                <td class="px-3 py-3.5 text-center text-muted">&rarr;</td>
-                                <td class="px-5 py-3.5 font-mono font-bold text-success">{{ $newName }}</td>
-                                <td class="px-5 py-3.5 text-muted italic max-w-[200px] truncate" title="{{ $reasonText }}">{{ $reasonText }}</td>
-                            </tr>
+                                </x-ui.table-td>
+                                <x-ui.table-td padding="wide" class="font-medium">{{ $tahap }}</x-ui.table-td>
+                                <x-ui.table-td align="right" padding="wide" class="font-mono text-muted">{{ $oldName }}</x-ui.table-td>
+                                <x-ui.table-td align="center" class="px-3 py-3.5 text-muted">&rarr;</x-ui.table-td>
+                                <x-ui.table-td padding="wide" class="font-mono font-bold text-success">{{ $newName }}</x-ui.table-td>
+                                <x-ui.table-td title="{{ $reasonText }}" padding="wide" class="text-muted italic max-w-[200px] truncate">{{ $reasonText }}</x-ui.table-td>
+                            </x-ui.table-row>
 
-                            <tr x-show="expandedAudit === {{ $idx }}" x-transition:enter="transition ease-out duration-150"
+                            <x-ui.table-row x-show="expandedAudit === {{ $idx }}" x-transition:enter="transition ease-out duration-150"
                                 x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" style="display: none;">
-                                <td colspan="8" class="bg-soft/30 px-8 py-4 border-t border-border">
+                                <x-ui.table-td colspan="8" class="bg-soft/30 px-8 py-4 border-t border-border">
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs">
                                         <div class="space-y-1">
                                             <span class="text-[10px] font-bold uppercase tracking-wider text-muted">IP Address</span>
@@ -210,49 +207,42 @@
                                             <p class="text-sm text-ink leading-relaxed">{{ $reasonText }}</p>
                                         </div>
                                     </div>
-                                </td>
-                            </tr>
+                                </x-ui.table-td>
+                            </x-ui.table-row>
                         @empty
-                            <tr>
-                                <td colspan="8" class="px-5 py-8 text-center text-sm text-muted">
+                            <x-ui.table-row>
+                                <x-ui.table-td colspan="8" align="center" class="px-5 py-8 text-sm text-muted">
                                     Belum ada perubahan konfigurasi tercatat.
-                                </td>
-                            </tr>
+                                </x-ui.table-td>
+                            </x-ui.table-row>
                         @endforelse
-                    </tbody>
-                </table>
+                    </x-ui.table-body>
+                </x-ui.table>
             </div>
         </div>
 
         {{-- MODAL KONFIRMASI --}}
-        <div x-show="showConfirm" x-transition:enter="transition ease-out duration-150"
-            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4" style="display: none;">
-            <div x-show="showConfirm" @click.outside="showConfirm = false"
-                class="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-xl">
-                <div class="flex items-start gap-3">
-                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-warning/10">
-                        <svg class="h-5 w-5 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="text-base font-semibold text-ink">Konfirmasi Perubahan Approver</h3>
-                        <p class="mt-1 text-sm text-muted">Perubahan ini langsung berlaku untuk pengajuan cuti berikutnya dan dicatat di log audit.</p>
-                    </div>
-                </div>
+        <x-ui.modal
+            show="showConfirm"
+            title="Konfirmasi Perubahan Approver"
+            close-action="showConfirm = false"
+            max-width="md"
+            body-class="p-6"
+            footer-class="flex justify-end gap-3"
+            overlay-class="bg-ink/40"
+        >
+            <p class="text-sm text-muted">Perubahan ini langsung berlaku untuk pengajuan cuti berikutnya dan dicatat di log audit.</p>
 
-                <div class="mt-6 flex justify-end gap-3">
-                    <button type="button" @click="showConfirm = false"
-                        class="rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft cursor-pointer">
-                        Batal
-                    </button>
-                    <button type="button" @click="submitForm()"
-                        class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 cursor-pointer">
-                        Ya, Simpan
-                    </button>
-                </div>
-            </div>
-        </div>
+            <x-slot:footer>
+                <button type="button" @click="showConfirm = false"
+                    class="rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft cursor-pointer">
+                    Batal
+                </button>
+                <button type="button" @click="submitForm()"
+                    class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 cursor-pointer">
+                    Ya, Simpan
+                </button>
+            </x-slot:footer>
+        </x-ui.modal>
     </div>
 </x-layouts.app>

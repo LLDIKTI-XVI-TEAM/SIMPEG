@@ -1,11 +1,5 @@
 <x-layouts.app title="Konfigurasi EWS">
     @php
-        $badgeClass = [
-            'Read-only' => 'text-info',
-            'Configurable' => 'text-primary',
-            'Aktif' => 'text-success',
-        ];
-
         // Helper: convert days to human-readable label
         function daysToHumanLabel($days)
         {
@@ -150,22 +144,14 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
                 </svg>
             </a>
-        </div>        @if(session('success'))
-            <div class="rounded-lg bg-success/10 border border-success/20 px-5 py-3 text-sm text-success flex items-center gap-2 mb-4">
-                <svg class="w-5 h-5 shrink-0 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                </svg>
-                <span>{{ session('success') }}</span>
-            </div>
+        </div>
+
+        @if(session('success'))
+            <x-ui.alert variant="success" class="mb-4">{{ session('success') }}</x-ui.alert>
         @endif
 
         @if(session('error'))
-            <div class="rounded-lg bg-danger/10 border border-danger/20 px-5 py-3 text-sm text-danger flex items-center gap-2 mb-4">
-                <svg class="w-5 h-5 shrink-0 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                </svg>
-                <span>{{ session('error') }}</span>
-            </div>
+            <x-ui.alert variant="danger" class="mb-4">{{ session('error') }}</x-ui.alert>
         @endif
         <div
             class="rounded-lg border border-border bg-surface px-5 py-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -173,7 +159,11 @@
                 <div>
                     <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">Status
                         Scheduler</span>
-                    <p class="text-sm font-semibold {{ $schedulerStatus['status'] === 'gagal' ? 'text-danger' : ($schedulerStatus['status'] === 'berhasil' ? 'text-success' : 'text-muted') }}">
+                    <x-ui.badge
+                        :variant="$schedulerStatus['status'] === 'gagal' ? 'danger' : ($schedulerStatus['status'] === 'berhasil' ? 'success' : 'muted')"
+                        size="md"
+                        dot
+                    >
                         @if($schedulerStatus['status'] === 'gagal')
                             Gagal (Perlu Perhatian)
                         @elseif($schedulerStatus['status'] === 'berhasil')
@@ -181,7 +171,7 @@
                         @else
                             {{ $schedulerStatus['status_label'] ?? 'Belum Jalan' }}
                         @endif
-                    </p>
+                    </x-ui.badge>
                 </div>
             </div>
 
@@ -204,7 +194,7 @@
                 </div>
                 <div>
                     <span class="text-[9px] font-bold text-muted uppercase tracking-wider block">Peringatan</span>
-                    <span class="text-xs font-bold text-warning">{{ $schedulerStatus['alerts_created'] }} alerts</span>
+                    <x-ui.badge variant="warning" size="sm">{{ $schedulerStatus['alerts_created'] }} alerts</x-ui.badge>
                 </div>
             </div>
         </div>
@@ -471,12 +461,14 @@
                             nilai ambang batas ini untuk dicatat dalam log audit kepegawaian secara lengkap.</p>
                     </div>
                     <div class="flex-1 max-w-xl space-y-3">
-                        <textarea id="cfg-reason" name="reason" x-model="reason" rows="3"
+                        <x-form.textarea
+                            name="reason"
+                            id="cfg-reason"
+                            rows="3"
                             placeholder="Contoh: Penyesuaian masa tenggang berkas usul pensiun dan kenaikan pangkat untuk semester gasal"
-                            class="w-full resize-y rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"></textarea>
-                        @error('reason')
-                            <p class="text-xs text-danger mt-1">{{ $message }}</p>
-                        @enderror
+                            class="resize-y transition-colors"
+                            x-model="reason"
+                        />
 
                         <button type="button" @click="openConfirm()"
                             class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 active:opacity-80 disabled:cursor-not-allowed disabled:opacity-50 font-sans cursor-pointer"
@@ -507,50 +499,48 @@
             </div>
 
             <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse text-xs">
-                    <thead>
-                        <tr class="bg-soft border-b border-border">
-                            <th class="px-5 py-3 font-semibold text-muted w-8"></th>
-                            <th class="px-5 py-3 font-semibold text-muted">Waktu</th>
-                            <th class="px-5 py-3 font-semibold text-muted">Pengguna</th>
-                            <th class="px-5 py-3 font-semibold text-muted">Parameter</th>
-                            <th class="px-5 py-3 font-semibold text-muted text-right">Nilai Lama</th>
-                            <th class="px-3 py-3 text-center text-muted"></th>
-                            <th class="px-5 py-3 font-semibold text-muted">Nilai Baru</th>
-                            <th class="px-5 py-3 font-semibold text-muted">Catatan</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
+                <x-ui.table class="text-left border-collapse text-xs">
+                    <x-ui.table-head>
+                        <x-ui.table-row class="bg-soft border-b border-border">
+                            <x-ui.table-th class="px-5 py-3 w-8"></x-ui.table-th>
+                            <x-ui.table-th class="px-5 py-3">Waktu</x-ui.table-th>
+                            <x-ui.table-th class="px-5 py-3">Pengguna</x-ui.table-th>
+                            <x-ui.table-th class="px-5 py-3">Parameter</x-ui.table-th>
+                            <x-ui.table-th align="right" class="px-5 py-3">Nilai Lama</x-ui.table-th>
+                            <x-ui.table-th align="center" class="px-3 py-3"></x-ui.table-th>
+                            <x-ui.table-th class="px-5 py-3">Nilai Baru</x-ui.table-th>
+                            <x-ui.table-th class="px-5 py-3">Catatan</x-ui.table-th>
+                        </x-ui.table-row>
+                    </x-ui.table-head>
+                    <x-ui.table-body>
                         @forelse($auditRows as $idx => $row)
                             {{-- Main row --}}
-                            <tr class="hover:bg-soft/30 transition-colors cursor-pointer"
-                                @click="expandedAudit = expandedAudit === {{ $idx }} ? null : {{ $idx }}">
-                                <td class="px-5 py-3.5 text-center">
+                            <x-ui.table-row @click="expandedAudit = expandedAudit === {{ $idx }} ? null : {{ $idx }}" :interactive="true" class="cursor-pointer">
+                                <x-ui.table-td align="center" padding="wide">
                                     <svg class="w-3.5 h-3.5 text-muted transition-transform duration-200"
                                         :class="expandedAudit === {{ $idx }} ? 'rotate-90' : ''" fill="none"
                                         stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round"
                                             d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                                     </svg>
-                                </td>
-                                <td class="px-5 py-3.5 text-muted whitespace-nowrap">{{ $row['time'] }}</td>
-                                <td class="px-5 py-3.5">
+                                </x-ui.table-td>
+                                <x-ui.table-td padding="wide" class="text-muted whitespace-nowrap">{{ $row['time'] }}</x-ui.table-td>
+                                <x-ui.table-td padding="wide">
                                     <span class="font-semibold text-ink block">{{ $row['actor'] }}</span>
                                     <span class="text-[9px] text-muted block font-mono">{{ $row['ip_address'] }}</span>
-                                </td>
-                                <td class="px-5 py-3.5 text-ink font-medium">{{ $row['field'] }}</td>
-                                <td class="px-5 py-3.5 text-right font-mono text-muted">{{ $row['before'] }}</td>
-                                <td class="px-3 py-3.5 text-center text-muted">→</td>
-                                <td class="px-5 py-3.5 font-mono font-bold text-success">{{ $row['after'] }}</td>
-                                <td class="px-5 py-3.5 text-muted italic max-w-[200px] truncate"
-                                    title="{{ $row['reason'] }}">{{ $row['reason'] }}</td>
-                            </tr>
+                                </x-ui.table-td>
+                                <x-ui.table-td padding="wide" class="font-medium">{{ $row['field'] }}</x-ui.table-td>
+                                <x-ui.table-td align="right" padding="wide" class="font-mono text-muted">{{ $row['before'] }}</x-ui.table-td>
+                                <x-ui.table-td align="center" class="px-3 py-3.5 text-muted">→</x-ui.table-td>
+                                <x-ui.table-td padding="wide" class="font-mono font-bold text-success">{{ $row['after'] }}</x-ui.table-td>
+                                <x-ui.table-td title="{{ $row['reason'] }}" padding="wide" class="text-muted italic max-w-[200px] truncate">{{ $row['reason'] }}</x-ui.table-td>
+                            </x-ui.table-row>
 
                             {{-- Detail row (expanded) --}}
-                            <tr x-show="expandedAudit === {{ $idx }}" x-transition:enter="transition ease-out duration-150"
+                            <x-ui.table-row x-show="expandedAudit === {{ $idx }}" x-transition:enter="transition ease-out duration-150"
                                 x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
                                 style="display: none;">
-                                <td colspan="8" class="bg-soft/30 px-8 py-4 border-t border-border">
+                                <x-ui.table-td colspan="8" class="bg-soft/30 px-8 py-4 border-t border-border">
                                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-xs">
                                         {{-- Event --}}
                                         <div class="space-y-1">
@@ -603,11 +593,11 @@
                                             </p>
                                         </div>
                                     </div>
-                                </td>
-                            </tr>
+                                </x-ui.table-td>
+                            </x-ui.table-row>
                         @empty
-                            <tr>
-                                <td colspan="8" class="px-5 py-8 text-center text-sm text-muted">
+                            <x-ui.table-row>
+                                <x-ui.table-td colspan="8" align="center" class="px-5 py-8 text-sm text-muted">
                                     <div class="flex flex-col items-center gap-2">
                                         <svg class="w-8 h-8 text-muted/40" fill="none" stroke="currentColor"
                                             viewBox="0 0 24 24" stroke-width="1">
@@ -616,44 +606,33 @@
                                         </svg>
                                         Belum ada perubahan konfigurasi tercatat.
                                     </div>
-                                </td>
-                            </tr>
+                                </x-ui.table-td>
+                            </x-ui.table-row>
                         @endforelse
-                    </tbody>
-                </table>
+                    </x-ui.table-body>
+                </x-ui.table>
             </div>
         </div>
 
         {{-- ================================================================ --}}
         {{-- CONFIRMATION MODAL --}}
         {{-- ================================================================ --}}
-        <div x-show="showConfirm" x-transition:enter="transition ease-out duration-150"
-            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4" style="display: none;">
-            <div x-show="showConfirm" x-transition:enter="transition ease-out duration-150"
-                x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
-                @click.outside="showConfirm = false"
-                class="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-xl">
-                {{-- Modal header --}}
-                <div class="flex items-start gap-3">
-                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-warning/10">
-                        <svg class="h-5 w-5 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                            stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="text-base font-semibold text-ink">Konfirmasi Perubahan Parameter EWS</h3>
-                        <p class="mt-1 text-sm text-muted">
-                            Perubahan ini langsung berlaku untuk scheduler pengecekan EWS harian dan dicatat di log
-                            audit.
-                        </p>
-                    </div>
-                </div>
+        <x-ui.modal
+            show="showConfirm"
+            title="Konfirmasi Perubahan Parameter EWS"
+            close-action="showConfirm = false"
+            max-width="md"
+            body-class="p-6 space-y-5"
+            footer-class="flex justify-end gap-3"
+            overlay-class="bg-ink/40"
+        >
+                <p class="text-sm text-muted">
+                    Perubahan ini langsung berlaku untuk scheduler pengecekan EWS harian dan dicatat di log
+                    audit.
+                </p>
 
                 {{-- Ringkasan perubahan --}}
-                <div class="mt-5 rounded-lg border border-border bg-soft p-4 max-h-[250px] overflow-y-auto">
+                <div class="rounded-lg border border-border bg-soft p-4 max-h-[250px] overflow-y-auto">
                     <p class="text-xs font-bold uppercase tracking-wide text-muted">Ringkasan Parameter Baru</p>
                     <dl class="mt-3 space-y-2 text-xs font-sans">
                         <div class="flex items-center justify-between gap-4 border-b border-border pb-1.5">
@@ -691,22 +670,20 @@
                     </dl>
                 </div>
 
-                {{-- Aksi modal --}}
-                <div class="mt-5 flex justify-end gap-3">
-                    <button type="button" @click="showConfirm = false"
-                        class="rounded-lg border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-muted transition-colors hover:bg-soft cursor-pointer focus:outline-none">
-                        Batal
-                    </button>
-                    <button type="button" @click="submitForm()"
-                        class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 cursor-pointer focus:outline-none">
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                        </svg>
-                        Ya, Terapkan Perubahan
-                    </button>
-                </div>
-            </div>
-        </div>
+            <x-slot:footer>
+                <button type="button" @click="showConfirm = false"
+                    class="rounded-lg border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-muted transition-colors hover:bg-soft cursor-pointer focus:outline-none">
+                    Batal
+                </button>
+                <button type="button" @click="submitForm()"
+                    class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 cursor-pointer focus:outline-none">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                    </svg>
+                    Ya, Terapkan Perubahan
+                </button>
+            </x-slot:footer>
+        </x-ui.modal>
 
     </div>
 </x-layouts.app>

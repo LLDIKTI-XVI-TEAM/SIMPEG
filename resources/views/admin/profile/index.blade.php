@@ -2,7 +2,7 @@
     <div class="max-w-2xl mx-auto space-y-6">
 
         {{-- Profile Info Card --}}
-        <div class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6">
+        <x-ui.card padding="lg" class="space-y-6">
             <div class="border-b border-border pb-4 flex items-center gap-4">
                 <div class="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-xl font-bold text-primary">
                     {{ strtoupper(substr(auth()->user()->name ?? 'U', 0, 1)) }}
@@ -38,15 +38,15 @@
 
             @if(auth()->user()?->role === 'super_admin')
                 <div class="border-t border-border pt-6 flex justify-end">
-                    <a href="{{ route('pengaturan') }}" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-soft">
+                    <x-ui.button href="{{ route('pengaturan') }}" variant="secondary" size="lg">
                         Kelola Pengaturan
-                    </a>
+                    </x-ui.button>
                 </div>
             @endif
-        </div>
+        </x-ui.card>
 
         {{-- Change Password Card --}}
-        <div class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6">
+        <x-ui.card padding="lg" class="space-y-6">
             <div class="border-b border-border pb-4">
                 <h3 class="text-base font-bold text-ink font-sans leading-tight">Ubah Kata Sandi</h3>
                 <p class="text-xs text-muted font-sans mt-0.5">Amankan akun Anda dengan melakukan pembaharuan kata sandi secara berkala.</p>
@@ -54,29 +54,41 @@
 
             <form action="{{ route('profile.password.update') }}" method="POST" class="space-y-4">
                 @csrf
-                <div class="space-y-1">
-                    <label for="current_password" class="text-xs font-semibold text-ink font-sans">Kata Sandi Saat Ini</label>
-                    <input id="current_password" name="current_password" type="password" required class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                </div>
+                <x-form.input
+    name="current_password"
+    label="Kata Sandi Saat Ini"
+    type="password"
+    id="current_password"
+    required
+    size="lg"
+/>
 
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div class="space-y-1">
-                        <label for="new_password" class="text-xs font-semibold text-ink font-sans">Kata Sandi Baru</label>
-                        <input id="new_password" name="new_password" type="password" required class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                    </div>
-                    <div class="space-y-1">
-                        <label for="new_password_confirmation" class="text-xs font-semibold text-ink font-sans">Konfirmasi Kata Sandi Baru</label>
-                        <input id="new_password_confirmation" name="new_password_confirmation" type="password" required class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                    </div>
+                    <x-form.input
+    name="new_password"
+    label="Kata Sandi Baru"
+    type="password"
+    id="new_password"
+    required
+    size="lg"
+/>
+                    <x-form.input
+    name="new_password_confirmation"
+    label="Konfirmasi Kata Sandi Baru"
+    type="password"
+    id="new_password_confirmation"
+    required
+    size="lg"
+/>
                 </div>
 
                 <div class="pt-2 flex justify-end">
-                    <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 font-sans">
+                    <x-ui.button type="submit" variant="primary" size="lg">
                         Simpan Kata Sandi Baru
-                    </button>
+                    </x-ui.button>
                 </div>
             </form>
-        </div>
+        </x-ui.card>
 
         {{-- Direct Logout Card --}}
         <div class="rounded-lg border border-danger/10 bg-danger/5 p-6 shadow-sm space-y-4 flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -87,9 +99,9 @@
             <div>
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
-                    <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-danger px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 font-sans cursor-pointer focus:outline-none w-full sm:w-auto">
+                    <x-ui.button type="submit" variant="danger-solid" size="lg" class="w-full sm:w-auto">
                         Keluar Sekarang
-                    </button>
+                    </x-ui.button>
                 </form>
             </div>
         </div>

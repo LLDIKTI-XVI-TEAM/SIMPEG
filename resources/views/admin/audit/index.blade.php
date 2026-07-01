@@ -134,20 +134,16 @@
         }
     }" class="space-y-6">
 
-        {{-- PAGE HEADER --}}
-        <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-                <h2 class="text-2xl font-bold text-primary font-sans">Audit Log</h2>
-                <nav class="mt-1 flex items-center gap-1.5 text-xs text-muted">
+        <x-admin.page-header title="Audit Log" class="mb-6">
+            <x-slot:breadcrumb>
                     <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
                     <span>/</span>
                     <span class="font-medium text-ink">Audit Log</span>
-                </nav>
-            </div>
-        </div>
+            </x-slot:breadcrumb>
+        </x-admin.page-header>
 
         {{-- FILTER PANEL --}}
-        <div class="rounded-lg border border-border bg-surface p-6 shadow-sm mb-6 space-y-6">
+        <x-ui.card padding="lg" class="mb-6 space-y-6">
             {{-- Header & Reset --}}
             <div class="flex items-center justify-between border-b border-border pb-3">
                 <div>
@@ -242,21 +238,26 @@
                 </div>
 
                 {{-- Periode Mulai --}}
-                <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Periode Mulai</label>
-                    <input type="date" x-model="filterStartDate" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
-                </div>
+                <x-form.date
+                    label="Periode Mulai"
+                    size="sm"
+                    label-sr-only="false"
+                    wrapper-class="space-y-1.5"
+                    x-model="filterStartDate"
+                />
 
                 {{-- Periode Selesai --}}
-                <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Periode Selesai</label>
-                    <input type="date" x-model="filterEndDate" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
-                </div>
+                <x-form.date
+                    label="Periode Selesai"
+                    size="sm"
+                    wrapper-class="space-y-1.5"
+                    x-model="filterEndDate"
+                />
             </div>
-        </div>
+        </x-ui.card>
 
         {{-- Table Card --}}
-        <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
+        <x-ui.card padding="none" class="overflow-hidden">
             
             {{-- Toolbar --}}
             <div class="px-6 py-4 border-b border-border flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-surface">
@@ -268,10 +269,10 @@
 
             {{-- Table render --}}
             <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-soft border-b border-border">
-                        <tr>
-                            <th @click="toggleSort('timestamp')" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans cursor-pointer hover:text-primary transition-colors select-none">
+                <x-ui.table>
+                    <x-ui.table-head class="border-b border-border">
+                        <x-ui.table-row>
+                            <x-ui.table-th @click="toggleSort('timestamp')" class="text-[11px] cursor-pointer hover:text-primary transition-colors select-none">
                                 <div class="flex items-center gap-1.5">
                                     Waktu
                                     <template x-if="sortField === 'timestamp'">
@@ -284,8 +285,8 @@
                                         <svg class="w-3 h-3 text-muted/40 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
                                     </template>
                                 </div>
-                            </th>
-                            <th @click="toggleSort('operator')" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans cursor-pointer hover:text-primary transition-colors select-none">
+                            </x-ui.table-th>
+                            <x-ui.table-th @click="toggleSort('operator')" class="text-[11px] cursor-pointer hover:text-primary transition-colors select-none">
                                 <div class="flex items-center gap-1.5">
                                     User
                                     <template x-if="sortField === 'operator'">
@@ -298,8 +299,8 @@
                                         <svg class="w-3 h-3 text-muted/40 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
                                     </template>
                                 </div>
-                            </th>
-                            <th @click="toggleSort('event')" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans cursor-pointer hover:text-primary transition-colors select-none">
+                            </x-ui.table-th>
+                            <x-ui.table-th @click="toggleSort('event')" class="text-[11px] cursor-pointer hover:text-primary transition-colors select-none">
                                 <div class="flex items-center gap-1.5">
                                     Jenis Event
                                     <template x-if="sortField === 'event'">
@@ -312,8 +313,8 @@
                                         <svg class="w-3 h-3 text-muted/40 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
                                     </template>
                                 </div>
-                            </th>
-                            <th @click="toggleSort('modul')" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans cursor-pointer hover:text-primary transition-colors select-none">
+                            </x-ui.table-th>
+                            <x-ui.table-th @click="toggleSort('modul')" class="text-[11px] cursor-pointer hover:text-primary transition-colors select-none">
                                 <div class="flex items-center gap-1.5">
                                     Modul/Tabel
                                     <template x-if="sortField === 'modul'">
@@ -326,61 +327,67 @@
                                         <svg class="w-3 h-3 text-muted/40 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
                                     </template>
                                 </div>
-                            </th>
-                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans select-none">Ringkasan Perubahan</th>
-                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans select-none">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
+                            </x-ui.table-th>
+                            <x-ui.table-th class="text-[11px] select-none">Ringkasan Perubahan</x-ui.table-th>
+                            <x-ui.table-th class="text-[11px] select-none">Aksi</x-ui.table-th>
+                        </x-ui.table-row>
+                    </x-ui.table-head>
+                    <x-ui.table-body>
                         <template x-for="log in paginatedLogs" :key="log.id">
-                            <tr @click="selectedLogId = log.id; showDrawer = true" class="transition-colors hover:bg-soft/50 cursor-pointer">
-                                <td class="px-4 py-3.5 text-xs font-mono text-ink" x-text="log.timestamp"></td>
-                                <td class="px-4 py-3.5 text-sm font-semibold text-ink font-sans" x-text="log.operator"></td>
-                                <td class="px-4 py-3.5">
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-semibold font-sans"
-                                        :class="log.event === 'CREATE' || log.event === 'IMPORT' || log.event === 'APPROVE' || log.event === 'RESTORE' ? 'text-success' : (log.event === 'LOGIN' ? 'text-primary' : (log.event === 'SOFT_DELETE' || log.event === 'LOGOUT' ? 'text-danger' : 'text-warning'))"
+                            <x-ui.table-row @click="selectedLogId = log.id; showDrawer = true" :interactive="true" class="cursor-pointer">
+                                <x-ui.table-td x-text="log.timestamp" class="font-mono"></x-ui.table-td>
+                                <x-ui.table-td x-text="log.operator" class="text-sm font-semibold"></x-ui.table-td>
+                                <x-ui.table-td>
+                                    <x-ui.badge
+                                        variant="none"
+                                        size="md"
+                                        dot
+                                        x-bind:class="log.event === 'CREATE' || log.event === 'IMPORT' || log.event === 'APPROVE' || log.event === 'RESTORE' ? 'border-success/20 bg-success/10 text-success' : (log.event === 'LOGIN' ? 'border-primary/20 bg-primary/10 text-primary' : (log.event === 'SOFT_DELETE' || log.event === 'LOGOUT' ? 'border-danger/20 bg-danger/10 text-danger' : 'border-warning/25 bg-warning/10 text-warning'))"
                                     >
-                                        <span class="h-1.5 w-1.5 rounded-full"
-                                            :class="log.event === 'CREATE' || log.event === 'IMPORT' || log.event === 'APPROVE' || log.event === 'RESTORE' ? 'bg-success' : (log.event === 'LOGIN' ? 'bg-primary' : (log.event === 'SOFT_DELETE' || log.event === 'LOGOUT' ? 'bg-danger' : 'bg-warning'))"
-                                        ></span>
                                         <span x-text="log.event"></span>
-                                    </span>
-                                </td>
-                                <td class="px-4 py-3.5 text-xs text-muted font-sans" x-text="log.modul"></td>
-                                <td class="px-4 py-3.5 text-xs text-ink font-sans" x-text="getRingkasan(log)"></td>
-                                <td class="px-4 py-3.5" @click.stop>
+                                    </x-ui.badge>
+                                </x-ui.table-td>
+                                <x-ui.table-td x-text="log.modul" class="text-muted"></x-ui.table-td>
+                                <x-ui.table-td x-text="getRingkasan(log)"></x-ui.table-td>
+                                <x-ui.table-td @click.stop>
                                     <div class="flex items-center gap-1.5">
-                                        <button 
-                                            @click.stop="selectedLogId = log.id; showDrawer = true" 
-                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/30 shadow-sm cursor-pointer" 
+                                        <x-ui.button
+                                            type="button"
+                                            variant="secondary"
+                                            size="icon"
+                                            @click.stop="selectedLogId = log.id; showDrawer = true"
                                             title="Detail Drawer"
+                                            aria-label="Detail Drawer"
                                         >
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                             </svg>
-                                        </button>
-                                        <a 
+                                        </x-ui.button>
+                                        <x-ui.button
+                                            as="a"
+                                            variant="muted"
+                                            size="icon"
                                             @click.stop
-                                            :href="'/dashboard/audit/' + log.id" 
-                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted transition hover:bg-soft hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/30 shadow-sm" 
+                                            x-bind:href="'/dashboard/audit/' + log.id"
                                             title="Halaman Detail"
+                                            aria-label="Halaman Detail"
                                         >
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
                                             </svg>
-                                        </a>
+                                        </x-ui.button>
                                     </div>
-                                </td>
-                            </tr>
+                                </x-ui.table-td>
+                            </x-ui.table-row>
                         </template>
-                        <tr x-show="filteredLogs.length === 0">
-                            <td colspan="6" class="px-6 py-8 text-center text-xs text-muted font-sans">
+                        <x-ui.table-row x-show="filteredLogs.length === 0">
+                            <x-ui.table-td colspan="6" align="center" class="px-6 py-8 text-muted">
                                 Tidak ada log aktivitas yang cocok dengan filter pencarian.
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                            </x-ui.table-td>
+                        </x-ui.table-row>
+                    </x-ui.table-body>
+                </x-ui.table>
             </div>
 
             {{-- TABLE FOOTER --}}
@@ -407,14 +414,18 @@
                 </div>
                 <div class="flex items-center gap-1.5">
                     {{-- Prev --}}
-                    <button @click="if (currentPage > 1) currentPage--" 
-                            :disabled="currentPage === 1"
-                            :class="currentPage === 1 ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-soft hover:text-ink text-ink'"
-                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface transition">
+                    <x-ui.button
+                            type="button"
+                            variant="muted"
+                            size="icon"
+                            @click="if (currentPage > 1) currentPage--"
+                            x-bind:disabled="currentPage === 1"
+                            x-bind:class="currentPage === 1 ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-soft hover:text-ink text-ink'"
+                            aria-label="Halaman sebelumnya">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
                         </svg>
-                    </button>
+                    </x-ui.button>
                     
                     <template x-for="page in totalPages" :key="page">
                         <button @click="currentPage = page" 
@@ -425,18 +436,22 @@
                     </template>
                     
                     {{-- Next --}}
-                    <button @click="if (currentPage < totalPages) currentPage++" 
-                            :disabled="currentPage === totalPages"
-                            :class="currentPage === totalPages ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-soft hover:text-ink text-ink'"
-                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface transition">
+                    <x-ui.button
+                            type="button"
+                            variant="muted"
+                            size="icon"
+                            @click="if (currentPage < totalPages) currentPage++"
+                            x-bind:disabled="currentPage === totalPages"
+                            x-bind:class="currentPage === totalPages ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-soft hover:text-ink text-ink'"
+                            aria-label="Halaman berikutnya">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                         </svg>
-                    </button>
+                    </x-ui.button>
                 </div>
             </div>
 
-        </div>
+        </x-ui.card>
 
         {{-- Slide-over Drawer --}}
         <div x-show="showDrawer" class="fixed inset-0 z-50 overflow-hidden" style="display: none;" x-transition>
@@ -497,31 +512,31 @@
                             <h4 class="text-xs font-bold text-ink font-sans uppercase tracking-wider">Perubahan Nilai Data</h4>
                             
                             <div class="overflow-hidden rounded-lg border border-border bg-soft">
-                                <table class="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr class="bg-primary/10 text-[10px] uppercase font-semibold text-muted font-sans border-b border-border">
-                                            <th class="px-3 py-2">Nama Field</th>
-                                            <th class="px-3 py-2">Sebelum</th>
-                                            <th class="px-3 py-2">Sesudah</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-border text-[11px] font-sans">
+                                <x-ui.table class="text-left border-collapse">
+                                    <x-ui.table-head>
+                                        <x-ui.table-row class="bg-primary/10 text-[10px] border-b border-border">
+                                            <x-ui.table-th padding="xs">Nama Field</x-ui.table-th>
+                                            <x-ui.table-th padding="xs">Sebelum</x-ui.table-th>
+                                            <x-ui.table-th padding="xs">Sesudah</x-ui.table-th>
+                                        </x-ui.table-row>
+                                    </x-ui.table-head>
+                                    <x-ui.table-body class="text-[11px] font-sans">
                                         <template x-for="item in getDiffFields(selectedLog)" :key="item.field">
-                                            <tr>
-                                                <td class="px-3 py-2 font-semibold text-ink font-mono" x-text="item.field"></td>
-                                                <td class="px-3 py-2 text-danger font-mono bg-danger/5" x-text="typeof item.old === 'object' ? JSON.stringify(item.old) : item.old"></td>
-                                                <td class="px-3 py-2 text-success font-mono bg-success/5" x-text="typeof item.new === 'object' ? JSON.stringify(item.new) : item.new"></td>
-                                            </tr>
+                                            <x-ui.table-row>
+                                                <x-ui.table-td x-text="item.field" padding="xs" class="font-semibold font-mono"></x-ui.table-td>
+                                                <x-ui.table-td x-text="typeof item.old === 'object' ? JSON.stringify(item.old) : item.old" padding="xs" class="text-danger font-mono bg-danger/5"></x-ui.table-td>
+                                                <x-ui.table-td x-text="typeof item.new === 'object' ? JSON.stringify(item.new) : item.new" padding="xs" class="text-success font-mono bg-success/5"></x-ui.table-td>
+                                            </x-ui.table-row>
                                         </template>
                                         <template x-if="getDiffFields(selectedLog).length === 0">
-                                            <tr>
-                                                <td colspan="3" class="px-3 py-4 text-center text-muted font-sans">
+                                            <x-ui.table-row>
+                                                <x-ui.table-td colspan="3" align="center" class="px-3 py-4 text-muted">
                                                     Tidak ada detail perubahan nilai data (misal: event login/logout).
-                                                </td>
-                                            </tr>
+                                                </x-ui.table-td>
+                                            </x-ui.table-row>
                                         </template>
-                                    </tbody>
-                                </table>
+                                    </x-ui.table-body>
+                                </x-ui.table>
                             </div>
                         </div>
 
