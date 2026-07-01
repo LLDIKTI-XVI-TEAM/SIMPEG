@@ -598,17 +598,7 @@
                         dari <span class="font-bold text-ink" x-text="allRows.length"></span> baris
                     </span>
                     <div class="flex items-center gap-1">
-                        <button type="button" @click="previewPage = Math.max(1, previewPage - 1)" :disabled="previewPage <= 1"
-                            :class="previewPage <= 1 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-soft cursor-pointer'"
-                            class="rounded border border-border bg-surface px-2.5 py-1 font-semibold text-ink transition">←</button>
-                        <template x-for="p in previewTotalPages" :key="p">
-                            <button type="button" @click="previewPage = p" x-show="p <= 5 || p === previewTotalPages || Math.abs(p - previewPage) <= 1"
-                                :class="previewPage === p ? 'bg-primary text-white border-primary' : 'bg-surface text-ink hover:bg-soft border-border'"
-                                class="rounded border px-2.5 py-1 font-semibold transition cursor-pointer" x-text="p"></button>
-                        </template>
-                        <button type="button" @click="previewPage = Math.min(previewTotalPages, previewPage + 1)" :disabled="previewPage >= previewTotalPages"
-                            :class="previewPage >= previewTotalPages ? 'opacity-30 cursor-not-allowed' : 'hover:bg-soft cursor-pointer'"
-                            class="rounded border border-border bg-surface px-2.5 py-1 font-semibold text-ink transition">→</button>
+                        <x-ui.pagination current="previewPage" total="previewTotalPages" />
                     </div>
                 </div>
 
@@ -734,17 +724,7 @@
                         Hal. <span class="font-bold text-ink" x-text="valPage"></span> / <span class="font-bold text-ink" x-text="valTotalPages"></span>
                     </span>
                     <div class="flex items-center gap-1">
-                        <button type="button" @click="valPage = Math.max(1, valPage - 1)" :disabled="valPage <= 1"
-                            :class="valPage <= 1 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-soft cursor-pointer'"
-                            class="rounded border border-border bg-surface px-2.5 py-1 font-semibold text-ink transition">←</button>
-                        <template x-for="p in valTotalPages" :key="'vp-' + p">
-                            <button type="button" @click="valPage = p" x-show="p <= 5 || p === valTotalPages || Math.abs(p - valPage) <= 1"
-                                :class="valPage === p ? 'bg-primary text-white border-primary' : 'bg-surface text-ink hover:bg-soft border-border'"
-                                class="rounded border px-2.5 py-1 font-semibold transition cursor-pointer" x-text="p"></button>
-                        </template>
-                        <button type="button" @click="valPage = Math.min(valTotalPages, valPage + 1)" :disabled="valPage >= valTotalPages"
-                            :class="valPage >= valTotalPages ? 'opacity-30 cursor-not-allowed' : 'hover:bg-soft cursor-pointer'"
-                            class="rounded border border-border bg-surface px-2.5 py-1 font-semibold text-ink transition">→</button>
+                        <x-ui.pagination current="valPage" total="valTotalPages" />
                     </div>
                 </div>
 

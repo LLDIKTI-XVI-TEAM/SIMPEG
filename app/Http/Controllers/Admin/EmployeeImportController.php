@@ -1,16 +1,15 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Admin;
 
 use App\Actions\Employees\GenerateImportTemplateAction;
-use App\Actions\Employees\ImportEmployeesAction;
 use App\Actions\Employees\UploadImportBatchAction;
 use App\Actions\Employees\ValidateImportBatchAction;
-use App\Http\Requests\ImportEmployeesRequest;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Import\ImportEmployeesRequest;
 use App\Jobs\ImportEmployeeBatchJob;
 use App\Support\EmployeeImport\ImportTemplateWriter;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use InvalidArgumentException;
@@ -19,27 +18,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class EmployeeImportController extends Controller
 {
     /**
-     * Handle the legacy /api/v1/pegawai/import request.
-     */
-    public function store(ImportEmployeesRequest $request, ImportEmployeesAction $action): JsonResponse|RedirectResponse
-    {
-        $summary = $action->execute($request);
-
-        if ($request->expectsJson()) {
-            return response()->json($summary, $summary['failed'] > 0 ? 422 : 200);
-        }
-
-        if ($summary['failed'] > 0) {
-            return back()
-                ->withErrors(['file' => $summary['message']])
-                ->with('import_summary', $summary);
-        }
-
-        return back()->with('import_summary', $summary);
-    }
-
-    /**
-     * Handle the import wizard upload step.
+     * Menangani langkah unggah pada wizard impor pegawai.
      */
     public function upload(ImportEmployeesRequest $request, UploadImportBatchAction $action): JsonResponse
     {
@@ -53,7 +32,7 @@ class EmployeeImportController extends Controller
     }
 
     /**
-     * Handle the import wizard preview step.
+     * Menangani langkah pratinjau pada wizard impor pegawai.
      */
     public function preview(Request $request, string $batchId): JsonResponse
     {
@@ -71,7 +50,7 @@ class EmployeeImportController extends Controller
     }
 
     /**
-     * Handle the import wizard validate step.
+     * Menangani langkah validasi pada wizard impor pegawai.
      */
     public function validate(Request $request, string $batchId, ValidateImportBatchAction $action): JsonResponse
     {
@@ -87,7 +66,7 @@ class EmployeeImportController extends Controller
     }
 
     /**
-     * Handle the import wizard execute step (Queue the job).
+     * Menangani eksekusi impor dengan memasukkan job ke antrean.
      */
     public function execute(Request $request, string $batchId): JsonResponse
     {
@@ -99,13 +78,13 @@ class EmployeeImportController extends Controller
             ], 422);
         }
 
-        // Set status to queued in cache
+        // Status cache diubah sebelum job diproses agar UI segera menampilkan antrean.
         $batch['status'] = 'queued';
         $batch['progress'] = 0;
         $batch['processed_count'] = 0;
         Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $batch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
 
-        // Dispatch background job
+        // Job menyimpan konteks user/IP untuk audit impor pegawai.
         ImportEmployeeBatchJob::dispatch(
             $batchId,
             $request->user()?->id,
@@ -120,7 +99,7 @@ class EmployeeImportController extends Controller
     }
 
     /**
-     * Handle checking the import queue status/progress.
+     * Mengembalikan progres antrean impor untuk polling UI.
      */
     public function status(Request $request, string $batchId): JsonResponse
     {
@@ -156,7 +135,7 @@ class EmployeeImportController extends Controller
     }
 
     /**
-     * Retrieve the import batch from cache or fail with HTTP exception.
+     * Mengambil batch impor dari cache dan menjaga akses hanya untuk pemilik batch.
      */
     private function getBatchOrFail(string $batchId, Request $request): array
     {

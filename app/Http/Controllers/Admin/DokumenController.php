@@ -2,111 +2,40 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\Documents\ListDocumentsPageAction;
+use App\Actions\Documents\PrepareDocumentDownloadAction;
+use App\Actions\Documents\ShowDocumentPageAction;
+use App\Actions\Documents\StoreDocumentAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Documents\StoreDocumentRequest;
 use App\Models\Document;
-use App\Models\Employee;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class DokumenController extends Controller
 {
-    public function index()
+    public function index(ListDocumentsPageAction $action)
     {
-        $pegawaiList = Employee::orderBy('nama_lengkap')->get(['id', 'nama_lengkap', 'nip']);
-        $documents = Document::with([
-            'employee.positionHistories' => fn ($query) => $query
-                ->with('unitKerja')
-                ->orderByDesc('is_latest')
-                ->orderByDesc('tmt_jabatan'),
-        ])->latest()->get();
-
-        return view('admin.dokumen.index', compact('pegawaiList', 'documents'));
+        return view('admin.dokumen.index', $action->execute());
     }
 
-    public function show($id)
+    public function show(string $id, ShowDocumentPageAction $action)
     {
-        $document = Document::with([
-            'employee.positionHistories' => fn ($query) => $query
-                ->with('unitKerja')
-                ->orderByDesc('is_latest')
-                ->orderByDesc('tmt_jabatan'),
-        ])->findOrFail($id);
-
-        $currentPosition = $document->employee->positionHistories->first();
-        $unit = $currentPosition?->unitKerja?->nama ?? '-';
-
-        $kategoriLabels = [
-            'sk_pengangkatan' => 'SK Pengangkatan',
-            'sk_pangkat' => 'SK Kenaikan Pangkat',
-            'sk_jabatan' => 'SK Kenaikan Jabatan',
-            'sk_kgb' => 'SK KGB',
-            'ijazah' => 'Ijazah',
-            'ktp_kk' => 'KTP & KK',
-            'lainnya' => 'Lainnya',
-        ];
-
-        $doc = [
-            'id' => $document->id,
-            'nama' => $document->nama_dokumen,
-            'kategori_label' => $kategoriLabels[$document->jenis_dokumen] ?? 'Lainnya',
-            'file_size' => '1.5 MB', // mock size
-            'nama_pegawai' => $document->employee->nama_lengkap,
-            'nip_pegawai' => $document->employee->nip,
-            'unit_pegawai' => $unit,
-            'nomor' => $document->nomor_dokumen ?? '-',
-            'tanggal' => $document->tanggal_dokumen ? $document->tanggal_dokumen->format('Y-m-d') : '-',
-            'deskripsi' => $document->keterangan ?? '-',
-            'file_path' => $document->file_path,
-        ];
-
-        return view('admin.dokumen.show', compact('doc'));
+        return view('admin.dokumen.show', $action->execute($id));
     }
 
-    public function store(Request $request)
+    public function store(StoreDocumentRequest $request, StoreDocumentAction $action)
     {
-        $request->validate([
-            'nama_dokumen' => 'required|string|max:255',
-            'nomor_dokumen' => 'required|string|max:100',
-            'tanggal_terbit' => 'required|date',
-            'kategori_dokumen' => 'required|string',
-            'pegawai_id' => 'required|uuid|exists:employees,id',
-            'berkas' => 'required|file|extensions:pdf,doc,docx,jpg,jpeg,png|max:10240',
-        ]);
-
-        $employee = Employee::findOrFail($request->input('pegawai_id'));
-
-        $filePath = $request->file('berkas')->store('employees/documents', 'public');
-        Log::info('File Path: '.var_export($filePath, true));
-
-        Document::create([
-            'employee_id' => $employee->id,
-            'jenis_dokumen' => $request->input('kategori_dokumen'),
-            'nama_dokumen' => $request->input('nama_dokumen'),
-            'nomor_dokumen' => $request->input('nomor_dokumen'),
-            'tanggal_dokumen' => $request->input('tanggal_terbit'),
-            'file_path' => $filePath,
-            'keterangan' => $request->input('deskripsi'),
-        ]);
+        $document = $action->execute($request->validated(), $request->file('berkas'));
 
         return redirect()->route('dokumen')
-            ->with('success', 'Dokumen "'.$request->input('nama_dokumen').'" berhasil diunggah.');
+            ->with('success', 'Dokumen "'.$document->nama_dokumen.'" berhasil diunggah.');
     }
 
-    public function download($id)
+    public function download(string $id, PrepareDocumentDownloadAction $action)
     {
-        $doc = Document::findOrFail($id);
+        $download = $action->execute($id);
 
-        if (! Storage::disk('public')->exists($doc->file_path)) {
-            abort(404);
-        }
-
-        $extension = pathinfo($doc->file_path, PATHINFO_EXTENSION);
-        $employeeName = Str::slug($doc->employee->nama_lengkap ?? 'pegawai');
-        $docName = Str::slug($doc->nama_dokumen);
-        $filename = $employeeName.'-'.$docName.'.'.$extension;
-
-        return Storage::disk('public')->download($doc->file_path, $filename);
+        return Storage::disk(Document::STORAGE_DISK)->download($download['path'], $download['filename']);
     }
 }

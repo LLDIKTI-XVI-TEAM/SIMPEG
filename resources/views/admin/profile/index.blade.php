@@ -75,40 +75,6 @@
             </div>
         </div>
     @else
-        @php
-            // Mapping riwayat berkas digital pegawai
-            $riwayatDokumen = $p->documents ?? [];
-
-            // Kalkulator otomatis jadwal
-            $tmtPangkatTerakhir = $p->latestRank()?->tmt_pangkat ? \Carbon\Carbon::parse($p->latestRank()->tmt_pangkat) : null;
-            $estimasiPangkatNext = $tmtPangkatTerakhir ? $tmtPangkatTerakhir->copy()->addYears(4)->format('d-m-Y') : '-';
-            $estimasiKgbNext = $p->tanggal_kgb_berikutnya
-                ? \Carbon\Carbon::parse($p->tanggal_kgb_berikutnya)->format('d-m-Y')
-                : ($p->latestSalary()?->tmt_kgb ? \Carbon\Carbon::parse($p->latestSalary()->tmt_kgb)->addYears(2)->format('d-m-Y') : '-');
-            
-            // Logika BUP dinamis berdasarkan jabatan
-            $bup = 58;
-            $jabatanStr = $p->latestPosition()?->nama_jabatan ?? '';
-            if (str_contains(strtolower($jabatanStr), 'madya') || str_contains(strtolower($jabatanStr), 'utama') || str_contains(strtolower($jabatanStr), 'pimpinan tinggi')) {
-                $bup = 60;
-            }
-
-            $tglLahir = isset($p->tanggal_lahir) ? \Carbon\Carbon::parse($p->tanggal_lahir) : null;
-            $estimasiPensiun = $tglLahir ? $tglLahir->copy()->addYears($bup)->format('d-m-Y') : '-';
-            
-            $sisaPensiunStr = '-';
-            if ($tglLahir) {
-                $pensiunDate = $tglLahir->copy()->addYears($bup);
-                $now = \Carbon\Carbon::now();
-                if ($pensiunDate->isFuture()) {
-                    $diff = $now->diff($pensiunDate);
-                    $sisaPensiunStr = $diff->y . ' Tahun, ' . $diff->m . ' Bulan lagi';
-                } else {
-                    $sisaPensiunStr = 'Memasuki Usia Pensiun';
-                }
-            }
-        @endphp
-
         <div x-data="{
             activeTab: new URLSearchParams(window.location.search).get('tab') || 'profile'
         }" class="mx-auto max-w-5xl space-y-6">
@@ -148,10 +114,6 @@
 
             {{-- MAIN DETAIL CARD --}}
             <div class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6">
-                @php
-                    $fotoUrl = $p->foto_url;
-                @endphp
-                
                 {{-- Header info --}}
                 <div class="border-b border-border pb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div class="flex items-center gap-4">
@@ -353,18 +315,21 @@
                 <div x-show="activeTab === 'cuti'" style="display: none;" class="space-y-4" x-transition>
                     <div class="flex items-center justify-between">
                         <div>
-                            <h3 class="text-sm font-bold text-ink font-sans">Informasi Saldo Cuti ({{ date('Y') }})</h3>
+                            <h3 class="text-sm font-bold text-ink font-sans">Informasi Saldo Cuti ({{ $tahun }})</h3>
                             <p class="text-xs text-muted font-sans mt-0.5">Menampilkan sisa jatah cuti tahunan berjalan Anda.</p>
                         </div>
-                        <a href="{{ route('cuti.saldo') ?? route('cuti') }}" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm font-sans">
-                            Ajukan Cuti
-                        </a>
                     </div>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div class="rounded-lg border border-border bg-surface p-4 shadow-sm text-center">
                             <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans block">Sisa Saldo</span>
-                            <span class="text-3xl font-bold text-primary block mt-2">{{ $saldoCuti }} <span class="text-sm font-normal text-muted">Hari</span></span>
+                            <span class="text-3xl font-bold text-primary block mt-2">
+                                @if($saldoCuti === null)
+                                    <span class="text-sm font-semibold text-muted">Belum tersedia</span>
+                                @else
+                                    {{ $saldoCuti }} <span class="text-sm font-normal text-muted">Hari</span>
+                                @endif
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -655,7 +620,7 @@
                 <div x-show="activeTab === 'docs'" style="display: none;" class="space-y-4" x-transition>
                     <div>
                         <h3 class="text-sm font-bold text-ink font-sans">Daftar Berkas Fisik Kepegawaian</h3>
-                        <p class="text-xs text-muted font-sans mt-0.5">Daftar berkas PDF pendukung mutasi pangkat, jabatan, dan KGB.</p>
+                        <p class="text-xs text-muted font-sans mt-0.5">Daftar berkas pendukung mutasi pangkat, jabatan, KGB, dan dokumen kepegawaian lain.</p>
                     </div>
 
                     <div class="overflow-x-auto rounded-lg border border-border">
@@ -676,12 +641,12 @@
                                         <div class="flex items-start gap-2.5">
                                             <div class="flex h-8 w-6 shrink-0 flex-col items-center justify-between rounded border border-border bg-soft p-0.5 shadow-sm relative">
                                                 <div class="w-full bg-primary/10 text-primary text-[5px] font-bold text-center py-0.5 uppercase tracking-wide">
-                                                    PDF
+                                                    {{ $doc['extension'] }}
                                                 </div>
                                             </div>
                                             <div class="min-w-0">
                                                 <p class="font-bold font-sans truncate">{{ $doc['nama'] }}</p>
-                                                <p class="text-[10px] text-muted font-sans mt-0.5 truncate">{{ $doc['deskripsi'] }}</p>
+                                                <p class="text-[10px] text-muted font-sans mt-0.5 truncate">{{ $doc['keterangan'] }}</p>
                                             </div>
                                         </div>
                                     </td>

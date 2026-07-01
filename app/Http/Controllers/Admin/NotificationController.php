@@ -2,20 +2,14 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\Notifications\PaginateNotificationsAction;
 use App\Http\Controllers\Controller;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 class NotificationController extends Controller
 {
-    public function index()
+    public function index(PaginateNotificationsAction $action)
     {
-        $notifications = collect();
-        if (auth()->check() && auth()->user()->employee) {
-            $notifications = auth()->user()->employee->notifications()->latest()->paginate(10);
-        } else {
-            $notifications = new LengthAwarePaginator([], 0, 10);
-        }
-
-        return view('admin.notifications.index', compact('notifications'));
+        return view('admin.notifications.index', $action->execute(auth()->user()?->employee_id));
     }
 }

@@ -105,11 +105,10 @@
     <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
             <h2 class="text-2xl font-semibold text-ink">Data Pegawai</h2>
-            <nav class="mt-1 flex items-center gap-1.5 text-xs text-muted">
-                <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
-                <span>/</span>
-                <span class="font-medium text-ink">Data Pegawai</span>
-            </nav>
+            <x-ui.breadcrumb :items="[
+                ['label' => 'Dashboard', 'url' => route('dashboard')],
+                ['label' => 'Data Pegawai']
+            ]" />
         </div>
         <div class="flex shrink-0 items-center gap-3">
             {{-- Export button --}}
@@ -374,14 +373,23 @@
                                 </a>
 
                                 {{-- Nonaktifkan --}}
-                                <form action="{{ route('pegawai.destroy', $p->id) }}" method="POST" class="inline" onsubmit="return confirm('Apakah Anda yakin ingin menonaktifkan pegawai ini?')">
-                                    @csrf
-                                    <button type="submit" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-danger transition hover:bg-danger/5 shadow-sm cursor-pointer" title="Nonaktifkan">
-                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M22 10.5h-6m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM4 19.235A10.19 10.19 0 0 1 12.75 15c2.015 0 3.907.585 5.5 1.59m-14.25 2.645A9.903 9.903 0 0 1 12.75 18a9.903 9.903 0 0 1 6.002 2.235" />
-                                        </svg>
-                                    </button>
-                                </form>
+                                <x-ui.confirm-dialog
+                                    id="delete-{{ $p->id }}"
+                                    title="Nonaktifkan Pegawai"
+                                    message="Apakah Anda yakin ingin menonaktifkan pegawai ini?"
+                                    confirm-text="Nonaktifkan"
+                                    variant="danger"
+                                    action="{{ route('pegawai.destroy', $p->id) }}"
+                                    method="POST"
+                                >
+                                    <x-slot:trigger>
+                                        <button type="button" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-danger transition hover:bg-danger/5 shadow-sm cursor-pointer" title="Nonaktifkan">
+                                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M22 10.5h-6m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM4 19.235A10.19 10.19 0 0 1 12.75 15c2.015 0 3.907.585 5.5 1.59m-14.25 2.645A9.903 9.903 0 0 1 12.75 18a9.903 9.903 0 0 1 6.002 2.235" />
+                                            </svg>
+                                        </button>
+                                    </x-slot:trigger>
+                                </x-ui.confirm-dialog>
                             </div>
                         </td>
                     </tr>
@@ -424,7 +432,15 @@
             </svg>
             Export Pilihan
         </button>
-        <button onclick="deactivateSelectedData()" class="inline-flex items-center gap-1.5 text-xs font-semibold text-danger hover:underline transition-colors cursor-pointer">
+        <button @click="
+            const count = document.querySelectorAll('.row-check:checked').length;
+            if (count === 0) {
+                window.alert('Tidak ada data pegawai yang dipilih.');
+                return;
+            }
+            document.getElementById('modal-title-bulk-delete').innerText = 'Nonaktifkan ' + count + ' Pegawai Terpilih';
+            $dispatch('open-confirm-bulk-delete');
+        " class="inline-flex items-center gap-1.5 text-xs font-semibold text-danger hover:underline transition-colors cursor-pointer">
             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M22 10.5h-6m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM4 19.235A10.19 10.19 0 0 1 12.75 15c2.015 0 3.907.585 5.5 1.59m-14.25 2.645A9.903 9.903 0 0 1 12.75 18a9.903 9.903 0 0 1 6.002 2.235" />
             </svg>
@@ -437,6 +453,14 @@
             Batal
         </button>
     </div>
+
+    <x-ui.confirm-dialog
+        id="bulk-delete"
+        title="Nonaktifkan Pegawai Terpilih"
+        message="Apakah Anda yakin ingin menonaktifkan pegawai yang dipilih?"
+        confirm-text="Nonaktifkan"
+        variant="danger"
+    />
 
     {{-- MODAL TAMBAH RIWAYAT --}}
     <div x-show="showRiwayatModal" @open-riwayat.window="openRiwayatModal($event.detail.type, $event.detail.id, $event.detail.name)" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;" x-transition>
@@ -729,17 +753,13 @@
     }
 
     // Nonaktifkan baris yang dipilih (Bulk Action)
-    function deactivateSelectedData() {
+    window.addEventListener('confirm-bulk-delete', () => {
         const selectedIds = Array.from(document.querySelectorAll('.row-check:checked'))
             .map(cb => cb.closest('tr').dataset.id)
             .filter(Boolean);
 
         if (selectedIds.length === 0) {
             window.alert('Tidak ada data pegawai yang dipilih.');
-            return;
-        }
-
-        if (!confirm('Apakah Anda yakin ingin menonaktifkan ' + selectedIds.length + ' pegawai yang dipilih?')) {
             return;
         }
 
@@ -764,7 +784,7 @@
 
         document.body.appendChild(form);
         form.submit();
-    }
+    });
 
     function updatePerPage(val) {
         const url = new URL(window.location.href);

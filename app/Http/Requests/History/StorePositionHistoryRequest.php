@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Requests;
+namespace App\Http\Requests\History;
 
 use App\Support\SkFilePathRules;
 use Illuminate\Foundation\Http\FormRequest;

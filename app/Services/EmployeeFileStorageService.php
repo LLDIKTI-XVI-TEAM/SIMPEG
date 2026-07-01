@@ -16,7 +16,7 @@ class EmployeeFileStorageService
 
     public function storeSk(UploadedFile $file): string
     {
-        return $this->store($file, 'sk');
+        return $this->storePrivate($file, 'sk');
     }
 
     /**
@@ -37,10 +37,20 @@ class EmployeeFileStorageService
 
     private function store(UploadedFile $file, string $directory): string
     {
+        return $this->storeOnDisk($file, $directory, 'public');
+    }
+
+    private function storePrivate(UploadedFile $file, string $directory): string
+    {
+        return $this->storeOnDisk($file, $directory, 'local');
+    }
+
+    private function storeOnDisk(UploadedFile $file, string $directory, string $disk): string
+    {
         $extension = strtolower($file->extension() ?: $file->getClientOriginalExtension());
         $path = $directory.'/'.Str::uuid().'.'.$extension;
         $contents = file_get_contents($file->getRealPath());
-        $targetPath = Storage::disk('public')->path($path);
+        $targetPath = Storage::disk($disk)->path($path);
         $targetDirectory = dirname($targetPath);
 
         File::ensureDirectoryExists($targetDirectory);

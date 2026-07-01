@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Controller;
 use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
 use Illuminate\Http\JsonResponse;
@@ -10,7 +11,7 @@ use Illuminate\Http\Request;
 class LeaveBalanceController extends Controller
 {
     /**
-     * API: Return personal leave balance and request history for the logged-in user.
+     * API: Mengembalikan saldo dan riwayat cuti milik pengguna login.
      */
     public function showMyBalance(Request $request): JsonResponse
     {
@@ -53,31 +54,5 @@ class LeaveBalanceController extends Controller
                 'created_at' => $lr->created_at->toIso8601String(),
             ]),
         ]);
-    }
-
-    /**
-     * Web: Show personal leave balance page for the logged-in user.
-     */
-    public function showMyBalanceWeb(Request $request)
-    {
-        $employee = $request->user()?->employee;
-
-        if (! $employee) {
-            return redirect()->route('dashboard')
-                ->with('error', 'Akun Anda belum ter-mapping ke data pegawai.');
-        }
-
-        $tahun = (int) now()->year;
-        $balance = LeaveBalance::firstOrCreate(
-            ['employee_id' => $employee->id, 'tahun' => $tahun],
-            ['jatah_awal' => 12, 'carry_over' => 0, 'terpakai' => 0, 'sisa' => 12]
-        );
-
-        $history = LeaveRequest::where('employee_id', $employee->id)
-            ->with(['jenisCuti'])
-            ->orderByDesc('created_at')
-            ->paginate(10);
-
-        return view('admin.cuti.personal-saldo', compact('balance', 'history'));
     }
 }

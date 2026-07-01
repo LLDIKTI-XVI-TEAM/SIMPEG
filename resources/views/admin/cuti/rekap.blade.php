@@ -46,9 +46,8 @@
         ];
     @endphp
 
-    <div class="space-y-6" x-data="{
+    <div class="space-y-6" @confirm-rekap.window="savedCorrection = true" x-data="{
             exportType: null,
-            showConfirm: false,
             savedCorrection: false,
             exportType: null,
             applyExport(type) {
@@ -72,14 +71,12 @@
         }">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink">Rekap Cuti Pegawai</h2>
-                <nav class="mt-1 flex items-center gap-1.5 text-xs text-muted">
-                    <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
-                    <span>/</span>
-                    <a href="{{ route('cuti') }}" class="transition-colors hover:text-ink">Cuti</a>
-                    <span>/</span>
-                    <span class="font-medium text-ink">Rekap Cuti</span>
-                </nav>
+                <h2 class="text-2xl font-semibold text-ink font-sans">Rekap Cuti Pegawai</h2>
+                <x-ui.breadcrumb :items="[
+                    ['label' => 'Dashboard', 'url' => route('dashboard')],
+                    ['label' => 'Cuti', 'url' => route('cuti')],
+                    ['label' => 'Rekap Cuti']
+                ]" />
             </div>
             <div class="flex shrink-0 items-center gap-2">
                 <button type="button" @click="applyExport('excel')" :disabled="exportType !== null"
@@ -98,6 +95,41 @@
                     <span x-show="exportType !== 'pdf'">Export PDF</span>
                     <span x-show="exportType === 'pdf'" style="display: none;">Menyiapkan PDF...</span>
                 </button>
+            </div>
+        </div>
+
+        <div class="rounded-lg border border-border bg-surface p-4 shadow-sm">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
+                <select x-model="activeFilters.periode"
+                    class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                    <option>Juni 2026</option>
+                    <option>Mei 2026</option>
+                    <option>April 2026</option>
+                </select>
+                <select x-model="activeFilters.unit"
+                    class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                    <option>Semua Unit Kerja</option>
+                    <option>Bag. Umum</option>
+                    <option>Bag. Keuangan</option>
+                    <option>Bag. SDM</option>
+                    <option>Bag. IT</option>
+                </select>
+                <select x-model="activeFilters.pegawai"
+                    class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                    <option>Semua Pegawai</option>
+                    <option>Ahmad Fauzi</option>
+                    <option>Siti Rahayu</option>
+                </select>
+                <select x-model="activeFilters.jenis"
+                    class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                    <option>Semua Jenis Cuti</option>
+                    <option>Cuti Tahunan</option>
+                    <option>Cuti Sakit</option>
+                    <option>Cuti Melahirkan</option>
+                    <option>Cuti Karena Alasan Penting</option>
+                    <option>Cuti Besar</option>
+                    <option>Cuti Luar Tanggungan Negara (CLTN)</option>
+                </select>
             </div>
         </div>
 
@@ -209,6 +241,7 @@
                                             <div class="flex items-center justify-end gap-1.5">
                                                 <button
                                                     title="Koreksi"
+                                                    aria-label="Koreksi saldo cuti"
                                                     class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm">
                                                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
@@ -406,6 +439,35 @@
                 </div>
             </div>
 
+                <div class="rounded-lg border border-border bg-surface p-5 shadow-sm">
+                    <h3 class="text-sm font-semibold text-ink">Koreksi Saldo</h3>
+                    <p class="mt-1 text-xs text-muted">Alasan wajib diisi dan koreksi akan masuk audit log.</p>
+                    <div x-show="savedCorrection"
+                        class="mt-3 rounded-lg bg-success/10 px-3 py-2 text-xs font-semibold text-success"
+                        style="display: none;">
+                        Koreksi saldo tersimpan sebagai draft dan siap dicatat ke audit log saat integrasi.
+                    </div>
+                    <div class="mt-4 space-y-3">
+                        <select
+                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            <option>Nadia Kusuma</option>
+                            <option>Yucna Dara, S.P., M.M.</option>
+                        </select>
+                        <select
+                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            <option>Tambah Carry-Over</option>
+                            <option>Kurangi Carry-Over</option>
+                        </select>
+                        <input type="number" value="1"
+                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        <textarea rows="3"
+                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                            placeholder="Alasan koreksi wajib diisi"></textarea>
+                        <button type="button" @click="$dispatch('open-confirm-rekap')"
+                            class="w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90">Simpan
+                            Koreksi</button>
+                    </div>
+                </div>
 
         </div>
 
@@ -484,31 +546,12 @@
             </div>
         </div>
 
-        <div x-show="showConfirm" class="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4"
-            style="display: none;">
-            <div class="w-full max-w-md rounded-lg border border-border bg-surface p-6 shadow-sm">
-                <h3 class="text-base font-semibold text-ink">Konfirmasi Koreksi Saldo</h3>
-                <p class="mt-2 text-sm text-muted">
-                    Pastikan nilai koreksi dan alasan sudah benar. Koreksi saldo akan dicatat sebagai aktivitas audit
-                    saat integrasi backend aktif.
-                </p>
-                <div class="mt-5 flex justify-end gap-2">
-                    <button type="button" @click="showConfirm = false"
-                        class="flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-muted hover:bg-soft">
-                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                        Batal
-                    </button>
-                    <button type="button" @click="showConfirm = false; savedCorrection = true"
-                        class="flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
-                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                        </svg>
-                        Konfirmasi Simpan
-                    </button>
-                </div>
-            </div>
-        </div>
+        <x-ui.confirm-dialog
+            id="rekap"
+            title="Konfirmasi Koreksi Saldo"
+            message="Pastikan nilai koreksi dan alasan sudah benar. Koreksi saldo akan dicatat sebagai aktivitas audit saat integrasi backend aktif."
+            confirm-text="Konfirmasi Simpan"
+            variant="primary"
+        />
     </div>
 </x-layouts.app>

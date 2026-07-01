@@ -2,49 +2,21 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\Profiles\ShowProfilePageAction;
+use App\Actions\Profiles\UpdatePasswordAction;
 use App\Http\Controllers\Controller;
-use App\Models\LeaveBalance;
-use Illuminate\Http\Request;
+use App\Http\Requests\Profiles\UpdatePasswordRequest;
 
 class ProfileController extends Controller
 {
-    public function index()
+    public function index(ShowProfilePageAction $action)
     {
-        $user = auth()->user();
-        $p = $user->employee()->with([
-            'families',
-            'rankHistories.golongan',
-            'positionHistories.unitKerja',
-            'salaryHistories',
-            'disciplineRecords',
-            'educationHistories.jenjang',
-            'documents',
-            'atasanLangsung',
-        ])->first();
-
-        // Ambil saldo cuti tahun ini
-        $tahun = date('Y');
-        $saldoCuti = 0;
-        if ($p) {
-            $leaveBalance = LeaveBalance::where('employee_id', $p->id)
-                ->where('tahun', $tahun)
-                ->first();
-            if ($leaveBalance) {
-                $saldoCuti = $leaveBalance->sisa;
-            } else {
-                $saldoCuti = 12; // default jatah cuti tahunan jika belum dibuat row-nya
-            }
-        }
-
-        return view('admin.profile.index', compact('p', 'saldoCuti'));
+        return view('admin.profile.index', $action->execute(auth()->user()));
     }
 
-    public function updatePassword(Request $request)
+    public function updatePassword(UpdatePasswordRequest $request, UpdatePasswordAction $action)
     {
-        $request->validate([
-            'current_password' => 'required|string',
-            'new_password' => 'required|string|min:8|confirmed',
-        ]);
+        $action->execute($request->user(), $request->validated());
 
         return redirect()->route('profil')
             ->with('success', 'Kata sandi Anda berhasil diperbarui.');

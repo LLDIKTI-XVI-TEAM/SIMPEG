@@ -110,14 +110,15 @@
             this.showEditModal = true;
         },
         saveUser() {
-            if (confirm('Apakah Anda yakin ingin mengubah pemetaan SSO & role user ini?')) {
-                const idx = this.users.findIndex(u => u.id === this.selectedUser.id);
-                if (idx !== -1) {
-                    this.selectedUser.status = this.selectedUser.keycloak_id.trim() ? 'Terhubung' : 'Belum Terhubung';
-                    this.users[idx] = this.selectedUser;
-                }
-                this.showEditModal = false;
+            $dispatch('open-confirm-sso');
+        },
+        executeSaveUser() {
+            const idx = this.users.findIndex(u => u.id === this.selectedUser.id);
+            if (idx !== -1) {
+                this.selectedUser.status = this.selectedUser.keycloak_id.trim() ? 'Terhubung' : 'Belum Terhubung';
+                this.users[idx] = this.selectedUser;
             }
+            this.showEditModal = false;
         },
         updateStage2(val) {
             const parts = val.split('|');
@@ -129,19 +130,18 @@
             this.cutiConfig.stage3_approver = parts[0];
             this.cutiConfig.stage3_nip = parts[1];
         }
-    }" class="space-y-6">
+    }" @confirm-sso.window="executeSaveUser()"
+       @confirm-instansi.window="$refs.formUmum.submit()"
+       @confirm-cuti.window="$refs.formCuti.submit()" class="space-y-6">
 
         {{-- PAGE HEADER --}}
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between border-b border-border pb-4">
             <div>
                 <h2 class="text-2xl font-bold text-ink font-sans leading-tight">Pengaturan Sistem</h2>
-                <nav class="mt-1 flex items-center gap-1.5 text-xs text-muted">
-                    <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
-                    <span>/</span>
-                    <span class="font-medium text-ink font-sans">Pengaturan</span>
-                    <span>•</span>
-                    <span class="text-muted italic">Akses: Khusus Super Admin</span>
-                </nav>
+                <x-ui.breadcrumb :items="[
+                    ['label' => 'Dashboard', 'url' => route('dashboard')],
+                    ['label' => 'Pengaturan']
+                ]" />
             </div>
             <div class="flex flex-wrap items-center gap-2 text-xs">
                 <span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-info">
@@ -217,7 +217,7 @@
                 
                 {{-- TAB: UMUM & INSTANSI --}}
                 <div x-show="activeTab === 'umum'" class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6">
-                    <form action="{{ route('settings.update') }}" method="POST" @submit.prevent="if (confirm('Apakah Anda yakin ingin menyimpan perubahan konfigurasi instansi & server SMTP ini?')) $el.submit()" class="space-y-6">
+                    <form x-ref="formUmum" action="{{ route('settings.update') }}" method="POST" @submit.prevent="$dispatch('open-confirm-instansi')" class="space-y-6">
                         @csrf
                         <div class="border-b border-border pb-4">
                             <h2 class="text-lg font-bold text-ink font-sans leading-tight">Pengaturan Umum & Instansi</h2>
@@ -277,7 +277,7 @@
 
                 {{-- TAB: ALUR APPROVAL CUTI --}}
                 <div x-show="activeTab === 'cuti'" class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6" style="display: none;">
-                    <form action="{{ route('settings.update') }}" method="POST" @submit.prevent="if (confirm('Apakah Anda yakin ingin memperbarui kebijakan alur persetujuan cuti? Perubahan ini hanya akan berdampak pada pengajuan cuti baru.')) $el.submit()" class="space-y-6">
+                    <form x-ref="formCuti" action="{{ route('settings.update') }}" method="POST" @submit.prevent="$dispatch('open-confirm-cuti')" class="space-y-6">
                         @csrf
                         <div class="border-b border-border pb-4">
                             <h2 class="text-lg font-bold text-ink font-sans leading-tight">Alur Persetujuan Cuti</h2>
@@ -551,6 +551,30 @@
                 </div>
             </div>
         </div>
+
+        <x-ui.confirm-dialog
+            id="sso"
+            title="Ubah Pemetaan SSO"
+            message="Apakah Anda yakin ingin mengubah pemetaan SSO & role user ini?"
+            confirm-text="Ya, Simpan"
+            variant="warning"
+        />
+
+        <x-ui.confirm-dialog
+            id="instansi"
+            title="Simpan Pengaturan Instansi"
+            message="Apakah Anda yakin ingin menyimpan perubahan konfigurasi instansi & server SMTP ini?"
+            confirm-text="Simpan Perubahan"
+            variant="warning"
+        />
+
+        <x-ui.confirm-dialog
+            id="cuti"
+            title="Perbarui Alur Cuti"
+            message="Apakah Anda yakin ingin memperbarui kebijakan alur persetujuan cuti? Perubahan ini hanya akan berdampak pada pengajuan cuti baru."
+            confirm-text="Perbarui"
+            variant="warning"
+        />
 
     </div>
 

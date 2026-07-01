@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Actions\Cuti\SaveApprovalChainConfigAction;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\ApprovalChainConfigRequest;
+use App\Http\Requests\Cuti\ApprovalChainConfigRequest;
 use App\Models\ApprovalConfig;
 use App\Models\AuditLog;
 use App\Models\User;

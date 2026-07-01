@@ -493,7 +493,7 @@
                             <div class="flex items-center gap-4">
                                 <div class="h-16 w-16 rounded-full border border-border bg-soft flex items-center justify-center overflow-hidden shrink-0">
                                     <template x-if="fotoPreview">
-                                        <img :src="fotoPreview" class="h-full w-full object-cover">
+                                        <img :src="fotoPreview" alt="Pratinjau foto profil pegawai" class="h-full w-full object-cover">
                                     </template>
                                     <template x-if="!fotoPreview">
                                         <svg class="h-8 w-8 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">

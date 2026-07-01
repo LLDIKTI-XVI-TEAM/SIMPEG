@@ -125,18 +125,26 @@
                                 </td>
                                 <td class="px-6 py-5 text-left">
                                     <div class="inline-flex items-center justify-start gap-2">
-                                        <form method="POST" action="{{ route('pegawai.restore', $employee->id) }}"
-                                            onsubmit="return confirm('Aktifkan kembali pegawai ini?')">
-                                            @csrf
-                                            <button type="submit"
-                                                class="inline-flex h-9 items-center gap-2 rounded-lg border border-success/20 bg-surface px-3.5 text-xs font-bold text-success shadow-sm transition hover:bg-success/5"
-                                                title="Aktifkan Kembali - Admin Kepegawaian/Super Admin">
-                                                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
-                                                </svg>
-                                                Aktifkan Kembali
-                                            </button>
-                                        </form>
+                                        <x-ui.confirm-dialog
+                                            id="restore-{{ $employee->id }}"
+                                            title="Aktifkan Kembali Pegawai"
+                                            message="Apakah Anda yakin ingin mengaktifkan kembali pegawai ini?"
+                                            confirm-text="Aktifkan"
+                                            variant="primary"
+                                            action="{{ route('pegawai.restore', $employee->id) }}"
+                                            method="POST"
+                                        >
+                                            <x-slot:trigger>
+                                                <button type="button"
+                                                    class="inline-flex h-9 items-center gap-2 rounded-lg border border-success/20 bg-surface px-3.5 text-xs font-bold text-success shadow-sm transition hover:bg-success/5"
+                                                    title="Aktifkan Kembali - Admin Kepegawaian/Super Admin">
+                                                    <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                                                    </svg>
+                                                    Aktifkan Kembali
+                                                </button>
+                                            </x-slot:trigger>
+                                        </x-ui.confirm-dialog>
                                     </div>
                                 </td>
                             </tr>

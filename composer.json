@@ -53,9 +53,9 @@
             "@php artisan config:clear --ansi",
             "@php artisan test"
         ],
-        "format": "pint",
-        "format:check": "pint --test",
-        "analyse": "phpstan analyse --memory-limit=1G",
+        "format": "@php vendor/bin/pint",
+        "format:check": "@php vendor/bin/pint --test",
+        "analyse": "@php vendor/bin/phpstan analyse --memory-limit=1G",
         "qa": [
             "@format:check",
             "@analyse",

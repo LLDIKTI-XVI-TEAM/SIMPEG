@@ -1,20 +1,15 @@
 <?php
 
-namespace App\Http\Requests;
+namespace App\Http\Requests\Employee;
 
-use App\Models\Employee;
 use App\Support\EmployeeValidationRules;
 use Illuminate\Foundation\Http\FormRequest;
 
-class UpdateEmployeeRequest extends FormRequest
+class StoreEmployeeRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        if (app()->environment('local')
-            && config('services.simpeg.disable_employee_api_auth')) {
-            return true;
-        }
-
+        // Otorisasi gagal-tertutup: tanpa user terautentikasi, tolak (tidak ada bypass dev/test).
         $user = $this->user();
 
         return $user !== null
@@ -23,16 +18,7 @@ class UpdateEmployeeRequest extends FormRequest
 
     public function rules(): array
     {
-        $employeeParam = $this->route('employee');
-
-        if ($employeeParam instanceof Employee) {
-            $employee = $employeeParam;
-        } else {
-            $id = $this->route('id') ?? $employeeParam;
-            $employee = Employee::findOrFail($id);
-        }
-
-        $rules = EmployeeValidationRules::update($employee);
+        $rules = EmployeeValidationRules::create();
 
         // Aturan tambahan khusus form UI web
         if (! $this->wantsJson() && ! $this->is('api/*')) {
