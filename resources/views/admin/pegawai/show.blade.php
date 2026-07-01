@@ -758,26 +758,26 @@
                                     <div class="flex items-start gap-2.5">
                                         <div class="flex h-8 w-6 shrink-0 flex-col items-center justify-between rounded border border-border bg-soft p-0.5 shadow-sm relative">
                                             <div class="w-full bg-primary/10 text-primary text-[5px] font-bold text-center py-0.5 uppercase tracking-wide">
-                                                PDF
+                                                {{ pathinfo($doc->file_path, PATHINFO_EXTENSION) ?: 'PDF' }}
                                             </div>
                                         </div>
                                         <div class="min-w-0">
-                                            <p class="font-bold font-sans truncate">{{ $doc['nama'] }}</p>
-                                            <p class="text-[10px] text-muted font-sans mt-0.5 truncate">{{ $doc['deskripsi'] }}</p>
+                                            <p class="font-bold font-sans truncate">{{ $doc->nama_dokumen }}</p>
+                                            <p class="text-[10px] text-muted font-sans mt-0.5 truncate">{{ $doc->keterangan ?? '-' }}</p>
                                         </div>
                                     </div>
                                 </td>
-                                <td class="px-4 py-3 text-muted font-sans">{{ $doc['kategori_label'] }}</td>
-                                <td class="px-4 py-3 font-mono text-muted">{{ $doc['nomor'] }}</td>
-                                <td class="px-4 py-3 font-mono text-muted">{{ $doc['tanggal'] }}</td>
-                                <td class="px-4 py-3 font-mono text-muted">{{ $doc['file_size'] }}</td>
+                                <td class="px-4 py-3 text-muted font-sans">{{ \App\Support\Documents\DocumentCategory::label($doc->jenis_dokumen) }}</td>
+                                <td class="px-4 py-3 font-mono text-muted">{{ $doc->nomor_dokumen ?? '-' }}</td>
+                                <td class="px-4 py-3 font-mono text-muted">{{ $doc->tanggal_dokumen ? \Carbon\Carbon::parse($doc->tanggal_dokumen)->format('d-m-Y') : '-' }}</td>
+                                <td class="px-4 py-3 font-mono text-muted">{{ $doc->fileSizeLabel() }}</td>
                                 <td class="px-4 py-3 text-right">
                                     <div class="flex items-center justify-end gap-2.5">
-                                        <a href="/dashboard/dokumen/{{ $doc['id'] }}" class="inline-flex items-center gap-1 font-semibold text-primary hover:underline font-sans">
+                                        <a href="{{ route('dokumen.show', $doc->id) }}" class="inline-flex items-center gap-1 font-semibold text-primary hover:underline font-sans">
                                             Detail
                                         </a>
                                         <span class="text-border">|</span>
-                                        <a href="/dashboard/dokumen/{{ $doc['id'] }}/download" class="inline-flex items-center gap-1 font-semibold text-primary hover:underline font-sans">
+                                        <a href="{{ route('dokumen.download', $doc->id) }}" class="inline-flex items-center gap-1 font-semibold text-primary hover:underline font-sans">
                                             Unduh
                                         </a>
                                     </div>
