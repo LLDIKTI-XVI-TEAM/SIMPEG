@@ -216,7 +216,11 @@
                                 <td class="px-5 py-4 text-sm">
                                     @if($alert['jenis_event'] === 'Kenaikan Pangkat')
                                         <div class="max-w-[240px] rounded-lg border {{ $alert['is_eligible'] ? 'border-success/20 bg-success/5' : 'border-danger/20 bg-danger/5' }} p-2.5">
-                                            <div class="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold {{ $alert['is_eligible'] ? 'text-success' : 'text-danger' }}">
+                                            <div class="mb-2 flex flex-wrap items-center gap-2 text-xs font-semibold {{ $alert['is_eligible'] ? 'text-success' : 'text-danger' }}">
+                                                <span class="inline-flex rounded-full {{ $alert['is_eligible'] ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger' }} px-2.5 py-1 text-xs font-semibold">
+                                                    {{ $alert['is_eligible'] ? 'Eligible' : 'Tidak Eligible' }}
+                                                </span>
+                                                <span class="inline-flex items-center gap-1.5">
                                                 @if($alert['is_eligible'])
                                                     <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                                         <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
@@ -227,6 +231,7 @@
                                                     </svg>
                                                 @endif
                                                 {{ $alert['eligibility_reason'] }}
+                                                </span>
                                             </div>
                                             <div class="space-y-1">
                                                 @foreach($alert['eligibility_checks'] as $check)
