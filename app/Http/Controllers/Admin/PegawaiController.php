@@ -11,8 +11,10 @@ use App\Actions\Employees\PrepareEmployeeEditFormDataAction;
 use App\Actions\Employees\RestoreEmployeeAction;
 use App\Actions\Employees\StoreEmployeeHistoryAction;
 use App\Actions\Employees\UpdateEmployeeAction;
+use App\Actions\Employees\UpdateEmployeePerformanceFlagAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Employee\StoreEmployeeRequest;
+use App\Http\Requests\Employee\UpdateEmployeePerformanceFlagRequest;
 use App\Http\Requests\Employee\UpdateEmployeeRequest;
 use App\Models\Appointment;
 use App\Models\Employee;
@@ -24,6 +26,7 @@ use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPerkawinan;
 use App\Models\RefUnitKerja;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -326,6 +329,28 @@ class PegawaiController extends Controller
 
         return redirect()->route('data-pegawai')
             ->with('success', 'Data pegawai '.$nama.' berhasil dinonaktifkan.');
+    }
+
+    /**
+     * Memperbarui flag kinerja manual yang menjadi pengganti SKP sementara untuk eligibility EWS.
+     */
+    public function updatePerformanceFlag(
+        UpdateEmployeePerformanceFlagRequest $request,
+        string $id,
+        UpdateEmployeePerformanceFlagAction $action,
+    ): JsonResponse {
+        $employee = Employee::findOrFail($id);
+
+        $updated = $action->execute(
+            $employee,
+            $request->boolean('is_kinerja_baik'),
+            $request,
+        );
+
+        return response()->json([
+            'message' => 'Status kinerja pegawai berhasil diperbarui.',
+            'is_kinerja_baik' => $updated->is_kinerja_baik,
+        ]);
     }
 
     public function bulkDestroy(Request $request, DeactivateEmployeeAction $action)

@@ -37,6 +37,8 @@
     <div x-data="{
         activeTab: new URLSearchParams(window.location.search).get('tab') || 'profile',
         kinerjaBaik: {{ $p->is_kinerja_baik ? 'true' : 'false' }},
+        kinerjaEndpoint: @js(route('pegawai.kinerja.update', $p->id)),
+        isUpdatingKinerja: false,
         showModal: false,
         modalTitle: '',
         modalType: '',
@@ -59,6 +61,41 @@
         newKgb: { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '' },
         newDisiplin: { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '' },
         newPendidikan: { tingkat: 'Sarjana (S1)', institusi: '', prodi: '', lulus: '', no_ijazah: '' },
+        async updateKinerjaBaik(value) {
+            const previous = !value;
+            this.isUpdatingKinerja = true;
+
+            try {
+                const response = await fetch(this.kinerjaEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({ is_kinerja_baik: value })
+                });
+
+                if (!response.ok) {
+                    this.kinerjaBaik = previous;
+                    this.toast = { show: true, message: 'Status kinerja gagal diperbarui.', type: 'error' };
+                    setTimeout(() => this.toast.show = false, 5000);
+
+                    return;
+                }
+
+                const result = await response.json();
+                this.kinerjaBaik = result.is_kinerja_baik;
+                this.toast = { show: true, message: result.message, type: 'success' };
+                setTimeout(() => this.toast.show = false, 3000);
+            } catch (error) {
+                this.kinerjaBaik = previous;
+                this.toast = { show: true, message: 'Terjadi kesalahan jaringan.', type: 'error' };
+                setTimeout(() => this.toast.show = false, 5000);
+            } finally {
+                this.isUpdatingKinerja = false;
+            }
+        },
         
         openModal(type, title) {
             this.modalType = type;
@@ -312,10 +349,13 @@
                     <div class="flex items-center justify-between p-2">
                         <div>
                             <span class="text-xs font-bold text-ink font-sans block">Toggle Flag "Kinerja Baik"</span>
-                            <p class="text-[10px] text-muted font-sans mt-0.5">Flag ini mempengaruhi kualifikasi rekomendasi promosi berkala.</p>
+                            <p class="text-[10px] text-muted font-sans mt-0.5">Flag manual pengganti SKP sementara untuk menentukan eligibility kenaikan pangkat di EWS.</p>
+                            <p x-show="isUpdatingKinerja" class="mt-1 text-[10px] text-primary font-sans" style="display: none;">
+                                Menyimpan status kinerja.
+                            </p>
                         </div>
                         <label class="relative inline-flex items-center cursor-pointer select-none">
-                            <input type="checkbox" x-model="kinerjaBaik" class="sr-only peer">
+                            <input type="checkbox" x-model="kinerjaBaik" @change="updateKinerjaBaik(kinerjaBaik)" :disabled="isUpdatingKinerja" aria-label="Toggle Kinerja Baik" class="sr-only peer">
                             <div class="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-success"></div>
                         </label>
                     </div>

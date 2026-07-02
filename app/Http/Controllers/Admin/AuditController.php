@@ -57,7 +57,7 @@ class AuditController extends Controller
 
     private function categoryFor(string $module, string $event): string
     {
-        if (in_array($event, ['LOGIN', 'LOGOUT'], true)) {
+        if (in_array($event, ['LOGIN', 'LOGOUT', 'SESSION_TIMEOUT'], true)) {
             return 'autentikasi';
         }
 
