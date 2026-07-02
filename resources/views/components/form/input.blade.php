@@ -52,7 +52,7 @@
         @if ($hasError) aria-invalid="true" @endif
         @if ($describedBy !== '') aria-describedby="{{ $describedBy }}" @endif
         {{ $attributes->class([
-            'w-full rounded-lg border bg-surface text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans',
+            'w-full rounded-xl border bg-surface text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans transition-all duration-200',
             $sizes[$size] ?? $sizes['md'],
             'border-danger focus:border-danger focus:ring-danger/20' => $hasError,
             'border-border' => ! $hasError,

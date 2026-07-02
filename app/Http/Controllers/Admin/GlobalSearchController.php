@@ -23,8 +23,8 @@ class GlobalSearchController extends Controller
         $results = [];
 
         // 1. Search Employees (Pegawai & NIP)
-        $employees = Employee::where('nama_lengkap', 'like', "%{$query}%")
-            ->orWhere('nip', 'like', "%{$query}%")
+        $employees = Employee::where('nama_lengkap', 'ilike', "%{$query}%")
+            ->orWhere('nip', 'ilike', "%{$query}%")
             ->limit(5)
             ->get();
 
@@ -41,7 +41,7 @@ class GlobalSearchController extends Controller
         // 2. Search Unit Kerja
         if (class_exists(RefUnitKerja::class)) {
             try {
-                $units = RefUnitKerja::where('nama', 'like', "%{$query}%")
+                $units = RefUnitKerja::where('nama', 'ilike', "%{$query}%")
                     ->limit(5)
                     ->get();
                 if ($units->isNotEmpty()) {
@@ -60,8 +60,8 @@ class GlobalSearchController extends Controller
         // 3. Search Dokumen
         if (class_exists(Document::class)) {
             try {
-                $docs = Document::with('employee')->where('nama_dokumen', 'like', "%{$query}%")
-                    ->orWhere('nomor_dokumen', 'like', "%{$query}%")
+                $docs = Document::with('employee')->where('nama_dokumen', 'ilike', "%{$query}%")
+                    ->orWhere('nomor_dokumen', 'ilike', "%{$query}%")
                     ->limit(5)
                     ->get();
                 if ($docs->isNotEmpty()) {
@@ -82,7 +82,7 @@ class GlobalSearchController extends Controller
         // 4. Search Cuti
         if (class_exists(LeaveRequest::class)) {
             try {
-                $leaves = LeaveRequest::with('employee')->where('alasan', 'like', "%{$query}%")
+                $leaves = LeaveRequest::with('employee')->where('alasan', 'ilike', "%{$query}%")
                     ->limit(5)
                     ->get();
                 if ($leaves->isNotEmpty()) {

@@ -78,11 +78,7 @@
                     <option>Bag. SDM</option>
                     <option>Bag. IT</option>
                 </select>
-                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                    </svg>
-                </div>
+
             </div>
 
             {{-- Filter Kategori Dokumen --}}
@@ -94,11 +90,7 @@
                         <option value="{{ $value }}">{{ $label }}</option>
                     @endforeach
                 </select>
-                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                    </svg>
-                </div>
+
             </div>
 
             {{-- Filter Status Dokumen --}}
@@ -109,21 +101,12 @@
                     <option value="tersedia">File tersedia</option>
                     <option value="file_tidak_ditemukan">File tidak ditemukan</option>
                 </select>
-                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                    </svg>
-                </div>
+
             </div>
         </x-ui.filter-bar>
 
         {{-- TABLE CARD --}}
         <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
-            <div class="px-6 py-4 border-b border-border bg-surface">
-                <h3 class="text-sm font-semibold text-ink font-sans">Daftar Arsip Dokumen & SK</h3>
-                <p class="text-[10px] text-muted font-sans mt-0.5">Menampilkan seluruh data berkas fisik pendukung
-                    kepegawaian LLDIKTI Wilayah XVI.</p>
-            </div>
 
             {{-- Table Render --}}
             <div class="overflow-x-auto">
@@ -157,16 +140,24 @@
                         <template x-for="doc in paginatedDocuments" :key="doc.id">
                             <tr class="transition-colors hover:bg-soft/50">
                                 <td class="px-4 py-3.5">
-                                    <div class="flex items-center gap-2.5">
-                                        <div
-                                            class="flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                                            <span x-text="doc.nama_pegawai.substring(0,1)"></span>
+                                    <div class="flex items-center gap-3">
+                                        <div class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-sm font-bold text-primary">
+                                            <template x-if="doc.foto_pegawai">
+                                                <img :src="doc.foto_pegawai" :alt="'Foto ' + doc.nama_pegawai" class="h-full w-full object-cover object-[center_25%]">
+                                            </template>
+                                            <template x-if="!doc.foto_pegawai">
+                                                <span aria-hidden="true">
+                                                    <svg class="h-5 w-5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                                                    </svg>
+                                                </span>
+                                            </template>
                                         </div>
                                         <div class="min-w-0">
-                                            <p class="text-xs font-bold text-ink font-sans leading-tight"
+                                            <p class="block truncate text-sm font-semibold text-ink"
                                                 x-text="doc.nama_pegawai"></p>
-                                            <p class="font-mono text-[10px] text-muted leading-none mt-0.5"
-                                                x-text="doc.nip_pegawai"></p>
+                                            <p class="font-mono text-xs text-muted"
+                                                x-text="'NIP. ' + doc.nip_pegawai"></p>
                                         </div>
                                     </div>
                                 </td>
@@ -197,10 +188,10 @@
                                 <td class="px-4 py-3.5 text-xs font-mono text-muted" x-text="doc.tanggal"></td>
                                 <td class="px-4 py-3.5">
                                     <span
-                                        class="inline-flex items-center gap-1.5 text-xs font-semibold"
+                                        class="inline-flex items-center gap-1.5 font-medium font-sans leading-none px-2.5 py-1 text-xs rounded-md"
                                         :class="{
-                                            'text-success': doc.status_dokumen === 'tersedia',
-                                            'text-danger': doc.status_dokumen === 'file_tidak_ditemukan'
+                                            'bg-success/10 text-success': doc.status_dokumen === 'tersedia',
+                                            'bg-danger/10 text-danger': doc.status_dokumen === 'file_tidak_ditemukan'
                                         }">
                                         <span class="h-1.5 w-1.5 rounded-full" :class="{
                                                 'bg-success': doc.status_dokumen === 'tersedia',
@@ -286,8 +277,12 @@
                 {{-- Modal Header --}}
                 <div class="flex justify-between items-center border-b border-border pb-3">
                     <h3 id="upload-dokumen-title" class="text-base font-semibold text-ink font-sans">Unggah Dokumen Kepegawaian</h3>
-                    <button @click="showUploadModal = false"
-                        class="text-xs font-semibold text-muted hover:text-ink font-sans cursor-pointer focus:outline-none">Tutup</button>
+                    <button type="button" @click="showUploadModal = false"
+                        class="text-muted hover:text-ink rounded-lg p-1 hover:bg-soft transition-colors cursor-pointer focus:outline-none" aria-label="Tutup">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
                 </div>
 
                 <form action="{{ route('dokumen.store') }}" method="POST" enctype="multipart/form-data"
@@ -295,12 +290,8 @@
                     @csrf
                     
                     @if ($errors->any())
-                        <div class="rounded-lg bg-danger/10 p-3 text-xs text-danger font-sans">
-                            <ul class="list-disc pl-4 space-y-1">
-                                @foreach ($errors->all() as $error)
-                                    <li>{{ $error }}</li>
-                                @endforeach
-                            </ul>
+                        <div class="rounded-lg bg-danger/10 p-3 text-xs text-danger font-bold font-sans">
+                            Terdapat kesalahan pengisian form
                         </div>
                     @endif
 
@@ -389,14 +380,14 @@
                                 class="text-danger">*</span></label>
                         <input type="text" name="nama_dokumen" required
                             placeholder="Contoh: SK Kenaikan Pangkat Penata Tkt. I 2026"
-                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder:text-muted shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                     </div>
 
                     <div class="grid grid-cols-2 gap-3">
                         <div class="space-y-1">
                             <label class="text-xs font-semibold text-ink font-sans">Nomor Dokumen</label>
                             <input type="text" name="nomor_dokumen" placeholder="SK-..."
-                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder:text-muted shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                         </div>
                         <div class="space-y-1">
                             <label class="text-xs font-semibold text-ink font-sans">Tanggal Dokumen</label>
@@ -409,7 +400,7 @@
                         <label class="text-xs font-semibold text-ink font-sans">Keterangan / Deskripsi</label>
                         <textarea name="deskripsi" rows="2"
                             placeholder="Tulis rincian atau catatan singkat mengenai dokumen..."
-                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none font-sans"></textarea>
+                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder:text-muted shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none font-sans"></textarea>
                     </div>
 
                     <div class="space-y-1">
@@ -423,7 +414,10 @@
                     {{-- Buttons --}}
                     <div class="flex justify-end gap-3 pt-3 border-t border-border">
                         <button type="button" @click="showUploadModal = false"
-                            class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-soft cursor-pointer focus:outline-none">
+                            class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-soft cursor-pointer focus:outline-none font-sans">
+                            <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                            </svg>
                             Batal
                         </button>
                         <button type="submit"

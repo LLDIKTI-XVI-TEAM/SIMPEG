@@ -239,7 +239,7 @@
                                     <x-ui.badge
                                         variant="none"
                                         size="sm"
-                                        x-bind:class="c.status === 'disetujui' ? 'border-success/20 bg-success/10 text-success' : 'border-warning/25 bg-warning/10 text-warning'"
+                                        x-bind:class="c.status === 'disetujui' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'"
                                         x-text="c.status"
                                     ></x-ui.badge>
                                 </x-ui.table-td>

@@ -286,7 +286,7 @@
                     <p class="truncate text-sm font-semibold text-ink">
                         {{ auth()->user()->name ?? 'Pengguna' }}
                     </p>
-                    <p class="truncate text-xs text-muted">{{ $activeRole }}</p>
+                    <p class="truncate text-xs text-muted">{{ ucwords(str_replace('_', ' ', $activeRole)) }}</p>
                 </div>
             </div>
         </div>
@@ -334,7 +334,7 @@
                             <p class="text-sm font-semibold leading-tight text-ink font-sans">
                                 {{ auth()->user()->name ?? 'Pengguna' }}
                             </p>
-                            <p class="text-[11px] leading-tight text-muted font-sans">{{ $activeRole }}</p>
+                            <p class="text-[11px] leading-tight text-muted font-sans">{{ ucwords(str_replace('_', ' ', $activeRole)) }}</p>
                         </div>
                         <svg class="w-4 h-4 text-muted shrink-0 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
                     </button>

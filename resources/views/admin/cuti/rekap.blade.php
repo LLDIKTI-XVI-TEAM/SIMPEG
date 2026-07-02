@@ -52,20 +52,19 @@
             exportType: null,
             applyExport(type) {
                 this.exportType = type;
-                const form = document.getElementById('filterForm');
-                const url = new URL(form.action);
                 
+                let targetUrl = '';
                 if (type === 'excel') {
-                    url.pathname = '/laporan/export-cuti/excel';
+                    targetUrl = '/laporan/export-cuti/excel';
+                } else if (type === 'pdf') {
+                    // Beralih ke halaman Laporan Export (Preview PDF)
+                    targetUrl = '/laporan/export-cuti';
                 }
                 
-                // Append query params
-                const formData = new FormData(form);
-                for (const [key, value] of formData) {
-                    if (value) url.searchParams.append(key, value);
+                if (targetUrl) {
+                    window.location.href = targetUrl;
                 }
                 
-                window.location.href = url.toString();
                 setTimeout(() => this.exportType = null, 1500);
             }
         }">
@@ -79,80 +78,45 @@
                 ]" />
             </div>
             <div class="flex shrink-0 items-center gap-2">
-                <button type="button" @click="applyExport('excel')" :disabled="exportType !== null"
-                    class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition hover:bg-soft disabled:cursor-not-allowed disabled:opacity-60">
-                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                    </svg>
-                    <span x-show="exportType !== 'excel'">Export Excel</span>
-                    <span x-show="exportType === 'excel'" style="display: none;">Menyiapkan Excel...</span>
-                </button>
-                <button type="button" @click="applyExport('pdf')" :disabled="exportType !== null"
-                    class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">
+                <a href="/laporan/export-cuti"
+                    class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
                     <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3-3m0 0l-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                     </svg>
-                    <span x-show="exportType !== 'pdf'">Export PDF</span>
-                    <span x-show="exportType === 'pdf'" style="display: none;">Menyiapkan PDF...</span>
-                </button>
+                    Buka Laporan & Export
+                </a>
             </div>
         </div>
 
-
-        <x-ui.card padding="sm">
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-5">
-
-                <select x-model="activeFilters.periode"
-                    class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                    <option>Juni 2026</option>
-                    <option>Mei 2026</option>
-                    <option>April 2026</option>
-                </select>
-                <select x-model="activeFilters.unit"
-                    class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                    <option>Semua Unit Kerja</option>
-                    <option>Bag. Umum</option>
-                    <option>Bag. Keuangan</option>
-                    <option>Bag. SDM</option>
-                    <option>Bag. IT</option>
-                </select>
-                <select x-model="activeFilters.pegawai"
-                    class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                    <option>Semua Pegawai</option>
-                    <option>Ahmad Fauzi</option>
-                    <option>Siti Rahayu</option>
-                </select>
-                <select x-model="activeFilters.jenis"
-                    class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                    <option>Semua Jenis Cuti</option>
-                    <option>Cuti Tahunan</option>
-                    <option>Cuti Sakit</option>
-                    <option>Cuti Melahirkan</option>
-                    <option>Cuti Karena Alasan Penting</option>
-                    <option>Cuti Besar</option>
-                    <option>Cuti Luar Tanggungan Negara (CLTN)</option>
-                </select>
-            </div>
-        </x-ui.card>
 
         <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
             @foreach($summary as $card)
-                <x-ui.card>
-                    <p class="text-[10px] font-bold uppercase tracking-wider text-muted">{{ $card['label'] }}</p>
-                    <p class="mt-2 font-mono text-3xl font-extrabold {{ $toneText[$card['tone']] }}">{{ $card['value'] }}
-                    </p>
-                    <p class="mt-1 text-xs text-muted">{{ $card['caption'] }}</p>
-                </x-ui.card>
+                <x-ui.stat-card label="{{ $card['label'] }}" value="{{ $card['value'] }}" variant="{{ $card['tone'] }}" size="lg" accent>
+                    <x-slot:icon>
+                        @if($card['tone'] === 'primary')
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
+                        @elseif($card['tone'] === 'success')
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        @elseif($card['tone'] === 'warning')
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                        @elseif($card['tone'] === 'danger')
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" /></svg>
+                        @else
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>
+                        @endif
+                    </x-slot:icon>
+                    <x-slot:meta>
+                        <span>{{ $card['caption'] }}</span>
+                    </x-slot:meta>
+                </x-ui.stat-card>
             @endforeach
         </div>
 
-        <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div class="flex flex-col gap-4">
             <div class="space-y-4">
                 <x-ui.card padding="none" class="overflow-hidden">
                     <div class="border-b border-border px-5 py-4">
                         <h3 class="text-sm font-semibold text-ink">Rekap Saldo Per Pegawai</h3>
-                        <p class="text-[10px] text-muted">Nama, NIP, jatah, carry-over, terpakai, sisa, total per jenis
-                            cuti, dan status saldo.</p>
                     </div>
                     <div class="overflow-x-auto">
 
@@ -213,13 +177,33 @@
                             </x-ui.table-body>
                         </x-ui.table>
                     </div>
+                    {{-- TABLE FOOTER --}}
+                    <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row">
+                        <div class="flex items-center gap-4">
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm text-muted">Tampilkan</span>
+                                <select class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
+                                    <option value="10" selected>10</option>
+                                    <option value="25">25</option>
+                                    <option value="50">50</option>
+                                </select>
+                                <span class="text-sm text-muted">data per halaman</span>
+                            </div>
+                            @if($leaveBalances->total() > 0)
+                            <p class="text-sm text-muted hidden sm:block">
+                                Menampilkan <span class="font-semibold text-ink">{{ $leaveBalances->firstItem() }}</span> hingga <span class="font-semibold text-ink">{{ $leaveBalances->lastItem() }}</span> dari <span class="font-semibold text-ink">{{ $leaveBalances->total() }}</span> hasil
+                            </p>
+                            @endif
+                        </div>
+                        <div class="w-full sm:w-auto">
+                            {{ $leaveBalances->onEachSide(1)->links('vendor.pagination.simpeg') }}
+                        </div>
+                    </div>
                 </x-ui.card>
 
                 <x-ui.card padding="none" class="overflow-hidden">
                     <div class="border-b border-border px-5 py-4">
                         <h3 class="text-sm font-semibold text-ink">Detail Penggunaan Cuti</h3>
-                        <p class="text-[10px] text-muted">Data detail untuk kebutuhan export Excel: No, NIP, Nama, Jenis
-                            Cuti, Tanggal Mulai, Tanggal Selesai, Jumlah Hari, Status.</p>
                     </div>
                     <div class="overflow-x-auto">
                         <x-ui.table>
@@ -262,14 +246,37 @@
                             </x-ui.table-body>
                         </x-ui.table>
                     </div>
+                    {{-- TABLE FOOTER --}}
+                    <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row">
+                        <div class="flex items-center gap-4">
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm text-muted">Tampilkan</span>
+                                <select class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
+                                    <option value="10" selected>10</option>
+                                    <option value="25">25</option>
+                                    <option value="50">50</option>
+                                </select>
+                                <span class="text-sm text-muted">data per halaman</span>
+                            </div>
+                            @if($usageRows->total() > 0)
+                            <p class="text-sm text-muted hidden sm:block">
+                                Menampilkan <span class="font-semibold text-ink">{{ $usageRows->firstItem() }}</span> hingga <span class="font-semibold text-ink">{{ $usageRows->lastItem() }}</span> dari <span class="font-semibold text-ink">{{ $usageRows->total() }}</span> hasil
+                            </p>
+                            @endif
+                        </div>
+                        <div class="w-full sm:w-auto">
+                            {{ $usageRows->onEachSide(1)->links('vendor.pagination.simpeg') }}
+                        </div>
+                    </div>
                 </x-ui.card>
             </div>
 
-            <aside class="space-y-4">
-                <x-ui.card>
+            <aside class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <x-ui.card class="h-full">
                     <h3 class="text-sm font-semibold text-ink">Komposisi Jenis Cuti</h3>
+                    <p class="mt-1 text-xs text-muted">Persentase penggunaan cuti berdasarkan jenisnya pada periode ini.</p>
                     <div class="mt-4 space-y-4">
-                        @foreach($jenisStats as $item)
+                        @forelse($jenisStats as $item)
                             <div>
                                 <div class="flex items-center justify-between text-xs">
                                     <span class="font-semibold text-ink">{{ $item['label'] }}</span>
@@ -280,11 +287,15 @@
                                         style="width: {{ $item['percent'] }}%"></div>
                                 </div>
                             </div>
-                        @endforeach
+                        @empty
+                            <div class="flex flex-col items-center justify-center py-6 text-center">
+                                <p class="text-xs text-muted">Belum ada data penggunaan cuti<br>pada periode ini.</p>
+                            </div>
+                        @endforelse
                     </div>
                 </x-ui.card>
 
-                <x-ui.card>
+                <x-ui.card class="h-full">
                     <h3 class="text-sm font-semibold text-ink">Koreksi Saldo</h3>
                     <p class="mt-1 text-xs text-muted">Alasan wajib diisi dan koreksi akan masuk audit log.</p>
                     <div x-show="savedCorrection"
@@ -295,8 +306,10 @@
                     <div class="mt-4 space-y-3">
                         <select
                             class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                            <option>Nadia Kusuma</option>
-                            <option>Yucna Dara, S.P., M.M.</option>
+                            <option value="">-- Pilih Pegawai --</option>
+                            @foreach($optPegawais as $peg)
+                                <option value="{{ $peg->id }}">{{ $peg->nama_lengkap }}</option>
+                            @endforeach
                         </select>
                         <select
                             class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
@@ -311,26 +324,22 @@
                             placeholder="Alasan koreksi wajib diisi"
                         />
                         <button type="button" @click="showConfirm = true"
-
-                            class="w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90">Simpan
-                            Koreksi</button>
-                    </div>
-                </x-ui.card>
-
-                <x-ui.card>
-                    <h3 class="text-sm font-semibold text-ink">Format Laporan</h3>
-                    <div class="mt-3 space-y-2 text-xs text-muted">
-                        <p>Excel: `Rekap_Cuti_Juni_2026_2026-06-22.xlsx`</p>
-                        <p>PDF memuat header institusi, periode laporan, tabel rekap per pegawai, tanda tangan, dan
-                            footer halaman.</p>
+                            class="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90">
+                            <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 3h6.75a.75.75 0 01.53.22l4.5 4.5a.75.75 0 01.22.53V19.5a2.25 2.25 0 01-2.25 2.25H4.5A2.25 2.25 0 012.25 19.5V5.25A2.25 2.25 0 014.5 3zM9 3v4.5A1.5 1.5 0 0010.5 9h3a1.5 1.5 0 001.5-1.5V3m-6 18v-4.5a1.5 1.5 0 011.5-1.5h6a1.5 1.5 0 011.5 1.5V21" />
+                            </svg>
+                            Simpan
+                        </button>
                     </div>
                 </x-ui.card>
             </aside>
         </div>
 
         <x-ui.card padding="lg">
-            <div class="flex flex-col gap-1 border-b border-border pb-4 text-center">
-                <p class="text-sm font-bold uppercase tracking-wide text-primary">LLDIKTI Wilayah XVI</p>
+            <div class="flex flex-col items-center gap-1 border-b border-border pb-4 text-center">
+                <div class="flex items-center justify-center gap-2">
+                    <p class="text-sm font-bold uppercase tracking-wide text-primary">LLDIKTI Wilayah XVI</p>
+                </div>
                 <h3 class="text-xl font-bold text-ink">Rekap Cuti Pegawai</h3>
                 <p class="text-sm text-muted">Periode Laporan: <span x-text="activeFilters.periode"></span></p>
             </div>

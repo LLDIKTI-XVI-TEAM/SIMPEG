@@ -16,7 +16,7 @@
     };
 
     $variants = [
-        'primary' => 'border border-primary bg-primary text-white shadow-sm hover:opacity-90 focus:ring-primary/30',
+        'primary' => 'border border-transparent bg-gradient-to-r from-primary to-[#1A3EBC] text-white shadow-md shadow-primary/20 hover:opacity-90 hover:shadow-lg focus:ring-primary/30',
         'secondary' => 'border border-border bg-surface text-primary shadow-sm hover:bg-soft hover:border-primary/30 focus:ring-primary/30',
         'muted' => 'border border-border bg-surface text-ink shadow-sm hover:bg-soft focus:ring-primary/20',
         'danger' => 'border border-danger/20 bg-surface text-danger shadow-sm hover:bg-danger/5 focus:ring-danger/20',
@@ -28,17 +28,17 @@
     ];
 
     $sizes = [
-        'xs' => 'gap-1.5 rounded px-3 py-2 text-xs',
-        'sm' => 'gap-1.5 rounded-lg px-3.5 py-1.5 text-xs',
-        'md' => 'gap-2 rounded-lg px-4 py-2.5 text-sm',
-        'lg' => 'gap-2 rounded-lg px-5 py-3 text-sm',
-        'icon' => 'h-8 w-8 rounded-lg p-0',
+        'xs' => 'gap-1.5 rounded-lg px-3 py-2 text-xs',
+        'sm' => 'gap-1.5 rounded-xl px-3.5 py-1.5 text-xs',
+        'md' => 'gap-2 rounded-xl px-4 py-2.5 text-sm',
+        'lg' => 'gap-2 rounded-xl px-5 py-3 text-sm',
+        'icon' => 'h-8 w-8 rounded-xl p-0',
     ];
 
     $isDisabled = filter_var($disabled, FILTER_VALIDATE_BOOL);
     $tag = ($as === 'a' || $href) ? 'a' : 'button';
     $classes = [
-        'inline-flex items-center justify-center font-semibold font-sans transition focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50',
+        'inline-flex items-center justify-center font-semibold font-sans transition-all duration-200 active:scale-95 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100',
         $sizes[(string) $size] ?? $sizes['md'],
         $variants[(string) $variant] ?? $variants['primary'],
         'w-full' => filter_var($fullWidth, FILTER_VALIDATE_BOOL),
@@ -46,10 +46,11 @@
     ];
 
     $title = $attributes->get('title');
+    $tooltipPosition = $attributes->get('tooltip-position', 'top');
 @endphp
 
 @if ($title)
-<x-ui.tooltip text="{{ $title }}">
+<x-ui.tooltip text="{{ $title }}" position="{{ $tooltipPosition }}">
 @endif
 
 @if ($tag === 'a')

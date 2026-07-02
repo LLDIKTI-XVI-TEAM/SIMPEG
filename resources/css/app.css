@@ -61,4 +61,36 @@ input:-webkit-autofill:active {
         background-repeat: no-repeat;
         background-size: 1.25em 1.25em;
     }
+
+    .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+    }
+    .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: var(--color-soft);
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: var(--color-primary);
+        border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: #0e2474;
+    }
+
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: var(--color-primary) var(--color-soft);
+    }
 }

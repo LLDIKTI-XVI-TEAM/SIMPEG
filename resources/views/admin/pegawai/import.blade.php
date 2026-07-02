@@ -1,5 +1,5 @@
 <x-layouts.app title="Import Data Pegawai">
-    <div class="mx-auto max-w-5xl space-y-6" x-data="{
+    <div class="space-y-6" x-data="{
         step: 1,
         fileName: '',
         fileSize: '',
@@ -401,15 +401,20 @@
         }
     }">
         
-        <x-admin.page-header title="Import Data Pegawai">
-            <x-slot:breadcrumb>
-                <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
-                <span>/</span>
-                <a href="{{ route('data-pegawai') }}" class="transition-colors hover:text-ink">Data Pegawai</a>
-                <span>/</span>
-                <span class="font-medium text-ink">Import Excel/CSV</span>
-            </x-slot:breadcrumb>
-        </x-admin.page-header>
+        {{-- PAGE HEADER --}}
+        <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+                <h2 class="text-2xl font-semibold text-ink">Import Data Pegawai</h2>
+                <x-ui.breadcrumb :items="[
+                    ['label' => 'Dashboard', 'url' => route('dashboard')],
+                    ['label' => 'Data Pegawai', 'url' => route('data-pegawai')],
+                    ['label' => 'Import Excel/CSV']
+                ]" />
+            </div>
+            <div class="flex shrink-0 items-center gap-3">
+                {{-- Additional header actions can be placed here --}}
+            </div>
+        </div>
 
         {{-- Global API Error Banner --}}
         <div x-show="apiError" x-cloak class="rounded-lg bg-danger/10 border border-danger/20 p-4 text-xs text-danger font-sans flex items-start gap-2.5" x-transition>
@@ -511,7 +516,14 @@
                     <p x-show="fileError" class="text-xs text-danger font-semibold mt-3 font-sans" x-text="fileError"></p>
                 </div>
 
-                <div class="border-t border-border pt-4 flex justify-end">
+                <div class="border-t border-border pt-4 flex items-center justify-between">
+                    <a href="{{ route('data-pegawai') }}" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft cursor-pointer">
+                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                        </svg>
+                        Batal
+                    </a>
+
                     <button type="button" @click="uploadAndPreview()" :disabled="!fileValid || isUploading"
                         :class="(!fileValid || isUploading) ? 'opacity-50 cursor-not-allowed bg-muted' : 'bg-primary hover:opacity-90 cursor-pointer'"
                         class="inline-flex items-center justify-center rounded-lg px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition font-sans gap-2">
@@ -681,9 +693,9 @@
                                             :pill="false"
                                             uppercase
                                             x-bind:class="{
-                                                'border-success/20 bg-success/10 text-success': item.status === 'valid',
-                                                'border-danger/20 bg-danger/10 text-danger': item.status === 'error',
-                                                'border-primary/20 bg-primary/10 text-primary': item.status === 'skip'
+                                                'bg-success/10 text-success': item.status === 'valid',
+                                                'bg-danger/10 text-danger': item.status === 'error',
+                                                'bg-primary/10 text-primary': item.status === 'skip'
                                             }"
                                             x-text="item.status"
                                         ></x-ui.badge>

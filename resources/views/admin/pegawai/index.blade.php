@@ -143,13 +143,10 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                     </svg>
                     <span>Tambah Pegawai</span>
-                    <svg class="w-4 h-4 shrink-0 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                    </svg>
                 </button>
 
                 <div x-show="open" style="display: none;" x-transition
-                    class="absolute right-0 top-full mt-1.5 w-48 rounded-lg border border-border bg-surface p-1 shadow-lg z-20">
+                    class="absolute right-0 top-full mt-1.5 w-full rounded-lg border border-border bg-surface p-1 shadow-lg z-20">
                     <a href="{{ route('pegawai.create') }}" class="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-ink hover:bg-soft transition-colors font-sans">
                         <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg>
                         Tambah Manual
@@ -169,7 +166,7 @@
             <input type="hidden" name="sort" value="{{ $sort }}">
             <input type="hidden" name="direction" value="{{ $direction }}">
             <input type="hidden" name="per_page" value="{{ $perPage ?? request('per_page', 10) }}">
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {{-- Search input --}}
             <div class="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5">
                 <svg class="w-4 h-4 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -207,16 +204,6 @@
                     @endforeach
                 </select>
             </div>
-
-            {{-- Filter Status --}}
-            <div class="relative">
-                <select id="filter-status" name="status_aktif" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                    <option value="">Semua Status</option>
-                    @foreach($statusOptions as $status)
-                        <option value="{{ $status }}" @selected($filters['status_aktif'] === $status)>{{ $status }}</option>
-                    @endforeach
-                </select>
-            </div>
             </div>
         </form>
     </x-ui.card>
@@ -250,8 +237,8 @@
                                 <svg class="{{ $sortIconClass('jabatan') }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
                             </a>
                         </x-ui.table-th>
-                        <x-ui.table-th align="center" class="select-none">
-                            <a href="{{ $sortUrl('golongan') }}" class="flex items-center justify-center gap-1 hover:text-ink transition-colors">
+                        <x-ui.table-th class="select-none">
+                            <a href="{{ $sortUrl('golongan') }}" class="flex items-center gap-1 hover:text-ink transition-colors">
                                 Gol. / Jenis
                                 <svg class="{{ $sortIconClass('golongan') }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
                             </a>
@@ -293,7 +280,7 @@
                                             <img
                                                 src="{{ $fotoUrl }}"
                                                 alt="Foto {{ $p->nama_lengkap }}"
-                                                class="h-full w-full object-cover"
+                                                class="h-full w-full object-cover object-[center_25%]"
                                                 loading="lazy"
                                                 onerror="this.classList.add('hidden'); this.nextElementSibling.classList.remove('hidden')"
                                             >
@@ -307,12 +294,12 @@
                                     <x-ui.tooltip text="Buka detail {{ $p->nama_lengkap }}" position="right">
                                         <a
                                             href="{{ route('pegawai.show', $p->id) }}"
-                                            class="block truncate text-sm font-semibold text-ink transition hover:text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/20 rounded"
+                                            class="block truncate text-sm font-semibold text-ink transition hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 rounded"
                                         >
                                             {{ $p->nama_lengkap }}
                                         </a>
                                     </x-ui.tooltip>
-                                    <p class="font-mono text-xs text-muted">{{ $p->nip }}</p>
+                                    <p class="font-mono text-xs text-muted">NIP. {{ $p->nip }}</p>
                                 </div>
                             </div>
                         </x-ui.table-td>
@@ -365,14 +352,14 @@
                         <x-ui.table-td>
                             <div class="flex items-center justify-start gap-1.5">
                                 {{-- Detail --}}
-                                <x-ui.button href="{{ route('pegawai.show', $p->id) }}" variant="secondary" size="icon" title="Detail" aria-label="Detail">
+                                <x-ui.button href="{{ route('pegawai.show', $p->id) }}" variant="secondary" size="icon" title="Detail" tooltip-position="top-end" aria-label="Detail">
                                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                     </svg>
                                 </x-ui.button>
                                 {{-- Edit --}}
-                                <x-ui.button href="{{ route('pegawai.edit', $p->id) }}" variant="secondary" size="icon" title="Edit" aria-label="Edit">
+                                <x-ui.button href="{{ route('pegawai.edit', $p->id) }}" variant="secondary" size="icon" title="Edit" tooltip-position="top-end" aria-label="Edit">
                                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                     </svg>
@@ -390,7 +377,7 @@
                                     method="POST"
                                 >
                                     <x-slot:trigger>
-                                        <x-ui.button type="button" variant="danger" size="icon" title="Nonaktifkan" aria-label="Nonaktifkan">
+                                        <x-ui.button type="button" variant="danger" size="icon" title="Nonaktifkan" tooltip-position="top-end" aria-label="Nonaktifkan">
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M22 10.5h-6m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM4 19.235A10.19 10.19 0 0 1 12.75 15c2.015 0 3.907.585 5.5 1.59m-14.25 2.645A9.903 9.903 0 0 1 12.75 18a9.903 9.903 0 0 1 6.002 2.235" />
                                             </svg>

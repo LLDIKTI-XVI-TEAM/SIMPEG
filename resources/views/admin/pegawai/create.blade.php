@@ -21,11 +21,6 @@
         {{-- Validation Errors --}}
         @if ($errors->any())
             <x-ui.alert variant="danger" title="Terdapat kesalahan pengisian form">
-                <ul role="list" class="list-disc space-y-1 pl-5">
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
             </x-ui.alert>
         @endif
 
@@ -33,10 +28,10 @@
         <x-ui.card padding="lg">
             <div x-data="{
             activeTab: 'utama',
-            nip: '',
+            nip: '{{ old('nip') }}',
             nipError: '',
-            nik: '',
-            kk: '',
+            nik: '{{ old('nik') }}',
+            kk: '{{ old('kk') }}',
             nikError: '',
             kkError: '',
             fotoPreview: null,
@@ -265,28 +260,16 @@
                         />
 
                         {{-- Golongan --}}
-                        <div class="space-y-1" x-data="{ open: false, selected: 'I/a' }">
-                            <label for="golongan_terakhir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Golongan <span class="text-danger">*</span></label>
-                            <div class="relative">
-                                <input type="hidden" name="golongan_terakhir" :value="selected">
-                                <button type="button" @click="open = !open" @click.away="open = false" class="w-full text-left appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <span x-text="selected"></span>
-                                </button>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                    </svg>
-                                </div>
-
-                                <div x-show="open" x-transition.opacity style="display: none;" class="absolute z-50 w-full mt-1 bg-surface border border-border rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                                    @foreach(['I/a','I/b','I/c','I/d','II/a','II/b','II/c','II/d','III/a','III/b','III/c','III/d','IV/a','IV/b','IV/c','IV/d','IV/e'] as $gol)
-                                    <div @click="selected = '{{ $gol }}'; open = false" class="px-4 py-2 text-sm text-ink cursor-pointer hover:bg-soft transition-colors" :class="selected === '{{ $gol }}' ? 'bg-primary/10 text-primary font-bold' : ''">
-                                        {{ $gol }}
-                                    </div>
-                                    @endforeach
-                                </div>
-                            </div>
-                        </div>
+                        <x-form.select
+                            name="golongan_terakhir"
+                            label="Golongan"
+                            id="golongan_terakhir"
+                            required
+                        >
+                            @foreach(['I/a','I/b','I/c','I/d','II/a','II/b','II/c','II/d','III/a','III/b','III/c','III/d','IV/a','IV/b','IV/c','IV/d','IV/e'] as $gol)
+                                <option value="{{ $gol }}">{{ $gol }}</option>
+                            @endforeach
+                        </x-form.select>
 
                         {{-- Pangkat --}}
                         <x-form.input
@@ -309,40 +292,30 @@
                         />
 
                         {{-- Jenis Jabatan --}}
-                        <div class="space-y-1">
-                            <label for="jenis_jabatan_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Jabatan <span class="text-danger">*</span></label>
-                            <div class="relative">
-                                <select id="jenis_jabatan_id" name="jenis_jabatan_id" required class="w-full appearance-none bg-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="" disabled selected>Pilih Jenis Jabatan</option>
-                                    @foreach($jenisJabatanOptions as $jenis)
-                                        <option value="{{ $jenis->id }}">{{ $jenis->nama }}</option>
-                                    @endforeach
-                                </select>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
+                        <x-form.select
+                            name="jenis_jabatan_id"
+                            label="Jenis Jabatan"
+                            id="jenis_jabatan_id"
+                            required
+                        >
+                            <option value="" disabled selected>Pilih Jenis Jabatan</option>
+                            @foreach($jenisJabatanOptions as $jenis)
+                                <option value="{{ $jenis->id }}">{{ $jenis->nama }}</option>
+                            @endforeach
+                        </x-form.select>
 
                         {{-- Unit Kerja --}}
-                        <div class="space-y-1">
-                            <label for="unit_kerja_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Unit Kerja <span class="text-danger">*</span></label>
-                            <div class="relative">
-                                <select id="unit_kerja_id" name="unit_kerja_id" required class="w-full appearance-none bg-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="" disabled selected>Pilih Unit Kerja</option>
-                                    @foreach($unitKerja as $unit)
-                                        <option value="{{ $unit->id }}">{{ $unit->nama }}</option>
-                                    @endforeach
-                                </select>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
+                        <x-form.select
+                            name="unit_kerja_id"
+                            label="Unit Kerja"
+                            id="unit_kerja_id"
+                            required
+                        >
+                            <option value="" disabled selected>Pilih Unit Kerja</option>
+                            @foreach($unitKerja as $unit)
+                                <option value="{{ $unit->id }}">{{ $unit->nama }}</option>
+                            @endforeach
+                        </x-form.select>
 
                         {{-- Kelas Jabatan --}}
                         <x-form.input
@@ -486,7 +459,7 @@
                             <div class="flex items-center gap-4">
                                 <div class="h-16 w-16 rounded-full border border-border bg-soft flex items-center justify-center overflow-hidden shrink-0">
                                     <template x-if="fotoPreview">
-                                        <img :src="fotoPreview" alt="Pratinjau foto profil pegawai" class="h-full w-full object-cover">
+                                        <img :src="fotoPreview" alt="Pratinjau foto profil pegawai" class="h-full w-full object-cover object-[center_25%]">
                                     </template>
                                     <template x-if="!fotoPreview">
                                         <svg class="h-8 w-8 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">

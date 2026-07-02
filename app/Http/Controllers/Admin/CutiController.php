@@ -175,7 +175,8 @@ class CutiController extends Controller
             ['label' => 'Saldo Kritis', 'value' => $saldoKritis, 'caption' => 'Sisa <= 3 hari', 'tone' => 'danger'],
         ];
 
-        $leaveBalances = $balances->map(function ($b) {
+        $leaveBalances = (clone $balancesQuery)->paginate(10, ['*'], 'page_saldo')->withQueryString();
+        $leaveBalances->getCollection()->transform(function ($b) {
             $status = 'Aman';
             if ($b->sisa <= 3) {
                 $status = 'Kritis';
@@ -228,7 +229,8 @@ class CutiController extends Controller
             }
         }
 
-        $usageRows = (clone $requestsQuery)->take(20)->get()->map(function ($r) {
+        $usageRows = (clone $requestsQuery)->paginate(10, ['*'], 'page_usage')->withQueryString();
+        $usageRows->getCollection()->transform(function ($r) {
             return [
                 'nama' => $r->employee?->nama_lengkap ?? '-',
                 'nip' => $r->employee?->nip ?? '-',
