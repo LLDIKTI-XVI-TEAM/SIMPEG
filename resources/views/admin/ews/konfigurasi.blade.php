@@ -136,7 +136,8 @@
                 class="inline-flex items-center gap-2 rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition hover:bg-soft">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                        d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                 </svg>
                 Lihat EWS Aktif
                 <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -190,11 +191,11 @@
                 <div>
                     <span class="text-[9px] font-bold text-muted uppercase tracking-wider block">Total Pegawai</span>
                     <span class="text-xs font-semibold text-ink">{{ $schedulerStatus['employees_checked'] }}
-                        checked</span>
+                        diperiksa</span>
                 </div>
                 <div>
                     <span class="text-[9px] font-bold text-muted uppercase tracking-wider block">Peringatan</span>
-                    <x-ui.badge variant="warning" size="sm">{{ $schedulerStatus['alerts_created'] }} alerts</x-ui.badge>
+                    <x-ui.badge variant="warning" size="sm">{{ $schedulerStatus['alerts_created'] }} peringatan</x-ui.badge>
                 </div>
             </div>
         </div>
@@ -226,7 +227,7 @@
                     <span
                         class="inline-flex items-center gap-1.5 text-[10px] font-semibold text-success">
                         <span class="h-1.5 w-1.5 rounded-full bg-success"></span>
-                        Status: Configurable
+                        Dapat Diubah
                     </span>
                 </div>
             </div>
@@ -258,9 +259,9 @@
                         <span>Parameter Notifikasi</span>
                     </div>
                     <div class="sm:col-span-7 grid grid-cols-3 gap-6 text-center">
-                        <div class="text-success bg-success/5 border border-success/10 rounded-md py-1">Tahap 1</div>
-                        <div class="text-warning bg-warning/5 border border-warning/10 rounded-md py-1">Tahap 2</div>
-                        <div class="text-danger bg-danger/5 border border-danger/10 rounded-md py-1">Tahap 3</div>
+                        <div class="text-success bg-success/5 border border-success/10 rounded-md py-1">Tahap 1 (Awal)</div>
+                        <div class="text-warning bg-warning/5 border border-warning/10 rounded-md py-1">Tahap 2 (Dekat)</div>
+                        <div class="text-danger bg-danger/5 border border-danger/10 rounded-md py-1">Tahap 3 (Mendesak)</div>
                     </div>
                 </div>
 
@@ -268,8 +269,8 @@
                 <div class="px-5 py-5 grid grid-cols-1 sm:grid-cols-12 gap-4 items-center hover:bg-soft/10 transition-colors">
                     <div class="sm:col-span-5">
                         <div class="flex items-center gap-3">
-                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary shadow-sm">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                                 </svg>
                             </div>
@@ -295,9 +296,9 @@
                 <div class="px-5 py-5 grid grid-cols-1 sm:grid-cols-12 gap-4 items-center hover:bg-soft/10 transition-colors">
                     <div class="sm:col-span-5">
                         <div class="flex items-center gap-3">
-                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success shadow-sm">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18 9 11.25l4.306 4.306a11.95 11.95 0 0 1 5.814-5.518l2.74-1.22m0 0-5.94-2.281m5.94 2.28-2.28 5.941" />
                                 </svg>
                             </div>
                             <div>
@@ -308,24 +309,36 @@
                     </div>
                     <div class="sm:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
                         <!-- Tahap 1 -->
-                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-success/5 border border-success/15 rounded-xl px-3 py-2.5 shadow-sm">
-                            <span class="text-[10px] font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1</span>
-                            <input type="number" name="pangkat_h90" x-model="pangkat_h90" min="1" step="1"
-                                :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + p90Class()">
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-success/5 border border-success/15 rounded-xl px-3 py-2.5">
+                            <span class="text-[10px] font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1 (Awal)</span>
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" name="pangkat_h90" x-model="pangkat_h90" min="1" step="1"
+                                    aria-label="Kenaikan Pangkat Tahap 1 (Awal) dalam hari"
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + p90Class()">
+                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                            </div>
                             <span class="text-[10px] font-bold text-success min-w-[68px] text-center" x-text="humanLabel(pangkat_h90)"></span>
                         </div>
                         <!-- Tahap 2 -->
-                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-warning/5 border border-warning/15 rounded-xl px-3 py-2.5 shadow-sm">
-                            <span class="text-[10px] font-bold text-warning uppercase tracking-wider block sm:hidden">Tahap 2</span>
-                            <input type="number" name="pangkat_h60" x-model="pangkat_h60" min="1" step="1"
-                                :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + p60Class()">
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-warning/5 border border-warning/15 rounded-xl px-3 py-2.5">
+                            <span class="text-[10px] font-bold text-warning uppercase tracking-wider block sm:hidden">Tahap 2 (Dekat)</span>
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" name="pangkat_h60" x-model="pangkat_h60" min="1" step="1"
+                                    aria-label="Kenaikan Pangkat Tahap 2 (Dekat) dalam hari"
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + p60Class()">
+                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                            </div>
                             <span class="text-[10px] font-bold text-warning min-w-[68px] text-center" x-text="humanLabel(pangkat_h60)"></span>
                         </div>
                         <!-- Tahap 3 -->
-                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-danger/5 border border-danger/15 rounded-xl px-3 py-2.5 shadow-sm">
-                            <span class="text-[10px] font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3</span>
-                            <input type="number" name="pangkat_h30" x-model="pangkat_h30" min="1" step="1"
-                                :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + p30Class()">
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-danger/5 border border-danger/15 rounded-xl px-3 py-2.5">
+                            <span class="text-[10px] font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3 (Mendesak)</span>
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" name="pangkat_h30" x-model="pangkat_h30" min="1" step="1"
+                                    aria-label="Kenaikan Pangkat Tahap 3 (Mendesak) dalam hari"
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + p30Class()">
+                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                            </div>
                             <span class="text-[10px] font-bold text-danger min-w-[68px] text-center" x-text="humanLabel(pangkat_h30)"></span>
                         </div>
                     </div>
@@ -335,8 +348,8 @@
                 <div class="px-5 py-5 grid grid-cols-1 sm:grid-cols-12 gap-4 items-center hover:bg-soft/10 transition-colors">
                     <div class="sm:col-span-5">
                         <div class="flex items-center gap-3">
-                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-info/10 text-info shadow-sm">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5h16.5M5.25 7.5h13.5m-12 9a3 3 0 0 1 3-3h9a3 3 0 0 1 3 3M5.25 12h13.5" />
                                 </svg>
                             </div>
@@ -348,24 +361,36 @@
                     </div>
                     <div class="sm:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
                         <!-- Tahap 1 -->
-                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-success/5 border border-success/15 rounded-xl px-3 py-2.5 shadow-sm">
-                            <span class="text-[10px] font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1</span>
-                            <input type="number" name="kgb_h60" x-model="kgb_h60" min="1" step="1"
-                                :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + k60Class()">
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-success/5 border border-success/15 rounded-xl px-3 py-2.5">
+                            <span class="text-[10px] font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1 (Awal)</span>
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" name="kgb_h60" x-model="kgb_h60" min="1" step="1"
+                                    aria-label="Kenaikan Gaji Berkala Tahap 1 (Awal) dalam hari"
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + k60Class()">
+                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                            </div>
                             <span class="text-[10px] font-bold text-success min-w-[68px] text-center" x-text="humanLabel(kgb_h60)"></span>
                         </div>
                         <!-- Tahap 2 -->
-                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-warning/5 border border-warning/15 rounded-xl px-3 py-2.5 shadow-sm">
-                            <span class="text-[10px] font-bold text-warning uppercase tracking-wider block sm:hidden">Tahap 2</span>
-                            <input type="number" name="kgb_h30" x-model="kgb_h30" min="1" step="1"
-                                :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + k30Class()">
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-warning/5 border border-warning/15 rounded-xl px-3 py-2.5">
+                            <span class="text-[10px] font-bold text-warning uppercase tracking-wider block sm:hidden">Tahap 2 (Dekat)</span>
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" name="kgb_h30" x-model="kgb_h30" min="1" step="1"
+                                    aria-label="Kenaikan Gaji Berkala Tahap 2 (Dekat) dalam hari"
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + k30Class()">
+                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                            </div>
                             <span class="text-[10px] font-bold text-warning min-w-[68px] text-center" x-text="humanLabel(kgb_h30)"></span>
                         </div>
                         <!-- Tahap 3 -->
-                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-danger/5 border border-danger/15 rounded-xl px-3 py-2.5 shadow-sm">
-                            <span class="text-[10px] font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3</span>
-                            <input type="number" name="kgb_h14" x-model="kgb_h14" min="1" step="1"
-                                :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + k14Class()">
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-danger/5 border border-danger/15 rounded-xl px-3 py-2.5">
+                            <span class="text-[10px] font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3 (Mendesak)</span>
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" name="kgb_h14" x-model="kgb_h14" min="1" step="1"
+                                    aria-label="Kenaikan Gaji Berkala Tahap 3 (Mendesak) dalam hari"
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + k14Class()">
+                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                            </div>
                             <span class="text-[10px] font-bold text-danger min-w-[68px] text-center" x-text="humanLabel(kgb_h14)"></span>
                         </div>
                     </div>
@@ -375,9 +400,9 @@
                 <div class="px-5 py-5 grid grid-cols-1 sm:grid-cols-12 gap-4 items-center hover:bg-soft/10 transition-colors">
                     <div class="sm:col-span-5">
                         <div class="flex items-center gap-3">
-                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-danger/10 text-danger shadow-sm">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-.778.099-1.533.284-2.253" />
+                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
                                 </svg>
                             </div>
                             <div>
@@ -388,24 +413,36 @@
                     </div>
                     <div class="sm:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
                         <!-- Tahap 1 -->
-                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-success/5 border border-success/15 rounded-xl px-3 py-2.5 shadow-sm">
-                            <span class="text-[10px] font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1</span>
-                            <input type="number" name="pensiun_y1" x-model="pensiun_y1" min="1" step="1"
-                                :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + py1Class()">
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-success/5 border border-success/15 rounded-xl px-3 py-2.5">
+                            <span class="text-[10px] font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1 (Awal)</span>
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" name="pensiun_y1" x-model="pensiun_y1" min="1" step="1"
+                                    aria-label="Batas Usia Pensiun Tahap 1 (Awal) dalam hari"
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + py1Class()">
+                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                            </div>
                             <span class="text-[10px] font-bold text-success min-w-[68px] text-center" x-text="humanLabel(pensiun_y1)"></span>
                         </div>
                         <!-- Tahap 2 -->
-                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-warning/5 border border-warning/15 rounded-xl px-3 py-2.5 shadow-sm">
-                            <span class="text-[10px] font-bold text-warning uppercase tracking-wider block sm:hidden">Tahap 2</span>
-                            <input type="number" name="pensiun_m6" x-model="pensiun_m6" min="1" step="1"
-                                :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + pm6Class()">
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-warning/5 border border-warning/15 rounded-xl px-3 py-2.5">
+                            <span class="text-[10px] font-bold text-warning uppercase tracking-wider block sm:hidden">Tahap 2 (Dekat)</span>
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" name="pensiun_m6" x-model="pensiun_m6" min="1" step="1"
+                                    aria-label="Batas Usia Pensiun Tahap 2 (Dekat) dalam hari"
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + pm6Class()">
+                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                            </div>
                             <span class="text-[10px] font-bold text-warning min-w-[68px] text-center" x-text="humanLabel(pensiun_m6)"></span>
                         </div>
                         <!-- Tahap 3 -->
-                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-danger/5 border border-danger/15 rounded-xl px-3 py-2.5 shadow-sm">
-                            <span class="text-[10px] font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3</span>
-                            <input type="number" name="pensiun_m3" x-model="pensiun_m3" min="1" step="1"
-                                :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + pm3Class()">
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-danger/5 border border-danger/15 rounded-xl px-3 py-2.5">
+                            <span class="text-[10px] font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3 (Mendesak)</span>
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" name="pensiun_m3" x-model="pensiun_m3" min="1" step="1"
+                                    aria-label="Batas Usia Pensiun Tahap 3 (Mendesak) dalam hari"
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + pm3Class()">
+                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                            </div>
                             <span class="text-[10px] font-bold text-danger min-w-[68px] text-center" x-text="humanLabel(pensiun_m3)"></span>
                         </div>
                     </div>
@@ -415,8 +452,8 @@
                 <div class="px-5 py-5 grid grid-cols-1 sm:grid-cols-12 gap-4 items-center hover:bg-soft/10 transition-colors">
                     <div class="sm:col-span-5">
                         <div class="flex items-center gap-3">
-                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-warning/10 text-warning shadow-sm">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
                                 </svg>
                             </div>
@@ -428,24 +465,36 @@
                     </div>
                     <div class="sm:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
                         <!-- Tahap 1 -->
-                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-success/5 border border-success/15 rounded-xl px-3 py-2.5 shadow-sm">
-                            <span class="text-[10px] font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1</span>
-                            <input type="number" name="pppk_m6" x-model="pppk_m6" min="1" step="1"
-                                :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + pp6Class()">
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-success/5 border border-success/15 rounded-xl px-3 py-2.5">
+                            <span class="text-[10px] font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1 (Awal)</span>
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" name="pppk_m6" x-model="pppk_m6" min="1" step="1"
+                                    aria-label="Kontrak PPPK Tahap 1 (Awal) dalam hari"
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + pp6Class()">
+                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                            </div>
                             <span class="text-[10px] font-bold text-success min-w-[68px] text-center" x-text="humanLabel(pppk_m6)"></span>
                         </div>
                         <!-- Tahap 2 -->
-                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-warning/5 border border-warning/15 rounded-xl px-3 py-2.5 shadow-sm">
-                            <span class="text-[10px] font-bold text-warning uppercase tracking-wider block sm:hidden">Tahap 2</span>
-                            <input type="number" name="pppk_m3" x-model="pppk_m3" min="1" step="1"
-                                :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + pp3Class()">
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-warning/5 border border-warning/15 rounded-xl px-3 py-2.5">
+                            <span class="text-[10px] font-bold text-warning uppercase tracking-wider block sm:hidden">Tahap 2 (Dekat)</span>
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" name="pppk_m3" x-model="pppk_m3" min="1" step="1"
+                                    aria-label="Kontrak PPPK Tahap 2 (Dekat) dalam hari"
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + pp3Class()">
+                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                            </div>
                             <span class="text-[10px] font-bold text-warning min-w-[68px] text-center" x-text="humanLabel(pppk_m3)"></span>
                         </div>
                         <!-- Tahap 3 -->
-                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-danger/5 border border-danger/15 rounded-xl px-3 py-2.5 shadow-sm">
-                            <span class="text-[10px] font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3</span>
-                            <input type="number" name="pppk_m1" x-model="pppk_m1" min="1" step="1"
-                                :class="'w-16 sm:w-20 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + pp1Class()">
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-danger/5 border border-danger/15 rounded-xl px-3 py-2.5">
+                            <span class="text-[10px] font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3 (Mendesak)</span>
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" name="pppk_m1" x-model="pppk_m1" min="1" step="1"
+                                    aria-label="Kontrak PPPK Tahap 3 (Mendesak) dalam hari"
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + pp1Class()">
+                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                            </div>
                             <span class="text-[10px] font-bold text-danger min-w-[68px] text-center" x-text="humanLabel(pppk_m1)"></span>
                         </div>
                     </div>
@@ -478,6 +527,14 @@
                             </svg>
                             Simpan Konfigurasi EWS
                         </button>
+                        <div class="space-y-1" aria-live="polite">
+                            <p class="text-xs text-danger" x-show="reason.trim() === ''">
+                                Isi alasan perubahan sebelum menyimpan konfigurasi.
+                            </p>
+                            <p class="text-xs text-danger" x-show="reason.trim() !== '' && thresholdWarnings.length > 0">
+                                Perbaiki urutan threshold terlebih dahulu. Tahap 1 harus lebih besar dari Tahap 2, dan Tahap 2 lebih besar dari Tahap 3.
+                            </p>
+                        </div>
                     </div>
                 </div>
             </form>
