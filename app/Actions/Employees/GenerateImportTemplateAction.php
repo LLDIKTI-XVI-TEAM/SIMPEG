@@ -62,6 +62,9 @@ class GenerateImportTemplateAction
         return match ($type) {
             'utama' => [
                 'No' => '1',
+                'Nama Pegawai' => 'Ahmad Fauzi, S.Kom.',
+                'Person' => 'Ahmad Saeful Fauzi',
+                'Person Formula' => 'Ahmad Saeful Fauzi',
                 'Email Pegawai' => 'contoh@example.com',
                 'Golongan' => 'III/a',
                 'Jabatan' => 'Analis Kepegawaian',

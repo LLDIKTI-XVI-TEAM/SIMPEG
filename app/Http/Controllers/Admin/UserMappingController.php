@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -12,29 +13,31 @@ class UserMappingController extends Controller
     public function index()
     {
 
-        $pegawai = PegawaiController::$pegawaiList;
+        $pegawai = Employee::orderBy('nama_lengkap')->get();
         $users = User::all()->keyBy('email');
 
-        $mappedPegawai = array_map(function ($p) use ($users) {
-            $email = $p['email'] ?? '';
-            $emailDinas = $p['email_dinas'] ?? '';
+        $mappedPegawai = $pegawai->map(function ($p) use ($users) {
+            $email = $p->email ?? '';
+            $emailDinas = $p->email ?? ''; // No email_dinas in Employee
 
-            // Find match in users table by email or email_dinas
+            // Find match in users table by email
             $user = null;
             if ($email) {
                 $user = $users->get($email);
             }
-            if (! $user && $emailDinas) {
-                $user = $users->get($emailDinas);
-            }
 
-            $p['keycloak_id'] = $user ? $user->keycloak_id : null;
-            $p['role'] = $user ? $user->role : 'pegawai';
-            $p['is_connected'] = $user && ! empty($user->keycloak_id);
-            $p['mapped_email'] = $user ? $user->email : ($emailDinas ?: $email);
-
-            return $p;
-        }, $pegawai);
+            return [
+                'id' => $p->id,
+                'nama' => $p->nama_lengkap,
+                'nip' => $p->nip,
+                'jenis' => $p->jenisPegawai?->nama ?? '-',
+                'email' => $email,
+                'keycloak_id' => $user ? $user->keycloak_id : null,
+                'role' => $user ? $user->role : 'pegawai',
+                'is_connected' => $user && ! empty($user->keycloak_id),
+                'mapped_email' => $user ? $user->email : $email,
+            ];
+        })->toArray();
 
         return view('admin.user-management.index', [
             'pegawai' => $mappedPegawai,

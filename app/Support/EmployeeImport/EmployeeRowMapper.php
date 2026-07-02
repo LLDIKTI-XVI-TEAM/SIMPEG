@@ -47,10 +47,16 @@ class EmployeeRowMapper
 
     /**
      * Mapping from Excel header to new SIMPEG field names.
-     * 'Person' and 'Person Formula' are ignored (not in PRD schema).
+     * - 'Nama Pegawai' berisi nama beserta gelar (misal: Grantly Sorongan, S.Kom.)
+     *   → disimpan ke nama_dengan_gelar.
+     * - 'Person' berisi nama lengkap tanpa gelar (misal: Grantly Antonio Edward Sorongan)
+     *   → disimpan ke nama_lengkap.
+     * - 'Person Formula' adalah alias/duplikat 'Person' pada file lama;
+     *   tidak di-map secara eksplisit; hanya dipakai dalam shift-detection.
      */
     private const MAP = [
-        'Nama Pegawai' => 'nama_lengkap',
+        'Nama Pegawai' => 'nama_dengan_gelar',
+        'Person' => 'nama_lengkap',
         'Email Pegawai' => 'email',
         'Golongan' => 'golongan_terakhir',
         'Jabatan' => 'jabatan_terakhir',
@@ -137,6 +143,8 @@ class EmployeeRowMapper
             $row['Tanggal Lahir'] = $row['Prodi Pendidikan Terakhir'] ?? null;
             $row['Status Kepegawaian'] = $row['Person Formula'] ?? null;
             $row['Prodi Pendidikan Terakhir'] = $row['Person'] ?? null;
+            $row['Person Formula'] = $row['Pensiun'] ?? null;
+            $row['Person'] = $row['Pendidikan Terakhir'] ?? null;
             $row['Pensiun'] = $row['Pangkat'] ?? null;
             $row['Pangkat'] = $row['No KK'] ?? null;
             $row['Pendidikan Terakhir'] = $row['Nomor Telepon'] ?? null;

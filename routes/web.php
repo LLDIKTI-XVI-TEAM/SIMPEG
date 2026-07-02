@@ -245,7 +245,17 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         ->name('ews.config.update');
 
     Route::get('/laporan/export-pegawai', function () {
-        $pegawai = PegawaiController::$pegawaiList;
+        $pegawai = Employee::all()->map(function ($emp) {
+            return [
+                'id' => $emp->id,
+                'nama' => $emp->nama_lengkap,
+                'nip' => $emp->nip,
+                'unit' => $emp->unitKerja?->nama ?? '-',
+                'golongan' => $emp->golongan_terakhir ?? '-',
+                'jenis' => $emp->jenisPegawai?->nama ?? '-',
+                'status' => $emp->status_aktif ?? 'Aktif',
+            ];
+        })->toArray();
 
         return view('admin.laporan.export-pegawai', [
             'pegawai' => $pegawai,
@@ -255,7 +265,17 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
         ->name('laporan.pegawai');
 
     Route::get('/laporan/export-pegawai/excel', function (Request $request) {
-        $pegawai = PegawaiController::$pegawaiList;
+        $pegawai = Employee::all()->map(function ($emp) {
+            return [
+                'id' => $emp->id,
+                'nama' => $emp->nama_lengkap,
+                'nip' => $emp->nip,
+                'unit' => $emp->unitKerja?->nama ?? '-',
+                'golongan' => $emp->golongan_terakhir ?? '-',
+                'jenis' => $emp->jenisPegawai?->nama ?? '-',
+                'status' => $emp->status_aktif ?? 'Aktif',
+            ];
+        })->toArray();
 
         // Apply filters
         $search = strtolower(trim($request->query('search', '')));
@@ -403,7 +423,17 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
 
     Route::get('/laporan/export-cuti', function () {
         $riwayatCuti = CutiController::$riwayatCuti;
-        $pegawai = PegawaiController::$pegawaiList;
+        $pegawai = Employee::all()->map(function ($emp) {
+            return [
+                'id' => $emp->id,
+                'nama' => $emp->nama_lengkap,
+                'nip' => $emp->nip,
+                'unit' => $emp->unitKerja?->nama ?? '-',
+                'golongan' => $emp->golongan_terakhir ?? '-',
+                'jenis' => $emp->jenisPegawai?->nama ?? '-',
+                'status' => $emp->status_aktif ?? 'Aktif',
+            ];
+        })->toArray();
 
         return view('admin.laporan.export-cuti', [
             'riwayatCuti' => $riwayatCuti,
@@ -415,7 +445,17 @@ Route::middleware(['keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan
 
     Route::get('/laporan/export-cuti/excel', function (Request $request) {
         $riwayatCuti = CutiController::$riwayatCuti;
-        $pegawai = PegawaiController::$pegawaiList;
+        $pegawai = Employee::all()->map(function ($emp) {
+            return [
+                'id' => $emp->id,
+                'nama' => $emp->nama_lengkap,
+                'nip' => $emp->nip,
+                'unit' => $emp->unitKerja?->nama ?? '-',
+                'golongan' => $emp->golongan_terakhir ?? '-',
+                'jenis' => $emp->jenisPegawai?->nama ?? '-',
+                'status' => $emp->status_aktif ?? 'Aktif',
+            ];
+        })->toArray();
 
         // Apply filters
         $bulan = $request->query('bulan', '');
