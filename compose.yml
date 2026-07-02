@@ -26,6 +26,14 @@ services:
     networks:
       - simpeg_net
 
+  mailpit:
+    image: docker.io/axllent/mailpit:latest
+    container_name: simpeg_mailpit
+    ports:
+      - "8025:8025"
+    networks:
+      - simpeg_net
+
   db:
     image: docker.io/library/postgres:17
     container_name: simpeg_postgres
