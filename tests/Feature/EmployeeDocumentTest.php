@@ -13,6 +13,7 @@ use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class EmployeeDocumentTest extends TestCase
@@ -229,8 +230,8 @@ class EmployeeDocumentTest extends TestCase
         $response = $this->get("/dashboard/dokumen/{$document->id}/download");
 
         $response->assertOk();
-        
-        $expectedFilename = \Illuminate\Support\Str::slug($employee->nama_lengkap ?? 'pegawai') . '-' . \Illuminate\Support\Str::slug($document->nama_dokumen) . '.pdf';
+
+        $expectedFilename = Str::slug($employee->nama_lengkap ?? 'pegawai').'-'.Str::slug($document->nama_dokumen).'.pdf';
         $response->assertDownload($expectedFilename);
     }
 

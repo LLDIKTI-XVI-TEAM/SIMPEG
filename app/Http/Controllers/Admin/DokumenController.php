@@ -10,7 +10,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Documents\StoreDocumentRequest;
 use App\Models\Document;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 class DokumenController extends Controller
 {
