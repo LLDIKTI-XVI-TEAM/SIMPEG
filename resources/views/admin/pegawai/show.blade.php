@@ -55,12 +55,12 @@
         pendidikanList: {{ $p->educationHistories->map(fn($e) => ['tingkat' => $e->jenjang->nama ?? '-', 'institusi' => $e->nama_institusi, 'prodi' => $e->jurusan, 'lulus' => $e->tahun_lulus, 'no_ijazah' => $e->no_ijazah])->toJson() }},
         
         // Form states
-        newKeluarga: { nama_anggota: '', hubungan: 'Istri', nik: '', tempat_lahir: '', tanggal_lahir: '', jenis_kelamin: 'P', status_tunjangan: false, pekerjaan: '' },
+        newKeluarga: { nama_anggota: '', hubungan: 'Istri', nik: '', tempat_lahir: '', tanggal_lahir: '', jenis_kelamin: 'P', status_tunjangan: '0', pekerjaan: '' },
         newPangkat: { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '' },
         newJabatan: { nama_jabatan: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '' },
         newKgb: { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '' },
         newDisiplin: { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '' },
-        newPendidikan: { tingkat: 'Sarjana (S1)', institusi: '', prodi: '', lulus: '', no_ijazah: '' },
+        newPendidikan: { tingkat: 'D4 / S1', institusi: '', prodi: '', lulus: '', no_ijazah: '' },
         async updateKinerjaBaik(value) {
             const previous = !value;
             this.isUpdatingKinerja = true;
@@ -187,9 +187,9 @@
                             tanggal_lahir: this.newKeluarga.tanggal_lahir,
                             jenis_kelamin: this.newKeluarga.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan',
                             pekerjaan: this.newKeluarga.pekerjaan,
-                            status: this.newKeluarga.status_tunjangan === 'true' || this.newKeluarga.status_tunjangan === true ? 'Ditanggung' : 'Tidak Ditanggung'
+                            status: this.newKeluarga.status_tunjangan === '1' || this.newKeluarga.status_tunjangan === 1 || this.newKeluarga.status_tunjangan === 'true' || this.newKeluarga.status_tunjangan === true ? 'Ditanggung' : 'Tidak Ditanggung'
                         });
-                        this.newKeluarga = { nama_anggota: '', hubungan: 'Istri', nik: '', tempat_lahir: '', tanggal_lahir: '', jenis_kelamin: 'P', status_tunjangan: false, pekerjaan: '' };
+                        this.newKeluarga = { nama_anggota: '', hubungan: 'Istri', nik: '', tempat_lahir: '', tanggal_lahir: '', jenis_kelamin: 'P', status_tunjangan: '0', pekerjaan: '' };
                     } else if (this.modalType === 'pendidikan') {
                         this.pendidikanList.unshift({
                             tingkat: this.newPendidikan.tingkat,
@@ -198,7 +198,7 @@
                             lulus: this.newPendidikan.lulus,
                             no_ijazah: this.newPendidikan.no_ijazah
                         });
-                        this.newPendidikan = { tingkat: 'Sarjana (S1)', institusi: '', prodi: '', lulus: '', no_ijazah: '' };
+                        this.newPendidikan = { tingkat: 'D4 / S1', institusi: '', prodi: '', lulus: '', no_ijazah: '' };
                     }
                     
                     this.showModal = false;
@@ -207,17 +207,7 @@
                     setTimeout(() => this.toast.show = false, 3000);
                 } else {
                     const errorData = await response.json();
-                    let errMsg = '';
-                    if (errorData.errors) {
-                        errMsg = '<ul class=\'list-disc pl-5 mt-1\'>';
-                        for (const key in errorData.errors) {
-                            errMsg += '<li>' + errorData.errors[key][0] + '</li>';
-                        }
-                        errMsg += '</ul>';
-                    } else {
-                        errMsg = errorData.message || 'Data tidak valid';
-                    }
-                    this.modalError = errMsg;
+                    this.modalError = true;
                 }
             } catch (error) {
                 this.toast = { show: true, message: 'Terjadi kesalahan jaringan', type: 'error' };
@@ -229,8 +219,9 @@
     }" class="mx-auto max-w-5xl space-y-6">
         
         {{-- BREADCRUMBS & DYNAMIC ALERT --}}
-        <div class="relative z-40 mb-2">
-            <nav class="flex items-center gap-1.5 text-xs text-muted">
+        <div class="relative mb-2">
+            <h2 class="mb-1 text-2xl font-extrabold text-ink tracking-tight font-sans">Detail Pegawai</h2>
+            <nav class="flex items-center gap-1.5 text-xs text-muted mb-4">
                 <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
                 <span>/</span>
                 <a href="{{ route('data-pegawai') }}" class="transition-colors hover:text-ink">Data Pegawai</a>
@@ -287,7 +278,7 @@
                             <img
                                 src="{{ $fotoUrl }}"
                                 alt="Foto {{ $p->nama_dengan_gelar ?? $p->nama_lengkap }}"
-                                class="h-full w-full object-cover"
+                                class="h-full w-full object-cover object-[center_25%]"
                             >
                         @else
                             <div class="flex h-full w-full items-center justify-center bg-primary/10 text-xl font-bold text-primary font-sans uppercase">
@@ -298,31 +289,35 @@
                     <div class="min-w-0">
                         <div class="flex flex-wrap items-center gap-2">
                             <h2 class="text-xl font-bold text-ink font-sans leading-tight">{{ $p->nama_dengan_gelar ?? $p->nama_lengkap }}</h2>
-                            <template x-if="kinerjaBaik">
-                                <span class="inline-flex items-center gap-1 text-[10px] font-bold text-success font-sans">
-                                    KINERJA BAIK
-                                </span>
-                            </template>
                         </div>
                         @if($p->nama_dengan_gelar)
                             <p class="text-xs text-muted font-sans mt-0.5">{{ $p->nama_lengkap }}</p>
                         @endif
                         <p class="text-xs text-muted font-sans font-mono mt-0.5">NIP. {{ $p->nip }}</p>
-                        <span class="inline-block mt-1.5 rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-semibold font-sans uppercase">{{ $p->jenisPegawai->nama ?? '-' }}</span>
+                        <div class="flex items-center gap-2 mt-1.5">
+                            <x-ui.badge variant="primary" size="md" class="!font-bold">
+                                {{ $p->jenisPegawai->nama ?? '-' }}
+                            </x-ui.badge>
+                            <template x-if="kinerjaBaik">
+                                <x-ui.badge variant="success" size="md" class="!font-bold">
+                                    Kinerja Baik
+                                </x-ui.badge>
+                            </template>
+                        </div>
                     </div>
                 </div>
                 <div class="flex items-center gap-3 shrink-0">
-                    <a href="{{ route('pegawai.edit', $p->id) }}" class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm">
-                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
-                        </svg>
-                        Edit Pegawai
-                    </a>
                     <a href="{{ route('data-pegawai') }}" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-soft">
                         <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
                         </svg>
                         Kembali
+                    </a>
+                    <a href="{{ route('pegawai.edit', $p->id) }}" class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm">
+                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                        </svg>
+                        Edit Pegawai
                     </a>
                 </div>
             </div>
@@ -363,7 +358,9 @@
                     {{-- Atasan Langsung --}}
                     <div class="flex items-center gap-3 border-l border-border/80 pl-6">
                         <div class="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold shrink-0">
-                            🏢
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0 1 12 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 0 1-.673-.38m0 0A2.18 2.18 0 0 1 3 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 0 1 3.413-.387m7.5 0V5.25A2.25 2.25 0 0 0 13.5 3h-3a2.25 2.25 0 0 0-2.25 2.25v.894m7.5 0a48.667 48.667 0 0 0-7.5 0M12 12.75h.008v.008H12v-.008Z" />
+                            </svg>
                         </div>
                         <div>
                             <span class="text-[9px] font-bold text-muted uppercase tracking-wider font-sans block">Atasan Langsung</span>
@@ -376,7 +373,7 @@
                 {{-- Auto-Kalkulasi Jadwal --}}
                 <div class="space-y-3">
                     <h3 class="text-xs font-bold text-ink uppercase tracking-wider font-sans border-b border-border pb-1.5 flex items-center gap-1.5">
-                        Estimasi Jadwal Kepegawaian <span class="text-[9px] text-primary lowercase font-normal">(kalkulator otomatis)</span>
+                        Estimasi Jadwal Kepegawaian
                     </h3>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div class="rounded-lg border border-border bg-surface p-3 shadow-sm text-center">
@@ -695,7 +692,7 @@
                             </template>
                             <tr x-show="disiplinList.length === 0">
                                 <td colspan="5" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
-                                    Pegawai ini tidak memiliki riwayat hukuman disiplin. Bersih (Clean Record). ✅
+                                    Pegawai ini tidak memiliki riwayat hukuman disiplin.
                                 </td>
                             </tr>
                         </tbody>
@@ -776,7 +773,7 @@
                             </div>
                             <div class="flex justify-between border-b border-border pb-1">
                                 <span class="font-semibold text-muted">Status Dokumen:</span>
-                                <span class="inline-flex items-center gap-1 rounded bg-success/15 px-1.5 py-0.2 text-[9px] font-bold text-success uppercase">VERIFIED</span>
+                                <x-ui.badge variant="success" size="md" class="!font-bold">Verified</x-ui.badge>
                             </div>
                         </div>
                     </div>
@@ -799,7 +796,7 @@
                                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Nomor Dokumen</th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Tanggal Terbit</th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Ukuran</th>
-                                <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Aksi</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border text-xs font-sans text-ink">
@@ -822,14 +819,27 @@
                                 <td class="px-4 py-3 font-mono text-muted">{{ $doc->nomor_dokumen ?? '-' }}</td>
                                 <td class="px-4 py-3 font-mono text-muted">{{ $doc->tanggal_dokumen ? \Carbon\Carbon::parse($doc->tanggal_dokumen)->format('d-m-Y') : '-' }}</td>
                                 <td class="px-4 py-3 font-mono text-muted">{{ $doc->fileSizeLabel() }}</td>
-                                <td class="px-4 py-3 text-right">
-                                    <div class="flex items-center justify-end gap-2.5">
-                                        <a href="{{ route('dokumen.show', $doc->id) }}" class="inline-flex items-center gap-1 font-semibold text-primary hover:underline font-sans">
-                                            Detail
+                                <td class="px-4 py-3 text-left">
+                                    <div class="flex items-center justify-start gap-1.5">
+                                        <a href="{{ route('dokumen.show', $doc->id) }}"
+                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
+                                            title="Detail" aria-label="Lihat detail {{ $doc->nama_dokumen }}">
+                                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24" stroke-width="1.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                    d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                    d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                                            </svg>
                                         </a>
-                                        <span class="text-border">|</span>
-                                        <a href="{{ route('dokumen.download', $doc->id) }}" class="inline-flex items-center gap-1 font-semibold text-primary hover:underline font-sans">
-                                            Unduh
+                                        <a href="{{ route('dokumen.download', $doc->id) }}"
+                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
+                                            title="Unduh" aria-label="Unduh {{ $doc->nama_dokumen }}">
+                                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24" stroke-width="1.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                    d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                            </svg>
                                         </a>
                                     </div>
                                 </td>
@@ -876,8 +886,7 @@
                                     </svg>
                                 </div>
                                 <div class="ml-3">
-                                    <h3 class="text-sm font-medium text-red-800">Terdapat kesalahan pengisian form:</h3>
-                                    <div class="mt-2 text-sm text-red-700" x-html="modalError"></div>
+                                    <h3 class="text-sm font-medium text-red-800">Terdapat Kesalahan Pengisian Form</h3>
                                 </div>
                             </div>
                         </div>
@@ -886,59 +895,81 @@
                     <form @submit.prevent="submitForm()" class="space-y-4">
                         {{-- KELUARGA FORM --}}
                         <template x-if="modalType === 'keluarga'">
-                            <div class="space-y-4">
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Anggota Keluarga</label>
-                                    <input type="text" x-model="newKeluarga.nama_anggota" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                </div>
+                            <div class="space-y-3">
+                                <x-form.input 
+                                    name="nama_anggota"
+                                    label="Nama Anggota Keluarga" 
+                                    x-model="newKeluarga.nama_anggota" 
+                                    required 
+                                />
                                 
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div class="space-y-1">
-                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Hubungan</label>
-                                        <select x-model="newKeluarga.hubungan" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                            <option value="Suami">Suami</option>
-                                            <option value="Istri">Istri</option>
-                                            <option value="Anak">Anak</option>
-                                        </select>
-                                    </div>
-                                    <div class="space-y-1">
-                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">NIK (Nomor Induk Kependudukan)</label>
-                                        <input type="text" maxlength="16" x-model="newKeluarga.nik" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                    </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <x-form.select 
+                                        name="hubungan"
+                                        label="Hubungan" 
+                                        x-model="newKeluarga.hubungan"
+                                    >
+                                        <option value="Suami">Suami</option>
+                                        <option value="Istri">Istri</option>
+                                        <option value="Anak">Anak</option>
+                                    </x-form.select>
+                                    
+                                    <x-form.input 
+                                        name="nik"
+                                        label="NIK" 
+                                        type="text"
+                                        placeholder="16 digit NIK"
+                                        minlength="16"
+                                        maxlength="16" 
+                                        pattern="[0-9]{16}"
+                                        title="NIK harus berupa 16 digit angka"
+                                        x-model="newKeluarga.nik" 
+                                        x-on:input="newKeluarga.nik = newKeluarga.nik.replace(/[^0-9]/g, '')"
+                                        required
+                                    />
                                 </div>
 
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div class="space-y-1">
-                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tempat Lahir</label>
-                                        <input type="text" x-model="newKeluarga.tempat_lahir" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                    </div>
-                                    <div class="space-y-1">
-                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Lahir</label>
-                                        <input type="date" x-model="newKeluarga.tanggal_lahir" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                    </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <x-form.input 
+                                        name="tempat_lahir"
+                                        label="Tempat Lahir" 
+                                        x-model="newKeluarga.tempat_lahir" 
+                                    />
+                                    <x-form.date 
+                                        name="tanggal_lahir"
+                                        label="Tanggal Lahir" 
+                                        x-model="newKeluarga.tanggal_lahir" 
+                                        required 
+                                    />
                                 </div>
 
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div class="space-y-1">
-                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Kelamin</label>
-                                        <select x-model="newKeluarga.jenis_kelamin" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                            <option value="L">Laki-laki</option>
-                                            <option value="P">Perempuan</option>
-                                        </select>
-                                    </div>
-                                    <div class="space-y-1">
-                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Status Tunjangan</label>
-                                        <select x-model="newKeluarga.status_tunjangan" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                            <option :value="true">Ditanggung</option>
-                                            <option :value="false">Tidak Ditanggung</option>
-                                        </select>
-                                    </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <x-form.select 
+                                        name="jenis_kelamin"
+                                        label="Jenis Kelamin" 
+                                        x-model="newKeluarga.jenis_kelamin" 
+                                        required
+                                    >
+                                        <option value="L">Laki-laki</option>
+                                        <option value="P">Perempuan</option>
+                                    </x-form.select>
+                                    
+                                    <x-form.select 
+                                        name="status_tunjangan"
+                                        label="Status Tunjangan" 
+                                        x-model="newKeluarga.status_tunjangan" 
+                                        required
+                                    >
+                                        <option value="1">Ditanggung</option>
+                                        <option value="0">Tidak Ditanggung</option>
+                                    </x-form.select>
                                 </div>
 
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Pekerjaan</label>
-                                    <input type="text" x-model="newKeluarga.pekerjaan" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                </div>
+                                <x-form.input 
+                                    name="pekerjaan"
+                                    label="Pekerjaan" 
+                                    x-model="newKeluarga.pekerjaan" 
+                                />
                             </div>
                         </template>
 
@@ -1053,7 +1084,7 @@
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Deskripsi Pelanggaran</label>
-                                    <textarea x-model="newDisiplin.deskripsi" required placeholder="Keterlambatan absensi berulang" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" rows="2"></textarea>
+                                    <textarea x-model="newDisiplin.deskripsi" required placeholder="Keterlambatan absensi berulang" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans resize-none" rows="2"></textarea>
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Hukuman</label>
@@ -1083,10 +1114,15 @@
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tingkat Pendidikan</label>
                                     <select x-model="newPendidikan.tingkat" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                        <option value="Diploma III (D3)">Diploma III (D3)</option>
-                                        <option value="Sarjana (S1)">Sarjana (S1)</option>
-                                        <option value="Magister (S2)">Magister (S2)</option>
-                                        <option value="Doktor (S3)">Doktor (S3)</option>
+                                        <option value="SD">SD</option>
+                                        <option value="SMP">SMP</option>
+                                        <option value="SMA / SMK / Sederajat">SMA / SMK / Sederajat</option>
+                                        <option value="D1">D1</option>
+                                        <option value="D2">D2</option>
+                                        <option value="D3">D3</option>
+                                        <option value="D4 / S1">D4 / S1</option>
+                                        <option value="S2 / Profesi">S2 / Profesi</option>
+                                        <option value="S3">S3</option>
                                     </select>
                                 </div>
                                 <div class="space-y-1">
@@ -1108,23 +1144,37 @@
                             </div>
                         </template>
 
-                        <div class="border-t border-border pt-4 flex justify-end gap-2.5 mt-6">
-                            <button type="button" @click="showModal = false" :disabled="isSubmitting" class="inline-flex items-center justify-center rounded border border-border bg-surface px-4 py-2 text-xs font-semibold text-ink hover:bg-soft transition font-sans cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                        <div class="border-t border-border pt-6 flex justify-end gap-3 mt-6">
+                            <button 
+                                type="button" 
+                                @click="showModal = false" 
+                                x-bind:disabled="isSubmitting"
+                                class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink hover:bg-soft transition font-sans cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                                </svg>
                                 Batal
                             </button>
-                            <button type="submit" :disabled="isSubmitting" class="inline-flex items-center justify-center rounded bg-primary px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition font-sans cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px]">
-                                <template x-if="!isSubmitting">
-                                    <span>Simpan</span>
-                                </template>
-                                <template x-if="isSubmitting">
-                                    <span class="flex items-center justify-center gap-2">
-                                        <svg class="animate-spin h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                        Menyimpan...
-                                    </span>
-                                </template>
+                            
+                            <button 
+                                type="submit" 
+                                x-bind:disabled="isSubmitting"
+                                class="inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm font-sans cursor-pointer min-w-[130px] disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <span class="flex items-center" x-show="!isSubmitting">
+                                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                    </svg>
+                                    Simpan
+                                </span>
+                                <span class="flex items-center justify-center gap-2" x-show="isSubmitting" style="display: none;">
+                                    <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Menyimpan...
+                                </span>
                             </button>
                         </div>
                     </form>

@@ -188,9 +188,8 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.restore'])
         ->name('data-nonaktif');
 
-    Route::get('/cuti/rekap', function () {
-        return view('admin.cuti.rekap');
-    })->middleware(['role:super_admin,admin_kepegawaian'])
+    Route::get('/cuti/rekap', [CutiController::class, 'rekap'])
+        ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('cuti.rekap');
 
     Route::get('/konfigurasi', [EwsConfigController::class, 'index'])
@@ -725,6 +724,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     })->name('hari-libur.index');
 
     Route::get('/dashboard/cuti', [CutiController::class, 'index'])->name('cuti');
+    Route::get('/dashboard/cuti/create', [CutiController::class, 'create'])
+        ->middleware('permission:cuti.create')
+        ->name('cuti.create');
     Route::post('/dashboard/cuti', [CutiController::class, 'store'])
         ->middleware('permission:cuti.create')
         ->name('cuti.store');

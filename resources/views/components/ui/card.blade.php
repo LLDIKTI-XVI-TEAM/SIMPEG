@@ -9,9 +9,9 @@
     $tag = in_array($as, ['div', 'section', 'article', 'form', 'a'], true) ? $as : 'div';
 
     $variants = [
-        'default' => 'border border-border bg-surface',
-        'soft' => 'border border-border bg-soft',
-        'interactive' => 'border border-border bg-surface transition-colors hover:bg-soft/40',
+        'default' => 'border border-border bg-surface transition-all duration-300',
+        'soft' => 'border border-border bg-soft transition-all duration-300',
+        'interactive' => 'border border-border bg-surface transition-all duration-300 hover:bg-soft/40 hover:-translate-y-1 hover:shadow-lg cursor-pointer',
     ];
 
     $paddings = [
@@ -23,10 +23,10 @@
 @endphp
 
 <{{ $tag }} {{ $attributes->class([
-    'rounded-lg',
+    'rounded-2xl',
     $variants[$variant] ?? $variants['default'],
     $paddings[$padding] ?? $paddings['md'],
-    'shadow-sm' => filter_var($shadow, FILTER_VALIDATE_BOOL),
+    'shadow-md shadow-slate-200/50' => filter_var($shadow, FILTER_VALIDATE_BOOL),
 ]) }}>
     @isset($header)
         <div class="border-b border-border px-5 py-4">

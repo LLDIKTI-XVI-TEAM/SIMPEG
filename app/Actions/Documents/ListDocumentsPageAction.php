@@ -27,7 +27,7 @@ class ListDocumentsPageAction
             ])->values(),
             'categoryLabels' => DocumentCategory::labels(),
             'documentsForTable' => $documents->map(function (Document $document): array {
-                $currentPosition = $document->employee->positionHistories->first();
+                $currentPosition = $document->employee?->positionHistories?->first();
                 $unit = $currentPosition?->unitKerja?->nama ?? '-';
 
                 return [
@@ -38,8 +38,9 @@ class ListDocumentsPageAction
                     'tanggal' => $document->tanggal_dokumen ? $document->tanggal_dokumen->format('Y-m-d') : '-',
                     'kategori' => $document->jenis_dokumen,
                     'kategori_label' => DocumentCategory::label($document->jenis_dokumen),
-                    'nama_pegawai' => $document->employee->nama_lengkap,
-                    'nip_pegawai' => $document->employee->nip,
+                    'nama_pegawai' => $document->employee?->nama_lengkap ?? 'Pegawai Nonaktif',
+                    'nip_pegawai' => $document->employee?->nip ?? '-',
+                    'foto_pegawai' => $document->employee?->foto_url ?? null,
                     'unit_pegawai' => $unit,
                     'file_path' => $document->file_path,
                     'file_size' => $document->fileSizeLabel(),

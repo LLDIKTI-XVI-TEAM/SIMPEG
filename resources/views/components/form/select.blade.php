@@ -67,7 +67,7 @@
             @if ($hasError) aria-invalid="true" @endif
             @if ($describedBy !== '') aria-describedby="{{ $describedBy }}" @endif
             {{ $attributes->class([
-                'w-full appearance-none rounded-lg border bg-surface text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer',
+                'w-full appearance-none rounded-xl border bg-surface text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer transition-all duration-200',
                 $sizes[$size] ?? $sizes['md'],
                 'border-danger focus:border-danger focus:ring-danger/20' => $hasError,
                 'border-border' => ! $hasError,
@@ -94,11 +94,6 @@
             {!! $slotHtml !!}
         </select>
 
-        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-            </svg>
-        </div>
     </div>
 
     @if ($help)

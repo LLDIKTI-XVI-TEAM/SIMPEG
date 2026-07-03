@@ -612,7 +612,7 @@
                                 </div>
                                 <div class="flex justify-between border-b border-border pb-1">
                                     <span class="font-semibold text-muted">Status Dokumen:</span>
-                                    <span class="inline-flex items-center gap-1 rounded bg-success/15 px-1.5 py-0.2 text-[9px] font-bold text-success uppercase">VERIFIED</span>
+                                    <span class="inline-flex items-center gap-1 rounded-md bg-success/10 px-1.5 py-0.2 text-[9px] font-bold text-success uppercase">VERIFIED</span>
                                 </div>
                             </div>
                         </div>

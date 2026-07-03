@@ -13,6 +13,7 @@ use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class EmployeeDocumentTest extends TestCase
@@ -229,7 +230,9 @@ class EmployeeDocumentTest extends TestCase
         $response = $this->get("/dashboard/dokumen/{$document->id}/download");
 
         $response->assertOk();
-        $response->assertHeader('Content-Disposition', 'attachment; filename='.basename($filePath));
+
+        $expectedFilename = Str::slug($employee->nama_lengkap ?? 'pegawai').'-'.Str::slug($document->nama_dokumen).'.pdf';
+        $response->assertDownload($expectedFilename);
     }
 
     public function test_document_routes_reject_malformed_ids_before_controller_lookup(): void

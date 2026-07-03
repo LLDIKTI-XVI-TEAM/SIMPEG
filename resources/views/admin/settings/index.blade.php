@@ -440,11 +440,11 @@
                                                 size="xs"
                                                 uppercase
                                                 x-bind:class="{
-                                                    'border-danger/20 bg-danger/10 text-danger': user.role === 'super_admin',
-                                                    'border-primary/20 bg-primary/10 text-primary': user.role === 'admin_kepegawaian',
-                                                    'border-info/25 bg-info/10 text-info': user.role === 'pimpinan',
-                                                    'border-warning/25 bg-warning/10 text-warning': user.role === 'atasan_langsung',
-                                                    'border-success/20 bg-success/10 text-success': user.role === 'pegawai'
+                                                    'bg-danger/10 text-danger': user.role === 'super_admin',
+                                                    'bg-primary/10 text-primary': user.role === 'admin_kepegawaian',
+                                                    'bg-info/10 text-info': user.role === 'pimpinan',
+                                                    'bg-warning/10 text-warning': user.role === 'atasan_langsung',
+                                                    'bg-success/10 text-success': user.role === 'pegawai'
                                                 }"
                                                 x-text="user.role"
                                             ></x-ui.badge>

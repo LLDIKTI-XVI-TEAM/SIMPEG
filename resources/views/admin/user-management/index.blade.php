@@ -184,11 +184,11 @@
                                            size="xs"
                                            uppercase
                                            x-bind:class="{
-                                               'border-danger/20 bg-danger/10 text-danger': emp.role === 'super_admin',
-                                               'border-primary/20 bg-primary/10 text-primary': emp.role === 'admin_kepegawaian',
-                                               'border-border bg-soft text-muted': emp.role === 'pimpinan',
-                                               'border-warning/25 bg-warning/10 text-warning': emp.role === 'atasan_langsung',
-                                               'border-success/20 bg-success/10 text-success': emp.role === 'pegawai'
+                                               'bg-danger/10 text-danger': emp.role === 'super_admin',
+                                               'bg-primary/10 text-primary': emp.role === 'admin_kepegawaian',
+                                               'bg-soft text-muted': emp.role === 'pimpinan',
+                                               'bg-warning/10 text-warning': emp.role === 'atasan_langsung',
+                                               'bg-success/10 text-success': emp.role === 'pegawai'
                                            }"
                                            x-text="emp.role"
                                      ></x-ui.badge>
@@ -198,7 +198,7 @@
                                           variant="none"
                                           size="xs"
                                           dot
-                                          x-bind:class="emp.is_connected ? 'border-success/20 bg-success/10 text-success' : 'border-danger/20 bg-danger/10 text-danger'">
+                                          x-bind:class="emp.is_connected ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'">
                                         <span x-text="emp.is_connected ? 'Terhubung' : 'Belum Terhubung'"></span>
                                     </x-ui.badge>
                                 </x-ui.table-td>

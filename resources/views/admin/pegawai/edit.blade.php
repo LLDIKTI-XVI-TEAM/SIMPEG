@@ -40,7 +40,7 @@
 
         {{-- Validation Errors --}}
         @if ($errors->any())
-            <div class="rounded-lg bg-red-50 p-4 border border-red-200">
+            <div class="mb-4 rounded-lg bg-red-50 p-4 border border-red-200">
                 <div class="flex">
                     <div class="flex-shrink-0">
                         <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -48,14 +48,7 @@
                         </svg>
                     </div>
                     <div class="ml-3">
-                        <h3 class="text-sm font-medium text-red-800">Terdapat kesalahan pengisian form:</h3>
-                        <div class="mt-2 text-sm text-red-700">
-                            <ul role="list" class="list-disc space-y-1 pl-5">
-                                @foreach ($errors->all() as $error)
-                                    <li>{{ $error }}</li>
-                                @endforeach
-                            </ul>
-                        </div>
+                        <h3 class="text-sm font-medium text-red-800">Terdapat kesalahan pengisian form</h3>
                     </div>
                 </div>
             </div>
@@ -65,10 +58,10 @@
         <div class="rounded-lg border border-border bg-surface p-6 shadow-sm" x-data="{
             activeTab: 'utama',
             subTab: 'pangkat',
-            nip: '{{ $p->nip ?? '' }}',
+            nip: '{{ old('nip', $p->nip ?? '') }}',
             nipError: '',
-            nik: '{{ $p->nik ?? '' }}',
-            kk: '{{ $p->no_kk ?? '' }}',
+            nik: '{{ old('nik', $p->nik ?? '') }}',
+            kk: '{{ old('kk', $p->no_kk ?? '') }}',
             nikError: '',
             kkError: '',
             fotoPreview: @js($fotoUrl),
@@ -480,15 +473,7 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
                                 </svg>
                                 @if($currentJenisPegawai)
-                                    @php
-                                        $badgeClass = match($currentJenisPegawai->nama) {
-                                            'PNS'  => 'bg-blue-100 text-blue-700',
-                                            'PPPK' => 'bg-green-100 text-green-700',
-                                            'CPNS' => 'bg-yellow-100 text-yellow-700',
-                                            default => 'bg-surface text-ink border border-border',
-                                        };
-                                    @endphp
-                                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold {{ $badgeClass }}">{{ $currentJenisPegawai->nama }}</span>
+                                    <x-ui.badge variant="primary" size="md" class="!font-bold">{{ $currentJenisPegawai->nama }}</x-ui.badge>
                                 @else
                                     <span class="text-muted">-</span>
                                 @endif
@@ -730,7 +715,7 @@
                                         :src="fotoPreview"
                                         src="{{ $fotoUrl ?? '' }}"
                                         alt="Foto {{ $p->nama_lengkap }}"
-                                        class="h-full w-full object-cover"
+                                        class="h-full w-full object-cover object-[center_25%]"
                                         @if(! $fotoUrl) style="display: none;" @endif
                                     >
                                     <div x-show="!fotoPreview" @if($fotoUrl) style="display: none;" @endif>
@@ -811,7 +796,7 @@
                             <label for="pangkat_history_id" class="text-xs font-bold text-primary uppercase tracking-wider font-sans">Pilih Riwayat Kepangkatan</label>
                             <div class="relative">
                                 <select id="pangkat_history_id" name="pangkat_history_id" x-model="selectedPangkatId" @change="loadPangkatData()" class="w-full appearance-none rounded-lg border border-primary/50 bg-primary/5 px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer font-semibold">
-                                    <option value="new">-- ✨ Tambah Riwayat Baru --</option>
+                                    <option value="new">-- Tambah Riwayat Baru --</option>
                                     @foreach($p->rankHistories->sortByDesc('tmt_pangkat') as $rh)
                                         <option value="{{ $rh->id }}">Edit Riwayat: {{ $rh->golongan->nama }} (TMT: {{ $rh->tmt_pangkat ? $rh->tmt_pangkat->format('d-m-Y') : '-' }}) {{ $rh->is_latest ? '[Terbaru]' : '' }}</option>
                                     @endforeach
@@ -932,7 +917,7 @@
                             <label for="jabatan_history_id" class="text-xs font-bold text-primary uppercase tracking-wider font-sans">Pilih Riwayat Jabatan</label>
                             <div class="relative">
                                 <select id="jabatan_history_id" name="jabatan_history_id" x-model="selectedJabatanId" @change="loadJabatanData()" class="w-full appearance-none rounded-lg border border-primary/50 bg-primary/5 px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer font-semibold">
-                                    <option value="new">-- ✨ Tambah Riwayat Baru --</option>
+                                    <option value="new">-- Tambah Riwayat Baru --</option>
                                     @foreach($p->positionHistories->sortByDesc('tmt_jabatan') as $jh)
                                         <option value="{{ $jh->id }}">Edit Riwayat: {{ $jh->nama_jabatan }} (TMT: {{ $jh->tmt_jabatan ? $jh->tmt_jabatan->format('d-m-Y') : '-' }}) {{ $jh->is_latest ? '[Terbaru]' : '' }}</option>
                                     @endforeach
@@ -1080,7 +1065,7 @@
                             <label for="kgb_history_id" class="text-xs font-bold text-primary uppercase tracking-wider font-sans">Pilih Riwayat KGB</label>
                             <div class="relative">
                                 <select id="kgb_history_id" name="kgb_history_id" x-model="selectedKgbId" @change="loadKgbData()" class="w-full appearance-none rounded-lg border border-primary/50 bg-primary/5 px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer font-semibold">
-                                    <option value="new">-- ✨ Tambah Riwayat Baru --</option>
+                                    <option value="new">-- Tambah Riwayat Baru --</option>
                                     @foreach($p->salaryHistories->sortByDesc('tmt_kgb') as $sh)
                                         <option value="{{ $sh->id }}">Edit Riwayat: Rp {{ number_format($sh->gaji_pokok, 0, ',', '.') }} (TMT: {{ $sh->tmt_kgb ? $sh->tmt_kgb->format('d-m-Y') : '-' }}) {{ $sh->is_latest ? '[Terbaru]' : '' }}</option>
                                     @endforeach

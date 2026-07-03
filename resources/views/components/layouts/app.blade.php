@@ -148,8 +148,8 @@
                 [
                     'group' => 'EWS & Notifikasi',
                     'items' => [
-                        ['label' => 'EWS Aktif', 'route' => 'ews', 'icon' => 'exclamation-triangle'],
                         ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
+                        ['label' => 'EWS Aktif', 'route' => 'ews', 'icon' => 'exclamation-triangle'],
                         ['label' => 'Konfigurasi EWS', 'route' => 'ews.config', 'icon' => 'cog-6-tooth'],
                     ]
                 ],
@@ -243,7 +243,7 @@
                             @elseif($menu['icon'] === 'bell')
                                 <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" /></svg>
                             @elseif($menu['icon'] === 'folder-open')
-                                <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 13.5h3.86a2.25 2.25 0 0 1 2.008 1.24l.885 1.77a2.25 2.25 0 0 0 2.007 1.24h1.98a2.25 2.25 0 0 0 2.007-1.24l.885-1.77a2.25 2.25 0 0 1 2.007-1.24h3.86m-18 0h18a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v4.5m18 0V17.25a2.25 2.25 0 0 1-2.25 2.25H4.5a2.25 2.25 0 0 1-2.25-2.25V13.5" /></svg>
+                                <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0A2.25 2.25 0 0 0 1.5 12v4.5c0 1.242 1.008 2.25 2.25 2.25h16.5A2.25 2.25 0 0 0 22.5 16.5V12a2.25 2.25 0 0 0-2.25-2.224M3.75 9.776V7.5a2.25 2.25 0 0 1 2.25-2.25h4.018c.22 0 .432.087.588.24l1.341 1.341c.156.153.368.24.588.24h4.72a2.25 2.25 0 0 1 2.25 2.25v.276m-16.5 0V18" /></svg>
                             @elseif($menu['icon'] === 'document-arrow-up')
                                 <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5h10.5a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 16.5 4.5H7.5A2.25 2.25 0 0 0 5.25 6.75v10.5A2.25 2.25 0 0 0 6.75 19.5Z" /></svg>
                             @elseif($menu['icon'] === 'document-arrow-down')
@@ -286,7 +286,7 @@
                     <p class="truncate text-sm font-semibold text-ink">
                         {{ auth()->user()->name ?? 'Pengguna' }}
                     </p>
-                    <p class="truncate text-xs text-muted">{{ $activeRole }}</p>
+                    <p class="truncate text-xs text-muted">{{ ucwords(str_replace('_', ' ', $activeRole)) }}</p>
                 </div>
             </div>
         </div>
@@ -298,7 +298,7 @@
     <div class="flex flex-1 flex-col min-w-0 overflow-hidden">
 
         {{-- NAVBAR --}}
-        <header class="sticky top-0 z-40 flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface px-4 lg:px-6">
+        <header class="sticky top-0 z-40 flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface/80 backdrop-blur-md px-4 lg:px-6">
 
             {{-- Left: Hamburger (mobile only) + Search --}}
             <div class="flex items-center gap-4 w-full max-w-sm">
@@ -334,30 +334,25 @@
 
                     {{-- Search Dropdown --}}
                     <div
-                        x-show="showDropdown && (Object.keys(searchResults).length > 0 || isSearching)"
+                        x-show="showDropdown && Object.keys(searchResults).length > 0"
                         class="absolute top-full left-0 mt-1 w-full max-h-96 overflow-y-auto rounded-lg border border-border bg-surface shadow-lg z-50 p-2"
                         style="display: none;"
                     >
-                        <template x-if="isSearching">
-                            <div class="p-3 text-center text-sm text-muted">Mencari...</div>
-                        </template>
-                        <template x-if="!isSearching && Object.keys(searchResults).length > 0">
-                            <div>
-                                <template x-for="(group, title) in searchResults" :key="title">
-                                    <div class="mb-2 last:mb-0">
-                                        <div class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted/60" x-text="title"></div>
-                                        <div class="space-y-1">
-                                            <template x-for="item in group" :key="item.url">
-                                                <a :href="item.url" class="block rounded-md px-3 py-2 text-sm text-ink hover:bg-soft transition-colors">
-                                                    <div class="font-medium" x-text="item.title"></div>
-                                                    <div class="text-xs text-muted mt-0.5" x-show="item.subtitle" x-text="item.subtitle"></div>
-                                                </a>
-                                            </template>
-                                        </div>
+                        <div>
+                            <template x-for="(group, title) in searchResults" :key="title">
+                                <div class="mb-2 last:mb-0">
+                                    <div class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted/60" x-text="title"></div>
+                                    <div class="space-y-1">
+                                        <template x-for="item in group" :key="item.url">
+                                            <a :href="item.url" class="block rounded-md px-3 py-2 text-sm text-ink hover:bg-soft transition-colors">
+                                                <div class="font-medium" x-text="item.title"></div>
+                                                <div class="text-xs text-muted mt-0.5" x-show="item.subtitle" x-text="item.subtitle"></div>
+                                            </a>
+                                        </template>
                                     </div>
-                                </template>
-                            </div>
-                        </template>
+                                </div>
+                            </template>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -383,9 +378,9 @@
                             <p class="text-sm font-semibold leading-tight text-ink font-sans">
                                 {{ auth()->user()->name ?? 'Pengguna' }}
                             </p>
-                            <p class="text-[11px] leading-tight text-muted font-sans">{{ $activeRole }}</p>
+                            <p class="text-[11px] leading-tight text-muted font-sans">{{ ucwords(str_replace('_', ' ', $activeRole)) }}</p>
                         </div>
-                        <svg class="w-4 h-4 text-muted shrink-0 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+                        
                     </button>
 
                     <div
@@ -448,7 +443,7 @@
 
 
         {{-- PAGE CONTENT --}}
-        <main class="flex-1 overflow-y-auto bg-page">
+        <main class="flex-1 overflow-y-auto bg-page scrollbar-hide">
             <div class="mx-auto max-w-7xl px-4 py-6 lg:px-6">
                 @php($sessionTimeoutMessage = session()->pull('simpeg_session_timeout_message'))
                 @if ($sessionTimeoutMessage)
@@ -485,10 +480,10 @@
         >
             <div
                 :class="{
-                    'bg-success/10 text-success': toast.type === 'success',
-                    'bg-danger/10 text-danger': toast.type === 'error',
-                    'bg-warning/10 text-warning': toast.type === 'warning',
-                    'bg-info/10 text-info': toast.type === 'info',
+                    'text-success': toast.type === 'success',
+                    'text-danger': toast.type === 'error',
+                    'text-warning': toast.type === 'warning',
+                    'text-info': toast.type === 'info',
                 }"
                 class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
             >
@@ -578,6 +573,9 @@
         Alpine.data('toastManager', () => ({
             toasts: [],
             addToast(toast) {
+                // Prevent duplicate toasts (spam protection)
+                if (this.toasts.some(t => t.title === toast.title && t.message === toast.message)) return;
+
                 const id = Date.now() + Math.random().toString(36).substr(2, 9);
                 this.toasts.push({ ...toast, id, show: false });
 

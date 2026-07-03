@@ -2,7 +2,7 @@
     'variant' => 'muted',
     'size' => 'sm',
     'dot' => false,
-    'pill' => true,
+    'pill' => false,
     'uppercase' => false,
 ])
 
@@ -15,31 +15,31 @@
 
     $variants = [
         'primary' => [
-            'box' => 'border-primary/20 bg-primary/10 text-primary',
+            'box' => 'bg-primary/10 text-primary',
             'dot' => 'bg-primary',
         ],
         'success' => [
-            'box' => 'border-success/20 bg-success/10 text-success',
+            'box' => 'bg-success/10 text-success',
             'dot' => 'bg-success',
         ],
         'danger' => [
-            'box' => 'border-danger/20 bg-danger/10 text-danger',
+            'box' => 'bg-danger/10 text-danger',
             'dot' => 'bg-danger',
         ],
         'warning' => [
-            'box' => 'border-warning/25 bg-warning/10 text-warning',
+            'box' => 'bg-warning/10 text-warning',
             'dot' => 'bg-warning',
         ],
         'info' => [
-            'box' => 'border-info/25 bg-info/10 text-info',
+            'box' => 'bg-info/10 text-info',
             'dot' => 'bg-info',
         ],
         'muted' => [
-            'box' => 'border-border bg-soft text-muted',
+            'box' => 'bg-soft text-muted',
             'dot' => 'bg-muted',
         ],
         'ink' => [
-            'box' => 'border-border bg-surface text-ink',
+            'box' => 'bg-surface text-ink',
             'dot' => 'bg-ink',
         ],
         'none' => [
@@ -58,7 +58,7 @@
 @endphp
 
 <span {{ $attributes->class([
-    'inline-flex items-center gap-1.5 border font-semibold font-sans leading-none',
+    'inline-flex items-center gap-1.5 font-medium font-sans leading-none',
     $sizes[$size] ?? $sizes['sm'],
     $current['box'],
     'rounded-full' => filter_var($pill, FILTER_VALIDATE_BOOL),
