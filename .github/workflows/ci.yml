@@ -9,6 +9,10 @@ on:
   push:
     branches: [development]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   qa:
     name: Pint + PHPStan + Test
@@ -78,5 +82,11 @@ jobs:
         # Tanpa build ini, test yang merender view gagal 500 (ViteManifestNotFoundException).
         run: npm run build
 
-      - name: Run quality gate (format check, static analysis, tests)
-        run: composer qa
+      - name: Run Pint format check
+        run: composer format:check
+
+      - name: Run PHPStan static analysis
+        run: composer analyse
+
+      - name: Run Laravel tests
+        run: composer test
