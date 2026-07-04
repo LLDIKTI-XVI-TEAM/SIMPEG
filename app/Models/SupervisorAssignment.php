@@ -12,9 +12,11 @@ use Illuminate\Support\Carbon;
  * @property string $id
  * @property string $employee_id
  * @property string $supervisor_id
+ * @property string|null $kepala_bagian_id
  * @property Carbon $tanggal_mulai
  * @property Carbon|null $tanggal_berakhir
  * @property-read Employee|null $supervisor
+ * @property-read Employee|null $kepalaBagian
  */
 class SupervisorAssignment extends Model
 {

@@ -10,11 +10,14 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
+ * @property string|null $jabatan_id
  * @property string $nama_jabatan
+ * @property string|null $kelas_jabatan
  * @property string|null $no_sk
  * @property string|null $file_sk
  * @property Carbon $tmt_jabatan
  * @property Carbon|null $tanggal_sk
+ * @property-read RefJabatan|null $jabatan
  * @property-read RefUnitKerja|null $unitKerja
  */
 class PositionHistory extends Model
@@ -57,6 +60,7 @@ class PositionHistory extends Model
         return $this->belongsTo(RefJenisJabatan::class, 'jenis_jabatan_id');
     }
 
+    /** @return BelongsTo<RefJabatan, $this> */
     public function jabatan(): BelongsTo
     {
         return $this->belongsTo(RefJabatan::class, 'jabatan_id');

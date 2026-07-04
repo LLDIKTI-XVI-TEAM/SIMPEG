@@ -22,7 +22,14 @@ use Illuminate\Support\Carbon;
  * @property string|null $jabatan_terakhir
  * @property string|null $golongan_terakhir
  * @property string|null $jenis_pegawai_id
+ * @property string|null $status_aktif
+ * @property string|null $status_pegawai_id
  * @property string|null $atasan_langsung_id
+ * @property string|null $kepala_bagian_id
+ * @property string|null $kelas_jabatan
+ * @property string|null $kelas_jabatan_terakhir
+ * @property string|null $email
+ * @property string|null $email_pribadi
  * @property Carbon|null $tanggal_lahir
  * @property Carbon|null $tanggal_pensiun
  * @property Carbon|null $tanggal_kenaikan_pangkat_berikutnya
@@ -32,6 +39,7 @@ use Illuminate\Support\Carbon;
  * @property bool $is_kinerja_baik
  * @property-read RefJenisPegawai|null $jenisPegawai
  * @property-read Employee|null $atasanLangsung
+ * @property-read Employee|null $kepalaBagian
  * @property-read Collection<int, PositionHistory> $positionHistories
  * @property-read Collection<int, DisciplineRecord> $disciplineRecords
  */
