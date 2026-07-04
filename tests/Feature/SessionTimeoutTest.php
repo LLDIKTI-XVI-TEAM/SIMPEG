@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Services\AuditService;
+use Database\Seeders\DemoSsoUserSeeder;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -104,11 +105,14 @@ class SessionTimeoutTest extends TestCase
 
     public function test_dev_login_preserves_timeout_message_after_session_regeneration(): void
     {
-        User::factory()->superAdmin()->create(['email' => 'demo@example.com']);
+        $this->seed(DemoSsoUserSeeder::class);
 
         $this->withSession([
             'simpeg_session_timeout_message' => 'Sesi Anda telah berakhir. Silakan login kembali.',
-        ])->get(route('dev-login'))
+        ])->post(route('dev-login'), [
+            'username' => 'demo-klabat',
+            'password' => 'demo-klabat',
+        ])
             ->assertRedirect(route('dashboard'));
 
         $response = $this->get(route('dashboard'));

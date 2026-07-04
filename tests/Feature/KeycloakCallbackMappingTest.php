@@ -7,6 +7,7 @@ use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 use Tests\TestCase;
@@ -415,6 +416,27 @@ class KeycloakCallbackMappingTest extends TestCase
         $this->assertDatabaseMissing('users', [
             'email' => 'test@example.com',
         ]);
+    }
+
+    public function test_database_seeder_creates_all_configured_demo_role_users(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+
+        $expectedUsers = [
+            'demo-klabat' => 'super_admin',
+            'demo-klabat-kepeg' => 'admin_kepegawaian',
+            'demo-klabat-kabag' => 'atasan_langsung',
+            'demo-klabat-pimpinan' => 'pimpinan',
+            'demo-klabat-pegawai' => 'pegawai',
+        ];
+
+        foreach ($expectedUsers as $username => $role) {
+            $user = User::where('keycloak_username', $username)->first();
+
+            $this->assertNotNull($user, "Demo user {$username} should exist.");
+            $this->assertSame($role, $user->role);
+            $this->assertTrue(Hash::check($username, $user->password), "Demo user {$username} should use matching password.");
+        }
     }
 
     public function test_no_keycloak_local_fallback_user_is_created(): void

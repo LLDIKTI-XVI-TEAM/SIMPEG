@@ -36,6 +36,28 @@ class ExampleTest extends TestCase
         );
     }
 
+    public function test_dev_login_page_redirects_to_keycloak(): void
+    {
+        $response = $this->get('/dev-login');
+
+        $response->assertStatus(302);
+        $this->assertStringStartsWith(
+            'https://sso-lldikti16.kemdiktisaintek.go.id/realms/sso/protocol/openid-connect/auth',
+            $response->headers->get('Location'),
+        );
+    }
+
+    public function test_keycloak_login_redirects_to_keycloak(): void
+    {
+        $response = $this->get('/login/keycloak');
+
+        $response->assertStatus(302);
+        $this->assertStringStartsWith(
+            'https://sso-lldikti16.kemdiktisaintek.go.id/realms/sso/protocol/openid-connect/auth',
+            $response->headers->get('Location'),
+        );
+    }
+
     public function test_authenticated_dashboard_renders(): void
     {
         $user = User::factory()->pegawai()->create();

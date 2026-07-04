@@ -20,9 +20,7 @@ use App\Http\Controllers\Auth\KeycloakAuthController;
 use App\Models\Employee;
 use App\Models\Permission;
 use App\Models\Role;
-use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -38,31 +36,13 @@ Route::get('/', function () {
 })->name('home');
 
 Route::get('/login', [KeycloakAuthController::class, 'redirectToKeycloak'])->name('login');
+Route::get('/login/keycloak', [KeycloakAuthController::class, 'redirectToKeycloak'])->name('auth.keycloak.redirect');
 Route::get('/auth/keycloak/callback', [KeycloakAuthController::class, 'handleCallback'])->name('auth.keycloak.callback');
 Route::post('/logout', [KeycloakAuthController::class, 'logout'])->name('logout');
 
 if (app()->environment(['local', 'testing'])) {
-    Route::get('/dev-login', function () {
-        $user = User::where('email', 'demo@example.com')->first()
-            ?? User::where('role', 'super_admin')->first();
-
-        if (! $user) {
-            $user = User::create([
-                'name' => 'Demo Klabat',
-                'email' => 'demo@example.com',
-                'password' => bcrypt('password'),
-                'role' => 'super_admin',
-            ]);
-        } else {
-            $user->name = 'Demo Klabat';
-            $user->role = 'super_admin';
-            $user->save();
-        }
-        Auth::login($user);
-        session(['active_role' => $user->role ?? 'super_admin']);
-
-        return redirect()->route('dashboard')->with('login_success', 'Selamat Datang! Anda berhasil masuk ke dalam sistem (Mode Dev).');
-    })->name('dev-login');
+    Route::get('/dev-login', [KeycloakAuthController::class, 'redirectToKeycloak']);
+    Route::post('/dev-login', [KeycloakAuthController::class, 'demoLogin'])->name('dev-login');
 
     Route::get('/set-super-admin', function () {
         $user = auth()->user();

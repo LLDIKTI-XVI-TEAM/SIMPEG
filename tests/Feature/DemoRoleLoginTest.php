@@ -1,0 +1,68 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\User;
+use Database\Seeders\DemoSsoUserSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class DemoRoleLoginTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_demo_role_user_can_login_with_matching_password(): void
+    {
+        $this->seed(DemoSsoUserSeeder::class);
+
+        $response = $this->post(route('dev-login'), [
+            'username' => 'demo-klabat-kepeg',
+            'password' => 'demo-klabat-kepeg',
+        ]);
+
+        $response->assertRedirect(route('dashboard'));
+        $this->assertAuthenticated();
+        $this->assertSame('admin_kepegawaian', auth()->user()->role);
+        $this->assertSame('admin_kepegawaian', session('active_role'));
+    }
+
+    public function test_demo_kabag_login_uses_current_internal_stage_one_role(): void
+    {
+        $this->seed(DemoSsoUserSeeder::class);
+
+        $this->post(route('dev-login'), [
+            'username' => 'demo-klabat-kabag',
+            'password' => 'demo-klabat-kabag',
+        ])->assertRedirect(route('dashboard'));
+
+        $this->assertAuthenticated();
+        $this->assertSame('atasan_langsung', auth()->user()->role);
+    }
+
+    public function test_demo_login_rejects_wrong_password(): void
+    {
+        $this->seed(DemoSsoUserSeeder::class);
+
+        $this->post(route('dev-login'), [
+            'username' => 'demo-klabat-pimpinan',
+            'password' => 'salah',
+        ])->assertSessionHasErrors('username');
+
+        $this->assertGuest();
+    }
+
+    public function test_demo_login_rejects_non_demo_user_even_with_valid_password(): void
+    {
+        User::factory()->pegawai()->create([
+            'keycloak_username' => 'pegawai-biasa',
+            'password' => 'pegawai-biasa',
+        ]);
+
+        $this->post(route('dev-login'), [
+            'username' => 'pegawai-biasa',
+            'password' => 'pegawai-biasa',
+        ])->assertSessionHasErrors('username');
+
+        $this->assertGuest();
+    }
+}
