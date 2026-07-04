@@ -38,11 +38,13 @@ class SendSimpegNotificationEmailJob implements ShouldQueue
     {
         $employee = Employee::find($this->employeeId);
 
-        if ($employee === null || $employee->email === null || $employee->email === '') {
+        $email = $employee?->email_pribadi ?? $employee?->email;
+
+        if ($employee === null || $email === null || $email === '') {
             return;
         }
 
-        Mail::to($employee->email)->send(new SimpegNotificationMail(
+        Mail::to($email)->send(new SimpegNotificationMail(
             $this->title,
             $this->body,
             $this->data,

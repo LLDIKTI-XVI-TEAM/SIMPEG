@@ -6,9 +6,11 @@ use App\Models\Employee;
 use App\Models\RefAgama;
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
+use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPerkawinan;
+use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
 
 class PrepareEmployeeEditFormDataAction
@@ -23,6 +25,7 @@ class PrepareEmployeeEditFormDataAction
     {
         $p = Employee::with([
             'appointment',
+            'positionHistories.jabatan',
             'positionHistories.unitKerja',
             'positionHistories.jenisJabatan',
             'rankHistories.golongan',
@@ -34,7 +37,9 @@ class PrepareEmployeeEditFormDataAction
         $agama = RefAgama::all();
         $statusKawin = RefStatusPerkawinan::all();
         $unitKerja = RefUnitKerja::all();
+        $jabatanOptions = RefJabatan::with('jenisJabatan')->orderBy('nama')->get();
         $jenisJabatanOptions = RefJenisJabatan::all();
+        $statusPegawai = RefStatusPegawai::orderByDesc('is_default')->orderBy('nama')->get();
         $golonganRefOptions = RefGolongan::orderBy('kode')->get();
         $eselonOptions = RefEselon::orderBy('nama')->get();
 
@@ -97,7 +102,9 @@ class PrepareEmployeeEditFormDataAction
             'agama',
             'statusKawin',
             'unitKerja',
+            'jabatanOptions',
             'jenisJabatanOptions',
+            'statusPegawai',
             'golonganRefOptions',
             'eselonOptions',
             'arsipPangkat',

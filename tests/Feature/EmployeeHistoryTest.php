@@ -7,6 +7,7 @@ use App\Models\Permission;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\RefGolongan;
+use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefUnitKerja;
 use App\Models\Role;
@@ -352,12 +353,22 @@ class EmployeeHistoryTest extends TestCase
         $employee = Employee::factory()->create(['tanggal_lahir' => '1980-06-15']);
         $jenisJabatan = RefJenisJabatan::where('nama', 'Struktural')->firstOrFail();
         $unitKerja = RefUnitKerja::firstOrFail();
+        $jabatanLama = RefJabatan::firstOrCreate(
+            ['nama' => 'Jabatan Lama'],
+            ['jenis_jabatan_id' => $jenisJabatan->id]
+        );
+        $jabatanBaru = RefJabatan::firstOrCreate(
+            ['nama' => 'Kepala Bagian Umum'],
+            ['jenis_jabatan_id' => $jenisJabatan->id]
+        );
 
         $oldHistory = PositionHistory::create([
             'employee_id' => $employee->id,
+            'jabatan_id' => $jabatanLama->id,
             'nama_jabatan' => 'Jabatan Lama',
             'jenis_jabatan_id' => $jenisJabatan->id,
             'unit_kerja_id' => $unitKerja->id,
+            'kelas_jabatan' => '7',
             'tmt_jabatan' => '2020-01-01',
             'no_sk' => 'SK-POS-OLD',
             'tanggal_sk' => '2020-01-10',
@@ -366,9 +377,10 @@ class EmployeeHistoryTest extends TestCase
 
         $this->actingAs($user);
         $response = $this->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/riwayat-jabatan", [
-            'nama_jabatan' => 'Kepala Bagian Umum',
+            'jabatan_id' => $jabatanBaru->id,
             'jenis_jabatan_id' => $jenisJabatan->id,
             'unit_kerja_id' => $unitKerja->id,
+            'kelas_jabatan' => '9',
             'tmt_jabatan' => '2026-03-01',
             'no_sk' => 'SK-POS-001',
             'tanggal_sk' => '2026-03-10',
@@ -381,12 +393,15 @@ class EmployeeHistoryTest extends TestCase
         $this->assertFalse($oldHistory->fresh()->is_latest);
         $this->assertDatabaseHas('position_histories', [
             'employee_id' => $employee->id,
+            'jabatan_id' => $jabatanBaru->id,
             'nama_jabatan' => 'Kepala Bagian Umum',
+            'kelas_jabatan' => '9',
             'is_latest' => true,
         ]);
         $this->assertDatabaseHas('employees', [
             'id' => $employee->id,
             'jabatan_terakhir' => 'Kepala Bagian Umum',
+            'kelas_jabatan_terakhir' => '9',
         ]);
         $this->assertSame('2040-06-15', $employee->fresh()->tanggal_pensiun->format('Y-m-d'));
         $this->assertDatabaseHas('audit_logs', [
@@ -400,17 +415,28 @@ class EmployeeHistoryTest extends TestCase
         $user = User::factory()->adminKepegawaian()->create();
         $jenisJabatan = RefJenisJabatan::where('nama', 'Struktural')->firstOrFail();
         $unitKerja = RefUnitKerja::firstOrFail();
+        $jabatanLama = RefJabatan::firstOrCreate(
+            ['nama' => 'Jabatan Lama'],
+            ['jenis_jabatan_id' => $jenisJabatan->id]
+        );
+        $jabatanTerbaru = RefJabatan::firstOrCreate(
+            ['nama' => 'Kepala Bagian Umum'],
+            ['jenis_jabatan_id' => $jenisJabatan->id]
+        );
         $employee = Employee::factory()->create([
             'tanggal_lahir' => '1980-06-15',
             'jabatan_terakhir' => 'Kepala Bagian Umum',
+            'kelas_jabatan_terakhir' => '9',
             'tanggal_pensiun' => '2040-06-15',
         ]);
 
         $latestHistory = PositionHistory::create([
             'employee_id' => $employee->id,
+            'jabatan_id' => $jabatanTerbaru->id,
             'nama_jabatan' => 'Kepala Bagian Umum',
             'jenis_jabatan_id' => $jenisJabatan->id,
             'unit_kerja_id' => $unitKerja->id,
+            'kelas_jabatan' => '9',
             'tmt_jabatan' => '2026-03-01',
             'no_sk' => 'SK-POS-LATEST',
             'tanggal_sk' => '2026-03-10',
@@ -419,9 +445,10 @@ class EmployeeHistoryTest extends TestCase
 
         $this->actingAs($user);
         $response = $this->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/riwayat-jabatan", [
-            'nama_jabatan' => 'Jabatan Lama',
+            'jabatan_id' => $jabatanLama->id,
             'jenis_jabatan_id' => $jenisJabatan->id,
             'unit_kerja_id' => $unitKerja->id,
+            'kelas_jabatan' => '7',
             'tmt_jabatan' => '2024-01-01',
             'no_sk' => 'SK-POS-BACKDATED',
             'tanggal_sk' => '2024-01-10',
@@ -432,6 +459,7 @@ class EmployeeHistoryTest extends TestCase
         $this->assertTrue($latestHistory->fresh()->is_latest);
         $employee->refresh();
         $this->assertSame('Kepala Bagian Umum', $employee->jabatan_terakhir);
+        $this->assertSame('9', $employee->kelas_jabatan_terakhir);
         $this->assertSame('2040-06-15', $employee->tanggal_pensiun->format('Y-m-d'));
     }
 

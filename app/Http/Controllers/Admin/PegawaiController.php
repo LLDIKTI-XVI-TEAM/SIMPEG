@@ -22,9 +22,11 @@ use App\Models\PositionHistory;
 use App\Models\RefAgama;
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
+use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPerkawinan;
+use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -44,7 +46,10 @@ class PegawaiController extends Controller
         $jenisPegawaiOptions = RefJenisPegawai::query()
             ->orderBy('nama')
             ->get(['id', 'nama']);
-        $statusOptions = ['Aktif', 'Non-Aktif', 'Pensiun', 'Mutasi'];
+        $statusOptions = RefStatusPegawai::query()
+            ->orderByDesc('is_default')
+            ->orderBy('nama')
+            ->get(['id', 'nama']);
         $golonganOptions = Employee::query()
             ->whereNotNull('golongan_terakhir')
             ->distinct()
@@ -64,6 +69,7 @@ class PegawaiController extends Controller
             'golongan' => trim((string) $request->query('golongan', '')),
             'unit_kerja_id' => trim((string) $request->query('unit_kerja_id', '')),
             'jenis_pegawai_id' => trim((string) $request->query('jenis_pegawai_id', '')),
+            'status_pegawai_id' => trim((string) $request->query('status_pegawai_id', '')),
             'status_aktif' => trim((string) $request->query('status_aktif', '')),
         ];
 
@@ -91,6 +97,10 @@ class PegawaiController extends Controller
             };
         }
 
+        if ($filters['status_pegawai_id'] === '' && $filters['status_aktif'] !== '') {
+            $filters['status_pegawai_id'] = $statusOptions->firstWhere('nama', $filters['status_aktif'])?->id ?? '';
+        }
+
         if ($request->query('filter') === 'pensiun' && $filters['status_aktif'] === '') {
             $filters['status_aktif'] = 'Pensiun';
         }
@@ -103,7 +113,11 @@ class PegawaiController extends Controller
             $filters['jenis_pegawai_id'] = '';
         }
 
-        if (! in_array($filters['status_aktif'], $statusOptions, true)) {
+        if (! $statusOptions->contains('id', $filters['status_pegawai_id'])) {
+            $filters['status_pegawai_id'] = '';
+        }
+
+        if ($filters['status_aktif'] !== '' && ! $statusOptions->contains('nama', $filters['status_aktif'])) {
             $filters['status_aktif'] = '';
         }
 
@@ -121,9 +135,10 @@ class PegawaiController extends Controller
         $pegawaiQuery = Employee::query()
             ->with([
                 'jenisPegawai',
+                'statusPegawai',
                 'appointment',
                 'positionHistories' => fn ($query) => $query
-                    ->with('unitKerja')
+                    ->with(['jabatan', 'unitKerja'])
                     ->orderByDesc('is_latest')
                     ->orderByDesc('tmt_jabatan'),
             ]);
@@ -153,7 +168,9 @@ class PegawaiController extends Controller
             $pegawaiQuery->where('jenis_pegawai_id', $filters['jenis_pegawai_id']);
         }
 
-        if ($filters['status_aktif'] !== '') {
+        if ($filters['status_pegawai_id'] !== '') {
+            $pegawaiQuery->where('status_pegawai_id', $filters['status_pegawai_id']);
+        } elseif ($filters['status_aktif'] !== '') {
             $pegawaiQuery->where('status_aktif', $filters['status_aktif']);
         }
 
@@ -194,6 +211,7 @@ class PegawaiController extends Controller
 
         // Data referensi untuk modal "Tambah Riwayat" langsung dari halaman daftar pegawai.
         $golonganRefOptions = RefGolongan::orderBy('kode')->get();
+        $jabatanOptions = RefJabatan::with('jenisJabatan')->orderBy('nama')->get();
         $jenisJabatanOptions = RefJenisJabatan::orderBy('nama')->get();
         $eselonOptions = RefEselon::orderBy('nama')->get();
 
@@ -208,6 +226,7 @@ class PegawaiController extends Controller
             'jenisPegawaiOptions',
             'statusOptions',
             'golonganRefOptions',
+            'jabatanOptions',
             'jenisJabatanOptions',
             'eselonOptions'
         ));
@@ -219,9 +238,11 @@ class PegawaiController extends Controller
         $agama = RefAgama::all();
         $statusKawin = RefStatusPerkawinan::all();
         $unitKerja = RefUnitKerja::all();
+        $jabatanOptions = RefJabatan::with('jenisJabatan')->orderBy('nama')->get();
         $jenisJabatanOptions = RefJenisJabatan::all();
+        $statusPegawai = RefStatusPegawai::orderByDesc('is_default')->orderBy('nama')->get();
 
-        return view('admin.pegawai.create', compact('jenisPegawai', 'agama', 'statusKawin', 'unitKerja', 'jenisJabatanOptions'));
+        return view('admin.pegawai.create', compact('jenisPegawai', 'agama', 'statusKawin', 'unitKerja', 'jabatanOptions', 'jenisJabatanOptions', 'statusPegawai'));
     }
 
     public function inactive(Request $request, ListInactiveEmployeesAction $action)
@@ -281,7 +302,8 @@ class PegawaiController extends Controller
         $p = Employee::with([
             'families',
             'rankHistories',
-            'positionHistories',
+            'positionHistories.jabatan',
+            'positionHistories.unitKerja',
             'salaryHistories',
             'disciplineRecords',
             'educationHistories',
@@ -289,14 +311,17 @@ class PegawaiController extends Controller
             'agama',
             'statusKawin',
             'jenisPegawai',
+            'statusPegawai',
+            'supervisorAssignments.supervisor',
         ])->findOrFail($id);
 
         $golonganOptions = RefGolongan::all();
+        $jabatanOptions = RefJabatan::with('jenisJabatan')->orderBy('nama')->get();
         $jenisJabatanOptions = RefJenisJabatan::all();
         $unitKerjaOptions = RefUnitKerja::all();
         $eselonOptions = RefEselon::all();
 
-        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions'));
+        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions'));
     }
 
     public function edit($id, PrepareEmployeeEditFormDataAction $action)
@@ -422,19 +447,20 @@ class PegawaiController extends Controller
     public function assignAtasan(Request $request, $id, AssignSupervisorAction $action)
     {
         $request->validate([
+            'kepala_bagian_id' => 'nullable|uuid|exists:employees,id',
             'supervisor_id' => 'nullable|uuid|exists:employees,id',
         ]);
 
         $employee = Employee::findOrFail($id);
 
         try {
-            $action->execute($employee, $request->input('supervisor_id'), $request);
+            $action->execute($employee, $request->input('kepala_bagian_id', $request->input('supervisor_id')), $request);
 
             return redirect()->route('pegawai.show', $id)
-                ->with('success', 'Atasan langsung untuk '.$employee->nama_lengkap.' berhasil diperbarui.');
+                ->with('success', 'Kepala bagian untuk '.$employee->nama_lengkap.' berhasil diperbarui.');
         } catch (\Exception $e) {
             return redirect()->route('pegawai.show', $id)
-                ->with('error', 'Gagal memperbarui atasan langsung: '.$e->getMessage());
+                ->with('error', 'Gagal memperbarui kepala bagian: '.$e->getMessage());
         }
     }
 }

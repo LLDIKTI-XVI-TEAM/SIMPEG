@@ -6,6 +6,8 @@ use App\Models\Document;
 use App\Models\Employee;
 use App\Models\RefGolongan;
 use App\Models\RefJenisPegawai;
+use App\Models\RefJabatan;
+use App\Models\RefStatusPegawai;
 use App\Services\AuditService;
 use App\Services\EmployeeFileStorageService;
 use Illuminate\Http\Request;
@@ -24,6 +26,7 @@ class UpdateEmployeeAction
     {
         return DB::transaction(function () use ($employee, $validated, $request) {
             $oldValues = $employee->toArray();
+            $validated = $this->normalizeEmployeeContract($validated);
 
             if ($request->hasFile('foto') && $request->file('foto')->isValid()) {
                 $validated['foto'] = $this->files->storePhoto($request->file('foto'));
@@ -108,14 +111,21 @@ class UpdateEmployeeAction
             }
 
             // 2. Jabatan (PositionHistory)
-            if ($request->filled('jabatan_nama_jabatan') && $request->filled('jabatan_jenis_jabatan_id')
-                && $request->filled('jabatan_unit_kerja_id') && $request->filled('jabatan_no_sk')
+            $hasJabatanReference = $request->filled('jabatan_jabatan_id') || $request->filled('jabatan_nama_jabatan');
+            $hasJenisJabatan = $request->filled('jabatan_jabatan_id') || $request->filled('jabatan_jenis_jabatan_id');
+            if ($hasJabatanReference && $hasJenisJabatan && $request->filled('jabatan_unit_kerja_id') && $request->filled('jabatan_no_sk')
                 && $request->filled('jabatan_tanggal_sk') && $request->filled('jabatan_tmt_jabatan')) {
+                $refJabatan = $request->filled('jabatan_jabatan_id')
+                    ? RefJabatan::find($validated['jabatan_jabatan_id'])
+                    : null;
+                $namaJabatan = $refJabatan?->nama ?? $validated['jabatan_nama_jabatan'] ?? null;
                 $jabatanData = [
-                    'nama_jabatan' => $validated['jabatan_nama_jabatan'],
-                    'jenis_jabatan_id' => $validated['jabatan_jenis_jabatan_id'],
+                    'jabatan_id' => $validated['jabatan_jabatan_id'] ?? null,
+                    'nama_jabatan' => $namaJabatan,
+                    'jenis_jabatan_id' => $validated['jabatan_jenis_jabatan_id'] ?? $refJabatan?->jenis_jabatan_id,
                     'eselon_id' => $validated['jabatan_eselon_id'] ?? null,
                     'unit_kerja_id' => $validated['jabatan_unit_kerja_id'],
+                    'kelas_jabatan' => $validated['jabatan_kelas_jabatan'] ?? $employee->kelas_jabatan_terakhir,
                     'no_sk' => $validated['jabatan_no_sk'],
                     'tanggal_sk' => $validated['jabatan_tanggal_sk'],
                     'tmt_jabatan' => $validated['jabatan_tmt_jabatan'],
@@ -158,7 +168,9 @@ class UpdateEmployeeAction
                         $history->update($jabatanData);
                         if ($history->is_latest) {
                             $employee->update([
-                                'jabatan_terakhir' => $validated['jabatan_nama_jabatan'],
+                                'jabatan_terakhir' => $namaJabatan,
+                                'kelas_jabatan_terakhir' => $jabatanData['kelas_jabatan'],
+                                'kelas_jabatan' => $jabatanData['kelas_jabatan'],
                             ]);
                         }
                     }
@@ -168,7 +180,9 @@ class UpdateEmployeeAction
                     $employee->positionHistories()->create($jabatanData);
 
                     $employee->update([
-                        'jabatan_terakhir' => $validated['jabatan_nama_jabatan'],
+                        'jabatan_terakhir' => $namaJabatan,
+                        'kelas_jabatan_terakhir' => $jabatanData['kelas_jabatan'],
+                        'kelas_jabatan' => $jabatanData['kelas_jabatan'],
                     ]);
                 }
             }
@@ -285,5 +299,38 @@ class UpdateEmployeeAction
 
             return $employee;
         });
+    }
+
+    private function normalizeEmployeeContract(array $data): array
+    {
+        $email = $data['email_pribadi'] ?? $data['email'] ?? null;
+        if ($email !== null) {
+            $data['email_pribadi'] = $email;
+            $data['email'] = $email;
+        }
+
+        $kelasJabatan = $data['kelas_jabatan_terakhir'] ?? $data['kelas_jabatan'] ?? null;
+        if ($kelasJabatan !== null) {
+            $data['kelas_jabatan_terakhir'] = $kelasJabatan;
+            $data['kelas_jabatan'] = $kelasJabatan;
+        }
+
+        if (! empty($data['jabatan_id']) && empty($data['jabatan_terakhir'])) {
+            $data['jabatan_terakhir'] = RefJabatan::find($data['jabatan_id'])?->nama;
+        }
+
+        $kepalaBagianId = $data['kepala_bagian_id'] ?? $data['atasan_langsung_id'] ?? null;
+        if ($kepalaBagianId !== null) {
+            $data['kepala_bagian_id'] = $kepalaBagianId;
+            $data['atasan_langsung_id'] = $kepalaBagianId;
+        }
+
+        if (! empty($data['status_pegawai_id']) && empty($data['status_aktif'])) {
+            $data['status_aktif'] = RefStatusPegawai::whereKey($data['status_pegawai_id'])->value('nama') ?? 'Aktif';
+        } elseif (empty($data['status_pegawai_id']) && ! empty($data['status_aktif'])) {
+            $data['status_pegawai_id'] = RefStatusPegawai::where('nama', $data['status_aktif'])->value('id');
+        }
+
+        return $data;
     }
 }

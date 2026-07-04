@@ -3,6 +3,7 @@
 namespace App\Actions\Employees;
 
 use App\Models\Employee;
+use App\Models\RefStatusPegawai;
 use App\Models\User;
 use App\Services\AuditService;
 use Illuminate\Support\Facades\Cache;
@@ -134,7 +135,11 @@ class ExecuteImportBatchAction
                 $data['nama_lengkap'] = $data['nama_dengan_gelar'];
             }
 
+            $aktifId = RefStatusPegawai::where('nama', 'Aktif')->value('id')
+                ?? RefStatusPegawai::where('is_default', true)->value('id');
+
             Employee::create($data + [
+                'status_pegawai_id' => $aktifId,
                 'status_aktif' => 'Aktif',
                 'profil_status' => 'belum_lengkap',
                 'is_kinerja_baik' => true,

@@ -46,7 +46,7 @@ class EmployeeCreationTest extends TestCase
         $response->assertJsonPath('employee.nama_lengkap', 'Budi Santoso');
         $this->assertDatabaseHas('employees', [
             'nama_lengkap' => 'Budi Santoso',
-            'email' => 'budi@example.com',
+            'email_pribadi' => 'budi@example.com',
             'nip' => '198001012006041001',
             'jenis_pegawai_id' => RefJenisPegawai::where('nama', 'PNS')->firstOrFail()->id,
         ]);
@@ -136,7 +136,7 @@ class EmployeeCreationTest extends TestCase
     {
         $user = User::factory()->adminKepegawaian()->create();
         Employee::factory()->create([
-            'email' => 'budi@example.com',
+            'email_pribadi' => 'budi@example.com',
             'nip' => '198001012006041001',
         ]);
 
@@ -144,7 +144,7 @@ class EmployeeCreationTest extends TestCase
         $response = $this->postJsonWithCsrf(self::EMPLOYEES_ENDPOINT, $this->validPayload());
 
         $response->assertUnprocessable();
-        $response->assertJsonValidationErrors(['email', 'nip']);
+        $response->assertJsonValidationErrors(['email_pribadi', 'nip']);
     }
 
     public function test_future_birth_date_is_rejected(): void
@@ -186,10 +186,10 @@ class EmployeeCreationTest extends TestCase
     {
         return array_merge([
             'nama_lengkap' => 'Budi Santoso',
-            'email' => 'budi@example.com',
+            'email_pribadi' => 'budi@example.com',
             'golongan_terakhir' => 'III/a',
             'jabatan_terakhir' => 'Analis Kepegawaian',
-            'kelas_jabatan' => '7',
+            'kelas_jabatan_terakhir' => '7',
             'nip' => '198001012006041001',
             'no_hp' => '081234567890',
             'pangkat_terakhir' => 'Penata Muda',

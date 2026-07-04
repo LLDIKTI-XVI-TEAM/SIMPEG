@@ -13,7 +13,7 @@
         
         // Logika BUP dinamis berdasarkan jabatan
         $bup = 58;
-        $jabatanStr = $p->latestPosition()?->nama_jabatan ?? '';
+        $jabatanStr = $p->latestPosition()?->jabatan?->nama ?? $p->latestPosition()?->nama_jabatan ?? '';
         if (str_contains(strtolower($jabatanStr), 'madya') || str_contains(strtolower($jabatanStr), 'utama') || str_contains(strtolower($jabatanStr), 'pimpinan tinggi')) {
             $bup = 60;
         }
@@ -49,7 +49,7 @@
         // Mengambil data riwayat riil dari database melalui relasi model Employee
         keluargaList: {{ $p->families->map(fn($f) => ['id' => $f->id, 'nama_anggota' => $f->nama_anggota, 'hubungan' => $f->hubungan, 'nik' => $f->nik, 'tempat_lahir' => $f->tempat_lahir, 'tanggal_lahir' => $f->tanggal_lahir ? \Carbon\Carbon::parse($f->tanggal_lahir)->format('d-m-Y') : '-', 'jenis_kelamin' => $f->jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan', 'pekerjaan' => $f->pekerjaan, 'status' => $f->status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'])->toJson() }},
         pangkatList: {{ $p->rankHistories->map(fn($r) => ['golongan' => $r->golongan->nama ?? '-', 'no_sk' => $r->no_sk, 'tgl_sk' => $r->tanggal_sk, 'tmt' => $r->tmt_pangkat])->toJson() }},
-        jabatanList: {{ $p->positionHistories->map(fn($j) => ['jabatan' => $j->nama_jabatan, 'unit' => $j->unitKerja->nama ?? '-', 'no_sk' => $j->no_sk, 'tgl_sk' => $j->tanggal_sk, 'tmt' => $j->tmt_jabatan])->toJson() }},
+        jabatanList: {{ $p->positionHistories->map(fn($j) => ['jabatan' => $j->jabatan?->nama ?? $j->nama_jabatan, 'unit' => $j->unitKerja->nama ?? '-', 'kelas_jabatan' => $j->kelas_jabatan, 'no_sk' => $j->no_sk, 'tgl_sk' => $j->tanggal_sk, 'tmt' => $j->tmt_jabatan])->toJson() }},
         kgbList: {{ $p->salaryHistories->map(fn($s) => ['gaji' => 'Rp ' . number_format($s->gaji_pokok, 0, ',', '.'), 'no_sk' => $s->no_sk, 'tgl_sk' => $s->tanggal_sk, 'tmt' => $s->tmt_kgb])->toJson() }},
         disiplinList: {{ $p->disciplineRecords->map(fn($d) => ['jenis' => $d->jenis_hukuman, 'alasan' => $d->deskripsi, 'no_sk' => $d->no_sk, 'tgl_sk' => $d->tanggal_sk ? \Carbon\Carbon::parse($d->tanggal_sk)->format('d-m-Y') : '-', 'masa' => ($d->tanggal_mulai ? \Carbon\Carbon::parse($d->tanggal_mulai)->format('d-m-Y') : '-') . ' s/d ' . ($d->tanggal_berakhir ? \Carbon\Carbon::parse($d->tanggal_berakhir)->format('d-m-Y') : 'Sekarang'), 'is_active' => $d->is_active])->toJson() }},
         pendidikanList: {{ $p->educationHistories->map(fn($e) => ['tingkat' => $e->jenjang->nama ?? '-', 'institusi' => $e->nama_institusi, 'prodi' => $e->jurusan, 'lulus' => $e->tahun_lulus, 'no_ijazah' => $e->no_ijazah])->toJson() }},
@@ -57,7 +57,7 @@
         // Form states
         newKeluarga: { nama_anggota: '', hubungan: 'Istri', nik: '', tempat_lahir: '', tanggal_lahir: '', jenis_kelamin: 'P', status_tunjangan: '0', pekerjaan: '' },
         newPangkat: { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '' },
-        newJabatan: { nama_jabatan: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '' },
+        newJabatan: { jabatan_id: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', kelas_jabatan: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '' },
         newKgb: { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '' },
         newDisiplin: { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '' },
         newPendidikan: { tingkat: 'D4 / S1', institusi: '', prodi: '', lulus: '', no_ijazah: '' },
@@ -163,13 +163,14 @@
                         this.newKgb = { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '' };
                     } else if (this.modalType === 'jabatan') {
                         this.jabatanList.unshift({
-                            jabatan: this.newJabatan.nama_jabatan,
-                            unit: '-', // Idealnya ini ambil dari nama referensi unit kerja
+                            jabatan: '-',
+                            unit: '-',
+                            kelas_jabatan: this.newJabatan.kelas_jabatan,
                             no_sk: this.newJabatan.no_sk,
                             tgl_sk: this.newJabatan.tanggal_sk,
                             tmt: this.newJabatan.tmt_jabatan
                         });
-                        this.newJabatan = { nama_jabatan: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '' };
+                        this.newJabatan = { jabatan_id: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', kelas_jabatan: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '' };
                     } else if (this.modalType === 'pangkat') {
                         this.pangkatList.unshift({
                             golongan: '-', // Idealnya ini ambil dari nama referensi golongan
@@ -338,7 +339,7 @@
             {{-- TAB 1: PROFIL LENGKAP --}}
             <div x-show="activeTab === 'profile'" class="space-y-6" x-transition>
                 
-                {{-- Toggle Flag Kinerja & Atasan Langsung --}}
+                {{-- Toggle Flag Kinerja & Kepala Bagian --}}
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-soft/40 rounded-lg p-4 border border-border">
                     {{-- Status Kinerja --}}
                     <div class="flex items-center justify-between p-2">
@@ -355,7 +356,7 @@
                         </label>
                     </div>
 
-                    {{-- Atasan Langsung --}}
+                    {{-- Kepala Bagian --}}
                     <div class="flex items-center gap-3 border-l border-border/80 pl-6">
                         <div class="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold shrink-0">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -363,7 +364,7 @@
                             </svg>
                         </div>
                         <div>
-                            <span class="text-[9px] font-bold text-muted uppercase tracking-wider font-sans block">Atasan Langsung</span>
+                            <span class="text-[9px] font-bold text-muted uppercase tracking-wider font-sans block">Kepala Bagian</span>
                             <p class="text-xs font-bold text-ink font-sans">{{ $p->currentSupervisor()?->supervisor->nama_lengkap ?? '-' }}</p>
                             <p class="text-[10px] text-muted font-mono leading-none mt-0.5">NIP. {{ $p->currentSupervisor()?->supervisor->nip ?? '-' }} ({{ $p->currentSupervisor()?->supervisor->latestPosition()?->nama_jabatan ?? '-' }})</p>
                         </div>
@@ -447,7 +448,7 @@
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Email Pribadi</span>
-                                <p class="text-ink font-sans font-mono">{{ $p->email ?? '-' }}</p>
+                                <p class="text-ink font-sans font-mono">{{ $p->email_pribadi ?? '-' }}</p>
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Nomor HP</span>
@@ -471,7 +472,7 @@
                     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-xs">
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">Jabatan Sekarang</span>
-                            <p class="text-ink font-sans font-bold">{{ $p->latestPosition()->nama_jabatan ?? $p->jabatan_terakhir ?? '-' }}</p>
+                            <p class="text-ink font-sans font-bold">{{ $p->latestPosition()?->jabatan?->nama ?? $p->latestPosition()?->nama_jabatan ?? $p->jabatan_terakhir ?? '-' }}</p>
                         </div>
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">Unit Kerja</span>
@@ -487,7 +488,7 @@
                         </div>
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">Kelas Jabatan</span>
-                            <p class="text-ink font-sans font-bold">{{ $p->kelas_jabatan ?? '-' }}</p>
+                            <p class="text-ink font-sans font-bold">{{ $p->kelas_jabatan_terakhir ?? '-' }}</p>
                         </div>
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">TMT Golongan</span>
@@ -1004,17 +1005,26 @@
                         <template x-if="modalType === 'jabatan'">
                             <div class="space-y-4">
                                 <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Jabatan</label>
-                                    <input type="text" x-model="newJabatan.nama_jabatan" required placeholder="Analis Kepegawaian Muda" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jabatan</label>
+                                    <select x-model="newJabatan.jabatan_id" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                        <option value="">-- Pilih Jabatan --</option>
+                                        @foreach($jabatanOptions as $jabatan)
+                                            <option value="{{ $jabatan->id }}">{{ $jabatan->nama }}{{ $jabatan->jenisJabatan ? ' - '.$jabatan->jenisJabatan->nama : '' }}</option>
+                                        @endforeach
+                                    </select>
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Jabatan</label>
-                                    <select x-model="newJabatan.jenis_jabatan_id" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <select x-model="newJabatan.jenis_jabatan_id" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                         <option value="">-- Pilih Jenis Jabatan --</option>
                                         @foreach($jenisJabatanOptions as $jj)
                                             <option value="{{ $jj->id }}">{{ $jj->nama }}</option>
                                         @endforeach
                                     </select>
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Kelas Jabatan</label>
+                                    <input type="text" x-model="newJabatan.kelas_jabatan" placeholder="8" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Eselon (Opsional)</label>

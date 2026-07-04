@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\HasUuid;
 use Database\Factories\EmployeeFactory;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -55,6 +56,9 @@ class Employee extends Model
         'foto',
         'jenis_pegawai_id',
         'status_aktif',
+        'status_pegawai_id',
+        'status_keterangan',
+        'kepala_bagian_id',
         'atasan_langsung_id',
 
         // Snapshot fields
@@ -62,6 +66,7 @@ class Employee extends Model
         'pangkat_terakhir',
         'jabatan_terakhir',
         'kelas_jabatan',
+        'kelas_jabatan_terakhir',
 
         // Pendidikan snapshot
         'pendidikan_terakhir',
@@ -80,6 +85,7 @@ class Employee extends Model
         'alamat',
         'no_hp',
         'email',
+        'email_pribadi',
         'no_telepon_rumah',
 
         // Flags
@@ -122,6 +128,12 @@ class Employee extends Model
     public function jenisPegawai(): BelongsTo
     {
         return $this->belongsTo(RefJenisPegawai::class, 'jenis_pegawai_id');
+    }
+
+    /** @return BelongsTo<RefStatusPegawai, $this> */
+    public function statusPegawai(): BelongsTo
+    {
+        return $this->belongsTo(RefStatusPegawai::class, 'status_pegawai_id');
     }
 
     // --- Child Relations ---
@@ -215,13 +227,25 @@ class Employee extends Model
     /** @return BelongsTo<Employee, $this> */
     public function atasanLangsung(): BelongsTo
     {
-        return $this->belongsTo(Employee::class, 'atasan_langsung_id');
+        return $this->belongsTo(Employee::class, 'kepala_bagian_id');
     }
 
     /** @return HasMany<Employee, $this> */
     public function bawahanLangsung(): HasMany
     {
-        return $this->hasMany(Employee::class, 'atasan_langsung_id');
+        return $this->hasMany(Employee::class, 'kepala_bagian_id');
+    }
+
+    /** @return BelongsTo<Employee, $this> */
+    public function kepalaBagian(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class, 'kepala_bagian_id');
+    }
+
+    /** @return HasMany<Employee, $this> */
+    public function bawahanBagian(): HasMany
+    {
+        return $this->hasMany(Employee::class, 'kepala_bagian_id');
     }
 
     // --- Helpers ---
@@ -272,5 +296,103 @@ class Employee extends Model
         return $this->foto_public_path
             ? asset('storage/'.$this->foto_public_path)
             : null;
+    }
+
+    protected function email(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value, array $attributes) => $attributes['email_pribadi'] ?? $value,
+            set: fn ($value) => [
+                'email' => $value,
+                'email_pribadi' => $value,
+            ],
+        );
+    }
+
+    protected function statusAktif(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value, array $attributes) => $attributes['status_pegawai_id'] ?? null
+                ? (RefStatusPegawai::whereKey($attributes['status_pegawai_id'])->value('nama') ?? $value)
+                : $value,
+            set: function ($value): array {
+                $statusPegawaiId = $value !== null
+                    ? RefStatusPegawai::where('nama', $value)->value('id')
+                    : null;
+
+                return [
+                    'status_aktif' => $value,
+                    'status_pegawai_id' => $statusPegawaiId,
+                ];
+            },
+        );
+    }
+
+    protected function statusPegawaiId(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value, array $attributes) => $value,
+            set: fn ($value) => [
+                'status_pegawai_id' => $value,
+                'status_aktif' => $value
+                    ? (RefStatusPegawai::whereKey($value)->value('nama') ?? 'Aktif')
+                    : null,
+            ],
+        );
+    }
+
+    protected function emailPribadi(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value, array $attributes) => $value ?? ($attributes['email'] ?? null),
+            set: fn ($value) => [
+                'email_pribadi' => $value,
+                'email' => $value,
+            ],
+        );
+    }
+
+    protected function kelasJabatan(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value, array $attributes) => $attributes['kelas_jabatan_terakhir'] ?? $value,
+            set: fn ($value) => [
+                'kelas_jabatan' => $value,
+                'kelas_jabatan_terakhir' => $value,
+            ],
+        );
+    }
+
+    protected function kelasJabatanTerakhir(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value, array $attributes) => $value ?? ($attributes['kelas_jabatan'] ?? null),
+            set: fn ($value) => [
+                'kelas_jabatan_terakhir' => $value,
+                'kelas_jabatan' => $value,
+            ],
+        );
+    }
+
+    protected function atasanLangsungId(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value, array $attributes) => $attributes['kepala_bagian_id'] ?? $value,
+            set: fn ($value) => [
+                'atasan_langsung_id' => $value,
+                'kepala_bagian_id' => $value,
+            ],
+        );
+    }
+
+    protected function kepalaBagianId(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value, array $attributes) => $value ?? ($attributes['atasan_langsung_id'] ?? null),
+            set: fn ($value) => [
+                'kepala_bagian_id' => $value,
+                'atasan_langsung_id' => $value,
+            ],
+        );
     }
 }

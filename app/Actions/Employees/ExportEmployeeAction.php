@@ -4,6 +4,7 @@ namespace App\Actions\Employees;
 
 use App\Models\Employee;
 use App\Models\RefJenisPegawai;
+use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
 use Illuminate\Http\Request;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
@@ -29,7 +30,7 @@ class ExportEmployeeAction
             ->unique()
             ->values();
 
-        $query = Employee::query()->with('jenisPegawai:id,nama');
+        $query = Employee::query()->with(['jenisPegawai:id,nama', 'statusPegawai:id,nama']);
 
         if ($requestedNips->isNotEmpty()) {
             $query->whereIn('nip', $requestedNips->all());
@@ -38,6 +39,7 @@ class ExportEmployeeAction
             $golongan = trim((string) $request->query('golongan', ''));
             $unitKerjaId = trim((string) $request->query('unit_kerja_id', ''));
             $jenisPegawaiId = trim((string) $request->query('jenis_pegawai_id', ''));
+            $statusPegawaiId = trim((string) $request->query('status_pegawai_id', ''));
             $statusAktif = trim((string) $request->query('status_aktif', ''));
 
             if ($unitKerjaId === '' && $request->filled('unit')) {
@@ -50,6 +52,9 @@ class ExportEmployeeAction
                 $statusAktif = match (strtolower((string) $request->query('status'))) {
                     'aktif' => 'Aktif', 'nonaktif', 'non-aktif' => 'Non-Aktif', 'pensiun' => 'Pensiun', 'mutasi' => 'Mutasi', default => ''
                 };
+            }
+            if ($statusPegawaiId === '' && $statusAktif !== '') {
+                $statusPegawaiId = RefStatusPegawai::where('nama', $statusAktif)->value('id') ?? '';
             }
             if ($request->query('filter') === 'pensiun' && $statusAktif === '') {
                 $statusAktif = 'Pensiun';
@@ -72,7 +77,9 @@ class ExportEmployeeAction
             if ($jenisPegawaiId !== '') {
                 $query->where('jenis_pegawai_id', $jenisPegawaiId);
             }
-            if ($statusAktif !== '') {
+            if ($statusPegawaiId !== '') {
+                $query->where('status_pegawai_id', $statusPegawaiId);
+            } elseif ($statusAktif !== '') {
                 $query->where('status_aktif', $statusAktif);
             }
         }
@@ -124,7 +131,7 @@ class ExportEmployeeAction
             'L' => ['Person', 22],
             'M' => ['Person Formula', 22],
             'N' => ['Prodi Pendidikan Terakhir', 28],
-            'O' => ['Status Kepegawaian', 20],
+            'O' => ['Status Pegawai', 20],
             'P' => ['Tanggal Lahir', 20],
         ];
 
@@ -146,10 +153,10 @@ class ExportEmployeeAction
 
             $sheet->setCellValue('A'.$r, $i + 1);
             $sheet->setCellValue('B'.$r, $employee->nama_lengkap);
-            $sheet->setCellValue('C'.$r, $employee->email ?? '');
+            $sheet->setCellValue('C'.$r, $employee->email_pribadi ?? '');
             $sheet->setCellValue('D'.$r, $employee->golongan_terakhir ?? '');
             $sheet->setCellValue('E'.$r, $employee->jabatan_terakhir ?? '');
-            $sheet->setCellValue('F'.$r, $employee->kelas_jabatan ?? '');
+            $sheet->setCellValue('F'.$r, $employee->kelas_jabatan_terakhir ?? '');
             $sheet->setCellValueExplicit('G'.$r, $employee->nip, DataType::TYPE_STRING);
             $sheet->setCellValueExplicit('H'.$r, $employee->no_hp ?? '', DataType::TYPE_STRING);
             $sheet->setCellValue('I'.$r, $employee->pangkat_terakhir ?? '');
@@ -162,7 +169,7 @@ class ExportEmployeeAction
             $sheet->setCellValue('L'.$r, $employee->nama_lengkap);
             $sheet->setCellValue('M'.$r, $employee->nama_lengkap);
             $sheet->setCellValue('N'.$r, $employee->prodi_pendidikan_terakhir ?? '');
-            $sheet->setCellValue('O'.$r, $employee->jenisPegawai?->nama ?? '');
+            $sheet->setCellValue('O'.$r, $employee->statusPegawai?->nama ?? $employee->status_aktif ?? '');
 
             if ($employee->tanggal_lahir !== null) {
                 $sheet->setCellValue('P'.$r, Date::PHPToExcel($employee->tanggal_lahir));

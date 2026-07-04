@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasUuid;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
@@ -22,10 +23,12 @@ class PositionHistory extends Model
 
     protected $fillable = [
         'employee_id',
+        'jabatan_id',
         'nama_jabatan',
         'jenis_jabatan_id',
         'eselon_id',
         'unit_kerja_id',
+        'kelas_jabatan',
         'tmt_jabatan',
         'no_sk',
         'tanggal_sk',
@@ -54,6 +57,11 @@ class PositionHistory extends Model
         return $this->belongsTo(RefJenisJabatan::class, 'jenis_jabatan_id');
     }
 
+    public function jabatan(): BelongsTo
+    {
+        return $this->belongsTo(RefJabatan::class, 'jabatan_id');
+    }
+
     /** @return BelongsTo<RefEselon, $this> */
     public function eselon(): BelongsTo
     {
@@ -64,5 +72,12 @@ class PositionHistory extends Model
     public function unitKerja(): BelongsTo
     {
         return $this->belongsTo(RefUnitKerja::class, 'unit_kerja_id');
+    }
+
+    protected function namaJabatan(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value) => $value ?? $this->jabatan?->nama,
+        );
     }
 }

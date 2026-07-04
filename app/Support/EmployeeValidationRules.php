@@ -28,14 +28,19 @@ class EmployeeValidationRules
             'foto' => ['nullable', File::image()->types(['jpg', 'jpeg', 'png'])->max('10mb')],
             'jenis_pegawai_id' => ['required', 'uuid', 'exists:ref_jenis_pegawai,id'],
             'status_aktif' => ['nullable', 'in:Aktif,Non-Aktif,Pensiun,Mutasi'],
+            'status_pegawai_id' => ['nullable', 'uuid', 'exists:ref_status_pegawai,id'],
+            'status_keterangan' => ['nullable', 'string', 'max:2000'],
+            'kepala_bagian_id' => ['nullable', 'uuid', 'exists:employees,id'],
 
             // Snapshot
             'golongan_terakhir' => ['nullable', 'string', 'max:20'],
             'pangkat_terakhir' => ['nullable', 'string', 'max:100'],
             'jabatan_terakhir' => ['nullable', 'string', 'max:255'],
+            'jabatan_id' => ['nullable', 'uuid', 'exists:ref_jabatan,id'],
             'jenis_jabatan_id' => ['nullable', 'uuid', 'exists:ref_jenis_jabatan,id'],
             'unit_kerja_id' => ['nullable', 'uuid', 'exists:ref_unit_kerja,id'],
             'kelas_jabatan' => ['nullable', 'string', 'max:10'],
+            'kelas_jabatan_terakhir' => ['nullable', 'string', 'max:10'],
 
             // Pendidikan snapshot
             'pendidikan_terakhir' => ['nullable', 'string', 'max:20'],
@@ -48,6 +53,7 @@ class EmployeeValidationRules
             'alamat' => ['nullable', 'string'],
             'no_hp' => ['nullable', 'string', 'max:20'],
             'email' => ['nullable', 'email', 'max:255', 'unique:employees,email'],
+            'email_pribadi' => ['nullable', 'email', 'max:255', 'unique:employees,email_pribadi'],
             'no_telepon_rumah' => ['nullable', 'string', 'max:20'],
         ];
     }
@@ -71,6 +77,12 @@ class EmployeeValidationRules
             'max:255',
             Rule::unique('employees', 'email')->ignore($employee->id),
         ];
+        $rules['email_pribadi'] = [
+            'nullable',
+            'email',
+            'max:255',
+            Rule::unique('employees', 'email_pribadi')->ignore($employee->id),
+        ];
 
         return $rules;
     }
@@ -90,13 +102,15 @@ class EmployeeValidationRules
             'nama_dengan_gelar' => ['required', 'string', 'max:255'],
             'nama_lengkap' => ['nullable', 'string', 'max:255'],
             'nip' => ['required', 'string', 'size:18', 'unique:employees,nip'],
-            'email' => ['required', 'email', 'max:255', 'unique:employees,email'],
+            'email_pribadi' => ['required', 'email', 'max:255', 'unique:employees,email_pribadi'],
+            'email' => ['nullable', 'email', 'max:255', 'unique:employees,email'],
             'tanggal_lahir' => ['required', 'date', 'before:today'],
             'jenis_pegawai' => ['required', 'in:PNS,PPPK,CPNS'],
             'golongan_terakhir' => ['required', 'string', 'max:20'],
             'pangkat_terakhir' => ['nullable', 'string', 'max:100'],
             'jabatan_terakhir' => ['required', 'string', 'max:255'],
-            'kelas_jabatan' => ['required', 'string', 'max:10'],
+            'kelas_jabatan_terakhir' => ['required', 'string', 'max:10'],
+            'kelas_jabatan' => ['nullable', 'string', 'max:10'],
             'pendidikan_terakhir' => ['required', 'string', 'max:20'],
             'prodi_pendidikan_terakhir' => ['required', 'string', 'max:255'],
             'tanggal_pensiun' => ['nullable', 'date'],
@@ -123,16 +137,22 @@ class EmployeeValidationRules
             'jenis_pegawai_id' => 'Jenis Pegawai',
             'jenis_pegawai' => 'Jenis Pegawai',
             'status_aktif' => 'Status Aktif',
+            'status_pegawai_id' => 'Status Pegawai',
+            'status_keterangan' => 'Keterangan Status',
+            'kepala_bagian_id' => 'Kepala Bagian',
             'golongan_terakhir' => 'Golongan',
             'pangkat_terakhir' => 'Pangkat',
             'jabatan_terakhir' => 'Jabatan',
+            'jabatan_id' => 'Jabatan',
             'kelas_jabatan' => 'Kelas Jabatan',
+            'kelas_jabatan_terakhir' => 'Kelas Jabatan',
             'pendidikan_terakhir' => 'Pendidikan Terakhir',
             'prodi_pendidikan_terakhir' => 'Prodi Pendidikan Terakhir',
             'tanggal_pensiun' => 'Tanggal Pensiun',
             'alamat' => 'Alamat',
             'no_hp' => 'Nomor HP',
             'email' => 'Email Pegawai',
+            'email_pribadi' => 'Email Pegawai',
             'no_telepon_rumah' => 'No. Telepon Rumah',
             'role' => 'Role',
         ];

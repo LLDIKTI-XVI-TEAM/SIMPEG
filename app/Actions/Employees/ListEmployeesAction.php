@@ -25,16 +25,19 @@ class ListEmployeesAction
                 'nama_lengkap',
                 'nip',
                 'email',
+                'email_pribadi',
                 'golongan_terakhir',
                 'pangkat_terakhir',
                 'jabatan_terakhir',
                 'kelas_jabatan',
+                'kelas_jabatan_terakhir',
                 'jenis_pegawai_id',
+                'status_pegawai_id',
                 'status_aktif',
                 'foto',
                 'created_at',
             ])
-            ->with(['jenisPegawai:id,nama'])
+            ->with(['jenisPegawai:id,nama', 'statusPegawai:id,nama'])
             ->when(
                 $validated['search'] ?? null,
                 fn ($query, string $search) => $query->where(function ($query) use ($search): void {
@@ -56,9 +59,9 @@ class ListEmployeesAction
                 fn ($query, string $jenisPegawaiId) => $query->where('jenis_pegawai_id', $jenisPegawaiId)
             )
             ->when(
-                $validated['status_aktif'] ?? null,
-                fn ($query, string $statusAktif) => $query->where('status_aktif', $statusAktif),
-                fn ($query) => $query->where('status_aktif', 'Aktif')
+                $validated['status_pegawai_id'] ?? null,
+                fn ($query, string $statusPegawaiId) => $query->where('status_pegawai_id', $statusPegawaiId),
+                fn ($query) => $query->where('status_aktif', $validated['status_aktif'] ?? 'Aktif')
             )
             ->orderBy($sort, $direction)
             ->paginate($perPage)

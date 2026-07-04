@@ -107,10 +107,11 @@
             jabatanHistories: @js($p->positionHistories->keyBy('id')),
             selectedJabatanId: '{{ $p->latestPosition()?->id ?? 'new' }}',
             jabatanForm: {
-                nama_jabatan: '{{ $p->latestPosition()?->nama_jabatan ?? $p->jabatan_terakhir ?? '' }}',
+                jabatan_id: '{{ $p->latestPosition()?->jabatan_id ?? '' }}',
                 jenis_jabatan_id: '{{ $p->latestPosition()?->jenis_jabatan_id ?? '' }}',
                 eselon_id: '{{ $p->latestPosition()?->eselon_id ?? '' }}',
                 unit_kerja_id: '{{ $p->latestPosition()?->unit_kerja_id ?? '' }}',
+                kelas_jabatan: '{{ $p->latestPosition()?->kelas_jabatan ?? $p->kelas_jabatan_terakhir ?? '' }}',
                 no_sk: '{{ $p->latestPosition()?->no_sk ?? '' }}',
                 tanggal_sk: '{{ $p->latestPosition()?->tanggal_sk?->format('Y-m-d') ?? '' }}',
                 tmt_jabatan: '{{ $p->latestPosition()?->tmt_jabatan?->format('Y-m-d') ?? '' }}',
@@ -149,10 +150,11 @@
             },
             loadJabatanData() {
                 if (this.selectedJabatanId === 'new') {
-                    this.jabatanForm.nama_jabatan = '';
+                    this.jabatanForm.jabatan_id = '';
                     this.jabatanForm.jenis_jabatan_id = '';
                     this.jabatanForm.eselon_id = '';
                     this.jabatanForm.unit_kerja_id = '';
+                    this.jabatanForm.kelas_jabatan = '';
                     this.jabatanForm.no_sk = '';
                     this.jabatanForm.tanggal_sk = '';
                     this.jabatanForm.tmt_jabatan = '';
@@ -162,10 +164,11 @@
                 } else {
                     const data = this.jabatanHistories[this.selectedJabatanId];
                     if (data) {
-                        this.jabatanForm.nama_jabatan = data.nama_jabatan || '';
+                        this.jabatanForm.jabatan_id = data.jabatan_id || '';
                         this.jabatanForm.jenis_jabatan_id = data.jenis_jabatan_id || '';
                         this.jabatanForm.eselon_id = data.eselon_id || '';
                         this.jabatanForm.unit_kerja_id = data.unit_kerja_id || '';
+                        this.jabatanForm.kelas_jabatan = data.kelas_jabatan || '';
                         this.jabatanForm.no_sk = data.no_sk || '';
                         this.jabatanForm.tanggal_sk = data.tanggal_sk ? data.tanggal_sk.substring(0, 10) : '';
                         this.jabatanForm.tmt_jabatan = data.tmt_jabatan ? data.tmt_jabatan.substring(0, 10) : '';
@@ -464,10 +467,11 @@
                         {{-- Status Kepegawaian (READ-ONLY - ubah melalui SK Pengangkatan di Berkas & SK) --}}
                         @php
                             $currentJenisPegawai = $jenisPegawai->firstWhere('id', $p->jenis_pegawai_id);
+                            $currentStatusPegawai = $statusPegawai->firstWhere('id', $p->status_pegawai_id);
                         @endphp
                         <input type="hidden" name="jenis_pegawai_id" value="{{ $p->jenis_pegawai_id }}">
                         <div class="space-y-1">
-                            <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Status Kepegawaian</label>
+                            <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Pegawai</label>
                             <div class="flex items-center gap-2 w-full rounded-lg border border-border bg-soft px-4 py-2 text-sm text-ink shadow-sm font-sans cursor-not-allowed">
                                 <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
@@ -484,6 +488,18 @@
                                 <button type="button" @click="activeTab = 'pengangkatan'; subTab = 'pengangkatan'" class="text-primary font-semibold hover:underline cursor-pointer">Berkas &amp; SK → Pengangkatan</button>
                                 untuk mengunggah SK.
                             </p>
+                        </div>
+
+                        <input type="hidden" name="status_pegawai_id" value="{{ $p->status_pegawai_id }}">
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Status Pegawai</label>
+                            <div class="flex items-center gap-2 w-full rounded-lg border border-border bg-soft px-4 py-2 text-sm text-ink shadow-sm font-sans cursor-not-allowed">
+                                <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                                </svg>
+                                <span>{{ $currentStatusPegawai?->nama ?? $p->status_aktif ?? '-' }}</span>
+                                <span class="ml-auto text-[10px] text-muted font-sans">Sinkron PRD</span>
+                            </div>
                         </div>
 
                         {{-- Tanggal Lahir --}}
@@ -567,12 +583,12 @@
                         {{-- Kelas Jabatan (READ-ONLY - ubah melalui Berkas & SK) --}}
                         <div class="space-y-1">
                             <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Kelas Jabatan</label>
-                            <input type="hidden" name="kelas_jabatan" value="{{ $p->kelas_jabatan }}">
+                            <input type="hidden" name="kelas_jabatan_terakhir" value="{{ $p->kelas_jabatan_terakhir }}">
                             <div class="flex items-center gap-2 w-full rounded-lg border border-border bg-soft px-4 py-2 text-sm text-ink shadow-sm font-sans cursor-not-allowed">
                                 <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
                                 </svg>
-                                <span>{{ $p->kelas_jabatan ?? '-' }}</span>
+                                <span>{{ $p->kelas_jabatan_terakhir ?? '-' }}</span>
                                 <span class="ml-auto text-[10px] text-muted font-sans">Ubah via Berkas &amp; SK</span>
                             </div>
                         </div>
@@ -750,8 +766,8 @@
 
                         {{-- Email Pribadi --}}
                         <div class="space-y-1 sm:col-span-2">
-                            <label for="email" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Email Pribadi</label>
-                            <input id="email" name="email" type="email" placeholder="pegawai@domain.com" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->email }}" >
+                            <label for="email_pribadi" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Email Pribadi</label>
+                            <input id="email_pribadi" name="email_pribadi" type="email" placeholder="pegawai@domain.com" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->email_pribadi }}" >
                         </div>
 
                         {{-- Alamat Lengkap --}}
@@ -931,17 +947,29 @@
                         </div>
 
                         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                            {{-- Nama Jabatan --}}
+                            {{-- Jabatan --}}
                             <div class="space-y-1">
-                                <label for="jabatan_nama_jabatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Jabatan <span class="text-danger">*</span></label>
-                                <input id="jabatan_nama_jabatan" name="jabatan_nama_jabatan" type="text" required placeholder="Analis Kepegawaian" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" x-model="jabatanForm.nama_jabatan">
+                                <label for="jabatan_jabatan_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jabatan <span class="text-danger">*</span></label>
+                                <div class="relative">
+                                    <select id="jabatan_jabatan_id" name="jabatan_jabatan_id" required x-model="jabatanForm.jabatan_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                        <option value="" disabled>Pilih Jabatan</option>
+                                        @foreach($jabatanOptions as $jabatan)
+                                            <option value="{{ $jabatan->id }}">{{ $jabatan->nama }}{{ $jabatan->jenisJabatan ? ' - '.$jabatan->jenisJabatan->nama : '' }}</option>
+                                        @endforeach
+                                    </select>
+                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                                        </svg>
+                                    </div>
+                                </div>
                             </div>
 
                             {{-- Jenis Jabatan --}}
                             <div class="space-y-1">
-                                <label for="jabatan_jenis_jabatan_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Jabatan <span class="text-danger">*</span></label>
+                                <label for="jabatan_jenis_jabatan_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Jabatan</label>
                                 <div class="relative">
-                                    <select id="jabatan_jenis_jabatan_id" name="jabatan_jenis_jabatan_id" required x-model="jabatanForm.jenis_jabatan_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <select id="jabatan_jenis_jabatan_id" name="jabatan_jenis_jabatan_id" x-model="jabatanForm.jenis_jabatan_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
                                         <option value="" disabled>Pilih Jenis Jabatan</option>
                                         @foreach($jenisJabatanOptions as $jj)
                                             <option value="{{ $jj->id }}">{{ $jj->nama }}</option>
@@ -953,6 +981,12 @@
                                         </svg>
                                     </div>
                                 </div>
+                            </div>
+
+                            {{-- Kelas Jabatan --}}
+                            <div class="space-y-1">
+                                <label for="jabatan_kelas_jabatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Kelas Jabatan</label>
+                                <input id="jabatan_kelas_jabatan" name="jabatan_kelas_jabatan" type="text" placeholder="8" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" x-model="jabatanForm.kelas_jabatan">
                             </div>
 
                             {{-- Eselon --}}

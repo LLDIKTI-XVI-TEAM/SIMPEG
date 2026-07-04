@@ -69,20 +69,22 @@ class SupervisorAssignmentTest extends TestCase
 
         $this->actingAs($user);
         $response = $this->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/assign-atasan", [
-            'supervisor_id' => $supervisor->id,
+            'kepala_bagian_id' => $supervisor->id,
         ]);
 
         $response->assertOk();
-        $response->assertJsonPath('message', 'Atasan langsung berhasil diperbarui.');
-        $response->assertJsonPath('employee.atasan_langsung.id', $supervisor->id);
+        $response->assertJsonPath('message', 'Kepala bagian berhasil diperbarui.');
+        $response->assertJsonPath('employee.kepala_bagian.id', $supervisor->id);
 
         $this->assertDatabaseHas('employees', [
             'id' => $employee->id,
+            'kepala_bagian_id' => $supervisor->id,
             'atasan_langsung_id' => $supervisor->id,
         ]);
 
         $this->assertDatabaseHas('supervisor_assignments', [
             'employee_id' => $employee->id,
+            'kepala_bagian_id' => $supervisor->id,
             'supervisor_id' => $supervisor->id,
             'tanggal_berakhir' => null,
         ]);
@@ -101,12 +103,13 @@ class SupervisorAssignmentTest extends TestCase
 
         $this->actingAs($user);
         $response = $this->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/assign-atasan", [
-            'supervisor_id' => null,
+            'kepala_bagian_id' => null,
         ]);
 
         $response->assertOk();
         $this->assertDatabaseHas('employees', [
             'id' => $employee->id,
+            'kepala_bagian_id' => null,
             'atasan_langsung_id' => null,
         ]);
     }
@@ -118,11 +121,11 @@ class SupervisorAssignmentTest extends TestCase
 
         $this->actingAs($user);
         $response = $this->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/assign-atasan", [
-            'supervisor_id' => $employee->id,
+            'kepala_bagian_id' => $employee->id,
         ]);
 
         $response->assertUnprocessable();
-        $response->assertJsonValidationErrors(['supervisor_id']);
+        $response->assertJsonValidationErrors(['kepala_bagian_id']);
     }
 
     public function test_supervisor_change_closes_old_assignment(): void
@@ -136,22 +139,24 @@ class SupervisorAssignmentTest extends TestCase
 
         // First assignment
         $this->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/assign-atasan", [
-            'supervisor_id' => $supervisor1->id,
+            'kepala_bagian_id' => $supervisor1->id,
         ]);
 
         // Second assignment
         $this->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/assign-atasan", [
-            'supervisor_id' => $supervisor2->id,
+            'kepala_bagian_id' => $supervisor2->id,
         ]);
 
         $this->assertDatabaseHas('supervisor_assignments', [
             'employee_id' => $employee->id,
+            'kepala_bagian_id' => $supervisor1->id,
             'supervisor_id' => $supervisor1->id,
             'tanggal_berakhir' => now()->startOfDay()->toDateTimeString(),
         ]);
 
         $this->assertDatabaseHas('supervisor_assignments', [
             'employee_id' => $employee->id,
+            'kepala_bagian_id' => $supervisor2->id,
             'supervisor_id' => $supervisor2->id,
             'tanggal_berakhir' => null,
         ]);

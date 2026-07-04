@@ -78,6 +78,7 @@
                             @php
                                 $latestPosition = $employee->positionHistories->first();
                                 $unitKerja = $latestPosition?->unitKerja?->nama ?? '-';
+                                $statusNama = $employee->statusPegawai?->nama ?? $employee->status_aktif ?? 'Non-Aktif';
                                 $initial = mb_substr($employee->nama_lengkap, 0, 1);
                                 $fotoUrl = $employee->foto_url;
                             @endphp
@@ -106,7 +107,7 @@
                                     </div>
                                 </x-ui.table-td>
                                 <x-ui.table-td>
-                                    <p class="text-sm font-medium text-ink">{{ $employee->jabatan_terakhir ?? '-' }}</p>
+                                    <p class="text-sm font-medium text-ink">{{ $latestPosition?->jabatan?->nama ?? $employee->jabatan_terakhir ?? '-' }}</p>
                                     <p class="text-xs text-muted">{{ $unitKerja }}</p>
                                 </x-ui.table-td>
                                 <x-ui.table-td>
@@ -114,7 +115,7 @@
                                 </x-ui.table-td>
                                 <x-ui.table-td>
                                     <x-ui.badge variant="danger" size="md" dot>
-                                        Non-Aktif
+                                        {{ $statusNama }}
                                     </x-ui.badge>
                                     @if($employee->updated_at)
                                         <p class="mt-1 font-mono text-xs text-muted">{{ $employee->updated_at->format('d/m/Y H:i') }}</p>

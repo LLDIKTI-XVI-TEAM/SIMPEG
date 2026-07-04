@@ -57,10 +57,10 @@ class EmployeeRowMapper
     private const MAP = [
         'Nama Pegawai' => 'nama_dengan_gelar',
         'Person' => 'nama_lengkap',
-        'Email Pegawai' => 'email',
+        'Email Pegawai' => 'email_pribadi',
         'Golongan' => 'golongan_terakhir',
         'Jabatan' => 'jabatan_terakhir',
-        'Kelas Jabatan' => 'kelas_jabatan',
+        'Kelas Jabatan' => 'kelas_jabatan_terakhir',
         'NIP' => 'nip',
         'NIK' => 'nik',
         'No KK' => 'no_kk',

@@ -39,7 +39,7 @@
             skFileSize: '',
             skFileError: '',
             validateUtama() {
-                const requiredIds = ['nama_lengkap', 'nip', 'jenis_pegawai_id', 'tanggal_lahir', 'pangkat_terakhir', 'jabatan_terakhir', 'kelas_jabatan', 'pendidikan_terakhir', 'prodi_pendidikan_terakhir'];
+                const requiredIds = ['nama_lengkap', 'nip', 'jenis_pegawai_id', 'status_pegawai_id', 'tanggal_lahir', 'pangkat_terakhir', 'jabatan_id', 'kelas_jabatan_terakhir', 'pendidikan_terakhir', 'prodi_pendidikan_terakhir'];
                 for (let id of requiredIds) {
                     const el = document.getElementById(id);
                     if (el && !el.value.trim()) {
@@ -235,17 +235,31 @@
                             <p x-show="nipError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="nipError"></p>
                         </x-form.input>
 
-                        {{-- Status Kepegawaian (Jenis) --}}
+                        {{-- Jenis Pegawai --}}
 
                         <x-form.select
                             name="jenis_pegawai_id"
-                            label="Status Kepegawaian"
+                            label="Jenis Pegawai"
                             id="jenis_pegawai_id"
                             required
                         >
-                            <option value="" disabled selected>Pilih Status Kepegawaian</option>
+                            <option value="" disabled selected>Pilih Jenis Pegawai</option>
                             @foreach($jenisPegawai as $jenis)
                                 <option value="{{ $jenis->id }}">{{ $jenis->nama }}</option>
+                            @endforeach
+                        </x-form.select>
+
+                        {{-- Status Pegawai --}}
+                        <x-form.select
+                            name="status_pegawai_id"
+                            label="Status Pegawai"
+                            id="status_pegawai_id"
+                            value="{{ old('status_pegawai_id', $statusPegawai->firstWhere('is_default', true)?->id) }}"
+                            required
+                        >
+                            <option value="" disabled>Pilih Status Pegawai</option>
+                            @foreach($statusPegawai as $status)
+                                <option value="{{ $status->id }}">{{ $status->nama }}</option>
                             @endforeach
                         </x-form.select>
 
@@ -282,14 +296,19 @@
                         />
 
                         {{-- Jabatan --}}
-                        <x-form.input
-                            name="jabatan_terakhir"
+                        <x-form.select
+                            name="jabatan_id"
                             label="Jabatan"
-                            type="text"
-                            id="jabatan_terakhir"
-                            placeholder="Analis Kepegawaian"
+                            id="jabatan_id"
                             required
-                        />
+                        >
+                            <option value="" disabled selected>Pilih Jabatan</option>
+                            @foreach($jabatanOptions as $jabatan)
+                                <option value="{{ $jabatan->id }}">
+                                    {{ $jabatan->nama }}{{ $jabatan->jenisJabatan ? ' - '.$jabatan->jenisJabatan->nama : '' }}
+                                </option>
+                            @endforeach
+                        </x-form.select>
 
                         {{-- Jenis Jabatan --}}
                         <x-form.select
@@ -319,10 +338,10 @@
 
                         {{-- Kelas Jabatan --}}
                         <x-form.input
-                            name="kelas_jabatan"
+                            name="kelas_jabatan_terakhir"
                             label="Kelas Jabatan"
                             type="text"
-                            id="kelas_jabatan"
+                            id="kelas_jabatan_terakhir"
                             placeholder="8"
                             required
                         />
@@ -500,10 +519,10 @@
 
                         {{-- Email Pribadi --}}
                         <x-form.input
-                            name="email"
+                            name="email_pribadi"
                             label="Email Pribadi"
                             type="email"
-                            id="email"
+                            id="email_pribadi"
                             placeholder="pegawai@domain.com"
                             wrapper-class="sm:col-span-2"
                         />

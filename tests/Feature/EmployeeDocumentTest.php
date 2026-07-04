@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Models\RefGolongan;
+use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefUnitKerja;
 use App\Models\User;
@@ -63,13 +64,18 @@ class EmployeeDocumentTest extends TestCase
         $employee = Employee::factory()->create();
         $jenisJabatan = RefJenisJabatan::where('nama', 'Struktural')->firstOrFail();
         $unitKerja = RefUnitKerja::firstOrFail();
+        $jabatan = RefJabatan::firstOrCreate(
+            ['nama' => 'Kepala Subbagian Umum'],
+            ['jenis_jabatan_id' => $jenisJabatan->id]
+        );
 
         $this->actingAs($user);
         $response = $this->withSession(['_token' => 'test-token'])
             ->postJson("/api/v1/pegawai/{$employee->id}/riwayat-jabatan", [
-                'nama_jabatan' => 'Kepala Subbagian Umum',
+                'jabatan_id' => $jabatan->id,
                 'jenis_jabatan_id' => $jenisJabatan->id,
                 'unit_kerja_id' => $unitKerja->id,
+                'kelas_jabatan' => '9',
                 'tmt_jabatan' => '2026-03-01',
                 'no_sk' => 'SK-POS-SYNC',
                 'tanggal_sk' => '2026-03-10',

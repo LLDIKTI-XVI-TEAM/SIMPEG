@@ -10,7 +10,7 @@
     successMessage: '',
 
     newPangkat: { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '', file_sk: null },
-    newJabatan: { nama_jabatan: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '', file_sk: null },
+    newJabatan: { jabatan_id: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', kelas_jabatan: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '', file_sk: null },
     newKgb: { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '', file_sk: null },
 
     openRiwayatModal(type, employeeId, employeeName) {
@@ -25,7 +25,7 @@
 
     resetForm() {
         this.newPangkat = { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '', file_sk: null };
-        this.newJabatan = { nama_jabatan: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '', file_sk: null };
+        this.newJabatan = { jabatan_id: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', kelas_jabatan: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '', file_sk: null };
         this.newKgb = { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '', file_sk: null };
     },
 
@@ -166,7 +166,7 @@
             <input type="hidden" name="sort" value="{{ $sort }}">
             <input type="hidden" name="direction" value="{{ $direction }}">
             <input type="hidden" name="per_page" value="{{ $perPage ?? request('per_page', 10) }}">
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
             {{-- Search input --}}
             <div class="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5">
                 <svg class="w-4 h-4 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -201,6 +201,16 @@
                     <option value="">Semua Jenis</option>
                     @foreach($jenisPegawaiOptions as $jenis)
                         <option value="{{ $jenis->id }}" @selected($filters['jenis_pegawai_id'] === $jenis->id)>{{ $jenis->nama }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            {{-- Filter Status --}}
+            <div class="relative">
+                <select id="filter-status" name="status_pegawai_id" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <option value="">Semua Status</option>
+                    @foreach($statusOptions as $status)
+                        <option value="{{ $status->id }}" @selected($filters['status_pegawai_id'] === $status->id)>{{ $status->nama }}</option>
                     @endforeach
                 </select>
             </div>
@@ -259,11 +269,12 @@
                     @php
                         $currentPosition = $p->positionHistories->first();
                         $currentUnit = $currentPosition?->unitKerja?->nama ?? '-';
+                        $statusNama = $p->statusPegawai?->nama ?? $p->status_aktif;
                         $tmt = $currentPosition?->tmt_jabatan ?? $p->appointment?->tmt_pengangkatan;
                         $fotoUrl = $p->foto_url;
                     @endphp
 
-                    <x-ui.table-row :interactive="true" data-id="{{ $p->id }}" data-nama="{{ $p->nama_lengkap }}" data-nip="{{ $p->nip }}" data-unit="{{ $currentUnit }}" data-jenis="{{ $p->jenisPegawai->nama ?? '-' }}" data-status="{{ strtolower($p->status_aktif) }}" data-golongan="{{ $p->golongan_terakhir ?? '-' }}">
+                    <x-ui.table-row :interactive="true" data-id="{{ $p->id }}" data-nama="{{ $p->nama_lengkap }}" data-nip="{{ $p->nip }}" data-unit="{{ $currentUnit }}" data-jenis="{{ $p->jenisPegawai->nama ?? '-' }}" data-status="{{ strtolower($statusNama) }}" data-golongan="{{ $p->golongan_terakhir ?? '-' }}">
                         <x-ui.table-td>
                             <x-form.checkbox size="sm" class="row-check" />
                         </x-ui.table-td>
@@ -304,7 +315,7 @@
                             </div>
                         </x-ui.table-td>
                         <x-ui.table-td>
-                            <p class="text-sm font-medium text-ink">{{ $p->jabatan_terakhir ?? '-' }}</p>
+                            <p class="text-sm font-medium text-ink">{{ $currentPosition?->jabatan?->nama ?? $p->jabatan_terakhir ?? '-' }}</p>
                             <p class="text-xs text-muted">{{ $currentUnit }}</p>
                         </x-ui.table-td>
                         <x-ui.table-td>
@@ -317,7 +328,7 @@
                         </x-ui.table-td>
                         <x-ui.table-td>
                             @php
-                            $status_lower = strtolower($p->status_aktif);
+                            $status_lower = strtolower($statusNama);
                             $statusVariants = [
                                 'aktif' => 'success',
                                 'cuti' => 'warning',
@@ -327,7 +338,7 @@
                             ];
                             @endphp
                             <x-ui.badge :variant="$statusVariants[$status_lower] ?? 'muted'" size="md" dot>
-                                {{ $p->status_aktif }}
+                                {{ $statusNama }}
                             </x-ui.badge>
                         </x-ui.table-td>
                         <x-ui.table-td>
@@ -540,14 +551,19 @@
                     <template x-if="riwayatType === 'jabatan'">
                         <div class="space-y-4">
                             <div class="space-y-1">
-                                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Jabatan <span class="text-danger">*</span></label>
-                                <input type="text" x-model="newJabatan.nama_jabatan" required placeholder="Analis Kepegawaian Muda" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                <template x-if="errors.nama_jabatan"><p class="text-[10px] text-danger font-sans" x-text="errors.nama_jabatan[0]"></p></template>
+                                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jabatan <span class="text-danger">*</span></label>
+                                <select x-model="newJabatan.jabatan_id" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <option value="">-- Pilih Jabatan --</option>
+                                    @foreach($jabatanOptions as $jabatan)
+                                        <option value="{{ $jabatan->id }}">{{ $jabatan->nama }}{{ $jabatan->jenisJabatan ? ' - '.$jabatan->jenisJabatan->nama : '' }}</option>
+                                    @endforeach
+                                </select>
+                                <template x-if="errors.jabatan_id"><p class="text-[10px] text-danger font-sans" x-text="errors.jabatan_id[0]"></p></template>
                             </div>
                             <div class="grid grid-cols-2 gap-3">
                                 <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Jabatan <span class="text-danger">*</span></label>
-                                    <select x-model="newJabatan.jenis_jabatan_id" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Jabatan</label>
+                                    <select x-model="newJabatan.jenis_jabatan_id" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                         <option value="">-- Pilih --</option>
                                         @foreach($jenisJabatanOptions as $jj)
                                             <option value="{{ $jj->id }}">{{ $jj->nama }}</option>
@@ -574,6 +590,11 @@
                                     @endforeach
                                 </select>
                                 <template x-if="errors.unit_kerja_id"><p class="text-[10px] text-danger font-sans" x-text="errors.unit_kerja_id[0]"></p></template>
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Kelas Jabatan</label>
+                                <input type="text" x-model="newJabatan.kelas_jabatan" placeholder="8" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                <template x-if="errors.kelas_jabatan"><p class="text-[10px] text-danger font-sans" x-text="errors.kelas_jabatan[0]"></p></template>
                             </div>
                             <div class="space-y-1">
                                 <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Jabatan <span class="text-danger">*</span></label>

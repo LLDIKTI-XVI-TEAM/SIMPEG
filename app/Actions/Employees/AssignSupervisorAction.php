@@ -12,75 +12,70 @@ use Illuminate\Validation\ValidationException;
 class AssignSupervisorAction
 {
     /**
-     * Assign (or clear) the direct supervisor of an employee.
-     *
-     * Creates a history record in supervisor_assignments and syncs
-     * employees.atasan_langsung_id within a single transaction.
-     *
      * @throws ValidationException
      */
-    public function execute(Employee $employee, ?string $supervisorId, ?Request $request = null): Employee
+    public function execute(Employee $employee, ?string $kepalaBagianId, ?Request $request = null): Employee
     {
-        if ($supervisorId !== null) {
-            if ($employee->id === $supervisorId) {
+        if ($kepalaBagianId !== null) {
+            if ($employee->id === $kepalaBagianId) {
                 throw ValidationException::withMessages([
-                    'supervisor_id' => 'Pegawai tidak bisa menjadi atasan untuk diri sendiri.',
+                    'kepala_bagian_id' => 'Pegawai tidak bisa menjadi kepala bagian untuk diri sendiri.',
                 ]);
             }
 
-            $supervisor = Employee::find($supervisorId);
-            if (! $supervisor) {
+            $kepalaBagian = Employee::find($kepalaBagianId);
+            if (! $kepalaBagian) {
                 throw ValidationException::withMessages([
-                    'supervisor_id' => 'Atasan yang dipilih tidak ditemukan.',
+                    'kepala_bagian_id' => 'Kepala bagian yang dipilih tidak ditemukan.',
                 ]);
             }
         }
 
-        DB::transaction(function () use ($employee, $supervisorId, $request) {
-            $oldValues = $employee->only('atasan_langsung_id');
+        DB::transaction(function () use ($employee, $kepalaBagianId, $request) {
+            $oldValues = $employee->only('kepala_bagian_id', 'atasan_langsung_id');
 
-            // Find current active assignment
             $currentAssignment = SupervisorAssignment::where('employee_id', $employee->id)
                 ->whereNull('tanggal_berakhir')
                 ->first();
 
             if ($currentAssignment) {
-                // If supervisor is already the same, do nothing
-                if ($currentAssignment->supervisor_id === $supervisorId) {
+                if ($currentAssignment->kepala_bagian_id === $kepalaBagianId) {
                     return;
                 }
-                // End current assignment
+
                 $currentAssignment->update([
                     'tanggal_berakhir' => now()->toDateString(),
                 ]);
             }
 
-            // Create new assignment if supervisor is set
-            if ($supervisorId !== null) {
+            if ($kepalaBagianId !== null) {
                 SupervisorAssignment::create([
                     'employee_id' => $employee->id,
-                    'supervisor_id' => $supervisorId,
+                    'supervisor_id' => $kepalaBagianId,
+                    'kepala_bagian_id' => $kepalaBagianId,
                     'tanggal_mulai' => now()->toDateString(),
                     'tanggal_berakhir' => null,
                 ]);
             }
 
-            // Sync cached column on employee
             $employee->update([
-                'atasan_langsung_id' => $supervisorId,
+                'kepala_bagian_id' => $kepalaBagianId,
+                'atasan_langsung_id' => $kepalaBagianId,
             ]);
 
-            // Audit log using 'UPDATE' event (matches audit_logs enum)
             AuditService::log(
                 'UPDATE',
                 'Employee',
                 $employee->id,
                 $oldValues,
-                ['atasan_langsung_id' => $supervisorId],
+                [
+                    'kepala_bagian_id' => $kepalaBagianId,
+                    'atasan_langsung_id' => $kepalaBagianId,
+                ],
                 $request
             );
         });
 
-        return $employee->load('atasanLangsung');
+        return $employee->load(['kepalaBagian', 'atasanLangsung']);
     }
 }

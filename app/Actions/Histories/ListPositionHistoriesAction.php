@@ -16,7 +16,7 @@ class ListPositionHistoriesAction
     public function execute(Employee $employee): Collection
     {
         return $employee->positionHistories()
-            ->with(['jenisJabatan', 'eselon', 'unitKerja'])
+            ->with(['jabatan', 'jenisJabatan', 'eselon', 'unitKerja'])
             ->orderByDesc('tmt_jabatan')
             ->orderByDesc('created_at')
             ->get();
