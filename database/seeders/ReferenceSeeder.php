@@ -6,11 +6,13 @@ use App\Models\RefAgama;
 use App\Models\RefBup;
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
+use App\Models\RefJabatan;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenisKelamin;
 use App\Models\RefJenisPegawai;
 use App\Models\RefJenjangPendidikan;
+use App\Models\RefStatusPegawai;
 use App\Models\RefStatusPerkawinan;
 use App\Models\RefUnitKerja;
 use Illuminate\Database\Seeder;
@@ -56,6 +58,8 @@ class ReferenceSeeder extends Seeder
         foreach ($jenisJabatan as $item) {
             RefJenisJabatan::firstOrCreate(['nama' => $item['nama']], $item);
         }
+
+        $jenisJabatanByNama = RefJenisJabatan::pluck('id', 'nama');
 
         // §16.3 ref_eselon
         $eselon = [
@@ -133,6 +137,17 @@ class ReferenceSeeder extends Seeder
             RefJenisPegawai::firstOrCreate(['nama' => $nama]);
         }
 
+        $statusPegawai = [
+            ['nama' => 'Aktif', 'keterangan' => 'Pegawai aktif', 'is_default' => true],
+            ['nama' => 'Non-Aktif', 'keterangan' => 'Pegawai nonaktif sementara', 'is_default' => false],
+            ['nama' => 'Pensiun', 'keterangan' => 'Pegawai pensiun', 'is_default' => false],
+            ['nama' => 'Mutasi', 'keterangan' => 'Pegawai mutasi keluar', 'is_default' => false],
+        ];
+
+        foreach ($statusPegawai as $item) {
+            RefStatusPegawai::firstOrCreate(['nama' => $item['nama']], $item);
+        }
+
         // ref_hari_libur — subset awal 2026 untuk baseline kalkulasi hari kerja; data mengikuti kalender libur nasional/SKB yang berlaku
         $hariLibur = [
             ['tanggal' => '2026-01-01', 'nama' => 'Tahun Baru Masehi', 'tahun' => 2026, 'is_cuti_bersama' => false],
@@ -167,6 +182,26 @@ class ReferenceSeeder extends Seeder
 
         foreach ($unitKerja as $item) {
             RefUnitKerja::firstOrCreate(['nama' => $item['nama']], $item);
+        }
+
+        $jabatan = [
+            ['nama' => 'Analis Kepegawaian', 'jenis' => 'Fungsional Umum / Pelaksana'],
+            ['nama' => 'Analis SDM', 'jenis' => 'Fungsional Umum / Pelaksana'],
+            ['nama' => 'Pengelola Data', 'jenis' => 'Fungsional Umum / Pelaksana'],
+            ['nama' => 'Perencana', 'jenis' => 'Fungsional Tertentu'],
+            ['nama' => 'Arsiparis', 'jenis' => 'Fungsional Tertentu'],
+            ['nama' => 'Kepala Subbagian Umum', 'jenis' => 'Struktural'],
+            ['nama' => 'Kepala Sub Bagian Web', 'jenis' => 'Struktural'],
+        ];
+
+        foreach ($jabatan as $item) {
+            RefJabatan::firstOrCreate(
+                ['nama' => $item['nama']],
+                [
+                    'jenis_jabatan_id' => $jenisJabatanByNama[$item['jenis']] ?? null,
+                    'keterangan' => 'Referensi awal jabatan SIMPEG.',
+                ],
+            );
         }
 
         // §16.12 ref_bup

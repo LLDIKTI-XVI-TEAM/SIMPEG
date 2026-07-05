@@ -3,17 +3,21 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasUuid;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
+ * @property string|null $jabatan_id
  * @property string $nama_jabatan
+ * @property string|null $kelas_jabatan
  * @property string|null $no_sk
  * @property string|null $file_sk
  * @property Carbon $tmt_jabatan
  * @property Carbon|null $tanggal_sk
+ * @property-read RefJabatan|null $jabatan
  * @property-read RefUnitKerja|null $unitKerja
  */
 class PositionHistory extends Model
@@ -22,10 +26,12 @@ class PositionHistory extends Model
 
     protected $fillable = [
         'employee_id',
+        'jabatan_id',
         'nama_jabatan',
         'jenis_jabatan_id',
         'eselon_id',
         'unit_kerja_id',
+        'kelas_jabatan',
         'tmt_jabatan',
         'no_sk',
         'tanggal_sk',
@@ -54,6 +60,12 @@ class PositionHistory extends Model
         return $this->belongsTo(RefJenisJabatan::class, 'jenis_jabatan_id');
     }
 
+    /** @return BelongsTo<RefJabatan, $this> */
+    public function jabatan(): BelongsTo
+    {
+        return $this->belongsTo(RefJabatan::class, 'jabatan_id');
+    }
+
     /** @return BelongsTo<RefEselon, $this> */
     public function eselon(): BelongsTo
     {
@@ -64,5 +76,12 @@ class PositionHistory extends Model
     public function unitKerja(): BelongsTo
     {
         return $this->belongsTo(RefUnitKerja::class, 'unit_kerja_id');
+    }
+
+    protected function namaJabatan(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value) => $value ?? $this->jabatan?->nama,
+        );
     }
 }

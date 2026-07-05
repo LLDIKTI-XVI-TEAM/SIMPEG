@@ -104,16 +104,21 @@ class EmployeeController extends Controller
     public function assignSupervisor(Request $request, Employee $employee, AssignSupervisorAction $action): JsonResponse
     {
         $request->validate([
+            'kepala_bagian_id' => 'nullable|uuid|exists:employees,id',
             'supervisor_id' => 'nullable|uuid|exists:employees,id',
         ]);
 
-        $updatedEmployee = $action->execute($employee, $request->input('supervisor_id'), $request);
+        $updatedEmployee = $action->execute($employee, $request->input('kepala_bagian_id', $request->input('supervisor_id')), $request);
 
         return response()->json([
-            'message' => 'Atasan langsung berhasil diperbarui.',
+            'message' => 'Kepala bagian berhasil diperbarui.',
             'employee' => [
                 'id' => $updatedEmployee->id,
                 'nama_lengkap' => $updatedEmployee->nama_lengkap,
+                'kepala_bagian' => $updatedEmployee->kepalaBagian ? [
+                    'id' => $updatedEmployee->kepalaBagian->id,
+                    'nama_lengkap' => $updatedEmployee->kepalaBagian->nama_lengkap,
+                ] : null,
                 'atasan_langsung' => $updatedEmployee->atasanLangsung ? [
                     'id' => $updatedEmployee->atasanLangsung->id,
                     'nama_lengkap' => $updatedEmployee->atasanLangsung->nama_lengkap,

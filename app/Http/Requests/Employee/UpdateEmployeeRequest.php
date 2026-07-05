@@ -44,10 +44,12 @@ class UpdateEmployeeRequest extends FormRequest
             $rules['file_sk_pangkat'] = ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png'];
 
             // Jabatan (Position)
+            $rules['jabatan_jabatan_id'] = ['nullable', 'uuid', 'exists:ref_jabatan,id'];
             $rules['jabatan_nama_jabatan'] = ['nullable', 'string', 'max:255'];
             $rules['jabatan_jenis_jabatan_id'] = ['nullable', 'uuid', 'exists:ref_jenis_jabatan,id'];
             $rules['jabatan_eselon_id'] = ['nullable', 'uuid', 'exists:ref_eselon,id'];
             $rules['jabatan_unit_kerja_id'] = ['nullable', 'uuid', 'exists:ref_unit_kerja,id'];
+            $rules['jabatan_kelas_jabatan'] = ['nullable', 'string', 'max:10'];
             $rules['jabatan_no_sk'] = ['nullable', 'string', 'max:255'];
             $rules['jabatan_tanggal_sk'] = ['nullable', 'date'];
             $rules['jabatan_tmt_jabatan'] = ['nullable', 'date'];

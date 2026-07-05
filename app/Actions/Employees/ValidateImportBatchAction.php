@@ -93,10 +93,10 @@ class ValidateImportBatchAction
             return $this->rowError($row, $nama, $this->mapErrors($validator->errors()->toArray(), [
                 'nama_dengan_gelar' => 'Nama Pegawai',
                 'nama_lengkap' => 'Nama Lengkap (Person)',
-                'email' => 'Email Pegawai',
+                'email_pribadi' => 'Email Pegawai',
                 'golongan_terakhir' => 'Golongan',
                 'jabatan_terakhir' => 'Jabatan',
-                'kelas_jabatan' => 'Kelas Jabatan',
+                'kelas_jabatan_terakhir' => 'Kelas Jabatan',
                 'nip' => 'NIP',
                 'nik' => 'NIK',
                 'no_kk' => 'No KK',
@@ -120,13 +120,13 @@ class ValidateImportBatchAction
         }
 
         $databaseErrors = [];
-        if (! empty($validated['email']) && Employee::whereRaw('LOWER(email) = ?', [strtolower($validated['email'])])->exists()) {
+        if (! empty($validated['email_pribadi']) && Employee::whereRaw('LOWER(email_pribadi) = ?', [strtolower($validated['email_pribadi'])])->exists()) {
             $databaseErrors['Email Pegawai'][] = 'Email pegawai sudah terdaftar di database.';
         }
 
         $duplicateErrors = $this->mapErrors($this->duplicateErrors($validated, $row['row'], $seenNips, $seenEmails), [
             'nip' => 'NIP',
-            'email' => 'Email Pegawai',
+            'email_pribadi' => 'Email Pegawai',
         ]);
 
         if ($skipErrors !== []) {
@@ -233,11 +233,11 @@ class ValidateImportBatchAction
             }
         }
 
-        if (! empty($data['email'])) {
-            $email = strtolower($data['email']);
+        if (! empty($data['email_pribadi'])) {
+            $email = strtolower($data['email_pribadi']);
 
             if (isset($seenEmails[$email])) {
-                $errors['email'][] = "Email pegawai sudah ada pada baris {$seenEmails[$email]}.";
+                $errors['email_pribadi'][] = "Email pegawai sudah ada pada baris {$seenEmails[$email]}.";
             } else {
                 $seenEmails[$email] = $row;
             }

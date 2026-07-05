@@ -21,8 +21,9 @@ class ListInactiveEmployeesAction
         return Employee::onlyTrashed()
             ->with([
                 'jenisPegawai',
+                'statusPegawai',
                 'positionHistories' => fn ($query) => $query
-                    ->with('unitKerja')
+                    ->with(['jabatan', 'unitKerja'])
                     ->orderByDesc('is_latest')
                     ->orderByDesc('tmt_jabatan'),
             ])

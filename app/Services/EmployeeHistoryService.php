@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\RefGolongan;
+use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\SalaryHistory;
 use Illuminate\Http\Request;
@@ -78,6 +79,8 @@ class EmployeeHistoryService
         $data = $this->storeSkUpload($data);
 
         return DB::transaction(function () use ($employee, $data, $request): PositionHistory {
+            $jabatan = RefJabatan::findOrFail($data['jabatan_id']);
+            $jenisJabatanId = $data['jenis_jabatan_id'] ?? $jabatan->jenis_jabatan_id;
             // Kunci baris pegawai agar dua penulisan paralel tidak sama-sama menyisakan riwayat terbaru.
             $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
             $currentLatest = $employee->positionHistories()->where('is_latest', true)->first();
@@ -91,22 +94,26 @@ class EmployeeHistoryService
 
             $history = $employee->positionHistories()->create([
                 ...Arr::only($data, [
-                    'nama_jabatan',
-                    'jenis_jabatan_id',
                     'eselon_id',
                     'unit_kerja_id',
+                    'kelas_jabatan',
                     'tmt_jabatan',
                     'no_sk',
                     'tanggal_sk',
                     'file_sk',
                 ]),
+                'jabatan_id' => $jabatan->id,
+                'nama_jabatan' => $jabatan->nama,
+                'jenis_jabatan_id' => $jenisJabatanId,
                 'is_latest' => $isLatest,
             ]);
 
             if ($isLatest) {
-                $jenisJabatan = RefJenisJabatan::findOrFail($data['jenis_jabatan_id']);
+                $jenisJabatan = RefJenisJabatan::findOrFail($jenisJabatanId);
                 $employee->update([
-                    'jabatan_terakhir' => $data['nama_jabatan'],
+                    'jabatan_terakhir' => $jabatan->nama,
+                    'kelas_jabatan_terakhir' => $data['kelas_jabatan'] ?? $employee->kelas_jabatan_terakhir,
+                    'kelas_jabatan' => $data['kelas_jabatan'] ?? $employee->kelas_jabatan_terakhir,
                     'tanggal_pensiun' => $employee->tanggal_lahir->copy()
                         ->addYears($jenisJabatan->maks_usia_pensiun)
                         ->toDateString(),
@@ -116,7 +123,7 @@ class EmployeeHistoryService
             if ($history->file_sk) {
                 $employee->documents()->create([
                     'jenis_dokumen' => 'sk_jabatan',
-                    'nama_dokumen' => 'SK Kenaikan Jabatan '.$history->nama_jabatan,
+                    'nama_dokumen' => 'SK Kenaikan Jabatan '.$jabatan->nama,
                     'nomor_dokumen' => $history->no_sk,
                     'tanggal_dokumen' => $history->tanggal_sk,
                     'file_path' => $history->file_sk,

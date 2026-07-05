@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Employee;
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
+use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\RefUnitKerja;
@@ -43,13 +44,13 @@ class EmployeeUpdateTest extends TestCase
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create([
             'nama_lengkap' => 'Nama Lama',
-            'email' => 'lama@example.com',
+            'email_pribadi' => 'lama@example.com',
             'nip' => '198001012006041001',
         ]);
 
         $payload = $this->validPayload($employee, [
             'nama_lengkap' => 'Nama Baru',
-            'email' => 'baru@example.com',
+            'email_pribadi' => 'baru@example.com',
             'jabatan_terakhir' => 'Analis SDM Aparatur',
         ]);
 
@@ -63,7 +64,7 @@ class EmployeeUpdateTest extends TestCase
         $this->assertDatabaseHas('employees', [
             'id' => $employee->id,
             'nama_lengkap' => 'Nama Baru',
-            'email' => 'baru@example.com',
+            'email_pribadi' => 'baru@example.com',
             'jabatan_terakhir' => 'Analis SDM Aparatur',
         ]);
         $this->assertDatabaseHas('audit_logs', [
@@ -131,14 +132,14 @@ class EmployeeUpdateTest extends TestCase
     {
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create([
-            'email' => 'tetap@example.com',
+            'email_pribadi' => 'tetap@example.com',
             'nip' => '198001012006041001',
         ]);
 
         $this->actingAs($user);
         $response = $this->putJsonWithCsrf($this->endpoint($employee), $this->validPayload($employee, [
             'nama_lengkap' => 'Nama Tetap Valid',
-            'email' => 'tetap@example.com',
+            'email_pribadi' => 'tetap@example.com',
             'nip' => '198001012006041001',
         ]));
 
@@ -146,7 +147,7 @@ class EmployeeUpdateTest extends TestCase
         $this->assertDatabaseHas('employees', [
             'id' => $employee->id,
             'nama_lengkap' => 'Nama Tetap Valid',
-            'email' => 'tetap@example.com',
+            'email_pribadi' => 'tetap@example.com',
             'nip' => '198001012006041001',
         ]);
     }
@@ -156,18 +157,18 @@ class EmployeeUpdateTest extends TestCase
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create();
         Employee::factory()->create([
-            'email' => 'duplikat@example.com',
+            'email_pribadi' => 'duplikat@example.com',
             'nip' => '198001012006041001',
         ]);
 
         $this->actingAs($user);
         $response = $this->putJsonWithCsrf($this->endpoint($employee), $this->validPayload($employee, [
-            'email' => 'duplikat@example.com',
+            'email_pribadi' => 'duplikat@example.com',
             'nip' => '198001012006041001',
         ]));
 
         $response->assertUnprocessable();
-        $response->assertJsonValidationErrors(['email', 'nip']);
+        $response->assertJsonValidationErrors(['email_pribadi', 'nip']);
     }
 
     public function test_future_birth_date_is_rejected(): void
@@ -216,10 +217,10 @@ class EmployeeUpdateTest extends TestCase
     {
         return array_merge([
             'nama_lengkap' => $employee->nama_lengkap,
-            'email' => $employee->email,
+            'email_pribadi' => $employee->email_pribadi,
             'golongan_terakhir' => $employee->golongan_terakhir,
             'jabatan_terakhir' => $employee->jabatan_terakhir,
-            'kelas_jabatan' => $employee->kelas_jabatan,
+            'kelas_jabatan_terakhir' => $employee->kelas_jabatan_terakhir,
             'nip' => $employee->nip,
             'no_hp' => $employee->no_hp,
             'pangkat_terakhir' => $employee->pangkat_terakhir,
@@ -238,9 +239,14 @@ class EmployeeUpdateTest extends TestCase
         $employee = Employee::factory()->create();
 
         $golongan = RefGolongan::first() ?: RefGolongan::create(['kode' => 'III/a', 'nama' => 'Penata Muda']);
-        $jenisJabatan = RefJenisJabatan::first() ?: RefJenisJabatan::create(['nama' => 'Fungsional']);
+        $jenisJabatan = RefJenisJabatan::where('nama', 'Struktural')->first()
+            ?: RefJenisJabatan::create(['nama' => 'Struktural']);
         $eselon = RefEselon::first() ?: RefEselon::create(['nama' => 'Eselon I']);
         $unitKerja = RefUnitKerja::first() ?: RefUnitKerja::create(['nama' => 'LLDIKTI']);
+        $jabatan = RefJabatan::firstOrCreate(
+            ['nama' => 'Kepala Sub Bagian Web'],
+            ['jenis_jabatan_id' => $jenisJabatan->id]
+        );
 
         $payload = $this->validPayload($employee, [
             // Pangkat
@@ -251,10 +257,10 @@ class EmployeeUpdateTest extends TestCase
             'file_sk_pangkat' => UploadedFile::fake()->create('sk-pangkat.pdf', 500, 'application/pdf'),
 
             // Jabatan
-            'jabatan_nama_jabatan' => 'Kepala Sub Bagian Web',
-            'jabatan_jenis_jabatan_id' => $jenisJabatan->id,
+            'jabatan_jabatan_id' => $jabatan->id,
             'jabatan_eselon_id' => $eselon->id,
             'jabatan_unit_kerja_id' => $unitKerja->id,
+            'jabatan_kelas_jabatan' => '9',
             'jabatan_no_sk' => 'SK-JABATAN-WEB-001',
             'jabatan_tanggal_sk' => '2026-02-01',
             'jabatan_tmt_jabatan' => '2026-02-02',
@@ -293,10 +299,12 @@ class EmployeeUpdateTest extends TestCase
         // Assert PositionHistory was created
         $this->assertDatabaseHas('position_histories', [
             'employee_id' => $employee->id,
+            'jabatan_id' => $jabatan->id,
             'nama_jabatan' => 'Kepala Sub Bagian Web',
             'jenis_jabatan_id' => $jenisJabatan->id,
             'eselon_id' => $eselon->id,
             'unit_kerja_id' => $unitKerja->id,
+            'kelas_jabatan' => '9',
             'no_sk' => 'SK-JABATAN-WEB-001',
             'tmt_jabatan' => '2026-02-02 00:00:00',
             'is_latest' => 1,

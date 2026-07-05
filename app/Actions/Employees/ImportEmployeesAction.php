@@ -4,6 +4,7 @@ namespace App\Actions\Employees;
 
 use App\Models\Employee;
 use App\Models\RefJenisPegawai;
+use App\Models\RefStatusPegawai;
 use App\Services\AuditService;
 use App\Support\EmployeeImport\CsvEmployeeReader;
 use App\Support\EmployeeValidationRules;
@@ -81,8 +82,16 @@ class ImportEmployeesAction
         }
 
         DB::transaction(function () use ($validatedRows): void {
+            $aktifId = RefStatusPegawai::where('nama', 'Aktif')->value('id')
+                ?? RefStatusPegawai::where('is_default', true)->value('id');
+
             foreach ($validatedRows as $data) {
-                Employee::create($data);
+                Employee::create($data + [
+                    'status_pegawai_id' => $aktifId,
+                    'status_aktif' => 'Aktif',
+                    'profil_status' => 'belum_lengkap',
+                    'is_kinerja_baik' => true,
+                ]);
             }
         });
 
@@ -161,11 +170,11 @@ class ImportEmployeesAction
             }
         }
 
-        if (! empty($data['email'])) {
-            $email = strtolower((string) $data['email']);
+        if (! empty($data['email_pribadi'])) {
+            $email = strtolower((string) $data['email_pribadi']);
 
             if (isset($seenEmails[$email])) {
-                $errors['email'][] = "Email pegawai sudah ada pada baris {$seenEmails[$email]}.";
+                $errors['email_pribadi'][] = "Email pegawai sudah ada pada baris {$seenEmails[$email]}.";
             } else {
                 $seenEmails[$email] = $row;
             }

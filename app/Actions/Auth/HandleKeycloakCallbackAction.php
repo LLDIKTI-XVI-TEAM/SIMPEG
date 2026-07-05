@@ -5,6 +5,7 @@ namespace App\Actions\Auth;
 use App\Models\Employee;
 use App\Models\User;
 use App\Services\AuditService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -60,7 +61,7 @@ class HandleKeycloakCallbackAction
         $matchedEmail = $this->verifiedEmailClaim($keycloakUser);
 
         if ($matchedEmail) {
-            $employees = Employee::whereRaw('lower('.$employeeField.') = ?', [$matchedEmail])->limit(2)->get();
+            $employees = $this->matchedEmployees($employeeField, $matchedEmail);
 
             if ($employees->count() !== 1) {
                 return view('auth.unregistered', [
@@ -149,6 +150,20 @@ class HandleKeycloakCallbackAction
         }
 
         return $field;
+    }
+
+    /** @return Collection<int, Employee> */
+    private function matchedEmployees(string $employeeField, string $matchedEmail): Collection
+    {
+        if ($employeeField === 'email') {
+            return Employee::where(function ($query) use ($matchedEmail): void {
+                $query
+                    ->whereRaw('lower(email_pribadi) = ?', [$matchedEmail])
+                    ->orWhereRaw('lower(email) = ?', [$matchedEmail]);
+            })->limit(2)->get();
+        }
+
+        return Employee::whereRaw('lower('.$employeeField.') = ?', [$matchedEmail])->limit(2)->get();
     }
 
     /**

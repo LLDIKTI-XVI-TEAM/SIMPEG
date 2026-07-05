@@ -24,10 +24,12 @@ class StorePositionHistoryRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'nama_jabatan' => ['required', 'string', 'max:255'],
-            'jenis_jabatan_id' => ['required', 'uuid', 'exists:ref_jenis_jabatan,id'],
+            'jabatan_id' => ['required', 'uuid', 'exists:ref_jabatan,id'],
+            'nama_jabatan' => ['nullable', 'string', 'max:255'],
+            'jenis_jabatan_id' => ['nullable', 'uuid', 'exists:ref_jenis_jabatan,id'],
             'eselon_id' => ['nullable', 'uuid', 'exists:ref_eselon,id'],
             'unit_kerja_id' => ['required', 'uuid', 'exists:ref_unit_kerja,id'],
+            'kelas_jabatan' => ['nullable', 'string', 'max:10'],
             'tmt_jabatan' => ['required', 'date'],
             'no_sk' => ['required', 'string', 'max:100'],
             'tanggal_sk' => ['required', 'date'],
@@ -38,10 +40,12 @@ class StorePositionHistoryRequest extends FormRequest
     public function attributes(): array
     {
         return [
+            'jabatan_id' => 'Jabatan',
             'nama_jabatan' => 'Nama Jabatan',
             'jenis_jabatan_id' => 'Jenis Jabatan',
             'eselon_id' => 'Eselon',
             'unit_kerja_id' => 'Unit Kerja',
+            'kelas_jabatan' => 'Kelas Jabatan',
             'tmt_jabatan' => 'TMT Jabatan',
             'no_sk' => 'Nomor SK',
             'tanggal_sk' => 'Tanggal SK',
