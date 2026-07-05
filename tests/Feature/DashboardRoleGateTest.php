@@ -47,20 +47,14 @@ class DashboardRoleGateTest extends TestCase
         $response->assertOk();
     }
 
-    public function test_dev_login_reuses_existing_demo_email_when_role_was_changed(): void
+    public function test_get_dev_login_redirects_to_keycloak(): void
     {
-        User::factory()->pegawai()->create([
-            'email' => 'demo@example.com',
-            'name' => 'Demo Klabat',
-        ]);
-
         $response = $this->get('/dev-login');
 
-        $response->assertRedirect(route('dashboard'));
-        $this->assertDatabaseHas('users', [
-            'email' => 'demo@example.com',
-            'role' => 'super_admin',
-        ]);
-        $this->assertSame(1, User::where('email', 'demo@example.com')->count());
+        $response->assertStatus(302);
+        $this->assertStringStartsWith(
+            'https://sso-lldikti16.kemdiktisaintek.go.id/realms/sso/protocol/openid-connect/auth',
+            $response->headers->get('Location'),
+        );
     }
 }
