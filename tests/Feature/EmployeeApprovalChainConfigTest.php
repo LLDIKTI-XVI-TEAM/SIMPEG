@@ -196,8 +196,8 @@ class EmployeeApprovalChainConfigTest extends TestCase
 
         $steps = $this->app->make(ApprovalChainResolver::class)->resolveEffectiveSteps($pegawai);
 
-        $this->assertCount(2, $steps);
-        $this->assertSame([$verifikator->id, $approverSama->id], $steps->pluck('approver_employee_id')->all());
+        $this->assertCount(3, $steps);
+        $this->assertSame([$approverSama->id, $verifikator->id, $approverSama->id], $steps->pluck('approver_employee_id')->all());
         $this->assertTrue($steps->last()->is_final);
         $this->assertSame('pybmc', $steps->last()->step_type);
     }
@@ -224,7 +224,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
         ]);
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Rantai approval cuti wajib memiliki tepat satu approver final efektif.');
+        $this->expectExceptionMessage('Rantai approval cuti wajib memiliki tepat satu approver final.');
 
         $this->app->make(ApprovalChainResolver::class)->resolveEffectiveSteps($pegawai);
     }

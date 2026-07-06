@@ -9,8 +9,8 @@ use Illuminate\Database\Eloquent\Collection;
 use RuntimeException;
 
 /**
- * Me-resolve chain approval aktif menjadi step efektif siap snapshot.
- * Duplikasi approver di-skip dengan mempertahankan kemunculan terakhir agar PYBMC final tetap berwenang.
+ * Me-resolve chain approval aktif menjadi step siap snapshot.
+ * Duplikasi approver tetap disnapshot agar runtime approval mencatat skip otomatis sebagai jejak audit.
  */
 class ApprovalChainResolver
 {
@@ -27,26 +27,16 @@ class ApprovalChainResolver
             throw new RuntimeException('Konfigurasi approval cuti pegawai belum tersedia.');
         }
 
-        $effective = new Collection;
-        $seenApprovers = [];
-
-        foreach ($chain->steps->reverse()->values() as $step) {
+        foreach ($chain->steps as $step) {
             if ($step->approver_employee_id === null) {
-                continue;
+                throw new RuntimeException("Approver {$step->role_label} belum tersedia pada konfigurasi approval cuti.");
             }
-
-            if (isset($seenApprovers[$step->approver_employee_id])) {
-                continue;
-            }
-
-            $seenApprovers[$step->approver_employee_id] = true;
-            $effective->prepend($step);
         }
 
-        if ($effective->where('is_final', true)->count() !== 1) {
-            throw new RuntimeException('Rantai approval cuti wajib memiliki tepat satu approver final efektif.');
+        if ($chain->steps->where('is_final', true)->count() !== 1) {
+            throw new RuntimeException('Rantai approval cuti wajib memiliki tepat satu approver final.');
         }
 
-        return $effective->values();
+        return $chain->steps->values();
     }
 }
