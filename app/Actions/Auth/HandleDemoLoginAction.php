@@ -6,12 +6,29 @@ use App\Http\Requests\Auth\DemoLoginRequest;
 use App\Models\User;
 use App\Services\AuditService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 class HandleDemoLoginAction
 {
+    public function executeDefault(Request $request): RedirectResponse
+    {
+        abort_unless(app()->environment(['local', 'testing']), 404);
+
+        $username = strtolower(trim((string) config('services.keycloak.test_username', 'demo-klabat')));
+        abort_unless($this->isConfiguredDemoUser($username), 404, 'Akun demo default tidak terdaftar.');
+
+        $user = User::query()
+            ->whereRaw('lower(keycloak_username) = ?', [$username])
+            ->first();
+
+        abort_unless($user !== null, 404, 'Akun demo default belum tersedia. Jalankan seeder demo terlebih dahulu.');
+
+        return $this->login($user, $request);
+    }
+
     public function execute(DemoLoginRequest $request): RedirectResponse
     {
         abort_unless(app()->environment(['local', 'testing']), 404);
@@ -31,6 +48,14 @@ class HandleDemoLoginAction
             throw $this->invalidCredentials();
         }
 
+        return $this->login($user, $request);
+    }
+
+    /**
+     * Login demo hanya tersedia di local/testing agar akses bypass SSO tidak pernah aktif di production.
+     */
+    private function login(User $user, Request $request): RedirectResponse
+    {
         Auth::login($user);
         $request->session()->regenerate();
         session(['active_role' => $user->role]);

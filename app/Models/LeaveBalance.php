@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property int $tahun
@@ -41,5 +42,11 @@ class LeaveBalance extends Model
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
+    }
+
+    /** @return HasMany<LeaveBalanceLedger, $this> */
+    public function ledgerEntries(): HasMany
+    {
+        return $this->hasMany(LeaveBalanceLedger::class);
     }
 }

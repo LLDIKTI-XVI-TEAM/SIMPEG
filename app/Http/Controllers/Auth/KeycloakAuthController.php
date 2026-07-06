@@ -20,6 +20,11 @@ class KeycloakAuthController extends Controller
         return $action->execute();
     }
 
+    public function defaultDemoLogin(Request $request, HandleDemoLoginAction $action): RedirectResponse
+    {
+        return $action->executeDefault($request);
+    }
+
     public function demoLogin(DemoLoginRequest $request, HandleDemoLoginAction $action): RedirectResponse
     {
         return $action->execute($request);

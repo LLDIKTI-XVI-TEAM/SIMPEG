@@ -74,6 +74,23 @@ class EmployeeUpdateTest extends TestCase
         ]);
     }
 
+    public function test_admin_kepegawaian_can_update_kepala_lembaga_marker(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create(['is_kepala_lembaga' => false]);
+
+        $this->actingAs($user);
+        $response = $this->putJsonWithCsrf($this->endpoint($employee), $this->validPayload($employee, [
+            'is_kepala_lembaga' => true,
+        ]));
+
+        $response->assertOk();
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'is_kepala_lembaga' => true,
+        ]);
+    }
+
     public function test_super_admin_can_update_employee(): void
     {
         $user = User::factory()->superAdmin()->create();

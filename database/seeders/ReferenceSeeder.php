@@ -79,16 +79,17 @@ class ReferenceSeeder extends Seeder
 
         // §16.4 ref_jenis_cuti
         $jenisCuti = [
-            ['nama' => 'Cuti Tahunan', 'khusus_pns' => false],
-            ['nama' => 'Cuti Sakit', 'khusus_pns' => false],
-            ['nama' => 'Cuti Melahirkan', 'khusus_pns' => false],
-            ['nama' => 'Cuti Karena Alasan Penting', 'khusus_pns' => false],
-            ['nama' => 'Cuti Besar', 'khusus_pns' => true],
-            ['nama' => 'Cuti Luar Tanggungan Negara (CLTN)', 'khusus_pns' => true],
+            ['nama' => 'Cuti Tahunan', 'code' => 'tahunan', 'mengurangi_saldo_tahunan' => true, 'khusus_pns' => false],
+            ['nama' => 'Cuti Sakit', 'code' => 'sakit', 'mengurangi_saldo_tahunan' => false, 'khusus_pns' => false],
+            ['nama' => 'Cuti Melahirkan', 'code' => 'melahirkan', 'mengurangi_saldo_tahunan' => false, 'khusus_pns' => false],
+            ['nama' => 'Cuti Karena Alasan Penting', 'code' => 'alasan_penting', 'mengurangi_saldo_tahunan' => false, 'khusus_pns' => false],
+            ['nama' => 'Cuti Besar', 'code' => 'besar', 'mengurangi_saldo_tahunan' => false, 'khusus_pns' => true],
+            ['nama' => 'Cuti Luar Tanggungan Negara (CLTN)', 'code' => 'cltn', 'mengurangi_saldo_tahunan' => false, 'khusus_pns' => true],
         ];
 
         foreach ($jenisCuti as $item) {
-            RefJenisCuti::firstOrCreate(['nama' => $item['nama']], $item);
+            // Metadata stabil mencegah rule cuti bergantung pada teks nama yang mudah berubah.
+            RefJenisCuti::updateOrCreate(['nama' => $item['nama']], $item);
         }
 
         // §16.5 ref_agama

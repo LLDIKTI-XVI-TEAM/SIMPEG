@@ -45,11 +45,18 @@ class RbacSeeder extends Seeder
             'notifications.update' => ['module' => 'notifications', 'description' => 'Menandai notifikasi milik sendiri sudah dibaca'],
             // Permission cuti menjadi gerbang kasar route/menu; otorisasi inti per pengajuan tetap berbasis approver terkonfigurasi.
             'cuti.create' => ['module' => 'cuti', 'description' => 'Mengajukan permohonan cuti'],
+            'cuti.read_own' => ['module' => 'cuti', 'description' => 'Melihat pengajuan cuti milik sendiri'],
             'cuti.read_all' => ['module' => 'cuti', 'description' => 'Melihat seluruh pengajuan cuti (monitor)'],
+            'cuti.approve' => ['module' => 'cuti', 'description' => 'Mengambil keputusan approval cuti sesuai assignment aktif'],
             'cuti.approve_stage1' => ['module' => 'cuti', 'description' => 'Menyetujui/menunda cuti pada stage 1 (Atasan Langsung)'],
             'cuti.approve_stage2' => ['module' => 'cuti', 'description' => 'Menyetujui/menunda cuti pada stage 2 (Kabag Umum)'],
             'cuti.approve_stage3' => ['module' => 'cuti', 'description' => 'Menyetujui/menunda cuti pada stage 3 (Pimpinan/PYBMC)'],
             'cuti.configure' => ['module' => 'cuti', 'description' => 'Mengonfigurasi approval chain cuti'],
+            'cuti.configure_chain' => ['module' => 'cuti', 'description' => 'Mengonfigurasi rantai approval cuti per pegawai'],
+            'cuti.balance.read' => ['module' => 'cuti', 'description' => 'Melihat saldo cuti'],
+            'cuti.balance.adjust' => ['module' => 'cuti', 'description' => 'Melakukan koreksi saldo cuti yang diaudit'],
+            'cuti.proof.generate' => ['module' => 'cuti', 'description' => 'Membuat bukti/formulir cuti resmi setelah approval final'],
+            'cuti.kepala_lembaga_documents.manage' => ['module' => 'cuti', 'description' => 'Mengelola dokumen pendukung cuti Kepala Lembaga'],
         ];
 
         foreach ($roles as $name => $description) {
@@ -90,11 +97,15 @@ class RbacSeeder extends Seeder
                 'notifications.update',
                 // Admin kepegawaian memonitor seluruh pengajuan cuti namun tidak boleh menyetujui.
                 'cuti.read_all',
+                'cuti.balance.read',
+                'cuti.balance.adjust',
+                'cuti.kepala_lembaga_documents.manage',
             ],
             'pimpinan' => [
                 'notifications.read',
                 'notifications.update',
                 // Pimpinan/PYBMC adalah approver final sekaligus dapat memonitor seluruh pengajuan.
+                'cuti.approve',
                 'cuti.approve_stage3',
                 'cuti.read_all',
             ],
@@ -102,6 +113,7 @@ class RbacSeeder extends Seeder
                 'notifications.read',
                 'notifications.update',
                 // Atasan langsung memegang approval stage 1 atas pengajuan bawahannya.
+                'cuti.approve',
                 'cuti.approve_stage1',
             ],
             'pegawai' => [
