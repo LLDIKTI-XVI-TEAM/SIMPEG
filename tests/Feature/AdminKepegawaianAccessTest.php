@@ -70,6 +70,17 @@ class AdminKepegawaianAccessTest extends TestCase
         }
     }
 
+    public function test_super_admin_dapat_membuka_halaman_pengaturan_sistem(): void
+    {
+        $superAdmin = User::factory()->superAdmin()->create();
+
+        $this->actingAs($superAdmin)
+            ->withSession(['active_role' => 'super_admin'])
+            ->get('/dashboard/pengaturan')
+            ->assertOk()
+            ->assertSee('Pengaturan Sistem');
+    }
+
     public function test_admin_kepegawaian_dapat_membuka_halaman_operasional_sesuai_dokumen(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();

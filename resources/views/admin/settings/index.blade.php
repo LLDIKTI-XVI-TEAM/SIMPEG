@@ -263,7 +263,7 @@
                             </x-ui.button>
                         </div>
                     </form>
-                </x-ui.card>
+                </div>
 
                 {{-- TAB: ALUR APPROVAL CUTI --}}
 
@@ -393,7 +393,7 @@
                             </x-ui.button>
                         </div>
                     </form>
-                </x-ui.card>
+                </div>
 
                 {{-- TAB: PEMETAAN SSO & RBAC --}}
                 <x-ui.card padding="lg" x-show="activeTab === 'rbac'"   style="display: none;" class="space-y-6">
