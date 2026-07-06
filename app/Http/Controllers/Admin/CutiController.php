@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Actions\Cuti\ApproveLeaveAction;
 use App\Actions\Cuti\PostponeLeaveAction;
+use App\Actions\Cuti\RejectLeaveAction;
+use App\Actions\Cuti\RequestChangesLeaveAction;
 use App\Actions\Cuti\SubmitLeaveRequestAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Cuti\ApproveLeaveRequest;
 use App\Http\Requests\Cuti\PostponeLeaveRequest;
+use App\Http\Requests\Cuti\ReviewLeaveDecisionRequest;
 use App\Http\Requests\Cuti\StoreLeaveRequestRequest;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
@@ -242,7 +245,7 @@ class CutiController extends Controller
             ];
         });
 
-        $statsQuery = LeaveRequest::where('status', 'Disetujui')->with('jenisCuti');
+        $statsQuery = LeaveRequest::where('status', 'disetujui')->with('jenisCuti');
         if ($unit) {
             $statsQuery->whereHas('employee', function ($q) use ($unit) {
                 $q->where('jabatan_terakhir', $unit);
@@ -304,7 +307,7 @@ class CutiController extends Controller
         $user = request()->user();
 
         $query = LeaveRequest::query()
-            ->with(['employee', 'jenisCuti'])
+            ->with(['employee', 'jenisCuti', 'steps'])
             ->latest();
 
         // Pemantau (mis. admin kepegawaian/pimpinan) boleh melihat semua; selain itu dibatasi milik sendiri.
@@ -348,7 +351,7 @@ class CutiController extends Controller
         $user = request()->user();
 
         $cuti = LeaveRequest::query()
-            ->with(['employee', 'jenisCuti', 'approvals.approver'])
+            ->with(['employee', 'jenisCuti', 'approvals.approver', 'steps.approver'])
             ->findOrFail($id);
 
         if (! $user->hasPermission('cuti.read_all') && $cuti->employee_id !== $user->employee_id) {
@@ -364,6 +367,7 @@ class CutiController extends Controller
         return view('admin.cuti.show', [
             'cuti' => $cuti,
             'canAct' => $canAct,
+            'activeStep' => $stage === null ? null : $cuti->steps->firstWhere('step_order', $stage),
         ]);
     }
 
@@ -391,15 +395,13 @@ class CutiController extends Controller
     {
         $employeeId = request()->user()->employee_id;
 
-        // Hanya pengajuan berstatus menunggu/ditunda yang relevan untuk antrean approver.
+        // Hanya pengajuan snapshot yang masih aktif/ditangguhkan yang relevan untuk antrean approver.
         $kandidat = LeaveRequest::query()
-            ->with(['employee', 'jenisCuti'])
-            ->whereIn('status', [
-                'Menunggu Atasan Langsung',
-                'Menunggu Verifikator',
-                'Menunggu Pimpinan',
-                'Ditunda',
-            ])
+            ->with(['employee', 'jenisCuti', 'steps'])
+            ->whereIn('status', ['menunggu_approval', 'ditangguhkan'])
+            ->whereHas('steps', fn ($query) => $query
+                ->where('status', 'active')
+                ->where('approver_employee_id', $employeeId))
             ->latest()
             ->get();
 
@@ -447,5 +449,33 @@ class CutiController extends Controller
 
         return redirect()->route('cuti.approval')
             ->with('success', 'Pengajuan cuti ditunda dan pemohon telah diberi tahu.');
+    }
+
+    /** Meminta perubahan pengajuan cuti pada step aktif; catatan wajib menjadi dasar revisi pemohon. */
+    public function requestChanges(ReviewLeaveDecisionRequest $request, $id, RequestChangesLeaveAction $action)
+    {
+        $leaveRequest = LeaveRequest::findOrFail($id);
+        $actor = $request->user()->employee;
+
+        abort_if($actor === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat meminta perubahan cuti.');
+
+        $action->execute($leaveRequest, $actor, $request->validated()['komentar'], $request);
+
+        return redirect()->route('cuti.approval')
+            ->with('success', 'Pengajuan cuti dikembalikan untuk perbaikan.');
+    }
+
+    /** Menolak pengajuan cuti secara terminal pada step aktif. */
+    public function reject(ReviewLeaveDecisionRequest $request, $id, RejectLeaveAction $action)
+    {
+        $leaveRequest = LeaveRequest::findOrFail($id);
+        $actor = $request->user()->employee;
+
+        abort_if($actor === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat menolak cuti.');
+
+        $action->execute($leaveRequest, $actor, $request->validated()['komentar'], $request);
+
+        return redirect()->route('cuti.approval')
+            ->with('success', 'Pengajuan cuti tidak disetujui dan pemohon telah diberi tahu.');
     }
 }

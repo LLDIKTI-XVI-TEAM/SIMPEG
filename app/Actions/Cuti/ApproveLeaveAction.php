@@ -11,7 +11,7 @@ use Illuminate\Http\Request;
 
 /**
  * Mengoordinasikan tindakan menyetujui pengajuan cuti.
- * Logika transisi tahap, skip duplikat, dan pemotongan saldo berada di LeaveApprovalService.
+ * Logika transisi snapshot, skip duplikat, dan pemotongan saldo berada di LeaveApprovalService.
  * Action ini menangani orkestrasi tepian: pencatatan audit dan notifikasi pihak terkait setelah transisi.
  */
 class ApproveLeaveAction
@@ -53,7 +53,7 @@ class ApproveLeaveAction
      */
     private function notifyAfterApproval(LeaveRequest $leaveRequest): void
     {
-        if ($leaveRequest->status === 'Disetujui') {
+        if ($leaveRequest->status === 'disetujui') {
             $pemohon = $leaveRequest->employee;
 
             if ($pemohon !== null) {

@@ -723,6 +723,14 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin,pimpinan,atasan_langsung,admin_kepegawaian'])
         ->name('cuti.postpone')
         ->whereUuid('id');
+    Route::post('/cuti/{id}/request-changes', [CutiController::class, 'requestChanges'])
+        ->middleware(['role:super_admin,pimpinan,atasan_langsung,admin_kepegawaian'])
+        ->name('cuti.request-changes')
+        ->whereUuid('id');
+    Route::post('/cuti/{id}/reject', [CutiController::class, 'reject'])
+        ->middleware(['role:super_admin,pimpinan,atasan_langsung,admin_kepegawaian'])
+        ->name('cuti.reject')
+        ->whereUuid('id');
     Route::get('/dashboard/cuti/{id}', [CutiController::class, 'show'])
         ->name('cuti.show')
         ->whereUuid('id');

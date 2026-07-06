@@ -6,7 +6,7 @@ use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * Memvalidasi tindakan menunda pengajuan cuti.
- * Otorisasi di sini bersifat gerbang kasar (pengguna memegang salah satu hak approve cuti);
+ * Otorisasi di sini bersifat gerbang kasar (pengguna memegang hak approve cuti);
  * kelayakan approver per-tahap ditegakkan secara person-based di LeaveApprovalService.
  */
 class PostponeLeaveRequest extends FormRequest
@@ -15,10 +15,8 @@ class PostponeLeaveRequest extends FormRequest
     {
         $user = $this->user();
 
-        // Penundaan hanya boleh dilakukan oleh approver; pemegang salah satu hak approve cuti boleh mencoba.
-        return (bool) $user?->hasPermission('cuti.approve_stage1')
-            || (bool) $user?->hasPermission('cuti.approve_stage2')
-            || (bool) $user?->hasPermission('cuti.approve_stage3');
+        // Kelayakan approver per-step tetap ditegakkan di service berdasarkan snapshot aktif.
+        return (bool) $user?->hasPermission('cuti.approve');
     }
 
     /**

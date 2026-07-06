@@ -80,8 +80,7 @@ class LeaveBalanceTest extends TestCase
             'tanggal_selesai' => now()->addDays(2)->toDateString(),
             'jumlah_hari_kerja' => 3,
             'alasan' => 'Liburan',
-            'status' => 'Disetujui',
-            'current_stage' => 3,
+            'status' => 'disetujui',
         ]);
 
         $this->actingAs($user);

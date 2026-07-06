@@ -9,35 +9,26 @@ use App\Services\LeaveApprovalService;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 
-/**
- * Mengoordinasikan tindakan menunda pengajuan cuti.
- * Transisi status ke ditangguhkan berada di LeaveApprovalService; Action ini menangani audit dan notifikasi.
- * Penundaan bersifat reversible, sehingga pemohon diberi tahu agar dapat menindaklanjuti.
- */
-class PostponeLeaveAction
+/** Mengembalikan pengajuan cuti ke pemohon untuk diperbaiki dengan catatan wajib dari approver. */
+class RequestChangesLeaveAction
 {
     public function __construct(
         private readonly LeaveApprovalService $approvals,
         private readonly NotificationService $notifications,
     ) {}
 
-    /**
-     * Menunda pengajuan cuti atas nama approver yang bertindak; alasan penundaan wajib diberikan.
-     */
     public function execute(LeaveRequest $leaveRequest, Employee $actor, string $komentar, Request $request): LeaveRequest
     {
         $statusSebelum = $leaveRequest->status;
 
-        $leaveRequest = $this->approvals->postpone($leaveRequest, $actor, $komentar);
+        $leaveRequest = $this->approvals->requestChanges($leaveRequest, $actor, $komentar);
 
-        // Audit dan notifikasi dijalankan setelah transaksi penundaan berhasil agar kegagalan keduanya
-        // tidak membatalkan penundaan yang sudah sah tersimpan.
         AuditService::log(
-            'POSTPONE',
+            'UPDATE',
             'LeaveRequest',
             $leaveRequest->id,
             ['status' => $statusSebelum],
-            ['status' => $leaveRequest->status, 'komentar' => $komentar],
+            ['status' => $leaveRequest->status, 'decision' => 'REQUEST_CHANGES', 'komentar' => $komentar],
             $request,
         );
 
@@ -46,9 +37,9 @@ class PostponeLeaveAction
         if ($pemohon !== null) {
             $this->notifications->createForEmployee(
                 $pemohon,
-                'cuti.ditunda',
-                'Pengajuan Cuti Ditangguhkan',
-                'Pengajuan cuti Anda ditangguhkan oleh approver. Silakan periksa catatan penangguhan.',
+                'cuti.perlu_perubahan',
+                'Pengajuan Cuti Perlu Perubahan',
+                'Pengajuan cuti Anda perlu diperbaiki sebelum dapat diproses lanjut.',
                 ['leave_request_id' => $leaveRequest->id],
             );
         }
