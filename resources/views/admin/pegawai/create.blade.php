@@ -380,6 +380,18 @@
                             label="Tanggal Pensiun"
                             id="tanggal_pensiun"
                         />
+
+                        {{-- Penanda ini dipakai cuti untuk membedakan Kepala Lembaga dari jabatan biasa. --}}
+                        <div class="space-y-1 rounded-lg border border-border bg-soft/40 p-4 sm:col-span-2">
+                            <input type="hidden" name="is_kepala_lembaga" value="0">
+                            <label for="is_kepala_lembaga" class="flex items-start gap-3 text-sm font-semibold text-ink font-sans">
+                                <input id="is_kepala_lembaga" name="is_kepala_lembaga" type="checkbox" value="1" @checked(old('is_kepala_lembaga')) class="mt-1 rounded border-border text-primary focus:ring-primary/20">
+                                <span>
+                                    Kepala Lembaga
+                                    <span class="block text-[10px] font-normal text-muted">Aktifkan hanya untuk pegawai yang berwenang memberi keputusan Kepala Lembaga pada alur cuti.</span>
+                                </span>
+                            </label>
+                        </div>
                     </div>
                 </div>
 

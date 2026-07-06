@@ -95,6 +95,20 @@ class AdminKepegawaianAccessTest extends TestCase
         }
     }
 
+    public function test_rekap_cuti_mendefinisikan_filter_periode_untuk_preview_laporan(): void
+    {
+        $admin = User::factory()->adminKepegawaian()->create();
+
+        $response = $this->actingAs($admin)
+            ->withSession(['active_role' => 'admin_kepegawaian'])
+            ->get('/cuti/rekap');
+
+        $response->assertOk();
+        $response->assertSee('activeFilters', false);
+        $response->assertSee("periode: 'Semua Periode'", false);
+        $response->assertSee('$dispatch(\'open-confirm-rekap\')', false);
+    }
+
     public function test_session_tidak_dapat_dipakai_untuk_menaikkan_role(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();

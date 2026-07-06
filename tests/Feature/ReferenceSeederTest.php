@@ -78,4 +78,28 @@ class ReferenceSeederTest extends TestCase
             'is_cuti_bersama' => false,
         ]);
     }
+
+    public function test_reference_seeder_includes_stable_leave_type_metadata(): void
+    {
+        $this->seed(ReferenceSeeder::class);
+
+        $this->assertDatabaseHas('ref_jenis_cuti', [
+            'nama' => 'Cuti Tahunan',
+            'code' => 'tahunan',
+            'mengurangi_saldo_tahunan' => true,
+            'khusus_pns' => false,
+        ]);
+        $this->assertDatabaseHas('ref_jenis_cuti', [
+            'nama' => 'Cuti Besar',
+            'code' => 'besar',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => true,
+        ]);
+        $this->assertDatabaseHas('ref_jenis_cuti', [
+            'nama' => 'Cuti Luar Tanggungan Negara (CLTN)',
+            'code' => 'cltn',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => true,
+        ]);
+    }
 }
