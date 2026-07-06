@@ -110,6 +110,11 @@ class RbacSeeder extends Seeder
                 'notifications.update',
                 // Pegawai sebagai pemohon hanya boleh membuat pengajuan cuti.
                 'cuti.create',
+                // Pegawai dapat melihat, menambah, dan mengedit data keluarga miliknya sendiri.
+                // Otorisasi "hanya milik sendiri" dijaga di layer controller dan FormRequest.
+                'employee_families.read',
+                'employee_families.create',
+                'employee_families.update',
             ],
         ]);
     }

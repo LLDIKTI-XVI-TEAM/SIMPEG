@@ -190,7 +190,7 @@ class EmployeeFamilyTest extends TestCase
         $this->actingAs($user);
         $response = $this->postJsonWithCsrf($this->endpoint($employee), [
             'nama_anggota' => '',
-            'hubungan' => 'Saudara',
+            'hubungan' => 'Tetangga',
             'nik' => '123',
             'tempat_lahir' => str_repeat('A', 101),
             'tanggal_lahir' => now()->addDay()->format('Y-m-d'),
