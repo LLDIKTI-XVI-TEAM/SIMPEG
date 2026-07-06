@@ -53,20 +53,21 @@ class ExecuteImportBatchAction
 
         try {
             if ($validRows !== []) {
-                DB::transaction(function () use ($validRows, $type, $batchId, $totalRows, &$processedCount): void {
-                    foreach ($validRows as $result) {
+                foreach ($validRows as $result) {
+                    DB::transaction(function () use ($type, $result): void {
                         $this->executeValidatedRow($type, $result['validated_data']);
-                        $processedCount++;
+                    });
 
-                        // Update progress in cache
-                        $currentBatch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
-                        if ($currentBatch) {
-                            $currentBatch['processed_count'] = $processedCount;
-                            $currentBatch['progress'] = (int) (($processedCount / $totalRows) * 100);
-                            Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $currentBatch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
-                        }
+                    $processedCount++;
+
+                    // Update progress in cache (di luar transaction agar terlihat real-time)
+                    $currentBatch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
+                    if ($currentBatch) {
+                        $currentBatch['processed_count'] = $processedCount;
+                        $currentBatch['progress'] = (int) (($processedCount / $totalRows) * 100);
+                        Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $currentBatch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
                     }
-                });
+                }
             }
 
             AuditService::logAs(

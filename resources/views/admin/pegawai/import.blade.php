@@ -776,7 +776,7 @@
                 </div>
                 <div class="space-y-2">
                     <h3 class="text-base font-bold text-ink font-sans" x-text="progressText"></h3>
-                    <p class="text-xs text-muted font-sans">Proses impor berjalan di latar belakang (antrean). Anda dapat keluar atau menutup halaman ini dengan aman, proses impor akan tetap dilanjutkan oleh server.</p>
+                    <p class="text-xs text-muted font-sans">Proses impor berjalan di latar belakang. Halaman ini akan otomatis lanjut ke hasil ketika selesai.</p>
                 </div>
                 <div class="space-y-1">
                     <div class="w-full bg-soft rounded-full h-2.5 overflow-hidden border border-border">
@@ -784,8 +784,16 @@
                     </div>
                     <span class="text-[10px] font-bold text-muted font-mono" x-text="progress + '%'"></span>
                 </div>
+                <div class="border-t border-border pt-4 flex justify-center">
+                    <a href="{{ route('data-pegawai') }}"
+                        class="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-ink transition font-sans underline-offset-2 hover:underline">
+                        Lanjutkan di Background →
+                    </a>
+                </div>
+                <p class="text-[10px] text-muted/70 font-sans -mt-2">Anda akan mendapat notifikasi sistem saat import selesai.</p>
             </x-ui.card>
         </div>
+
 
         {{-- ═══════════════════════════════════════════════════════════════════ --}}
         {{-- STEP 5: LAPORAN HASIL                                             --}}
