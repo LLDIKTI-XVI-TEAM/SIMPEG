@@ -51,8 +51,8 @@ class RbacPermissionMiddlewareTest extends TestCase
         // Re-seed tidak boleh menduplikasi permission (firstOrCreate + sync).
         $this->seed(RbacSeeder::class);
 
-        // 22 permission dasar + 6 permission modul cuti (cuti.create, read_all, approve_stage1/2/3, configure).
-        $this->assertSame(28, Permission::count());
+        // 22 permission dasar + 12 permission modul cuti setelah fondasi revisi cuti.
+        $this->assertSame(34, Permission::count());
         $this->assertTrue(
             Role::where('name', 'super_admin')->firstOrFail()
                 ->permissions()->where('name', 'hari_libur.delete')->exists()
