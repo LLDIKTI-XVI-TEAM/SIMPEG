@@ -2,20 +2,34 @@
     <div class="mx-auto max-w-7xl space-y-6">
 
         @php
-            // Status tersimpan berupa enum panjang; dipetakan ke token tampilan agar warna/label konsisten.
+            // Status runtime Phase 4 memakai token snake_case; label dipisahkan agar UI tidak bergantung status lama.
             $status = $cuti->status;
             $statusVariant = match ($status) {
-                'Disetujui' => 'success',
-                'Ditunda' => 'danger',
+                'disetujui' => 'success',
+                'ditangguhkan' => 'warning',
+                'tidak_disetujui' => 'danger',
+                'perlu_perubahan' => 'danger',
                 default => 'warning',
             };
-
-            // Tahap atasan langsung dianggap lewat bila pengajuan sudah melaju ke tahap verifikator/pimpinan atau disetujui.
-            $atasanSelesai = in_array($status, ['Menunggu Verifikator', 'Menunggu Pimpinan', 'Disetujui'], true);
-            $atasanDitunda = $status === 'Ditunda';
-            $finalDisetujui = $status === 'Disetujui';
+            $statusLabel = match ($status) {
+                'menunggu_approval' => 'Menunggu Approval',
+                'ditangguhkan' => 'Ditangguhkan',
+                'perlu_perubahan' => 'Perlu Perubahan',
+                'disetujui' => 'Disetujui',
+                'tidak_disetujui' => 'Tidak Disetujui',
+                default => $status,
+            };
 
             $pemohon = $cuti->employee?->nama_lengkap ?? 'Pegawai';
+
+            $buttonBase = 'inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold font-sans transition-all duration-200 active:scale-95 focus:outline-none focus:ring-2';
+            $buttonStyles = [
+                'secondary' => $buttonBase.' border border-border bg-surface text-primary shadow-sm hover:bg-soft hover:border-primary/30 focus:ring-primary/30',
+                'muted' => $buttonBase.' border border-border bg-surface text-ink shadow-sm hover:bg-soft focus:ring-primary/20',
+                'danger' => $buttonBase.' border border-danger/20 bg-surface text-danger shadow-sm hover:bg-danger/5 focus:ring-danger/20',
+                'success' => $buttonBase.' border border-success bg-success text-white shadow-sm hover:opacity-90 focus:ring-success/30',
+                'warning' => $buttonBase.' border border-warning bg-warning text-white shadow-sm hover:opacity-90 focus:ring-warning/30',
+            ];
         @endphp
 
         <x-admin.page-header title="Detail Pengajuan Cuti">
@@ -44,7 +58,7 @@
                 </div>
                 <div>
                     <x-ui.badge :variant="$statusVariant" size="md" dot>
-                        {{ $status }}
+                        {{ $statusLabel }}
                     </x-ui.badge>
                 </div>
             </div>
@@ -89,27 +103,36 @@
                 <h4 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Alur Persetujuan Cuti</h4>
 
                 <x-ui.timeline>
-                    {{-- Step 1: pengajuan oleh pegawai selalu sudah terjadi --}}
                     <x-ui.timeline-item
                         title="Diajukan oleh Pegawai"
                         :description="$cuti->created_at?->translatedFormat('d M Y, H:i')"
                     />
 
-                    {{-- Step 2: persetujuan atasan langsung --}}
-                    @if ($atasanSelesai)
-                        <x-ui.timeline-item title="Disetujui oleh Atasan Langsung" />
-                    @elseif ($atasanDitunda)
-                        <x-ui.timeline-item variant="danger" title="Ditunda oleh Atasan Langsung" />
-                    @else
-                        <x-ui.timeline-item variant="warning" title="Menunggu Persetujuan Atasan Langsung" pulse />
-                    @endif
-
-                    {{-- Step 3: pengesahan pimpinan/kepala lembaga --}}
-                    @if ($finalDisetujui)
-                        <x-ui.timeline-item title="Disahkan oleh Pimpinan" />
-                    @else
-                        <x-ui.timeline-item variant="muted" title="Verifikasi & Pengesahan Cuti" />
-                    @endif
+                    @foreach ($cuti->steps->sortBy('step_order') as $step)
+                        @php
+                            $stepVariant = match ($step->status) {
+                                'approved' => 'success',
+                                'rejected' => 'danger',
+                                'active' => $status === 'ditangguhkan' ? 'warning' : 'warning',
+                                'skipped' => 'muted',
+                                default => 'muted',
+                            };
+                            $stepTitle = match ($step->status) {
+                                'approved' => "Disetujui oleh {$step->role_label}",
+                                'rejected' => "Tidak disetujui oleh {$step->role_label}",
+                                'active' => $status === 'ditangguhkan' ? "Ditangguhkan oleh {$step->role_label}" : "Menunggu {$step->role_label}",
+                                'skipped' => "Dilewati: {$step->role_label}",
+                                default => "Menunggu {$step->role_label}",
+                            };
+                            $stepDescription = trim(($step->approver?->nama_lengkap ?? 'Approver').' '.($step->acted_at?->translatedFormat('d M Y, H:i') ?? ''));
+                        @endphp
+                        <x-ui.timeline-item
+                            :variant="$stepVariant"
+                            :title="$stepTitle"
+                            :description="$stepDescription"
+                            :pulse="$step->status === 'active' && $status !== 'ditangguhkan'"
+                        />
+                    @endforeach
                 </x-ui.timeline>
             </div>
 
@@ -119,23 +142,38 @@
                     <h4 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Riwayat Tindakan Approval</h4>
                     <div class="space-y-3">
                         @php
-                            $stageLabel = [1 => 'Atasan Langsung', 2 => 'Verifikator', 3 => 'Pimpinan'];
+                            $stepLabels = $cuti->steps->keyBy('step_order');
                         @endphp
                         @foreach ($cuti->approvals->sortBy('acted_at') as $approval)
                             <div class="flex items-start gap-3 rounded-lg border border-border bg-soft/30 p-3">
+                                @php
+                                    $actionVariant = match ($approval->action) {
+                                        'APPROVE' => 'success',
+                                        'REJECT', 'REQUEST_CHANGES' => 'danger',
+                                        default => 'warning',
+                                    };
+                                    $actionLabel = match ($approval->action) {
+                                        'APPROVE' => 'Setuju',
+                                        'POSTPONE' => 'Tunda',
+                                        'REQUEST_CHANGES' => 'Perlu Perubahan',
+                                        'REJECT' => 'Tidak Disetujui',
+                                        'SKIP' => 'Dilewati',
+                                        default => $approval->action,
+                                    };
+                                @endphp
                                 <x-ui.badge
-                                    :variant="$approval->action === 'APPROVE' ? 'success' : 'warning'"
+                                    :variant="$actionVariant"
                                     size="sm"
                                     :pill="false"
                                     uppercase
                                     class="mt-0.5"
                                 >
-                                    {{ $approval->action === 'APPROVE' ? 'Setuju' : 'Tunda' }}
+                                    {{ $actionLabel }}
                                 </x-ui.badge>
                                 <div class="flex-1">
                                     <p class="text-xs font-semibold text-ink font-sans">
                                         {{ $approval->approver?->nama_lengkap ?? 'Approver' }}
-                                        <span class="text-muted font-normal">- Tahap {{ $approval->stage }} ({{ $stageLabel[$approval->stage] ?? '-' }})</span>
+                                        <span class="text-muted font-normal">- Tahap {{ $approval->stage }} ({{ $stepLabels[$approval->stage]?->role_label ?? '-' }})</span>
                                     </p>
                                     <p class="text-[10px] text-muted font-sans mt-0.5">{{ $approval->acted_at?->translatedFormat('d M Y, H:i') }}</p>
                                     @if ($approval->komentar)
@@ -147,7 +185,7 @@
                     </div>
                 </div>
             @endif
-            <div class="border-t border-border pt-6 space-y-4" x-data="{ showTunda: false }">
+            <div class="border-t border-border pt-6 space-y-4" x-data="{ decisionForm: null }">
                 @if (session('success'))
                     <x-ui.alert variant="success" size="sm">{{ session('success') }}</x-ui.alert>
                 @endif
@@ -156,43 +194,55 @@
                 @enderror
 
                 @if ($canAct)
-                    {{-- Form penundaan: alasan wajib, jadi ditampilkan terpisah saat approver memilih Tunda. --}}
-                    <div x-show="showTunda" x-cloak class="rounded-lg border border-warning/25 bg-warning/5 p-4">
-                        <form action="{{ route('cuti.postpone', $cuti->id) }}" method="POST" class="space-y-3">
+                    {{-- Catatan keputusan wajib untuk tindakan selain setuju agar pemohon memahami dasar keputusan. --}}
+                    @foreach ([
+                        'postpone' => ['route' => 'cuti.postpone', 'label' => 'Alasan Penundaan', 'title' => 'Tunda Pengajuan', 'variant' => 'warning'],
+                        'requestChanges' => ['route' => 'cuti.request-changes', 'label' => 'Catatan Perubahan', 'title' => 'Minta Perubahan', 'variant' => 'danger'],
+                        'reject' => ['route' => 'cuti.reject', 'label' => 'Alasan Penolakan', 'title' => 'Tidak Setujui', 'variant' => 'danger'],
+                    ] as $formKey => $form)
+                    <div x-show="decisionForm === '{{ $formKey }}'" x-cloak class="rounded-lg border border-warning/25 bg-warning/5 p-4">
+                        <form action="{{ route($form['route'], $cuti->id) }}" method="POST" class="space-y-3">
                             @csrf
                             <x-form.textarea
                                 name="komentar"
-                                label="Alasan Penundaan"
-                                id="komentar-tunda"
+                                label="{{ $form['label'] }}"
+                                id="komentar-{{ $formKey }}"
                                 rows="3"
                                 minlength="5"
-                                placeholder="Jelaskan alasan penundaan agar pemohon dapat menindaklanjuti."
+                                placeholder="Tuliskan catatan keputusan agar pemohon memahami tindak lanjut."
                                 class="resize-y"
                                 required
                             />
                             <div class="flex justify-end gap-2">
-                                <x-ui.button type="button" variant="muted" size="md" @click="showTunda = false">Batal</x-ui.button>
-                                <x-ui.button type="submit" variant="warning" size="md">Tunda Pengajuan</x-ui.button>
+                                <button type="button" class="{{ $buttonStyles['muted'] }}" @click="decisionForm = null">Batal</button>
+                                <button type="submit" class="{{ $buttonStyles[$form['variant']] }}">{{ $form['title'] }}</button>
                             </div>
                         </form>
                     </div>
+                    @endforeach
                 @endif
 
                 <div class="flex justify-end gap-3">
 
-                    <x-ui.button href="{{ route('cuti') }}" variant="secondary">
+                    <a href="{{ route('cuti') }}" class="{{ $buttonStyles['secondary'] }}">
                         Kembali ke Daftar
-                    </x-ui.button>
+                    </a>
 
                     @if ($canAct)
-                        <x-ui.button type="button" variant="warning" @click="showTunda = true">
+                        <button type="button" class="{{ $buttonStyles['warning'] }}" @click="decisionForm = 'postpone'">
                             Tunda
-                        </x-ui.button>
+                        </button>
+                        <button type="button" class="{{ $buttonStyles['danger'] }}" @click="decisionForm = 'requestChanges'">
+                            Perlu Perubahan
+                        </button>
+                        <button type="button" class="{{ $buttonStyles['danger'] }}" @click="decisionForm = 'reject'">
+                            Tidak Setujui
+                        </button>
                         <form action="{{ route('cuti.approve', $cuti->id) }}" method="POST" class="inline">
                             @csrf
-                            <x-ui.button type="submit" variant="success">
+                            <button type="submit" class="{{ $buttonStyles['success'] }}">
                                 Setujui
-                            </x-ui.button>
+                            </button>
                         </form>
                     @endif
                 </div>

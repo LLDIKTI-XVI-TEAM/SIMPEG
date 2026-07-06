@@ -7,8 +7,10 @@
             'Perhatian' => 'text-warning',
             'Kritis' => 'text-danger',
             'Menunggu' => 'text-warning',
-            'Disetujui' => 'text-success',
-            'Ditunda' => 'text-danger',
+            'disetujui' => 'text-success',
+            'ditangguhkan' => 'text-warning',
+            'perlu_perubahan' => 'text-danger',
+            'tidak_disetujui' => 'text-danger',
         ];
 
         $toneText = [

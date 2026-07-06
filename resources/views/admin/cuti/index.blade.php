@@ -1,12 +1,12 @@
 <x-layouts.app title="Cuti Pegawai">
 
     @php
-        // Padatkan status enum tersimpan menjadi token tampilan agar warna/label tetap konsisten.
+        // Padatkan status snapshot menjadi token tampilan agar warna/label tetap konsisten.
         $statusToken = function (string $status): string {
-            if ($status === 'Disetujui') {
+            if ($status === 'disetujui') {
                 return 'disetujui';
             }
-            if ($status === 'Ditunda') {
+            if ($status === 'ditangguhkan') {
                 return 'ditunda';
             }
 
@@ -15,12 +15,8 @@
 
         // Petakan model pengajuan cuti ke bentuk baris yang dipakai markup tabel di bawah.
         $riwayatCuti = collect($riwayatCuti)->map(function ($r) use ($statusToken) {
-            // Stage approval diturunkan dari status; rincian per-tahap menyusul saat engine approval aktif.
-            $stageAtasan = match ($r->status) {
-                'Disetujui', 'Menunggu Verifikator', 'Menunggu Pimpinan' => 'disetujui',
-                'Ditunda' => 'ditunda',
-                default => 'menunggu',
-            };
+            $activeStep = $r->steps->firstWhere('status', 'active');
+            $approvedSteps = $r->steps->where('status', 'approved')->count();
 
             return [
                 'id' => $r->id,
@@ -33,8 +29,8 @@
                 'hari' => $r->jumlah_hari_kerja,
                 'status' => $statusToken($r->status),
                 'alasan' => $r->alasan,
-                'stage_atasan' => $stageAtasan,
-                'stage_kepala' => $r->status === 'Disetujui' ? 'disetujui' : 'menunggu',
+                'stage_atasan' => $approvedSteps > 0 ? 'disetujui' : ($r->status === 'ditangguhkan' ? 'ditunda' : 'menunggu'),
+                'stage_kepala' => $r->status === 'disetujui' ? 'disetujui' : ($activeStep?->role_label ?? 'menunggu'),
                 'periode' => optional($r->tanggal_mulai)->translatedFormat('F Y'),
             ];
         });
@@ -65,7 +61,7 @@
         $totalPengajuan = $riwayatCuti->count();
         $jumlahMenunggu = $riwayatCuti->where('status', 'menunggu')->count();
         $jumlahDisetujui = $riwayatCuti->where('status', 'disetujui')->count();
-        $jumlahDitunda = $riwayatCuti->where('status', 'ditunda')->count();
+        $jumlahDitangguhkan = $riwayatCuti->where('status', 'ditunda')->count();
 
         $statusVariant = [
             'menunggu'  => 'warning',
@@ -76,7 +72,7 @@
         $statusLabel = [
             'menunggu'  => 'Menunggu',
             'disetujui' => 'Disetujui',
-            'ditunda'   => 'Ditunda',
+            'ditunda'   => 'Ditangguhkan',
         ];
     @endphp
 
@@ -136,7 +132,7 @@
             </x-ui.stat-card>
 
             {{-- Postponed --}}
-            <x-ui.stat-card label="Ditunda" value="{{ $jumlahDitunda ?? '2' }}" variant="danger" size="lg" accent>
+            <x-ui.stat-card label="Ditangguhkan" value="{{ $jumlahDitangguhkan ?? '2' }}" variant="danger" size="lg" accent>
                 <x-slot:icon>
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" /></svg>
                 </x-slot:icon>
@@ -158,7 +154,7 @@
                     <option value="">Semua Status</option>
                     <option value="menunggu">Menunggu</option>
                     <option value="disetujui">Disetujui</option>
-                    <option value="ditunda">Ditunda</option>
+                        <option value="ditunda">Ditangguhkan</option>
                 </select>
             </div>
 

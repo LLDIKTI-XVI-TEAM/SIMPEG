@@ -86,15 +86,22 @@
                                 <x-ui.table-td align="center" padding="wide">
                                     <x-ui.badge
                                         :variant="match ($r->status) {
-                                            'Disetujui' => 'success',
-                                            'Ditunda' => 'warning',
-                                            'Draft' => 'muted',
+                                            'disetujui' => 'success',
+                                            'ditangguhkan' => 'warning',
+                                            'perlu_perubahan', 'tidak_disetujui' => 'danger',
                                             default => 'primary',
                                         }"
                                         size="md"
                                         dot
                                     >
-                                        {{ $r->status }}
+                                        {{ match ($r->status) {
+                                            'menunggu_approval' => 'Menunggu Approval',
+                                            'ditangguhkan' => 'Ditangguhkan',
+                                            'perlu_perubahan' => 'Perlu Perubahan',
+                                            'disetujui' => 'Disetujui',
+                                            'tidak_disetujui' => 'Tidak Disetujui',
+                                            default => $r->status,
+                                        } }}
                                     </x-ui.badge>
                                 </x-ui.table-td>
                             </x-ui.table-row>
