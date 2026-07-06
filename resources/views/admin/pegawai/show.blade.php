@@ -304,6 +304,11 @@
                                     Kinerja Baik
                                 </x-ui.badge>
                             </template>
+                            @if($p->is_kepala_lembaga)
+                                <x-ui.badge variant="primary" size="md" class="!font-bold">
+                                    Kepala Lembaga
+                                </x-ui.badge>
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -435,6 +440,10 @@
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Golongan Darah</span>
                                 <p class="text-ink font-sans font-bold">{{ $p->golongan_darah ?? '-' }}</p>
+                            </div>
+                            <div class="space-y-0.5">
+                                <span class="font-semibold text-muted font-sans">Kepala Lembaga</span>
+                                <p class="text-ink font-sans font-bold">{{ $p->is_kepala_lembaga ? 'Ya' : 'Tidak' }}</p>
                             </div>
                         </div>
                     </div>
