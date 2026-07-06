@@ -49,7 +49,7 @@
     <div class="space-y-6" @confirm-rekap.window="savedCorrection = true" x-data="{
             exportType: null,
             savedCorrection: false,
-            exportType: null,
+            activeFilters: { periode: 'Semua Periode' },
             applyExport(type) {
                 this.exportType = type;
                 
@@ -323,7 +323,7 @@
                             rows="3"
                             placeholder="Alasan koreksi wajib diisi"
                         />
-                        <button type="button" @click="showConfirm = true"
+                        <button type="button" @click="$dispatch('open-confirm-rekap')"
                             class="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90">
                             <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 3h6.75a.75.75 0 01.53.22l4.5 4.5a.75.75 0 01.22.53V19.5a2.25 2.25 0 01-2.25 2.25H4.5A2.25 2.25 0 012.25 19.5V5.25A2.25 2.25 0 014.5 3zM9 3v4.5A1.5 1.5 0 0010.5 9h3a1.5 1.5 0 001.5-1.5V3m-6 18v-4.5a1.5 1.5 0 011.5-1.5h6a1.5 1.5 0 011.5 1.5V21" />
