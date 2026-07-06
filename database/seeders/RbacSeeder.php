@@ -55,6 +55,7 @@ class RbacSeeder extends Seeder
             'cuti.configure_chain' => ['module' => 'cuti', 'description' => 'Mengonfigurasi rantai approval cuti per pegawai'],
             'cuti.balance.read' => ['module' => 'cuti', 'description' => 'Melihat saldo cuti'],
             'cuti.balance.adjust' => ['module' => 'cuti', 'description' => 'Melakukan koreksi saldo cuti yang diaudit'],
+            'cuti.proof.generate' => ['module' => 'cuti', 'description' => 'Membuat bukti/formulir cuti resmi setelah approval final'],
             'cuti.kepala_lembaga_documents.manage' => ['module' => 'cuti', 'description' => 'Mengelola dokumen pendukung cuti Kepala Lembaga'],
         ];
 

@@ -41,7 +41,7 @@ Route::get('/auth/keycloak/callback', [KeycloakAuthController::class, 'handleCal
 Route::post('/logout', [KeycloakAuthController::class, 'logout'])->name('logout');
 
 if (app()->environment(['local', 'testing'])) {
-    Route::get('/dev-login', [KeycloakAuthController::class, 'redirectToKeycloak']);
+    Route::get('/dev-login', [KeycloakAuthController::class, 'defaultDemoLogin']);
     Route::post('/dev-login', [KeycloakAuthController::class, 'demoLogin'])->name('dev-login');
 
     Route::get('/set-super-admin', function () {
@@ -735,6 +735,16 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::post('/cuti/konfigurasi-approval', [CutiConfigController::class, 'update'])
         ->middleware(['role:super_admin', 'permission:cuti.configure'])
         ->name('cuti.config.update');
+    Route::post('/cuti/konfigurasi-approval/backfill', [CutiConfigController::class, 'backfill'])
+        ->middleware(['role:super_admin', 'permission:cuti.configure_chain'])
+        ->name('cuti.config.backfill');
+    Route::post('/cuti/konfigurasi-approval/pybmc-global', [CutiConfigController::class, 'updateGlobalPybmc'])
+        ->middleware(['role:super_admin', 'permission:cuti.configure_chain'])
+        ->name('cuti.config.pybmc-global');
+    Route::post('/cuti/konfigurasi-approval/pegawai/{employee}', [CutiConfigController::class, 'storeEmployeeChain'])
+        ->middleware(['role:super_admin', 'permission:cuti.configure_chain'])
+        ->name('cuti.config.employee-chain.store')
+        ->whereUuid('employee');
 
     Route::get('/dashboard/cuti/legacy', function () {
         return redirect()->route('cuti');

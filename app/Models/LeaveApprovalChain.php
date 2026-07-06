@@ -16,6 +16,8 @@ use Illuminate\Support\Carbon;
  * @property bool $is_active
  * @property Carbon $effective_from
  * @property Carbon|null $effective_until
+ * @property string|null $created_by
+ * @property string|null $updated_by
  * @property string|null $change_reason
  * @property-read Employee|null $employee
  */
@@ -29,6 +31,8 @@ class LeaveApprovalChain extends Model
         'is_active',
         'effective_from',
         'effective_until',
+        'created_by',
+        'updated_by',
         'change_reason',
     ];
 

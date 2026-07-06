@@ -32,6 +32,7 @@ class CutiRbacTest extends TestCase
         'cuti.configure_chain',
         'cuti.balance.read',
         'cuti.balance.adjust',
+        'cuti.proof.generate',
         'cuti.kepala_lembaga_documents.manage',
     ];
 
