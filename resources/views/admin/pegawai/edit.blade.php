@@ -202,69 +202,12 @@
             },
 
             validateUtama() {
-                const requiredIds = ['nama_lengkap', 'nip', 'tanggal_lahir', 'pendidikan_terakhir', 'prodi_pendidikan_terakhir'];
-                for (let id of requiredIds) {
-                    const el = document.getElementById(id);
-                    if (el && !el.value.trim()) {
-                        el.setCustomValidity('Mohon lengkapi isian kolom ini terlebih dahulu.');
-                        el.reportValidity();
-                        return false;
-                    } else if (el) {
-                        el.setCustomValidity('');
-                    }
-                }
-
-                const elNip = document.getElementById('nip');
-                if (this.nip.length < 18) {
-                    this.nipError = 'NIP harus tepat 18 digit sebelum melanjutkan';
-                    if (elNip) {
-                        elNip.setCustomValidity('Mohon lengkapi NIP dengan tepat 18 digit.');
-                        elNip.reportValidity();
-                    }
-                    return false;
-                } else if (elNip) {
-                    elNip.setCustomValidity('');
-                }
                 return true;
             },
             validateKontak() {
-                const requiredIds = ['no_hp', 'alamat'];
-                for (let id of requiredIds) {
-                    const el = document.getElementById(id);
-                    if (el && !el.value.trim()) {
-                        el.setCustomValidity('Mohon lengkapi isian kolom ini terlebih dahulu.');
-                        el.reportValidity();
-                        return false;
-                    } else if (el) {
-                        el.setCustomValidity('');
-                    }
-                }
                 return true;
             },
             validatePelengkap() {
-                const elNik = document.getElementById('nik');
-                if (this.nik.length < 16) {
-                    this.nikError = 'NIK harus tepat 16 digit sebelum melanjutkan';
-                    if (elNik) {
-                        elNik.setCustomValidity('Mohon lengkapi NIK dengan tepat 16 digit.');
-                        elNik.reportValidity();
-                    }
-                    return false;
-                } else if (elNik) {
-                    elNik.setCustomValidity('');
-                }
-
-                const elKk = document.getElementById('no_kk');
-                if (this.kk.length > 0 && this.kk.length < 16) {
-                    this.kkError = 'Nomor KK harus tepat 16 digit sebelum melanjutkan';
-                    if (elKk) {
-                        elKk.setCustomValidity('Mohon lengkapi Nomor KK dengan tepat 16 digit.');
-                        elKk.reportValidity();
-                    }
-                    return false;
-                } else if (elKk) {
-                    elKk.setCustomValidity('');
-                }
                 return true;
             },
             validateNik() {
@@ -452,15 +395,16 @@
 
                         {{-- Nama Lengkap (tanpa gelar) --}}
                         <div class="space-y-1">
-                            <label for="nama_lengkap" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Lengkap (tanpa gelar) <span class="text-danger">*</span></label>
-                            <input id="nama_lengkap" name="nama_lengkap" type="text" required placeholder="Grantly Antonio Edward Sorongan" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ old('nama_lengkap', $p->nama_lengkap) }}">
-                            <p class="text-[10px] text-muted font-sans mt-0.5">Nama lengkap resmi sesuai KTP atau SK, tanpa gelar akademik.</p>
+                            <label for="nama_lengkap" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Lengkap (tanpa gelar)</label>
+                            <input id="nama_lengkap" name="nama_lengkap" type="text" placeholder="Grantly Antonio Edward Sorongan" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ old('nama_lengkap', $p->nama_lengkap) }}">
+                            <p class="text-[10px] text-muted font-sans mt-0.5">Nama lengkap resmi sesuai KTP atau SK, tanpa gelar akademik. Data ini penting untuk dilengkapi.</p>
                         </div>
 
                         {{-- NIP --}}
                         <div class="space-y-1">
-                            <label for="nip" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">NIP <span class="text-danger">*</span></label>
-                            <input id="nip" name="nip" type="text" required maxlength="18" x-model="nip" @input="validateNip" value="{{ $p->nip }}" placeholder="198503122010011001" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <label for="nip" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">NIP</label>
+                            <input id="nip" name="nip" type="text" maxlength="18" x-model="nip" @input="validateNip" value="{{ $p->nip }}" placeholder="198503122010011001" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <p class="text-[10px] text-muted font-sans mt-0.5">Data ini penting untuk dilengkapi.</p>
                             <p x-show="nipError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="nipError"></p>
                         </div>
 
@@ -504,8 +448,9 @@
 
                         {{-- Tanggal Lahir --}}
                         <div class="space-y-1">
-                            <label for="tanggal_lahir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Lahir <span class="text-danger">*</span></label>
-                            <input id="tanggal_lahir" name="tanggal_lahir" type="date" required max="{{ date('Y-m-d') }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" value="{{ $p->tanggal_lahir ? \Carbon\Carbon::parse($p->tanggal_lahir)->format('Y-m-d') : '' }}" >
+                            <label for="tanggal_lahir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Lahir</label>
+                            <input id="tanggal_lahir" name="tanggal_lahir" type="date" max="{{ date('Y-m-d') }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" value="{{ $p->tanggal_lahir ? \Carbon\Carbon::parse($p->tanggal_lahir)->format('Y-m-d') : '' }}" >
+                            <p class="text-[10px] text-muted font-sans mt-0.5">Data ini penting untuk dilengkapi.</p>
                         </div>
 
                         {{-- Golongan (READ-ONLY - ubah melalui Berkas & SK) --}}
@@ -595,9 +540,9 @@
 
                         {{-- Pendidikan Terakhir --}}
                         <div class="space-y-1">
-                            <label for="pendidikan_terakhir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Pendidikan Terakhir <span class="text-danger">*</span></label>
+                            <label for="pendidikan_terakhir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Pendidikan Terakhir</label>
                             <div class="relative">
-                                <select id="pendidikan_terakhir" name="pendidikan_terakhir" required class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                <select id="pendidikan_terakhir" name="pendidikan_terakhir" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
                                     <option value="Diploma III (D3)" {{ $p->pendidikan_terakhir == 'Diploma III (D3)' ? 'selected' : '' }}>Diploma III (D3)</option>
                                     <option value="Sarjana (S1)" {{ $p->pendidikan_terakhir == 'Sarjana (S1)' ? 'selected' : '' }}>Sarjana (S1)</option>
                                     <option value="Magister (S2)" {{ $p->pendidikan_terakhir == 'Magister (S2)' ? 'selected' : '' }}>Magister (S2)</option>
@@ -610,12 +555,14 @@
                                     </svg>
                                 </div>
                             </div>
+                            <p class="text-[10px] text-muted font-sans mt-0.5">Data ini penting untuk dilengkapi.</p>
                         </div>
 
                         {{-- Program Studi --}}
                         <div class="space-y-1">
-                            <label for="prodi_pendidikan_terakhir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Program Studi <span class="text-danger">*</span></label>
-                            <input id="prodi_pendidikan_terakhir" name="prodi_pendidikan_terakhir" type="text" required placeholder="Teknik Informatika" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->prodi_pendidikan_terakhir }}" >
+                            <label for="prodi_pendidikan_terakhir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Program Studi</label>
+                            <input id="prodi_pendidikan_terakhir" name="prodi_pendidikan_terakhir" type="text" placeholder="Teknik Informatika" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->prodi_pendidikan_terakhir }}" >
+                            <p class="text-[10px] text-muted font-sans mt-0.5">Data ini penting untuk dilengkapi.</p>
                         </div>
 
                         
@@ -633,8 +580,9 @@
                     <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                         {{-- NIK --}}
                         <div class="space-y-1">
-                            <label for="nik" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">NIK (No. KTP) <span class="text-danger">*</span></label>
-                            <input id="nik" name="nik" type="text" required maxlength="16" x-model="nik" @input="validateNik" placeholder="3273251203850002" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <label for="nik" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">NIK (No. KTP)</label>
+                            <input id="nik" name="nik" type="text" maxlength="16" x-model="nik" @input="validateNik" placeholder="3273251203850002" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <p class="text-[10px] text-muted font-sans mt-0.5">Data ini penting untuk dilengkapi.</p>
                             <p x-show="nikError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="nikError"></p>
                         </div>
 
@@ -754,8 +702,9 @@
                     <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                         {{-- Telepon Handphone --}}
                         <div class="space-y-1">
-                            <label for="no_hp" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor HP <span class="text-danger">*</span></label>
-                            <input id="no_hp" name="no_hp" type="tel" required placeholder="081234567890" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->no_hp }}" >
+                            <label for="no_hp" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor HP</label>
+                            <input id="no_hp" name="no_hp" type="tel" placeholder="081234567890" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->no_hp }}" >
+                            <p class="text-[10px] text-muted font-sans mt-0.5">Data ini penting untuk dilengkapi.</p>
                         </div>
 
                         {{-- Telepon Rumah --}}
@@ -772,8 +721,9 @@
 
                         {{-- Alamat Lengkap --}}
                         <div class="space-y-1 sm:col-span-2">
-                            <label for="alamat" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Alamat Tempat Tinggal <span class="text-danger">*</span></label>
-                            <textarea id="alamat" name="alamat" rows="3" required placeholder="Jl. Buah Batu No. 120, Lengkong, Bandung" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans resize-none">{{ $p->alamat }}</textarea>
+                            <label for="alamat" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Alamat Tempat Tinggal</label>
+                            <textarea id="alamat" name="alamat" rows="3" placeholder="Jl. Buah Batu No. 120, Lengkong, Bandung" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans resize-none">{{ $p->alamat }}</textarea>
+                            <p class="text-[10px] text-muted font-sans mt-0.5">Data ini penting untuk dilengkapi.</p>
                         </div>
                     </div>
                 </div>
