@@ -198,7 +198,7 @@ class CutiFoundationSchemaTest extends TestCase
         ]);
     }
 
-    public function test_constraint_fondasi_revisi_cuti_menolak_duplikasi_token_dan_dedup_key(): void
+    public function test_constraint_fondasi_revisi_cuti_menolak_duplikasi_token_bukti(): void
     {
         $pemohon = Employee::factory()->create();
         $jenisCuti = RefJenisCuti::create([
@@ -225,6 +225,17 @@ class CutiFoundationSchemaTest extends TestCase
             'alasan' => 'Uji token proof lain.',
             'status' => 'Draft',
         ]);
+
+        LeaveProof::create(['leave_request_id' => $cuti->id, 'token' => 'token-duplikat']);
+        $this->assertThrows(
+            fn () => LeaveProof::create(['leave_request_id' => $cutiLain->id, 'token' => 'token-duplikat']),
+            QueryException::class,
+        );
+    }
+
+    public function test_constraint_fondasi_revisi_cuti_menolak_duplikasi_dedup_key_ledger(): void
+    {
+        $pemohon = Employee::factory()->create();
         $saldo = LeaveBalance::create([
             'employee_id' => $pemohon->id,
             'tahun' => 2026,
@@ -233,12 +244,6 @@ class CutiFoundationSchemaTest extends TestCase
             'terpakai' => 0,
             'sisa' => 12,
         ]);
-
-        LeaveProof::create(['leave_request_id' => $cuti->id, 'token' => 'token-duplikat']);
-        $this->assertThrows(
-            fn () => LeaveProof::create(['leave_request_id' => $cutiLain->id, 'token' => 'token-duplikat']),
-            QueryException::class,
-        );
 
         LeaveBalanceLedger::create([
             'employee_id' => $pemohon->id,
