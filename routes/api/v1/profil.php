@@ -34,4 +34,3 @@ Route::middleware(['web', 'keycloak.auth', 'role:pegawai'])
             ->middleware('permission:employee_families.update')
             ->name('update');
     });
-

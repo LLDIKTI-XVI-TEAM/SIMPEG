@@ -26,14 +26,14 @@ class StoreMyFamilyRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'nama_anggota'    => ['required', 'string', 'max:255'],
-            'hubungan'        => ['required', Rule::in(['Suami', 'Istri', 'Anak', 'Saudara'])],
-            'nik'             => ['nullable', 'string', 'digits:16'],
-            'tempat_lahir'    => ['nullable', 'string', 'max:100'],
-            'tanggal_lahir'   => ['required', 'date', 'before_or_equal:today'],
-            'jenis_kelamin'   => ['required', Rule::in(['L', 'P'])],
+            'nama_anggota' => ['required', 'string', 'max:255'],
+            'hubungan' => ['required', Rule::in(['Suami', 'Istri', 'Anak', 'Saudara'])],
+            'nik' => ['nullable', 'string', 'digits:16'],
+            'tempat_lahir' => ['nullable', 'string', 'max:100'],
+            'tanggal_lahir' => ['required', 'date', 'before_or_equal:today'],
+            'jenis_kelamin' => ['required', Rule::in(['L', 'P'])],
             'status_tunjangan' => ['required', 'boolean'],
-            'pekerjaan'       => ['nullable', 'string', 'max:100'],
+            'pekerjaan' => ['nullable', 'string', 'max:100'],
         ];
     }
 }

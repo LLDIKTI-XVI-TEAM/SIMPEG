@@ -10,6 +10,7 @@ use App\Http\Requests\Employee\StoreMyFamilyRequest;
 use App\Http\Requests\Employee\UpdateMyFamilyRequest;
 use App\Models\Employee;
 use App\Models\EmployeeFamily;
+use App\Models\User;
 use App\Support\EmployeeFamilies\EmployeeFamilyPayload;
 use Illuminate\Http\JsonResponse;
 
@@ -27,7 +28,7 @@ class MyFamilyController extends Controller
 
         return response()->json([
             'employee_id' => $employee->id,
-            'families'    => $action->execute($employee),
+            'families' => $action->execute($employee),
         ]);
     }
 
@@ -42,7 +43,7 @@ class MyFamilyController extends Controller
 
         return response()->json([
             'message' => 'Data keluarga berhasil ditambahkan.',
-            'family'  => $payload->response($family),
+            'family' => $payload->response($family),
         ], 201);
     }
 
@@ -61,7 +62,7 @@ class MyFamilyController extends Controller
 
         return response()->json([
             'message' => 'Data keluarga berhasil diperbarui.',
-            'family'  => $payload->response($family),
+            'family' => $payload->response($family),
         ]);
     }
 
@@ -71,7 +72,7 @@ class MyFamilyController extends Controller
      */
     private function resolveEmployee(): Employee
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = auth()->user();
 
         return Employee::findOrFail($user->employee_id);
