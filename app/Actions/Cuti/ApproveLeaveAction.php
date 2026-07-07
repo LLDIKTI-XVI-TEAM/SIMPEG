@@ -2,6 +2,7 @@
 
 namespace App\Actions\Cuti;
 
+use App\Actions\Cuti\Concerns\BuildsLeaveDecisionAuditPayload;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Services\AuditService;
@@ -16,6 +17,8 @@ use Illuminate\Http\Request;
  */
 class ApproveLeaveAction
 {
+    use BuildsLeaveDecisionAuditPayload;
+
     public function __construct(
         private readonly LeaveApprovalService $approvals,
         private readonly NotificationService $notifications,
@@ -27,8 +30,13 @@ class ApproveLeaveAction
     public function execute(LeaveRequest $leaveRequest, Employee $actor, ?string $komentar, Request $request): LeaveRequest
     {
         $statusSebelum = $leaveRequest->status;
+        $stepSebelum = $leaveRequest->steps()
+            ->where('status', 'active')
+            ->where('approver_employee_id', $actor->id)
+            ->first();
 
         $leaveRequest = $this->approvals->approve($leaveRequest, $actor, $komentar);
+        $auditPayload = $this->decisionAuditPayload($statusSebelum, $leaveRequest, $stepSebelum, $actor, 'APPROVE', $komentar);
 
         // Audit dan notifikasi bersifat fire-and-forget setelah transaksi persetujuan berhasil di service,
         // agar kegagalan audit/notifikasi tidak membatalkan persetujuan yang sudah sah tersimpan.
@@ -36,8 +44,8 @@ class ApproveLeaveAction
             'APPROVE',
             'LeaveRequest',
             $leaveRequest->id,
-            ['status' => $statusSebelum],
-            ['status' => $leaveRequest->status],
+            $auditPayload['old'],
+            $auditPayload['new'],
             $request,
         );
 

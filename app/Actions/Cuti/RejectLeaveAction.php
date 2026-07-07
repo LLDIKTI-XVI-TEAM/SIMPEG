@@ -2,6 +2,7 @@
 
 namespace App\Actions\Cuti;
 
+use App\Actions\Cuti\Concerns\BuildsLeaveDecisionAuditPayload;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Services\AuditService;
@@ -12,6 +13,8 @@ use Illuminate\Http\Request;
 /** Menolak pengajuan cuti secara terminal tanpa pemotongan saldo. */
 class RejectLeaveAction
 {
+    use BuildsLeaveDecisionAuditPayload;
+
     public function __construct(
         private readonly LeaveApprovalService $approvals,
         private readonly NotificationService $notifications,
@@ -20,15 +23,20 @@ class RejectLeaveAction
     public function execute(LeaveRequest $leaveRequest, Employee $actor, string $komentar, Request $request): LeaveRequest
     {
         $statusSebelum = $leaveRequest->status;
+        $stepSebelum = $leaveRequest->steps()
+            ->where('status', 'active')
+            ->where('approver_employee_id', $actor->id)
+            ->first();
 
         $leaveRequest = $this->approvals->reject($leaveRequest, $actor, $komentar);
+        $auditPayload = $this->decisionAuditPayload($statusSebelum, $leaveRequest, $stepSebelum, $actor, 'REJECT', $komentar);
 
         AuditService::log(
             'UPDATE',
             'LeaveRequest',
             $leaveRequest->id,
-            ['status' => $statusSebelum],
-            ['status' => $leaveRequest->status, 'decision' => 'REJECT', 'komentar' => $komentar],
+            $auditPayload['old'],
+            $auditPayload['new'],
             $request,
         );
 

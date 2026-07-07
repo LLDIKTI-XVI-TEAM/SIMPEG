@@ -2,6 +2,7 @@
 
 namespace App\Actions\Cuti;
 
+use App\Actions\Cuti\Concerns\BuildsLeaveDecisionAuditPayload;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Services\AuditService;
@@ -12,6 +13,8 @@ use Illuminate\Http\Request;
 /** Mengembalikan pengajuan cuti ke pemohon untuk diperbaiki dengan catatan wajib dari approver. */
 class RequestChangesLeaveAction
 {
+    use BuildsLeaveDecisionAuditPayload;
+
     public function __construct(
         private readonly LeaveApprovalService $approvals,
         private readonly NotificationService $notifications,
@@ -20,15 +23,20 @@ class RequestChangesLeaveAction
     public function execute(LeaveRequest $leaveRequest, Employee $actor, string $komentar, Request $request): LeaveRequest
     {
         $statusSebelum = $leaveRequest->status;
+        $stepSebelum = $leaveRequest->steps()
+            ->where('status', 'active')
+            ->where('approver_employee_id', $actor->id)
+            ->first();
 
         $leaveRequest = $this->approvals->requestChanges($leaveRequest, $actor, $komentar);
+        $auditPayload = $this->decisionAuditPayload($statusSebelum, $leaveRequest, $stepSebelum, $actor, 'REQUEST_CHANGES', $komentar);
 
         AuditService::log(
             'UPDATE',
             'LeaveRequest',
             $leaveRequest->id,
-            ['status' => $statusSebelum],
-            ['status' => $leaveRequest->status, 'decision' => 'REQUEST_CHANGES', 'komentar' => $komentar],
+            $auditPayload['old'],
+            $auditPayload['new'],
             $request,
         );
 

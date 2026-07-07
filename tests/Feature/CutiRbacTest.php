@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
@@ -120,6 +121,28 @@ class CutiRbacTest extends TestCase
 
         $response->assertRedirect(route('cuti.approval'));
         $this->assertSame('disetujui', $cuti->fresh()->status);
+
+        $audit = AuditLog::query()
+            ->where('auditable_type', 'LeaveRequest')
+            ->where('auditable_id', $cuti->id)
+            ->where('event', 'APPROVE')
+            ->firstOrFail();
+
+        $this->assertSame([
+            'status' => 'menunggu_approval',
+            'step_order' => 1,
+            'step_label' => 'Verifikator',
+            'approver_id' => $approver->id,
+        ], $audit->old_values);
+        $this->assertSame([
+            'status' => 'disetujui',
+            'decision' => 'APPROVE',
+            'step_order' => 1,
+            'step_label' => 'Verifikator',
+            'approver_id' => $approver->id,
+            'acted_at' => $audit->new_values['acted_at'],
+            'komentar' => null,
+        ], $audit->new_values);
     }
 
     public function test_pegawai_yang_menjadi_approver_snapshot_bisa_membuka_detail_pengajuan(): void
