@@ -9,6 +9,8 @@ use App\Models\RefStatusPerkawinan;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class EmployeeCreateIntegrationTest extends TestCase
@@ -24,6 +26,8 @@ class EmployeeCreateIntegrationTest extends TestCase
 
     public function test_can_create_employee_via_ui_form()
     {
+        Storage::fake('public');
+
         // Arrange
         $user = User::factory()->create([
             'role' => 'admin_kepegawaian',
@@ -50,6 +54,8 @@ class EmployeeCreateIntegrationTest extends TestCase
             'jenis_pengangkatan' => 'PNS',
             'nomor_sk' => 'SK-UJI-001',
             'tanggal_sk' => '2023-12-01',
+            'file_sk' => UploadedFile::fake()->create('sk-pengangkatan.pdf', 500, 'application/pdf'),
+            'is_kepala_lembaga' => true,
         ];
 
         // Act
@@ -66,13 +72,39 @@ class EmployeeCreateIntegrationTest extends TestCase
         $this->assertDatabaseHas('employees', [
             'nama_lengkap' => 'Budi Santoso Uji',
             'nip' => '199001012024011001',
+            'is_kepala_lembaga' => true,
         ]);
 
         $employee = Employee::where('nip', '199001012024011001')->first();
+
+        $this->assertDatabaseHas('appointments', [
+            'employee_id' => $employee->id,
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2024-01-01 00:00:00',
+            'no_sk' => 'SK-UJI-001',
+            'tanggal_sk' => '2023-12-01 00:00:00',
+        ]);
+
+        $documentPath = $employee->documents()->where('jenis_dokumen', 'sk_pengangkatan')->value('file_path');
+        $this->assertIsString($documentPath);
+        $this->assertStringStartsWith('sk/', $documentPath);
+        Storage::disk('public')->assertExists($documentPath);
 
         // Check if detail page renders
         $detailResponse = $this->actingAs($user)->get(route('pegawai.show', $employee->id));
         $detailResponse->assertStatus(200);
         $detailResponse->assertSee('Budi Santoso Uji');
+        $detailResponse->assertSee('Kepala Lembaga');
+        $detailResponse->assertSee('Ya');
+
+        $createResponse = $this->actingAs($user)->get(route('pegawai.create'));
+        $createResponse->assertStatus(200);
+        $createResponse->assertSee('Kepala Lembaga');
+        $createResponse->assertSee('name="is_kepala_lembaga"', false);
+
+        $editResponse = $this->actingAs($user)->get(route('pegawai.edit', $employee->id));
+        $editResponse->assertStatus(200);
+        $editResponse->assertSee('Kepala Lembaga');
+        $editResponse->assertSee('name="is_kepala_lembaga"', false);
     }
 }

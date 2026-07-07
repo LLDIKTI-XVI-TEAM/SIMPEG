@@ -74,6 +74,18 @@ class EmployeeShowTest extends TestCase
             ->assertJsonPath('employee.id', $employee->id);
     }
 
+    public function test_employee_detail_response_includes_kepala_lembaga_marker(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = $this->employeeWithReferences(['is_kepala_lembaga' => true]);
+
+        $this->actingAs($user);
+        $response = $this->getJson("/api/v1/pegawai/{$employee->id}");
+
+        $response->assertOk()
+            ->assertJsonPath('employee.is_kepala_lembaga', true);
+    }
+
     public function test_employee_detail_response_includes_erd_relations(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
