@@ -4,10 +4,15 @@ namespace App\Http\Controllers\Admin;
 
 use App\Actions\Cuti\ApproveLeaveAction;
 use App\Actions\Cuti\PostponeLeaveAction;
+use App\Actions\Cuti\RejectLeaveAction;
+use App\Actions\Cuti\RequestChangesLeaveAction;
+use App\Actions\Cuti\ResubmitLeaveRequestAction;
 use App\Actions\Cuti\SubmitLeaveRequestAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Cuti\ApproveLeaveRequest;
 use App\Http\Requests\Cuti\PostponeLeaveRequest;
+use App\Http\Requests\Cuti\ResubmitLeaveRequestRequest;
+use App\Http\Requests\Cuti\ReviewLeaveDecisionRequest;
 use App\Http\Requests\Cuti\StoreLeaveRequestRequest;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
@@ -162,11 +167,10 @@ class CutiController extends Controller
             $balancesQuery->where('tahun', $periode);
         }
 
-        $balances = $balancesQuery->get();
         $totalPegawai = Employee::where('status_aktif', 'Aktif')->count();
-        $cutiTerpakai = $balances->sum('terpakai');
-        $sisaSaldo = $balances->sum('sisa');
-        $saldoKritis = $balances->where('sisa', '<=', 3)->count();
+        $cutiTerpakai = (clone $balancesQuery)->sum('terpakai');
+        $sisaSaldo = (clone $balancesQuery)->sum('sisa');
+        $saldoKritis = (clone $balancesQuery)->where('sisa', '<=', 3)->count();
 
         $summary = [
             ['label' => 'Total Pegawai', 'value' => $totalPegawai, 'caption' => 'Pegawai aktif', 'tone' => 'primary'],
@@ -242,7 +246,7 @@ class CutiController extends Controller
             ];
         });
 
-        $statsQuery = LeaveRequest::where('status', 'Disetujui')->with('jenisCuti');
+        $statsQuery = LeaveRequest::where('status', 'disetujui')->with('jenisCuti');
         if ($unit) {
             $statsQuery->whereHas('employee', function ($q) use ($unit) {
                 $q->where('jabatan_terakhir', $unit);
@@ -262,11 +266,11 @@ class CutiController extends Controller
             }
         }
 
-        $stats = $statsQuery->get()
-            ->groupBy('jenisCuti.nama')
-            ->map(function ($group) {
-                return $group->sum('jumlah_hari_kerja');
-            });
+        $stats = $statsQuery
+            ->leftJoin('ref_jenis_cuti', 'leave_requests.jenis_cuti_id', '=', 'ref_jenis_cuti.id')
+            ->selectRaw('ref_jenis_cuti.nama as nama, COALESCE(SUM(leave_requests.jumlah_hari_kerja), 0) as hari')
+            ->groupBy('ref_jenis_cuti.nama')
+            ->pluck('hari', 'nama');
 
         $totalDays = $stats->sum() ?: 1;
         $jenisStats = [];
@@ -275,7 +279,7 @@ class CutiController extends Controller
         foreach ($stats as $name => $days) {
             $jenisStats[] = [
                 'label' => $name ?: 'Lainnya',
-                'hari' => $days,
+                'hari' => (int) $days,
                 'percent' => round(($days / $totalDays) * 100),
                 'tone' => $tones[$i % 4],
             ];
@@ -299,12 +303,18 @@ class CutiController extends Controller
      * Menampilkan daftar pengajuan cuti.
      * Pegawai biasa hanya melihat pengajuannya sendiri; peran dengan hak memantau melihat seluruh pengajuan.
      */
-    public function index()
+    public function index(Request $request)
     {
         $user = request()->user();
+        $search = trim((string) $request->query('search', ''));
+        $status = (string) $request->query('status', '');
+        $jenis = (string) $request->query('jenis', '');
+        $unit = (string) $request->query('unit', '');
+        $periode = (string) $request->query('periode', '');
+        $perPage = min(max((int) $request->query('per_page', 10), 10), 50);
 
         $query = LeaveRequest::query()
-            ->with(['employee', 'jenisCuti'])
+            ->with(['employee', 'jenisCuti', 'steps'])
             ->latest();
 
         // Pemantau (mis. admin kepegawaian/pimpinan) boleh melihat semua; selain itu dibatasi milik sendiri.
@@ -312,9 +322,109 @@ class CutiController extends Controller
             $query->where('employee_id', $user->employee_id);
         }
 
-        $riwayatCuti = $query->get();
+        $baseQuery = clone $query;
 
-        return view('admin.cuti.index', compact('riwayatCuti'));
+        $statusMap = [
+            'pending' => ['menunggu_approval'],
+            'menunggu' => ['menunggu_approval'],
+            'disetujui' => ['disetujui'],
+            'ditunda' => ['ditangguhkan'],
+            'ditangguhkan' => ['ditangguhkan'],
+            'perlu_perubahan' => ['perlu_perubahan'],
+            'tidak_disetujui' => ['tidak_disetujui'],
+        ];
+
+        if ($status !== '' && isset($statusMap[$status])) {
+            $query->whereIn('status', $statusMap[$status]);
+        }
+
+        if ($jenis !== '') {
+            $query->whereHas('jenisCuti', fn ($jenisQuery) => $jenisQuery->where('nama', $jenis));
+        }
+
+        if ($unit !== '') {
+            $query->whereHas('employee', fn ($employeeQuery) => $employeeQuery->where('jabatan_terakhir', $unit));
+        }
+
+        if ($periode !== '') {
+            $parts = explode('-', $periode);
+            if (count($parts) === 2) {
+                $query->whereYear('tanggal_mulai', $parts[0])->whereMonth('tanggal_mulai', $parts[1]);
+            }
+        }
+
+        if ($search !== '') {
+            $query->whereHas('employee', function ($employeeQuery) use ($search): void {
+                $employeeQuery->where('nama_lengkap', 'like', "%{$search}%")
+                    ->orWhere('nip', 'like', "%{$search}%");
+            });
+        }
+
+        $riwayatCuti = $query->paginate($perPage)->withQueryString();
+        $riwayatCuti->getCollection()->transform(fn (LeaveRequest $r): array => $this->mapCutiRow($r));
+
+        $totalPengajuan = (clone $baseQuery)->count();
+        $jumlahMenunggu = (clone $baseQuery)->where('status', 'menunggu_approval')->count();
+        $jumlahDisetujui = (clone $baseQuery)->where('status', 'disetujui')->count();
+        $jumlahDitangguhkan = (clone $baseQuery)->where('status', 'ditangguhkan')->count();
+
+        $optJenisCutis = RefJenisCuti::orderBy('nama')->pluck('nama');
+        $optUnits = Employee::query()
+            ->whereNotNull('jabatan_terakhir')
+            ->distinct()
+            ->orderBy('jabatan_terakhir')
+            ->pluck('jabatan_terakhir');
+        $optPeriodes = collect(range(0, 11))
+            ->map(fn (int $offset): string => now()->subMonths($offset)->format('Y-m'));
+
+        return view('admin.cuti.index', compact(
+            'riwayatCuti',
+            'totalPengajuan',
+            'jumlahMenunggu',
+            'jumlahDisetujui',
+            'jumlahDitangguhkan',
+            'optJenisCutis',
+            'optUnits',
+            'optPeriodes',
+            'search',
+            'status',
+            'jenis',
+            'unit',
+            'periode',
+        ));
+    }
+
+    /**
+     * Membentuk baris tabel cuti dari model yang sudah dipaginasi oleh database.
+     *
+     * @return array<string, mixed>
+     */
+    private function mapCutiRow(LeaveRequest $r): array
+    {
+        $activeStep = $r->steps->firstWhere('status', 'active');
+        $approvedSteps = $r->steps->where('status', 'approved')->count();
+
+        return [
+            'id' => $r->id,
+            'nama' => $r->employee?->nama_lengkap ?? '-',
+            'nip' => $r->employee?->nip ?? '-',
+            'unit' => $r->employee?->jabatan_terakhir ?? '-',
+            'jenis' => $r->jenisCuti?->nama ?? '-',
+            'mulai' => optional($r->tanggal_mulai)->toDateString(),
+            'selesai' => optional($r->tanggal_selesai)->toDateString(),
+            'hari' => $r->jumlah_hari_kerja,
+            'status' => match ($r->status) {
+                'disetujui' => 'disetujui',
+                'ditangguhkan' => 'ditunda',
+                'perlu_perubahan' => 'perlu_perubahan',
+                'tidak_disetujui' => 'tidak_disetujui',
+                default => 'menunggu',
+            },
+            'alasan' => $r->alasan,
+            'stage_atasan' => $approvedSteps > 0 ? 'disetujui' : ($r->status === 'ditangguhkan' ? 'ditunda' : 'menunggu'),
+            'stage_kepala' => $r->status === 'disetujui' ? 'disetujui' : ($activeStep?->role_label ?? 'menunggu'),
+            'periode' => optional($r->tanggal_mulai)->format('Y-m'),
+        ];
     }
 
     /**
@@ -348,12 +458,8 @@ class CutiController extends Controller
         $user = request()->user();
 
         $cuti = LeaveRequest::query()
-            ->with(['employee', 'jenisCuti', 'approvals.approver'])
+            ->with(['employee', 'jenisCuti', 'approvals.approver', 'steps.approver'])
             ->findOrFail($id);
-
-        if (! $user->hasPermission('cuti.read_all') && $cuti->employee_id !== $user->employee_id) {
-            abort(403);
-        }
 
         // Tombol setujui/tunda hanya muncul bila pengguna ini adalah approver tahap yang sedang menunggu;
         // otorisasi sebenarnya tetap ditegakkan ulang di service saat aksi dijalankan.
@@ -361,9 +467,15 @@ class CutiController extends Controller
         $canAct = $stage !== null
             && $approvals->approverEmployeeIdForStage($cuti, $stage) === $user->employee_id;
 
+        if (! $user->hasPermission('cuti.read_all') && $cuti->employee_id !== $user->employee_id && ! $canAct) {
+            abort(403);
+        }
+
         return view('admin.cuti.show', [
             'cuti' => $cuti,
             'canAct' => $canAct,
+            'canResubmit' => $cuti->status === 'perlu_perubahan' && $cuti->employee_id === $user->employee_id,
+            'activeStep' => $stage === null ? null : $cuti->steps->firstWhere('step_order', $stage),
         ]);
     }
 
@@ -382,6 +494,15 @@ class CutiController extends Controller
             ->with('success', 'Pengajuan cuti berhasil dikirim dan menunggu persetujuan atasan langsung.');
     }
 
+    /** Mengirim ulang pengajuan perlu perubahan dengan snapshot approval yang sama. */
+    public function resubmit(ResubmitLeaveRequestRequest $request, LeaveRequest $leaveRequest, ResubmitLeaveRequestAction $action)
+    {
+        $action->execute($leaveRequest, $request->validated(), $request);
+
+        return redirect()->route('cuti.show', $leaveRequest)
+            ->with('success', 'Perubahan pengajuan cuti berhasil dikirim ulang.');
+    }
+
     /**
      * Menampilkan daftar pengajuan cuti yang menunggu tindakan approver yang sedang login.
      * Daftar dibatasi pada pengajuan yang approver tahap menunggunya adalah pegawai milik pengguna ini,
@@ -391,15 +512,13 @@ class CutiController extends Controller
     {
         $employeeId = request()->user()->employee_id;
 
-        // Hanya pengajuan berstatus menunggu/ditunda yang relevan untuk antrean approver.
+        // Hanya pengajuan snapshot yang masih aktif/ditangguhkan yang relevan untuk antrean approver.
         $kandidat = LeaveRequest::query()
-            ->with(['employee', 'jenisCuti'])
-            ->whereIn('status', [
-                'Menunggu Atasan Langsung',
-                'Menunggu Verifikator',
-                'Menunggu Pimpinan',
-                'Ditunda',
-            ])
+            ->with(['employee', 'jenisCuti', 'steps'])
+            ->whereIn('status', ['menunggu_approval', 'ditangguhkan'])
+            ->whereHas('steps', fn ($query) => $query
+                ->where('status', 'active')
+                ->where('approver_employee_id', $employeeId))
             ->latest()
             ->get();
 
@@ -447,5 +566,33 @@ class CutiController extends Controller
 
         return redirect()->route('cuti.approval')
             ->with('success', 'Pengajuan cuti ditunda dan pemohon telah diberi tahu.');
+    }
+
+    /** Meminta perubahan pengajuan cuti pada step aktif; catatan wajib menjadi dasar revisi pemohon. */
+    public function requestChanges(ReviewLeaveDecisionRequest $request, $id, RequestChangesLeaveAction $action)
+    {
+        $leaveRequest = LeaveRequest::findOrFail($id);
+        $actor = $request->user()->employee;
+
+        abort_if($actor === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat meminta perubahan cuti.');
+
+        $action->execute($leaveRequest, $actor, $request->validated()['komentar'], $request);
+
+        return redirect()->route('cuti.approval')
+            ->with('success', 'Pengajuan cuti dikembalikan untuk perbaikan.');
+    }
+
+    /** Menolak pengajuan cuti secara terminal pada step aktif. */
+    public function reject(ReviewLeaveDecisionRequest $request, $id, RejectLeaveAction $action)
+    {
+        $leaveRequest = LeaveRequest::findOrFail($id);
+        $actor = $request->user()->employee;
+
+        abort_if($actor === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat menolak cuti.');
+
+        $action->execute($leaveRequest, $actor, $request->validated()['komentar'], $request);
+
+        return redirect()->route('cuti.approval')
+            ->with('success', 'Pengajuan cuti tidak disetujui dan pemohon telah diberi tahu.');
     }
 }

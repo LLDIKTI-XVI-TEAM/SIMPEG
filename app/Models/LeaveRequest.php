@@ -15,7 +15,6 @@ use Illuminate\Support\Carbon;
  * @property string $status
  * @property int $jumlah_hari_kerja
  * @property string $alasan
- * @property int $current_stage
  * @property Carbon $tanggal_mulai
  * @property Carbon $tanggal_selesai
  * @property Carbon|null $created_at
@@ -36,7 +35,6 @@ class LeaveRequest extends Model
         'alasan',
         'lampiran_path',
         'status',
-        'current_stage',
     ];
 
     protected function casts(): array
@@ -45,7 +43,6 @@ class LeaveRequest extends Model
             'tanggal_mulai' => 'date',
             'tanggal_selesai' => 'date',
             'jumlah_hari_kerja' => 'integer',
-            'current_stage' => 'integer',
         ];
     }
 

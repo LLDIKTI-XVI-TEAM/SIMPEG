@@ -5,6 +5,7 @@ namespace App\Actions\Cuti;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Services\AuditService;
+use App\Services\Cuti\ApprovalChainResolver;
 use App\Services\EmployeeFileStorageService;
 use App\Services\NotificationService;
 use App\Services\WorkdayCalculator;
@@ -23,6 +24,7 @@ class SubmitLeaveRequestAction
         private readonly WorkdayCalculator $workdayCalculator,
         private readonly EmployeeFileStorageService $files,
         private readonly NotificationService $notifications,
+        private readonly ApprovalChainResolver $approvalChains,
     ) {}
 
     /**
@@ -43,9 +45,11 @@ class SubmitLeaveRequestAction
             $lampiranPath = $this->files->storeLampiran($request->file('lampiran'));
         }
 
+        $steps = $this->approvalChains->resolveEffectiveSteps($employee);
+
         // Penyimpanan pengajuan dan notifikasi atasan dibungkus transaksi agar tidak ada pengajuan tersimpan
         // tanpa notifikasi pasangannya bila salah satu langkah gagal.
-        $leaveRequest = DB::transaction(function () use ($employee, $data, $mulai, $selesai, $jumlahHariKerja, $lampiranPath) {
+        $leaveRequest = DB::transaction(function () use ($employee, $data, $mulai, $selesai, $jumlahHariKerja, $lampiranPath, $steps) {
             $leaveRequest = LeaveRequest::create([
                 'employee_id' => $employee->id,
                 'jenis_cuti_id' => $data['jenis_cuti_id'],
@@ -54,11 +58,39 @@ class SubmitLeaveRequestAction
                 'jumlah_hari_kerja' => $jumlahHariKerja,
                 'alasan' => $data['alasan'],
                 'lampiran_path' => $lampiranPath,
-                // Pengajuan baru langsung masuk antrean approval stage 1 (atasan langsung), bukan draft.
-                'status' => 'Menunggu Atasan Langsung',
+                // Pengajuan baru selalu masuk engine snapshot dinamis; step aktif pertama disimpan di leave_request_steps.
+                'status' => 'menunggu_approval',
             ]);
 
-            $this->notifySupervisor($employee, $leaveRequest);
+            $latestOrderByApprover = $steps
+                ->groupBy('approver_employee_id')
+                ->map(fn ($approverSteps) => $approverSteps->max('step_order'));
+            $firstActiveAssigned = false;
+
+            foreach ($steps as $step) {
+                $isEarlierDuplicate = $latestOrderByApprover[$step->approver_employee_id] !== $step->step_order;
+                $status = 'pending';
+
+                if ($isEarlierDuplicate) {
+                    $status = 'skipped';
+                } elseif (! $firstActiveAssigned) {
+                    $status = 'active';
+                    $firstActiveAssigned = true;
+                }
+
+                $leaveRequest->steps()->create([
+                    'step_order' => $step->step_order,
+                    'step_type' => $step->step_type,
+                    'role_label' => $step->role_label,
+                    'approver_employee_id' => $step->approver_employee_id,
+                    'status' => $status,
+                    'is_final' => $step->is_final,
+                    'skipped_reason' => $isEarlierDuplicate ? 'duplicate_approver' : null,
+                    'decision_note' => $isEarlierDuplicate ? 'Dilewati otomatis karena approver muncul lagi pada step otoritas lebih akhir.' : null,
+                ]);
+            }
+
+            $this->notifyActiveApprover($leaveRequest);
 
             return $leaveRequest;
         });
@@ -70,22 +102,26 @@ class SubmitLeaveRequestAction
     }
 
     /**
-     * Mengirim notifikasi in-app ke atasan langsung aktif bahwa ada pengajuan cuti yang menunggu persetujuannya.
-     * Atasan langsung dipastikan ada pada layer validasi, namun tetap dijaga defensif di sini.
+     * Mengirim notifikasi in-app ke approver pada snapshot step aktif pertama.
+     * Assignment dibaca dari snapshot agar perubahan konfigurasi setelah submit tidak mengubah penerima awal.
      */
-    private function notifySupervisor(Employee $employee, LeaveRequest $leaveRequest): void
+    private function notifyActiveApprover(LeaveRequest $leaveRequest): void
     {
-        $supervisor = $employee->currentSupervisor()?->supervisor;
+        $approver = $leaveRequest->steps()
+            ->with('approver')
+            ->where('status', 'active')
+            ->orderBy('step_order')
+            ->first()?->approver;
 
-        if ($supervisor === null) {
+        if ($approver === null) {
             return;
         }
 
         $this->notifications->createForEmployee(
-            $supervisor,
+            $approver,
             'cuti.pengajuan_baru',
             'Pengajuan Cuti Menunggu Persetujuan',
-            "{$employee->nama_lengkap} mengajukan cuti dan menunggu persetujuan Anda.",
+            "{$leaveRequest->employee?->nama_lengkap} mengajukan cuti dan menunggu persetujuan Anda.",
             ['leave_request_id' => $leaveRequest->id],
         );
     }

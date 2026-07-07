@@ -4,7 +4,7 @@ namespace App\Http\Requests\Cuti;
 
 use App\Models\Employee;
 use App\Models\RefJenisCuti;
-use App\Services\LeaveApprovalService;
+use App\Services\Cuti\ApprovalChainResolver;
 use App\Services\WorkdayCalculator;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -66,22 +66,22 @@ class StoreLeaveRequestRequest extends FormRequest
 
             $employee = $this->user()?->employee;
 
-            // Pemohon wajib memiliki atasan langsung aktif sebagai approver stage 1; tanpa itu alur approval tak bisa jalan.
-            if ($employee === null || $employee->currentSupervisor() === null) {
+            if ($employee === null) {
                 $validator->errors()->add(
                     'tanggal_mulai',
-                    'Anda belum memiliki atasan langsung aktif sehingga belum dapat mengajukan cuti.',
+                    'Akun pengguna belum terhubung ke data pegawai sehingga belum dapat mengajukan cuti.',
                 );
 
                 return;
             }
 
-            // Rantai approval (stage 2 dan 3) wajib dikonfigurasi sebelum cuti dapat diajukan; tanpa approver
-            // terkonfigurasi pengajuan tidak akan dapat ditindaklanjuti dan akan tersangkut tanpa penyelesaian.
-            if (! app(LeaveApprovalService::class)->approvalChainIsConfigured()) {
+            // Chain dinamis wajib dapat di-resolve sebelum pengajuan disimpan agar request langsung punya snapshot step.
+            try {
+                app(ApprovalChainResolver::class)->resolveEffectiveSteps($employee);
+            } catch (\RuntimeException $exception) {
                 $validator->errors()->add(
                     'jenis_cuti_id',
-                    'Konfigurasi approver cuti belum lengkap. Hubungi Super Admin.',
+                    $exception->getMessage(),
                 );
 
                 return;
@@ -105,7 +105,7 @@ class StoreLeaveRequestRequest extends FormRequest
             }
 
             // Hanya Cuti Tahunan yang memotong saldo; saldo tidak cukup berarti pengajuan ditolak otomatis dan tidak tersimpan.
-            if ($jenis->nama === 'Cuti Tahunan') {
+            if ($jenis->mengurangi_saldo_tahunan) {
                 $this->validateSaldoTahunan($validator, $employee);
             }
         });
@@ -120,6 +120,15 @@ class StoreLeaveRequestRequest extends FormRequest
     {
         $mulai = Carbon::createFromFormat('Y-m-d', (string) $this->input('tanggal_mulai'))->startOfDay();
         $selesai = Carbon::createFromFormat('Y-m-d', (string) $this->input('tanggal_selesai'))->startOfDay();
+
+        if ($employee->appointment?->tmt_pengangkatan === null) {
+            $validator->errors()->add(
+                'tanggal_mulai',
+                'Data TMT pengangkatan pegawai belum tersedia sehingga hak cuti tahunan belum dapat dihitung.',
+            );
+
+            return;
+        }
 
         // Cuti tahunan yang melintasi pergantian tahun belum didukung: aturan carry-over saldo antar tahun
         // belum final, sehingga membebankan seluruh hari ke saldo tahun mulai berisiko salah hitung.
