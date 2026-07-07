@@ -76,6 +76,7 @@
                     'data-master',
                     'hari-libur',
                     'ews.config',
+                    'kabag.bawahan.index',
                 ],
                 'pimpinan' => [
                     'audit-log',
@@ -84,6 +85,7 @@
                     'rbac',
                     'data-nonaktif',
                     'ews.config',
+                    'kabag.bawahan.index',
                 ],
                 'atasan_langsung' => [
                     'pegawai.import',
@@ -117,6 +119,7 @@
                     'hari-libur',
                     'pengaturan',
                     'audit-log',
+                    'kabag.bawahan.index',
                 ],
             ];
 
@@ -133,6 +136,7 @@
                     'group' => 'Kepegawaian',
                     'items' => [
                         ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users'],
+                        ['label' => 'Daftar Bawahan', 'route' => 'kabag.bawahan.index', 'icon' => 'users'],
                         ['label' => 'Data Nonaktif', 'route' => 'data-nonaktif', 'icon' => 'user-minus'],
                         ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open'],
                     ]

@@ -835,4 +835,13 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('pegawai.export');
 
+    // UI DUMMY ROUTES FOR KEPALA BAGIAN
+    Route::get('/kabag/bawahan', function () {
+        return view('kabag.bawahan.index');
+    })->name('kabag.bawahan.index');
+
+    Route::get('/kabag/bawahan/{id}', function ($id) {
+        return view('kabag.bawahan.show', compact('id'));
+    })->name('kabag.bawahan.show');
+
 });
