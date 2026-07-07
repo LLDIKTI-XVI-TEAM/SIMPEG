@@ -386,7 +386,7 @@
                                            class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-sm font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20">
                                             <img x-show="p.foto_url" :src="p.foto_url" :alt="'Foto ' + p.nama_lengkap"
                                                  class="h-full w-full object-cover object-[center_25%]" loading="lazy"
-                                                 @error="$el.classList.add('hidden'); $el.nextElementSibling.classList.remove('hidden')">
+                                                 x-on:error="$el.classList.add('hidden'); $el.nextElementSibling.classList.remove('hidden')">
                                             <span x-show="!p.foto_url" x-text="p.nama_lengkap.charAt(0).toUpperCase()" aria-hidden="true"></span>
                                         </a>
                                         <div class="min-w-0">
