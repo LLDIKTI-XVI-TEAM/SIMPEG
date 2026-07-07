@@ -844,4 +844,16 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         return view('kabag.bawahan.show', compact('id'));
     })->name('kabag.bawahan.show');
 
+    Route::get('/kabag/cuti', function () {
+        return view('kabag.cuti.index');
+    })->name('kabag.cuti.index');
+
+    Route::get('/kabag/cuti/{id}', function ($id) {
+        return view('kabag.cuti.show', compact('id'));
+    })->name('kabag.cuti.show');
+
+    Route::get('/kabag/ews', function () {
+        return view('kabag.ews.index');
+    })->name('kabag.ews.index');
+
 });

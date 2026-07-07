@@ -12,20 +12,14 @@
         ];
     @endphp
 
-    <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div class="w-full sm:w-72 relative">
-            <input type="text" placeholder="Cari nama atau NIP..." class="w-full rounded-lg border border-border bg-white py-2.5 pl-10 pr-4 text-sm font-sans placeholder:text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-sm" />
-            <div class="absolute left-3 top-1/2 -translate-y-1/2 text-muted">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
-            </div>
-        </div>
+    <x-ui.filter-bar searchPlaceholder="Cari nama atau NIP..." searchCols="lg:col-span-2 sm:col-span-1">
         <div class="flex items-center gap-2">
             <x-ui.button variant="secondary" size="md">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 4.5h14.25M3 9h9.75M3 13.5h9.75m4.5-4.5v12m0 0l-3.75-3.75M17.25 21L21 17.25" /></svg>
                 Filter
             </x-ui.button>
         </div>
-    </div>
+    </x-ui.filter-bar>
 
     <x-ui.card padding="none" class="overflow-hidden">
         <div class="overflow-x-auto">
@@ -77,12 +71,7 @@
         
         <div class="border-t border-border px-6 py-4 bg-surface flex items-center justify-between">
             <p class="text-xs text-muted font-sans">Menampilkan 1 hingga 6 dari 12 data</p>
-            <div class="flex gap-1">
-                <x-ui.button variant="secondary" size="sm" class="px-3 py-1" disabled>&lt; Prev</x-ui.button>
-                <x-ui.button variant="primary" size="sm" class="px-3 py-1">1</x-ui.button>
-                <x-ui.button variant="secondary" size="sm" class="px-3 py-1">2</x-ui.button>
-                <x-ui.button variant="secondary" size="sm" class="px-3 py-1">Next &gt;</x-ui.button>
-            </div>
+            <x-ui.pagination current="1" total="2" />
         </div>
     </x-ui.card>
 

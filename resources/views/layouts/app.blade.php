@@ -88,6 +88,23 @@
                     'kabag.bawahan.index',
                 ],
                 'atasan_langsung' => [
+                    'data-pegawai',
+                    'pegawai.import',
+                    'hari-libur',
+                    'dokumen',
+                    'audit-log',
+                    'pengaturan',
+                    'user-management',
+                    'rbac',
+                    'data-nonaktif',
+                    'data-master',
+                    'laporan',
+                    'laporan.pegawai',
+                    'laporan.cuti',
+                    'ews.config',
+                ],
+                'kepala_bagian' => [
+                    'data-pegawai',
                     'pegawai.import',
                     'hari-libur',
                     'dokumen',
@@ -144,6 +161,7 @@
                 [
                     'group' => 'Cuti',
                     'items' => [
+                        ['label' => 'Cuti Bawahan', 'route' => 'kabag.cuti.index', 'icon' => 'check-badge'],
                         ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
                         ['label' => 'Rekap Cuti', 'route' => 'cuti.rekap', 'icon' => 'document-text'],
                     ]
@@ -151,6 +169,7 @@
                 [
                     'group' => 'EWS & Notifikasi',
                     'items' => [
+                        ['label' => 'EWS Bawahan', 'route' => 'kabag.ews.index', 'icon' => 'exclamation-triangle'],
                         ['label' => 'EWS Aktif', 'route' => 'ews', 'icon' => 'exclamation-triangle'],
                         ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
                         ['label' => 'Konfigurasi EWS', 'route' => 'ews.config', 'icon' => 'cog-6-tooth'],
@@ -185,22 +204,27 @@
             @endphp
 
             @foreach($menuGroups as $group)
-                @if(!empty($group['group']))
-                    <div class="px-4 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted/60 font-sans">
-                        {{ $group['group'] }}
-                    </div>
-                @endif
-                <div class="space-y-1">
-                    @foreach($group['items'] as $menu)
-                        @php
-                            $routeExists = \Illuminate\Support\Facades\Route::has($menu['route']);
-                            $isLocked    = in_array($menu['route'], $myLockedMenus);
-
-                            if (!$routeExists || $isLocked) {
-                                continue;
-                            }
-
-                            $isActive = false;
+                @php
+                    $visibleItems = [];
+                    foreach ($group['items'] as $menu) {
+                        $routeExists = \Illuminate\Support\Facades\Route::has($menu['route']);
+                        $isLocked    = in_array($menu['route'], $myLockedMenus);
+                        if ($routeExists && !$isLocked) {
+                            $visibleItems[] = $menu;
+                        }
+                    }
+                @endphp
+                
+                @if(count($visibleItems) > 0)
+                    @if(!empty($group['group']))
+                        <div class="px-4 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted/60 font-sans">
+                            {{ $group['group'] }}
+                        </div>
+                    @endif
+                    <div class="space-y-1">
+                        @foreach($visibleItems as $menu)
+                            @php
+                                $isActive = false;
                             $currentRoute = request()->route() ? request()->route()->getName() : null;
                             if ($currentRoute === $menu['route']) {
                                 $isActive = true;
@@ -274,6 +298,7 @@
                         </a>
                     @endforeach
                 </div>
+                @endif
             @endforeach
 
         </nav>
