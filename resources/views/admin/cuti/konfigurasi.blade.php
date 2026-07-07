@@ -136,6 +136,77 @@
             </form>
         </div>
 
+        {{-- BACKFILL CHAIN DINAMIS --}}
+        <div class="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-border bg-soft/30">
+                <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Backfill Chain Dinamis</h3>
+                <p class="mt-0.5 text-xs text-muted">Membuat chain approval per pegawai aktif dari Kepala Bagian dan konfigurasi stage 2/3 lama.</p>
+            </div>
+            <div class="grid grid-cols-1 gap-4 px-5 py-5 md:grid-cols-[1fr_auto] md:items-start">
+                <div class="space-y-2 text-sm text-muted">
+                    <p><span class="font-semibold text-ink">{{ $chainStats['active'] }}</span> chain aktif sudah tersedia.</p>
+                    <p>Backfill aman dijalankan ulang; pegawai yang sudah memiliki chain aktif akan dilewati.</p>
+                </div>
+                <form method="POST" action="{{ route('cuti.config.backfill') }}" class="w-full max-w-md space-y-3">
+                    @csrf
+                    <x-form.textarea
+                        name="backfill_reason"
+                        id="backfill-reason"
+                        label="Alasan Backfill"
+                        :required="true"
+                        rows="3"
+                        placeholder="Contoh: Backfill awal dari konfigurasi approval lama"
+                    />
+                    <button type="submit"
+                        class="inline-flex w-full items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition hover:bg-soft">
+                        Jalankan Backfill Chain
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        {{-- PYBMC GLOBAL --}}
+        <div class="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-border bg-soft/30">
+                <h3 class="text-xs font-bold text-ink uppercase tracking-wider">PYBMC Global</h3>
+                <p class="mt-0.5 text-xs text-muted">Final approver default untuk chain baru ketika pegawai belum punya PYBMC khusus.</p>
+            </div>
+            <div class="grid grid-cols-1 gap-4 px-5 py-5 md:grid-cols-[1fr_auto] md:items-start">
+                <div class="space-y-2 text-sm text-muted">
+                    <p>PYBMC aktif: <span class="font-semibold text-ink">{{ $globalPybmc?->approver?->nama_lengkap ?? 'Belum ditetapkan' }}</span></p>
+                    <p>Perubahan dicatat ke audit dan dipakai oleh chain baru berikutnya.</p>
+                </div>
+                <form method="POST" action="{{ route('cuti.config.pybmc-global') }}" class="w-full max-w-md space-y-3">
+                    @csrf
+                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans" for="pybmc-global-approver">Pegawai PYBMC <span class="text-danger">*</span></label>
+                    <select id="pybmc-global-approver" name="approver_employee_id"
+                        class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        <option value="">-- Pilih PYBMC --</option>
+                        @foreach($eligibleUsers as $user)
+                            @if($user->employee_id)
+                                <option value="{{ $user->employee_id }}" @selected(old('approver_employee_id', $globalPybmc?->approver_employee_id) === $user->employee_id)>{{ $user->name }} ({{ $user->role }})</option>
+                            @endif
+                        @endforeach
+                    </select>
+                    @error('approver_employee_id')
+                        <p class="text-[11px] text-danger font-semibold font-sans">{{ $message }}</p>
+                    @enderror
+                    <x-form.textarea
+                        name="pybmc_reason"
+                        id="pybmc-global-reason"
+                        label="Alasan PYBMC Global"
+                        :required="true"
+                        rows="3"
+                        placeholder="Contoh: Pergantian pejabat PYBMC"
+                    />
+                    <button type="submit"
+                        class="inline-flex w-full items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition hover:bg-soft">
+                        Simpan PYBMC Global
+                    </button>
+                </form>
+            </div>
+        </div>
+
         {{-- LOG PERUBAHAN KONFIGURASI (dari audit log nyata) --}}
         <div class="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
             <div class="px-5 py-4 border-b border-border bg-soft/30 flex items-center justify-between">

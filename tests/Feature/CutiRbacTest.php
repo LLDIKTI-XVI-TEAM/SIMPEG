@@ -22,11 +22,18 @@ class CutiRbacTest extends TestCase
      */
     private const CUTI_PERMISSIONS = [
         'cuti.create',
+        'cuti.read_own',
         'cuti.read_all',
+        'cuti.approve',
         'cuti.approve_stage1',
         'cuti.approve_stage2',
         'cuti.approve_stage3',
         'cuti.configure',
+        'cuti.configure_chain',
+        'cuti.balance.read',
+        'cuti.balance.adjust',
+        'cuti.proof.generate',
+        'cuti.kepala_lembaga_documents.manage',
     ];
 
     protected function setUp(): void

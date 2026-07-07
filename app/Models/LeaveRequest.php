@@ -6,6 +6,7 @@ use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -20,6 +21,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property-read Employee|null $employee
  * @property-read RefJenisCuti|null $jenisCuti
+ * @property-read LeaveProof|null $proof
  */
 class LeaveRequest extends Model
 {
@@ -63,5 +65,17 @@ class LeaveRequest extends Model
     public function approvals(): HasMany
     {
         return $this->hasMany(LeaveApproval::class);
+    }
+
+    /** @return HasMany<LeaveRequestStep, $this> */
+    public function steps(): HasMany
+    {
+        return $this->hasMany(LeaveRequestStep::class);
+    }
+
+    /** @return HasOne<LeaveProof, $this> */
+    public function proof(): HasOne
+    {
+        return $this->hasOne(LeaveProof::class);
     }
 }

@@ -453,6 +453,18 @@
                             <p class="text-[10px] text-muted font-sans mt-0.5">Data ini penting untuk dilengkapi.</p>
                         </div>
 
+                        {{-- Penanda eksplisit agar alur cuti tidak menebak Kepala Lembaga dari nama jabatan bebas. --}}
+                        <div class="space-y-1 rounded-lg border border-border bg-soft/40 p-4 sm:col-span-2">
+                            <input type="hidden" name="is_kepala_lembaga" value="0">
+                            <label for="is_kepala_lembaga" class="flex items-start gap-3 text-sm font-semibold text-ink font-sans">
+                                <input id="is_kepala_lembaga" name="is_kepala_lembaga" type="checkbox" value="1" @checked(old('is_kepala_lembaga', $p->is_kepala_lembaga)) class="mt-1 rounded border-border text-primary focus:ring-primary/20">
+                                <span>
+                                    Kepala Lembaga
+                                    <span class="block text-[10px] font-normal text-muted">Aktifkan hanya untuk pegawai yang berwenang memberi keputusan Kepala Lembaga pada alur cuti.</span>
+                                </span>
+                            </label>
+                        </div>
+
                         {{-- Golongan (READ-ONLY - ubah melalui Berkas & SK) --}}
                         <div class="space-y-1">
                             <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Golongan</label>

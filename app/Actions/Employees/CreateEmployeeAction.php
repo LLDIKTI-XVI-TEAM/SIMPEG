@@ -2,12 +2,14 @@
 
 namespace App\Actions\Employees;
 
+use App\Models\Document;
 use App\Models\Employee;
 use App\Models\RefJabatan;
 use App\Models\RefStatusPegawai;
 use App\Services\AuditService;
 use App\Services\EmployeeFileStorageService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CreateEmployeeAction
 {
@@ -23,15 +25,44 @@ class CreateEmployeeAction
     {
         $data = $this->normalizeEmployeeContract($data);
 
-        if ($request->hasFile('foto')) {
-            $data['foto'] = $this->files->storePhoto($request->file('foto'));
-        }
+        return DB::transaction(function () use ($data, $request): Employee {
+            if ($request->hasFile('foto')) {
+                $data['foto'] = $this->files->storePhoto($request->file('foto'));
+            }
 
-        $employee = Employee::create($data);
+            $employee = Employee::create($data);
 
-        AuditService::log('CREATE', 'Employee', $employee->id, null, $employee->getRawOriginal(), $request);
+            if ($request->filled('jenis_pengangkatan')) {
+                $appointmentData = [
+                    'jenis_pengangkatan' => $data['jenis_pengangkatan'],
+                    'tmt_pengangkatan' => $data['tmt'],
+                    'no_sk' => $data['nomor_sk'],
+                    'tanggal_sk' => $data['tanggal_sk'],
+                ];
 
-        return $employee;
+                if ($request->hasFile('file_sk') && $request->file('file_sk')->isValid()) {
+                    $appointmentData['file_sk'] = $this->files->storeSk($request->file('file_sk'));
+
+                    Document::create([
+                        'employee_id' => $employee->id,
+                        'jenis_dokumen' => 'sk_pengangkatan',
+                        'nama_dokumen' => 'SK Pengangkatan '.$appointmentData['jenis_pengangkatan'],
+                        'nomor_dokumen' => $appointmentData['no_sk'],
+                        'tanggal_dokumen' => $appointmentData['tanggal_sk'],
+                        'file_path' => $appointmentData['file_sk'],
+                        'keterangan' => 'Diunggah otomatis saat tambah pegawai',
+                    ]);
+                }
+
+                // TMT pengangkatan menjadi sumber masa kerja cuti; simpan saat pegawai dibuat agar eligibility tidak kosong.
+                $employee->appointment()->create($appointmentData);
+            }
+
+            $employee->refresh();
+            AuditService::log('CREATE', 'Employee', $employee->id, null, $employee->getRawOriginal(), $request);
+
+            return $employee;
+        });
     }
 
     private function normalizeEmployeeContract(array $data): array
