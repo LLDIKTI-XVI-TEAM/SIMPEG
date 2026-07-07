@@ -62,14 +62,31 @@ class SubmitLeaveRequestAction
                 'status' => 'menunggu_approval',
             ]);
 
-            foreach ($steps as $index => $step) {
+            $latestOrderByApprover = $steps
+                ->groupBy('approver_employee_id')
+                ->map(fn ($approverSteps) => $approverSteps->max('step_order'));
+            $firstActiveAssigned = false;
+
+            foreach ($steps as $step) {
+                $isEarlierDuplicate = $latestOrderByApprover[$step->approver_employee_id] !== $step->step_order;
+                $status = 'pending';
+
+                if ($isEarlierDuplicate) {
+                    $status = 'skipped';
+                } elseif (! $firstActiveAssigned) {
+                    $status = 'active';
+                    $firstActiveAssigned = true;
+                }
+
                 $leaveRequest->steps()->create([
-                    'step_order' => $index + 1,
+                    'step_order' => $step->step_order,
                     'step_type' => $step->step_type,
                     'role_label' => $step->role_label,
                     'approver_employee_id' => $step->approver_employee_id,
-                    'status' => $index === 0 ? 'active' : 'pending',
+                    'status' => $status,
                     'is_final' => $step->is_final,
+                    'skipped_reason' => $isEarlierDuplicate ? 'duplicate_approver' : null,
+                    'decision_note' => $isEarlierDuplicate ? 'Dilewati otomatis karena approver muncul lagi pada step otoritas lebih akhir.' : null,
                 ]);
             }
 

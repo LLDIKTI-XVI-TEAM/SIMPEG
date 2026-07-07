@@ -79,11 +79,24 @@ class LeaveApprovalEngineTest extends TestCase
             'effective_from' => '2026-01-01',
         ]);
 
+        $latestOrderByApprover = collect($approvers)
+            ->mapWithKeys(fn (Employee $approver, int $index) => [$approver->id => $index + 1]);
+        $firstActiveAssigned = false;
+
         foreach ($approvers as $index => $approver) {
             $order = $index + 1;
             $isFinal = $order === count($approvers);
             $stepType = $isFinal ? 'pybmc' : 'kepala_bagian';
             $roleLabel = $isFinal ? 'PYBMC' : 'Kepala Bagian';
+            $isEarlierDuplicate = $latestOrderByApprover[$approver->id] !== $order;
+            $status = 'pending';
+
+            if ($isEarlierDuplicate) {
+                $status = 'skipped';
+            } elseif (! $firstActiveAssigned) {
+                $status = 'active';
+                $firstActiveAssigned = true;
+            }
 
             $chain->steps()->create([
                 'step_order' => $order,
@@ -99,8 +112,9 @@ class LeaveApprovalEngineTest extends TestCase
                 'step_type' => $stepType,
                 'role_label' => $roleLabel,
                 'approver_employee_id' => $approver->id,
-                'status' => $order === 1 ? 'active' : 'pending',
+                'status' => $status,
                 'is_final' => $isFinal,
+                'skipped_reason' => $isEarlierDuplicate ? 'duplicate_approver' : null,
             ]);
         }
 
@@ -145,12 +159,66 @@ class LeaveApprovalEngineTest extends TestCase
 
         $this->assertDatabaseHas('leave_request_steps', [
             'leave_request_id' => $cuti->id,
-            'step_order' => 2,
+            'step_order' => 1,
             'status' => 'skipped',
             'skipped_reason' => 'duplicate_approver',
         ]);
-        $this->assertDatabaseHas('leave_approvals', ['leave_request_id' => $cuti->id, 'stage' => 2, 'action' => 'SKIP']);
+        $this->assertDatabaseHas('leave_request_steps', ['leave_request_id' => $cuti->id, 'step_order' => 2, 'status' => 'approved']);
         $this->assertDatabaseHas('leave_request_steps', ['leave_request_id' => $cuti->id, 'step_order' => 3, 'status' => 'active']);
+    }
+
+    public function test_duplikat_kepala_bagian_dan_pybmc_mempertahankan_step_final(): void
+    {
+        $pemohon = $this->makePemohon();
+        $jenis = $this->jenisCuti('Cuti Sakit');
+        $cuti = $this->makeRequest($pemohon['employee'], $jenis, [$pemohon['pybmc'], $pemohon['pybmc']], 2);
+
+        $this->assertDatabaseHas('leave_request_steps', [
+            'leave_request_id' => $cuti->id,
+            'step_order' => 1,
+            'status' => 'skipped',
+            'skipped_reason' => 'duplicate_approver',
+            'is_final' => false,
+        ]);
+        $this->assertDatabaseHas('leave_request_steps', [
+            'leave_request_id' => $cuti->id,
+            'step_order' => 2,
+            'status' => 'active',
+            'is_final' => true,
+        ]);
+
+        $this->service()->approve($cuti->fresh(), $pemohon['pybmc']);
+
+        $this->assertSame('disetujui', $cuti->fresh()->status);
+        $this->assertDatabaseHas('leave_approvals', [
+            'leave_request_id' => $cuti->id,
+            'stage' => 2,
+            'action' => 'APPROVE',
+        ]);
+    }
+
+    public function test_duplikat_verifikator_dan_pybmc_mempertahankan_step_final(): void
+    {
+        $pemohon = $this->makePemohon();
+        $jenis = $this->jenisCuti('Cuti Sakit');
+        $verifikatorFinal = Employee::factory()->create();
+        $cuti = $this->makeRequest($pemohon['employee'], $jenis, [$pemohon['kepala_bagian'], $verifikatorFinal, $verifikatorFinal], 2);
+
+        $this->service()->approve($cuti, $pemohon['kepala_bagian']);
+
+        $this->assertDatabaseHas('leave_request_steps', [
+            'leave_request_id' => $cuti->id,
+            'step_order' => 2,
+            'status' => 'skipped',
+            'skipped_reason' => 'duplicate_approver',
+            'is_final' => false,
+        ]);
+        $this->assertDatabaseHas('leave_request_steps', [
+            'leave_request_id' => $cuti->id,
+            'step_order' => 3,
+            'status' => 'active',
+            'is_final' => true,
+        ]);
     }
 
     public function test_perlu_perubahan_mengembalikan_pengajuan_ke_pemohon(): void
@@ -164,6 +232,18 @@ class LeaveApprovalEngineTest extends TestCase
         $this->assertSame('perlu_perubahan', $cuti->fresh()->status);
         $this->assertDatabaseHas('leave_request_steps', ['leave_request_id' => $cuti->id, 'step_order' => 1, 'status' => 'active']);
         $this->assertDatabaseHas('leave_approvals', ['leave_request_id' => $cuti->id, 'stage' => 1, 'action' => 'REQUEST_CHANGES']);
+    }
+
+    public function test_perlu_perubahan_tidak_bisa_disetujui_sebelum_dikirim_ulang(): void
+    {
+        $pemohon = $this->makePemohon();
+        $jenis = $this->jenisCuti('Cuti Sakit');
+        $cuti = $this->makeRequest($pemohon['employee'], $jenis, [$pemohon['kepala_bagian'], $pemohon['pybmc']], 2);
+
+        $this->service()->requestChanges($cuti, $pemohon['kepala_bagian'], 'Tanggal cuti perlu diperbaiki.');
+
+        $this->expectException(ValidationException::class);
+        $this->service()->approve($cuti->fresh(), $pemohon['kepala_bagian']);
     }
 
     public function test_tidak_disetujui_menutup_pengajuan_tanpa_memotong_saldo(): void

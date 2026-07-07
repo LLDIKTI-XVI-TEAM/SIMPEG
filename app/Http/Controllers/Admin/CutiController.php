@@ -6,10 +6,12 @@ use App\Actions\Cuti\ApproveLeaveAction;
 use App\Actions\Cuti\PostponeLeaveAction;
 use App\Actions\Cuti\RejectLeaveAction;
 use App\Actions\Cuti\RequestChangesLeaveAction;
+use App\Actions\Cuti\ResubmitLeaveRequestAction;
 use App\Actions\Cuti\SubmitLeaveRequestAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Cuti\ApproveLeaveRequest;
 use App\Http\Requests\Cuti\PostponeLeaveRequest;
+use App\Http\Requests\Cuti\ResubmitLeaveRequestRequest;
 use App\Http\Requests\Cuti\ReviewLeaveDecisionRequest;
 use App\Http\Requests\Cuti\StoreLeaveRequestRequest;
 use App\Models\Employee;
@@ -354,19 +356,20 @@ class CutiController extends Controller
             ->with(['employee', 'jenisCuti', 'approvals.approver', 'steps.approver'])
             ->findOrFail($id);
 
-        if (! $user->hasPermission('cuti.read_all') && $cuti->employee_id !== $user->employee_id) {
-            abort(403);
-        }
-
         // Tombol setujui/tunda hanya muncul bila pengguna ini adalah approver tahap yang sedang menunggu;
         // otorisasi sebenarnya tetap ditegakkan ulang di service saat aksi dijalankan.
         $stage = $approvals->pendingStage($cuti);
         $canAct = $stage !== null
             && $approvals->approverEmployeeIdForStage($cuti, $stage) === $user->employee_id;
 
+        if (! $user->hasPermission('cuti.read_all') && $cuti->employee_id !== $user->employee_id && ! $canAct) {
+            abort(403);
+        }
+
         return view('admin.cuti.show', [
             'cuti' => $cuti,
             'canAct' => $canAct,
+            'canResubmit' => $cuti->status === 'perlu_perubahan' && $cuti->employee_id === $user->employee_id,
             'activeStep' => $stage === null ? null : $cuti->steps->firstWhere('step_order', $stage),
         ]);
     }
@@ -384,6 +387,15 @@ class CutiController extends Controller
 
         return redirect()->route('cuti')
             ->with('success', 'Pengajuan cuti berhasil dikirim dan menunggu persetujuan atasan langsung.');
+    }
+
+    /** Mengirim ulang pengajuan perlu perubahan dengan snapshot approval yang sama. */
+    public function resubmit(ResubmitLeaveRequestRequest $request, LeaveRequest $leaveRequest, ResubmitLeaveRequestAction $action)
+    {
+        $action->execute($leaveRequest, $request->validated(), $request);
+
+        return redirect()->route('cuti.show', $leaveRequest)
+            ->with('success', 'Perubahan pengajuan cuti berhasil dikirim ulang.');
     }
 
     /**

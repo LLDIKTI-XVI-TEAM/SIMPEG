@@ -6,9 +6,8 @@ use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * Memvalidasi tindakan menyetujui pengajuan cuti.
- * Otorisasi di sini bersifat gerbang kasar (pengguna memegang hak approve cuti);
- * otorisasi inti yang menentukan apakah pengguna adalah approver tahap yang menunggu
- * ditegakkan secara person-based di LeaveApprovalService.
+ * Otorisasi di sini hanya memastikan akun tertaut ke pegawai.
+ * Approver dinamis bisa pegawai biasa; kelayakan per-step ditegakkan person-based di LeaveApprovalService.
  */
 class ApproveLeaveRequest extends FormRequest
 {
@@ -16,8 +15,8 @@ class ApproveLeaveRequest extends FormRequest
     {
         $user = $this->user();
 
-        // Kelayakan per-step tetap diuji di service berdasarkan snapshot aktif.
-        return (bool) $user?->hasPermission('cuti.approve');
+        // Permission cuti.approve tidak dipakai sebagai syarat karena approver snapshot bisa pegawai biasa.
+        return $user?->employee_id !== null;
     }
 
     /**

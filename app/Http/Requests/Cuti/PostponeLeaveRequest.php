@@ -16,7 +16,8 @@ class PostponeLeaveRequest extends FormRequest
         $user = $this->user();
 
         // Kelayakan approver per-step tetap ditegakkan di service berdasarkan snapshot aktif.
-        return (bool) $user?->hasPermission('cuti.approve');
+        // Approver snapshot bisa pegawai biasa; service tetap memverifikasi kecocokan orang pada step aktif.
+        return $user?->employee_id !== null;
     }
 
     /**

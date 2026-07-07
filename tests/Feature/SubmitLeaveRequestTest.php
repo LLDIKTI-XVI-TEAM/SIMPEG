@@ -13,6 +13,7 @@ use App\Models\RefJenisPegawai;
 use App\Models\SimpegNotification;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
+use App\Services\LeaveApprovalService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -440,5 +441,38 @@ class SubmitLeaveRequestTest extends TestCase
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors(['tanggal_mulai']);
         $this->assertDatabaseCount('leave_requests', 0);
+    }
+
+    public function test_pemohon_bisa_mengirim_ulang_pengajuan_perlu_perubahan_dengan_snapshot_yang_sama(): void
+    {
+        $aktor = $this->makePemohon();
+        $jenis = $this->jenisCuti('Cuti Sakit');
+
+        $this->actingAs($aktor['user']);
+        $this->post(route(self::ROUTE), $this->payload($jenis));
+
+        $leave = LeaveRequest::with('steps')->firstOrFail();
+        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], 'Tanggal harus diperbaiki.');
+        $stepIdsBefore = $leave->steps()->orderBy('step_order')->pluck('id')->all();
+
+        $response = $this->patch(route('cuti.resubmit', $leave), [
+            'tanggal_mulai' => '2026-07-13',
+            'tanggal_selesai' => '2026-07-15',
+            'alasan' => 'Revisi tanggal sesuai arahan approver.',
+        ]);
+
+        $response->assertRedirect(route('cuti.show', $leave));
+        $leave->refresh();
+
+        $this->assertSame('menunggu_approval', $leave->status);
+        $this->assertSame('2026-07-13', $leave->tanggal_mulai->toDateString());
+        $this->assertSame('2026-07-15', $leave->tanggal_selesai->toDateString());
+        $this->assertSame(3, $leave->jumlah_hari_kerja);
+        $this->assertSame($stepIdsBefore, $leave->steps()->orderBy('step_order')->pluck('id')->all());
+        $this->assertDatabaseHas('leave_request_steps', [
+            'leave_request_id' => $leave->id,
+            'step_order' => 1,
+            'status' => 'active',
+        ]);
     }
 }

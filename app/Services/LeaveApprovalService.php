@@ -33,10 +33,12 @@ class LeaveApprovalService
      */
     public function approve(LeaveRequest $leaveRequest, Employee $actor, ?string $komentar = null): LeaveRequest
     {
+        $this->assertApprovalActionable($leaveRequest);
         $this->assertActorIsApprover($leaveRequest, $actor, $this->pendingStageOrFail($leaveRequest));
 
         return DB::transaction(function () use ($leaveRequest, $actor, $komentar): LeaveRequest {
             $locked = LeaveRequest::query()->whereKey($leaveRequest->id)->lockForUpdate()->firstOrFail();
+            $this->assertApprovalActionable($locked);
             $activeStep = $this->activeStepOrFail($locked);
             $this->assertActorMatchesStep($activeStep, $actor);
 
@@ -69,10 +71,12 @@ class LeaveApprovalService
      */
     public function postpone(LeaveRequest $leaveRequest, Employee $actor, string $komentar): LeaveRequest
     {
+        $this->assertApprovalActionable($leaveRequest);
         $this->assertActorIsApprover($leaveRequest, $actor, $this->pendingStageOrFail($leaveRequest));
 
         return DB::transaction(function () use ($leaveRequest, $actor, $komentar): LeaveRequest {
             $locked = LeaveRequest::query()->whereKey($leaveRequest->id)->lockForUpdate()->firstOrFail();
+            $this->assertApprovalActionable($locked);
             $activeStep = $this->activeStepOrFail($locked);
             $this->assertActorMatchesStep($activeStep, $actor);
 
@@ -91,10 +95,12 @@ class LeaveApprovalService
      */
     public function requestChanges(LeaveRequest $leaveRequest, Employee $actor, string $komentar): LeaveRequest
     {
+        $this->assertApprovalActionable($leaveRequest);
         $this->assertActorIsApprover($leaveRequest, $actor, $this->pendingStageOrFail($leaveRequest));
 
         return DB::transaction(function () use ($leaveRequest, $actor, $komentar): LeaveRequest {
             $locked = LeaveRequest::query()->whereKey($leaveRequest->id)->lockForUpdate()->firstOrFail();
+            $this->assertApprovalActionable($locked);
             $activeStep = $this->activeStepOrFail($locked);
             $this->assertActorMatchesStep($activeStep, $actor);
 
@@ -112,10 +118,12 @@ class LeaveApprovalService
      */
     public function reject(LeaveRequest $leaveRequest, Employee $actor, string $komentar): LeaveRequest
     {
+        $this->assertApprovalActionable($leaveRequest);
         $this->assertActorIsApprover($leaveRequest, $actor, $this->pendingStageOrFail($leaveRequest));
 
         return DB::transaction(function () use ($leaveRequest, $actor, $komentar): LeaveRequest {
             $locked = LeaveRequest::query()->whereKey($leaveRequest->id)->lockForUpdate()->firstOrFail();
+            $this->assertApprovalActionable($locked);
             $activeStep = $this->activeStepOrFail($locked);
             $this->assertActorMatchesStep($activeStep, $actor);
 
@@ -126,6 +134,14 @@ class LeaveApprovalService
             ])->save();
 
             $this->recordApproval($locked, $actor, $activeStep->step_order, 'REJECT', $komentar);
+            $locked->steps()
+                ->where('status', 'pending')
+                ->update([
+                    'status' => 'skipped',
+                    'skipped_reason' => 'request_rejected',
+                    'decision_note' => 'Dilewati karena pengajuan sudah tidak disetujui.',
+                    'acted_at' => Carbon::now(),
+                ]);
             $locked->forceFill(['status' => self::STATUS_TIDAK_DISETUJUI])->save();
 
             return $locked;
@@ -160,6 +176,15 @@ class LeaveApprovalService
         }
 
         return $stage;
+    }
+
+    private function assertApprovalActionable(LeaveRequest $leaveRequest): void
+    {
+        if (! in_array($leaveRequest->status, [self::STATUS_MENUNGGU, self::STATUS_DITANGGUHKAN], true)) {
+            throw ValidationException::withMessages([
+                'status' => 'Pengajuan cuti ini belum dapat diproses oleh approver.',
+            ]);
+        }
     }
 
     private function activeStepOrFail(LeaveRequest $leaveRequest): LeaveRequestStep

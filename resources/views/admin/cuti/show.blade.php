@@ -193,6 +193,40 @@
                     <x-ui.alert variant="danger" size="sm">{{ $message }}</x-ui.alert>
                 @enderror
 
+                @if ($canResubmit)
+                    <div class="rounded-lg border border-warning/25 bg-warning/5 p-4">
+                        <h4 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Kirim Ulang Perubahan</h4>
+                        <p class="mt-1 text-xs text-muted font-sans">Perbaiki tanggal, alasan, atau lampiran. Jenis cuti tetap terkunci agar snapshot approval tidak berubah.</p>
+                        <form action="{{ route('cuti.resubmit', $cuti->id) }}" method="POST" enctype="multipart/form-data" class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                            @csrf
+                            @method('PATCH')
+                            <div>
+                                <label for="tanggal_mulai" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Mulai</label>
+                                <input id="tanggal_mulai" name="tanggal_mulai" type="date" value="{{ old('tanggal_mulai', $cuti->tanggal_mulai?->toDateString()) }}" class="mt-1 w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink" required>
+                                @error('tanggal_mulai')<p class="mt-1 text-xs text-danger">{{ $message }}</p>@enderror
+                            </div>
+                            <div>
+                                <label for="tanggal_selesai" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Selesai</label>
+                                <input id="tanggal_selesai" name="tanggal_selesai" type="date" value="{{ old('tanggal_selesai', $cuti->tanggal_selesai?->toDateString()) }}" class="mt-1 w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink" required>
+                                @error('tanggal_selesai')<p class="mt-1 text-xs text-danger">{{ $message }}</p>@enderror
+                            </div>
+                            <div class="md:col-span-2">
+                                <label for="alasan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Alasan</label>
+                                <textarea id="alasan" name="alasan" rows="3" class="mt-1 w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink" required>{{ old('alasan', $cuti->alasan) }}</textarea>
+                                @error('alasan')<p class="mt-1 text-xs text-danger">{{ $message }}</p>@enderror
+                            </div>
+                            <div class="md:col-span-2">
+                                <label for="lampiran" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Lampiran Baru <span class="font-normal text-muted">(opsional)</span></label>
+                                <input id="lampiran" name="lampiran" type="file" accept=".pdf,.jpg,.jpeg,.png" class="mt-1 w-full rounded-lg border border-border bg-surface text-sm text-muted file:mr-4 file:border-0 file:bg-primary/10 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary">
+                                @error('lampiran')<p class="mt-1 text-xs text-danger">{{ $message }}</p>@enderror
+                            </div>
+                            <div class="md:col-span-2 flex justify-end">
+                                <button type="submit" class="{{ $buttonStyles['success'] }}">Kirim Ulang Pengajuan</button>
+                            </div>
+                        </form>
+                    </div>
+                @endif
+
                 @if ($canAct)
                     {{-- Catatan keputusan wajib untuk tindakan selain setuju agar pemohon memahami dasar keputusan. --}}
                     @foreach ([

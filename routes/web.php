@@ -710,25 +710,29 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::post('/dashboard/cuti', [CutiController::class, 'store'])
         ->middleware('permission:cuti.create')
         ->name('cuti.store');
+    Route::patch('/dashboard/cuti/{leaveRequest}/resubmit', [CutiController::class, 'resubmit'])
+        ->middleware('permission:cuti.create')
+        ->name('cuti.resubmit')
+        ->whereUuid('leaveRequest');
     // Antrean dan tindakan approval cuti digerbang ganda: role allowlist sebagai pagar kasar
     // dan permission level-aksi; kelayakan approver per-tahap (person-based) ditegakkan di service.
     Route::get('/cuti/approval', [CutiController::class, 'approval'])
-        ->middleware(['role:super_admin,pimpinan,atasan_langsung,admin_kepegawaian'])
+        ->middleware(['role:super_admin,pimpinan,atasan_langsung,admin_kepegawaian,pegawai'])
         ->name('cuti.approval');
     Route::post('/cuti/{id}/approve', [CutiController::class, 'approve'])
-        ->middleware(['role:super_admin,pimpinan,atasan_langsung,admin_kepegawaian'])
+        ->middleware(['role:super_admin,pimpinan,atasan_langsung,admin_kepegawaian,pegawai'])
         ->name('cuti.approve')
         ->whereUuid('id');
     Route::post('/cuti/{id}/postpone', [CutiController::class, 'postpone'])
-        ->middleware(['role:super_admin,pimpinan,atasan_langsung,admin_kepegawaian'])
+        ->middleware(['role:super_admin,pimpinan,atasan_langsung,admin_kepegawaian,pegawai'])
         ->name('cuti.postpone')
         ->whereUuid('id');
     Route::post('/cuti/{id}/request-changes', [CutiController::class, 'requestChanges'])
-        ->middleware(['role:super_admin,pimpinan,atasan_langsung,admin_kepegawaian'])
+        ->middleware(['role:super_admin,pimpinan,atasan_langsung,admin_kepegawaian,pegawai'])
         ->name('cuti.request-changes')
         ->whereUuid('id');
     Route::post('/cuti/{id}/reject', [CutiController::class, 'reject'])
-        ->middleware(['role:super_admin,pimpinan,atasan_langsung,admin_kepegawaian'])
+        ->middleware(['role:super_admin,pimpinan,atasan_langsung,admin_kepegawaian,pegawai'])
         ->name('cuti.reject')
         ->whereUuid('id');
     Route::get('/dashboard/cuti/{id}', [CutiController::class, 'show'])

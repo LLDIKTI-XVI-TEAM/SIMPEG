@@ -14,7 +14,8 @@ class ReviewLeaveDecisionRequest extends FormRequest
     {
         $user = $this->user();
 
-        return (bool) $user?->hasPermission('cuti.approve');
+        // Keputusan bisa dilakukan pegawai biasa bila ia tersnapshot sebagai approver aktif.
+        return $user?->employee_id !== null;
     }
 
     /** @return array<string, list<string>> */
