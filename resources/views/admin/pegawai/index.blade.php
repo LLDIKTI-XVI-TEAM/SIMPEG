@@ -382,7 +382,7 @@
                                 {{-- Pegawai --}}
                                 <td class="px-4 py-3">
                                     <div class="flex items-center gap-3">
-                                        <a :href="`/dashboard/pegawai/${p.id}`"
+                                        <a :href="`/pegawai/${p.id}`"
                                            class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-sm font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20">
                                             <img x-show="p.foto_url" :src="p.foto_url" :alt="'Foto ' + p.nama_lengkap"
                                                  class="h-full w-full object-cover object-[center_25%]" loading="lazy"
@@ -390,7 +390,7 @@
                                             <span x-show="!p.foto_url" x-text="p.nama_lengkap.charAt(0).toUpperCase()" aria-hidden="true"></span>
                                         </a>
                                         <div class="min-w-0">
-                                            <a :href="`/dashboard/pegawai/${p.id}`"
+                                            <a :href="`/pegawai/${p.id}`"
                                                class="block truncate text-sm font-semibold text-ink transition hover:text-primary"
                                                x-text="p.nama_lengkap"></a>
                                             <p class="font-mono text-xs text-muted" x-text="'NIP. ' + p.nip"></p>
@@ -439,7 +439,7 @@
                                 {{-- Aksi --}}
                                 <td class="px-4 py-3">
                                     <div class="flex items-center justify-start gap-1.5">
-                                        <a :href="`/dashboard/pegawai/${p.id}`"
+                                        <a :href="`/pegawai/${p.id}`"
                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
                                            title="Detail">
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -447,7 +447,7 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                             </svg>
                                         </a>
-                                        <a :href="`/dashboard/pegawai/${p.id}/edit`"
+                                        <a :href="`/pegawai/${p.id}/edit`"
                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
                                            title="Edit">
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
