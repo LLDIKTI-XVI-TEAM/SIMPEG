@@ -7,6 +7,7 @@
             'Perhatian' => 'text-warning',
             'Kritis' => 'text-danger',
             'Menunggu' => 'text-warning',
+            'menunggu_approval' => 'text-warning',
             'disetujui' => 'text-success',
             'ditangguhkan' => 'text-warning',
             'perlu_perubahan' => 'text-danger',
