@@ -5,7 +5,7 @@ namespace App\Http\Requests\Employee;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class StoreEmployeeFamilyRequest extends FormRequest
+class StoreMyFamilyRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -14,11 +14,13 @@ class StoreEmployeeFamilyRequest extends FormRequest
             return true;
         }
 
-        // Mutasi data keluarga hanya untuk pengelola data kepegawaian.
         $user = $this->user();
 
+        // Hanya role pegawai yang dapat mengakses endpoint self-service ini,
+        // dan akun tersebut harus sudah dipetakan ke data pegawai.
         return $user !== null
-            && in_array($user->role, ['super_admin', 'admin_kepegawaian'], true);
+            && $user->role === 'pegawai'
+            && $user->employee_id !== null;
     }
 
     public function rules(): array
