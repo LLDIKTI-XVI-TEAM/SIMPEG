@@ -7,10 +7,10 @@
         $sedangCuti = 2;
 
         $daftarBawahan = [
-            ['id' => 1, 'nama' => 'Ahmad Fauzi', 'jabatan' => 'Analis Kepegawaian Ahli Muda', 'status' => 'Aktif'],
-            ['id' => 2, 'nama' => 'Siti Rahayu', 'jabatan' => 'Pranata Komputer Ahli Pertama', 'status' => 'Cuti Tahunan'],
-            ['id' => 3, 'nama' => 'Budi Santoso', 'jabatan' => 'Pengelola Keuangan', 'status' => 'Dinas Luar'],
-            ['id' => 4, 'nama' => 'Dewi Pertiwi', 'jabatan' => 'Arsiparis Terampil', 'status' => 'Aktif'],
+            ['id' => '9b6574f2-959c-4876-880f-90e822e11fa1', 'nama' => 'Ahmad Fauzi', 'jabatan' => 'Analis Kepegawaian Ahli Muda', 'status' => 'Aktif'],
+            ['id' => '9b6574f2-959c-4876-880f-90e822e11fa2', 'nama' => 'Siti Rahayu', 'jabatan' => 'Pranata Komputer Ahli Pertama', 'status' => 'Cuti Tahunan'],
+            ['id' => '9b6574f2-959c-4876-880f-90e822e11fa3', 'nama' => 'Budi Santoso', 'jabatan' => 'Pengelola Keuangan', 'status' => 'Dinas Luar'],
+            ['id' => '9b6574f2-959c-4876-880f-90e822e11fa4', 'nama' => 'Dewi Pertiwi', 'jabatan' => 'Arsiparis Terampil', 'status' => 'Aktif'],
         ];
 
         $listCutiPending = [
@@ -20,11 +20,12 @@
         ];
 
         $listEwsBawahan = [
-            ['id' => 1, 'nama' => 'Budi Santoso', 'pemicu' => 'Masa Berlaku SK Pengangkatan', 'sisa' => '12 Hari Lagi', 'status' => 'Urgent'],
-            ['id' => 2, 'nama' => 'Siti Rahayu', 'pemicu' => 'Persiapan Administrasi Pensiun', 'sisa' => '45 Hari Lagi', 'status' => 'Warning'],
-            ['id' => 3, 'nama' => 'Ahmad Fauzi', 'pemicu' => 'Kenaikan Gaji Berkala (KGB)', 'sisa' => '55 Hari Lagi', 'status' => 'Warning'],
+            ['id' => '9b6574f2-959c-4876-880f-90e822e11fa3', 'nama' => 'Budi Santoso', 'pemicu' => 'Masa Berlaku SK Pengangkatan', 'sisa' => '12 Hari Lagi', 'status' => 'Urgent'],
+            ['id' => '9b6574f2-959c-4876-880f-90e822e11fa2', 'nama' => 'Siti Rahayu', 'pemicu' => 'Persiapan Administrasi Pensiun', 'sisa' => '45 Hari Lagi', 'status' => 'Warning'],
+            ['id' => '9b6574f2-959c-4876-880f-90e822e11fa1', 'nama' => 'Ahmad Fauzi', 'pemicu' => 'Kenaikan Gaji Berkala (KGB)', 'sisa' => '55 Hari Lagi', 'status' => 'Warning'],
         ];
     @endphp
+
 
     {{-- ================================================================ --}}
     {{-- WELCOME BANNER --}}
@@ -241,14 +242,18 @@
                         </x-ui.table-head>
                         <x-ui.table-body>
                             @foreach($listEwsBawahan as $ews)
-                            <x-ui.table-row :interactive="true" class="cursor-pointer">
+                            <x-ui.table-row class="hover:bg-soft transition-colors border-b border-border/50 group">
                                 <x-ui.table-td class="px-6 py-3.5">
                                     <div class="flex items-center gap-3">
-                                        <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                                            <span class="text-xs font-bold text-primary">{{ substr($ews['nama'], 0, 1) }}</span>
-                                        </div>
+                                        <x-ui.tooltip text="Buka detail {{ $ews['nama'] }}" position="right">
+                                            <a href="{{ route('pegawai.show', ['id' => $ews['id']]) }}" class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-xs font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Buka detail profil {{ $ews['nama'] }}">
+                                                <span>{{ substr($ews['nama'], 0, 1) }}</span>
+                                            </a>
+                                        </x-ui.tooltip>
                                         <div class="min-w-0">
-                                            <p class="text-xs font-bold text-ink font-sans leading-tight">{{ $ews['nama'] }}</p>
+                                            <x-ui.tooltip text="Buka detail {{ $ews['nama'] }}" position="right">
+                                                <a href="{{ route('pegawai.show', ['id' => $ews['id']]) }}" class="block truncate text-xs font-semibold text-ink transition hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 rounded leading-tight">{{ $ews['nama'] }}</a>
+                                            </x-ui.tooltip>
                                         </div>
                                     </div>
                                 </x-ui.table-td>
@@ -296,15 +301,19 @@
                     </x-ui.table-head>
                     <x-ui.table-body>
                         @foreach($daftarBawahan as $bawahan)
-                        <x-ui.table-row :interactive="true" class="cursor-pointer" onclick="window.location='{{ route('kabag.bawahan.show', ['id' => $bawahan['id']]) }}'">
+                        <x-ui.table-row class="hover:bg-soft transition-colors border-b border-border/50 group">
                             <x-ui.table-td class="px-6 py-3.5">
                                 <div class="flex items-center gap-3">
-                                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                                        <span class="text-xs font-bold text-primary">{{ substr($bawahan['nama'], 0, 1) }}</span>
-                                    </div>
+                                    <x-ui.tooltip text="Buka detail {{ $bawahan['nama'] }}" position="right">
+                                        <a href="{{ route('pegawai.show', ['id' => $bawahan['id']]) }}" class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-xs font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Buka detail profil {{ $bawahan['nama'] }}">
+                                            <span>{{ substr($bawahan['nama'], 0, 1) }}</span>
+                                        </a>
+                                    </x-ui.tooltip>
                                     <div class="min-w-0">
-                                        <p class="text-xs font-bold text-ink font-sans leading-tight">{{ $bawahan['nama'] }}</p>
-                                        <p class="text-[10px] text-muted font-sans leading-none mt-0.5">NIP. 19800{{ $bawahan['id'] }}01 20000{{ $bawahan['id'] }} 1 00{{ $bawahan['id'] }}</p>
+                                        <x-ui.tooltip text="Buka detail {{ $bawahan['nama'] }}" position="right">
+                                            <a href="{{ route('pegawai.show', ['id' => $bawahan['id']]) }}" class="block truncate text-xs font-semibold text-ink transition hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 rounded leading-tight">{{ $bawahan['nama'] }}</a>
+                                        </x-ui.tooltip>
+                                        <p class="text-[10px] text-muted font-sans leading-none mt-0.5 font-mono">NIP. 198123456789100{{ substr($bawahan['id'], -3) }}</p>
                                     </div>
                                 </div>
                             </x-ui.table-td>
@@ -313,20 +322,22 @@
                             </x-ui.table-td>
                             <x-ui.table-td class="px-6 py-3.5">
                                 @if($bawahan['status'] === 'Aktif')
-                                    <x-ui.badge variant="success" size="md">Aktif</x-ui.badge>
+                                    <x-ui.badge variant="success" size="sm" dot>Aktif</x-ui.badge>
                                 @elseif(str_contains($bawahan['status'], 'Cuti'))
-                                    <x-ui.badge variant="warning" size="md">{{ $bawahan['status'] }}</x-ui.badge>
+                                    <x-ui.badge variant="warning" size="sm" dot>{{ $bawahan['status'] }}</x-ui.badge>
                                 @else
-                                    <x-ui.badge variant="info" size="md">{{ $bawahan['status'] }}</x-ui.badge>
+                                    <x-ui.badge variant="ink" size="sm" dot>{{ $bawahan['status'] }}</x-ui.badge>
                                 @endif
                             </x-ui.table-td>
                             <x-ui.table-td align="right" class="px-6 py-3.5">
-                                <x-ui.button href="{{ route('kabag.bawahan.show', ['id' => $bawahan['id']]) }}" variant="secondary" size="icon" title="Detail" aria-label="Detail">
-                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                    </svg>
-                                </x-ui.button>
+                                <x-ui.tooltip text="Lihat Detail">
+                                    <x-ui.button href="{{ route('kabag.bawahan.show', ['id' => $bawahan['id']]) }}" variant="secondary" size="icon" aria-label="Detail">
+                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                                        </svg>
+                                    </x-ui.button>
+                                </x-ui.tooltip>
                             </x-ui.table-td>
                         </x-ui.table-row>
                         @endforeach

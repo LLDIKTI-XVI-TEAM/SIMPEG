@@ -47,6 +47,18 @@
         ];
     @endphp
 
+    {{-- PAGE HEADER --}}
+    <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+            <h2 class="text-2xl font-semibold text-ink">Detail Pengajuan Cuti</h2>
+            <x-ui.breadcrumb :items="[
+                ['label' => 'Dashboard', 'url' => route('dashboard')],
+                ['label' => 'Cuti Bawahan', 'url' => route('kabag.cuti.index')],
+                ['label' => 'Detail Cuti']
+            ]" />
+        </div>
+    </div>
+
     <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <x-ui.button href="{{ route('kabag.cuti.index') }}" variant="secondary" size="md">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>

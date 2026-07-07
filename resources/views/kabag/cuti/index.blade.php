@@ -61,6 +61,17 @@
         ];
     @endphp
 
+    {{-- PAGE HEADER --}}
+    <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+            <h2 class="text-2xl font-semibold text-ink">Pengajuan Cuti Bawahan</h2>
+            <x-ui.breadcrumb :items="[
+                ['label' => 'Dashboard', 'url' => route('dashboard')],
+                ['label' => 'Cuti Bawahan']
+            ]" />
+        </div>
+    </div>
+
     <!-- FILTER & PENCARIAN -->
     <x-ui.filter-bar searchPlaceholder="Cari nama pegawai..." searchCols="lg:col-span-2">
         <!-- Filter Status -->
@@ -132,21 +143,23 @@
                         </x-ui.table-td>
 
                         <!-- ALASAN SINGKAT -->
-                        <x-ui.table-td class="px-6 py-4 text-xs text-muted max-w-[200px] truncate" title="{{ $cuti['alasan'] }}">
-                            {{ $cuti['alasan'] }}
+                        <x-ui.table-td class="px-6 py-4 text-xs text-muted max-w-[200px]">
+                            <x-ui.tooltip text="{{ $cuti['alasan'] }}" position="top">
+                                <div class="truncate">{{ $cuti['alasan'] }}</div>
+                            </x-ui.tooltip>
                         </x-ui.table-td>
 
                         <!-- STATUS -->
                         <x-ui.table-td class="px-6 py-4">
-                            @if($cuti['status'] === 'Menunggu Tindakan Saya')
-                                <x-ui.badge variant="warning" size="md" dot>Menunggu Tindakan</x-ui.badge>
-                            @elseif($cuti['status'] === 'Selesai')
-                                <x-ui.badge variant="success" size="md">{{ $cuti['status'] }}</x-ui.badge>
-                            @elseif($cuti['status'] === 'Perubahan')
-                                <x-ui.badge variant="info" size="md">{{ $cuti['status'] }}</x-ui.badge>
-                            @else
-                                <x-ui.badge variant="danger" size="md">{{ $cuti['status'] }}</x-ui.badge>
-                            @endif
+                                @if($cuti['status'] === 'Menunggu Tindakan Saya')
+                                    <x-ui.badge variant="warning" size="md" dot>Menunggu Tindakan</x-ui.badge>
+                                @elseif($cuti['status'] === 'Selesai')
+                                    <x-ui.badge variant="success" size="md" dot>{{ $cuti['status'] }}</x-ui.badge>
+                                @elseif($cuti['status'] === 'Perubahan')
+                                    <x-ui.badge variant="info" size="md" dot>{{ $cuti['status'] }}</x-ui.badge>
+                                @else
+                                    <x-ui.badge variant="danger" size="md" dot>{{ $cuti['status'] }}</x-ui.badge>
+                                @endif
                         </x-ui.table-td>
 
                         <!-- TANGGAL AJUKAN -->
