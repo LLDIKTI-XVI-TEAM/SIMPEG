@@ -6,6 +6,7 @@ use App\Actions\Employees\AssignSupervisorAction;
 use App\Actions\Employees\CreateEmployeeAction;
 use App\Actions\Employees\DeactivateEmployeeAction;
 use App\Actions\Employees\ExportEmployeeAction;
+use App\Actions\Employees\ListEmployeesAction;
 use App\Actions\Employees\ListInactiveEmployeesAction;
 use App\Actions\Employees\PrepareEmployeeEditFormDataAction;
 use App\Actions\Employees\RestoreEmployeeAction;
@@ -30,47 +31,60 @@ use App\Models\RefStatusPerkawinan;
 use App\Models\RefUnitKerja;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PegawaiController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, ListEmployeesAction $listAction)
     {
         $perPage = (int) $request->query('per_page', 10);
         $perPage = in_array($perPage, [10, 25, 50], true) ? $perPage : 10;
 
-        $unitKerjaOptions = RefUnitKerja::query()
-            ->orderBy('nama')
-            ->get(['id', 'nama']);
-        $jenisPegawaiOptions = RefJenisPegawai::query()
-            ->orderBy('nama')
-            ->get(['id', 'nama']);
-        $statusOptions = RefStatusPegawai::query()
-            ->orderByDesc('is_default')
-            ->orderBy('nama')
-            ->get(['id', 'nama']);
-        $golonganOptions = Employee::query()
-            ->whereNotNull('golongan_terakhir')
-            ->distinct()
-            ->orderBy('golongan_terakhir')
-            ->pluck('golongan_terakhir')
-            ->map(fn (?string $golongan) => $golongan ? strtok($golongan, '/') : null)
-            ->filter()
-            ->unique()
-            ->values();
+        // === Data Referensi — di-cache agar tidak query DB setiap request ===
+        $unitKerjaOptions = Cache::remember('ref.unit_kerja', now()->addHours(6), function () {
+            return RefUnitKerja::query()->orderBy('nama')->get(['id', 'nama']);
+        });
+        $jenisPegawaiOptions = Cache::remember('ref.jenis_pegawai', now()->addHours(6), function () {
+            return RefJenisPegawai::query()->orderBy('nama')->get(['id', 'nama']);
+        });
+        $statusOptions = Cache::remember('ref.status_pegawai', now()->addHours(6), function () {
+            return RefStatusPegawai::query()->orderByDesc('is_default')->orderBy('nama')->get(['id', 'nama']);
+        });
+        $golonganOptions = Cache::remember('ref.golongan_distinct', now()->addHours(1), function () {
+            $opts = Employee::query()
+                ->whereNotNull('golongan_terakhir')
+                ->distinct()
+                ->orderBy('golongan_terakhir')
+                ->pluck('golongan_terakhir')
+                ->map(fn (?string $golongan) => $golongan ? strtok($golongan, '/') : null)
+                ->filter()
+                ->unique()
+                ->values();
 
-        if ($golonganOptions->isEmpty()) {
-            $golonganOptions = collect(['II', 'III', 'IV']);
-        }
+            return $opts->isEmpty() ? collect(['II', 'III', 'IV']) : $opts;
+        });
+        $golonganRefOptions = Cache::remember('ref.golongan', now()->addHours(6), function () {
+            return RefGolongan::orderBy('kode')->get();
+        });
+        $jabatanOptions = Cache::remember('ref.jabatan_with_jenis', now()->addHours(6), function () {
+            return RefJabatan::with('jenisJabatan')->orderBy('nama')->get();
+        });
+        $jenisJabatanOptions = Cache::remember('ref.jenis_jabatan', now()->addHours(6), function () {
+            return RefJenisJabatan::orderBy('nama')->get();
+        });
+        $eselonOptions = Cache::remember('ref.eselon', now()->addHours(6), function () {
+            return RefEselon::orderBy('nama')->get();
+        });
 
         $filters = [
-            'search' => trim((string) $request->query('search', '')),
-            'golongan' => trim((string) $request->query('golongan', '')),
-            'unit_kerja_id' => trim((string) $request->query('unit_kerja_id', '')),
+            'search'           => trim((string) $request->query('search', '')),
+            'golongan'         => trim((string) $request->query('golongan', '')),
+            'unit_kerja_id'    => trim((string) $request->query('unit_kerja_id', '')),
             'jenis_pegawai_id' => trim((string) $request->query('jenis_pegawai_id', '')),
-            'status_pegawai_id' => trim((string) $request->query('status_pegawai_id', '')),
-            'status_aktif' => trim((string) $request->query('status_aktif', '')),
+            'status_pegawai_id'=> trim((string) $request->query('status_pegawai_id', '')),
+            'status_aktif'     => trim((string) $request->query('status_aktif', '')),
         ];
 
         // Backward-compatible query params from the pagination branch.
@@ -108,119 +122,51 @@ class PegawaiController extends Controller
         if (! $unitKerjaOptions->contains('id', $filters['unit_kerja_id'])) {
             $filters['unit_kerja_id'] = '';
         }
-
         if (! $jenisPegawaiOptions->contains('id', $filters['jenis_pegawai_id'])) {
             $filters['jenis_pegawai_id'] = '';
         }
-
         if (! $statusOptions->contains('id', $filters['status_pegawai_id'])) {
             $filters['status_pegawai_id'] = '';
         }
-
         if ($filters['status_aktif'] !== '' && ! $statusOptions->contains('nama', $filters['status_aktif'])) {
             $filters['status_aktif'] = '';
         }
-
         if ($filters['golongan'] !== '' && ! $golonganOptions->contains($filters['golongan'])) {
             $filters['golongan'] = '';
         }
 
-        $allowedSorts = ['pegawai', 'jabatan', 'golongan', 'tmt'];
-        $sort = $request->query('sort', 'pegawai');
-        $sort = in_array($sort, $allowedSorts, true) ? $sort : 'pegawai';
+        $allowedSorts = ['nama_lengkap', 'jabatan_terakhir', 'golongan_terakhir', 'created_at'];
+        $sort = $request->query('sort', 'nama_lengkap');
+        $sort = in_array($sort, $allowedSorts, true) ? $sort : 'nama_lengkap';
 
         $direction = strtolower((string) $request->query('direction', 'asc'));
         $direction = in_array($direction, ['asc', 'desc'], true) ? $direction : 'asc';
 
-        $pegawaiQuery = Employee::query()
-            ->with([
-                'jenisPegawai',
-                'statusPegawai',
-                'appointment',
-                'positionHistories' => fn ($query) => $query
-                    ->with(['jabatan', 'unitKerja'])
-                    ->orderByDesc('is_latest')
-                    ->orderByDesc('tmt_jabatan'),
-            ]);
+        // === Initial page data — menggunakan ListEmployeesAction (sama seperti API) ===
+        $validated = array_merge($filters, [
+            'sort'      => $sort,
+            'direction' => $direction,
+            'per_page'  => $perPage,
+        ]);
 
-        if ($filters['search'] !== '') {
-            $search = mb_strtolower($filters['search']);
-            $pegawaiQuery->where(function ($query) use ($search): void {
-                $query
-                    ->whereRaw('LOWER(nama_lengkap) LIKE ?', ["%{$search}%"])
-                    ->orWhereRaw('LOWER(nip) LIKE ?', ["%{$search}%"]);
-            });
-        }
-
-        if ($filters['golongan'] !== '') {
-            $pegawaiQuery->where('golongan_terakhir', 'like', $filters['golongan'].'%');
-        }
-
-        if ($filters['unit_kerja_id'] !== '') {
-            $pegawaiQuery->whereHas('positionHistories', function ($query) use ($filters): void {
-                $query
-                    ->where('unit_kerja_id', $filters['unit_kerja_id'])
-                    ->where('is_latest', true);
-            });
-        }
-
-        if ($filters['jenis_pegawai_id'] !== '') {
-            $pegawaiQuery->where('jenis_pegawai_id', $filters['jenis_pegawai_id']);
-        }
-
-        if ($filters['status_pegawai_id'] !== '') {
-            $pegawaiQuery->where('status_pegawai_id', $filters['status_pegawai_id']);
-        } elseif ($filters['status_aktif'] !== '') {
-            $pegawaiQuery->where('status_aktif', $filters['status_aktif']);
-        }
-
-        match ($sort) {
-            'jabatan' => $pegawaiQuery
-                ->orderBy('jabatan_terakhir', $direction)
-                ->orderBy('nama_lengkap'),
-            'golongan' => $pegawaiQuery
-                ->orderBy('golongan_terakhir', $direction)
-                ->orderBy('nama_lengkap'),
-            'tmt' => $pegawaiQuery
-                ->orderBy(
-                    PositionHistory::query()
-                        ->select('tmt_jabatan')
-                        ->whereColumn('position_histories.employee_id', 'employees.id')
-                        ->orderByDesc('is_latest')
-                        ->orderByDesc('tmt_jabatan')
-                        ->limit(1),
-                    $direction
-                )
-                ->orderBy(
-                    Appointment::query()
-                        ->select('tmt_pengangkatan')
-                        ->whereColumn('appointments.employee_id', 'employees.id')
-                        ->orderBy('tmt_pengangkatan')
-                        ->limit(1),
-                    $direction
-                )
-                ->orderBy('nama_lengkap'),
-            default => $pegawaiQuery
-                ->orderBy('nama_lengkap', $direction)
-                ->orderBy('nip'),
-        };
-
-        $pegawaiData = $pegawaiQuery
-            ->paginate($perPage)
-            ->withQueryString();
-
-        // Data referensi untuk modal "Tambah Riwayat" langsung dari halaman daftar pegawai.
-        $golonganRefOptions = RefGolongan::orderBy('kode')->get();
-        $jabatanOptions = RefJabatan::with('jenisJabatan')->orderBy('nama')->get();
-        $jenisJabatanOptions = RefJenisJabatan::orderBy('nama')->get();
-        $eselonOptions = RefEselon::orderBy('nama')->get();
+        $paginator   = $listAction->execute($validated);
+        $initialRows = $paginator->items(); // sudah berupa flat array dari ->through()
+        $initialMeta = [
+            'total'        => $paginator->total(),
+            'current_page' => $paginator->currentPage(),
+            'last_page'    => $paginator->lastPage(),
+            'from'         => $paginator->firstItem() ?? 0,
+            'to'           => $paginator->lastItem() ?? 0,
+            'per_page'     => $paginator->perPage(),
+        ];
 
         return view('admin.pegawai.index', compact(
-            'pegawaiData',
             'perPage',
             'sort',
             'direction',
             'filters',
+            'initialRows',
+            'initialMeta',
             'golonganOptions',
             'unitKerjaOptions',
             'jenisPegawaiOptions',

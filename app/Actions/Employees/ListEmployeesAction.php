@@ -11,7 +11,7 @@ class ListEmployeesAction
      * Mengambil daftar pegawai dengan filter default hanya pegawai aktif.
      *
      * @param  array<string, mixed>  $validated
-     * @return LengthAwarePaginator<int, Employee>
+     * @return LengthAwarePaginator<int, array<string, mixed>>
      */
     public function execute(array $validated): LengthAwarePaginator
     {
@@ -24,20 +24,23 @@ class ListEmployeesAction
                 'id',
                 'nama_lengkap',
                 'nip',
-                'email',
-                'email_pribadi',
                 'golongan_terakhir',
-                'pangkat_terakhir',
                 'jabatan_terakhir',
-                'kelas_jabatan',
-                'kelas_jabatan_terakhir',
                 'jenis_pegawai_id',
                 'status_pegawai_id',
                 'status_aktif',
                 'foto',
-                'created_at',
             ])
-            ->with(['jenisPegawai:id,nama', 'statusPegawai:id,nama'])
+            ->with([
+                'jenisPegawai:id,nama',
+                'statusPegawai:id,nama',
+                'positionHistories' => fn ($q) => $q
+                    ->with(['jabatan:id,nama', 'unitKerja:id,nama'])
+                    ->where('is_latest', true)
+                    ->orderByDesc('tmt_jabatan')
+                    ->limit(1),
+                'appointment:id,employee_id,tmt_pengangkatan',
+            ])
             ->when(
                 $validated['search'] ?? null,
                 fn ($query, string $search) => $query->where(function ($query) use ($search): void {
@@ -55,6 +58,12 @@ class ListEmployeesAction
                 })
             )
             ->when(
+                $validated['unit_kerja_id'] ?? null,
+                fn ($query, string $unitKerjaId) => $query->whereHas('positionHistories', function ($q) use ($unitKerjaId): void {
+                    $q->where('unit_kerja_id', $unitKerjaId)->where('is_latest', true);
+                })
+            )
+            ->when(
                 $validated['jenis_pegawai_id'] ?? null,
                 fn ($query, string $jenisPegawaiId) => $query->where('jenis_pegawai_id', $jenisPegawaiId)
             )
@@ -65,6 +74,33 @@ class ListEmployeesAction
             )
             ->orderBy($sort, $direction)
             ->paginate($perPage)
-            ->withQueryString();
+            ->withQueryString()
+            ->through(fn (Employee $p) => $this->toTableRow($p));
+    }
+
+    /**
+     * Mengubah model Employee menjadi flat array yang siap dikonsumsi Alpine.js di tabel admin.
+     *
+     * @return array<string, mixed>
+     */
+    public function toTableRow(Employee $p): array
+    {
+        $currentPosition = $p->positionHistories->first();
+        $statusNama = $p->statusPegawai?->nama ?? $p->status_aktif;
+        $tmt = $currentPosition?->tmt_jabatan ?? $p->appointment?->tmt_pengangkatan;
+
+        return [
+            'id'                => $p->id,
+            'nama_lengkap'      => $p->nama_lengkap,
+            'nip'               => $p->nip,
+            'foto_url'          => $p->foto_url,
+            'jabatan'           => $currentPosition?->jabatan?->nama ?? $p->jabatan_terakhir ?? '-',
+            'unit_kerja'        => $currentPosition?->unitKerja?->nama ?? '-',
+            'golongan_terakhir' => $p->golongan_terakhir ?? '-',
+            'jenis_pegawai'     => $p->jenisPegawai?->nama ?? '-',
+            'status_nama'       => $statusNama,
+            'status_key'        => strtolower((string) $statusNama),
+            'tmt'               => $tmt?->format('d-m-Y'),
+        ];
     }
 }
