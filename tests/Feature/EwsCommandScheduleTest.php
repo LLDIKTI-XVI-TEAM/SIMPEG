@@ -12,7 +12,7 @@ class EwsCommandScheduleTest extends TestCase
     public function test_run_ews_command_is_registered_and_calls_service(): void
     {
         $this->mock(EwsEngineService::class, function (MockInterface $mock): void {
-            $mock->shouldReceive('run')->once();
+            $mock->expects('run');
         });
 
         $this->artisan('app:run-ews')
