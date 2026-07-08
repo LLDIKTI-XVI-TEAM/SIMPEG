@@ -169,6 +169,42 @@
                 ]
             ];
 
+            if ($activeRole === 'pimpinan') {
+                $menuGroups = [
+                    [
+                        'group' => '',
+                        'items' => [
+                            ['label' => 'Dashboard', 'route' => 'pimpinan.dashboard', 'icon' => 'squares-2x2'],
+                        ]
+                    ],
+                    [
+                        'group' => 'Kepegawaian',
+                        'items' => [
+                            ['label' => 'Data Pegawai', 'route' => 'pimpinan.pegawai.index', 'icon' => 'users'],
+                        ]
+                    ],
+                    [
+                        'group' => 'Cuti',
+                        'items' => [
+                            ['label' => 'Monitoring Cuti', 'route' => 'pimpinan.cuti.index', 'icon' => 'calendar'],
+                        ]
+                    ],
+                    [
+                        'group' => 'EWS & Notifikasi',
+                        'items' => [
+                            ['label' => 'EWS', 'route' => 'pimpinan.ews.index', 'icon' => 'exclamation-triangle'],
+                            ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
+                        ]
+                    ],
+                    [
+                        'group' => 'Laporan',
+                        'items' => [
+                            ['label' => 'Laporan Eksekutif', 'route' => 'pimpinan.laporan.index', 'icon' => 'document-chart-bar'],
+                        ]
+                    ]
+                ];
+            }
+
             $allMenuRoutes = [];
             foreach ($menuGroups as $g) {
                 foreach ($g['items'] as $item) {

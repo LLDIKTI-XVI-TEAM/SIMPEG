@@ -165,8 +165,23 @@
                         ['label' => 'Pengaturan Sistem', 'route' => 'pengaturan', 'icon' => 'cog-6-tooth'],
                         ['label' => 'Audit Log', 'route' => 'audit-log', 'icon' => 'clipboard-document-list'],
                     ]
-                ]
             ];
+
+            if ($activeRole === 'pimpinan') {
+                $menuGroups = [
+                    [
+                        'group' => '',
+                        'items' => [
+                            ['label' => 'Dashboard', 'route' => 'pimpinan.dashboard', 'icon' => 'squares-2x2'],
+                            ['label' => 'Data Pegawai', 'route' => 'pimpinan.pegawai.index', 'icon' => 'users'],
+                            ['label' => 'Cuti', 'route' => 'pimpinan.cuti.index', 'icon' => 'calendar'],
+                            ['label' => 'EWS', 'route' => 'pimpinan.ews.index', 'icon' => 'exclamation-triangle'],
+                            ['label' => 'Laporan', 'route' => 'pimpinan.laporan.index', 'icon' => 'document-chart-bar'],
+                            ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
+                        ]
+                    ]
+                ];
+            }
 
             $allMenuRoutes = [];
             foreach ($menuGroups as $g) {

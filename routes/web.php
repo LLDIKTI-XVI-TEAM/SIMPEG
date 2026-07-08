@@ -39,6 +39,7 @@ Route::get('/login', [KeycloakAuthController::class, 'redirectToKeycloak'])->nam
 Route::get('/login/keycloak', [KeycloakAuthController::class, 'redirectToKeycloak'])->name('auth.keycloak.redirect');
 Route::get('/auth/keycloak/callback', [KeycloakAuthController::class, 'handleCallback'])->name('auth.keycloak.callback');
 Route::post('/logout', [KeycloakAuthController::class, 'logout'])->name('logout');
+Route::get('/logout', [KeycloakAuthController::class, 'logout'])->name('logout.get');
 
 if (app()->environment(['local', 'testing'])) {
     Route::get('/dev-login', [KeycloakAuthController::class, 'defaultDemoLogin']);
@@ -92,6 +93,9 @@ if (app()->environment(['local', 'testing'])) {
 
 Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_kepegawaian,pimpinan,atasan_langsung,pegawai'])->group(function (): void {
     Route::get('/dashboard', function () {
+        if (auth()->user()?->role === 'pimpinan') {
+            return redirect()->route('pimpinan.dashboard');
+        }
         return view('dashboard');
     })->name('dashboard');
 
@@ -823,4 +827,34 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('pegawai.export');
 
+    // =========================================================================
+    // ROUTES PIMPINAN
+    // =========================================================================
+    Route::middleware(['role:pimpinan'])
+        ->prefix('pimpinan')
+        ->name('pimpinan.')
+        ->group(function () {
+            Route::get('/dashboard', [\App\Http\Controllers\PimpinanDashboardController::class, 'index'])->name('dashboard');
+
+            Route::get('/pegawai', [\App\Http\Controllers\PimpinanEmployeeController::class, 'index'])->name('pegawai.index');
+            Route::get('/pegawai/{employee}', [\App\Http\Controllers\PimpinanEmployeeController::class, 'show'])
+                ->whereUuid('employee')
+                ->name('pegawai.show');
+
+            Route::get('/cuti', [\App\Http\Controllers\PimpinanLeaveController::class, 'index'])->name('cuti.index');
+            Route::get('/cuti/{leave}', [\App\Http\Controllers\PimpinanLeaveController::class, 'show'])
+                ->whereUuid('leave')
+                ->name('cuti.show');
+            Route::post('/cuti/{leave}/decision', [\App\Http\Controllers\PimpinanLeaveDecisionController::class, 'store'])
+                ->whereUuid('leave')
+                ->name('cuti.decision');
+
+            Route::get('/ews', [\App\Http\Controllers\PimpinanEwsController::class, 'index'])->name('ews.index');
+
+            Route::get('/laporan', [\App\Http\Controllers\PimpinanReportController::class, 'index'])->name('laporan.index');
+            Route::get('/laporan/pegawai', [\App\Http\Controllers\PimpinanReportController::class, 'employees'])->name('laporan.pegawai');
+            Route::post('/laporan/pegawai/custom', [\App\Http\Controllers\PimpinanReportController::class, 'customEmployees'])->name('laporan.pegawai.custom');
+            Route::get('/laporan/cuti', [\App\Http\Controllers\PimpinanReportController::class, 'leaves'])->name('laporan.cuti');
+            Route::get('/laporan/kepangkatan', [\App\Http\Controllers\PimpinanReportController::class, 'rankHistories'])->name('laporan.kepangkatan');
+        });
 });
