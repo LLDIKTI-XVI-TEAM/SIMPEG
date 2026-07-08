@@ -38,6 +38,14 @@ Route::middleware($employeeGroupMiddleware)
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.deactivate'])
             ->whereUuid('employee')
             ->name('destroy');
+        Route::delete('/{employee}/force', [EmployeeController::class, 'forceDestroy'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['role:super_admin'])
+            ->whereUuid('employee')
+            ->name('force-destroy');
+        Route::patch('/{employee}/status', [EmployeeController::class, 'updateStatus'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.update'])
+            ->whereUuid('employee')
+            ->name('update-status');
         Route::post('/{employee}/restore', [EmployeeController::class, 'restore'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.restore'])
             ->whereUuid('employee')
