@@ -274,7 +274,7 @@
                                     </div>
                                 </x-ui.table-td>
                                 <x-ui.table-td align="right" class="px-6 py-3.5">
-                                    <p class="text-xs font-medium text-ink">{{ $ews['pemicu'] }}</p>
+                                    <p class="text-xs text-muted font-sans leading-none">{{ $ews['pemicu'] }}</p>
                                     <div class="flex items-center justify-end gap-2 mt-1">
                                         <x-ui.badge variant="{{ $ews['status'] == 'Urgent' ? 'danger' : 'warning' }}" size="sm" :pill="false" dot>
                                             {{ $ews['sisa'] }}
