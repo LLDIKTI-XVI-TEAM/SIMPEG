@@ -13,7 +13,7 @@ $dokumenGroupMiddleware = $disableEmployeeApiAuth
 Route::middleware($dokumenGroupMiddleware)
     ->prefix('dokumen')
     ->name('dokumen.')
-    ->group(function () use ($disableEmployeeApiAuth): void {
+    ->group(function (): void {
         Route::get('/', [DokumenApiController::class, 'index'])
             ->name('index');
     });

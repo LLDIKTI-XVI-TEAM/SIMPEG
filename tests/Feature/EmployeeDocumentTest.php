@@ -135,7 +135,7 @@ class EmployeeDocumentTest extends TestCase
 
         $response->assertOk();
         $response->assertViewHas('pegawaiList');
-        $response->assertViewHas('documents');
+        $response->assertViewHas('categoryLabels');
     }
 
     public function test_admin_can_upload_document_via_controller(): void

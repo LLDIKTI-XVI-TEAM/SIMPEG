@@ -17,9 +17,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Employee\StoreEmployeeRequest;
 use App\Http\Requests\Employee\UpdateEmployeePerformanceFlagRequest;
 use App\Http\Requests\Employee\UpdateEmployeeRequest;
-use App\Models\Appointment;
 use App\Models\Employee;
-use App\Models\PositionHistory;
 use App\Models\RefAgama;
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
@@ -79,12 +77,12 @@ class PegawaiController extends Controller
         });
 
         $filters = [
-            'search'           => trim((string) $request->query('search', '')),
-            'golongan'         => trim((string) $request->query('golongan', '')),
-            'unit_kerja_id'    => trim((string) $request->query('unit_kerja_id', '')),
+            'search' => trim((string) $request->query('search', '')),
+            'golongan' => trim((string) $request->query('golongan', '')),
+            'unit_kerja_id' => trim((string) $request->query('unit_kerja_id', '')),
             'jenis_pegawai_id' => trim((string) $request->query('jenis_pegawai_id', '')),
             'status_pegawai_id' => trim((string) $request->query('status_pegawai_id', 'all')),
-            'status_aktif'     => trim((string) $request->query('status_aktif', '')),
+            'status_aktif' => trim((string) $request->query('status_aktif', '')),
         ];
 
         // Backward-compatible query params from the pagination branch.
@@ -144,20 +142,20 @@ class PegawaiController extends Controller
 
         // === Initial page data — menggunakan ListEmployeesAction (sama seperti API) ===
         $validated = array_merge($filters, [
-            'sort'      => $sort,
+            'sort' => $sort,
             'direction' => $direction,
-            'per_page'  => $perPage,
+            'per_page' => $perPage,
         ]);
 
-        $paginator   = $listAction->execute($validated);
+        $paginator = $listAction->execute($validated);
         $initialRows = $paginator->items(); // sudah berupa flat array dari ->through()
         $initialMeta = [
-            'total'        => $paginator->total(),
+            'total' => $paginator->total(),
             'current_page' => $paginator->currentPage(),
-            'last_page'    => $paginator->lastPage(),
-            'from'         => $paginator->firstItem() ?? 0,
-            'to'           => $paginator->lastItem() ?? 0,
-            'per_page'     => $paginator->perPage(),
+            'last_page' => $paginator->lastPage(),
+            'from' => $paginator->firstItem() ?? 0,
+            'to' => $paginator->lastItem() ?? 0,
+            'per_page' => $paginator->perPage(),
         ];
 
         return view('admin.pegawai.index', compact(

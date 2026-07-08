@@ -22,24 +22,24 @@ class ListDocumentsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'search'           => ['nullable', 'string', 'max:100'],
-            'kategori'         => ['nullable', 'string', 'max:100'],
-            'unit_kerja'       => ['nullable', 'string', 'max:150'],
-            'status'           => ['nullable', 'in:tersedia,file_tidak_ditemukan'],
-            'per_page'         => ['nullable', 'integer', 'in:5,10,25,50'],
-            'page'             => ['nullable', 'integer', 'min:1'],
+            'search' => ['nullable', 'string', 'max:100'],
+            'kategori' => ['nullable', 'string', 'max:100'],
+            'unit_kerja' => ['nullable', 'string', 'max:150'],
+            'status' => ['nullable', 'in:tersedia,file_tidak_ditemukan'],
+            'per_page' => ['nullable', 'integer', 'in:5,10,25,50'],
+            'page' => ['nullable', 'integer', 'min:1'],
         ];
     }
 
     public function attributes(): array
     {
         return [
-            'search'     => 'Kata Pencarian',
-            'kategori'   => 'Kategori Dokumen',
+            'search' => 'Kata Pencarian',
+            'kategori' => 'Kategori Dokumen',
             'unit_kerja' => 'Unit Kerja',
-            'status'     => 'Status Dokumen',
-            'per_page'   => 'Jumlah Data per Halaman',
-            'page'       => 'Halaman',
+            'status' => 'Status Dokumen',
+            'per_page' => 'Jumlah Data per Halaman',
+            'page' => 'Halaman',
         ];
     }
 }

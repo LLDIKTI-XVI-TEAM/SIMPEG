@@ -95,18 +95,18 @@ class ListEmployeesAction
         $tmt = $currentPosition?->tmt_jabatan ?? $p->appointment?->tmt_pengangkatan;
 
         return [
-            'id'                => $p->id,
-            'nama_lengkap'      => $p->nama_lengkap,
-            'nip'               => $p->nip,
-            'foto_url'          => $p->foto_url,
-            'jabatan'           => $p->jabatan_terakhir ?: '-',
-            'unit_kerja'        => $currentPosition?->unitKerja?->nama ?? '-',
+            'id' => $p->id,
+            'nama_lengkap' => $p->nama_lengkap,
+            'nip' => $p->nip,
+            'foto_url' => $p->foto_url,
+            'jabatan' => $p->jabatan_terakhir ?: '-',
+            'unit_kerja' => $currentPosition?->unitKerja?->nama ?? '-',
             'golongan_terakhir' => $p->golongan_terakhir ?? '-',
-            'jenis_pegawai'     => $p->jenisPegawai?->nama ?? '-',
-            'status_nama'       => $statusNama,
-            'status_key'        => strtolower((string) $statusNama),
-            'is_lengkap'        => $p->profil_status === 'lengkap',
-            'tmt'               => $tmt?->format('d/m/Y'),
+            'jenis_pegawai' => $p->jenisPegawai?->nama ?? '-',
+            'status_nama' => $statusNama,
+            'status_key' => strtolower((string) $statusNama),
+            'is_lengkap' => $p->profil_status === 'lengkap',
+            'tmt' => $tmt?->format('d/m/Y'),
         ];
     }
 }

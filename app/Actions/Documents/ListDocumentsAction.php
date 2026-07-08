@@ -16,7 +16,7 @@ class ListDocumentsAction
      */
     public function execute(array $validated): LengthAwarePaginator
     {
-        $perPage    = (int) ($validated['per_page'] ?? 10);
+        $perPage = (int) ($validated['per_page'] ?? 10);
         $filterUnit = $validated['unit_kerja'] ?? null;
         $filterStatus = $validated['status'] ?? null;
 
@@ -43,7 +43,8 @@ class ListDocumentsAction
         $paginator = $query->latest()->paginate($perPage)->withQueryString();
 
         // ->through() menjaga struktur paginator tetap utuh (berbeda dari map/transform pada collection)
-        return $paginator->through(function (Document $document) use ($filterUnit, $filterStatus): array {
+        /** @var \Illuminate\Pagination\LengthAwarePaginator<int, array<string, mixed>> $result */
+        $result = $paginator->through(static function (Document $document) use ($filterUnit, $filterStatus): array {
             $currentPosition = $document->employee?->positionHistories?->first();
             $unit = $currentPosition?->unitKerja?->nama ?? '-';
 
@@ -60,23 +61,25 @@ class ListDocumentsAction
             }
 
             return [
-                'id'             => $document->id,
-                'jenis'          => DocumentCategory::label($document->jenis_dokumen),
-                'nama'           => $document->nama_dokumen,
-                'nomor'          => $document->nomor_dokumen ?? '-',
-                'tanggal'        => $document->tanggal_dokumen ? $document->tanggal_dokumen->format('Y-m-d') : '-',
-                'kategori'       => $document->jenis_dokumen,
+                'id' => $document->id,
+                'jenis' => DocumentCategory::label($document->jenis_dokumen),
+                'nama' => $document->nama_dokumen,
+                'nomor' => $document->nomor_dokumen ?? '-',
+                'tanggal' => $document->tanggal_dokumen ? $document->tanggal_dokumen->format('Y-m-d') : '-',
+                'kategori' => $document->jenis_dokumen,
                 'kategori_label' => DocumentCategory::label($document->jenis_dokumen),
-                'nama_pegawai'   => $document->employee?->nama_lengkap ?? 'Pegawai Nonaktif',
-                'nip_pegawai'    => $document->employee?->nip ?? '-',
-                'foto_pegawai'   => $document->employee?->foto_url ?? null,
-                'unit_pegawai'   => $unit,
-                'file_path'      => $document->file_path,
-                'file_size'      => $document->fileSizeLabel(),
+                'nama_pegawai' => $document->employee?->nama_lengkap ?? 'Pegawai Nonaktif',
+                'nip_pegawai' => $document->employee?->nip ?? '-',
+                'foto_pegawai' => $document->employee?->foto_url ?? null,
+                'unit_pegawai' => $unit,
+                'file_path' => $document->file_path,
+                'file_size' => $document->fileSizeLabel(),
                 'status_dokumen' => $statusDokumen,
-                'status_label'   => $document->fileStatusLabel(),
-                'deskripsi'      => $document->keterangan ?? '',
+                'status_label' => $document->fileStatusLabel(),
+                'deskripsi' => $document->keterangan ?? '',
             ];
         });
+
+        return $result;
     }
 }
