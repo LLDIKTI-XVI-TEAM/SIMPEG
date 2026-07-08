@@ -13,6 +13,7 @@
         isLoading: false,
         perPage: 10,
         searchTimer: null,
+        fetchError: null,
         dataChanged: @js(session('document_data_changed', false)),
         
         get cacheKey() {
@@ -45,6 +46,7 @@
             }
 
             this.isLoading = true;
+            this.fetchError = null;
             try {
                 const params = new URLSearchParams({
                     page,
@@ -55,24 +57,30 @@
                     headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 });
                 
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                if (!res.ok) {
+                    const errText = await res.text();
+                    throw new Error(`HTTP ${res.status}: ${errText.substring(0, 200)}`);
+                }
                 const json = await res.json();
                 
-                const rows = json.documents.data;
+                console.log('[Dokumen] API response:', json);
+                
+                const rows = json.documents?.data ?? [];
                 const meta = {
-                    total:        json.documents.total,
-                    current_page: json.documents.current_page,
-                    last_page:    json.documents.last_page,
-                    from:         json.documents.from ?? 0,
-                    to:           json.documents.to   ?? 0,
-                    per_page:     json.documents.per_page,
+                    total:        json.documents?.total        ?? 0,
+                    current_page: json.documents?.current_page ?? 1,
+                    last_page:    json.documents?.last_page    ?? 1,
+                    from:         json.documents?.from         ?? 0,
+                    to:           json.documents?.to           ?? 0,
+                    per_page:     json.documents?.per_page     ?? this.perPage,
                 };
                 
                 sessionStorage.setItem(cKey, JSON.stringify({ rows, meta }));
                 this.documentsRows = rows;
                 this.meta = meta;
             } catch (e) {
-                console.error('Gagal fetch data dokumen:', e);
+                console.error('[Dokumen] Gagal fetch data dokumen:', e);
+                this.fetchError = e.message;
             } finally {
                 this.isLoading = false;
             }
@@ -84,9 +92,8 @@
         },
 
         init() {
-            if (this.dataChanged) {
-                this.clearCache();
-            }
+            // Selalu clear cache saat init agar tidak pakai data stale
+            this.clearCache();
             
             const urlParams = new URLSearchParams(window.location.search);
             const filterParam = urlParams.get('filter');
@@ -205,7 +212,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-border">
-                        <template x-for="doc in documentsRows" :key="doc.id">
+                        <template x-for="doc in documentsRows.filter(d => d && d.id)" :key="doc.id">
                             <tr class="transition-colors hover:bg-soft/50">
                                 <td class="px-4 py-3.5">
                                     <div class="flex items-center gap-3">
@@ -303,7 +310,13 @@
                             </td>
                         </tr>
 
-                        <tr x-show="!isLoading && documentsRows.length === 0">
+                        <tr x-show="fetchError">
+                            <td colspan="7" class="px-6 py-4 text-center text-xs text-danger font-sans font-semibold bg-danger/5">
+                                ⚠️ Error API: <span x-text="fetchError"></span>
+                            </td>
+                        </tr>
+
+                        <tr x-show="!isLoading && !fetchError && documentsRows.length === 0">
                             <td colspan="7" class="px-6 py-8 text-center text-xs text-muted font-sans">
                                 Tidak ada dokumen yang cocok dengan filter atau pencarian Anda.
                             </td>

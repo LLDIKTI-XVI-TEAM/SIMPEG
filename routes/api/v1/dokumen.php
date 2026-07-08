@@ -15,6 +15,5 @@ Route::middleware($dokumenGroupMiddleware)
     ->name('dokumen.')
     ->group(function () use ($disableEmployeeApiAuth): void {
         Route::get('/', [DokumenApiController::class, 'index'])
-            ->middleware($disableEmployeeApiAuth ? [] : ['permission:documents.read'])
             ->name('index');
     });
