@@ -28,7 +28,7 @@
     @endphp
 
     <div class="mb-6 flex items-center justify-between">
-        <x-ui.button href="{{ route('kabag.bawahan.index') }}" variant="secondary" size="md">
+        <x-ui.button href="{{ route('kepala-bagian.bawahan.index') }}" variant="secondary" size="md">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
             Kembali
         </x-ui.button>

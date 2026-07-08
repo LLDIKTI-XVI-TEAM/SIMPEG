@@ -143,19 +143,19 @@
                 
                 {{-- Event Filter Links --}}
                 <div class="flex flex-wrap gap-1 bg-soft p-1 rounded-lg">
-                    <a href="{{ route('kabag.ews.index') }}" class="px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all {{ $filterEvent === '' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink' }}">
+                    <a href="{{ route('kepala-bagian.ews.index') }}" class="px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all {{ $filterEvent === '' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink' }}">
                         Semua
                     </a>
-                    <a href="{{ route('kabag.ews.index', ['event' => 'Kenaikan Pangkat']) }}" class="px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all {{ $filterEvent === 'Kenaikan Pangkat' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink' }}">
+                    <a href="{{ route('kepala-bagian.ews.index', ['event' => 'Kenaikan Pangkat']) }}" class="px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all {{ $filterEvent === 'Kenaikan Pangkat' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink' }}">
                         Kenaikan Pangkat
                     </a>
-                    <a href="{{ route('kabag.ews.index', ['event' => 'KGB']) }}" class="px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all {{ $filterEvent === 'KGB' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink' }}">
+                    <a href="{{ route('kepala-bagian.ews.index', ['event' => 'KGB']) }}" class="px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all {{ $filterEvent === 'KGB' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink' }}">
                         KGB
                     </a>
-                    <a href="{{ route('kabag.ews.index', ['event' => 'Pensiun']) }}" class="px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all {{ $filterEvent === 'Pensiun' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink' }}">
+                    <a href="{{ route('kepala-bagian.ews.index', ['event' => 'Pensiun']) }}" class="px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all {{ $filterEvent === 'Pensiun' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink' }}">
                         Pensiun
                     </a>
-                    <a href="{{ route('kabag.ews.index', ['event' => 'Kontrak PPPK']) }}" class="px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all {{ $filterEvent === 'Kontrak PPPK' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink' }}">
+                    <a href="{{ route('kepala-bagian.ews.index', ['event' => 'Kontrak PPPK']) }}" class="px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all {{ $filterEvent === 'Kontrak PPPK' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink' }}">
                         Kontrak PPPK
                     </a>
                 </div>
@@ -210,7 +210,7 @@
                                 <x-ui.table-td align="center" padding="lg" class="font-mono text-sm font-semibold text-muted">{{ $index + 1 }}</x-ui.table-td>
                                 <x-ui.table-td padding="lg" class="text-sm">
                                     <div class="font-semibold leading-snug text-ink transition-colors hover:text-primary">
-                                        <a href="{{ route('pegawai.show', $alert['pegawai_id']) }}">{{ $alert['nama'] }}</a>
+                                        <a href="{{ route('kepala-bagian.bawahan.show', $alert['pegawai_id']) }}">{{ $alert['nama'] }}</a>
                                     </div>
                                     <div class="mt-1 font-mono text-xs text-muted">{{ $alert['nip'] }}</div>
                                 </x-ui.table-td>

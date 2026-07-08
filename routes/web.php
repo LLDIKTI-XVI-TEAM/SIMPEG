@@ -836,24 +836,24 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->name('pegawai.export');
 
     // UI DUMMY ROUTES FOR KEPALA BAGIAN
-    Route::get('/kabag/bawahan', function () {
+    Route::get('/kepala-bagian/bawahan', function () {
         return view('kabag.bawahan.index');
-    })->name('kabag.bawahan.index');
+    })->name('kepala-bagian.bawahan.index');
 
-    Route::get('/kabag/bawahan/{id}', function ($id) {
+    Route::get('/kepala-bagian/bawahan/{id}', function ($id) {
         return view('kabag.bawahan.show', compact('id'));
-    })->name('kabag.bawahan.show');
+    })->name('kepala-bagian.bawahan.show');
 
-    Route::get('/kabag/cuti', function () {
+    Route::get('/kepala-bagian/cuti', function () {
         return view('kabag.cuti.index');
-    })->name('kabag.cuti.index');
+    })->name('kepala-bagian.cuti.index');
 
-    Route::get('/kabag/cuti/{id}', function ($id) {
+    Route::get('/kepala-bagian/cuti/{id}', function ($id) {
         return view('kabag.cuti.show', compact('id'));
-    })->name('kabag.cuti.show');
+    })->name('kepala-bagian.cuti.show');
 
-    Route::get('/kabag/ews', function () {
+    Route::get('/kepala-bagian/ews', function () {
         return view('kabag.ews.index');
-    })->name('kabag.ews.index');
+    })->name('kepala-bagian.ews.index');
 
 });

@@ -155,7 +155,7 @@
                     'group' => 'Kepegawaian',
                     'items' => array_filter([
                         ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users'],
-                        in_array($activeRole, ['kepala_bagian', 'atasan_langsung']) ? ['label' => 'Daftar Bawahan', 'route' => 'kabag.bawahan.index', 'icon' => 'users'] : null,
+                        in_array($activeRole, ['kepala_bagian', 'atasan_langsung']) ? ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'] : null,
                         ['label' => 'Data Nonaktif', 'route' => 'data-nonaktif', 'icon' => 'user-minus'],
                         ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open'],
                     ])
@@ -163,7 +163,7 @@
                 [
                     'group' => 'Cuti',
                     'items' => array_filter([
-                        in_array($activeRole, ['kepala_bagian', 'atasan_langsung']) ? ['label' => 'Cuti Bawahan', 'route' => 'kabag.cuti.index', 'icon' => 'check-badge'] : null,
+                        in_array($activeRole, ['kepala_bagian', 'atasan_langsung']) ? ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge'] : null,
                         ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
                         ['label' => 'Rekap Cuti', 'route' => 'cuti.rekap', 'icon' => 'document-text'],
                     ])
@@ -171,7 +171,7 @@
                 [
                     'group' => 'EWS & Notifikasi',
                     'items' => array_filter([
-                        in_array($activeRole, ['kepala_bagian', 'atasan_langsung']) ? ['label' => 'EWS Bawahan', 'route' => 'kabag.ews.index', 'icon' => 'exclamation-triangle'] : null,
+                        in_array($activeRole, ['kepala_bagian', 'atasan_langsung']) ? ['label' => 'EWS Bawahan', 'route' => 'kepala-bagian.ews.index', 'icon' => 'exclamation-triangle'] : null,
                         ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
                         ['label' => 'EWS Aktif', 'route' => 'ews', 'icon' => 'exclamation-triangle'],
                         ['label' => 'Konfigurasi EWS', 'route' => 'ews.config', 'icon' => 'cog-6-tooth'],

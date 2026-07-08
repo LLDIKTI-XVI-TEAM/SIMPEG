@@ -24,7 +24,7 @@
     </div>
 
     {{-- FILTER BAR --}}
-    <form id="filter-form" method="GET" action="{{ route('kabag.bawahan.index') }}">
+    <form id="filter-form" method="GET" action="{{ route('kepala-bagian.bawahan.index') }}">
         <x-ui.filter-bar 
             searchId="search-input"
             searchName="search"
@@ -91,13 +91,13 @@
                         <x-ui.table-td padding="comfortable">
                             <div class="flex items-center gap-3">
                                 <x-ui.tooltip text="Buka detail {{ $bawahan['nama'] }}" position="right">
-                                    <a href="{{ route('pegawai.show', ['id' => $bawahan['id']]) }}" class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-xs font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Buka detail profil {{ $bawahan['nama'] }}">
+                                    <a href="{{ route('kepala-bagian.bawahan.show', ['id' => $bawahan['id']]) }}" class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-xs font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Buka detail profil {{ $bawahan['nama'] }}">
                                         <span>{{ substr($bawahan['nama'], 0, 1) }}</span>
                                     </a>
                                 </x-ui.tooltip>
                                 <div class="min-w-0">
                                     <x-ui.tooltip text="Buka detail {{ $bawahan['nama'] }}" position="right">
-                                        <a href="{{ route('pegawai.show', ['id' => $bawahan['id']]) }}" class="block truncate text-sm font-semibold text-ink transition hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 rounded leading-tight">{{ $bawahan['nama'] }}</a>
+                                        <a href="{{ route('kepala-bagian.bawahan.show', ['id' => $bawahan['id']]) }}" class="block truncate text-sm font-semibold text-ink transition hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 rounded leading-tight">{{ $bawahan['nama'] }}</a>
                                     </x-ui.tooltip>
                                     <p class="text-[11px] text-muted font-sans leading-none mt-1 font-mono">NIP. {{ $bawahan['nip'] }}</p>
                                 </div>
@@ -121,7 +121,7 @@
                         </x-ui.table-td>
                         <x-ui.table-td padding="comfortable">
                             <div class="flex items-center gap-1">
-                                <x-ui.button as="a" href="{{ route('pegawai.show', ['id' => $bawahan['id']]) }}" variant="secondary" size="icon" title="Lihat Detail">
+                                <x-ui.button as="a" href="{{ route('kepala-bagian.bawahan.show', ['id' => $bawahan['id']]) }}" variant="secondary" size="icon" title="Lihat Detail">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                                 </x-ui.button>
                             </div>

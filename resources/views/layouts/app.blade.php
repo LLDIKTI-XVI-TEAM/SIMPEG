@@ -76,7 +76,7 @@
                     'data-master',
                     'hari-libur',
                     'ews.config',
-                    'kabag.bawahan.index',
+                    'kepala-bagian.bawahan.index',
                 ],
                 'pimpinan' => [
                     'audit-log',
@@ -85,7 +85,7 @@
                     'rbac',
                     'data-nonaktif',
                     'ews.config',
-                    'kabag.bawahan.index',
+                    'kepala-bagian.bawahan.index',
                 ],
                 'atasan_langsung' => [
                     'data-pegawai',
@@ -136,7 +136,7 @@
                     'hari-libur',
                     'pengaturan',
                     'audit-log',
-                    'kabag.bawahan.index',
+                    'kepala-bagian.bawahan.index',
                 ],
             ];
 
@@ -153,7 +153,7 @@
                     'group' => 'Kepegawaian',
                     'items' => [
                         ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users'],
-                        ['label' => 'Daftar Bawahan', 'route' => 'kabag.bawahan.index', 'icon' => 'users'],
+                        ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'],
                         ['label' => 'Data Nonaktif', 'route' => 'data-nonaktif', 'icon' => 'user-minus'],
                         ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open'],
                     ]
@@ -161,7 +161,7 @@
                 [
                     'group' => 'Cuti',
                     'items' => [
-                        ['label' => 'Cuti Bawahan', 'route' => 'kabag.cuti.index', 'icon' => 'check-badge'],
+                        ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge'],
                         ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
                         ['label' => 'Rekap Cuti', 'route' => 'cuti.rekap', 'icon' => 'document-text'],
                     ]
@@ -169,7 +169,7 @@
                 [
                     'group' => 'EWS & Notifikasi',
                     'items' => [
-                        ['label' => 'EWS Bawahan', 'route' => 'kabag.ews.index', 'icon' => 'exclamation-triangle'],
+                        ['label' => 'EWS Bawahan', 'route' => 'kepala-bagian.ews.index', 'icon' => 'exclamation-triangle'],
                         ['label' => 'EWS Aktif', 'route' => 'ews', 'icon' => 'exclamation-triangle'],
                         ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
                         ['label' => 'Konfigurasi EWS', 'route' => 'ews.config', 'icon' => 'cog-6-tooth'],
