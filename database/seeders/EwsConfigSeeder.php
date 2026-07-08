@@ -23,6 +23,9 @@ class EwsConfigSeeder extends Seeder
             ['key' => 'pppk_m6', 'value' => '180'],
             ['key' => 'pppk_m3', 'value' => '90'],
             ['key' => 'pppk_m1', 'value' => '30'],
+            ['key' => 'satyalancana_h180', 'value' => '180'],
+            ['key' => 'satyalancana_h90', 'value' => '90'],
+            ['key' => 'satyalancana_h30', 'value' => '30'],
         ];
 
         foreach ($defaults as $config) {
