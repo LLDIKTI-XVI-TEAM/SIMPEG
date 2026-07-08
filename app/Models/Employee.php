@@ -37,6 +37,8 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $tanggal_akhir_kontrak
  * @property Carbon|null $deleted_at
  * @property bool $is_kinerja_baik
+ * @property bool $is_satyalancana_eligible
+ * @property string|null $satyalancana_note
  * @property bool $is_kepala_lembaga
  * @property-read RefJenisPegawai|null $jenisPegawai
  * @property-read Employee|null $atasanLangsung
@@ -99,6 +101,8 @@ class Employee extends Model
 
         // Flags
         'is_kinerja_baik',
+        'is_satyalancana_eligible',
+        'satyalancana_note',
         'is_kepala_lembaga',
 
         // SSO & RBAC
@@ -115,6 +119,7 @@ class Employee extends Model
             'tanggal_kgb_berikutnya' => 'date',
             'tanggal_akhir_kontrak' => 'date',
             'is_kinerja_baik' => 'boolean',
+            'is_satyalancana_eligible' => 'boolean',
             'is_kepala_lembaga' => 'boolean',
             'nik' => 'encrypted',
             'no_kk' => 'encrypted',
