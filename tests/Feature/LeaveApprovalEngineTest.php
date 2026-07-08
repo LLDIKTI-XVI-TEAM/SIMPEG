@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Employee;
 use App\Models\LeaveApprovalChain;
 use App\Models\LeaveBalance;
+use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
 use App\Models\RefJenisCuti;
@@ -147,6 +148,85 @@ class LeaveApprovalEngineTest extends TestCase
         $balance = LeaveBalance::where('employee_id', $pemohon['employee']->id)->where('tahun', 2026)->first();
         $this->assertSame(3, $balance->terpakai);
         $this->assertSame(9, $balance->sisa);
+    }
+
+    public function test_final_approval_memotong_bucket_dan_mencatat_ledger_tanpa_double_debit(): void
+    {
+        $pemohon = $this->makePemohon();
+        $jenis = $this->jenisCuti('Cuti Tahunan');
+        LeaveBalance::create([
+            'employee_id' => $pemohon['employee']->id,
+            'tahun' => 2026,
+            'jatah_awal' => 12,
+            'carry_over' => 6,
+            'terpakai' => 0,
+            'sisa' => 18,
+            'sisa_n2' => 2,
+            'sisa_n1' => 4,
+            'sisa_tahun_berjalan' => 12,
+            'terpakai_tahun_berjalan' => 0,
+            'hangus' => 0,
+        ]);
+
+        $cuti = $this->makeRequest($pemohon['employee'], $jenis, [$pemohon['kepala_bagian'], $pemohon['pybmc']], 8);
+
+        $this->service()->approve($cuti, $pemohon['kepala_bagian']);
+        $this->service()->approve($cuti->fresh(), $pemohon['pybmc']);
+
+        $balance = LeaveBalance::where('employee_id', $pemohon['employee']->id)->where('tahun', 2026)->firstOrFail();
+        $this->assertSame(8, $balance->terpakai);
+        $this->assertSame(10, $balance->sisa);
+        $this->assertSame(0, $balance->sisa_n2);
+        $this->assertSame(0, $balance->sisa_n1);
+        $this->assertSame(10, $balance->sisa_tahun_berjalan);
+        $this->assertSame(2, $balance->terpakai_tahun_berjalan);
+
+        $this->assertDatabaseHas('leave_balance_ledger', [
+            'leave_request_id' => $cuti->id,
+            'event_type' => 'leave_deducted',
+            'amount' => -2,
+            'source_year' => 2024,
+            'dedup_key' => "leave_deducted:{$cuti->id}:2024",
+        ]);
+        $this->assertDatabaseHas('leave_balance_ledger', [
+            'leave_request_id' => $cuti->id,
+            'event_type' => 'leave_deducted',
+            'amount' => -4,
+            'source_year' => 2025,
+            'dedup_key' => "leave_deducted:{$cuti->id}:2025",
+        ]);
+        $this->assertDatabaseHas('leave_balance_ledger', [
+            'leave_request_id' => $cuti->id,
+            'event_type' => 'leave_deducted',
+            'amount' => -2,
+            'source_year' => 2026,
+            'dedup_key' => "leave_deducted:{$cuti->id}:2026",
+        ]);
+
+        $this->assertSame(-8, LeaveBalanceLedger::where('leave_request_id', $cuti->id)->sum('amount'));
+    }
+
+    public function test_penundaan_workflow_tidak_mencatat_mutasi_saldo(): void
+    {
+        $pemohon = $this->makePemohon();
+        $jenis = $this->jenisCuti('Cuti Tahunan');
+        LeaveBalance::create([
+            'employee_id' => $pemohon['employee']->id,
+            'tahun' => 2026,
+            'jatah_awal' => 12,
+            'carry_over' => 0,
+            'terpakai' => 0,
+            'sisa' => 12,
+        ]);
+        $cuti = $this->makeRequest($pemohon['employee'], $jenis, [$pemohon['kepala_bagian'], $pemohon['pybmc']], 3);
+
+        $this->service()->postpone($cuti, $pemohon['kepala_bagian'], 'Menunggu pengganti tugas.');
+
+        $this->assertSame('ditangguhkan', $cuti->fresh()->status);
+        $this->assertDatabaseCount('leave_balance_ledger', 0);
+        $balance = LeaveBalance::where('employee_id', $pemohon['employee']->id)->where('tahun', 2026)->firstOrFail();
+        $this->assertSame(0, $balance->terpakai);
+        $this->assertSame(12, $balance->sisa);
     }
 
     public function test_approver_duplikat_dilewati_otomatis_pada_snapshot(): void
@@ -340,6 +420,7 @@ class LeaveApprovalEngineTest extends TestCase
         } catch (ValidationException $e) {
             $this->assertSame('menunggu_approval', $cuti->fresh()->status);
             $this->assertDatabaseHas('leave_request_steps', ['leave_request_id' => $cuti->id, 'step_order' => 2, 'status' => 'active']);
+            $this->assertDatabaseMissing('leave_balance_ledger', ['leave_request_id' => $cuti->id]);
             $balance = LeaveBalance::where('employee_id', $pemohon['employee']->id)->where('tahun', 2026)->first();
             $this->assertSame(11, $balance->terpakai);
             $this->assertSame(1, $balance->sisa);

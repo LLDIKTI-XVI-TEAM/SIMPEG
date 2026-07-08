@@ -4,9 +4,9 @@ namespace App\Services;
 
 use App\Models\Employee;
 use App\Models\LeaveApproval;
-use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
+use App\Services\Cuti\LeaveBalanceService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -58,8 +58,8 @@ class LeaveApprovalService
                 return $locked;
             }
 
-            $locked->forceFill(['status' => self::STATUS_DISETUJUI])->save();
             $this->deductBalanceIfRequired($locked);
+            $locked->forceFill(['status' => self::STATUS_DISETUJUI])->save();
 
             return $locked;
         });
@@ -270,34 +270,11 @@ class LeaveApprovalService
     }
 
     /**
-     * Pemotongan saldo sementara masih memakai tabel summary sampai Phase 5 ledger menggantinya.
+     * Memotong saldo lewat service ledger agar final approval tidak memakai path summary lama.
      * Eligibility jenis cuti memakai metadata, bukan nama tampilan, agar aman dari perubahan label.
      */
     private function deductBalanceIfRequired(LeaveRequest $leaveRequest): void
     {
-        if (! $leaveRequest->jenisCuti?->mengurangi_saldo_tahunan) {
-            return;
-        }
-
-        $tahun = $leaveRequest->tanggal_mulai->year;
-        $hari = (int) $leaveRequest->jumlah_hari_kerja;
-
-        $balance = LeaveBalance::query()
-            ->where('employee_id', $leaveRequest->employee_id)
-            ->where('tahun', $tahun)
-            ->lockForUpdate()
-            ->first();
-
-        $sisa = (int) ($balance?->sisa ?? 0);
-
-        if ($balance === null || $sisa < $hari) {
-            throw ValidationException::withMessages([
-                'status' => "Saldo cuti tahunan tidak mencukupi saat persetujuan final. Sisa {$sisa} hari, dibutuhkan {$hari} hari.",
-            ]);
-        }
-
-        $balance->terpakai += $hari;
-        $balance->sisa = $sisa - $hari;
-        $balance->save();
+        app(LeaveBalanceService::class)->deductForFinalApproval($leaveRequest);
     }
 }
