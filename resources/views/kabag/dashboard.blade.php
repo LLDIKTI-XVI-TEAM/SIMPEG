@@ -192,31 +192,46 @@
                         <h3 class="text-sm font-bold text-ink font-sans">Pengajuan Cuti Bawahan</h3>
                         <p class="text-[10px] text-muted font-sans mt-0.5">Menunggu persetujuan Anda</p>
                     </div>
-                    <span class="text-xs font-bold font-sans text-warning">{{ $cutiPending }}</span>
-                </div>
-                <div class="divide-y divide-border">
-                    @foreach($listCutiPending as $c)
-                    <div class="flex items-center justify-between px-6 py-4 transition-colors hover:bg-soft/30">
-                        <div class="min-w-0 flex-1 pr-4">
-                            <p class="text-xs font-bold text-ink font-sans">{{ $c['nama'] }}</p>
-                            <p class="text-[10px] text-muted mt-0.5 font-sans leading-none">{{ $c['jenis'] }} · {{ $c['lama'] }} · {{ $c['tanggal'] }}</p>
-                        </div>
-                        <div class="ml-3 flex shrink-0 items-center gap-2">
-                            <x-ui.button variant="primary" size="sm" class="text-[10px] py-1 px-2">
-                                Setuju
-                            </x-ui.button>
-                            <x-ui.button variant="secondary" size="sm" class="text-[10px] py-1 px-2">
-                                Tinjau
-                            </x-ui.button>
-                        </div>
+                    <div class="flex items-center gap-3">
+                        <a href="{{ route('kabag.cuti.index') }}" class="text-xs font-semibold text-primary hover:underline font-sans flex items-center gap-1">
+                            Kelola Cuti
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>
+                        </a>
                     </div>
-                    @endforeach
                 </div>
-            </div>
-            <div class="border-t border-border px-6 py-4 bg-soft/20 text-center">
-                <a href="#" class="text-xs font-bold text-primary hover:underline transition-all font-sans">
-                    Lihat Seluruh Pengajuan
-                </a>
+                <div class="overflow-x-auto">
+                    <x-ui.table>
+                        <x-ui.table-head>
+                            <x-ui.table-row>
+                                <x-ui.table-th padding="lg">Pegawai</x-ui.table-th>
+                                <x-ui.table-th align="right" padding="lg">Keterangan</x-ui.table-th>
+                            </x-ui.table-row>
+                        </x-ui.table-head>
+                        <x-ui.table-body>
+                            @foreach($listCutiPending as $c)
+                            <x-ui.table-row class="hover:bg-soft transition-colors border-b border-border/50 group">
+                                <x-ui.table-td class="px-6 py-3.5">
+                                    <div class="flex items-center gap-3">
+                                        <x-ui.tooltip text="Buka detail {{ $c['nama'] }}" position="right">
+                                            <a href="{{ route('pegawai.show', ['id' => $c['id']]) }}" class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-xs font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Buka detail profil {{ $c['nama'] }}">
+                                                <span>{{ substr($c['nama'], 0, 1) }}</span>
+                                            </a>
+                                        </x-ui.tooltip>
+                                        <div class="min-w-0">
+                                            <x-ui.tooltip text="Buka detail {{ $c['nama'] }}" position="right">
+                                                <a href="{{ route('pegawai.show', ['id' => $c['id']]) }}" class="block truncate text-xs font-semibold text-ink transition hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 rounded leading-tight">{{ $c['nama'] }}</a>
+                                            </x-ui.tooltip>
+                                        </div>
+                                    </div>
+                                </x-ui.table-td>
+                                <x-ui.table-td align="right" class="px-6 py-3.5">
+                                    <p class="text-xs text-muted font-sans leading-none">{{ $c['jenis'] }} · {{ $c['lama'] }} · {{ $c['tanggal'] }}</p>
+                                </x-ui.table-td>
+                            </x-ui.table-row>
+                            @endforeach
+                        </x-ui.table-body>
+                    </x-ui.table>
+                </div>
             </div>
         </x-ui.card>
 
@@ -228,8 +243,9 @@
                         <h3 class="text-sm font-bold text-ink font-sans">EWS Bawahan Aktif</h3>
                         <p class="text-[10px] text-muted font-sans mt-0.5">Peringatan urgent dan warning</p>
                     </div>
-                    <a href="#" class="text-xs font-semibold text-primary hover:underline font-sans">
+                    <a href="{{ route('kabag.ews.index') }}" class="text-xs font-semibold text-primary hover:underline font-sans flex items-center gap-1">
                         Lihat Semua
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>
                     </a>
                 </div>
                 <div class="overflow-x-auto">
@@ -237,7 +253,7 @@
                         <x-ui.table-head>
                             <x-ui.table-row>
                                 <x-ui.table-th padding="lg">Pegawai</x-ui.table-th>
-                                <x-ui.table-th padding="lg">Peringatan</x-ui.table-th>
+                                <x-ui.table-th align="right" padding="lg">Peringatan</x-ui.table-th>
                             </x-ui.table-row>
                         </x-ui.table-head>
                         <x-ui.table-body>
@@ -257,9 +273,9 @@
                                         </div>
                                     </div>
                                 </x-ui.table-td>
-                                <x-ui.table-td class="px-6 py-3.5">
+                                <x-ui.table-td align="right" class="px-6 py-3.5">
                                     <p class="text-xs font-medium text-ink">{{ $ews['pemicu'] }}</p>
-                                    <div class="flex items-center gap-2 mt-1">
+                                    <div class="flex items-center justify-end gap-2 mt-1">
                                         <x-ui.badge variant="{{ $ews['status'] == 'Urgent' ? 'danger' : 'warning' }}" size="sm" :pill="false" dot>
                                             {{ $ews['sisa'] }}
                                         </x-ui.badge>
@@ -330,7 +346,7 @@
                                 @endif
                             </x-ui.table-td>
                             <x-ui.table-td align="right" class="px-6 py-3.5">
-                                <x-ui.button as="a" href="{{ route('kabag.bawahan.show', ['id' => $bawahan['id']]) }}" variant="secondary" size="icon" title="Lihat Detail">
+                                <x-ui.button as="a" href="{{ route('kabag.bawahan.show', ['id' => $bawahan['id']]) }}" variant="secondary" size="icon" title="Lihat Detail" tooltip-position="top-end">
                                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />

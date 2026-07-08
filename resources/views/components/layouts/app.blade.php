@@ -100,6 +100,8 @@
                     'laporan',
                     'laporan.pegawai',
                     'laporan.cuti',
+                    'cuti.rekap',
+                    'ews',
                     'ews.config',
                 ],
                 'kepala_bagian' => [
@@ -116,6 +118,8 @@
                     'laporan',
                     'laporan.pegawai',
                     'laporan.cuti',
+                    'cuti.rekap',
+                    'ews',
                     'ews.config',
                 ],
                 'pegawai' => [

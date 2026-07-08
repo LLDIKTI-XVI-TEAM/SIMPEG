@@ -33,42 +33,42 @@
             class="lg:grid-cols-5"
         >
             {{-- Filter Golongan --}}
-            <div class="relative">
-                <select id="filter-golongan" name="golongan" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+            <div>
+                <x-form.select id="filter-golongan" name="golongan" size="md" onchange="this.form.submit()">
                     <option value="">Semua Golongan</option>
-                    <option value="I">Golongan I</option>
-                    <option value="II">Golongan II</option>
-                    <option value="III">Golongan III</option>
-                    <option value="IV">Golongan IV</option>
-                </select>
+                    <option value="I" {{ request('golongan') === 'I' ? 'selected' : '' }}>Golongan I</option>
+                    <option value="II" {{ request('golongan') === 'II' ? 'selected' : '' }}>Golongan II</option>
+                    <option value="III" {{ request('golongan') === 'III' ? 'selected' : '' }}>Golongan III</option>
+                    <option value="IV" {{ request('golongan') === 'IV' ? 'selected' : '' }}>Golongan IV</option>
+                </x-form.select>
             </div>
 
             {{-- Filter Unit --}}
-            <div class="relative">
-                <select id="filter-unit" name="unit_kerja_id" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+            <div>
+                <x-form.select id="filter-unit" name="unit_kerja_id" size="md" onchange="this.form.submit()">
                     <option value="">Semua Unit</option>
-                    <option value="1">Bagian Umum</option>
-                    <option value="2">Subbagian Tata Usaha</option>
-                </select>
+                    <option value="1" {{ request('unit_kerja_id') === '1' ? 'selected' : '' }}>Bagian Umum</option>
+                    <option value="2" {{ request('unit_kerja_id') === '2' ? 'selected' : '' }}>Subbagian Tata Usaha</option>
+                </x-form.select>
             </div>
 
             {{-- Filter Jenis --}}
-            <div class="relative">
-                <select id="filter-jenis" name="jenis_pegawai_id" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+            <div>
+                <x-form.select id="filter-jenis" name="jenis_pegawai_id" size="md" onchange="this.form.submit()">
                     <option value="">Semua Jenis</option>
-                    <option value="1">PNS</option>
-                    <option value="2">PPPK</option>
-                </select>
+                    <option value="1" {{ request('jenis_pegawai_id') === '1' ? 'selected' : '' }}>PNS</option>
+                    <option value="2" {{ request('jenis_pegawai_id') === '2' ? 'selected' : '' }}>PPPK</option>
+                </x-form.select>
             </div>
 
             {{-- Filter Status --}}
-            <div class="relative">
-                <select id="filter-status" name="status_pegawai_id" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+            <div>
+                <x-form.select id="filter-status" name="status_pegawai_id" size="md" onchange="this.form.submit()">
                     <option value="">Semua Status</option>
-                    <option value="1">Aktif</option>
-                    <option value="2">Cuti</option>
-                    <option value="3">Pensiun</option>
-                </select>
+                    <option value="1" {{ request('status_pegawai_id') === '1' ? 'selected' : '' }}>Aktif</option>
+                    <option value="2" {{ request('status_pegawai_id') === '2' ? 'selected' : '' }}>Cuti</option>
+                    <option value="3" {{ request('status_pegawai_id') === '3' ? 'selected' : '' }}>Pensiun</option>
+                </x-form.select>
             </div>
         </x-ui.filter-bar>
     </form>
