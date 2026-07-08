@@ -13,6 +13,10 @@
     newJabatan: { jabatan_id: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', kelas_jabatan: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '', file_sk: null },
     newKgb: { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '', file_sk: null },
 
+    // ===== State Modal Delete =====
+    showDeleteModal: false,
+    deletePegawaiId: null,
+
     // ===== State Tabel Pegawai =====
     pegawaiRows: @js($initialRows),
     meta: @js($initialMeta),
@@ -194,8 +198,15 @@
 
     // ===== Hapus Pegawai (UI Dummy) =====
     deletePegawai(id) {
-        console.log(`[UI Only] Hapus pegawai ${id}`);
-        // Logika untuk konfirmasi & fetch API akan ditambahkan di step selanjutnya
+        this.deletePegawaiId = id;
+        this.showDeleteModal = true;
+    },
+
+    confirmDeletePegawai() {
+        console.log(`[UI Only] Hapus pegawai ${this.deletePegawaiId}`);
+        // Logika untuk fetch API akan ditambahkan di step selanjutnya
+        this.showDeleteModal = false;
+        this.deletePegawaiId = null;
     },
 
     // ===== Init: cache halaman awal yang sudah dimuat dari PHP =====
@@ -811,6 +822,62 @@
             </div>
         </div>
     </div>
+
+    {{-- Modal Konfirmasi Hapus --}}
+    <template x-teleport="body">
+        <div x-show="showDeleteModal" style="display: none;" class="relative z-50">
+            {{-- Backdrop --}}
+            <div x-show="showDeleteModal"
+                 x-transition:enter="ease-out duration-300"
+                 x-transition:enter-start="opacity-0"
+                 x-transition:enter-end="opacity-100"
+                 x-transition:leave="ease-in duration-200"
+                 x-transition:leave-start="opacity-100"
+                 x-transition:leave-end="opacity-0"
+                 class="fixed inset-0 bg-ink/60 transition-opacity"></div>
+
+            {{-- Panel --}}
+            <div class="fixed inset-0 z-10 overflow-y-auto">
+                <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+                    <div x-show="showDeleteModal"
+                         @click.away="showDeleteModal = false"
+                         x-transition:enter="ease-out duration-300"
+                         x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                         x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                         x-transition:leave="ease-in duration-200"
+                         x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                         x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                         class="relative transform overflow-hidden rounded-xl bg-surface text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg border border-border">
+                        
+                        <div class="bg-surface px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                            <div class="sm:flex sm:items-start">
+                                <div class="mx-auto flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-danger/10 sm:mx-0 sm:h-10 sm:w-10">
+                                    <svg class="h-6 w-6 text-danger" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                </div>
+                                <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
+                                    <h3 class="text-base font-semibold leading-6 text-ink" id="modal-title">Konfirmasi Hapus</h3>
+                                    <div class="mt-2">
+                                        <p class="text-sm text-muted">Apakah Anda yakin ingin menghapus data pegawai ini? Data yang sudah dihapus tidak dapat dikembalikan.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-soft px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                            <button type="button" @click="confirmDeletePegawai" class="inline-flex w-full justify-center rounded-lg bg-danger px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-danger/90 sm:ml-3 sm:w-auto transition-colors">
+                                Hapus
+                            </button>
+                            <button type="button" @click="showDeleteModal = false" class="mt-3 inline-flex w-full justify-center rounded-lg bg-surface px-3 py-2 text-sm font-semibold text-ink shadow-sm ring-1 ring-inset ring-border hover:bg-soft sm:mt-0 sm:w-auto transition-colors">
+                                Batal
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
 
 </div> {{-- end Alpine.js x-data wrapper --}}
 
