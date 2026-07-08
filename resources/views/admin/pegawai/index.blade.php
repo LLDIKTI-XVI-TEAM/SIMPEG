@@ -475,23 +475,36 @@
                                             </svg>
                                         </a>
 
-                                        {{-- Button Ubah Status Aktif --}}
-                                        <button type="button" @click="changeStatus(p.id, 'Aktif')" 
-                                                class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-success transition hover:bg-soft shadow-sm"
-                                                title="Ubah Status Aktif">
-                                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                        </button>
+                                        {{-- Dropdown Ubah Status --}}
+                                        <div class="relative" x-data="{ openStatusDropdown: false }" @click.away="openStatusDropdown = false">
+                                            <button type="button" @click="openStatusDropdown = !openStatusDropdown"
+                                                    class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-ink transition hover:bg-soft shadow-sm"
+                                                    title="Ubah Status">
+                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                                                </svg>
+                                            </button>
 
-                                        {{-- Button Ubah Status Non Aktif --}}
-                                        <button type="button" @click="changeStatus(p.id, 'Non-Aktif')" 
-                                                class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-warning transition hover:bg-soft shadow-sm"
-                                                title="Ubah Status Non Aktif">
-                                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                                            </svg>
-                                        </button>
+                                            {{-- Dropdown Menu --}}
+                                            <div x-show="openStatusDropdown" style="display: none;"
+                                                 x-transition.opacity.duration.200ms
+                                                 class="absolute right-0 top-full z-50 mt-1 w-36 rounded-lg border border-border bg-surface p-1 shadow-lg">
+                                                <button type="button" @click="changeStatus(p.id, 'Aktif'); openStatusDropdown = false" 
+                                                        class="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-sm text-success hover:bg-soft transition text-left">
+                                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    Aktif
+                                                </button>
+                                                <button type="button" @click="changeStatus(p.id, 'Non-Aktif'); openStatusDropdown = false" 
+                                                        class="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-sm text-warning hover:bg-soft transition text-left">
+                                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                                    </svg>
+                                                    Non Aktif
+                                                </button>
+                                            </div>
+                                        </div>
 
                                         @if(auth()->user()->role === 'super_admin')
                                         {{-- Button Hapus (Super Admin Only) --}}
