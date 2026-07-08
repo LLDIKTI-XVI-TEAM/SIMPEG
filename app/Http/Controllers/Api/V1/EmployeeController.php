@@ -11,6 +11,8 @@ use App\Actions\Employees\RestoreEmployeeAction;
 use App\Actions\Employees\ShowEmployeeAction;
 use App\Actions\Employees\ShowMyProfileAction;
 use App\Actions\Employees\UpdateEmployeeAction;
+use App\Actions\Employees\DeleteEmployeeAction;
+use App\Actions\Employees\UpdateEmployeeStatusAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Employee\ListEmployeesRequest;
 use App\Http\Requests\Employee\StoreEmployeeRequest;
@@ -81,6 +83,35 @@ class EmployeeController extends Controller
         return response()->json([
             'message' => 'Data pegawai berhasil dinonaktifkan.',
         ]);
+    }
+
+    public function forceDestroy(Employee $employee, Request $request, DeleteEmployeeAction $action): JsonResponse
+    {
+        $action->execute($employee, $request);
+
+        return response()->json([
+            'message' => 'Data pegawai berhasil dihapus secara permanen.',
+        ]);
+    }
+
+    public function updateStatus(Employee $employee, Request $request, UpdateEmployeeStatusAction $action): JsonResponse
+    {
+        $request->validate([
+            'status' => 'required|string',
+        ]);
+
+        try {
+            $updatedEmployee = $action->execute($employee, $request->status, $request);
+
+            return response()->json([
+                'message' => 'Status pegawai berhasil diperbarui.',
+                'employee' => $this->employeeListPayload($updatedEmployee),
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 422);
+        }
     }
 
     public function restore(string $employee, Request $request, RestoreEmployeeAction $action): JsonResponse

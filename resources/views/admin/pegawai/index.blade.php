@@ -190,10 +190,34 @@
         }
     },
 
-    // ===== Ubah Status Pegawai (UI Dummy) =====
-    changeStatus(id, newStatus) {
-        console.log(`[UI Only] Change status of employee ${id} to ${newStatus}`);
-        // Logika untuk fetch API akan ditambahkan di step selanjutnya
+    // ===== Ubah Status Pegawai =====
+    async changeStatus(id, newStatus) {
+        try {
+            const res = await fetch(`/api/v1/pegawai/${id}/status`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({ status: newStatus })
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.message || `HTTP ${res.status}`);
+            }
+
+            // Bersihkan cache dan reload data
+            this.clearCache();
+            this.fetchPage(this.currentPage);
+            
+            // Tampilkan notifikasi (asumsi ada komponen toast, jika tidak, log saja)
+            console.log(`Status pegawai ${id} berhasil diubah ke ${newStatus}`);
+        } catch (error) {
+            console.error('Error changing status:', error);
+            alert('Gagal mengubah status: ' + error.message);
+        }
     },
 
     // ===== Hapus Pegawai (UI Dummy) =====
@@ -202,11 +226,34 @@
         this.showDeleteModal = true;
     },
 
-    confirmDeletePegawai() {
-        console.log(`[UI Only] Hapus pegawai ${this.deletePegawaiId}`);
-        // Logika untuk fetch API akan ditambahkan di step selanjutnya
-        this.showDeleteModal = false;
-        this.deletePegawaiId = null;
+    async confirmDeletePegawai() {
+        if (!this.deletePegawaiId) return;
+        
+        try {
+            const res = await fetch(`/api/v1/pegawai/${this.deletePegawaiId}/force`, {
+                method: 'DELETE',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.message || `HTTP ${res.status}`);
+            }
+
+            // Bersihkan cache dan reload data
+            this.clearCache();
+            this.fetchPage(this.currentPage);
+            
+        } catch (error) {
+            console.error('Error deleting pegawai:', error);
+            alert('Gagal menghapus pegawai: ' + error.message);
+        } finally {
+            this.showDeleteModal = false;
+            this.deletePegawaiId = null;
+        }
     },
 
     // ===== Init: cache halaman awal yang sudah dimuat dari PHP =====

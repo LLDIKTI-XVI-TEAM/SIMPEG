@@ -1,43 +1,111 @@
 <x-layouts.app title="Arsip Dokumen Kepegawaian">
 
     <div x-data="{
-        activeKategori: '',
-        activeUnit: '',
-        activeStatus: '',
-        searchQuery: '',
+        filters: {
+            search: '',
+            kategori: '',
+            unit_kerja: '',
+            status: '',
+        },
         showUploadModal: {{ $errors->any() ? 'true' : 'false' }},
-        documents: @js($documentsForTable),
-        currentPage: 1,
-        perPage: 5,
+        documentsRows: [],
+        meta: { current_page: 1, last_page: 1, total: 0, from: 0, to: 0 },
+        isLoading: false,
+        perPage: 10,
+        searchTimer: null,
+        dataChanged: @js(session('document_data_changed', false)),
+        
+        get cacheKey() {
+            const f = this.filters;
+            return `dokumen_pp${this.perPage}_s${f.search}_k${f.kategori}_u${f.unit_kerja}_st${f.status}`;
+        },
+
+        clearCache() {
+            const toDelete = [];
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                if (key && key.startsWith('dokumen_')) toDelete.push(key);
+            }
+            toDelete.forEach(k => sessionStorage.removeItem(k));
+        },
+
+        async fetchPage(page) {
+            const cKey = this.cacheKey + `_p${page}`;
+            const cached = sessionStorage.getItem(cKey);
+            
+            if (cached) {
+                try {
+                    const data = JSON.parse(cached);
+                    this.documentsRows = data.rows;
+                    this.meta = data.meta;
+                    return;
+                } catch (e) {
+                    sessionStorage.removeItem(cKey);
+                }
+            }
+
+            this.isLoading = true;
+            try {
+                const params = new URLSearchParams({
+                    page,
+                    per_page: this.perPage,
+                    ...Object.fromEntries(Object.entries(this.filters).filter(([, v]) => v !== '')),
+                });
+                const res = await fetch(`/api/v1/dokumen?${params}`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const json = await res.json();
+                
+                const rows = json.documents.data;
+                const meta = {
+                    total:        json.documents.total,
+                    current_page: json.documents.current_page,
+                    last_page:    json.documents.last_page,
+                    from:         json.documents.from ?? 0,
+                    to:           json.documents.to   ?? 0,
+                    per_page:     json.documents.per_page,
+                };
+                
+                sessionStorage.setItem(cKey, JSON.stringify({ rows, meta }));
+                this.documentsRows = rows;
+                this.meta = meta;
+            } catch (e) {
+                console.error('Gagal fetch data dokumen:', e);
+            } finally {
+                this.isLoading = false;
+            }
+        },
+
+        applyFilter() {
+            this.clearCache();
+            this.fetchPage(1);
+        },
+
         init() {
+            if (this.dataChanged) {
+                this.clearCache();
+            }
+            
             const urlParams = new URLSearchParams(window.location.search);
             const filterParam = urlParams.get('filter');
             if (filterParam === 'kadaluarsa') {
-                this.activeKategori = 'sk_pengangkatan';
+                this.filters.kategori = 'sk_pengangkatan';
             }
-            this.$watch('searchQuery', () => this.currentPage = 1);
-            this.$watch('activeKategori', () => this.currentPage = 1);
-            this.$watch('activeUnit', () => this.currentPage = 1);
-            this.$watch('activeStatus', () => this.currentPage = 1);
-        },
-        get filteredDocuments() {
-            return this.documents.filter(doc => {
-                const matchesSearch = doc.nama.toLowerCase().includes(this.searchQuery.toLowerCase()) || 
-                                       doc.nomor.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-                                       doc.jenis.toLowerCase().includes(this.searchQuery.toLowerCase());
-                const matchesKategori = !this.activeKategori || doc.kategori === this.activeKategori;
-                const matchesUnit = !this.activeUnit || doc.unit_pegawai === this.activeUnit;
-                const matchesStatus = !this.activeStatus || doc.status_dokumen === this.activeStatus;
-                return matchesSearch && matchesKategori && matchesUnit && matchesStatus;
+            
+            // Watchers untuk memicu pencarian/filter
+            this.$watch('filters.search', () => {
+                clearTimeout(this.searchTimer);
+                this.searchTimer = setTimeout(() => this.applyFilter(), 300);
             });
-        },
-        get paginatedDocuments() {
-            const start = (this.currentPage - 1) * this.perPage;
-            const end = start + this.perPage;
-            return this.filteredDocuments.slice(start, end);
-        },
-        get totalPages() {
-            return Math.ceil(this.filteredDocuments.length / this.perPage) || 1;
+            this.$watch('filters.kategori', () => this.applyFilter());
+            this.$watch('filters.unit_kerja', () => this.applyFilter());
+            this.$watch('filters.status', () => this.applyFilter());
+            this.$watch('perPage', () => this.applyFilter());
+            
+            // Initial fetch
+            this.fetchPage(1);
         }
     }" class="space-y-6">
 
@@ -65,12 +133,12 @@
         </div>
 
         <x-ui.filter-bar 
-            searchModel="searchQuery" 
+            searchModel="filters.search" 
             searchPlaceholder="Cari nama, nomor, jenis..."
         >
             {{-- Filter Unit Kerja --}}
             <div class="relative col-span-1 sm:col-span-1 lg:col-span-1">
-                <select x-model="activeUnit"
+                <select x-model="filters.unit_kerja"
                     class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Unit Kerja</option>
                     <option>Bag. Umum</option>
@@ -83,7 +151,7 @@
 
             {{-- Filter Kategori Dokumen --}}
             <div class="relative col-span-1 sm:col-span-1 lg:col-span-1">
-                <select x-model="activeKategori"
+                <select x-model="filters.kategori"
                     class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Kategori Dokumen</option>
                     @foreach ($categoryLabels as $value => $label)
@@ -95,7 +163,7 @@
 
             {{-- Filter Status Dokumen --}}
             <div class="relative col-span-1 sm:col-span-2 lg:col-span-1">
-                <select x-model="activeStatus"
+                <select x-model="filters.status"
                     class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Status</option>
                     <option value="tersedia">File tersedia</option>
@@ -137,7 +205,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-border">
-                        <template x-for="doc in paginatedDocuments" :key="doc.id">
+                        <template x-for="doc in documentsRows" :key="doc.id">
                             <tr class="transition-colors hover:bg-soft/50">
                                 <td class="px-4 py-3.5">
                                     <div class="flex items-center gap-3">
@@ -228,7 +296,14 @@
                                 </td>
                             </tr>
                         </template>
-                        <tr x-show="filteredDocuments.length === 0">
+
+                        <tr x-show="isLoading">
+                            <td colspan="7" class="px-6 py-8 text-center text-xs text-muted font-sans">
+                                Memuat data...
+                            </td>
+                        </tr>
+
+                        <tr x-show="!isLoading && documentsRows.length === 0">
                             <td colspan="7" class="px-6 py-8 text-center text-xs text-muted font-sans">
                                 Tidak ada dokumen yang cocok dengan filter atau pencarian Anda.
                             </td>
@@ -242,7 +317,7 @@
                 <div class="flex items-center gap-4">
                     <div class="flex items-center gap-2">
                         <span class="text-sm text-muted">Tampilkan</span>
-                        <select id="per-page" x-model.number="perPage" @change="currentPage = 1"
+                        <select id="per-page" x-model.number="perPage"
                             class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
                             <option value="10">10</option>
                             <option value="25">25</option>
@@ -251,14 +326,14 @@
                         <span class="text-sm text-muted">data per halaman</span>
                     </div>
                     
-                    <p class="text-sm text-muted hidden sm:block" x-show="filteredDocuments.length > 0">
-                        Menampilkan <span class="font-semibold text-ink" x-text="(currentPage - 1) * perPage + 1"></span> hingga <span class="font-semibold text-ink" x-text="Math.min(currentPage * perPage, filteredDocuments.length)"></span> dari <span class="font-semibold text-ink" x-text="filteredDocuments.length"></span> hasil
+                    <p class="text-sm text-muted hidden sm:block" x-show="meta.total > 0">
+                        Menampilkan <span class="font-semibold text-ink" x-text="meta.from"></span> hingga <span class="font-semibold text-ink" x-text="meta.to"></span> dari <span class="font-semibold text-ink" x-text="meta.total"></span> hasil
                     </p>
                 </div>
                 
                 <div class="w-full sm:w-auto">
                     <div class="flex items-center justify-center gap-1.5">
-                        <x-ui.pagination current="currentPage" total="totalPages" />
+                        <x-ui.pagination current="meta.current_page" total="meta.last_page" action="fetchPage(page)" />
                     </div>
                 </div>
             </div>

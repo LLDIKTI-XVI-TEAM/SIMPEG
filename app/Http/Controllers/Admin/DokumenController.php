@@ -28,7 +28,8 @@ class DokumenController extends Controller
         $document = $action->execute($request->validated(), $request->file('berkas'));
 
         return redirect()->route('dokumen')
-            ->with('success', 'Dokumen "'.$document->nama_dokumen.'" berhasil diunggah.');
+            ->with('success', 'Dokumen "'.$document->nama_dokumen.'" berhasil diunggah.')
+            ->with('document_data_changed', true);
     }
 
     public function download(string $id, PrepareDocumentDownloadAction $action)
