@@ -1,4 +1,12 @@
 <x-layouts.app title="Dashboard" subtitle="Ringkasan eksekutif dan pemantauan aktivitas kepegawaian hari ini.">
+    @php
+        $dashboardEwsAlerts = $dashboardEwsAlerts ?? [];
+        $dashboardEwsTotal = $dashboardEwsTotal ?? count($dashboardEwsAlerts);
+        $dashboardEwsUrgent = $dashboardEwsUrgent ?? collect($dashboardEwsAlerts)->where('urgency', 'danger')->count();
+        $dashboardEwsWarning = $dashboardEwsWarning ?? collect($dashboardEwsAlerts)->where('urgency', 'warning')->count();
+        $dashboardEwsInfo = $dashboardEwsInfo ?? collect($dashboardEwsAlerts)->where('urgency', 'success')->count();
+        $dashboardEwsLink = $dashboardEwsLink ?? route('ews');
+    @endphp
 
 
     {{-- ================================================================ --}}
@@ -156,12 +164,12 @@
         </x-ui.stat-card>
 
         {{-- W4: EWS Aktif --}}
-        <x-ui.stat-card href="#ews-section" label="EWS Aktif" value="5" variant="danger" size="lg" accent>
+        <x-ui.stat-card href="#ews-section" label="EWS Aktif" value="{{ $dashboardEwsTotal }}" variant="danger" size="lg" accent>
             <x-slot:icon>
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
             </x-slot:icon>
             <x-slot:meta>
-                <span class="font-semibold text-danger">1 Urgent · 3 Warning · 1 Info</span>
+                <span class="font-semibold text-danger">{{ $dashboardEwsUrgent }} Urgent &middot; {{ $dashboardEwsWarning }} Warning &middot; {{ $dashboardEwsInfo }} Info</span>
                 <span>Per {{ now()->translatedFormat('d F Y') }}</span>
             </x-slot:meta>
         </x-ui.stat-card>
@@ -191,7 +199,7 @@
                             <x-ui.table-th padding="lg">Golongan Asal</x-ui.table-th>
                             <x-ui.table-th padding="lg">Golongan Baru</x-ui.table-th>
                             <x-ui.table-th padding="lg">TMT Kenaikan</x-ui.table-th>
-                            <x-ui.table-th align="right" padding="lg">Aksi</x-ui.table-th>
+                            <x-ui.table-th align="right" padding="lg">Status</x-ui.table-th>
                         </x-ui.table-row>
                     </x-ui.table-head>
                     <x-ui.table-body>
@@ -314,7 +322,7 @@
                     <h3 class="text-sm font-bold text-ink font-sans">Daftar EWS Aktif</h3>
                     <p class="text-[10px] text-muted font-sans mt-0.5">Peringatan otomatis masa berlaku dokumen & kepegawaian</p>
                 </div>
-                <a href="{{ route('ews') }}" class="text-xs font-semibold text-primary hover:underline font-sans">
+                <a href="{{ $dashboardEwsLink }}" class="text-xs font-semibold text-primary hover:underline font-sans">
                     Lihat Semua
                 </a>
             </div>
@@ -330,161 +338,67 @@
                         </x-ui.table-row>
                     </x-ui.table-head>
                     <x-ui.table-body>
-                        {{-- EWS Item 1: Merah (<30 Hari) --}}
-                        <x-ui.table-row :interactive="true" class="cursor-pointer">
-                            <x-ui.table-td class="px-6 py-3.5">
-                                <div class="flex items-center gap-3">
-                                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                                        <span class="text-xs font-bold text-primary">B</span>
+                        @forelse($dashboardEwsAlerts as $alert)
+                            @php
+                                $canOpenEmployee = in_array(auth()->user()?->role, ['super_admin', 'admin_kepegawaian'], true);
+                                $urgencyVariant = match ($alert['urgency']) {
+                                    'danger' => 'danger',
+                                    'warning' => 'warning',
+                                    default => 'success',
+                                };
+                                $urgencyLabel = match ($alert['urgency']) {
+                                    'danger' => 'Urgent',
+                                    'warning' => 'Warning',
+                                    default => 'Informasi',
+                                };
+                                $statusVariant = match ($alert['followup_status']) {
+                                    'ditangani' => 'success',
+                                    'tidak_perlu' => 'muted',
+                                    'kedaluwarsa' => 'warning',
+                                    default => 'primary',
+                                };
+                            @endphp
+                            <x-ui.table-row :interactive="false">
+                                <x-ui.table-td class="px-6 py-3.5">
+                                    <div class="flex items-center gap-3">
+                                        <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                                            <span class="text-xs font-bold text-primary">{{ strtoupper(substr($alert['nama'], 0, 1)) }}</span>
+                                        </div>
+                                        <div class="min-w-0">
+                                            @if($canOpenEmployee)
+                                                <a href="{{ route('pegawai.show', $alert['pegawai_id']) }}" class="text-xs font-bold text-ink font-sans leading-tight hover:text-primary">
+                                                    {{ $alert['nama'] }}
+                                                </a>
+                                            @else
+                                                <p class="text-xs font-bold text-ink font-sans leading-tight">{{ $alert['nama'] }}</p>
+                                            @endif
+                                            <p class="text-[9px] text-muted font-sans leading-none mt-0.5">NIP. {{ $alert['nip'] }}</p>
+                                        </div>
                                     </div>
-                                    <div class="min-w-0">
-                                        <p class="text-xs font-bold text-ink font-sans leading-tight">Budi Santoso</p>
-                                        <p class="text-[9px] text-muted font-sans leading-none mt-0.5">NIP. 19780601 200312 1 002</p>
-                                    </div>
-                                </div>
-                            </x-ui.table-td>
-                            <x-ui.table-td class="px-6 py-3.5 font-medium">Masa Berlaku SK Pengangkatan</x-ui.table-td>
-                            <x-ui.table-td class="px-6 py-3.5 font-medium">12 Hari Lagi</x-ui.table-td>
-                            <x-ui.table-td class="px-6 py-3.5">
-                                <x-ui.badge variant="danger" size="md" :pill="false" dot>
-                                    Urgent
-                                </x-ui.badge>
-                            </x-ui.table-td>
-                            <x-ui.table-td align="right" class="px-6 py-3.5">
-                                <div class="flex items-center justify-end">
-                                    <x-ui.button href="{{ route('dokumen') }}" variant="secondary" size="icon" title="Tinjau" aria-label="Tinjau">
-                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                        </svg>
-                                    </x-ui.button>
-                                </div>
-                            </x-ui.table-td>
-                        </x-ui.table-row>
-                        {{-- EWS Item 2: Kuning (30-90 Hari) --}}
-                        <x-ui.table-row :interactive="true" class="cursor-pointer">
-                            <x-ui.table-td class="px-6 py-3.5">
-                                <div class="flex items-center gap-3">
-                                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                                        <span class="text-xs font-bold text-primary">S</span>
-                                    </div>
-                                    <div class="min-w-0">
-                                        <p class="text-xs font-bold text-ink font-sans leading-tight">Siti Rahayu</p>
-                                        <p class="text-[9px] text-muted font-sans leading-none mt-0.5">NIP. 19901120 201501 2 003</p>
-                                    </div>
-                                </div>
-                            </x-ui.table-td>
-                            <x-ui.table-td class="px-6 py-3.5 font-medium">Persiapan Administrasi Pensiun</x-ui.table-td>
-                            <x-ui.table-td class="px-6 py-3.5 font-medium">45 Hari Lagi</x-ui.table-td>
-                            <x-ui.table-td class="px-6 py-3.5">
-                                <x-ui.badge variant="warning" size="md" :pill="false" dot>
-                                    Warning
-                                </x-ui.badge>
-                            </x-ui.table-td>
-                            <x-ui.table-td align="right" class="px-6 py-3.5">
-                                <div class="flex items-center justify-end">
-                                    <x-ui.button href="{{ route('data-pegawai', ['filter' => 'pensiun']) }}" variant="secondary" size="icon" title="Tinjau" aria-label="Tinjau">
-                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                        </svg>
-                                    </x-ui.button>
-                                </div>
-                            </x-ui.table-td>
-                        </x-ui.table-row>
-                        {{-- EWS Item 3: Kuning --}}
-                        <x-ui.table-row :interactive="true" class="cursor-pointer">
-                            <x-ui.table-td class="px-6 py-3.5">
-                                <div class="flex items-center gap-3">
-                                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                                        <span class="text-xs font-bold text-primary">A</span>
-                                    </div>
-                                    <div class="min-w-0">
-                                        <p class="text-xs font-bold text-ink font-sans leading-tight">Ahmad Fauzi</p>
-                                        <p class="text-[9px] text-muted font-sans leading-none mt-0.5">NIP. 19850312 201001 1 001</p>
-                                    </div>
-                                </div>
-                            </x-ui.table-td>
-                            <x-ui.table-td class="px-6 py-3.5 font-medium">Kenaikan Gaji Berkala (KGB)</x-ui.table-td>
-                            <x-ui.table-td class="px-6 py-3.5 font-medium">55 Hari Lagi</x-ui.table-td>
-                            <x-ui.table-td class="px-6 py-3.5">
-                                <x-ui.badge variant="warning" size="md" :pill="false" dot>
-                                    Warning
-                                </x-ui.badge>
-                            </x-ui.table-td>
-                            <x-ui.table-td align="right" class="px-6 py-3.5">
-                                <div class="flex items-center justify-end">
-                                    <x-ui.button href="{{ route('data-pegawai') }}" variant="secondary" size="icon" title="Tinjau" aria-label="Tinjau">
-                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                        </svg>
-                                    </x-ui.button>
-                                </div>
-                            </x-ui.table-td>
-                        </x-ui.table-row>
-                        {{-- EWS Item 4: Kuning --}}
-                        <x-ui.table-row :interactive="true" class="cursor-pointer">
-                            <x-ui.table-td class="px-6 py-3.5">
-                                <div class="flex items-center gap-3">
-                                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                                        <span class="text-xs font-bold text-primary">D</span>
-                                    </div>
-                                    <div class="min-w-0">
-                                        <p class="text-xs font-bold text-ink font-sans leading-tight">Dewi Pertiwi</p>
-                                        <p class="text-[9px] text-muted font-sans leading-none mt-0.5">NIP. 19931205 201901 2 001</p>
-                                    </div>
-                                </div>
-                            </x-ui.table-td>
-                            <x-ui.table-td class="px-6 py-3.5 font-medium">Peninjauan Kontrak PPPK</x-ui.table-td>
-                            <x-ui.table-td class="px-6 py-3.5 font-medium">80 Hari Lagi</x-ui.table-td>
-                            <x-ui.table-td class="px-6 py-3.5">
-                                <x-ui.badge variant="warning" size="md" :pill="false" dot>
-                                    Warning
-                                </x-ui.badge>
-                            </x-ui.table-td>
-                            <x-ui.table-td align="right" class="px-6 py-3.5">
-                                <div class="flex items-center justify-end">
-                                    <x-ui.button href="{{ route('data-pegawai') }}" variant="secondary" size="icon" title="Tinjau" aria-label="Tinjau">
-                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                        </svg>
-                                    </x-ui.button>
-                                </div>
-                            </x-ui.table-td>
-                        </x-ui.table-row>
-                        {{-- EWS Item 5: Hijau (>90 Hari) --}}
-                        <x-ui.table-row :interactive="true" class="cursor-pointer">
-                            <x-ui.table-td class="px-6 py-3.5">
-                                <div class="flex items-center gap-3">
-                                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                                        <span class="text-xs font-bold text-primary">R</span>
-                                    </div>
-                                    <div class="min-w-0">
-                                        <p class="text-xs font-bold text-ink font-sans leading-tight">Rudi Hermawan</p>
-                                        <p class="text-[9px] text-muted font-sans leading-none mt-0.5">NIP. 19751010 199903 1 004</p>
-                                    </div>
-                                </div>
-                            </x-ui.table-td>
-                            <x-ui.table-td class="px-6 py-3.5 font-medium">Pembaruan SK Jabatan Struktural</x-ui.table-td>
-                            <x-ui.table-td class="px-6 py-3.5 font-medium">110 Hari Lagi</x-ui.table-td>
-                            <x-ui.table-td class="px-6 py-3.5">
-                                <x-ui.badge variant="info" size="md" :pill="false" dot>
-                                    Informasi
-                                </x-ui.badge>
-                            </x-ui.table-td>
-                            <x-ui.table-td align="right" class="px-6 py-3.5">
-                                <div class="flex items-center justify-end">
-                                    <x-ui.button href="{{ route('dokumen') }}" variant="secondary" size="icon" title="Tinjau" aria-label="Tinjau">
-                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                        </svg>
-                                    </x-ui.button>
-                                </div>
-                            </x-ui.table-td>
-                        </x-ui.table-row>
+                                </x-ui.table-td>
+                                <x-ui.table-td class="px-6 py-3.5">
+                                    <div class="text-xs font-semibold text-ink">{{ $alert['jenis_event'] }}</div>
+                                    <div class="mt-1 text-[10px] text-muted">{{ $alert['threshold_label'] }} &middot; {{ date('d M Y', strtotime($alert['tanggal_target'])) }}</div>
+                                </x-ui.table-td>
+                                <x-ui.table-td class="px-6 py-3.5 font-medium">{{ $alert['sisa_hari'] }} Hari Lagi</x-ui.table-td>
+                                <x-ui.table-td class="px-6 py-3.5">
+                                    <x-ui.badge :variant="$urgencyVariant" size="md" :pill="false" dot>
+                                        {{ $urgencyLabel }}
+                                    </x-ui.badge>
+                                </x-ui.table-td>
+                                <x-ui.table-td align="right" class="px-6 py-3.5">
+                                    <x-ui.badge :variant="$statusVariant" size="md" dot>
+                                        {{ $alert['followup_status_label'] }}
+                                    </x-ui.badge>
+                                </x-ui.table-td>
+                            </x-ui.table-row>
+                        @empty
+                            <x-ui.table-row>
+                                <x-ui.table-td colspan="5" align="center" class="px-6 py-10 text-sm text-muted">
+                                    Tidak ada peringatan EWS aktif.
+                                </x-ui.table-td>
+                            </x-ui.table-row>
+                        @endforelse
                     </x-ui.table-body>
                 </x-ui.table>
             </div>

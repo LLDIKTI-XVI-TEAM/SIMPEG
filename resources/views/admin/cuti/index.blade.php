@@ -1,82 +1,20 @@
 <x-layouts.app title="Cuti Pegawai">
 
     @php
-        // Padatkan status enum tersimpan menjadi token tampilan agar warna/label tetap konsisten.
-        $statusToken = function (string $status): string {
-            if ($status === 'Disetujui') {
-                return 'disetujui';
-            }
-            if ($status === 'Ditunda') {
-                return 'ditunda';
-            }
-
-            return 'menunggu';
-        };
-
-        // Petakan model pengajuan cuti ke bentuk baris yang dipakai markup tabel di bawah.
-        $riwayatCuti = collect($riwayatCuti)->map(function ($r) use ($statusToken) {
-            // Stage approval diturunkan dari status; rincian per-tahap menyusul saat engine approval aktif.
-            $stageAtasan = match ($r->status) {
-                'Disetujui', 'Menunggu Verifikator', 'Menunggu Pimpinan' => 'disetujui',
-                'Ditunda' => 'ditunda',
-                default => 'menunggu',
-            };
-
-            return [
-                'id' => $r->id,
-                'nama' => $r->employee?->nama_lengkap ?? '-',
-                'nip' => $r->employee?->nip ?? '-',
-                'unit' => $r->employee?->jabatan_terakhir ?? '-',
-                'jenis' => $r->jenisCuti?->nama ?? '-',
-                'mulai' => optional($r->tanggal_mulai)->toDateString(),
-                'selesai' => optional($r->tanggal_selesai)->toDateString(),
-                'hari' => $r->jumlah_hari_kerja,
-                'status' => $statusToken($r->status),
-                'alasan' => $r->alasan,
-                'stage_atasan' => $stageAtasan,
-                'stage_kepala' => $r->status === 'Disetujui' ? 'disetujui' : 'menunggu',
-                'periode' => optional($r->tanggal_mulai)->translatedFormat('F Y'),
-            ];
-        });
-
-        // Filter cepat dari query string (mis. tautan "menunggu persetujuan").
-        if (request()->query('status') === 'pending') {
-            $riwayatCuti = collect($riwayatCuti)->where('status', 'menunggu');
-        }
-
-        $perPage = request()->input('per_page', 10);
-        $page = request()->input('page', 1);
-
-        $offset = ($page - 1) * $perPage;
-        $total = count($riwayatCuti);
-
-        $riwayatCutiArray = is_array($riwayatCuti) ? $riwayatCuti : collect($riwayatCuti)->all();
-        $pagedData = array_slice($riwayatCutiArray, $offset, $perPage);
-
-        $riwayatCutiPaginator = new \Illuminate\Pagination\LengthAwarePaginator(
-            $pagedData,
-            $total,
-            $perPage,
-            $page,
-            ['path' => request()->url(), 'query' => request()->query()]
-        );
-
-        // Metrik ringkas dihitung dari data nyata, bukan angka statis.
-        $totalPengajuan = $riwayatCuti->count();
-        $jumlahMenunggu = $riwayatCuti->where('status', 'menunggu')->count();
-        $jumlahDisetujui = $riwayatCuti->where('status', 'disetujui')->count();
-        $jumlahDitunda = $riwayatCuti->where('status', 'ditunda')->count();
-
         $statusVariant = [
             'menunggu'  => 'warning',
             'disetujui' => 'success',
             'ditunda'   => 'danger',
+            'perlu_perubahan' => 'danger',
+            'tidak_disetujui' => 'danger',
         ];
 
         $statusLabel = [
             'menunggu'  => 'Menunggu',
             'disetujui' => 'Disetujui',
-            'ditunda'   => 'Ditunda',
+            'ditunda'   => 'Ditangguhkan',
+            'perlu_perubahan' => 'Perlu Perubahan',
+            'tidak_disetujui' => 'Tidak Disetujui',
         ];
     @endphp
 
@@ -106,7 +44,7 @@
         {{-- METRICS SUMMARY CARD (GLOBAL MONITORING) --}}
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
             {{-- Total Cuti Active --}}
-            <x-ui.stat-card label="Total Staf Cuti" value="{{ $totalPengajuan ?? '7' }}" variant="primary" size="lg" accent>
+            <x-ui.stat-card label="Total Staf Cuti" value="{{ $totalPengajuan }}" variant="primary" size="lg" accent>
                 <x-slot:icon>
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
                 </x-slot:icon>
@@ -116,7 +54,7 @@
             </x-ui.stat-card>
 
             {{-- Approved --}}
-            <x-ui.stat-card label="Disetujui (Bulan Ini)" value="{{ $jumlahDisetujui ?? '3' }}" variant="success" size="lg" accent>
+            <x-ui.stat-card label="Disetujui (Bulan Ini)" value="{{ $jumlahDisetujui }}" variant="success" size="lg" accent>
                 <x-slot:icon>
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 </x-slot:icon>
@@ -126,7 +64,7 @@
             </x-ui.stat-card>
 
             {{-- Pending --}}
-            <x-ui.stat-card label="Menunggu Persetujuan" value="{{ $jumlahMenunggu ?? '2' }}" variant="warning" size="lg" accent>
+            <x-ui.stat-card label="Menunggu Persetujuan" value="{{ $jumlahMenunggu }}" variant="warning" size="lg" accent>
                 <x-slot:icon>
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                 </x-slot:icon>
@@ -136,7 +74,7 @@
             </x-ui.stat-card>
 
             {{-- Postponed --}}
-            <x-ui.stat-card label="Ditunda" value="{{ $jumlahDitunda ?? '2' }}" variant="danger" size="lg" accent>
+            <x-ui.stat-card label="Ditangguhkan" value="{{ $jumlahDitangguhkan }}" variant="danger" size="lg" accent>
                 <x-slot:icon>
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" /></svg>
                 </x-slot:icon>
@@ -147,53 +85,64 @@
         </div>
 
 
+        <form method="GET" action="{{ route('cuti') }}">
+            <input type="hidden" name="per_page" value="{{ request('per_page', 10) }}">
         <x-ui.filter-bar
             searchId="search-cuti"
+            searchName="search"
+            searchValue="{{ $search }}"
             searchPlaceholder="Cari nama atau NIP..."
             class="sm:grid-cols-2 lg:grid-cols-5"
         >
             {{-- Filter Status --}}
             <div class="relative">
-                <select id="filter-status" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                <select id="filter-status" name="status" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Status</option>
-                    <option value="menunggu">Menunggu</option>
-                    <option value="disetujui">Disetujui</option>
-                    <option value="ditunda">Ditunda</option>
+                    <option value="menunggu" @selected($status === 'menunggu' || $status === 'pending')>Menunggu</option>
+                    <option value="disetujui" @selected($status === 'disetujui')>Disetujui</option>
+                    <option value="ditunda" @selected($status === 'ditunda' || $status === 'ditangguhkan')>Ditangguhkan</option>
+                    <option value="perlu_perubahan" @selected($status === 'perlu_perubahan')>Perlu Perubahan</option>
+                    <option value="tidak_disetujui" @selected($status === 'tidak_disetujui')>Tidak Disetujui</option>
                 </select>
             </div>
 
 
             {{-- Filter Jenis Cuti --}}
             <div class="relative">
-                <select id="filter-jenis" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                <select id="filter-jenis" name="jenis" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Jenis Cuti</option>
-                    <option>Cuti Tahunan</option>
-                    <option>Cuti Sakit</option>
-                    <option>Cuti Melahirkan</option>
+                    @foreach($optJenisCutis as $namaJenis)
+                        <option value="{{ $namaJenis }}" @selected($jenis === $namaJenis)>{{ $namaJenis }}</option>
+                    @endforeach
                 </select>
             </div>
 
             {{-- Filter Unit Kerja --}}
             <div class="relative">
-                <select id="filter-unit" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                <select id="filter-unit" name="unit" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Unit Kerja</option>
-                    <option>Bag. Umum</option>
-                    <option>Bag. Keuangan</option>
-                    <option>Bag. SDM</option>
-                    <option>Bag. IT</option>
+                    @foreach($optUnits as $namaUnit)
+                        <option value="{{ $namaUnit }}" @selected($unit === $namaUnit)>{{ $namaUnit }}</option>
+                    @endforeach
                 </select>
             </div>
 
             {{-- Filter Periode Bulan --}}
             <div class="relative">
-                <select id="filter-periode" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                <select id="filter-periode" name="periode" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Periode</option>
-                    <option value="Juni 2026">Juni 2026</option>
-                    <option value="Mei 2026">Mei 2026</option>
-                    <option value="April 2026">April 2026</option>
+                    @foreach($optPeriodes as $periodeOption)
+                        <option value="{{ $periodeOption }}" @selected($periode === $periodeOption)>{{ \Carbon\Carbon::createFromFormat('Y-m', $periodeOption)->translatedFormat('F Y') }}</option>
+                    @endforeach
                 </select>
             </div>
+
+            <div class="flex gap-2">
+                <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Terapkan</button>
+                <a href="{{ route('cuti') }}" class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink shadow-sm transition hover:bg-soft">Reset</a>
+            </div>
         </x-ui.filter-bar>
+        </form>
 
 
         {{-- TABLE CARD --}}
@@ -286,15 +235,15 @@
                         </select>
                         <span class="text-sm text-muted">data per halaman</span>
                     </div>
-                    @if($riwayatCutiPaginator->total() > 0)
+                    @if($riwayatCuti->total() > 0)
                     <p class="text-sm text-muted hidden sm:block">
-                        Menampilkan <span class="font-semibold text-ink">{{ $riwayatCutiPaginator->firstItem() }}</span> hingga <span class="font-semibold text-ink">{{ $riwayatCutiPaginator->lastItem() }}</span> dari <span class="font-semibold text-ink">{{ $riwayatCutiPaginator->total() }}</span> hasil
+                        Menampilkan <span class="font-semibold text-ink">{{ $riwayatCuti->firstItem() }}</span> hingga <span class="font-semibold text-ink">{{ $riwayatCuti->lastItem() }}</span> dari <span class="font-semibold text-ink">{{ $riwayatCuti->total() }}</span> hasil
                     </p>
                     @endif
                 </div>
 
                 <div class="w-full sm:w-auto">
-                    {{ $riwayatCutiPaginator->onEachSide(1)->links('vendor.pagination.simpeg') }}
+                    {{ $riwayatCuti->onEachSide(1)->links('vendor.pagination.simpeg') }}
 
                 </div>
             </div>
@@ -304,68 +253,6 @@
 
     @push('scripts')
     <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const searchInput = document.getElementById('search-cuti');
-        const filterStatus = document.getElementById('filter-status');
-        const filterJenis = document.getElementById('filter-jenis');
-        const filterUnit = document.getElementById('filter-unit');
-        const filterPeriode = document.getElementById('filter-periode');
-
-        function applyCutiFilters() {
-            const query = searchInput.value.toLowerCase();
-            const status = filterStatus.value;
-            const jenis = filterJenis.value;
-            const unit = filterUnit.value;
-            const periode = filterPeriode.value;
-
-            const rows = document.querySelectorAll('#cuti-table tbody tr');
-            let visibleCount = 0;
-
-            rows.forEach(row => {
-                const rNama = row.getAttribute('data-nama');
-                if (!rNama) return;
-                const rNip = row.getAttribute('data-nip').toLowerCase();
-                const rUnit = row.getAttribute('data-unit');
-                const rJenis = row.getAttribute('data-jenis');
-                const rStatus = row.getAttribute('data-status');
-                const rPeriode = row.getAttribute('data-periode');
-
-                const matchesSearch = rNama.toLowerCase().includes(query) || rNip.includes(query);
-                const matchesStatus = !status || rStatus === status;
-                const matchesJenis = !jenis || rJenis === jenis;
-                const matchesUnit = !unit || rUnit === unit;
-                const matchesPeriode = !periode || rPeriode === periode;
-
-                if (matchesSearch && matchesStatus && matchesJenis && matchesUnit && matchesPeriode) {
-                    row.style.display = '';
-                    visibleCount++;
-                } else {
-                    row.style.display = 'none';
-                }
-            });
-
-            // Update showing count text
-            const countText = document.getElementById('cuti-count-text');
-            if (countText) {
-                countText.textContent = `Menampilkan 1 - ${visibleCount} dari ${visibleCount} data`;
-            }
-        }
-
-        if (searchInput) searchInput.addEventListener('input', applyCutiFilters);
-        if (filterStatus) filterStatus.addEventListener('change', applyCutiFilters);
-        if (filterJenis) filterJenis.addEventListener('change', applyCutiFilters);
-        if (filterUnit) filterUnit.addEventListener('change', applyCutiFilters);
-        if (filterPeriode) filterPeriode.addEventListener('change', applyCutiFilters);
-
-        // Pre-apply filter if status query exists
-        const urlParams = new URLSearchParams(window.location.search);
-        const statusParam = urlParams.get('status');
-        if (statusParam === 'pending' && filterStatus) {
-            filterStatus.value = 'menunggu';
-            applyCutiFilters();
-        }
-    });
-
     function updatePerPage(val) {
         const url = new URL(window.location.href);
         url.searchParams.set('per_page', val);

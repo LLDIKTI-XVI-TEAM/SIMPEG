@@ -2,9 +2,10 @@
 
 namespace Tests\Feature;
 
-use App\Models\ApprovalConfig;
+use App\Models\Appointment;
 use App\Models\AuditLog;
 use App\Models\Employee;
+use App\Models\LeaveApprovalChain;
 use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
@@ -12,6 +13,7 @@ use App\Models\RefJenisPegawai;
 use App\Models\SimpegNotification;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
+use App\Services\LeaveApprovalService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -37,28 +39,12 @@ class SubmitLeaveRequestTest extends TestCase
         // Seed RBAC agar permission cuti.create tersedia bagi gerbang route dan FormRequest.
         $this->seed(RbacSeeder::class);
 
-        // Rantai approval (stage 2 dan 3) wajib terkonfigurasi sebagai prasyarat operasional modul cuti.
-        // Tanpa ini pengajuan ditolak; happy-path di kelas ini mengasumsikan chain sudah lengkap.
-        $this->seedApprovalChain();
-    }
-
-    /**
-     * Mengisi approver stage 2 dan stage 3 di approval_configs agar pengajuan tidak ditolak
-     * karena konfigurasi belum lengkap. Approver disimpan sebagai id User yang tertaut ke Employee.
-     */
-    private function seedApprovalChain(): void
-    {
-        $verifikator = User::factory()->create(['employee_id' => Employee::factory()->create()->id]);
-        $pimpinan = User::factory()->create(['employee_id' => Employee::factory()->create()->id]);
-
-        ApprovalConfig::setVal('stage2_approver_id', (string) $verifikator->id);
-        ApprovalConfig::setVal('stage3_approver_id', (string) $pimpinan->id);
     }
 
     /**
      * Membuat pegawai pemohon lengkap dengan akun, jenis pegawai, dan atasan langsung aktif.
      *
-     * @return array{user: User, employee: Employee, supervisor: Employee}
+     * @return array{user: User, employee: Employee, supervisor: Employee, pybmc: Employee}
      */
     private function makePemohon(string $jenisPegawai = 'PNS'): array
     {
@@ -66,6 +52,15 @@ class SubmitLeaveRequestTest extends TestCase
 
         $employee = Employee::factory()->create(['jenis_pegawai_id' => $jenis->id]);
         $supervisor = Employee::factory()->create();
+        $pybmc = Employee::factory()->create();
+
+        Appointment::create([
+            'employee_id' => $employee->id,
+            'jenis_pengangkatan' => $jenisPegawai === 'PPPK' ? 'PPPK' : 'PNS',
+            'tmt_pengangkatan' => '2024-01-01',
+            'no_sk' => 'SK-TEST-001',
+            'tanggal_sk' => '2024-01-01',
+        ]);
 
         // Atasan langsung aktif: tanggal_berakhir null menandai penugasan masih berjalan.
         SupervisorAssignment::create([
@@ -77,12 +72,48 @@ class SubmitLeaveRequestTest extends TestCase
 
         $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
 
-        return ['user' => $user, 'employee' => $employee, 'supervisor' => $supervisor];
+        $this->createApprovalChain($employee, $supervisor, $pybmc);
+
+        return ['user' => $user, 'employee' => $employee, 'supervisor' => $supervisor, 'pybmc' => $pybmc];
+    }
+
+    private function createApprovalChain(Employee $employee, Employee $kepalaBagian, Employee $pybmc): LeaveApprovalChain
+    {
+        $chain = LeaveApprovalChain::create([
+            'employee_id' => $employee->id,
+            'name' => 'Chain cuti pegawai',
+            'effective_from' => '2026-01-01',
+            'change_reason' => 'Setup test chain.',
+        ]);
+
+        $chain->steps()->createMany([
+            [
+                'step_order' => 1,
+                'step_type' => 'kepala_bagian',
+                'role_label' => 'Kepala Bagian',
+                'approver_employee_id' => $kepalaBagian->id,
+                'is_final' => false,
+            ],
+            [
+                'step_order' => 2,
+                'step_type' => 'pybmc',
+                'role_label' => 'PYBMC',
+                'approver_employee_id' => $pybmc->id,
+                'is_final' => true,
+            ],
+        ]);
+
+        return $chain;
     }
 
     private function jenisCuti(string $nama, bool $khususPns = false): RefJenisCuti
     {
-        return RefJenisCuti::create(['nama' => $nama, 'khusus_pns' => $khususPns]);
+        return RefJenisCuti::create([
+            'nama' => $nama,
+            'code' => str($nama)->slug('_')->toString(),
+            'mengurangi_saldo_tahunan' => $nama === 'Cuti Tahunan',
+            'khusus_pns' => $khususPns,
+        ]);
     }
 
     /**
@@ -119,8 +150,26 @@ class SubmitLeaveRequestTest extends TestCase
         $this->assertDatabaseHas('leave_requests', [
             'employee_id' => $aktor['employee']->id,
             'jenis_cuti_id' => $jenis->id,
-            'status' => 'Menunggu Atasan Langsung',
+            'status' => 'menunggu_approval',
             'jumlah_hari_kerja' => 5,
+        ]);
+
+        $leave = LeaveRequest::query()->firstOrFail();
+        $this->assertDatabaseHas('leave_request_steps', [
+            'leave_request_id' => $leave->id,
+            'step_order' => 1,
+            'step_type' => 'kepala_bagian',
+            'approver_employee_id' => $aktor['supervisor']->id,
+            'status' => 'active',
+            'is_final' => false,
+        ]);
+        $this->assertDatabaseHas('leave_request_steps', [
+            'leave_request_id' => $leave->id,
+            'step_order' => 2,
+            'step_type' => 'pybmc',
+            'approver_employee_id' => $aktor['pybmc']->id,
+            'status' => 'pending',
+            'is_final' => true,
         ]);
 
         // Atasan langsung harus menerima notifikasi pengajuan baru.
@@ -359,18 +408,71 @@ class SubmitLeaveRequestTest extends TestCase
 
     public function test_menolak_pengajuan_saat_rantai_approval_belum_dikonfigurasi(): void
     {
-        // Hapus konfigurasi approver agar rantai approval dianggap belum lengkap.
-        ApprovalConfig::query()->delete();
-
         $aktor = $this->makePemohon();
+        LeaveApprovalChain::query()->where('employee_id', $aktor['employee']->id)->delete();
         $jenis = $this->jenisCuti('Cuti Sakit');
 
         $this->actingAs($aktor['user']);
         $response = $this->postJson(route(self::ROUTE), $this->payload($jenis));
 
-        // Prasyarat operasional: tanpa approver stage 2/3, pengajuan ditolak dengan pesan jelas dan tidak tersimpan.
+        // Prasyarat operasional: tanpa chain aktif, pengajuan ditolak dengan pesan jelas dan tidak tersimpan.
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors(['jenis_cuti_id']);
         $this->assertDatabaseCount('leave_requests', 0);
+    }
+
+    public function test_menolak_cuti_tahunan_tanpa_tmt_pengangkatan(): void
+    {
+        $aktor = $this->makePemohon();
+        $aktor['employee']->appointment()->delete();
+        $jenis = $this->jenisCuti('Cuti Tahunan');
+        LeaveBalance::create([
+            'employee_id' => $aktor['employee']->id,
+            'tahun' => 2026,
+            'jatah_awal' => 12,
+            'carry_over' => 0,
+            'terpakai' => 0,
+            'sisa' => 12,
+        ]);
+
+        $this->actingAs($aktor['user']);
+        $response = $this->postJson(route(self::ROUTE), $this->payload($jenis));
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['tanggal_mulai']);
+        $this->assertDatabaseCount('leave_requests', 0);
+    }
+
+    public function test_pemohon_bisa_mengirim_ulang_pengajuan_perlu_perubahan_dengan_snapshot_yang_sama(): void
+    {
+        $aktor = $this->makePemohon();
+        $jenis = $this->jenisCuti('Cuti Sakit');
+
+        $this->actingAs($aktor['user']);
+        $this->post(route(self::ROUTE), $this->payload($jenis));
+
+        $leave = LeaveRequest::with('steps')->firstOrFail();
+        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], 'Tanggal harus diperbaiki.');
+        $stepIdsBefore = $leave->steps()->orderBy('step_order')->pluck('id')->all();
+
+        $response = $this->patch(route('cuti.resubmit', $leave), [
+            'tanggal_mulai' => '2026-07-13',
+            'tanggal_selesai' => '2026-07-15',
+            'alasan' => 'Revisi tanggal sesuai arahan approver.',
+        ]);
+
+        $response->assertRedirect(route('cuti.show', $leave));
+        $leave->refresh();
+
+        $this->assertSame('menunggu_approval', $leave->status);
+        $this->assertSame('2026-07-13', $leave->tanggal_mulai->toDateString());
+        $this->assertSame('2026-07-15', $leave->tanggal_selesai->toDateString());
+        $this->assertSame(3, $leave->jumlah_hari_kerja);
+        $this->assertSame($stepIdsBefore, $leave->steps()->orderBy('step_order')->pluck('id')->all());
+        $this->assertDatabaseHas('leave_request_steps', [
+            'leave_request_id' => $leave->id,
+            'step_order' => 1,
+            'status' => 'active',
+        ]);
     }
 }

@@ -30,7 +30,7 @@ class LeaveBalanceController extends Controller
             ->first();
 
         $history = LeaveRequest::where('employee_id', $employee->id)
-            ->with(['jenisCuti', 'approvals.approver'])
+            ->with(['jenisCuti', 'approvals.approver', 'steps'])
             ->orderByDesc('created_at')
             ->get();
 
@@ -50,7 +50,7 @@ class LeaveBalanceController extends Controller
                 'jumlah_hari_kerja' => $lr->jumlah_hari_kerja,
                 'alasan' => $lr->alasan,
                 'status' => $lr->status,
-                'current_stage' => $lr->current_stage,
+                'current_step' => $lr->steps->firstWhere('status', 'active')?->step_order,
                 'created_at' => $lr->created_at->toIso8601String(),
             ]),
         ]);

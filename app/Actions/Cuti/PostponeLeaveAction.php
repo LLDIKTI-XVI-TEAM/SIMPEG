@@ -2,6 +2,7 @@
 
 namespace App\Actions\Cuti;
 
+use App\Actions\Cuti\Concerns\BuildsLeaveDecisionAuditPayload;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Services\AuditService;
@@ -11,11 +12,13 @@ use Illuminate\Http\Request;
 
 /**
  * Mengoordinasikan tindakan menunda pengajuan cuti.
- * Transisi status ke Ditunda berada di LeaveApprovalService; Action ini menangani audit dan notifikasi.
+ * Transisi status ke ditangguhkan berada di LeaveApprovalService; Action ini menangani audit dan notifikasi.
  * Penundaan bersifat reversible, sehingga pemohon diberi tahu agar dapat menindaklanjuti.
  */
 class PostponeLeaveAction
 {
+    use BuildsLeaveDecisionAuditPayload;
+
     public function __construct(
         private readonly LeaveApprovalService $approvals,
         private readonly NotificationService $notifications,
@@ -27,8 +30,13 @@ class PostponeLeaveAction
     public function execute(LeaveRequest $leaveRequest, Employee $actor, string $komentar, Request $request): LeaveRequest
     {
         $statusSebelum = $leaveRequest->status;
+        $stepSebelum = $leaveRequest->steps()
+            ->where('status', 'active')
+            ->where('approver_employee_id', $actor->id)
+            ->first();
 
         $leaveRequest = $this->approvals->postpone($leaveRequest, $actor, $komentar);
+        $auditPayload = $this->decisionAuditPayload($statusSebelum, $leaveRequest, $stepSebelum, $actor, 'POSTPONE', $komentar);
 
         // Audit dan notifikasi dijalankan setelah transaksi penundaan berhasil agar kegagalan keduanya
         // tidak membatalkan penundaan yang sudah sah tersimpan.
@@ -36,8 +44,8 @@ class PostponeLeaveAction
             'POSTPONE',
             'LeaveRequest',
             $leaveRequest->id,
-            ['status' => $statusSebelum],
-            ['status' => $leaveRequest->status, 'komentar' => $komentar],
+            $auditPayload['old'],
+            $auditPayload['new'],
             $request,
         );
 
@@ -47,8 +55,8 @@ class PostponeLeaveAction
             $this->notifications->createForEmployee(
                 $pemohon,
                 'cuti.ditunda',
-                'Pengajuan Cuti Ditunda',
-                'Pengajuan cuti Anda ditunda oleh approver. Silakan periksa catatan penundaan.',
+                'Pengajuan Cuti Ditangguhkan',
+                'Pengajuan cuti Anda ditangguhkan oleh approver. Silakan periksa catatan penangguhan.',
                 ['leave_request_id' => $leaveRequest->id],
             );
         }

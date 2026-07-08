@@ -38,6 +38,9 @@
                     </x-ui.table-head>
                     <x-ui.table-body>
                         @forelse($pending as $r)
+                        @php
+                            $activeStep = $r->steps->firstWhere('status', 'active');
+                        @endphp
                         <x-ui.table-row :interactive="true">
                             <x-ui.table-td padding="comfortable">
                                 <div class="flex items-center gap-3">
@@ -50,7 +53,12 @@
                                     </div>
                                 </div>
                             </x-ui.table-td>
-                            <x-ui.table-td padding="comfortable" class="text-sm font-medium">{{ $r->jenisCuti->nama ?? '-' }}</x-ui.table-td>
+                            <x-ui.table-td padding="comfortable" class="text-sm font-medium">
+                                {{ $r->jenisCuti->nama ?? '-' }}
+                                <div class="mt-1 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                                    {{ $activeStep?->role_label ?? 'Approver' }}
+                                </div>
+                            </x-ui.table-td>
                             <x-ui.table-td padding="comfortable" class="text-sm font-mono">{{ $r->jumlah_hari_kerja }} Hari Kerja<br><span class="text-[10px] text-muted font-sans">{{ $r->tanggal_mulai?->translatedFormat('d M') }} - {{ $r->tanggal_selesai?->translatedFormat('d M Y') }}</span></x-ui.table-td>
                             <x-ui.table-td title="{{ $r->alasan }}" padding="comfortable" class="text-muted max-w-xs truncate">{{ $r->alasan }}</x-ui.table-td>
                             <x-ui.table-td align="right" padding="comfortable">

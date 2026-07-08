@@ -25,7 +25,7 @@ class StoreEmployeeFamilyRequest extends FormRequest
     {
         return [
             'nama_anggota' => ['required', 'string', 'max:255'],
-            'hubungan' => ['required', Rule::in(['Suami', 'Istri', 'Anak'])],
+            'hubungan' => ['required', Rule::in(['Suami', 'Istri', 'Anak', 'Saudara'])],
             'nik' => ['nullable', 'string', 'digits:16'],
             'tempat_lahir' => ['nullable', 'string', 'max:100'],
             'tanggal_lahir' => ['required', 'date', 'before_or_equal:today'],

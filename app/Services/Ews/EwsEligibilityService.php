@@ -35,4 +35,25 @@ class EwsEligibilityService
             ],
         ];
     }
+
+    /**
+     * Menentukan eligibility Satyalancana dari flag manual Fase 1.
+     *
+     * @return array{is_eligible: bool, reason: string, checks: array<int, array{label: string, passed: bool}>}
+     */
+    public function satyalancana(Employee $employee): array
+    {
+        $isEligible = $employee->is_satyalancana_eligible === true;
+        $note = trim((string) $employee->satyalancana_note);
+
+        return [
+            'is_eligible' => $isEligible,
+            'reason' => $note !== ''
+                ? $note
+                : ($isEligible ? 'Layak Satyalancana' : 'Perlu verifikasi kelayakan Satyalancana'),
+            'checks' => [
+                ['label' => 'Kelayakan manual Satyalancana', 'passed' => $isEligible],
+            ],
+        ];
+    }
 }

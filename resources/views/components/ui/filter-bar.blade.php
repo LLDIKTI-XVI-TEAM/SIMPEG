@@ -1,6 +1,8 @@
 @props([
     'searchModel' => null,
     'searchId' => null,
+    'searchName' => null,
+    'searchValue' => null,
     'searchPlaceholder' => 'Cari...',
     'searchCols' => 'col-span-1 sm:col-span-2 lg:col-span-1',
     'searchLabel' => null,
@@ -31,7 +33,9 @@
                     </svg>
                     <input type="text"
                         @if($searchId) id="{{ $searchId }}" @endif
+                        @if($searchName) name="{{ $searchName }}" @endif
                         @if($searchModel) x-model="{{ $searchModel }}" @endif
+                        value="{{ $searchValue }}"
                         placeholder="{{ $searchPlaceholder }}"
                         class="flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none font-sans">
                 </div>
