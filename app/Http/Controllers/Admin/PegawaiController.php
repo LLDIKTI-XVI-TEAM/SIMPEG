@@ -19,7 +19,6 @@ use App\Http\Requests\Employee\StoreEmployeeRequest;
 use App\Http\Requests\Employee\UpdateEmployeePerformanceFlagRequest;
 use App\Http\Requests\Employee\UpdateEmployeeRequest;
 use App\Http\Requests\Employee\UpdateEmployeeSatyalancanaEligibilityRequest;
-use App\Models\Appointment;
 use App\Models\Employee;
 use App\Models\RefAgama;
 use App\Models\RefEselon;
