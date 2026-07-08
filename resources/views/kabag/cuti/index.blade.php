@@ -182,9 +182,15 @@
             </x-ui.table>
         </div>
         
-        <div class="border-t border-border px-6 py-4 bg-surface flex items-center justify-between" x-data="{ currentPage: 1, totalPages: 1 }">
-            <p class="text-xs text-muted font-sans">Menampilkan 5 pengajuan terbaru</p>
-            <x-ui.pagination />
+        <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row" x-data="{ currentPage: 1, totalPages: 1 }">
+            <div class="flex items-center gap-4">
+                <p class="text-sm text-muted hidden sm:block">
+                    Menampilkan <span class="font-semibold text-ink">1</span> hingga <span class="font-semibold text-ink">5</span> dari <span class="font-semibold text-ink">5</span> hasil
+                </p>
+            </div>
+            <div class="w-full sm:w-auto">
+                <x-ui.pagination />
+            </div>
         </div>
     </x-ui.card>
 

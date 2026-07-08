@@ -330,14 +330,12 @@
                                 @endif
                             </x-ui.table-td>
                             <x-ui.table-td align="right" class="px-6 py-3.5">
-                                <x-ui.tooltip text="Lihat Detail">
-                                    <x-ui.button href="{{ route('kabag.bawahan.show', ['id' => $bawahan['id']]) }}" variant="secondary" size="icon" aria-label="Detail">
-                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                        </svg>
-                                    </x-ui.button>
-                                </x-ui.tooltip>
+                                <x-ui.button as="a" href="{{ route('kabag.bawahan.show', ['id' => $bawahan['id']]) }}" variant="secondary" size="icon" title="Lihat Detail">
+                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                                    </svg>
+                                </x-ui.button>
                             </x-ui.table-td>
                         </x-ui.table-row>
                         @endforeach

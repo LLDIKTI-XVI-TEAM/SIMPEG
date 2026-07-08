@@ -48,13 +48,6 @@
                 'status' => 'Belum Waktunya'
             ],
         ];
-
-        $urgencyClasses = [
-            'danger' => 'bg-danger/10 text-danger',
-            'warning' => 'bg-warning/10 text-warning',
-            'info' => 'bg-info/10 text-info',
-            'success' => 'bg-success/10 text-success',
-        ];
     @endphp
 
     {{-- PAGE HEADER --}}
@@ -126,11 +119,18 @@
                     @forelse($listEws as $ews)
                     <x-ui.table-row class="hover:bg-soft transition-colors border-b border-border/50 group">
                         <x-ui.table-td padding="comfortable">
-                            <div class="flex flex-col min-w-[150px]">
-                                <a href="{{ route('pegawai.show', ['id' => $ews['id']]) }}" class="text-sm font-semibold text-ink hover:text-primary transition-colors line-clamp-1">
-                                    {{ $ews['nama'] }}
-                                </a>
-                                <span class="text-xs text-muted font-mono mt-0.5">{{ $ews['nip'] }}</span>
+                            <div class="flex items-center gap-3">
+                                <x-ui.tooltip text="Buka detail {{ $ews['nama'] }}" position="right">
+                                    <a href="{{ route('pegawai.show', ['id' => $ews['id']]) }}" class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-xs font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Buka detail profil {{ $ews['nama'] }}">
+                                        <span>{{ substr($ews['nama'], 0, 1) }}</span>
+                                    </a>
+                                </x-ui.tooltip>
+                                <div class="min-w-0">
+                                    <x-ui.tooltip text="Buka detail {{ $ews['nama'] }}" position="right">
+                                        <a href="{{ route('pegawai.show', ['id' => $ews['id']]) }}" class="block truncate text-sm font-semibold text-ink transition hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 rounded leading-tight">{{ $ews['nama'] }}</a>
+                                    </x-ui.tooltip>
+                                    <p class="text-[11px] text-muted font-sans leading-none mt-1 font-mono">NIP. {{ $ews['nip'] }}</p>
+                                </div>
                             </div>
                         </x-ui.table-td>
                         <x-ui.table-td padding="comfortable">
@@ -141,9 +141,9 @@
                         </x-ui.table-td>
                         <x-ui.table-td padding="comfortable">
                             <div class="flex items-center gap-2">
-                                <span class="rounded-full px-3 py-1 text-xs font-semibold {{ $urgencyClasses[$ews['urgency']] }}">
+                                <x-ui.badge variant="{{ $ews['urgency'] }}" size="md" pill>
                                     {{ $ews['sisa_hari'] }} Hari
-                                </span>
+                                </x-ui.badge>
                             </div>
                         </x-ui.table-td>
                         <x-ui.table-td padding="comfortable">
@@ -153,7 +153,7 @@
                             </div>
                         </x-ui.table-td>
                         <x-ui.table-td padding="comfortable" class="text-center">
-                            <x-ui.button as="a" href="{{ route('pegawai.show', ['id' => $ews['id']]) }}" variant="ghost" size="icon" title="Lihat Profil Pegawai" tooltip-position="left">
+                            <x-ui.button as="a" href="{{ route('pegawai.show', ['id' => $ews['id']]) }}" variant="secondary" size="icon" title="Lihat Detail">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                             </x-ui.button>
                         </x-ui.table-td>
@@ -174,8 +174,15 @@
         </div>
         
         {{-- Pagination Mock --}}
-        <div class="border-t border-border px-4 py-4 sm:px-6" x-data="{ currentPage: 1, totalPages: 1 }">
-            <x-ui.pagination />
+        <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row" x-data="{ currentPage: 1, totalPages: 1 }">
+            <div class="flex items-center gap-4">
+                <p class="text-sm text-muted hidden sm:block">
+                    Menampilkan <span class="font-semibold text-ink">1</span> hingga <span class="font-semibold text-ink">4</span> dari <span class="font-semibold text-ink">4</span> hasil
+                </p>
+            </div>
+            <div class="w-full sm:w-auto">
+                <x-ui.pagination />
+            </div>
         </div>
     </x-ui.card>
 </x-layouts.app>

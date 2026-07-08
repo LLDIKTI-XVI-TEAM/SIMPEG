@@ -86,16 +86,13 @@
 
             <x-ui.card padding="lg">
                 <h3 class="text-sm font-bold text-ink font-sans border-b border-border pb-3 mb-4">Riwayat Jabatan</h3>
-                <div class="relative pl-4 border-l border-border space-y-6">
+                <x-ui.timeline>
                     @foreach($riwayatJabatan as $riwayat)
-                    <div class="relative">
-                        <div class="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-primary border-2 border-white ring-1 ring-border"></div>
-                        <p class="text-xs font-bold text-ink font-sans">{{ $riwayat['jabatan'] }}</p>
-                        <p class="text-[11px] text-muted font-sans mt-0.5">{{ $riwayat['unit'] }}</p>
+                    <x-ui.timeline-item title="{{ $riwayat['jabatan'] }}" description="{{ $riwayat['unit'] }}" variant="success">
                         <p class="text-[10px] font-mono font-medium text-muted mt-1 bg-soft inline-block px-1.5 py-0.5 rounded">TMT: {{ $riwayat['tmt'] }}</p>
-                    </div>
+                    </x-ui.timeline-item>
                     @endforeach
-                </div>
+                </x-ui.timeline>
             </x-ui.card>
         </div>
 
