@@ -186,6 +186,18 @@
         }
     },
 
+    // ===== Ubah Status Pegawai (UI Dummy) =====
+    changeStatus(id, newStatus) {
+        console.log(`[UI Only] Change status of employee ${id} to ${newStatus}`);
+        // Logika untuk fetch API akan ditambahkan di step selanjutnya
+    },
+
+    // ===== Hapus Pegawai (UI Dummy) =====
+    deletePegawai(id) {
+        console.log(`[UI Only] Hapus pegawai ${id}`);
+        // Logika untuk konfirmasi & fetch API akan ditambahkan di step selanjutnya
+    },
+
     // ===== Init: cache halaman awal yang sudah dimuat dari PHP =====
     init() {
         if (this.dataChanged) {
@@ -462,6 +474,35 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                             </svg>
                                         </a>
+
+                                        {{-- Button Ubah Status Aktif --}}
+                                        <button type="button" @click="changeStatus(p.id, 'Aktif')" 
+                                                class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-success transition hover:bg-soft shadow-sm"
+                                                title="Ubah Status Aktif">
+                                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        </button>
+
+                                        {{-- Button Ubah Status Non Aktif --}}
+                                        <button type="button" @click="changeStatus(p.id, 'Non-Aktif')" 
+                                                class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-warning transition hover:bg-soft shadow-sm"
+                                                title="Ubah Status Non Aktif">
+                                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                            </svg>
+                                        </button>
+
+                                        @if(auth()->user()->role === 'super_admin')
+                                        {{-- Button Hapus (Super Admin Only) --}}
+                                        <button type="button" @click="deletePegawai(p.id)" 
+                                                class="flex h-8 w-8 items-center justify-center rounded-lg border border-danger/30 bg-surface text-danger transition hover:bg-danger/10 shadow-sm"
+                                                title="Hapus Pegawai">
+                                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                                            </svg>
+                                        </button>
+                                        @endif
                                     </div>
                                 </td>
                             </tr>
