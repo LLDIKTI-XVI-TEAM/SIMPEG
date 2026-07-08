@@ -224,16 +224,60 @@ class SubmitLeaveRequestTest extends TestCase
         $this->assertDatabaseCount('leave_requests', 0);
     }
 
-    public function test_tanpa_baris_saldo_dianggap_nol_untuk_cuti_tahunan(): void
+    public function test_pengajuan_cuti_tahunan_menggunakan_bucket_saldo_ledger_saat_submit(): void
+    {
+        $aktor = $this->makePemohon();
+        $jenis = $this->jenisCuti('Cuti Tahunan');
+        LeaveBalance::create([
+            'employee_id' => $aktor['employee']->id,
+            'tahun' => 2026,
+            'jatah_awal' => 12,
+            'carry_over' => 0,
+            'terpakai' => 0,
+            'sisa' => 0,
+            'sisa_n2' => 2,
+            'sisa_n1' => 3,
+            'sisa_tahun_berjalan' => 7,
+            'terpakai_tahun_berjalan' => 0,
+            'hangus' => 0,
+        ]);
+
+        $this->actingAs($aktor['user']);
+        $response = $this->post(route(self::ROUTE), $this->payload($jenis));
+
+        $response->assertRedirect(route('cuti'));
+        $this->assertDatabaseHas('leave_requests', [
+            'employee_id' => $aktor['employee']->id,
+            'jenis_cuti_id' => $jenis->id,
+            'jumlah_hari_kerja' => 5,
+        ]);
+        $this->assertDatabaseCount('leave_balance_ledger', 0);
+    }
+
+    public function test_pegawai_eligible_mendapat_jatah_tahunan_lazily_saat_submit_pertama(): void
     {
         $aktor = $this->makePemohon();
         $jenis = $this->jenisCuti('Cuti Tahunan');
 
         $this->actingAs($aktor['user']);
-        $response = $this->postJson(route(self::ROUTE), $this->payload($jenis));
+        $response = $this->post(route(self::ROUTE), $this->payload($jenis));
 
-        $response->assertUnprocessable();
-        $this->assertDatabaseCount('leave_requests', 0);
+        $response->assertRedirect(route('cuti'));
+        $this->assertDatabaseHas('leave_balances', [
+            'employee_id' => $aktor['employee']->id,
+            'tahun' => 2026,
+            'jatah_awal' => 12,
+            'sisa_tahun_berjalan' => 12,
+            'sisa' => 12,
+        ]);
+        $this->assertDatabaseHas('leave_balance_ledger', [
+            'employee_id' => $aktor['employee']->id,
+            'tahun' => 2026,
+            'event_type' => 'annual_entitlement_granted',
+            'amount' => 12,
+            'dedup_key' => "{$aktor['employee']->id}:2026:annual_entitlement_granted",
+        ]);
+        $this->assertDatabaseCount('leave_requests', 1);
     }
 
     public function test_cuti_non_tahunan_tidak_mengecek_saldo(): void

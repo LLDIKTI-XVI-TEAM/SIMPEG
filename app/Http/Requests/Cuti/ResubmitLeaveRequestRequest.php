@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Cuti;
 
+use App\Services\Cuti\LeaveBalanceService;
 use App\Services\WorkdayCalculator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Carbon;
@@ -65,9 +66,11 @@ class ResubmitLeaveRequestRequest extends FormRequest
             }
 
             $hariKerja = app(WorkdayCalculator::class)->calculate($mulai, $selesai);
-            $sisaSaldo = (int) ($this->user()?->employee?->leaveBalances()
-                ->where('tahun', $mulai->year)
-                ->value('sisa') ?? 0);
+            // Resubmit hanya mengecek ketersediaan saldo dari bucket summary; pemotongan tetap terjadi saat final approval.
+            $employee = $this->user()?->employee;
+            $sisaSaldo = $employee === null
+                ? 0
+                : app(LeaveBalanceService::class)->availableFor($employee, $mulai->year, $mulai);
 
             if ($sisaSaldo < $hariKerja) {
                 $validator->errors()->add('tanggal_selesai', "Saldo cuti tahunan tidak mencukupi. Sisa saldo {$sisaSaldo} hari, sedangkan pengajuan membutuhkan {$hariKerja} hari kerja.");
