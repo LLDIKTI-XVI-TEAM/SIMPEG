@@ -67,6 +67,13 @@ class CutiFoundationSchemaTest extends TestCase
                 'acted_at',
                 'decision_note',
             ],
+            'leave_balances' => [
+                'sisa_n2',
+                'sisa_n1',
+                'sisa_tahun_berjalan',
+                'terpakai_tahun_berjalan',
+                'hangus',
+            ],
             'leave_balance_ledger' => [
                 'id',
                 'employee_id',
