@@ -29,6 +29,7 @@ class ListEmployeesAction
                 'jenis_pegawai_id',
                 'status_pegawai_id',
                 'status_aktif',
+                'profil_status',
                 'foto',
             ])
             ->with([
@@ -94,13 +95,14 @@ class ListEmployeesAction
             'nama_lengkap'      => $p->nama_lengkap,
             'nip'               => $p->nip,
             'foto_url'          => $p->foto_url,
-            'jabatan'           => $currentPosition?->jabatan?->nama ?? $p->jabatan_terakhir ?? '-',
+            'jabatan'           => $p->jabatan_terakhir ?: '-',
             'unit_kerja'        => $currentPosition?->unitKerja?->nama ?? '-',
             'golongan_terakhir' => $p->golongan_terakhir ?? '-',
             'jenis_pegawai'     => $p->jenisPegawai?->nama ?? '-',
             'status_nama'       => $statusNama,
             'status_key'        => strtolower((string) $statusNama),
-            'tmt'               => $tmt?->format('d-m-Y'),
+            'is_lengkap'        => $p->profil_status === 'lengkap',
+            'tmt'               => $tmt?->format('d/m/Y'),
         ];
     }
 }

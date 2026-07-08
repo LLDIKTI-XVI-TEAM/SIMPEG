@@ -237,7 +237,8 @@ class PegawaiController extends Controller
             $employee = $action->execute($request->validated(), $request);
 
             return redirect()->route('data-pegawai')
-                ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil ditambahkan.');
+                ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil ditambahkan.')
+                ->with('employee_data_changed', true);
         } catch (\Exception $e) {
             return back()->withInput()->with('error', 'Gagal menambahkan pegawai: '.$e->getMessage());
         }
@@ -285,7 +286,8 @@ class PegawaiController extends Controller
             $employee = $action->execute($employee, $request->validated(), $request);
 
             return redirect()->route('data-pegawai')
-                ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil diperbarui.');
+                ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil diperbarui.')
+                ->with('employee_data_changed', true);
         } catch (\Exception $e) {
             return back()->withInput()->with('error', 'Gagal memperbarui pegawai: '.$e->getMessage());
         }
@@ -299,7 +301,8 @@ class PegawaiController extends Controller
         $action->execute($employee, $request);
 
         return redirect()->route('data-pegawai')
-            ->with('success', 'Data pegawai '.$nama.' berhasil dinonaktifkan.');
+            ->with('success', 'Data pegawai '.$nama.' berhasil dinonaktifkan.')
+            ->with('employee_data_changed', true);
     }
 
     /**
@@ -350,7 +353,9 @@ class PegawaiController extends Controller
 
             DB::commit();
 
-            return back()->with('success', $count.' pegawai berhasil dinonaktifkan.');
+            return back()
+                ->with('success', $count.' pegawai berhasil dinonaktifkan.')
+                ->with('employee_data_changed', true);
         } catch (\Exception $e) {
             DB::rollBack();
 
@@ -403,7 +408,8 @@ class PegawaiController extends Controller
             $action->execute($employee, $request->input('kepala_bagian_id', $request->input('supervisor_id')), $request);
 
             return redirect()->route('pegawai.show', $id)
-                ->with('success', 'Kepala bagian untuk '.$employee->nama_lengkap.' berhasil diperbarui.');
+                ->with('success', 'Kepala bagian untuk '.$employee->nama_lengkap.' berhasil diperbarui.')
+                ->with('employee_data_changed', true);
         } catch (\Exception $e) {
             return redirect()->route('pegawai.show', $id)
                 ->with('error', 'Gagal memperbarui kepala bagian: '.$e->getMessage());

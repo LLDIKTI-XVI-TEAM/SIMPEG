@@ -18,6 +18,7 @@
     meta: @js($initialMeta),
     isLoading: false,
     perPage: {{ $perPage }},
+    dataChanged: @js(session('employee_data_changed', false)),
     sort: '{{ $sort }}',
     direction: '{{ $direction }}',
     filters: {
@@ -187,7 +188,13 @@
 
     // ===== Init: cache halaman awal yang sudah dimuat dari PHP =====
     init() {
-        // Simpan data awal (dari PHP) ke cache agar navigasi kembali tidak refetch
+        if (this.dataChanged) {
+            // Ada perubahan data dari server (edit/tambah/hapus) → bersihkan cache lama dan fetch ulang
+            this.clearCache();
+            this.fetchPage(1);
+            return;
+        }
+        // Tidak ada perubahan → simpan data awal dari PHP ke cache agar navigasi kembali tidak refetch
         if (this.pegawaiRows.length > 0) {
             const cKey = this.cacheKey + `_p${this.meta.current_page}`;
             if (!sessionStorage.getItem(cKey)) {
@@ -429,11 +436,12 @@
                                         <span x-text="p.status_nama"></span>
                                     </span>
                                 </td>
-                                {{-- Dokumen (placeholder) --}}
+                                {{-- Dokumen --}}
                                 <td class="px-4 py-3">
-                                    <span class="inline-flex items-center gap-1.5 bg-success/10 text-success font-medium text-xs rounded-md px-2.5 py-1">
-                                        <span class="h-1.5 w-1.5 rounded-full bg-success"></span>
-                                        Lengkap
+                                    <span class="inline-flex items-center gap-1.5 font-medium text-xs rounded-md px-2.5 py-1"
+                                        :class="p.is_lengkap ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'">
+                                        <span class="h-1.5 w-1.5 rounded-full" :class="p.is_lengkap ? 'bg-success' : 'bg-warning'"></span>
+                                        <span x-text="p.is_lengkap ? 'Lengkap' : 'Belum Lengkap'"></span>
                                     </span>
                                 </td>
                                 {{-- Aksi --}}
