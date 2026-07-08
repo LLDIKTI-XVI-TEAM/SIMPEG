@@ -70,7 +70,11 @@ class ListEmployeesAction
             )
             ->when(
                 ($validated['status_pegawai_id'] ?? null) ?: null,
-                fn ($query, string $statusPegawaiId) => $query->where('status_pegawai_id', $statusPegawaiId),
+                function ($query, string $statusPegawaiId) {
+                    if ($statusPegawaiId !== 'all') {
+                        $query->where('status_pegawai_id', $statusPegawaiId);
+                    }
+                },
                 fn ($query) => $query->where('status_aktif', ($validated['status_aktif'] ?? '') ?: 'Aktif')
             )
             ->orderBy($sort, $direction)

@@ -26,7 +26,11 @@ class ListEmployeesRequest extends FormRequest
             'golongan'         => ['nullable', 'string', 'max:20'],
             'unit_kerja_id'    => ['nullable', 'uuid', 'exists:ref_unit_kerja,id'],
             'jenis_pegawai_id' => ['nullable', 'uuid', 'exists:ref_jenis_pegawai,id'],
-            'status_pegawai_id'=> ['nullable', 'uuid', 'exists:ref_status_pegawai,id'],
+            'status_pegawai_id'=> ['nullable', 'string', function ($attribute, $value, $fail) {
+                if ($value !== 'all' && ! \Illuminate\Support\Str::isUuid($value)) {
+                    $fail('Format status pegawai tidak valid.');
+                }
+            }],
             'status_aktif'     => ['nullable', 'in:Aktif,Non-Aktif,Pensiun,Mutasi'],
             'sort' => [
                 'nullable',

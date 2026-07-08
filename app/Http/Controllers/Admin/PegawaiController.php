@@ -83,7 +83,7 @@ class PegawaiController extends Controller
             'golongan'         => trim((string) $request->query('golongan', '')),
             'unit_kerja_id'    => trim((string) $request->query('unit_kerja_id', '')),
             'jenis_pegawai_id' => trim((string) $request->query('jenis_pegawai_id', '')),
-            'status_pegawai_id'=> trim((string) $request->query('status_pegawai_id', '')),
+            'status_pegawai_id' => trim((string) $request->query('status_pegawai_id', 'all')),
             'status_aktif'     => trim((string) $request->query('status_aktif', '')),
         ];
 
@@ -111,8 +111,8 @@ class PegawaiController extends Controller
             };
         }
 
-        if ($filters['status_pegawai_id'] === '' && $filters['status_aktif'] !== '') {
-            $filters['status_pegawai_id'] = $statusOptions->firstWhere('nama', $filters['status_aktif'])?->id ?? '';
+        if (($filters['status_pegawai_id'] === '' || $filters['status_pegawai_id'] === 'all') && $filters['status_aktif'] !== '') {
+            $filters['status_pegawai_id'] = $statusOptions->firstWhere('nama', $filters['status_aktif'])?->id ?? 'all';
         }
 
         if ($request->query('filter') === 'pensiun' && $filters['status_aktif'] === '') {
@@ -125,7 +125,7 @@ class PegawaiController extends Controller
         if (! $jenisPegawaiOptions->contains('id', $filters['jenis_pegawai_id'])) {
             $filters['jenis_pegawai_id'] = '';
         }
-        if (! $statusOptions->contains('id', $filters['status_pegawai_id'])) {
+        if ($filters['status_pegawai_id'] !== 'all' && ! $statusOptions->contains('id', $filters['status_pegawai_id'])) {
             $filters['status_pegawai_id'] = '';
         }
         if ($filters['status_aktif'] !== '' && ! $statusOptions->contains('nama', $filters['status_aktif'])) {

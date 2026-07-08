@@ -26,7 +26,7 @@
         golongan:         '{{ $filters['golongan'] }}',
         unit_kerja_id:    '{{ $filters['unit_kerja_id'] }}',
         jenis_pegawai_id: '{{ $filters['jenis_pegawai_id'] }}',
-        status_pegawai_id:'{{ $filters['status_pegawai_id'] }}',
+        status_pegawai_id:'{{ $filters['status_pegawai_id'] ?: 'all' }}',
     },
     searchTimer: null,
 
@@ -317,7 +317,7 @@
             {{-- Filter Status --}}
             <div class="relative">
                 <select x-model="filters.status_pegawai_id" @change="applyFilter()" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                    <option value="">Semua Status</option>
+                    <option value="all">Semua Status</option>
                     @foreach($statusOptions as $status)
                         <option value="{{ $status->id }}">{{ $status->nama }}</option>
                     @endforeach
