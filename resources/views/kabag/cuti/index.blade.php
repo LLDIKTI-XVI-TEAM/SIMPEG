@@ -182,9 +182,9 @@
             </x-ui.table>
         </div>
         
-        <div class="border-t border-border px-6 py-4 bg-surface flex items-center justify-between">
+        <div class="border-t border-border px-6 py-4 bg-surface flex items-center justify-between" x-data="{ currentPage: 1, totalPages: 1 }">
             <p class="text-xs text-muted font-sans">Menampilkan 5 pengajuan terbaru</p>
-            <x-ui.pagination current="1" total="1" />
+            <x-ui.pagination />
         </div>
     </x-ui.card>
 
