@@ -77,6 +77,9 @@ class AuditPageIntegrationTest extends TestCase
                 'pppk_m6' => '180',
                 'pppk_m3' => '90',
                 'pppk_m1' => '30',
+                'satyalancana_h180' => '180',
+                'satyalancana_h90' => '90',
+                'satyalancana_h30' => '30',
                 'reason' => 'Verifikasi integrasi halaman audit',
             ])
             ->assertRedirect('/konfigurasi');

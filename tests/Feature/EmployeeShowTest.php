@@ -74,6 +74,21 @@ class EmployeeShowTest extends TestCase
             ->assertJsonPath('employee.id', $employee->id);
     }
 
+    public function test_employee_detail_page_uses_tanggal_pensiun_from_employee(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = $this->employeeWithReferences([
+            'tanggal_lahir' => '1970-01-01',
+            'tanggal_pensiun' => '2042-05-15',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSee('15-05-2042', false)
+            ->assertDontSee('01-01-2028', false);
+    }
+
     public function test_employee_detail_response_includes_kepala_lembaga_marker(): void
     {
         $user = User::factory()->adminKepegawaian()->create();

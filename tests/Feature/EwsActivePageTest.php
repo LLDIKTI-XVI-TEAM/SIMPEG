@@ -73,6 +73,53 @@ class EwsActivePageTest extends TestCase
         $response->assertDontSee($pensiun->employee->nama_lengkap);
     }
 
+    public function test_satyalancana_event_filter_is_available(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $satyalancana = $this->alert(now()->addDays(90)->toDateString(), 'SATYALANCANA', 'Pegawai Satyalancana Filter');
+        $kgb = $this->alert(now()->addDays(60)->toDateString(), 'KGB', 'Pegawai KGB Lain');
+
+        $response = $this->actingAs($user)->get(route('ews', ['event' => 'Satyalancana']));
+
+        $response->assertOk();
+        $response->assertSee('Satyalancana');
+        $response->assertSee($satyalancana->employee->nama_lengkap);
+        $response->assertDontSee($kgb->employee->nama_lengkap);
+    }
+
+    public function test_status_filter_only_shows_selected_followup_status(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $active = $this->alert(now()->addDays(60)->toDateString(), 'KGB', 'Pegawai Status Aktif');
+        $handled = $this->alert(now()->addDays(60)->toDateString(), 'KGB', 'Pegawai Status Ditangani');
+        $handled->update([
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+            'handled_at' => now(),
+            'handled_by' => $user->id,
+            'handled_note' => 'Berkas sudah selesai diproses.',
+            'is_processed' => true,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('ews', ['status' => EwsAlert::FOLLOWUP_STATUS_HANDLED]));
+
+        $response->assertOk();
+        $response->assertSee($handled->employee->nama_lengkap);
+        $response->assertSee('Berkas sudah selesai diproses.');
+        $response->assertDontSee($active->employee->nama_lengkap);
+    }
+
+    public function test_admin_can_see_followup_action_for_active_alert(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $alert = $this->alert(now()->addDays(60)->toDateString(), 'KGB', 'Pegawai Followup Button');
+
+        $this->actingAs($user)
+            ->get(route('ews'))
+            ->assertOk()
+            ->assertSee($alert->id, false)
+            ->assertSee('Catatan Tindak Lanjut EWS');
+    }
+
     public function test_non_eligible_promotion_alert_still_appears_for_admin(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -157,6 +204,7 @@ class EwsActivePageTest extends TestCase
             'interval_days' => match ($type) {
                 'KGB' => 60,
                 'PENSIUN' => 90,
+                'SATYALANCANA' => 90,
                 default => 90,
             },
             'is_processed' => false,

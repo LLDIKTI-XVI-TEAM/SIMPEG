@@ -27,6 +27,9 @@ class EwsConfigController extends Controller
         'pppk_m6' => 'PPPK Tahap 1 (Hari)',
         'pppk_m3' => 'PPPK Tahap 2 (Hari)',
         'pppk_m1' => 'PPPK Tahap 3 (Hari)',
+        'satyalancana_h180' => 'Satyalancana Tahap 1 (Hari)',
+        'satyalancana_h90' => 'Satyalancana Tahap 2 (Hari)',
+        'satyalancana_h30' => 'Satyalancana Tahap 3 (Hari)',
     ];
 
     /**
@@ -55,6 +58,10 @@ class EwsConfigController extends Controller
             'pppk_m6' => EwsConfig::getVal('pppk_m6', '180'),
             'pppk_m3' => EwsConfig::getVal('pppk_m3', '90'),
             'pppk_m1' => EwsConfig::getVal('pppk_m1', '30'),
+
+            'satyalancana_h180' => EwsConfig::getVal('satyalancana_h180', '180'),
+            'satyalancana_h90' => EwsConfig::getVal('satyalancana_h90', '90'),
+            'satyalancana_h30' => EwsConfig::getVal('satyalancana_h30', '30'),
         ];
 
         // Map persistent DB audit logs
@@ -145,6 +152,10 @@ class EwsConfigController extends Controller
             'pppk_m3' => 'required|integer|min:1',
             'pppk_m1' => 'required|integer|min:1',
 
+            'satyalancana_h180' => 'required|integer|min:1',
+            'satyalancana_h90' => 'required|integer|min:1',
+            'satyalancana_h30' => 'required|integer|min:1',
+
             'reason' => 'required|string|min:5',
         ], [
             'required' => ':attribute wajib diisi.',
@@ -168,6 +179,9 @@ class EwsConfigController extends Controller
             'pppk_m6' => 'PPPK Tahap 1',
             'pppk_m3' => 'PPPK Tahap 2',
             'pppk_m1' => 'PPPK Tahap 3',
+            'satyalancana_h180' => 'Satyalancana Tahap 1',
+            'satyalancana_h90' => 'Satyalancana Tahap 2',
+            'satyalancana_h30' => 'Satyalancana Tahap 3',
             'reason' => 'Alasan perubahan',
         ]);
 
@@ -212,6 +226,16 @@ class EwsConfigController extends Controller
         }
         if ($pp3 <= $pp1) {
             $thresholdErrors['pppk_m1'][] = 'PPPK Tahap 2 harus lebih besar dari Tahap 3.';
+        }
+
+        $sl180 = (int) $request->input('satyalancana_h180');
+        $sl90 = (int) $request->input('satyalancana_h90');
+        $sl30 = (int) $request->input('satyalancana_h30');
+        if ($sl180 <= $sl90) {
+            $thresholdErrors['satyalancana_h90'][] = 'Satyalancana Tahap 1 harus lebih besar dari Tahap 2.';
+        }
+        if ($sl90 <= $sl30) {
+            $thresholdErrors['satyalancana_h30'][] = 'Satyalancana Tahap 2 harus lebih besar dari Tahap 3.';
         }
 
         if (! empty($thresholdErrors)) {

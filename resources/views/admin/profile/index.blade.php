@@ -95,20 +95,25 @@
             </div>
 
             {{-- EWS WARNING SECTION --}}
-            @if(session('active_role', auth()->user()->role) === 'super_admin' || $sisaPensiunStr === 'Memasuki Usia Pensiun')
+            @if(count($ewsAlerts) > 0)
             <div class="rounded-lg border border-warning/20 bg-warning/10 px-4 py-3 flex items-start gap-3">
                 <svg class="h-5 w-5 text-warning shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
-                <div>
-                    <h4 class="text-sm font-bold text-warning">Peringatan Penting (EWS)</h4>
-                    <ul class="mt-1 text-xs text-warning list-disc list-inside">
-                        @if($sisaPensiunStr === 'Memasuki Usia Pensiun')
-                            <li>Anda telah memasuki usia batas pensiun (BUP). Segera siapkan dokumen terkait pensiun Anda.</li>
+                <div class="min-w-0 flex-1">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <h4 class="text-sm font-bold text-warning">Peringatan Penting (EWS)</h4>
+                        @if(auth()->user()?->role === 'pegawai')
+                            <a href="{{ route('ews.saya') }}" class="text-xs font-semibold text-warning hover:underline">Lihat semua</a>
                         @endif
-                        @if(session('active_role', auth()->user()->role) === 'super_admin')
-                            <li>Terdapat notifikasi sistem yang memerlukan perhatian Super Admin (Mockup EWS).</li>
-                        @endif
+                    </div>
+                    <ul class="mt-1 space-y-1 text-xs text-warning">
+                        @foreach(array_slice($ewsAlerts, 0, 3) as $alert)
+                            <li>
+                                {{ $alert['jenis_event'] }} pada {{ date('d M Y', strtotime($alert['tanggal_target'])) }}
+                                ({{ $alert['sisa_hari'] }} hari, {{ $alert['followup_status_label'] }}).
+                            </li>
+                        @endforeach
                     </ul>
                 </div>
             </div>
