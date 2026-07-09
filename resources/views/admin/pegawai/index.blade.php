@@ -1,6 +1,7 @@
 <x-layouts.app title="Data Pegawai">
 
 <div x-data="{
+    // ===== State Modal Riwayat (tidak berubah) =====
     showRiwayatModal: false,
     riwayatType: '',
     riwayatEmployeeId: '',
@@ -8,11 +9,128 @@
     isSubmitting: false,
     errors: {},
     successMessage: '',
-
     newPangkat: { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '', file_sk: null },
     newJabatan: { jabatan_id: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', kelas_jabatan: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '', file_sk: null },
     newKgb: { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '', file_sk: null },
 
+    // ===== State Modal Delete =====
+    showDeleteModal: false,
+    deletePegawaiId: null,
+
+    // ===== State Tabel Pegawai =====
+    pegawaiRows: @js($initialRows),
+    meta: @js($initialMeta),
+    isLoading: false,
+    perPage: {{ $perPage }},
+    dataChanged: @js(session('employee_data_changed', false)),
+    sort: '{{ $sort }}',
+    direction: '{{ $direction }}',
+    filters: {
+        search:           '{{ $filters['search'] }}',
+        golongan:         '{{ $filters['golongan'] }}',
+        unit_kerja_id:    '{{ $filters['unit_kerja_id'] }}',
+        jenis_pegawai_id: '{{ $filters['jenis_pegawai_id'] }}',
+        status_pegawai_id:'{{ $filters['status_pegawai_id'] ?: 'all' }}',
+    },
+    searchTimer: null,
+
+    // ===== Computed: cache key berdasarkan semua filter + sort aktif =====
+    get cacheKey() {
+        const f = this.filters;
+        return `pegawai_pp${this.perPage}_s${f.search}_g${f.golongan}_u${f.unit_kerja_id}_j${f.jenis_pegawai_id}_st${f.status_pegawai_id}_sort${this.sort}_dir${this.direction}`;
+    },
+
+    // ===== Hapus seluruh cache tabel dari sessionStorage =====
+    clearCache() {
+        const toDelete = [];
+        for (let i = 0; i < sessionStorage.length; i++) {
+            const key = sessionStorage.key(i);
+            if (key && key.startsWith('pegawai_')) toDelete.push(key);
+        }
+        toDelete.forEach(k => sessionStorage.removeItem(k));
+    },
+
+    // ===== Ambil halaman (cek cache dulu, baru fetch API) =====
+    async fetchPage(page) {
+        const cKey = this.cacheKey + `_p${page}`;
+        const cached = sessionStorage.getItem(cKey);
+        if (cached) {
+            try {
+                const data = JSON.parse(cached);
+                this.pegawaiRows = data.rows;
+                this.meta = data.meta;
+                return;
+            } catch (e) {
+                sessionStorage.removeItem(cKey);
+            }
+        }
+
+        this.isLoading = true;
+        try {
+            const params = new URLSearchParams({
+                page,
+                per_page: this.perPage,
+                sort: this.sort,
+                direction: this.direction,
+                ...Object.fromEntries(Object.entries(this.filters).filter(([, v]) => v !== '')),
+            });
+            const res  = await fetch(`/api/v1/pegawai?${params}`, {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const json = await res.json();
+
+            const rows = json.employees.data;
+            const meta = {
+                total:        json.employees.total,
+                current_page: json.employees.current_page,
+                last_page:    json.employees.last_page,
+                from:         json.employees.from ?? 0,
+                to:           json.employees.to   ?? 0,
+                per_page:     json.employees.per_page,
+            };
+            sessionStorage.setItem(cKey, JSON.stringify({ rows, meta }));
+            this.pegawaiRows = rows;
+            this.meta = meta;
+        } catch (e) {
+            console.error('Gagal fetch data pegawai:', e);
+        } finally {
+            this.isLoading = false;
+        }
+    },
+
+    // ===== Terapkan filter (reset ke halaman 1 dan hapus cache lama) =====
+    applyFilter() {
+        this.clearCache();
+        this.fetchPage(1);
+    },
+
+    // ===== Ubah sort =====
+    setSort(column) {
+        if (this.sort === column) {
+            this.direction = this.direction === 'asc' ? 'desc' : 'asc';
+        } else {
+            this.sort = column;
+            this.direction = 'asc';
+        }
+        this.clearCache();
+        this.fetchPage(1);
+    },
+
+    // ===== Ubah per_page =====
+    setPerPage(val) {
+        this.perPage = parseInt(val);
+        this.clearCache();
+        this.fetchPage(1);
+    },
+
+    // ===== Warna badge status =====
+    statusVariant(statusKey) {
+        const map = { 'aktif': 'success', 'cuti': 'warning', 'non-aktif': 'danger', 'pensiun': 'danger', 'mutasi': 'warning' };
+        return map[statusKey] ?? 'muted';
+    },
+
+    // ===== Modal Riwayat methods =====
     openRiwayatModal(type, employeeId, employeeName) {
         this.riwayatType = type;
         this.riwayatEmployeeId = employeeId;
@@ -22,69 +140,44 @@
         this.resetForm();
         this.showRiwayatModal = true;
     },
-
     resetForm() {
         this.newPangkat = { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '', file_sk: null };
         this.newJabatan = { jabatan_id: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', kelas_jabatan: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '', file_sk: null };
         this.newKgb = { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '', file_sk: null };
     },
-
     get modalTitle() {
-        const titles = {
-            pangkat: 'Tambah Riwayat Kepangkatan',
-            jabatan: 'Tambah Riwayat Jabatan',
-            kgb: 'Tambah Riwayat KGB'
-        };
+        const titles = { pangkat: 'Tambah Riwayat Kepangkatan', jabatan: 'Tambah Riwayat Jabatan', kgb: 'Tambah Riwayat KGB' };
         return titles[this.riwayatType] || '';
     },
-
     async submitRiwayat() {
         if (this.isSubmitting) return;
         this.isSubmitting = true;
         this.errors = {};
         this.successMessage = '';
-
         const endpoints = {
             pangkat: `/api/v1/pegawai/${this.riwayatEmployeeId}/riwayat-kepangkatan`,
             jabatan: `/api/v1/pegawai/${this.riwayatEmployeeId}/riwayat-jabatan`,
             kgb: `/api/v1/pegawai/${this.riwayatEmployeeId}/riwayat-kgb`
         };
-
         const formData = new FormData();
-        let source = this.riwayatType === 'pangkat' ? this.newPangkat
-                    : this.riwayatType === 'jabatan' ? this.newJabatan
-                    : this.newKgb;
-
+        let source = this.riwayatType === 'pangkat' ? this.newPangkat : this.riwayatType === 'jabatan' ? this.newJabatan : this.newKgb;
         for (const [key, value] of Object.entries(source)) {
             if (key === 'file_sk') continue;
             if (value !== '' && value !== null) formData.append(key, value);
         }
-
         const fileInput = this.$refs.fileSkInput;
-        if (fileInput && fileInput.files.length > 0) {
-            formData.append('file_sk', fileInput.files[0]);
-        }
-
+        if (fileInput && fileInput.files.length > 0) formData.append('file_sk', fileInput.files[0]);
         try {
             const response = await fetch(endpoints[this.riwayatType], {
                 method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '{{ csrf_token() }}',
-                    'Accept': 'application/json'
-                },
+                headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '{{ csrf_token() }}', 'Accept': 'application/json' },
                 body: formData
             });
-
             const data = await response.json();
-
             if (response.ok) {
                 this.successMessage = data.message || 'Riwayat berhasil ditambahkan.';
                 this.resetForm();
-                setTimeout(() => {
-                    this.showRiwayatModal = false;
-                    this.successMessage = '';
-                    window.location.reload();
-                }, 1200);
+                setTimeout(() => { this.showRiwayatModal = false; this.successMessage = ''; window.location.reload(); }, 1200);
             } else if (response.status === 422 && data.errors) {
                 this.errors = data.errors;
             } else {
@@ -95,7 +188,90 @@
         } finally {
             this.isSubmitting = false;
         }
-    }
+    },
+
+    // ===== Ubah Status Pegawai =====
+    async changeStatus(id, newStatus) {
+        try {
+            const res = await fetch(`/api/v1/pegawai/${id}/status`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({ status: newStatus })
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.message || `HTTP ${res.status}`);
+            }
+
+            // Bersihkan cache dan reload data
+            this.clearCache();
+            this.fetchPage(this.currentPage);
+            
+            // Tampilkan notifikasi (asumsi ada komponen toast, jika tidak, log saja)
+            console.log(`Status pegawai ${id} berhasil diubah ke ${newStatus}`);
+        } catch (error) {
+            console.error('Error changing status:', error);
+            alert('Gagal mengubah status: ' + error.message);
+        }
+    },
+
+    // ===== Hapus Pegawai (UI Dummy) =====
+    deletePegawai(id) {
+        this.deletePegawaiId = id;
+        this.showDeleteModal = true;
+    },
+
+    async confirmDeletePegawai() {
+        if (!this.deletePegawaiId) return;
+        
+        try {
+            const res = await fetch(`/api/v1/pegawai/${this.deletePegawaiId}/force`, {
+                method: 'DELETE',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '{{ csrf_token() }}'
+                }
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.message || `HTTP ${res.status}`);
+            }
+
+            // Bersihkan cache dan reload data
+            this.clearCache();
+            this.fetchPage(this.currentPage);
+            
+        } catch (error) {
+            console.error('Error deleting pegawai:', error);
+            alert('Gagal menghapus pegawai: ' + error.message);
+        } finally {
+            this.showDeleteModal = false;
+            this.deletePegawaiId = null;
+        }
+    },
+
+    // ===== Init: cache halaman awal yang sudah dimuat dari PHP =====
+    init() {
+        if (this.dataChanged) {
+            // Ada perubahan data dari server (edit/tambah/hapus) → bersihkan cache lama dan fetch ulang
+            this.clearCache();
+            this.fetchPage(1);
+            return;
+        }
+        // Tidak ada perubahan → simpan data awal dari PHP ke cache agar navigasi kembali tidak refetch
+        if (this.pegawaiRows.length > 0) {
+            const cKey = this.cacheKey + `_p${this.meta.current_page}`;
+            if (!sessionStorage.getItem(cKey)) {
+                sessionStorage.setItem(cKey, JSON.stringify({ rows: this.pegawaiRows, meta: this.meta }));
+            }
+        }
+    },
 }">
 
 
@@ -160,57 +336,60 @@
         </div>
     </div>
 
-    {{-- FILTER BAR --}}
+    {{-- FILTER BAR (Alpine-driven, tidak reload halaman) --}}
     <x-ui.card padding="none" class="mb-6">
-        <form id="filter-form" method="GET" action="{{ route('data-pegawai') }}" class="flex flex-col gap-4 p-4">
-            <input type="hidden" name="sort" value="{{ $sort }}">
-            <input type="hidden" name="direction" value="{{ $direction }}">
-            <input type="hidden" name="per_page" value="{{ $perPage ?? request('per_page', 10) }}">
+        <form @submit.prevent="applyFilter()" class="flex flex-col gap-4 p-4">
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
             {{-- Search input --}}
             <div class="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5">
                 <svg class="w-4 h-4 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                 </svg>
-                <input id="search-input" name="search" value="{{ $filters['search'] }}" type="text" placeholder="Cari nama atau NIP..." class="flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none font-sans">
+                <input
+                    x-model="filters.search"
+                    @input="clearTimeout(searchTimer); searchTimer = setTimeout(() => applyFilter(), 450)"
+                    type="text"
+                    placeholder="Cari nama atau NIP..."
+                    class="flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none font-sans"
+                >
             </div>
-            
+
             {{-- Filter Golongan --}}
             <div class="relative">
-                <select id="filter-golongan" name="golongan" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                <select x-model="filters.golongan" @change="applyFilter()" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Golongan</option>
                     @foreach($golonganOptions as $golongan)
-                        <option value="{{ $golongan }}" @selected($filters['golongan'] === $golongan)>Golongan {{ $golongan }}</option>
+                        <option value="{{ $golongan }}">Golongan {{ $golongan }}</option>
                     @endforeach
                 </select>
             </div>
 
             {{-- Filter Unit --}}
             <div class="relative">
-                <select id="filter-unit" name="unit_kerja_id" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                <select x-model="filters.unit_kerja_id" @change="applyFilter()" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Unit</option>
                     @foreach($unitKerjaOptions as $unit)
-                        <option value="{{ $unit->id }}" @selected($filters['unit_kerja_id'] === $unit->id)>{{ $unit->nama }}</option>
+                        <option value="{{ $unit->id }}">{{ $unit->nama }}</option>
                     @endforeach
                 </select>
             </div>
 
             {{-- Filter Jenis --}}
             <div class="relative">
-                <select id="filter-jenis" name="jenis_pegawai_id" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                <select x-model="filters.jenis_pegawai_id" @change="applyFilter()" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Jenis</option>
                     @foreach($jenisPegawaiOptions as $jenis)
-                        <option value="{{ $jenis->id }}" @selected($filters['jenis_pegawai_id'] === $jenis->id)>{{ $jenis->nama }}</option>
+                        <option value="{{ $jenis->id }}">{{ $jenis->nama }}</option>
                     @endforeach
                 </select>
             </div>
 
             {{-- Filter Status --}}
             <div class="relative">
-                <select id="filter-status" name="status_pegawai_id" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                    <option value="">Semua Status</option>
+                <select x-model="filters.status_pegawai_id" @change="applyFilter()" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <option value="all">Semua Status</option>
                     @foreach($statusOptions as $status)
-                        <option value="{{ $status->id }}" @selected($filters['status_pegawai_id'] === $status->id)>{{ $status->nama }}</option>
+                        <option value="{{ $status->id }}">{{ $status->nama }}</option>
                     @endforeach
                 </select>
             </div>
@@ -219,14 +398,6 @@
     </x-ui.card>
 
     {{-- TABLE --}}
-    @php
-        $nextDirection = fn (string $column) => $sort === $column && $direction === 'asc' ? 'desc' : 'asc';
-        $sortUrl = fn (string $column) => route('data-pegawai', array_merge(request()->except('page'), [
-            'sort' => $column,
-            'direction' => $nextDirection($column),
-        ]));
-        $sortIconClass = fn (string $column) => 'w-3.5 h-3.5 shrink-0 transition ' . ($sort === $column ? 'text-primary ' . ($direction === 'asc' ? 'rotate-180' : '') : '');
-    @endphp
     <x-ui.card padding="none" class="overflow-hidden">
         <div class="overflow-x-auto">
             <x-ui.table id="pegawai-table">
@@ -235,177 +406,188 @@
                         <x-ui.table-th class="w-10 select-none">
                             <x-form.checkbox id="check-all" size="sm" />
                         </x-ui.table-th>
+                        {{-- Sort: nama_lengkap --}}
                         <x-ui.table-th class="select-none">
-                            <a href="{{ $sortUrl('pegawai') }}" class="flex items-center gap-1 hover:text-ink transition-colors">
+                            <button @click="setSort('nama_lengkap')" class="flex items-center gap-1 hover:text-ink transition-colors cursor-pointer">
                                 Pegawai
-                                <svg class="{{ $sortIconClass('pegawai') }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
-                            </a>
+                                <svg :class="'w-3.5 h-3.5 shrink-0 transition ' + (sort === 'nama_lengkap' ? 'text-primary ' + (direction === 'asc' ? 'rotate-180' : '') : '')" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
+                            </button>
                         </x-ui.table-th>
+                        {{-- Sort: jabatan_terakhir --}}
                         <x-ui.table-th class="select-none">
-                            <a href="{{ $sortUrl('jabatan') }}" class="flex items-center gap-1 hover:text-ink transition-colors">
+                            <button @click="setSort('jabatan_terakhir')" class="flex items-center gap-1 hover:text-ink transition-colors cursor-pointer">
                                 Jabatan & Unit
-                                <svg class="{{ $sortIconClass('jabatan') }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
-                            </a>
+                                <svg :class="'w-3.5 h-3.5 shrink-0 transition ' + (sort === 'jabatan_terakhir' ? 'text-primary ' + (direction === 'asc' ? 'rotate-180' : '') : '')" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
+                            </button>
                         </x-ui.table-th>
+                        {{-- Sort: golongan_terakhir --}}
                         <x-ui.table-th class="select-none">
-                            <a href="{{ $sortUrl('golongan') }}" class="flex items-center gap-1 hover:text-ink transition-colors">
+                            <button @click="setSort('golongan_terakhir')" class="flex items-center gap-1 hover:text-ink transition-colors cursor-pointer">
                                 Gol. / Jenis
-                                <svg class="{{ $sortIconClass('golongan') }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
-                            </a>
+                                <svg :class="'w-3.5 h-3.5 shrink-0 transition ' + (sort === 'golongan_terakhir' ? 'text-primary ' + (direction === 'asc' ? 'rotate-180' : '') : '')" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
+                            </button>
                         </x-ui.table-th>
-                        <x-ui.table-th class="select-none">
-                            <a href="{{ $sortUrl('tmt') }}" class="flex items-center gap-1 hover:text-ink transition-colors">
-                                TMT
-                                <svg class="{{ $sortIconClass('tmt') }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
-                            </a>
-                        </x-ui.table-th>
+                        <x-ui.table-th class="select-none">TMT</x-ui.table-th>
                         <x-ui.table-th class="select-none">Status</x-ui.table-th>
                         <x-ui.table-th class="select-none">Dokumen</x-ui.table-th>
                         <x-ui.table-th class="select-none">Aksi</x-ui.table-th>
                     </x-ui.table-row>
                 </x-ui.table-head>
                 <x-ui.table-body>
-                    @forelse($pegawaiData as $p)
-                    @php
-                        $currentPosition = $p->positionHistories->first();
-                        $currentUnit = $currentPosition?->unitKerja?->nama ?? '-';
-                        $statusNama = $p->statusPegawai?->nama ?? $p->status_aktif;
-                        $tmt = $currentPosition?->tmt_jabatan ?? $p->appointment?->tmt_pengangkatan;
-                        $fotoUrl = $p->foto_url;
-                    @endphp
-
-                    <x-ui.table-row :interactive="true" data-id="{{ $p->id }}" data-nama="{{ $p->nama_lengkap }}" data-nip="{{ $p->nip }}" data-unit="{{ $currentUnit }}" data-jenis="{{ $p->jenisPegawai->nama ?? '-' }}" data-status="{{ strtolower($statusNama) }}" data-golongan="{{ $p->golongan_terakhir ?? '-' }}">
-                        <x-ui.table-td>
-                            <x-form.checkbox size="sm" class="row-check" />
-                        </x-ui.table-td>
-                        <x-ui.table-td>
-
-                            <div class="flex items-center gap-3">
-                                <x-ui.tooltip text="Buka detail profil {{ $p->nama_lengkap }}" position="right">
-                                    <a
-                                        href="{{ route('pegawai.show', $p->id) }}"
-                                        class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-sm font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                                        aria-label="Buka detail profil {{ $p->nama_lengkap }}"
-                                    >
-                                        @if($fotoUrl)
-                                            <img
-                                                src="{{ $fotoUrl }}"
-                                                alt="Foto {{ $p->nama_lengkap }}"
-                                                class="h-full w-full object-cover object-[center_25%]"
-                                                loading="lazy"
-                                                onerror="this.classList.add('hidden'); this.nextElementSibling.classList.remove('hidden')"
-                                            >
-                                        @endif
-                                        <span class="{{ $fotoUrl ? 'hidden' : '' }}" aria-hidden="true">
-                                            {{ strtoupper(substr($p->nama_lengkap, 0, 1)) }}
-                                        </span>
-                                    </a>
-                                </x-ui.tooltip>
-                                <div class="min-w-0">
-                                    <x-ui.tooltip text="Buka detail {{ $p->nama_lengkap }}" position="right">
-                                        <a
-                                            href="{{ route('pegawai.show', $p->id) }}"
-                                            class="block truncate text-sm font-semibold text-ink transition hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 rounded"
-                                        >
-                                            {{ $p->nama_lengkap }}
-                                        </a>
-                                    </x-ui.tooltip>
-                                    <p class="font-mono text-xs text-muted">NIP. {{ $p->nip }}</p>
+                    {{-- Loading state --}}
+                    <template x-if="isLoading">
+                        <tr>
+                            <td colspan="8" class="py-10 text-center">
+                                <div class="inline-flex items-center gap-2 text-sm text-muted">
+                                    <svg class="w-4 h-4 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                                    </svg>
+                                    Memuat data...
                                 </div>
-                            </div>
-                        </x-ui.table-td>
-                        <x-ui.table-td>
-                            <p class="text-sm font-medium text-ink">{{ $currentPosition?->jabatan?->nama ?? $p->jabatan_terakhir ?? '-' }}</p>
-                            <p class="text-xs text-muted">{{ $currentUnit }}</p>
-                        </x-ui.table-td>
-                        <x-ui.table-td>
-                            <span class="text-sm font-medium text-ink">{{ $p->golongan_terakhir ?? '-' }} / {{ $p->jenisPegawai->nama ?? '-' }}</span>
-                        </x-ui.table-td>
-                        <x-ui.table-td>
-                            <p class="text-sm text-ink font-mono">
-                                {{ $tmt?->format('d-m-Y') ?? '-' }}
-                            </p>
-                        </x-ui.table-td>
-                        <x-ui.table-td>
-                            @php
-                            $status_lower = strtolower($statusNama);
-                            $statusVariants = [
-                                'aktif' => 'success',
-                                'cuti' => 'warning',
-                                'non-aktif' => 'danger',
-                                'pensiun' => 'danger',
-                                'mutasi' => 'warning'
-                            ];
-                            @endphp
-                            <x-ui.badge :variant="$statusVariants[$status_lower] ?? 'muted'" size="md" dot>
-                                {{ $statusNama }}
-                            </x-ui.badge>
-                        </x-ui.table-td>
-                        <x-ui.table-td>
-                            @php
-                            // Default mock for 'dok' since we don't have it on model
-                            $dok = 'ok';
-                            $dokVariants = [
-                                'ok' => 'success',
-                                'warn' => 'warning',
-                                'danger' => 'danger'
-                            ];
-                            $dokLabels = [
-                                'ok' => 'Lengkap',
-                                'warn' => 'H-60',
-                                'danger' => 'H-30'
-                            ];
-                            @endphp
-                            <x-ui.badge :variant="$dokVariants[$dok] ?? 'muted'" size="md" dot>
-                                {{ $dokLabels[$dok] ?? $dok }}
-                            </x-ui.badge>
-                        </x-ui.table-td>
-                        <x-ui.table-td>
-                            <div class="flex items-center justify-start gap-1.5">
-                                {{-- Detail --}}
-                                <x-ui.button href="{{ route('pegawai.show', $p->id) }}" variant="secondary" size="icon" title="Detail" tooltip-position="top-end" aria-label="Detail">
-                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                    </svg>
-                                </x-ui.button>
-                                {{-- Edit --}}
-                                <x-ui.button href="{{ route('pegawai.edit', $p->id) }}" variant="secondary" size="icon" title="Edit" tooltip-position="top-end" aria-label="Edit">
-                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
-                                    </svg>
-                                </x-ui.button>
+                            </td>
+                        </tr>
+                    </template>
 
-                                {{-- Nonaktifkan --}}
-
-                                <x-ui.confirm-dialog
-                                    id="delete-{{ $p->id }}"
-                                    title="Nonaktifkan Pegawai"
-                                    message="Apakah Anda yakin ingin menonaktifkan pegawai ini?"
-                                    confirm-text="Nonaktifkan"
-                                    variant="danger"
-                                    action="{{ route('pegawai.destroy', $p->id) }}"
-                                    method="POST"
-                                >
-                                    <x-slot:trigger>
-                                        <x-ui.button type="button" variant="danger" size="icon" title="Nonaktifkan" tooltip-position="top-end" aria-label="Nonaktifkan">
+                    {{-- Data rows --}}
+                    <template x-if="!isLoading && pegawaiRows.length > 0">
+                        <template x-for="p in pegawaiRows" :key="p.id">
+                            <tr class="border-b border-border last:border-0 hover:bg-soft/40 transition-colors" :data-id="p.id" :data-nip="p.nip">
+                                <td class="px-4 py-3">
+                                    <x-form.checkbox size="sm" class="row-check" />
+                                </td>
+                                {{-- Pegawai --}}
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center gap-3">
+                                        <a :href="`/pegawai/${p.id}`"
+                                           class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-sm font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20">
+                                            <img x-show="p.foto_url" :src="p.foto_url" :alt="'Foto ' + p.nama_lengkap"
+                                                 class="h-full w-full object-cover object-[center_25%]" loading="lazy"
+                                                 x-on:error="$el.classList.add('hidden'); $el.nextElementSibling.classList.remove('hidden')">
+                                            <span x-show="!p.foto_url" x-text="p.nama_lengkap.charAt(0).toUpperCase()" aria-hidden="true"></span>
+                                        </a>
+                                        <div class="min-w-0">
+                                            <a :href="`/pegawai/${p.id}`"
+                                               class="block truncate text-sm font-semibold text-ink transition hover:text-primary"
+                                               x-text="p.nama_lengkap"></a>
+                                            <p class="font-mono text-xs text-muted" x-text="'NIP. ' + p.nip"></p>
+                                        </div>
+                                    </div>
+                                </td>
+                                {{-- Jabatan & Unit --}}
+                                <td class="px-4 py-3">
+                                    <p class="text-sm font-medium text-ink" x-text="p.jabatan"></p>
+                                    <p class="text-xs text-muted" x-text="p.unit_kerja"></p>
+                                </td>
+                                {{-- Golongan / Jenis --}}
+                                <td class="px-4 py-3">
+                                    <span class="text-sm font-medium text-ink" x-text="p.golongan_terakhir + ' / ' + p.jenis_pegawai"></span>
+                                </td>
+                                {{-- TMT --}}
+                                <td class="px-4 py-3">
+                                    <p class="text-sm text-ink font-mono" x-text="p.tmt ?? '-'"></p>
+                                </td>
+                                {{-- Status --}}
+                                <td class="px-4 py-3">
+                                    <span class="inline-flex items-center gap-1.5 font-medium font-sans leading-none px-2.5 py-1 text-xs rounded-md"
+                                        :class="{
+                                            'bg-success/10 text-success': p.status_key === 'aktif',
+                                            'bg-warning/10 text-warning': p.status_key === 'cuti' || p.status_key === 'mutasi',
+                                            'bg-danger/10 text-danger':   p.status_key === 'non-aktif' || p.status_key === 'pensiun',
+                                            'bg-muted/10 text-muted':     !['aktif','cuti','mutasi','non-aktif','pensiun'].includes(p.status_key),
+                                        }">
+                                        <span class="h-1.5 w-1.5 rounded-full"
+                                            :class="{
+                                                'bg-success': p.status_key === 'aktif',
+                                                'bg-warning': p.status_key === 'cuti' || p.status_key === 'mutasi',
+                                                'bg-danger':  p.status_key === 'non-aktif' || p.status_key === 'pensiun',
+                                                'bg-muted':   !['aktif','cuti','mutasi','non-aktif','pensiun'].includes(p.status_key),
+                                            }"></span>
+                                        <span x-text="p.status_nama"></span>
+                                    </span>
+                                </td>
+                                {{-- Dokumen --}}
+                                <td class="px-4 py-3">
+                                    <span class="inline-flex items-center gap-1.5 font-medium text-xs rounded-md px-2.5 py-1"
+                                        :class="p.is_lengkap ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'">
+                                        <span class="h-1.5 w-1.5 rounded-full" :class="p.is_lengkap ? 'bg-success' : 'bg-warning'"></span>
+                                        <span x-text="p.is_lengkap ? 'Lengkap' : 'Belum Lengkap'"></span>
+                                    </span>
+                                </td>
+                                {{-- Aksi --}}
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center justify-start gap-1.5">
+                                        <a :href="`/pegawai/${p.id}`"
+                                           class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
+                                           title="Detail">
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M22 10.5h-6m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM4 19.235A10.19 10.19 0 0 1 12.75 15c2.015 0 3.907.585 5.5 1.59m-14.25 2.645A9.903 9.903 0 0 1 12.75 18a9.903 9.903 0 0 1 6.002 2.235" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                             </svg>
-                                        </x-ui.button>
-                                    </x-slot:trigger>
-                                </x-ui.confirm-dialog>
+                                        </a>
+                                        <a :href="`/pegawai/${p.id}/edit`"
+                                           class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
+                                           title="Edit">
+                                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
+                                            </svg>
+                                        </a>
 
-                            </div>
-                        </x-ui.table-td>
-                    </x-ui.table-row>
-                    @empty
-                        <x-ui.table-row>
-                            <x-ui.table-td colspan="7" align="center" class="px-0 py-0 text-sm text-muted">
+                                        {{-- Dropdown Ubah Status --}}
+                                        <div class="relative" x-data="{ openStatusDropdown: false }" @click.away="openStatusDropdown = false">
+                                            <button type="button" @click="openStatusDropdown = !openStatusDropdown"
+                                                    class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-ink transition hover:bg-soft shadow-sm"
+                                                    title="Ubah Status">
+                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                                                </svg>
+                                            </button>
+
+                                            {{-- Dropdown Menu --}}
+                                            <div x-show="openStatusDropdown" style="display: none;"
+                                                 x-transition.opacity.duration.200ms
+                                                 class="absolute right-0 top-full z-50 mt-1 w-36 rounded-lg border border-border bg-surface p-1 shadow-lg">
+                                                <button type="button" @click="changeStatus(p.id, 'Aktif'); openStatusDropdown = false" 
+                                                        class="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-sm text-success hover:bg-soft transition text-left">
+                                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    Aktif
+                                                </button>
+                                                <button type="button" @click="changeStatus(p.id, 'Non-Aktif'); openStatusDropdown = false" 
+                                                        class="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-sm text-warning hover:bg-soft transition text-left">
+                                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                                    </svg>
+                                                    Non Aktif
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        @if(auth()->user()->role === 'super_admin')
+                                        {{-- Button Hapus (Super Admin Only) --}}
+                                        <button type="button" @click="deletePegawai(p.id)" 
+                                                class="flex h-8 w-8 items-center justify-center rounded-lg border border-danger/30 bg-surface text-danger transition hover:bg-danger/10 shadow-sm"
+                                                title="Hapus Pegawai">
+                                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                                            </svg>
+                                        </button>
+                                        @endif
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                    </template>
+
+                    {{-- Empty state --}}
+                    <template x-if="!isLoading && pegawaiRows.length === 0">
+                        <tr>
+                            <td colspan="8" class="px-0 py-0">
                                 <x-ui.empty-state icon="search" title="Tidak ada data pegawai yang sesuai." />
-                            </x-ui.table-td>
-                        </x-ui.table-row>
-                    @endforelse
+                            </td>
+                        </tr>
+                    </template>
                 </x-ui.table-body>
             </x-ui.table>
         </div>
@@ -415,21 +597,38 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2">
                     <span class="text-sm text-muted">Tampilkan</span>
-                    <select onchange="updatePerPage(this.value)" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
-                        <option value="10" {{ request('per_page', 10) == 10 ? 'selected' : '' }}>10</option>
-                        <option value="25" {{ request('per_page') == 25 ? 'selected' : '' }}>25</option>
-                        <option value="50" {{ request('per_page') == 50 ? 'selected' : '' }}>50</option>
+                    <select @change="setPerPage($event.target.value)" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
+                        <option value="10" :selected="perPage == 10">10</option>
+                        <option value="25" :selected="perPage == 25">25</option>
+                        <option value="50" :selected="perPage == 50">50</option>
                     </select>
                     <span class="text-sm text-muted">data per halaman</span>
                 </div>
-                @if($pegawaiData->total() > 0)
-                <p class="text-sm text-muted hidden sm:block">
-                    Menampilkan <span class="font-semibold text-ink">{{ $pegawaiData->firstItem() }}</span> hingga <span class="font-semibold text-ink">{{ $pegawaiData->lastItem() }}</span> dari <span class="font-semibold text-ink">{{ $pegawaiData->total() }}</span> hasil
+                <p class="text-sm text-muted hidden sm:block" x-show="meta.total > 0">
+                    Menampilkan <span class="font-semibold text-ink" x-text="meta.from"></span> hingga <span class="font-semibold text-ink" x-text="meta.to"></span> dari <span class="font-semibold text-ink" x-text="meta.total"></span> hasil
                 </p>
-                @endif
             </div>
-            <div class="w-full sm:w-auto">
-                {{ $pegawaiData->onEachSide(1)->links('vendor.pagination.simpeg') }}
+            {{-- Alpine-driven pagination --}}
+            <div class="w-full sm:w-auto" x-show="meta.last_page > 1">
+                <div class="flex items-center justify-center gap-1">
+                    <button @click="fetchPage(meta.current_page - 1)" :disabled="meta.current_page <= 1"
+                        class="flex h-8 w-8 items-center justify-center rounded-md border border-border bg-surface text-sm text-ink transition hover:bg-soft disabled:opacity-40 disabled:cursor-not-allowed">
+                        &lsaquo;
+                    </button>
+                    <template x-for="n in meta.last_page" :key="n">
+                        <button @click="fetchPage(n)"
+                            :class="n === meta.current_page
+                                ? 'bg-primary text-white border-primary'
+                                : 'bg-surface text-ink border-border hover:bg-soft'"
+                            class="flex h-8 w-8 items-center justify-center rounded-md border text-sm font-medium transition"
+                            x-text="n">
+                        </button>
+                    </template>
+                    <button @click="fetchPage(meta.current_page + 1)" :disabled="meta.current_page >= meta.last_page"
+                        class="flex h-8 w-8 items-center justify-center rounded-md border border-border bg-surface text-sm text-ink transition hover:bg-soft disabled:opacity-40 disabled:cursor-not-allowed">
+                        &rsaquo;
+                    </button>
+                </div>
             </div>
         </div>
     </x-ui.card>
@@ -671,60 +870,83 @@
         </div>
     </div>
 
+    {{-- Modal Konfirmasi Hapus --}}
+    <template x-teleport="body">
+        <div x-show="showDeleteModal" style="display: none;" class="relative z-50">
+            {{-- Backdrop --}}
+            <div x-show="showDeleteModal"
+                 x-transition:enter="ease-out duration-300"
+                 x-transition:enter-start="opacity-0"
+                 x-transition:enter-end="opacity-100"
+                 x-transition:leave="ease-in duration-200"
+                 x-transition:leave-start="opacity-100"
+                 x-transition:leave-end="opacity-0"
+                 class="fixed inset-0 bg-ink/60 transition-opacity"></div>
+
+            {{-- Panel --}}
+            <div class="fixed inset-0 z-10 overflow-y-auto">
+                <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+                    <div x-show="showDeleteModal"
+                         @click.away="showDeleteModal = false"
+                         x-transition:enter="ease-out duration-300"
+                         x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                         x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                         x-transition:leave="ease-in duration-200"
+                         x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                         x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                         class="relative transform overflow-hidden rounded-xl bg-surface text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg border border-border">
+                        
+                        <div class="bg-surface px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                            <div class="sm:flex sm:items-start">
+                                <div class="mx-auto flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-danger/10 sm:mx-0 sm:h-10 sm:w-10">
+                                    <svg class="h-6 w-6 text-danger" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                </div>
+                                <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
+                                    <h3 class="text-base font-semibold leading-6 text-ink" id="modal-title">Konfirmasi Hapus</h3>
+                                    <div class="mt-2">
+                                        <p class="text-sm text-muted">Apakah Anda yakin ingin menghapus data pegawai ini? Data yang sudah dihapus tidak dapat dikembalikan.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-soft px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                            <button type="button" @click="confirmDeletePegawai" class="inline-flex w-full justify-center rounded-lg bg-danger px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-danger/90 sm:ml-3 sm:w-auto transition-colors">
+                                Hapus
+                            </button>
+                            <button type="button" @click="showDeleteModal = false" class="mt-3 inline-flex w-full justify-center rounded-lg bg-surface px-3 py-2 text-sm font-semibold text-ink shadow-sm ring-1 ring-inset ring-border hover:bg-soft sm:mt-0 sm:w-auto transition-colors">
+                                Batal
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
 </div> {{-- end Alpine.js x-data wrapper --}}
 
     @push('scripts')
     <script>
-    const filterForm = document.getElementById('filter-form');
-    const searchInput = document.getElementById('search-input');
-    const filterGolongan = document.getElementById('filter-golongan');
-    const filterUnit = document.getElementById('filter-unit');
-    const filterJenis = document.getElementById('filter-jenis');
-    const filterStatus = document.getElementById('filter-status');
-
-    let filterSubmitTimer;
-
-    function submitFilterForm(delay = 0) {
-        if (!filterForm) return;
-
-        window.clearTimeout(filterSubmitTimer);
-        filterSubmitTimer = window.setTimeout(() => {
-            clearBulk();
-            filterForm.submit();
-        }, delay);
-    }
-
-    if (searchInput) searchInput.addEventListener('input', () => submitFilterForm(450));
-    if (filterGolongan) filterGolongan.addEventListener('change', () => submitFilterForm());
-    if (filterUnit) filterUnit.addEventListener('change', () => submitFilterForm());
-    if (filterJenis) filterJenis.addEventListener('change', () => submitFilterForm());
-    if (filterStatus) filterStatus.addEventListener('change', () => submitFilterForm());
-
-    // Checkbox bulk
+    // ===== Checkbox Bulk Action =====
     const checkAll = document.getElementById('check-all');
     const bulkBar  = document.getElementById('bulk-bar');
     const countEl  = document.getElementById('selected-count');
 
     function updateBulk() {
         const n = document.querySelectorAll('.row-check:checked').length;
-        countEl.textContent = n;
-        bulkBar.classList.toggle('hidden', n === 0);
-        bulkBar.classList.toggle('flex',   n > 0);
+        if (countEl) countEl.textContent = n;
+        if (bulkBar) {
+            bulkBar.classList.toggle('hidden', n === 0);
+            bulkBar.classList.toggle('flex',   n > 0);
+        }
     }
 
-    if (checkAll) {
-        checkAll.addEventListener('change', () => {
-            document.querySelectorAll('.row-check').forEach(cb => {
-                if (cb.closest('tr').style.display !== 'none') {
-                    cb.checked = checkAll.checked;
-                }
-            });
-            updateBulk();
-        });
-    }
-
-    document.querySelectorAll('.row-check').forEach(cb => {
-        cb.addEventListener('change', () => {
+    // Delegasi event untuk row-check (karena tabel di-render Alpine secara dinamis)
+    document.addEventListener('change', (e) => {
+        if (e.target.classList.contains('row-check')) {
             const all    = document.querySelectorAll('.row-check').length;
             const ticked = document.querySelectorAll('.row-check:checked').length;
             if (checkAll) {
@@ -732,86 +954,78 @@
                 checkAll.checked       = ticked === all;
             }
             updateBulk();
-        });
+        }
     });
+
+    if (checkAll) {
+        checkAll.addEventListener('change', () => {
+            document.querySelectorAll('.row-check').forEach(cb => { cb.checked = checkAll.checked; });
+            updateBulk();
+        });
+    }
 
     function clearBulk() {
         document.querySelectorAll('.row-check').forEach(cb => cb.checked = false);
-        if (checkAll) {
-            checkAll.checked       = false;
-            checkAll.indeterminate = false;
-        }
+        if (checkAll) { checkAll.checked = false; checkAll.indeterminate = false; }
         updateBulk();
     }
 
-    // Export seluruh data yang difilter
+    // ===== Export seluruh data yang difilter =====
     function exportFilteredData() {
-        const urlParams = new URLSearchParams(window.location.search);
+        const alpineData = Alpine.store ? Alpine.$data(document.querySelector('[x-data]')) : null;
         const exportUrl = new URL(@json(route('pegawai.export')), window.location.origin);
-        for (const [key, value] of urlParams.entries()) {
-            if (key !== 'page' && key !== 'per_page') {
-                exportUrl.searchParams.append(key, value);
+        // Ambil filter dari Alpine state
+        try {
+            const el = document.querySelector('[x-data]');
+            const data = Alpine.$data ? Alpine.$data(el) : null;
+            if (data) {
+                const f = data.filters;
+                if (f.search)           exportUrl.searchParams.set('search', f.search);
+                if (f.golongan)         exportUrl.searchParams.set('golongan', f.golongan);
+                if (f.unit_kerja_id)    exportUrl.searchParams.set('unit_kerja_id', f.unit_kerja_id);
+                if (f.jenis_pegawai_id) exportUrl.searchParams.set('jenis_pegawai_id', f.jenis_pegawai_id);
+                if (f.status_pegawai_id)exportUrl.searchParams.set('status_pegawai_id', f.status_pegawai_id);
             }
-        }
+        } catch(e) {}
         window.location.href = exportUrl.toString();
     }
 
-    // Export baris yang dipilih (Bulk Action)
+    // ===== Export baris yang dipilih (Bulk Action) =====
     function exportSelectedData() {
         const selectedNips = Array.from(document.querySelectorAll('.row-check:checked'))
-            .map(cb => cb.closest('tr').dataset.nip)
+            .map(cb => cb.closest('tr')?.dataset?.nip)
             .filter(Boolean);
 
-        if (selectedNips.length === 0) {
-            window.alert('Tidak ada data pegawai yang dipilih.');
-            return;
-        }
+        if (selectedNips.length === 0) { window.alert('Tidak ada data pegawai yang dipilih.'); return; }
 
         const exportUrl = new URL(@json(route('pegawai.export')), window.location.origin);
         selectedNips.forEach(nip => exportUrl.searchParams.append('nips[]', nip));
         window.location.href = exportUrl.toString();
     }
 
-    // Nonaktifkan baris yang dipilih (Bulk Action)
+    // ===== Bulk nonaktifkan =====
     window.addEventListener('confirm-bulk-delete', () => {
         const selectedIds = Array.from(document.querySelectorAll('.row-check:checked'))
-            .map(cb => cb.closest('tr').dataset.id)
+            .map(cb => cb.closest('tr')?.dataset?.id)
             .filter(Boolean);
 
-        if (selectedIds.length === 0) {
-            window.alert('Tidak ada data pegawai yang dipilih.');
-            return;
-        }
+        if (selectedIds.length === 0) { window.alert('Tidak ada data pegawai yang dipilih.'); return; }
 
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = @json(route('pegawai.bulkDestroy'));
-
-        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         const csrfInput = document.createElement('input');
-        csrfInput.type = 'hidden';
-        csrfInput.name = '_token';
-        csrfInput.value = csrfToken;
+        csrfInput.type = 'hidden'; csrfInput.name = '_token';
+        csrfInput.value = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         form.appendChild(csrfInput);
-
         selectedIds.forEach(id => {
             const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = 'ids[]';
-            input.value = id;
+            input.type = 'hidden'; input.name = 'ids[]'; input.value = id;
             form.appendChild(input);
         });
-
         document.body.appendChild(form);
         form.submit();
     });
-
-    function updatePerPage(val) {
-        const url = new URL(window.location.href);
-        url.searchParams.set('per_page', val);
-        url.searchParams.delete('page');
-        window.location.assign(url.href);
-    }
     </script>
     @endpush
 

@@ -45,6 +45,8 @@ class EmployeeFactory extends Factory
             'no_hp' => fake()->phoneNumber(),
             'email_pribadi' => $email,
             'is_kinerja_baik' => true,
+            'is_satyalancana_eligible' => true,
+            'satyalancana_note' => null,
             'role' => 'pegawai',
         ];
     }

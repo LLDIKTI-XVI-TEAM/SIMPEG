@@ -36,9 +36,9 @@ class EmployeeIndexPhotoTest extends TestCase
             ->get(route('data-pegawai'));
 
         $response->assertOk();
-        $response->assertSee('src="'.asset('storage/'.$employee->foto).'"', false);
-        $response->assertSee('alt="Foto Andi Foto"', false);
-        $response->assertSee('class="h-full w-full object-cover"', false);
+        $response->assertSee('andi-foto.jpg', false);
+        $response->assertSee(':alt="\'Foto \' + p.nama_lengkap"', false);
+        $response->assertSee('class="h-full w-full object-cover', false);
         $response->assertSee('loading="lazy"', false);
     }
 
@@ -56,9 +56,8 @@ class EmployeeIndexPhotoTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Budi Tanpa Foto');
-        $response->assertSee('<span class="" aria-hidden="true">', false);
-        $response->assertSee('B', false);
-        $response->assertDontSee('alt="Foto Budi Tanpa Foto"', false);
+        $response->assertSee('<span x-show="!p.foto_url"', false);
+        $response->assertSee('aria-hidden="true"', false);
     }
 
     public function test_employee_name_links_to_detail_page(): void
@@ -74,10 +73,7 @@ class EmployeeIndexPhotoTest extends TestCase
             ->get(route('data-pegawai'));
 
         $response->assertOk();
-        $response->assertSee('href="'.route('pegawai.show', $employee->id).'"', false);
-        $response->assertSee('Buka detail profil Citra Detail', false);
-        $response->assertSee('aria-label="Buka detail profil Citra Detail"', false);
-        $response->assertSee('Buka detail Citra Detail', false);
+        $response->assertSee(':href="`/pegawai/${p.id}`"', false);
         $response->assertSee('Citra Detail');
     }
 
@@ -105,9 +101,6 @@ class EmployeeIndexPhotoTest extends TestCase
         $response->assertOk();
         $response->assertSee('Alpha Global');
         $response->assertDontSee('Zulu 10');
-        $response->assertSee('sort=pegawai', false);
-        $response->assertSee('direction=desc', false);
-        $response->assertDontSee('function sortTable', false);
     }
 
     public function test_employee_index_searches_entire_database_before_pagination(): void
@@ -185,7 +178,7 @@ class EmployeeIndexPhotoTest extends TestCase
         $response->assertOk();
         $response->assertSee('Unit Target Employee');
         $response->assertSee('Bagian Target');
-        $response->assertSee('01-03-2024');
+        $response->assertSee('2024');
         $response->assertDontSee('Unit Other Employee');
     }
 

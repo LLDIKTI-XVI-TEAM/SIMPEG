@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\EwsAlert;
 use App\Models\LeaveBalance;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -54,6 +55,43 @@ class ProfileTest extends TestCase
         $response->assertOk();
         $response->assertSee('Belum tersedia', false);
         $response->assertDontSee('12 <span class="text-sm font-normal text-muted">Hari</span>', false);
+    }
+
+    public function test_profile_ews_section_uses_real_alerts_not_mock(): void
+    {
+        $employee = Employee::factory()->create();
+        $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+
+        EwsAlert::create([
+            'employee_id' => $employee->id,
+            'type' => 'SATYALANCANA',
+            'target_date' => now()->addDays(90)->toDateString(),
+            'interval_days' => 90,
+            'is_processed' => false,
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_ACTIVE,
+        ]);
+
+        $response = $this->actingAs($user)->get('/dashboard/profil');
+
+        $response->assertOk();
+        $response->assertSee('Satyalancana', false);
+        $response->assertSee(route('ews.saya'), false);
+        $response->assertDontSee('Mockup EWS', false);
+    }
+
+    public function test_profile_uses_employee_tanggal_pensiun(): void
+    {
+        $employee = Employee::factory()->create([
+            'tanggal_lahir' => '1970-01-01',
+            'tanggal_pensiun' => '2042-05-15',
+        ]);
+        $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+
+        $response = $this->actingAs($user)->get('/dashboard/profil');
+
+        $response->assertOk();
+        $response->assertSee('15-05-2042', false);
+        $response->assertDontSee('01-01-2028', false);
     }
 
     public function test_profile_password_update_rejects_wrong_current_password(): void

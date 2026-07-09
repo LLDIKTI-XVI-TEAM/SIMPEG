@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Ews\ListActiveEwsAlertsAction;
 use App\Http\Controllers\Admin\AuditController;
 use App\Http\Controllers\Admin\CutiConfigController;
 use App\Http\Controllers\Admin\CutiController;
@@ -91,8 +92,26 @@ if (app()->environment(['local', 'testing'])) {
 }
 
 Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_kepegawaian,pimpinan,kepala_bagian,pegawai'])->group(function (): void {
-    Route::get('/dashboard', function () {
-        return view('dashboard');
+    Route::get('/dashboard', function (Request $request, ListActiveEwsAlertsAction $ewsAlerts) {
+        $user = $request->user();
+        $role = $user?->role;
+        $isPegawai = $role === 'pegawai';
+        $employeeId = $isPegawai ? (string) ($user?->employee_id ?? '') : null;
+        $dashboardEwsData = $employeeId !== '' || ! $isPegawai
+            ? $ewsAlerts->execute(null, null, $employeeId)
+            : ['alerts' => []];
+        $dashboardEwsAlerts = $dashboardEwsData['alerts'];
+
+        return view('dashboard', [
+            'dashboardEwsAlerts' => array_slice($dashboardEwsAlerts, 0, 5),
+            'dashboardEwsTotal' => count($dashboardEwsAlerts),
+            'dashboardEwsUrgent' => collect($dashboardEwsAlerts)->where('urgency', 'danger')->count(),
+            'dashboardEwsWarning' => collect($dashboardEwsAlerts)->where('urgency', 'warning')->count(),
+            'dashboardEwsInfo' => collect($dashboardEwsAlerts)->where('urgency', 'success')->count(),
+            'dashboardEwsLink' => $isPegawai
+                ? route('ews.saya')
+                : (in_array($role, ['super_admin', 'admin_kepegawaian', 'pimpinan'], true) ? route('ews') : '#ews-section'),
+        ]);
     })->name('dashboard');
 
     Route::get('/admin/search', [GlobalSearchController::class, 'search'])->name('global.search');
@@ -139,6 +158,13 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/ews', [EwsController::class, 'index'])
         ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('ews');
+    Route::get('/dashboard/ews-saya', [EwsController::class, 'myAlerts'])
+        ->middleware(['role:pegawai'])
+        ->name('ews.saya');
+    Route::match(['post', 'patch'], '/ews/{alert}/followup', [EwsController::class, 'updateFollowup'])
+        ->whereUuid('alert')
+        ->middleware(['role:super_admin,admin_kepegawaian'])
+        ->name('ews.followup.update');
 
     Route::get('/laporan-export', function () {
         return view('dummy', ['title' => 'Laporan / Export']);
@@ -656,6 +682,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
         ->name('pegawai.kinerja.update');
+    Route::post('/pegawai/{id}/satyalancana-eligibility', [PegawaiController::class, 'updateSatyalancanaEligibility'])
+        ->whereUuid('id')
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
+        ->name('pegawai.satyalancana.update');
     Route::post('/pegawai/bulk-destroy', [PegawaiController::class, 'bulkDestroy'])
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.deactivate'])
         ->name('pegawai.bulkDestroy');
