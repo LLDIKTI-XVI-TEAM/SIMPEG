@@ -12,3 +12,8 @@ Artisan::command('inspire', function () {
 Schedule::command('discipline-records:deactivate-expired')
     ->dailyAt('07:00')
     ->timezone(config('app.timezone'));
+
+// Command menghitung tahun sumber saat dieksekusi agar aman untuk cron maupun scheduler worker yang berjalan lama.
+Schedule::command('cuti:rollover')
+    ->yearlyOn(1, 1, '00:05')
+    ->timezone(config('app.timezone'));

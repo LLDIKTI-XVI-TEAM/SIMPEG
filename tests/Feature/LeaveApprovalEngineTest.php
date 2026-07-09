@@ -427,6 +427,47 @@ class LeaveApprovalEngineTest extends TestCase
         }
     }
 
+    public function test_final_cuti_besar_gagal_jika_cuti_tahunan_tahun_sama_sudah_dipakai(): void
+    {
+        $pemohon = $this->makePemohon();
+        $jenisBesar = RefJenisCuti::firstOrCreate(
+            ['code' => 'besar'],
+            ['nama' => 'Cuti Besar', 'mengurangi_saldo_tahunan' => false, 'khusus_pns' => true],
+        );
+        $balance = LeaveBalance::create([
+            'employee_id' => $pemohon['employee']->id,
+            'tahun' => 2026,
+            'jatah_awal' => 12,
+            'carry_over' => 0,
+            'terpakai' => 2,
+            'sisa' => 10,
+            'sisa_tahun_berjalan' => 10,
+            'terpakai_tahun_berjalan' => 2,
+        ]);
+        LeaveBalanceLedger::create([
+            'employee_id' => $pemohon['employee']->id,
+            'leave_balance_id' => $balance->id,
+            'tahun' => 2026,
+            'event_type' => 'leave_deducted',
+            'amount' => -2,
+            'source_year' => 2026,
+            'reason' => 'Pemotongan cuti tahunan sebelum cuti besar.',
+            'dedup_key' => "leave_deducted:approval-test:{$pemohon['employee']->id}:2026",
+            'occurred_at' => now(),
+        ]);
+        $cuti = $this->makeRequest($pemohon['employee'], $jenisBesar, [$pemohon['kepala_bagian'], $pemohon['pybmc']], 20);
+
+        $this->service()->approve($cuti, $pemohon['kepala_bagian']);
+
+        try {
+            $this->service()->approve($cuti->fresh(), $pemohon['pybmc']);
+            $this->fail('Persetujuan final cuti besar seharusnya gagal setelah cuti tahunan dipakai di tahun yang sama.');
+        } catch (ValidationException $e) {
+            $this->assertSame('menunggu_approval', $cuti->fresh()->status);
+            $this->assertDatabaseHas('leave_request_steps', ['leave_request_id' => $cuti->id, 'step_order' => 2, 'status' => 'active']);
+        }
+    }
+
     public function test_approve_tanpa_step_aktif_memberi_pesan_konfigurasi(): void
     {
         $pemohon = $this->makePemohon();
