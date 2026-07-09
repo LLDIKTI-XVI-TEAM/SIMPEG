@@ -1,6 +1,6 @@
 <x-layouts.app title="Detail Pegawai">
 
-<div class="max-w-7xl mx-auto px-6 py-6 space-y-6" x-data="{ activeTab: 'profil' }">
+<div class="space-y-6" x-data="{ activeTab: 'profil' }">
 
     {{-- PAGE HEADER --}}
     <div class="mb-6">

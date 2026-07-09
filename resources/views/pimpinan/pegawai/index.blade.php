@@ -1,6 +1,6 @@
 <x-layouts.app title="Data Pegawai">
 
-<div class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 space-y-6">
+<div class="space-y-6">
 
     {{-- PAGE HEADER --}}
     <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -16,9 +16,9 @@
             <a
                 href="{{ route('pimpinan.laporan.pegawai') }}"
                 id="export-btn"
-                class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm cursor-pointer"
+                class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary/90 shadow-sm cursor-pointer"
             >
-                <svg class="w-4 h-4 mr-1.5 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                <svg class="w-4 h-4 mr-1.5 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
                 </svg>
                 Export Excel
@@ -28,56 +28,56 @@
 
     {{-- FILTER BAR --}}
     <x-ui.card padding="none" class="mb-6">
-        <form id="filter-form" method="GET" action="#" class="flex flex-col gap-4 p-4">
+        <form id="filter-form" method="GET" action="{{ route('pimpinan.pegawai.index') }}" class="flex flex-col gap-4 p-4">
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
             {{-- Search input --}}
             <div class="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5">
                 <svg class="w-4 h-4 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                 </svg>
-                <input id="search-input" name="search" type="text" placeholder="Cari nama atau NIP..." class="flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none font-sans">
+                <input id="search-input" name="search" value="{{ request('search') }}" onchange="this.form.submit()" type="text" placeholder="Cari nama atau NIP..." class="flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none font-sans">
             </div>
             
             {{-- Filter Golongan --}}
             <div class="relative">
-                <select id="filter-golongan" name="golongan" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                <select id="filter-golongan" name="golongan" onchange="this.form.submit()" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Golongan</option>
-                    <option value="IV/e">Golongan IV/e</option>
-                    <option value="IV/d">Golongan IV/d</option>
-                    <option value="IV/c">Golongan IV/c</option>
-                    <option value="IV/b">Golongan IV/b</option>
-                    <option value="IV/a">Golongan IV/a</option>
-                    <option value="III/d">Golongan III/d</option>
-                    <option value="III/c">Golongan III/c</option>
+                    <option value="IV/e" {{ request('golongan') == 'IV/e' ? 'selected' : '' }}>Golongan IV/e</option>
+                    <option value="IV/d" {{ request('golongan') == 'IV/d' ? 'selected' : '' }}>Golongan IV/d</option>
+                    <option value="IV/c" {{ request('golongan') == 'IV/c' ? 'selected' : '' }}>Golongan IV/c</option>
+                    <option value="IV/b" {{ request('golongan') == 'IV/b' ? 'selected' : '' }}>Golongan IV/b</option>
+                    <option value="IV/a" {{ request('golongan') == 'IV/a' ? 'selected' : '' }}>Golongan IV/a</option>
+                    <option value="III/d" {{ request('golongan') == 'III/d' ? 'selected' : '' }}>Golongan III/d</option>
+                    <option value="III/c" {{ request('golongan') == 'III/c' ? 'selected' : '' }}>Golongan III/c</option>
                 </select>
             </div>
 
             {{-- Filter Unit --}}
             <div class="relative">
-                <select id="filter-unit" name="unit_kerja_id" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                <select id="filter-unit" name="unit_kerja_id" onchange="this.form.submit()" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Unit</option>
-                    <option value="1">Bagian Umum</option>
-                    <option value="2">Bagian Kepegawaian</option>
+                    <option value="1" {{ request('unit_kerja_id') == '1' ? 'selected' : '' }}>Bagian Umum</option>
+                    <option value="2" {{ request('unit_kerja_id') == '2' ? 'selected' : '' }}>Bagian Kepegawaian</option>
                 </select>
             </div>
 
             {{-- Filter Jenis --}}
             <div class="relative">
-                <select id="filter-jenis" name="jenis_pegawai_id" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                <select id="filter-jenis" name="jenis_pegawai_id" onchange="this.form.submit()" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Jenis</option>
-                    <option value="PNS">PNS</option>
-                    <option value="PPPK">PPPK</option>
-                    <option value="CPNS">CPNS</option>
+                    <option value="PNS" {{ request('jenis_pegawai_id') == 'PNS' ? 'selected' : '' }}>PNS</option>
+                    <option value="PPPK" {{ request('jenis_pegawai_id') == 'PPPK' ? 'selected' : '' }}>PPPK</option>
+                    <option value="CPNS" {{ request('jenis_pegawai_id') == 'CPNS' ? 'selected' : '' }}>CPNS</option>
                 </select>
             </div>
 
             {{-- Filter Status --}}
             <div class="relative">
-                <select id="filter-status" name="status_pegawai_id" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                <select id="filter-status" name="status_pegawai_id" onchange="this.form.submit()" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Status</option>
-                    <option value="aktif">Aktif</option>
-                    <option value="cuti">Cuti</option>
-                    <option value="tugas_belajar">Tugas Belajar</option>
+                    <option value="aktif" {{ request('status_pegawai_id') == 'aktif' ? 'selected' : '' }}>Aktif</option>
+                    <option value="cuti" {{ request('status_pegawai_id') == 'cuti' ? 'selected' : '' }}>Cuti</option>
+                    <option value="tugas_belajar" {{ request('status_pegawai_id') == 'tugas_belajar' ? 'selected' : '' }}>Tugas Belajar</option>
                 </select>
             </div>
             </div>

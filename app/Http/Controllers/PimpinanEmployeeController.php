@@ -7,15 +7,34 @@ use Illuminate\Support\Str;
 
 class PimpinanEmployeeController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $employees = [
-            ['id' => Str::uuid(), 'nip' => '198001012005011001', 'nama' => 'Budi Santoso', 'golongan' => 'IV/a', 'status' => 'aktif', 'jabatan' => 'Analis Kepegawaian Muda'],
-            ['id' => Str::uuid(), 'nip' => '198205122008012003', 'nama' => 'Siti Aminah', 'golongan' => 'III/d', 'status' => 'aktif', 'jabatan' => 'Perancang Peraturan'],
-            ['id' => Str::uuid(), 'nip' => '197511202000121001', 'nama' => 'Andi Darmawan', 'golongan' => 'IV/c', 'status' => 'aktif', 'jabatan' => 'Auditor Utama'],
-            ['id' => Str::uuid(), 'nip' => '198509152010122002', 'nama' => 'Rina Mulyani', 'golongan' => 'III/c', 'status' => 'cuti', 'jabatan' => 'Penelaah Teknis'],
-            ['id' => Str::uuid(), 'nip' => '199003052015041001', 'nama' => 'Herman Susilo', 'golongan' => 'III/a', 'status' => 'tugas_belajar', 'jabatan' => 'Pranata Komputer'],
+            ['id' => (string) Str::uuid(), 'nip' => '198001012005011001', 'nama' => 'Budi Santoso', 'golongan' => 'IV/a', 'status' => 'aktif', 'jabatan' => 'Analis Kepegawaian Muda'],
+            ['id' => (string) Str::uuid(), 'nip' => '198205122008012003', 'nama' => 'Siti Aminah', 'golongan' => 'III/d', 'status' => 'aktif', 'jabatan' => 'Perancang Peraturan'],
+            ['id' => (string) Str::uuid(), 'nip' => '197511202000121001', 'nama' => 'Andi Darmawan', 'golongan' => 'IV/c', 'status' => 'aktif', 'jabatan' => 'Auditor Utama'],
+            ['id' => (string) Str::uuid(), 'nip' => '198509152010122002', 'nama' => 'Rina Mulyani', 'golongan' => 'III/c', 'status' => 'cuti', 'jabatan' => 'Penelaah Teknis'],
+            ['id' => (string) Str::uuid(), 'nip' => '199003052015041001', 'nama' => 'Herman Susilo', 'golongan' => 'III/a', 'status' => 'tugas_belajar', 'jabatan' => 'Pranata Komputer'],
         ];
+
+        // Basic dummy filter
+        $employees = collect($employees)->filter(function ($emp) use ($request) {
+            $match = true;
+            if ($request->filled('search')) {
+                $search = strtolower($request->search);
+                if (!str_contains(strtolower($emp['nama']), $search) && !str_contains($emp['nip'], $search)) {
+                    $match = false;
+                }
+            }
+            if ($request->filled('golongan') && $emp['golongan'] !== $request->golongan) {
+                $match = false;
+            }
+            if ($request->filled('status_pegawai_id') && $emp['status'] !== $request->status_pegawai_id) {
+                $match = false;
+            }
+            // unit_kerja_id and jenis_pegawai_id are not detailed in dummy, ignore or handle minimally
+            return $match;
+        })->values()->all();
 
         return view('pimpinan.pegawai.index', compact('employees'));
     }

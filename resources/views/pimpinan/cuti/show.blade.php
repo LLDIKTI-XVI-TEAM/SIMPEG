@@ -1,7 +1,7 @@
 <x-layouts.app title="Detail Pengajuan Cuti">
 
 
-<div class="max-w-7xl mx-auto px-6 py-6 space-y-6">
+<div class="space-y-6">
 
     {{-- PAGE HEADER --}}
     <div class="mb-6">

@@ -1,7 +1,7 @@
 <x-layouts.app title="EWS Pimpinan">
 
 
-<div class="max-w-7xl mx-auto px-6 py-6 space-y-6">
+<div class="space-y-6">
 
     @if(session('success'))
         <x-ui.alert variant="success">{{ session('success') }}</x-ui.alert>
