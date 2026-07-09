@@ -92,16 +92,41 @@
         },
 
         init() {
-            // Selalu clear cache saat init agar tidak pakai data stale
-            this.clearCache();
-            
+            if (this.dataChanged) {
+                // Ada perubahan data (upload/hapus) → bersihkan cache lama dan fetch ulang
+                this.clearCache();
+                this.fetchPage(1);
+                return;
+            }
+
             const urlParams = new URLSearchParams(window.location.search);
             const filterParam = urlParams.get('filter');
             if (filterParam === 'kadaluarsa') {
                 this.filters.kategori = 'sk_pengangkatan';
             }
-            
-            // Watchers untuk memicu pencarian/filter
+
+            // Cek sessionStorage dulu — jika pengguna kembali dari halaman lain, gunakan cache langsung
+            const cKey = this.cacheKey + `_p${this.meta.current_page}`;
+            const cached = sessionStorage.getItem(cKey);
+            if (cached) {
+                try {
+                    const data = JSON.parse(cached);
+                    this.documentsRows = data.rows;
+                    this.meta = data.meta;
+                    // Pasang watcher setelah cache dimuat agar tidak memicu fetchPage ulang
+                    this.$nextTick(() => this._watchFilters());
+                    return;
+                } catch (e) {
+                    sessionStorage.removeItem(cKey);
+                }
+            }
+
+            // Tidak ada cache → kunjungan pertama, fetch dari API dan tulis ke sessionStorage
+            this._watchFilters();
+            this.fetchPage(1);
+        },
+
+        _watchFilters() {
             this.$watch('filters.search', () => {
                 clearTimeout(this.searchTimer);
                 this.searchTimer = setTimeout(() => this.applyFilter(), 300);
@@ -110,10 +135,7 @@
             this.$watch('filters.unit_kerja', () => this.applyFilter());
             this.$watch('filters.status', () => this.applyFilter());
             this.$watch('perPage', () => this.applyFilter());
-            
-            // Initial fetch
-            this.fetchPage(1);
-        }
+        },
     }" class="space-y-6">
 
         {{-- PAGE HEADER --}}

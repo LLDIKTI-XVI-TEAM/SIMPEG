@@ -264,14 +264,26 @@
             this.fetchPage(1);
             return;
         }
-        // Tidak ada perubahan → simpan data awal dari PHP ke cache agar navigasi kembali tidak refetch
-        if (this.pegawaiRows.length > 0) {
-            const cKey = this.cacheKey + `_p${this.meta.current_page}`;
-            if (!sessionStorage.getItem(cKey)) {
-                sessionStorage.setItem(cKey, JSON.stringify({ rows: this.pegawaiRows, meta: this.meta }));
+        // Cek sessionStorage dulu — jika pengguna kembali dari halaman lain, gunakan cache langsung
+        // tanpa mengandalkan data server-render yang sudah ada (menghindari flash re-fetch).
+        const cKey = this.cacheKey + `_p${this.meta.current_page}`;
+        const cached = sessionStorage.getItem(cKey);
+        if (cached) {
+            try {
+                const data = JSON.parse(cached);
+                this.pegawaiRows = data.rows;
+                this.meta = data.meta;
+                return;
+            } catch (e) {
+                sessionStorage.removeItem(cKey);
             }
         }
+        // Tidak ada cache → kunjungan pertama, simpan data dari PHP ke sessionStorage
+        if (this.pegawaiRows.length > 0) {
+            sessionStorage.setItem(cKey, JSON.stringify({ rows: this.pegawaiRows, meta: this.meta }));
+        }
     },
+
 }">
 
 
