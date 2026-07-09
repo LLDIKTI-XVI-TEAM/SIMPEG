@@ -344,4 +344,83 @@ class EmployeeUpdateTest extends TestCase
             'no_sk' => 'SK-PENGANGKATAN-WEB-001',
         ]);
     }
+
+    public function test_berkas_lainnya_preset_ktp_is_saved_as_document_on_employee_update(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+
+        $payload = $this->validPayload($employee, [
+            'berkas_lainnya_jenis' => 'KTP',
+            'berkas_lainnya_nomor' => 'KTP-1234-07-2026',
+            'berkas_lainnya_deskripsi' => 'KTP pegawai terbaru',
+            'berkas_lainnya_tanggal' => '2026-07-01',
+            'file_berkas_lainnya' => UploadedFile::fake()->create('ktp.pdf', 300, 'application/pdf'),
+        ]);
+
+        $this->actingAs($user);
+        $response = $this->withSession(['_token' => 'test-token'])
+            ->post("/pegawai/{$employee->id}", $payload, ['X-CSRF-TOKEN' => 'test-token']);
+
+        $response->assertRedirect(route('data-pegawai'));
+
+        // KTP & KK dikategorikan sebagai ktp_kk; nama dokumen memakai label jenis.
+        $this->assertDatabaseHas('documents', [
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'ktp_kk',
+            'nama_dokumen' => 'KTP',
+            'nomor_dokumen' => 'KTP-1234-07-2026',
+            'keterangan' => 'KTP pegawai terbaru',
+        ]);
+
+        $document = $employee->documents()->firstOrFail();
+        $this->assertStringStartsWith("berkas/{$employee->id}/", $document->file_path);
+        Storage::disk('public')->assertExists($document->file_path);
+    }
+
+    public function test_berkas_lainnya_manual_jenis_is_saved_as_lainnya_category(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+
+        $payload = $this->validPayload($employee, [
+            'berkas_lainnya_jenis' => 'Lainnya',
+            'berkas_lainnya_jenis_manual' => 'Sertifikat Pelatihan',
+            'file_berkas_lainnya' => UploadedFile::fake()->create('sertifikat.pdf', 300, 'application/pdf'),
+        ]);
+
+        $this->actingAs($user);
+        $response = $this->withSession(['_token' => 'test-token'])
+            ->post("/pegawai/{$employee->id}", $payload, ['X-CSRF-TOKEN' => 'test-token']);
+
+        $response->assertRedirect(route('data-pegawai'));
+        $this->assertDatabaseHas('documents', [
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Sertifikat Pelatihan',
+        ]);
+    }
+
+    public function test_berkas_lainnya_is_not_saved_when_no_file_uploaded(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+
+        // Jenis dipilih tetapi tanpa file → tidak boleh membuat dokumen.
+        $payload = $this->validPayload($employee, [
+            'berkas_lainnya_jenis' => 'KTP',
+        ]);
+
+        $this->actingAs($user);
+        $response = $this->from("/pegawai/{$employee->id}/edit")
+            ->withSession(['_token' => 'test-token'])
+            ->post("/pegawai/{$employee->id}", $payload, ['X-CSRF-TOKEN' => 'test-token']);
+
+        // file_berkas_lainnya required_with:berkas_lainnya_jenis → validasi gagal.
+        $response->assertSessionHasErrors('file_berkas_lainnya');
+        $this->assertDatabaseCount('documents', 0);
+    }
 }
