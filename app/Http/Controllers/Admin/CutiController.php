@@ -16,10 +16,12 @@ use App\Http\Requests\Cuti\ReviewLeaveDecisionRequest;
 use App\Http\Requests\Cuti\StoreLeaveRequestRequest;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
+use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
 use App\Services\LeaveApprovalService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class CutiController extends Controller
 {
@@ -152,6 +154,16 @@ class CutiController extends Controller
         $pegawaiId = $request->query('pegawai');
         $jenisId = $request->query('jenis');
 
+        if (is_array($pegawaiId)) {
+            abort(404);
+        }
+
+        $pegawaiId = trim((string) $pegawaiId);
+        if ($pegawaiId !== '' && ! Str::isUuid($pegawaiId)) {
+            abort(404);
+        }
+        $pegawaiId = $pegawaiId === '' ? null : $pegawaiId;
+
         $balancesQuery = LeaveBalance::with('employee');
 
         if ($unit) {
@@ -189,11 +201,17 @@ class CutiController extends Controller
             }
 
             return [
+                'employee_id' => $b->employee_id,
+                'tahun' => $b->tahun,
                 'nama' => $b->employee?->nama_lengkap ?? '-',
                 'nip' => $b->employee?->nip ?? '-',
                 'unit' => $b->employee?->jabatan_terakhir ?? '-',
                 'jatah' => $b->jatah_awal,
                 'carry' => $b->carry_over,
+                'sisa_n2' => $b->sisa_n2,
+                'sisa_n1' => $b->sisa_n1,
+                'sisa_tahun_berjalan' => $b->sisa_tahun_berjalan,
+                'hangus' => $b->hangus,
                 'terpakai' => $b->terpakai,
                 'sisa' => $b->sisa,
                 'tahunan' => $b->terpakai,
@@ -246,56 +264,37 @@ class CutiController extends Controller
             ];
         });
 
-        $statsQuery = LeaveRequest::where('status', 'disetujui')->with('jenisCuti');
-        if ($unit) {
-            $statsQuery->whereHas('employee', function ($q) use ($unit) {
-                $q->where('jabatan_terakhir', $unit);
-            });
-        }
-        if ($pegawaiId) {
-            $statsQuery->where('employee_id', $pegawaiId);
-        }
-        if ($periode) {
-            if (is_numeric($periode)) {
-                $statsQuery->whereYear('tanggal_mulai', $periode);
-            } else {
-                $parts = explode(' ', $periode);
-                if (count($parts) === 2 && isset($months[$parts[0]])) {
-                    $statsQuery->whereMonth('tanggal_mulai', $months[$parts[0]])->whereYear('tanggal_mulai', $parts[1]);
-                }
-            }
-        }
-
-        $stats = $statsQuery
-            ->leftJoin('ref_jenis_cuti', 'leave_requests.jenis_cuti_id', '=', 'ref_jenis_cuti.id')
-            ->selectRaw('ref_jenis_cuti.nama as nama, COALESCE(SUM(leave_requests.jumlah_hari_kerja), 0) as hari')
-            ->groupBy('ref_jenis_cuti.nama')
-            ->pluck('hari', 'nama');
-
-        $totalDays = $stats->sum() ?: 1;
-        $jenisStats = [];
-        $tones = ['primary', 'info', 'secondary', 'muted'];
-        $i = 0;
-        foreach ($stats as $name => $days) {
-            $jenisStats[] = [
-                'label' => $name ?: 'Lainnya',
-                'hari' => (int) $days,
-                'percent' => round(($days / $totalDays) * 100),
-                'tone' => $tones[$i % 4],
-            ];
-            $i++;
-        }
-
-        // Data Dropdown Filter
-        $optUnits = Employee::select('jabatan_terakhir')->whereNotNull('jabatan_terakhir')->distinct()->pluck('jabatan_terakhir');
-        $optPegawais = Employee::where('status_aktif', 'Aktif')->get(['id', 'nama_lengkap', 'nip']);
-        $optJenisCutis = RefJenisCuti::all();
-        $optPeriodes = ['Semua Periode', 'Juni 2026', 'Mei 2026', 'April 2026', '2026', '2025'];
+        $selectedEmployee = $pegawaiId ? Employee::find($pegawaiId) : null;
+        $selectedBalance = $selectedEmployee === null ? null : LeaveBalance::query()
+            ->where('employee_id', $selectedEmployee->id)
+            ->when($periode && is_numeric($periode), fn ($query) => $query->where('tahun', (int) $periode))
+            ->orderByDesc('tahun')
+            ->first();
+        $ledgerRows = LeaveBalanceLedger::query()
+            ->when(
+                $selectedEmployee !== null,
+                fn ($query) => $query->where('employee_id', $selectedEmployee->id),
+                fn ($query) => $query->whereRaw('1 = 0')
+            )
+            ->orderByDesc('occurred_at')
+            ->orderByDesc('created_at')
+            ->paginate(10, ['*'], 'page_ledger')
+            ->withQueryString();
+        $rolloverRows = LeaveBalanceLedger::query()
+            ->when(
+                $selectedEmployee !== null,
+                fn ($query) => $query->where('employee_id', $selectedEmployee->id),
+                fn ($query) => $query->whereRaw('1 = 0')
+            )
+            ->whereIn('event_type', ['rollover_applied', 'carry_over_granted', 'carry_over_expired'])
+            ->orderByDesc('occurred_at')
+            ->limit(5)
+            ->get();
 
         return view('admin.cuti.rekap', compact(
-            'summary', 'leaveBalances', 'usageRows', 'jenisStats',
-            'optUnits', 'optPegawais', 'optJenisCutis', 'optPeriodes',
-            'periode', 'unit', 'pegawaiId', 'jenisId'
+            'summary', 'leaveBalances', 'usageRows',
+            'periode', 'unit', 'pegawaiId', 'jenisId',
+            'selectedEmployee', 'selectedBalance', 'ledgerRows', 'rolloverRows'
         ));
     }
 

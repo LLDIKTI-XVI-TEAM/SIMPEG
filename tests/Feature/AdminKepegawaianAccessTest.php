@@ -117,7 +117,9 @@ class AdminKepegawaianAccessTest extends TestCase
         $response->assertOk();
         $response->assertSee('activeFilters', false);
         $response->assertSee("periode: 'Semua Periode'", false);
-        $response->assertSee('$dispatch(\'open-confirm-rekap\')', false);
+        $response->assertSee('Buka Laporan & Export', false);
+        $response->assertSee('/laporan/export-cuti', false);
+        $response->assertSee('Admin Saldo Cuti', false);
     }
 
     public function test_session_tidak_dapat_dipakai_untuk_menaikkan_role(): void

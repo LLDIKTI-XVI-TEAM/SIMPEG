@@ -24,6 +24,7 @@ class RouteUuidConstraintTest extends TestCase
 
         $this->actingAs($user);
 
+        $this->get('/cuti/rekap?pegawai=not-a-uuid')->assertNotFound();
         $this->get('/dashboard/cuti/not-a-uuid')->assertNotFound();
         $this->withSession(['_token' => 'test-token'])
             ->post('/cuti/not-a-uuid/approve', ['_token' => 'test-token'])
