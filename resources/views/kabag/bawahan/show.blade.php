@@ -96,11 +96,22 @@
         ];
     @endphp
 
-    <div class="mb-6 flex items-center justify-between">
-        <x-ui.button href="{{ route('kepala-bagian.bawahan.index') }}" variant="secondary" size="md">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
-            Kembali
-        </x-ui.button>
+    {{-- PAGE HEADER --}}
+    <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+            <h2 class="text-2xl font-semibold text-ink">Detail Bawahan</h2>
+            <x-ui.breadcrumb :items="[
+                ['label' => 'Dashboard', 'url' => route('dashboard')],
+                ['label' => 'Daftar Bawahan', 'url' => route('kepala-bagian.bawahan.index')],
+                ['label' => 'Detail Bawahan']
+            ]" />
+        </div>
+        <div>
+            <x-ui.button href="{{ route('kepala-bagian.bawahan.index') }}" variant="secondary" size="md">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
+                Kembali
+            </x-ui.button>
+        </div>
     </div>
 
     @if(!$bawahan)
@@ -114,22 +125,25 @@
             </x-ui.empty-state>
         </div>
     @else
-        <!-- HEADER PROFIL -->
+    <!-- HEADER PROFIL -->
     <div class="mb-6 bg-surface rounded-xl border border-border shadow-sm overflow-hidden relative">
-        <div class="h-24 bg-gradient-to-r from-primary to-[#2143c2]"></div>
-        <div class="px-6 pb-6 relative">
-            <div class="flex flex-col sm:flex-row sm:items-end gap-6 -mt-12 mb-4">
-                <div class="h-24 w-24 rounded-full bg-white p-1 shadow-sm shrink-0">
-                    <div class="h-full w-full rounded-full bg-primary/10 flex items-center justify-center border border-border">
+        <div class="bg-gradient-to-r from-primary to-[#2143c2] px-6 py-8 sm:p-10 relative overflow-hidden">
+            <!-- Decorative elements -->
+            <div class="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white opacity-5 blur-3xl pointer-events-none"></div>
+            <div class="absolute bottom-0 right-1/4 w-32 h-32 rounded-full bg-white opacity-10 blur-2xl pointer-events-none"></div>
+            
+            <div class="relative z-10 flex flex-col sm:flex-row sm:items-center gap-6">
+                <div class="h-24 w-24 rounded-full bg-white p-1 shadow-lg shrink-0">
+                    <div class="h-full w-full rounded-full bg-primary/5 flex items-center justify-center border border-gray-100">
                         <span class="text-3xl font-bold text-primary">{{ substr($bawahan['nama'], 0, 1) }}</span>
                     </div>
                 </div>
-                <div class="pb-2">
-                    <h1 class="text-2xl font-extrabold text-ink font-sans leading-tight">{{ $bawahan['nama'] }}</h1>
-                    <p class="text-sm font-medium text-muted font-sans mt-1">{{ $bawahan['nip'] }} · {{ $bawahan['jabatan'] }}</p>
+                <div>
+                    <h1 class="text-2xl sm:text-3xl font-extrabold text-white font-sans leading-tight drop-shadow-sm">{{ $bawahan['nama'] }}</h1>
+                    <p class="text-sm sm:text-base font-medium text-white/80 font-sans mt-2">{{ $bawahan['nip'] }} &middot; {{ $bawahan['jabatan'] }}</p>
                 </div>
-                <div class="pb-2 sm:ml-auto">
-                    <x-ui.badge variant="{{ $bawahan['status'] == 'Aktif' ? 'success' : 'warning' }}" size="lg">
+                <div class="sm:ml-auto mt-2 sm:mt-0 bg-white rounded-full p-1 shadow-sm shrink-0 flex items-center justify-center w-max h-max">
+                    <x-ui.badge variant="{{ $bawahan['status'] == 'Aktif' ? 'success' : 'warning' }}" size="md" pill dot="true">
                         {{ $bawahan['status'] }}
                     </x-ui.badge>
                 </div>
@@ -201,7 +215,7 @@
                     </div>
                     <div class="flex items-start gap-3">
                         <div class="mt-0.5 shrink-0 text-muted">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8.25v-1.5m0 1.5c-1.355 0-2.697.056-4.024.166C6.845 8.51 6 9.473 6 10.608v2.513m6-4.87c1.355 0 2.697.055 4.024.165C17.155 8.51 18 9.473 18 10.608v2.513m-3-8.093v1.5m0 0c-1.355 0-2.697.056-4.024.166C9.845 6.51 9 7.473 9 8.608v2.513m6-4.87c1.355 0 2.697.055 4.024.165C19.155 6.51 20 7.473 20 8.608v2.513" /></svg>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>
                         </div>
                         <div>
                             <p class="text-[10px] font-bold uppercase text-muted font-sans tracking-wider">Tanggal Lahir</p>

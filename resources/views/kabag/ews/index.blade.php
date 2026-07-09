@@ -218,26 +218,24 @@
                     <x-ui.table-body>
                         @forelse($listEws as $index => $alert)
                             @php
-                                $rowColorClass = '';
                                 $sisaBadgeClass = '';
                                 if ($alert['sisa_hari'] < 30) {
-                                    $rowColorClass = 'hover:bg-danger/[0.01]';
                                     $sisaBadgeClass = 'text-danger';
                                 } elseif ($alert['sisa_hari'] <= 90) {
-                                    $rowColorClass = 'hover:bg-warning/[0.01]';
                                     $sisaBadgeClass = 'text-warning';
                                 } else {
-                                    $rowColorClass = 'hover:bg-success/[0.01]';
                                     $sisaBadgeClass = 'text-success';
                                 }
                             @endphp
-                            <x-ui.table-row x-show="search === '' || '{{ strtolower($alert['nama']) }}'.includes(search.toLowerCase()) || '{{ str_replace(' ', '', $alert['nip']) }}'.includes(search.replace(/\s+/g, ''))" :interactive="true" class="align-top {{ $rowColorClass }}">
+                            <x-ui.table-row x-show="search === '' || '{{ strtolower($alert['nama']) }}'.includes(search.toLowerCase()) || '{{ str_replace(' ', '', $alert['nip']) }}'.includes(search.replace(/\s+/g, ''))" class="align-middle hover:bg-soft transition-colors border-b border-border/50 group">
                                 <x-ui.table-td align="center" padding="lg" class="font-mono text-sm font-semibold text-muted">{{ $index + 1 }}</x-ui.table-td>
                                 <x-ui.table-td padding="lg" class="text-sm">
-                                    <div class="font-semibold leading-snug text-ink transition-colors hover:text-primary">
-                                        <a href="{{ route('kepala-bagian.bawahan.show', $alert['pegawai_id']) }}">{{ $alert['nama'] }}</a>
+                                    <div class="w-full min-w-0">
+                                        <x-ui.tooltip text="Buka detail {{ $alert['nama'] }}" position="right">
+                                            <a href="{{ route('kepala-bagian.bawahan.show', $alert['pegawai_id']) }}" class="block truncate text-sm font-semibold text-ink transition-colors hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 rounded leading-tight">{{ $alert['nama'] }}</a>
+                                        </x-ui.tooltip>
+                                        <p class="text-[11px] text-muted font-sans leading-none mt-1 font-mono">NIP. {{ $alert['nip'] }}</p>
                                     </div>
-                                    <div class="mt-1 font-mono text-xs text-muted">{{ $alert['nip'] }}</div>
                                 </x-ui.table-td>
                                 <x-ui.table-td padding="lg" class="text-sm">
                                     <div class="space-y-1.5">
@@ -278,7 +276,7 @@
                                     </div>
                                 </x-ui.table-td>
                                 <x-ui.table-td padding="lg" class="text-sm">
-                                    <div class="font-mono text-sm font-semibold text-ink">{{ date('d M Y', strtotime($alert['tanggal_target'])) }}</div>
+                                    <div class="font-sans text-sm font-semibold text-ink">{{ date('d M Y', strtotime($alert['tanggal_target'])) }}</div>
                                     <div class="mt-1 text-[11px] font-medium text-muted">Tanggal target</div>
                                 </x-ui.table-td>
                                 <x-ui.table-td padding="lg" class="text-sm">
@@ -308,41 +306,48 @@
                                 </x-ui.table-td>
                                 <x-ui.table-td padding="lg" class="text-sm">
                                     @if($alert['jenis_event'] === 'Kenaikan Pangkat')
-                                        <div class="max-w-[240px] rounded-lg border {{ $alert['is_eligible'] ? 'border-success/20 bg-success/5' : 'border-danger/20 bg-danger/5' }} p-2.5">
-                                            <div class="mb-2 flex flex-wrap items-center gap-2 text-xs font-semibold {{ $alert['is_eligible'] ? 'text-success' : 'text-danger' }}">
+                                        <div x-data="{ open: false }" class="max-w-[240px]">
+                                            <div class="flex items-center gap-1.5 cursor-pointer w-max" @click="open = !open">
                                                 <span class="inline-flex rounded-full {{ $alert['is_eligible'] ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger' }} px-2.5 py-1 text-xs font-semibold">
                                                     {{ $alert['is_eligible'] ? 'Eligible' : 'Tidak Eligible' }}
                                                 </span>
-                                                <span class="inline-flex items-center gap-1.5">
-                                                @if($alert['is_eligible'])
-                                                    <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                                                <button type="button" class="p-0.5 rounded-full hover:bg-black/5 focus:outline-none transition-colors {{ $alert['is_eligible'] ? 'text-success' : 'text-danger' }}" aria-label="Toggle Detail">
+                                                    <svg class="w-4 h-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
                                                     </svg>
-                                                @else
-                                                    <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m0-10.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.75c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.57-.598-3.75h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
-                                                    </svg>
-                                                @endif
-                                                {{ $alert['eligibility_reason'] }}
-                                                </span>
+                                                </button>
                                             </div>
-                                            <div class="space-y-1">
-                                                @foreach($alert['eligibility_checks'] as $check)
-                                                    <div class="flex items-center gap-1.5 text-[11px] font-medium {{ $check['passed'] ? 'text-success' : 'text-danger' }}">
-                                                        <span class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full {{ $check['passed'] ? 'bg-success/10' : 'bg-danger/10' }}">
-                                                            @if($check['passed'])
-                                                                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
-                                                                    <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                                                                </svg>
-                                                            @else
-                                                                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
-                                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-                                                                </svg>
-                                                            @endif
-                                                        </span>
-                                                        <span>{{ $check['label'] }}</span>
-                                                    </div>
-                                                @endforeach
+                                            <div x-show="open" style="display: none;" x-transition class="mt-3 border-t {{ $alert['is_eligible'] ? 'border-success/10' : 'border-danger/10' }} pt-2.5">
+                                                <div class="mb-2 flex items-start gap-1.5 text-xs font-semibold {{ $alert['is_eligible'] ? 'text-success' : 'text-danger' }}">
+                                                    @if($alert['is_eligible'])
+                                                        <svg class="h-4 w-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                                                        </svg>
+                                                    @else
+                                                        <svg class="h-4 w-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m0-10.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.75c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.57-.598-3.75h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
+                                                        </svg>
+                                                    @endif
+                                                    <span class="leading-snug">{{ $alert['eligibility_reason'] }}</span>
+                                                </div>
+                                                <div class="space-y-1.5">
+                                                    @foreach($alert['eligibility_checks'] as $check)
+                                                        <div class="flex items-center gap-1.5 text-[11px] font-medium {{ $check['passed'] ? 'text-success' : 'text-danger' }}">
+                                                            <span class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full {{ $check['passed'] ? 'bg-success/10' : 'bg-danger/10' }}">
+                                                                @if($check['passed'])
+                                                                    <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                                                                        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                                                                    </svg>
+                                                                @else
+                                                                    <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                                                                    </svg>
+                                                                @endif
+                                                            </span>
+                                                            <span>{{ $check['label'] }}</span>
+                                                        </div>
+                                                    @endforeach
+                                                </div>
                                             </div>
                                         </div>
                                     @else

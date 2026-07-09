@@ -213,13 +213,13 @@
                             <x-ui.table-row class="hover:bg-soft transition-colors border-b border-border/50 group">
                                 <x-ui.table-td class="px-6 py-3.5">
                                     <div class="flex items-center gap-3">
-                                        <x-ui.tooltip text="Buka detail cuti {{ $c['nama'] }}" position="right">
+                                        <x-ui.tooltip text="Buka detail pengajuan cuti {{ $c['nama'] }}" position="right">
                                             <a href="{{ route('kepala-bagian.cuti.show', ['id' => $c['id']]) }}" class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-xs font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Buka detail cuti {{ $c['nama'] }}">
                                                 <span>{{ substr($c['nama'], 0, 1) }}</span>
                                             </a>
                                         </x-ui.tooltip>
                                         <div class="min-w-0">
-                                            <x-ui.tooltip text="Buka detail cuti {{ $c['nama'] }}" position="right">
+                                            <x-ui.tooltip text="Buka detail pengajuan cuti {{ $c['nama'] }}" position="right">
                                                 <a href="{{ route('kepala-bagian.cuti.show', ['id' => $c['id']]) }}" class="block truncate text-xs font-semibold text-ink transition hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 rounded leading-tight">{{ $c['nama'] }}</a>
                                             </x-ui.tooltip>
                                         </div>

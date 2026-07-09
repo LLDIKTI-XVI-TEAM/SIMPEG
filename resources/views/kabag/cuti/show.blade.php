@@ -261,7 +261,7 @@
         <!-- KOLOM KANAN (Saldo & Timeline) -->
         <div class="space-y-6">
             @if(in_array($cuti['jenis_cuti'], ['Cuti Tahunan', 'Cuti Besar']))
-            <x-ui.card padding="lg" class="bg-primary text-white overflow-hidden relative border-none">
+            <div class="bg-primary text-white overflow-hidden relative border-none rounded-xl shadow-sm p-6">
                 <div class="absolute right-0 top-0 opacity-10">
                     <svg class="w-32 h-32 -mt-4 -mr-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 6v6.242l4.28 4.28-1.06 1.06-4.97-4.97V6h1.75z" /></svg>
                 </div>
@@ -276,7 +276,7 @@
                         <span class="font-bold">{{ $cuti['sisa_saldo'] }} Hari</span>
                     </div>
                 </div>
-            </x-ui.card>
+            </div>
             @endif
 
             <x-ui.card padding="lg">
@@ -289,10 +289,10 @@
                             description="{{ $item['aktor'] }}"
                             pulse="{{ $item['active'] }}">
                             
-                            <div class="mt-1.5 bg-surface rounded p-2 border border-border">
-                                <p class="text-[10px] font-bold uppercase tracking-wider text-ink font-sans">{{ $item['keputusan'] }}</p>
+                            <div class="mt-2 bg-soft/50 rounded-lg p-3 border border-border">
+                                <p class="text-[11px] font-bold uppercase tracking-wider text-ink font-sans mb-1">{{ $item['keputusan'] }}</p>
                                 @if($item['keterangan'] !== '-')
-                                    <p class="text-xs text-muted font-sans mt-0.5">{{ $item['keterangan'] }}</p>
+                                    <p class="text-xs font-medium text-ink/80 font-sans">{{ $item['keterangan'] }}</p>
                                 @endif
                             </div>
                             

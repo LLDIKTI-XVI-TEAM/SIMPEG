@@ -135,8 +135,7 @@
                 <x-ui.table-body>
                     @foreach($cutiList as $cuti)
                     <x-ui.table-row 
-                        class="hover:bg-soft transition-colors group" 
-                        :interactive="true"
+                        class="hover:bg-soft transition-colors group"
                         x-show="(search === '' || '{{ strtolower($cuti['nama']) }}'.includes(search.toLowerCase()) || '{{ $cuti['nip'] }}'.includes(search)) && 
                                 (filterStatus === '' || '{{ $cuti['status'] }}' === filterStatus) &&
                                 (filterJenis === '' || '{{ $cuti['jenis_cuti'] }}' === filterJenis) &&
@@ -144,10 +143,12 @@
                     >
                         <!-- NAMA PEGAWAI -->
                         <x-ui.table-td padding="comfortable">
-                            <div>
-                                <p class="text-sm font-semibold text-ink font-sans leading-tight">{{ $cuti['nama'] }}</p>
-                                <p class="text-[10px] text-muted font-sans mt-0.5">NIP. {{ $cuti['nip'] }}</p>
-                            </div>
+                            <x-ui.tooltip text="Buka detail pengajuan cuti {{ $cuti['nama'] }}" position="right">
+                                <a href="{{ route('kepala-bagian.cuti.show', ['id' => $cuti['id']]) }}" class="block truncate text-sm font-semibold text-ink transition-colors hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 rounded leading-tight">
+                                    {{ $cuti['nama'] }}
+                                </a>
+                            </x-ui.tooltip>
+                            <p class="text-[11px] text-muted font-sans leading-none mt-1 font-mono">NIP. {{ $cuti['nip'] }}</p>
                         </x-ui.table-td>
                         
                         <!-- JENIS CUTI & TGL AJUKAN -->
