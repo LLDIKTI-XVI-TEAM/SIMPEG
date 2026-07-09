@@ -18,7 +18,8 @@
                 'eligibility_checks' => [
                     ['label' => 'Kinerja Minimal Baik', 'passed' => true],
                     ['label' => 'Masa Kerja 2 Tahun', 'passed' => true]
-                ]
+                ],
+                'status_tindak_lanjut' => 'Ditangani'
             ],
             [
                 'id' => 2,
@@ -35,7 +36,8 @@
                 'eligibility_checks' => [
                     ['label' => 'Kinerja Minimal Baik', 'passed' => true],
                     ['label' => 'Ujian Dinas', 'passed' => false]
-                ]
+                ],
+                'status_tindak_lanjut' => 'Aktif'
             ],
             [
                 'id' => 3,
@@ -49,7 +51,8 @@
                 'threshold_schedule' => ['H-3 bulan'],
                 'is_eligible' => true,
                 'eligibility_reason' => 'Perlu tindak lanjut',
-                'eligibility_checks' => []
+                'eligibility_checks' => [],
+                'status_tindak_lanjut' => 'Aktif'
             ],
             [
                 'id' => 4,
@@ -63,7 +66,25 @@
                 'threshold_schedule' => ['H-3 bulan', 'H-1 bulan'],
                 'is_eligible' => true,
                 'eligibility_reason' => 'Perlu tindak lanjut',
-                'eligibility_checks' => []
+                'eligibility_checks' => [],
+                'status_tindak_lanjut' => 'Tidak Perlu'
+            ],
+            [
+                'id' => 5,
+                'pegawai_id' => '9b6574f2-959c-4876-880f-90e822e11fa5',
+                'nama' => 'Rudi Hermawan', 
+                'nip' => '198812345678910000',
+                'jenis_event' => 'Satyalancana', 
+                'tanggal_target' => '2026-08-03',
+                'sisa_hari' => 25, 
+                'threshold_label' => 'H-30',
+                'threshold_schedule' => ['H-14'],
+                'is_eligible' => true,
+                'eligibility_reason' => '10 Tahun Mengabdi',
+                'eligibility_checks' => [
+                    ['label' => 'Masa Kerja 10 Tahun', 'passed' => true]
+                ],
+                'status_tindak_lanjut' => 'Aktif'
             ],
         ];
         $filterEvent = request('event', '');
@@ -158,6 +179,9 @@
                     <a href="{{ route('kepala-bagian.ews.index', ['event' => 'Kontrak PPPK']) }}" class="px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all {{ $filterEvent === 'Kontrak PPPK' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink' }}">
                         Kontrak PPPK
                     </a>
+                    <a href="{{ route('kepala-bagian.ews.index', ['event' => 'Satyalancana']) }}" class="px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all {{ $filterEvent === 'Satyalancana' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink' }}">
+                        Satyalancana
+                    </a>
                 </div>
 
                 {{-- Search Box --}}
@@ -187,6 +211,7 @@
                             <x-ui.table-th padding="wide" class="w-[260px]">EVENT & AMBANG</x-ui.table-th>
                             <x-ui.table-th padding="wide" class="w-[150px]">TARGET</x-ui.table-th>
                             <x-ui.table-th padding="wide" class="w-[140px]">URGENSI</x-ui.table-th>
+                            <x-ui.table-th padding="wide" class="w-[160px]">STATUS TINDAKAN</x-ui.table-th>
                             <x-ui.table-th padding="wide">ELIGIBILITY</x-ui.table-th>
                         </x-ui.table-row>
                     </x-ui.table-head>
@@ -229,6 +254,10 @@
                                                 <svg class="w-3.5 h-3.5 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.57 50.57 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M12 13.489v6.527c0 1.229-.926 2.274-2.14 2.417a4.347 4.347 0 0 1-2.911-1.013L6.47 20.25a2.247 2.247 0 0 1-.72-1.667v-5.094" />
                                                 </svg>
+                                            @elseif($alert['jenis_event'] === 'Satyalancana')
+                                                <svg class="w-3.5 h-3.5 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5z" />
+                                                </svg>
                                             @else
                                                 <svg class="w-3.5 h-3.5 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
@@ -265,6 +294,17 @@
                                             Pemantauan rutin
                                         @endif
                                     </div>
+                                </x-ui.table-td>
+                                <x-ui.table-td padding="lg" class="text-sm">
+                                    @php
+                                        $tindakLanjutColor = 'ink';
+                                        if ($alert['status_tindak_lanjut'] === 'Aktif') $tindakLanjutColor = 'warning';
+                                        elseif ($alert['status_tindak_lanjut'] === 'Ditangani') $tindakLanjutColor = 'success';
+                                        elseif ($alert['status_tindak_lanjut'] === 'Kedaluwarsa') $tindakLanjutColor = 'danger';
+                                    @endphp
+                                    <x-ui.badge variant="{{ $tindakLanjutColor }}" size="md" dot>
+                                        {{ $alert['status_tindak_lanjut'] }}
+                                    </x-ui.badge>
                                 </x-ui.table-td>
                                 <x-ui.table-td padding="lg" class="text-sm">
                                     @if($alert['jenis_event'] === 'Kenaikan Pangkat')
@@ -317,7 +357,7 @@
                             </x-ui.table-row>
                         @empty
                             <x-ui.table-row>
-                                <x-ui.table-td colspan="6" class="py-12">
+                                <x-ui.table-td colspan="7" class="py-12">
                                     <x-ui.empty-state 
                                         icon="exclamation-triangle" 
                                         title="Tidak Ada EWS Aktif" 

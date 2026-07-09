@@ -1,4 +1,5 @@
 <x-layouts.app title="Daftar Bawahan" subtitle="Kelola dan pantau seluruh pegawai di bawah naungan Anda.">
+    <div x-data="{ search: '', filterGolongan: '', filterUnit: '', filterJenis: '', filterStatus: '' }">
 
     @php
         // DUMMY DATA UNTUK UI
@@ -24,17 +25,17 @@
     </div>
 
     {{-- FILTER BAR --}}
-    <form id="filter-form" method="GET" action="{{ route('kepala-bagian.bawahan.index') }}">
+    <div id="filter-form" class="mb-6">
         <x-ui.filter-bar 
             searchId="search-input"
             searchName="search"
-            searchValue=""
             searchPlaceholder="Cari nama atau NIP..." 
             class="lg:grid-cols-5"
+            x-model="search"
         >
             {{-- Filter Golongan --}}
             <div>
-                <x-form.select id="filter-golongan" name="golongan" size="md" onchange="this.form.submit()">
+                <x-form.select id="filter-golongan" name="golongan" size="md" x-model="filterGolongan">
                     <option value="">Semua Golongan</option>
                     <option value="I" {{ request('golongan') === 'I' ? 'selected' : '' }}>Golongan I</option>
                     <option value="II" {{ request('golongan') === 'II' ? 'selected' : '' }}>Golongan II</option>
@@ -45,33 +46,33 @@
 
             {{-- Filter Unit --}}
             <div>
-                <x-form.select id="filter-unit" name="unit_kerja_id" size="md" onchange="this.form.submit()">
+                <x-form.select id="filter-unit" name="unit_kerja_id" size="md" x-model="filterUnit">
                     <option value="">Semua Unit</option>
-                    <option value="1" {{ request('unit_kerja_id') === '1' ? 'selected' : '' }}>Bagian Umum</option>
-                    <option value="2" {{ request('unit_kerja_id') === '2' ? 'selected' : '' }}>Subbagian Tata Usaha</option>
+                    <option value="Bagian Umum">Bagian Umum</option>
+                    <option value="Subbagian Tata Usaha">Subbagian Tata Usaha</option>
                 </x-form.select>
             </div>
 
             {{-- Filter Jenis --}}
             <div>
-                <x-form.select id="filter-jenis" name="jenis_pegawai_id" size="md" onchange="this.form.submit()">
+                <x-form.select id="filter-jenis" name="jenis_pegawai_id" size="md" x-model="filterJenis">
                     <option value="">Semua Jenis</option>
-                    <option value="1" {{ request('jenis_pegawai_id') === '1' ? 'selected' : '' }}>PNS</option>
-                    <option value="2" {{ request('jenis_pegawai_id') === '2' ? 'selected' : '' }}>PPPK</option>
+                    <option value="PNS">PNS</option>
+                    <option value="PPPK">PPPK</option>
                 </x-form.select>
             </div>
 
             {{-- Filter Status --}}
             <div>
-                <x-form.select id="filter-status" name="status_pegawai_id" size="md" onchange="this.form.submit()">
+                <x-form.select id="filter-status" name="status_pegawai_id" size="md" x-model="filterStatus">
                     <option value="">Semua Status</option>
-                    <option value="1" {{ request('status_pegawai_id') === '1' ? 'selected' : '' }}>Aktif</option>
-                    <option value="2" {{ request('status_pegawai_id') === '2' ? 'selected' : '' }}>Cuti</option>
-                    <option value="3" {{ request('status_pegawai_id') === '3' ? 'selected' : '' }}>Pensiun</option>
+                    <option value="Aktif">Aktif</option>
+                    <option value="Cuti">Cuti</option>
+                    <option value="Pensiun">Pensiun</option>
                 </x-form.select>
             </div>
         </x-ui.filter-bar>
-    </form>
+    </div>
 
     <x-ui.card padding="none" class="overflow-hidden">
         <div class="overflow-x-auto">
@@ -87,7 +88,14 @@
                 </x-ui.table-head>
                 <x-ui.table-body>
                     @foreach($daftarBawahan as $bawahan)
-                    <x-ui.table-row class="hover:bg-soft transition-colors border-b border-border/50 group">
+                    <x-ui.table-row 
+                        class="hover:bg-soft transition-colors border-b border-border/50 group"
+                        x-show="(search === '' || '{{ strtolower($bawahan['nama']) }}'.includes(search.toLowerCase()) || '{{ $bawahan['nip'] }}'.includes(search)) &&
+                                (filterGolongan === '' || '{{ $bawahan['golongan'] }}'.includes(filterGolongan)) &&
+                                (filterUnit === '' || '{{ $bawahan['unit'] }}' === filterUnit) &&
+                                (filterJenis === '' || '{{ $bawahan['jenis'] }}' === filterJenis) &&
+                                (filterStatus === '' || '{{ $bawahan['status'] }}'.includes(filterStatus))"
+                    >
                         <x-ui.table-td padding="comfortable">
                             <div class="flex items-center gap-3">
                                 <x-ui.tooltip text="Buka detail {{ $bawahan['nama'] }}" position="right">
@@ -132,16 +140,17 @@
             </x-ui.table>
         </div>
         
-        <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row" x-data="{ currentPage: 1, totalPages: 2 }">
+        <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row" x-data="{ currentPage: 1, totalPages: 1 }">
             <div class="flex items-center gap-4">
                 <p class="text-sm text-muted hidden sm:block">
-                    Menampilkan <span class="font-semibold text-ink">1</span> hingga <span class="font-semibold text-ink">6</span> dari <span class="font-semibold text-ink">12</span> hasil
+                    Menampilkan <span class="font-semibold text-ink">1</span> hingga <span class="font-semibold text-ink">6</span> dari <span class="font-semibold text-ink">6</span> hasil
                 </p>
             </div>
-            <div class="w-full sm:w-auto">
+            <div class="w-full sm:w-auto" x-show="totalPages > 1">
                 <x-ui.pagination />
             </div>
         </div>
     </x-ui.card>
 
+    </div>
 </x-layouts.app>

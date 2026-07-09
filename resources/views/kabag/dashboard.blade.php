@@ -16,13 +16,14 @@
         $listCutiPending = [
             ['id' => 1, 'nama' => 'Ahmad Fauzi', 'jenis' => 'Cuti Tahunan', 'tanggal' => '20-24 Jun 2026', 'lama' => '5 Hari'],
             ['id' => 2, 'nama' => 'Nadia Kusuma', 'jenis' => 'Cuti Sakit', 'tanggal' => '19-21 Jun 2026', 'lama' => '3 Hari'],
-            ['id' => 3, 'nama' => 'Teguh Wibowo', 'jenis' => 'Cuti Alasan Penting', 'tanggal' => '1 Jul 2026', 'lama' => '1 Hari'],
+            ['id' => 4, 'nama' => 'Siti Rahayu', 'jenis' => 'Cuti Tahunan', 'tanggal' => '01-05 Agu 2026', 'lama' => '5 Hari'],
         ];
 
         $listEwsBawahan = [
-            ['id' => '9b6574f2-959c-4876-880f-90e822e11fa3', 'nama' => 'Budi Santoso', 'pemicu' => 'Masa Berlaku SK Pengangkatan', 'sisa' => '12 Hari Lagi', 'status' => 'Urgent'],
-            ['id' => '9b6574f2-959c-4876-880f-90e822e11fa2', 'nama' => 'Siti Rahayu', 'pemicu' => 'Persiapan Administrasi Pensiun', 'sisa' => '45 Hari Lagi', 'status' => 'Warning'],
+            ['id' => '9b6574f2-959c-4876-880f-90e822e11fa3', 'nama' => 'Budi Santoso', 'pemicu' => 'Kontrak PPPK', 'sisa' => '12 Hari Lagi', 'status' => 'Urgent'],
+            ['id' => '9b6574f2-959c-4876-880f-90e822e11fa2', 'nama' => 'Siti Rahayu', 'pemicu' => 'Pensiun', 'sisa' => '45 Hari Lagi', 'status' => 'Warning'],
             ['id' => '9b6574f2-959c-4876-880f-90e822e11fa1', 'nama' => 'Ahmad Fauzi', 'pemicu' => 'Kenaikan Gaji Berkala (KGB)', 'sisa' => '55 Hari Lagi', 'status' => 'Warning'],
+            ['id' => '9b6574f2-959c-4876-880f-90e822e11fa5', 'nama' => 'Rudi Hermawan', 'pemicu' => 'Satyalancana', 'sisa' => '25 Hari Lagi', 'status' => 'Urgent'],
         ];
     @endphp
 
@@ -159,7 +160,7 @@
         </x-ui.stat-card>
 
         {{-- Stat: Cuti Pending --}}
-        <x-ui.stat-card href="#" label="Pengajuan Cuti Pending" value="{{ $cutiPending }}" variant="warning" size="lg" accent>
+        <x-ui.stat-card href="{{ route('kepala-bagian.cuti.index') }}" label="Pengajuan Cuti Pending" value="{{ $cutiPending }}" variant="warning" size="lg" accent>
             <x-slot:icon>
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
             </x-slot:icon>
@@ -212,14 +213,14 @@
                             <x-ui.table-row class="hover:bg-soft transition-colors border-b border-border/50 group">
                                 <x-ui.table-td class="px-6 py-3.5">
                                     <div class="flex items-center gap-3">
-                                        <x-ui.tooltip text="Buka detail {{ $c['nama'] }}" position="right">
-                                            <a href="{{ route('kepala-bagian.bawahan.show', ['id' => $c['id']]) }}" class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-xs font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Buka detail profil {{ $c['nama'] }}">
+                                        <x-ui.tooltip text="Buka detail cuti {{ $c['nama'] }}" position="right">
+                                            <a href="{{ route('kepala-bagian.cuti.show', ['id' => $c['id']]) }}" class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-xs font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Buka detail cuti {{ $c['nama'] }}">
                                                 <span>{{ substr($c['nama'], 0, 1) }}</span>
                                             </a>
                                         </x-ui.tooltip>
                                         <div class="min-w-0">
-                                            <x-ui.tooltip text="Buka detail {{ $c['nama'] }}" position="right">
-                                                <a href="{{ route('kepala-bagian.bawahan.show', ['id' => $c['id']]) }}" class="block truncate text-xs font-semibold text-ink transition hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 rounded leading-tight">{{ $c['nama'] }}</a>
+                                            <x-ui.tooltip text="Buka detail cuti {{ $c['nama'] }}" position="right">
+                                                <a href="{{ route('kepala-bagian.cuti.show', ['id' => $c['id']]) }}" class="block truncate text-xs font-semibold text-ink transition hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 rounded leading-tight">{{ $c['nama'] }}</a>
                                             </x-ui.tooltip>
                                         </div>
                                     </div>

@@ -2,19 +2,88 @@
 
     @php
         // DUMMY DATA UNTUK UI (Read-Only)
-        $bawahan = [
-            'id' => $id ?? 1,
-            'nama' => 'Ahmad Fauzi',
-            'nip' => '19800101 200001 1 001',
-            'jabatan' => 'Analis Kepegawaian Ahli Muda',
-            'unit' => 'Subbagian Tata Usaha',
-            'golongan' => 'III/c (Penata)',
-            'status' => 'Aktif',
-            'email' => 'ahmad.fauzi@example.com',
-            'no_hp' => '081234567890',
-            'tgl_lahir' => '01 Januari 1980',
-            'pendidikan' => 'S1 Ilmu Pemerintahan',
+        $bawahanList = [
+            [
+                'id' => '9b6574f2-959c-4876-880f-90e822e11fa1',
+                'nama' => 'Ahmad Fauzi',
+                'nip' => '198123456789100000',
+                'jabatan' => 'Analis Kepegawaian Ahli Muda',
+                'unit' => 'Bagian Umum',
+                'golongan' => 'I/d',
+                'status' => 'Aktif',
+                'email' => 'ahmad.fauzi@example.com',
+                'no_hp' => '081234567890',
+                'tgl_lahir' => '01 Januari 1980',
+                'pendidikan' => 'S1 Ilmu Pemerintahan',
+            ],
+            [
+                'id' => '9b6574f2-959c-4876-880f-90e822e11fa2',
+                'nama' => 'Siti Rahayu',
+                'nip' => '198512345678910000',
+                'jabatan' => 'Pranata Komputer Ahli Pertama',
+                'unit' => 'Subbagian Tata Usaha',
+                'golongan' => 'III/a',
+                'status' => 'Cuti Tahunan',
+                'email' => 'siti.rahayu@example.com',
+                'no_hp' => '081234567891',
+                'tgl_lahir' => '12 Februari 1985',
+                'pendidikan' => 'S1 Teknik Informatika',
+            ],
+            [
+                'id' => '9b6574f2-959c-4876-880f-90e822e11fa3',
+                'nama' => 'Budi Santoso',
+                'nip' => '199012345678910000',
+                'jabatan' => 'Pengelola Keuangan',
+                'unit' => 'Subbagian Perencanaan',
+                'golongan' => 'II/c',
+                'status' => 'Dinas Luar',
+                'email' => 'budi.santoso@example.com',
+                'no_hp' => '081234567892',
+                'tgl_lahir' => '23 Maret 1990',
+                'pendidikan' => 'D3 Akuntansi',
+            ],
+            [
+                'id' => '9b6574f2-959c-4876-880f-90e822e11fa4',
+                'nama' => 'Dewi Pertiwi',
+                'nip' => '737741487614535936',
+                'jabatan' => 'Pengelola Data',
+                'unit' => 'Subbagian Informasi',
+                'golongan' => 'III/b',
+                'status' => 'Aktif',
+                'email' => 'dewi.pertiwi@example.com',
+                'no_hp' => '081234567893',
+                'tgl_lahir' => '04 April 1988',
+                'pendidikan' => 'S1 Sistem Informasi',
+            ],
+            [
+                'id' => '9b6574f2-959c-4876-880f-90e822e11fa5',
+                'nama' => 'Rudi Hermawan',
+                'nip' => '198812345678910000',
+                'jabatan' => 'Pranata Humas Ahli Muda',
+                'unit' => 'Bagian Humas',
+                'golongan' => 'III/b',
+                'status' => 'Aktif',
+                'email' => 'rudi.hermawan@example.com',
+                'no_hp' => '081234567894',
+                'tgl_lahir' => '15 Mei 1988',
+                'pendidikan' => 'S1 Ilmu Komunikasi',
+            ],
+            [
+                'id' => '9b6574f2-959c-4876-880f-90e822e11fa6',
+                'nama' => 'Nadia Kusuma',
+                'nip' => '199512345678910000',
+                'jabatan' => 'Analis Hukum Ahli Pertama',
+                'unit' => 'Subbagian Hukum',
+                'golongan' => 'III/a',
+                'status' => 'Cuti Sakit',
+                'email' => 'nadia.kusuma@example.com',
+                'no_hp' => '081234567895',
+                'tgl_lahir' => '26 Juni 1995',
+                'pendidikan' => 'S1 Ilmu Hukum',
+            ],
         ];
+
+        $bawahan = collect($bawahanList)->firstWhere('id', $id ?? '9b6574f2-959c-4876-880f-90e822e11fa1');
 
         $riwayatJabatan = [
             ['jabatan' => 'Analis Kepegawaian Ahli Muda', 'unit' => 'Subbagian Tata Usaha', 'tmt' => '01-04-2022'],
@@ -34,7 +103,18 @@
         </x-ui.button>
     </div>
 
-    <!-- HEADER PROFIL -->
+    @if(!$bawahan)
+        <div class="mt-8">
+            <x-ui.empty-state 
+                icon="users" 
+                title="Bawahan Tidak Ditemukan" 
+                description="Pegawai yang Anda cari tidak ada atau bukan merupakan bawahan Anda."
+            >
+                <x-ui.button href="{{ route('kepala-bagian.bawahan.index') }}" variant="secondary">Kembali ke Daftar Bawahan</x-ui.button>
+            </x-ui.empty-state>
+        </div>
+    @else
+        <!-- HEADER PROFIL -->
     <div class="mb-6 bg-surface rounded-xl border border-border shadow-sm overflow-hidden relative">
         <div class="h-24 bg-gradient-to-r from-primary to-[#2143c2]"></div>
         <div class="px-6 pb-6 relative">
@@ -156,4 +236,5 @@
         </div>
     </div>
 
+    @endif
 </x-layouts.app>

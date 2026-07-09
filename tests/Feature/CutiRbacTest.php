@@ -195,7 +195,6 @@ class CutiRbacTest extends TestCase
         $this->assertFalse($user->hasPermission('cuti.configure'));
     }
 
-
     public function test_pimpinan_bisa_approve_stage3_dan_lihat_semua_cuti(): void
     {
         $user = User::factory()->pimpinan()->create();

@@ -1,4 +1,5 @@
 <x-layouts.app title="Pengajuan Cuti Bawahan" subtitle="Kelola dan berikan persetujuan untuk cuti bawahan Anda.">
+    <div x-data="{ search: '', filterStatus: '', filterJenis: '', filterTahun: '' }">
 
     @php
         // DUMMY DATA UNTUK UI
@@ -78,34 +79,35 @@
     </div>
 
     <!-- FILTER & PENCARIAN -->
-    <x-ui.filter-bar searchId="search" searchName="search" searchPlaceholder="Cari nama pegawai..." searchCols="lg:col-span-1">
+    <x-ui.filter-bar searchId="search" searchName="search" searchPlaceholder="Cari nama pegawai..." searchCols="lg:col-span-1" x-model="search">
         <!-- Filter Status -->
         <div>
-            <x-form.select size="md">
+            <x-form.select size="md" x-model="filterStatus">
                 <option value="">Semua Status</option>
-                <option value="menunggu" selected>Menunggu Tindakan Saya</option>
-                <option value="perubahan">Perubahan</option>
-                <option value="ditangguhkan">Ditangguhkan</option>
-                <option value="selesai">Selesai</option>
+                <option value="Menunggu Tindakan Saya">Menunggu Tindakan Saya</option>
+                <option value="Perubahan">Perubahan</option>
+                <option value="Ditangguhkan">Ditangguhkan</option>
+                <option value="Selesai">Selesai</option>
             </x-form.select>
         </div>
 
         <!-- Filter Jenis Cuti -->
         <div>
-            <x-form.select size="md">
+            <x-form.select size="md" x-model="filterJenis">
                 <option value="">Semua Jenis Cuti</option>
-                <option value="tahunan">Cuti Tahunan</option>
-                <option value="sakit">Cuti Sakit</option>
-                <option value="penting">Cuti Alasan Penting</option>
-                <option value="melahirkan">Cuti Melahirkan</option>
-                <option value="besar">Cuti Besar</option>
-                <option value="cltn">Cuti di Luar Tanggungan Negara</option>
+                <option value="Cuti Tahunan">Cuti Tahunan</option>
+                <option value="Cuti Sakit">Cuti Sakit</option>
+                <option value="Cuti Alasan Penting">Cuti Alasan Penting</option>
+                <option value="Cuti Melahirkan">Cuti Melahirkan</option>
+                <option value="Cuti Besar">Cuti Besar</option>
+                <option value="Cuti di Luar Tanggungan Negara">Cuti di Luar Tanggungan Negara</option>
             </x-form.select>
         </div>
 
         <!-- Filter Tahun/Periode -->
         <div>
-            <x-form.select size="md">
+            <x-form.select size="md" x-model="filterTahun">
+                <option value="">Semua Tahun</option>
                 <option value="2026">Tahun 2026</option>
                 <option value="2025">Tahun 2025</option>
             </x-form.select>
@@ -132,7 +134,14 @@
                 </x-ui.table-head>
                 <x-ui.table-body>
                     @foreach($cutiList as $cuti)
-                    <x-ui.table-row class="hover:bg-soft transition-colors group" :interactive="true">
+                    <x-ui.table-row 
+                        class="hover:bg-soft transition-colors group" 
+                        :interactive="true"
+                        x-show="(search === '' || '{{ strtolower($cuti['nama']) }}'.includes(search.toLowerCase()) || '{{ $cuti['nip'] }}'.includes(search)) && 
+                                (filterStatus === '' || '{{ $cuti['status'] }}' === filterStatus) &&
+                                (filterJenis === '' || '{{ $cuti['jenis_cuti'] }}' === filterJenis) &&
+                                (filterTahun === '' || '{{ $cuti['tgl_mulai'] }}'.includes(filterTahun))"
+                    >
                         <!-- NAMA PEGAWAI -->
                         <x-ui.table-td padding="comfortable">
                             <div>
@@ -201,4 +210,5 @@
         </div>
     </x-ui.card>
 
+    </div>
 </x-layouts.app>

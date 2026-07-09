@@ -1,23 +1,58 @@
 <x-layouts.app title="Detail Pengajuan Cuti" subtitle="Tinjau dan berikan keputusan atas permohonan cuti bawahan.">
 
     @php
-        // DUMMY DATA UNTUK UI
-        $cuti = [
-            'id' => $id ?? 1,
-            'nama' => 'Ahmad Fauzi',
-            'nip' => '19800101 200001 1 001',
-            'jabatan' => 'Analis Kepegawaian Ahli Muda',
-            'unit' => 'Subbagian Tata Usaha',
-            'jenis_cuti' => 'Cuti Tahunan',
-            'tgl_mulai' => '20 Jun 2026',
-            'tgl_selesai' => '24 Jun 2026',
-            'jml_hari' => '5',
-            'alasan' => 'Acara keluarga di kampung halaman (pernikahan adik kandung).',
-            'saldo_tahunan' => 12,
-            'sisa_saldo' => 7,
-            'status' => 'Menunggu Tindakan Saya',
-            'tgl_ajukan' => '15 Jun 2026, 09:30',
+        $cutiList = [
+            [
+                'id' => 1,
+                'nama' => 'Ahmad Fauzi',
+                'nip' => '19800101 200001 1 001',
+                'jabatan' => 'Analis Kepegawaian Ahli Muda',
+                'unit' => 'Subbagian Tata Usaha',
+                'jenis_cuti' => 'Cuti Tahunan',
+                'tgl_mulai' => '20 Jun 2026',
+                'tgl_selesai' => '24 Jun 2026',
+                'jml_hari' => '5',
+                'alasan' => 'Acara keluarga di kampung halaman (pernikahan adik kandung).',
+                'saldo_tahunan' => 12,
+                'sisa_saldo' => 7,
+                'status' => 'Menunggu Tindakan Saya',
+                'tgl_ajukan' => '15 Jun 2026, 09:30',
+            ],
+            [
+                'id' => 2,
+                'nama' => 'Nadia Kusuma',
+                'nip' => '199512345678910000',
+                'jabatan' => 'Analis Hukum Ahli Pertama',
+                'unit' => 'Subbagian Hukum',
+                'jenis_cuti' => 'Cuti Sakit',
+                'tgl_mulai' => '19 Jun 2026',
+                'tgl_selesai' => '21 Jun 2026',
+                'jml_hari' => '3',
+                'alasan' => 'Sakit demam berdarah dan perlu rawat inap.',
+                'saldo_tahunan' => 0,
+                'sisa_saldo' => 0,
+                'status' => 'Perubahan',
+                'tgl_ajukan' => '14 Jun 2026, 08:30',
+            ],
+            [
+                'id' => 4,
+                'nama' => 'Siti Rahayu',
+                'nip' => '198512345678910000',
+                'jabatan' => 'Pranata Komputer Ahli Pertama',
+                'unit' => 'Subbagian Tata Usaha',
+                'jenis_cuti' => 'Cuti Tahunan',
+                'tgl_mulai' => '01 Agu 2026',
+                'tgl_selesai' => '05 Agu 2026',
+                'jml_hari' => '5',
+                'alasan' => 'Liburan.',
+                'saldo_tahunan' => 10,
+                'sisa_saldo' => 5,
+                'status' => 'Ditangguhkan',
+                'tgl_ajukan' => '01 Jun 2026, 08:30',
+            ],
         ];
+
+        $cuti = collect($cutiList)->firstWhere('id', (int) ($id ?? 1));
 
         $timeline = [
             [
@@ -58,6 +93,18 @@
             ]" />
         </div>
     </div>
+
+    @if(!$cuti)
+        <div class="mt-8">
+            <x-ui.empty-state 
+                icon="document-text" 
+                title="Data Cuti Tidak Ditemukan" 
+                description="Pengajuan cuti yang Anda cari tidak ada atau sudah dihapus."
+            >
+                <x-ui.button href="{{ route('kepala-bagian.cuti.index') }}" variant="secondary">Kembali ke Daftar Cuti</x-ui.button>
+            </x-ui.empty-state>
+        </div>
+    @else
 
     <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <x-ui.button href="{{ route('kepala-bagian.cuti.index') }}" variant="secondary" size="md">
@@ -149,30 +196,45 @@
                     Tindak Lanjut Anda
                 </h3>
                 
-                <form action="#" method="POST" class="space-y-4">
+                <form x-data="{ 
+                    keputusan: 'disetujui', 
+                    catatan: '', 
+                    submitting: false, 
+                    simpan() { 
+                        if(this.keputusan !== 'disetujui' && this.catatan.trim() === '') { 
+                            alert('Catatan wajib diisi jika keputusan selain Disetujui!'); 
+                            return; 
+                        } 
+                        this.submitting = true; 
+                        setTimeout(() => { 
+                            alert('Keputusan berhasil disimpan (Simulasi)!'); 
+                            window.location.href = '{{ route('kepala-bagian.cuti.index') }}'; 
+                        }, 800); 
+                    } 
+                }" @submit.prevent="simpan" class="space-y-4">
                     <div>
                         <label class="block text-xs font-bold uppercase tracking-wider text-ink font-sans mb-1.5">Keputusan Resmi</label>
                         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                             <label class="cursor-pointer">
-                                <input type="radio" name="keputusan" value="disetujui" class="peer sr-only" checked />
+                                <input type="radio" name="keputusan" value="disetujui" x-model="keputusan" class="peer sr-only" />
                                 <div class="rounded-lg border border-border bg-white px-3 py-2.5 text-center transition-all peer-checked:border-success peer-checked:bg-success/10 peer-checked:text-success-dark">
                                     <span class="text-sm font-bold font-sans">Disetujui</span>
                                 </div>
                             </label>
                             <label class="cursor-pointer">
-                                <input type="radio" name="keputusan" value="perubahan" class="peer sr-only" />
+                                <input type="radio" name="keputusan" value="perubahan" x-model="keputusan" class="peer sr-only" />
                                 <div class="rounded-lg border border-border bg-white px-3 py-2.5 text-center transition-all peer-checked:border-warning peer-checked:bg-warning/10 peer-checked:text-warning-dark">
                                     <span class="text-sm font-bold font-sans">Perubahan</span>
                                 </div>
                             </label>
                             <label class="cursor-pointer">
-                                <input type="radio" name="keputusan" value="ditangguhkan" class="peer sr-only" />
+                                <input type="radio" name="keputusan" value="ditangguhkan" x-model="keputusan" class="peer sr-only" />
                                 <div class="rounded-lg border border-border bg-white px-3 py-2.5 text-center transition-all peer-checked:border-info peer-checked:bg-info/10 peer-checked:text-info-dark">
                                     <span class="text-sm font-bold font-sans">Ditangguhkan</span>
                                 </div>
                             </label>
                             <label class="cursor-pointer">
-                                <input type="radio" name="keputusan" value="tidak_disetujui" class="peer sr-only" />
+                                <input type="radio" name="keputusan" value="tidak_disetujui" x-model="keputusan" class="peer sr-only" />
                                 <div class="rounded-lg border border-border bg-white px-3 py-2.5 text-center transition-all peer-checked:border-danger peer-checked:bg-danger/10 peer-checked:text-danger-dark">
                                     <span class="text-sm font-bold font-sans">Tidak Disetujui</span>
                                 </div>
@@ -182,12 +244,14 @@
                     </div>
 
                     <div>
-                        <label class="block text-xs font-bold uppercase tracking-wider text-ink font-sans mb-1.5">Keterangan / Catatan Tambahan</label>
-                        <textarea rows="3" placeholder="Wajib diisi jika memilih Perubahan, Ditangguhkan, atau Tidak Disetujui..." class="w-full rounded-lg border border-border bg-white p-3 text-sm font-sans placeholder:text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-sm"></textarea>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-ink font-sans mb-1.5">Keterangan / Catatan Tambahan <span x-show="keputusan !== 'disetujui'" class="text-danger">*</span></label>
+                        <textarea rows="3" name="catatan" x-model="catatan" placeholder="Wajib diisi jika memilih Perubahan, Ditangguhkan, atau Tidak Disetujui..." class="w-full rounded-lg border border-border bg-white p-3 text-sm font-sans placeholder:text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-sm"></textarea>
                     </div>
 
                     <div class="flex justify-end gap-3 pt-2">
-                        <x-ui.button type="button" variant="primary" size="md">Simpan Keputusan</x-ui.button>
+                        <x-ui.button type="submit" variant="primary" size="md" x-bind:disabled="submitting">
+                            <span x-text="submitting ? 'Menyimpan...' : 'Simpan Keputusan'"></span>
+                        </x-ui.button>
                     </div>
                 </form>
             </x-ui.card>
@@ -242,4 +306,5 @@
         </div>
     </div>
 
+    @endif
 </x-layouts.app>
