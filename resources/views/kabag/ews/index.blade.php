@@ -376,13 +376,22 @@
             </div>
             
             {{-- Pagination Mock --}}
-            <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row" x-data="{ currentPage: 1, totalPages: 1 }">
+            <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row" x-data="{ currentPage: 1, totalPages: 1, perPage: 10 }">
                 <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm text-muted">Tampilkan</span>
+                        <select x-model="perPage" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                        </select>
+                        <span class="text-sm text-muted">data per halaman</span>
+                    </div>
                     <p class="text-sm text-muted hidden sm:block">
                         Menampilkan <span class="font-semibold text-ink">{{ count($listEws) > 0 ? 1 : 0 }}</span> hingga <span class="font-semibold text-ink">{{ count($listEws) }}</span> dari <span class="font-semibold text-ink">{{ count($listEws) }}</span> hasil
                     </p>
                 </div>
-                <div class="w-full sm:w-auto">
+                <div class="w-full sm:w-auto" x-show="totalPages > 1">
                     <x-ui.pagination />
                 </div>
             </div>

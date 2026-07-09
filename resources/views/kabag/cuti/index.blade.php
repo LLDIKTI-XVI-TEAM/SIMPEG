@@ -124,6 +124,7 @@
             <x-ui.table>
                 <x-ui.table-head class="border-b border-border">
                     <x-ui.table-row>
+                        <x-ui.table-th align="center" class="px-6 py-3.5 w-14">NO</x-ui.table-th>
                         <x-ui.table-th class="px-6 py-3.5">Pegawai</x-ui.table-th>
                         <x-ui.table-th class="px-6 py-3.5">Jenis Cuti</x-ui.table-th>
                         <x-ui.table-th class="px-6 py-3.5">Durasi & Tanggal</x-ui.table-th>
@@ -133,7 +134,7 @@
                     </x-ui.table-row>
                 </x-ui.table-head>
                 <x-ui.table-body>
-                    @foreach($cutiList as $cuti)
+                    @foreach($cutiList as $index => $cuti)
                     <x-ui.table-row 
                         class="hover:bg-soft transition-colors group"
                         x-show="(search === '' || '{{ strtolower($cuti['nama']) }}'.includes(search.toLowerCase()) || '{{ $cuti['nip'] }}'.includes(search)) && 
@@ -141,6 +142,11 @@
                                 (filterJenis === '' || '{{ $cuti['jenis_cuti'] }}' === filterJenis) &&
                                 (filterTahun === '' || '{{ $cuti['tgl_mulai'] }}'.includes(filterTahun))"
                     >
+                        <!-- NOMOR -->
+                        <x-ui.table-td align="center" padding="comfortable" class="font-mono text-sm font-semibold text-muted">
+                            {{ $index + 1 }}
+                        </x-ui.table-td>
+                        
                         <!-- NAMA PEGAWAI -->
                         <x-ui.table-td padding="comfortable">
                             <x-ui.tooltip text="Buka detail pengajuan cuti {{ $cuti['nama'] }}" position="right">
@@ -199,13 +205,22 @@
             </x-ui.table>
         </div>
         
-        <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row" x-data="{ currentPage: 1, totalPages: 1 }">
+        <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row" x-data="{ currentPage: 1, totalPages: 1, perPage: 10 }">
             <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-muted">Tampilkan</span>
+                    <select x-model="perPage" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
+                        <option value="10">10</option>
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                    </select>
+                    <span class="text-sm text-muted">data per halaman</span>
+                </div>
                 <p class="text-sm text-muted hidden sm:block">
                     Menampilkan <span class="font-semibold text-ink">1</span> hingga <span class="font-semibold text-ink">5</span> dari <span class="font-semibold text-ink">5</span> hasil
                 </p>
             </div>
-            <div class="w-full sm:w-auto">
+            <div class="w-full sm:w-auto" x-show="totalPages > 1">
                 <x-ui.pagination />
             </div>
         </div>
