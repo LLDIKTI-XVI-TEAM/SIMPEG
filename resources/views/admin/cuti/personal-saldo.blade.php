@@ -8,52 +8,59 @@
             </div>
             <div class="inline-flex items-center gap-2 rounded-lg bg-surface px-3 py-1.5 border border-border shadow-sm">
                 <span class="h-2 w-2 rounded-full bg-success"></span>
-                <span class="text-xs font-semibold text-muted">Periode Tahun {{ $balance->tahun }}</span>
+                <span class="text-xs font-semibold text-muted">Periode Tahun {{ $balance?->tahun ?? now()->year }}</span>
             </div>
         </div>
 
         <!-- Metrics Grid -->
-        <div class="grid gap-5 md:grid-cols-4">
-            <!-- Jatah Awal -->
-            <x-ui.stat-card label="Jatah Cuti" value="{{ $balance->jatah_awal }}" variant="primary" size="lg" label-class="normal-case tracking-normal text-sm font-medium" value-class="text-ink">
+        @if($balance)
+            <div class="grid gap-5 md:grid-cols-4">
+                <!-- Jatah Awal -->
+                <x-ui.stat-card label="Jatah Cuti" value="{{ $balance->jatah_awal }}" variant="primary" size="lg" label-class="normal-case tracking-normal text-sm font-medium" value-class="text-ink">
                 <x-slot:icon>
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                 </x-slot:icon>
                 <span class="text-sm text-muted normal-case tracking-normal">hari kerja</span>
-            </x-ui.stat-card>
+                </x-ui.stat-card>
 
-            <!-- Carry Over -->
-            <x-ui.stat-card label="Carry Over ({{ $balance->tahun - 1 }})" value="{{ $balance->carry_over }}" variant="info" size="lg" label-class="normal-case tracking-normal text-sm font-medium" value-class="text-ink">
+                <!-- Carry Over -->
+                <x-ui.stat-card label="Carry Over ({{ $balance->tahun - 1 }})" value="{{ $balance->carry_over }}" variant="info" size="lg" label-class="normal-case tracking-normal text-sm font-medium" value-class="text-ink">
                 <x-slot:icon>
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </x-slot:icon>
                 <span class="text-sm text-muted normal-case tracking-normal">hari</span>
-            </x-ui.stat-card>
+                </x-ui.stat-card>
 
-            <!-- Terpakai -->
-            <x-ui.stat-card label="Cuti Terpakai" value="{{ $balance->terpakai }}" variant="warning" size="lg" label-class="normal-case tracking-normal text-sm font-medium">
+                <!-- Terpakai -->
+                <x-ui.stat-card label="Cuti Terpakai" value="{{ $balance->terpakai }}" variant="warning" size="lg" label-class="normal-case tracking-normal text-sm font-medium">
                 <x-slot:icon>
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </x-slot:icon>
                 <span class="text-sm text-muted normal-case tracking-normal">hari</span>
-            </x-ui.stat-card>
+                </x-ui.stat-card>
 
-            <!-- Sisa -->
-            <x-ui.stat-card label="Sisa Saldo Cuti" value="{{ $balance->sisa }}" variant="primary" size="lg" surface="soft" label-class="normal-case tracking-normal text-sm font-semibold text-primary">
+                <!-- Sisa -->
+                <x-ui.stat-card label="Sisa Saldo Cuti" value="{{ $balance->sisa }}" variant="primary" size="lg" surface="soft" label-class="normal-case tracking-normal text-sm font-semibold text-primary">
                 <x-slot:icon>
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </x-slot:icon>
                 <span class="text-sm font-semibold text-primary/80 normal-case tracking-normal">hari</span>
-            </x-ui.stat-card>
-        </div>
+                </x-ui.stat-card>
+            </div>
+        @else
+            <x-ui.card>
+                <p class="text-sm font-semibold text-ink">Saldo cuti tahunan belum tersedia</p>
+                <p class="mt-1 text-sm text-muted">Saldo akan tampil setelah hak cuti tahunan dibuat oleh proses pengajuan atau admin kepegawaian.</p>
+            </x-ui.card>
+        @endif
 
         <!-- History -->
         <div class="rounded-xl border border-border bg-surface shadow-sm">

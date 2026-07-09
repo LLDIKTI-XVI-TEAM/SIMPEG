@@ -7,6 +7,7 @@ use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveRequest;
 use App\Models\User;
+use App\Services\AuditService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -156,6 +157,159 @@ class LeaveBalanceService
     }
 
     /**
+     * Mencatat saldo awal tahunan sebagai event khusus, bukan koreksi generik.
+     * Dedup per pegawai+tahun mencegah input saldo awal tertulis dua kali saat admin mengulang submit.
+     *
+     * @param  array{n2:int, n1:int, current:int}  $buckets
+     */
+    public function setOpeningBalance(Employee|string $employee, int $tahun, array $buckets, string $reason, User $actor): LeaveBalance
+    {
+        $employeeModel = $this->resolveEmployee($employee);
+        $dedupKey = "{$employeeModel->id}:{$tahun}:opening_balance_set";
+
+        return DB::transaction(function () use ($employeeModel, $tahun, $buckets, $reason, $actor, $dedupKey): LeaveBalance {
+            $existingLedger = LeaveBalanceLedger::query()
+                ->where('dedup_key', $dedupKey)
+                ->first();
+
+            $balance = LeaveBalance::query()->firstOrCreate(
+                ['employee_id' => $employeeModel->id, 'tahun' => $tahun],
+                ['jatah_awal' => 0, 'carry_over' => 0, 'terpakai' => 0, 'sisa' => 0]
+            );
+            if ($this->hasBalanceDeduction($employeeModel->id, $tahun)) {
+                throw ValidationException::withMessages([
+                    'saldo' => 'Saldo awal tidak dapat diedit setelah ada pemotongan cuti. Gunakan koreksi manual.',
+                ]);
+            }
+
+            $oldTotal = (int) $balance->sisa;
+            $normalized = $this->normalizeBuckets($buckets);
+            $newTotal = $this->calculator->availableTotal($normalized);
+
+            $balance->forceFill([
+                'jatah_awal' => $normalized['current'],
+                'carry_over' => $normalized['n2'] + $normalized['n1'],
+                'terpakai' => 0,
+                'sisa' => $newTotal,
+                'sisa_n2' => $normalized['n2'],
+                'sisa_n1' => $normalized['n1'],
+                'sisa_tahun_berjalan' => $normalized['current'],
+                'terpakai_tahun_berjalan' => 0,
+                'hangus' => 0,
+            ])->save();
+
+            $ledgerPayload = [
+                'employee_id' => $employeeModel->id,
+                'leave_balance_id' => $balance->id,
+                'tahun' => $tahun,
+                'event_type' => 'opening_balance_set',
+                'amount' => $newTotal,
+                'source_year' => $tahun,
+                'reason' => $reason,
+                'dedup_key' => $dedupKey,
+                'metadata' => ['buckets' => $normalized],
+                'created_by' => $actor->id,
+                'occurred_at' => Carbon::now(),
+            ];
+
+            // Saldo awal dapat diperbaiki sebelum ada pemotongan karena belum ada fakta cuti yang dikonsumsi.
+            // Setelah deduction terjadi, perubahan harus masuk sebagai `manual_adjustment` append-only.
+            if ($existingLedger === null) {
+                LeaveBalanceLedger::create($ledgerPayload);
+            } else {
+                $existingLedger->forceFill($ledgerPayload)->save();
+            }
+
+            $this->auditBalanceChange(
+                event: 'LEAVE_BALANCE_OPENING_SET',
+                balance: $balance,
+                actor: $actor,
+                reason: $reason,
+                sourceYear: $tahun,
+                oldBalance: $oldTotal,
+                newBalance: $newTotal,
+                delta: $newTotal - $oldTotal,
+                extra: ['buckets' => $normalized],
+            );
+
+            return $balance;
+        });
+    }
+
+    /**
+     * Menulis koreksi saldo manual sebagai delta append-only.
+     * Debit dikunci ke sisa bucket agar saldo tidak pernah menjadi negatif atau membentuk utang cuti.
+     */
+    public function adjustBalance(Employee|string $employee, int $tahun, string $bucket, int $amount, string $reason, User $actor): LeaveBalance
+    {
+        if ($amount === 0) {
+            throw ValidationException::withMessages([
+                'amount' => 'Jumlah koreksi saldo tidak boleh nol.',
+            ]);
+        }
+
+        $employeeModel = $this->resolveEmployee($employee);
+
+        return DB::transaction(function () use ($employeeModel, $tahun, $bucket, $amount, $reason, $actor): LeaveBalance {
+            $balance = LeaveBalance::query()
+                ->where('employee_id', $employeeModel->id)
+                ->where('tahun', $tahun)
+                ->lockForUpdate()
+                ->firstOrCreate(
+                    ['employee_id' => $employeeModel->id, 'tahun' => $tahun],
+                    ['jatah_awal' => 0, 'carry_over' => 0, 'terpakai' => 0, 'sisa' => 0]
+                );
+            $buckets = $this->bucketsFromBalance($balance);
+            $oldTotal = $this->calculator->availableTotal($buckets);
+            $currentBucketValue = $this->bucketValue($buckets, $bucket);
+            $applied = $amount < 0 ? -min(abs($amount), $currentBucketValue) : $amount;
+
+            $remaining = $this->applyBucketDelta($buckets, $bucket, $applied);
+            $newTotal = $this->calculator->availableTotal($remaining);
+            $sourceYear = $this->sourceYearForBucket($tahun, $bucket);
+            $metadata = [
+                'bucket' => $bucket,
+                'old_bucket_balance' => $currentBucketValue,
+                'new_bucket_balance' => $this->bucketValue($remaining, $bucket),
+            ];
+
+            if ($amount < 0 && abs($amount) !== abs($applied)) {
+                $metadata['niat_pengurangan'] = abs($amount);
+                $metadata['diterapkan'] = abs($applied);
+            }
+
+            LeaveBalanceLedger::create([
+                'employee_id' => $employeeModel->id,
+                'leave_balance_id' => $balance->id,
+                'tahun' => $tahun,
+                'event_type' => 'manual_adjustment',
+                'amount' => $applied,
+                'source_year' => $sourceYear,
+                'reason' => $reason,
+                'metadata' => $metadata,
+                'created_by' => $actor->id,
+                'occurred_at' => Carbon::now(),
+            ]);
+
+            $this->fillSummaryBuckets($balance, $remaining)->save();
+
+            $this->auditBalanceChange(
+                event: 'LEAVE_BALANCE_CORRECTED',
+                balance: $balance,
+                actor: $actor,
+                reason: $reason,
+                sourceYear: $sourceYear,
+                oldBalance: $oldTotal,
+                newBalance: $newTotal,
+                delta: $applied,
+                extra: $metadata,
+            );
+
+            return $balance;
+        });
+    }
+
+    /**
      * Mencatat sisa cuti yang secara formal ditunda karena tugas dinas.
      * Status workflow `Ditangguhkan` tidak cukup, karena status itu hanya jeda approval dan bukan hak saldo baru.
      */
@@ -226,7 +380,10 @@ class LeaveBalanceService
      */
     private function bucketsFromBalance(LeaveBalance $balance): array
     {
-        $bucketTotal = $balance->sisa_n2 + $balance->sisa_n1 + $balance->sisa_tahun_berjalan;
+        $sisaN2 = (int) ($balance->sisa_n2 ?? 0);
+        $sisaN1 = (int) ($balance->sisa_n1 ?? 0);
+        $sisaCurrent = (int) ($balance->sisa_tahun_berjalan ?? 0);
+        $bucketTotal = $sisaN2 + $sisaN1 + $sisaCurrent;
 
         if ($bucketTotal === 0 && $balance->sisa > 0) {
             $n1 = min($balance->carry_over, $balance->sisa);
@@ -239,16 +396,123 @@ class LeaveBalanceService
         }
 
         return [
-            'n2' => $balance->sisa_n2,
-            'n1' => $balance->sisa_n1,
-            'current' => $balance->sisa_tahun_berjalan,
+            'n2' => $sisaN2,
+            'n1' => $sisaN1,
+            'current' => $sisaCurrent,
         ];
+    }
+
+    /**
+     * @param  array{n2:int, n1:int, current:int}  $buckets
+     * @return array{n2:int, n1:int, current:int}
+     */
+    private function normalizeBuckets(array $buckets): array
+    {
+        return [
+            'n2' => max(0, (int) $buckets['n2']),
+            'n1' => max(0, (int) $buckets['n1']),
+            'current' => max(0, (int) $buckets['current']),
+        ];
+    }
+
+    /**
+     * @param  array{n2:int, n1:int, current:int}  $buckets
+     */
+    private function bucketValue(array $buckets, string $bucket): int
+    {
+        return match ($bucket) {
+            'n2' => $buckets['n2'],
+            'n1' => $buckets['n1'],
+            'current' => $buckets['current'],
+            default => throw ValidationException::withMessages([
+                'bucket' => 'Bucket saldo cuti tidak valid.',
+            ]),
+        };
+    }
+
+    /**
+     * @param  array{n2:int, n1:int, current:int}  $buckets
+     * @return array{n2:int, n1:int, current:int}
+     */
+    private function applyBucketDelta(array $buckets, string $bucket, int $amount): array
+    {
+        $remaining = $buckets;
+        $remaining[$bucket] = max(0, $remaining[$bucket] + $amount);
+
+        return $remaining;
+    }
+
+    private function sourceYearForBucket(int $tahun, string $bucket): int
+    {
+        return match ($bucket) {
+            'n2' => $tahun - 2,
+            'n1' => $tahun - 1,
+            'current' => $tahun,
+            default => throw ValidationException::withMessages([
+                'bucket' => 'Bucket saldo cuti tidak valid.',
+            ]),
+        };
+    }
+
+    /**
+     * Ringkasan materialized selalu disinkronkan dari bucket agar UI cepat tanpa menghitung ulang ledger.
+     *
+     * @param  array{n2:int, n1:int, current:int}  $buckets
+     */
+    private function fillSummaryBuckets(LeaveBalance $balance, array $buckets): LeaveBalance
+    {
+        $available = $this->calculator->availableTotal($buckets);
+
+        return $balance->forceFill([
+            'carry_over' => $buckets['n2'] + $buckets['n1'],
+            'sisa' => $available,
+            'sisa_n2' => $buckets['n2'],
+            'sisa_n1' => $buckets['n1'],
+            'sisa_tahun_berjalan' => $buckets['current'],
+        ]);
+    }
+
+    /**
+     * Audit log melengkapi ledger: ledger untuk rekonstruksi saldo, audit untuk jejak aktor dan konteks admin.
+     *
+     * @param  array<string, mixed>  $extra
+     */
+    private function auditBalanceChange(string $event, LeaveBalance $balance, ?User $actor, string $reason, int $sourceYear, int $oldBalance, int $newBalance, int $delta, array $extra = []): void
+    {
+        $payload = array_merge([
+            'employee_id' => $balance->employee_id,
+            'tahun' => $balance->tahun,
+            'tahun_sumber' => $sourceYear,
+            'reason' => $reason,
+            'corrected_by' => $actor?->id,
+            'corrected_at' => Carbon::now()->toIso8601String(),
+        ], $extra);
+
+        $oldValues = array_merge($payload, ['old_balance' => $oldBalance]);
+        $newValues = array_merge($payload, ['new_balance' => $newBalance, 'delta' => $delta]);
+
+        if ($actor === null) {
+            AuditService::log($event, 'LeaveBalance', $balance->id, $oldValues, $newValues);
+
+            return;
+        }
+
+        AuditService::logAs((string) $actor->id, (string) $actor->name, $event, 'LeaveBalance', $balance->id, $oldValues, $newValues);
     }
 
     private function alreadyDeducted(LeaveRequest $leaveRequest): bool
     {
         return LeaveBalanceLedger::query()
             ->where('leave_request_id', $leaveRequest->id)
+            ->where('event_type', 'leave_deducted')
+            ->exists();
+    }
+
+    private function hasBalanceDeduction(string $employeeId, int $tahun): bool
+    {
+        return LeaveBalanceLedger::query()
+            ->where('employee_id', $employeeId)
+            ->where('tahun', $tahun)
             ->where('event_type', 'leave_deducted')
             ->exists();
     }
@@ -494,6 +758,23 @@ class LeaveBalanceService
                 ],
             );
         }
+
+        $oldBalance = $this->calculator->availableTotal($this->bucketsFromBalance($sourceBalance));
+        $newBalance = $this->calculator->availableTotal($this->bucketsFromBalance($targetBalance));
+        $this->auditBalanceChange(
+            event: 'LEAVE_ROLLOVER_APPLIED',
+            balance: $targetBalance,
+            actor: null,
+            reason: 'Rollover saldo cuti tahunan ke tahun berikutnya.',
+            sourceYear: $sourceYear,
+            oldBalance: $oldBalance,
+            newBalance: $newBalance,
+            delta: $newBalance - $oldBalance,
+            extra: [
+                'carry_over' => $result['n2'] + $result['n1'],
+                'hangus' => $result['hangus'],
+            ],
+        );
     }
 
     /**

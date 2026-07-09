@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceLedger;
@@ -80,6 +81,15 @@ class LeaveBalanceRolloverTest extends TestCase
             'source_year' => 2026,
             'dedup_key' => "{$employee->id}:2027:carry_over_expired:2026",
         ]);
+
+        $audit = AuditLog::where('event', 'LEAVE_ROLLOVER_APPLIED')->firstOrFail();
+        $this->assertSame('LeaveBalance', $audit->auditable_type);
+        $this->assertSame($employee->id, $audit->new_values['employee_id']);
+        $this->assertSame(2027, $audit->new_values['tahun']);
+        $this->assertSame(2026, $audit->new_values['tahun_sumber']);
+        $this->assertSame(10, $audit->old_values['old_balance']);
+        $this->assertSame(18, $audit->new_values['new_balance']);
+        $this->assertSame(8, $audit->new_values['delta']);
     }
 
     public function test_rollover_dua_tahun_tanpa_cuti_tahunan_mengizinkan_total_dua_puluh_empat_hari(): void
