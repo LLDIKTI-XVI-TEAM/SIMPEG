@@ -10,15 +10,19 @@ class EwsConfig extends Model
 
     protected $fillable = ['key', 'value'];
 
+    private static ?array $configCache = null;
+
     /**
      * Get config value by key.
      */
     public static function getVal(string $key, $default = null)
     {
         try {
-            $config = self::where('key', $key)->first();
+            if (self::$configCache === null) {
+                self::$configCache = self::pluck('value', 'key')->toArray();
+            }
 
-            return $config ? $config->value : $default;
+            return array_key_exists($key, self::$configCache) ? self::$configCache[$key] : $default;
         } catch (\Throwable $e) {
             return $default;
         }
