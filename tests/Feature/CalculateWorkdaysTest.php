@@ -88,9 +88,9 @@ class CalculateWorkdaysTest extends TestCase
         $response->assertForbidden();
     }
 
-    public function test_atasan_langsung_tidak_dapat_mengakses(): void
+    public function test_kepala_bagian_tidak_dapat_mengakses(): void
     {
-        $user = User::factory()->atasanLangsung()->create();
+        $user = User::factory()->kepalaBagian()->create();
 
         $this->actingAs($user);
         $response = $this->getJson(self::ENDPOINT.'?start=2026-01-05&end=2026-01-09');
