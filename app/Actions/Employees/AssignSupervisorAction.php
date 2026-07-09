@@ -32,7 +32,7 @@ class AssignSupervisorAction
         }
 
         DB::transaction(function () use ($employee, $kepalaBagianId, $request) {
-            $oldValues = $employee->only('kepala_bagian_id', 'atasan_langsung_id');
+            $oldValues = $employee->only('kepala_bagian_id');
 
             $currentAssignment = SupervisorAssignment::where('employee_id', $employee->id)
                 ->whereNull('tanggal_berakhir')
@@ -60,7 +60,6 @@ class AssignSupervisorAction
 
             $employee->update([
                 'kepala_bagian_id' => $kepalaBagianId,
-                'atasan_langsung_id' => $kepalaBagianId,
             ]);
 
             AuditService::log(
@@ -70,12 +69,11 @@ class AssignSupervisorAction
                 $oldValues,
                 [
                     'kepala_bagian_id' => $kepalaBagianId,
-                    'atasan_langsung_id' => $kepalaBagianId,
                 ],
                 $request
             );
         });
 
-        return $employee->load(['kepalaBagian', 'atasanLangsung']);
+        return $employee->load(['kepalaBagian']);
     }
 }

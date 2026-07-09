@@ -79,7 +79,6 @@ class SupervisorAssignmentTest extends TestCase
         $this->assertDatabaseHas('employees', [
             'id' => $employee->id,
             'kepala_bagian_id' => $supervisor->id,
-            'atasan_langsung_id' => $supervisor->id,
         ]);
 
         $this->assertDatabaseHas('supervisor_assignments', [
@@ -110,7 +109,6 @@ class SupervisorAssignmentTest extends TestCase
         $this->assertDatabaseHas('employees', [
             'id' => $employee->id,
             'kepala_bagian_id' => null,
-            'atasan_langsung_id' => null,
         ]);
     }
 

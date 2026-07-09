@@ -120,7 +120,7 @@ $permissionPaths = [
                             $roleVariant = match ($role->name) {
                                 'super_admin' => 'danger',
                                 'admin_kepegawaian' => 'primary',
-                                'atasan_langsung' => 'warning',
+                                'kepala_bagian' => 'warning',
                                 'pegawai' => 'success',
                                 default => 'muted',
                             };

@@ -81,8 +81,8 @@ class EmployeeRowMapper
         'admin_kepegawaian' => 'admin_kepegawaian',
         'admin kepegawaian' => 'admin_kepegawaian',
         'pimpinan' => 'pimpinan',
-        'atasan_langsung' => 'atasan_langsung',
-        'atasan langsung' => 'atasan_langsung',
+        'kepala_bagian' => 'kepala_bagian',
+        'atasan langsung' => 'kepala_bagian',
         'pegawai' => 'pegawai',
     ];
 

@@ -91,7 +91,7 @@ if (app()->environment(['local', 'testing'])) {
     });
 }
 
-Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_kepegawaian,pimpinan,atasan_langsung,pegawai'])->group(function (): void {
+Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_kepegawaian,pimpinan,kepala_bagian,pegawai'])->group(function (): void {
     Route::get('/dashboard', function (Request $request, ListActiveEwsAlertsAction $ewsAlerts) {
         $user = $request->user();
         $role = $user?->role;
@@ -122,7 +122,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         session(['active_role' => $role]);
 
         return back();
-    })->whereIn('role', ['super_admin', 'admin_kepegawaian', 'pimpinan', 'atasan_langsung', 'pegawai'])
+    })->whereIn('role', ['super_admin', 'admin_kepegawaian', 'pimpinan', 'kepala_bagian', 'pegawai'])
         ->name('change-role');
 
     Route::get('/pegawai/import-data', function () {
@@ -747,22 +747,22 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     // Antrean dan tindakan approval cuti digerbang ganda: role allowlist sebagai pagar kasar
     // dan permission level-aksi; kelayakan approver per-tahap (person-based) ditegakkan di service.
     Route::get('/cuti/approval', [CutiController::class, 'approval'])
-        ->middleware(['role:super_admin,pimpinan,atasan_langsung,admin_kepegawaian,pegawai'])
+        ->middleware(['role:super_admin,pimpinan,kepala_bagian,admin_kepegawaian,pegawai'])
         ->name('cuti.approval');
     Route::post('/cuti/{id}/approve', [CutiController::class, 'approve'])
-        ->middleware(['role:super_admin,pimpinan,atasan_langsung,admin_kepegawaian,pegawai'])
+        ->middleware(['role:super_admin,pimpinan,kepala_bagian,admin_kepegawaian,pegawai'])
         ->name('cuti.approve')
         ->whereUuid('id');
     Route::post('/cuti/{id}/postpone', [CutiController::class, 'postpone'])
-        ->middleware(['role:super_admin,pimpinan,atasan_langsung,admin_kepegawaian,pegawai'])
+        ->middleware(['role:super_admin,pimpinan,kepala_bagian,admin_kepegawaian,pegawai'])
         ->name('cuti.postpone')
         ->whereUuid('id');
     Route::post('/cuti/{id}/request-changes', [CutiController::class, 'requestChanges'])
-        ->middleware(['role:super_admin,pimpinan,atasan_langsung,admin_kepegawaian,pegawai'])
+        ->middleware(['role:super_admin,pimpinan,kepala_bagian,admin_kepegawaian,pegawai'])
         ->name('cuti.request-changes')
         ->whereUuid('id');
     Route::post('/cuti/{id}/reject', [CutiController::class, 'reject'])
-        ->middleware(['role:super_admin,pimpinan,atasan_langsung,admin_kepegawaian,pegawai'])
+        ->middleware(['role:super_admin,pimpinan,kepala_bagian,admin_kepegawaian,pegawai'])
         ->name('cuti.reject')
         ->whereUuid('id');
     Route::get('/dashboard/cuti/{id}', [CutiController::class, 'show'])
@@ -864,5 +864,26 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/pegawai/export', [PegawaiController::class, 'export'])
         ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('pegawai.export');
+
+    // UI DUMMY ROUTES FOR KEPALA BAGIAN
+    Route::get('/kepala-bagian/bawahan', function () {
+        return view('kabag.bawahan.index');
+    })->name('kepala-bagian.bawahan.index');
+
+    Route::get('/kepala-bagian/bawahan/{id}', function ($id) {
+        return view('kabag.bawahan.show', compact('id'));
+    })->name('kepala-bagian.bawahan.show');
+
+    Route::get('/kepala-bagian/cuti', function () {
+        return view('kabag.cuti.index');
+    })->name('kepala-bagian.cuti.index');
+
+    Route::get('/kepala-bagian/cuti/{id}', function ($id) {
+        return view('kabag.cuti.show', compact('id'));
+    })->name('kepala-bagian.cuti.show');
+
+    Route::get('/kepala-bagian/ews', function () {
+        return view('kabag.ews.index');
+    })->name('kepala-bagian.ews.index');
 
 });

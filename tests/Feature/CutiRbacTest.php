@@ -182,11 +182,11 @@ class CutiRbacTest extends TestCase
         $response->assertSee('Setujui');
     }
 
-    public function test_atasan_langsung_hanya_bisa_approve_stage1(): void
+    public function test_kepala_bagian_hanya_bisa_approve_stage1(): void
     {
-        $user = User::factory()->atasanLangsung()->create();
+        $user = User::factory()->kepalaBagian()->create();
 
-        // Atasan langsung memegang gerbang stage 1 (mengetahui pengajuan bawahan).
+        // Kepala bagian memegang gerbang stage 1 (mengetahui pengajuan bawahan).
         $this->assertTrue($user->hasPermission('cuti.approve_stage1'));
 
         // Atasan langsung bukan approver stage 2/3 dan tidak mengonfigurasi approval chain.
@@ -226,7 +226,7 @@ class CutiRbacTest extends TestCase
         $superAdmin = User::factory()->superAdmin()->create();
         $this->assertTrue($superAdmin->hasPermission('cuti.configure'));
 
-        foreach (['admin_kepegawaian', 'pimpinan', 'atasan_langsung', 'pegawai'] as $role) {
+        foreach (['admin_kepegawaian', 'pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
             $user = User::factory()->state(['role' => $role])->create();
             $this->assertFalse(
                 $user->hasPermission('cuti.configure'),
