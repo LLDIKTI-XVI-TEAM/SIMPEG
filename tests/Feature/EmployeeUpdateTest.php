@@ -8,6 +8,7 @@ use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
+use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
 use App\Models\User;
 use Carbon\Carbon;
@@ -422,5 +423,81 @@ class EmployeeUpdateTest extends TestCase
         // file_berkas_lainnya required_with:berkas_lainnya_jenis → validasi gagal.
         $response->assertSessionHasErrors('file_berkas_lainnya');
         $this->assertDatabaseCount('documents', 0);
+    }
+
+    public function test_upload_sk_mutasi_changes_employee_status_to_mutasi(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
+        $statusMutasi = RefStatusPegawai::where('nama', 'Mutasi')->firstOrFail();
+
+        $payload = $this->validPayload($employee, [
+            'berkas_lainnya_jenis' => 'SK Mutasi',
+            'berkas_lainnya_nomor' => 'SK-MUT-001',
+            'file_berkas_lainnya' => UploadedFile::fake()->create('mutasi.pdf', 300, 'application/pdf'),
+        ]);
+
+        $this->actingAs($user);
+        $response = $this->withSession(['_token' => 'test-token'])
+            ->post("/pegawai/{$employee->id}", $payload, ['X-CSRF-TOKEN' => 'test-token']);
+
+        $response->assertRedirect(route('data-pegawai'));
+        $this->assertDatabaseHas('documents', [
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'SK Mutasi',
+        ]);
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'status_pegawai_id' => $statusMutasi->id,
+            'status_aktif' => 'Mutasi',
+        ]);
+    }
+
+    public function test_upload_sk_pensiun_changes_employee_status_to_pensiun(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
+        $statusPensiun = RefStatusPegawai::where('nama', 'Pensiun')->firstOrFail();
+
+        $payload = $this->validPayload($employee, [
+            'berkas_lainnya_jenis' => 'SK Pensiun',
+            'file_berkas_lainnya' => UploadedFile::fake()->create('pensiun.pdf', 300, 'application/pdf'),
+        ]);
+
+        $this->actingAs($user);
+        $response = $this->withSession(['_token' => 'test-token'])
+            ->post("/pegawai/{$employee->id}", $payload, ['X-CSRF-TOKEN' => 'test-token']);
+
+        $response->assertRedirect(route('data-pegawai'));
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'status_pegawai_id' => $statusPensiun->id,
+            'status_aktif' => 'Pensiun',
+        ]);
+    }
+
+    public function test_upload_ktp_does_not_change_employee_status(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
+
+        $payload = $this->validPayload($employee, [
+            'berkas_lainnya_jenis' => 'KTP',
+            'file_berkas_lainnya' => UploadedFile::fake()->create('ktp.pdf', 300, 'application/pdf'),
+        ]);
+
+        $this->actingAs($user);
+        $response = $this->withSession(['_token' => 'test-token'])
+            ->post("/pegawai/{$employee->id}", $payload, ['X-CSRF-TOKEN' => 'test-token']);
+
+        $response->assertRedirect(route('data-pegawai'));
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'status_aktif' => 'Aktif',
+        ]);
     }
 }

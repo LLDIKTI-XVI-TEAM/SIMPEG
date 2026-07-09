@@ -317,6 +317,22 @@ class UpdateEmployeeAction
                     'file_path' => $filePath,
                     'keterangan' => $validated['berkas_lainnya_deskripsi'] ?? null,
                 ]);
+
+                // SK Mutasi/Pensiun otomatis mengubah status pegawai sesuai berkas yang diunggah.
+                $statusTujuan = match ($jenis) {
+                    'SK Mutasi' => 'Mutasi',
+                    'SK Pensiun' => 'Pensiun',
+                    default => null,
+                };
+                if ($statusTujuan !== null) {
+                    $statusPegawai = RefStatusPegawai::where('nama', $statusTujuan)->first();
+                    if ($statusPegawai) {
+                        $employee->update([
+                            'status_pegawai_id' => $statusPegawai->id,
+                            'status_aktif' => $statusPegawai->nama,
+                        ]);
+                    }
+                }
             }
 
             $employee->refresh();
