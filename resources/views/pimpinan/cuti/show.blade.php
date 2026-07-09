@@ -129,11 +129,11 @@
                 <h3 class="text-lg font-semibold text-ink mb-4">Keputusan Pejabat Berwenang (Pimpinan)</h3>
                 
                 @if($leaveData['status'] === 'Menunggu Keputusan Pimpinan')
-                    <form action="{{ route('pimpinan.cuti.decision', $leaveData['id']) }}" method="POST" class="space-y-4">
+                    <form action="{{ route('pimpinan.cuti.decision', $leaveData['id']) }}" method="POST" class="space-y-4" x-data="{ keputusan: '' }">
                         @csrf
                         <div>
                             <label class="block text-sm font-semibold text-ink mb-2">Ambil Keputusan</label>
-                            <select name="keputusan" class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none" required>
+                            <select name="keputusan" x-model="keputusan" class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none" required>
                                 <option value="">-- Pilih Keputusan --</option>
                                 <option value="DISETUJUI">1. Disetujui</option>
                                 <option value="PERUBAHAN">2. Disetujui dengan Perubahan</option>
@@ -143,8 +143,12 @@
                         </div>
                         
                         <div>
-                            <label class="block text-sm font-semibold text-ink mb-2">Catatan Tambahan (Opsional)</label>
-                            <textarea name="catatan" rows="3" class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none" placeholder="Tulis catatan jika ada perubahan atau penangguhan..."></textarea>
+                            <label class="block text-sm font-semibold text-ink mb-2">
+                                Catatan Tambahan 
+                                <span x-show="keputusan === 'PERUBAHAN' || keputusan === 'DITANGGUHKAN' || keputusan === 'TIDAK_DISETUJUI'" class="text-danger">* (Wajib)</span>
+                                <span x-show="keputusan === '' || keputusan === 'DISETUJUI'" class="text-muted font-normal">(Opsional)</span>
+                            </label>
+                            <textarea name="catatan" :required="keputusan === 'PERUBAHAN' || keputusan === 'DITANGGUHKAN' || keputusan === 'TIDAK_DISETUJUI'" rows="3" class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none" placeholder="Tulis catatan jika ada perubahan atau penangguhan..."></textarea>
                         </div>
 
                         <div class="pt-2">
