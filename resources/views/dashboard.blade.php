@@ -2,7 +2,7 @@
     $role = auth()->user()?->role ?? 'pegawai';
 @endphp
 
-@if(in_array($role, ['atasan_langsung', 'kepala_bagian']))
+@if($role === 'kepala_bagian')
     @include('kabag.dashboard')
 @else
 <x-layouts.app title="Dashboard" subtitle="Ringkasan eksekutif dan pemantauan aktivitas kepegawaian hari ini.">

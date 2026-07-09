@@ -119,10 +119,7 @@ class EmployeeController extends Controller
                     'id' => $updatedEmployee->kepalaBagian->id,
                     'nama_lengkap' => $updatedEmployee->kepalaBagian->nama_lengkap,
                 ] : null,
-                'atasan_langsung' => $updatedEmployee->atasanLangsung ? [
-                    'id' => $updatedEmployee->atasanLangsung->id,
-                    'nama_lengkap' => $updatedEmployee->atasanLangsung->nama_lengkap,
-                ] : null,
+
             ],
         ]);
     }

@@ -88,7 +88,9 @@ class EmployeeCreateIntegrationTest extends TestCase
         $documentPath = $employee->documents()->where('jenis_dokumen', 'sk_pengangkatan')->value('file_path');
         $this->assertIsString($documentPath);
         $this->assertStringStartsWith('sk/', $documentPath);
-        Storage::disk('public')->assertExists($documentPath);
+        /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
+        $disk = Storage::disk('public');
+        $disk->assertExists($documentPath);
 
         // Check if detail page renders
         $detailResponse = $this->actingAs($user)->get(route('pegawai.show', $employee->id));

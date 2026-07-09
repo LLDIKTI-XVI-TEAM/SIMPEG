@@ -87,7 +87,7 @@
                     'ews.config',
                     'kepala-bagian.bawahan.index',
                 ],
-                'atasan_langsung' => [
+                'kepala_bagian' => [
                     'data-pegawai',
                     'pegawai.import',
                     'hari-libur',

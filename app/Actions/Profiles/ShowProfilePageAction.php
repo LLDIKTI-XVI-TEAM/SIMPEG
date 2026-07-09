@@ -19,7 +19,7 @@ class ShowProfilePageAction
             'disciplineRecords',
             'educationHistories.jenjang',
             'documents',
-            'atasanLangsung',
+            'kepalaBagian',
         ])->first();
 
         $year = (int) now()->year;
