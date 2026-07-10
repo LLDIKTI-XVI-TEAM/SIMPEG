@@ -457,7 +457,7 @@
 
                     {{-- Dokumen --}}
                     <td class="px-4 py-3">
-                        <span class="inline-flex items-center gap-1.5 font-medium text-xs rounded-md px-2.5 py-1"
+                        <span class="inline-flex items-center gap-1.5 font-medium text-xs rounded-md px-2.5 py-1 whitespace-nowrap"
                             :class="p.is_lengkap ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'">
                             <span class="h-1.5 w-1.5 rounded-full" :class="p.is_lengkap ? 'bg-success' : 'bg-warning'"></span>
                             <span x-text="p.is_lengkap ? 'Lengkap' : 'Belum Lengkap'"></span>
