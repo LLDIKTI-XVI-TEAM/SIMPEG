@@ -83,12 +83,6 @@ class CreateEmployeeAction
             $data['jabatan_terakhir'] = RefJabatan::find($data['jabatan_id'])?->nama;
         }
 
-        $kepalaBagianId = $data['kepala_bagian_id'] ?? $data['atasan_langsung_id'] ?? null;
-        if ($kepalaBagianId !== null) {
-            $data['kepala_bagian_id'] = $kepalaBagianId;
-            $data['atasan_langsung_id'] = $kepalaBagianId;
-        }
-
         if (empty($data['status_pegawai_id'])) {
             $statusName = $data['status_aktif'] ?? 'Aktif';
             $data['status_pegawai_id'] = RefStatusPegawai::where('nama', $statusName)->value('id')

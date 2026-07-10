@@ -27,7 +27,7 @@
                 @if($searchLabel)
                     <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">{{ $searchLabel }}</label>
                 @endif
-                <div class="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary w-full">
+                <div class="flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-2 shadow-sm focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary w-full transition-all duration-200">
                     <svg class="w-4 h-4 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                     </svg>

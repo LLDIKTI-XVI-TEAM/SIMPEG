@@ -14,7 +14,7 @@
     ];
 
     $cutiConfig = [
-        'stage1_role' => 'atasan_langsung',
+        'stage1_role' => 'kepala_bagian',
         'stage2_approver' => 'Riza Hamzah, S.Sos.',
         'stage2_nip' => '197804122005012002',
         'stage3_approver' => 'Munawir Sadzali Razak, S.I.P., M.A.',
@@ -39,7 +39,7 @@
             'nip' => '19901120201501 2 003',
             'email' => 'sitirahayu@gmail.com',
             'keycloak_id' => 'user-rahayu-90',
-            'role' => 'atasan_langsung',
+            'role' => 'kepala_bagian',
             'status' => 'Terhubung'
         ],
         [
@@ -291,7 +291,7 @@
                             <div class="flex gap-4 items-start p-4 rounded-lg bg-soft/40 border border-border">
                                 <span class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0 font-sans mt-0.5">1</span>
                                 <div class="space-y-1 flex-1">
-                                    <p class="text-xs font-bold text-ink font-sans">Stage 1: Verifikasi Atasan Langsung</p>
+                                    <p class="text-xs font-bold text-ink font-sans">Stage 1: Verifikasi Kepala Bagian</p>
                                     <p class="text-[10px] text-muted font-sans leading-normal">Otomatis dicarikan berdasarkan NIP Atasan yang terdaftar di masing-masing profil pegawai.</p>
                                 </div>
                             </div>
@@ -443,7 +443,7 @@
                                                     'bg-danger/10 text-danger': user.role === 'super_admin',
                                                     'bg-primary/10 text-primary': user.role === 'admin_kepegawaian',
                                                     'bg-info/10 text-info': user.role === 'pimpinan',
-                                                    'bg-warning/10 text-warning': user.role === 'atasan_langsung',
+                                                    'bg-warning/10 text-warning': user.role === 'kepala_bagian',
                                                     'bg-success/10 text-success': user.role === 'pegawai'
                                                 }"
                                                 x-text="user.role"
@@ -527,7 +527,7 @@
                                 <option value="Super Admin">Super Admin</option>
                                 <option value="Admin Kepegawaian">Admin Kepegawaian</option>
                                 <option value="Pimpinan">Pimpinan</option>
-                                <option value="Atasan Langsung">Atasan Langsung</option>
+                                <option value="Kepala Bagian">Kepala Bagian</option>
                                 <option value="Pegawai">Pegawai</option>
                             </select>
                         </div>

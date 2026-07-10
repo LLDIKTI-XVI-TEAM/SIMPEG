@@ -86,7 +86,8 @@
                     'data-nonaktif',
                     'ews.config',
                 ],
-                'atasan_langsung' => [
+                'kepala_bagian' => [
+                    'data-pegawai',
                     'pegawai.import',
                     'hari-libur',
                     'dokumen',
@@ -99,6 +100,26 @@
                     'laporan',
                     'laporan.pegawai',
                     'laporan.cuti',
+                    'cuti.rekap',
+                    'ews',
+                    'ews.config',
+                ],
+                'kepala_bagian' => [
+                    'data-pegawai',
+                    'pegawai.import',
+                    'hari-libur',
+                    'dokumen',
+                    'audit-log',
+                    'pengaturan',
+                    'user-management',
+                    'rbac',
+                    'data-nonaktif',
+                    'data-master',
+                    'laporan',
+                    'laporan.pegawai',
+                    'laporan.cuti',
+                    'cuti.rekap',
+                    'ews',
                     'ews.config',
                 ],
                 'pegawai' => [
@@ -132,28 +153,31 @@
                 ],
                 [
                     'group' => 'Kepegawaian',
-                    'items' => [
+                    'items' => array_filter([
                         ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users'],
+                        in_array($activeRole, ['kepala_bagian', 'kepala_bagian']) ? ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'] : null,
                         ['label' => 'Data Nonaktif', 'route' => 'data-nonaktif', 'icon' => 'user-minus'],
                         ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open'],
                         ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up'],
-                    ]
+                    ])
                 ],
                 [
                     'group' => 'Cuti',
-                    'items' => [
+                    'items' => array_filter([
+                        in_array($activeRole, ['kepala_bagian', 'kepala_bagian']) ? ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge'] : null,
                         ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
                         ['label' => 'Rekap Cuti', 'route' => 'cuti.rekap', 'icon' => 'document-text'],
                         ['label' => 'Export Cuti', 'route' => 'laporan.cuti', 'icon' => 'document-arrow-down'],
-                    ]
+                    ])
                 ],
                 [
                     'group' => 'EWS & Notifikasi',
-                    'items' => [
+                    'items' => array_filter([
+                        in_array($activeRole, ['kepala_bagian', 'kepala_bagian']) ? ['label' => 'EWS Bawahan', 'route' => 'kepala-bagian.ews.index', 'icon' => 'exclamation-triangle'] : null,
                         ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
                         ['label' => 'EWS Aktif', 'route' => 'ews', 'icon' => 'exclamation-triangle'],
                         ['label' => 'Konfigurasi EWS', 'route' => 'ews.config', 'icon' => 'cog-6-tooth'],
-                    ]
+                    ])
                 ],
 
                 [
@@ -214,22 +238,27 @@
             @endphp
 
             @foreach($menuGroups as $group)
-                @if(!empty($group['group']))
-                    <div class="px-4 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted/60 font-sans">
-                        {{ $group['group'] }}
-                    </div>
-                @endif
-                <div class="space-y-1">
-                    @foreach($group['items'] as $menu)
-                        @php
-                            $routeExists = \Illuminate\Support\Facades\Route::has($menu['route']);
-                            $isLocked    = in_array($menu['route'], $myLockedMenus);
-
-                            if (!$routeExists || $isLocked) {
-                                continue;
-                            }
-
-                            $isActive = false;
+                @php
+                    $visibleItems = [];
+                    foreach ($group['items'] as $menu) {
+                        $routeExists = \Illuminate\Support\Facades\Route::has($menu['route']);
+                        $isLocked    = in_array($menu['route'], $myLockedMenus);
+                        if ($routeExists && !$isLocked) {
+                            $visibleItems[] = $menu;
+                        }
+                    }
+                @endphp
+                
+                @if(count($visibleItems) > 0)
+                    @if(!empty($group['group']))
+                        <div class="px-4 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted/60 font-sans">
+                            {{ $group['group'] }}
+                        </div>
+                    @endif
+                    <div class="space-y-1">
+                        @foreach($visibleItems as $menu)
+                            @php
+                                $isActive = false;
                             $currentRoute = request()->route() ? request()->route()->getName() : null;
                             if ($currentRoute === $menu['route']) {
                                 $isActive = true;
@@ -303,6 +332,7 @@
                         </a>
                     @endforeach
                 </div>
+                @endif
             @endforeach
         </nav>
 
