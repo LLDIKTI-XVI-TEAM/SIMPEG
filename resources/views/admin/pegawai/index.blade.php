@@ -336,63 +336,48 @@
         emptyIcon="search"
         :colspanCount="8"
         checkAllId="check-all"
+        filterClass="lg:grid-cols-5"
     >
         {{-- ---- Filter Slots ---- --}}
         <x-slot:filters>
             {{-- Filter Golongan --}}
-            <div class="relative col-span-1">
-                <select x-model="filters.golongan" @change="applyFilter()"
-                    class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+            <div>
+                <x-form.select x-model="filters.golongan" @change="applyFilter()" size="md">
                     <option value="">Semua Golongan</option>
                     @foreach($golonganOptions as $golongan)
                         <option value="{{ $golongan }}">Golongan {{ $golongan }}</option>
                     @endforeach
-                </select>
-                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                    <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </div>
+                </x-form.select>
             </div>
 
             {{-- Filter Unit Kerja --}}
-            <div class="relative col-span-1">
-                <select x-model="filters.unit_kerja_id" @change="applyFilter()"
-                    class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+            <div>
+                <x-form.select x-model="filters.unit_kerja_id" @change="applyFilter()" size="md">
                     <option value="">Semua Unit</option>
                     @foreach($unitKerjaOptions as $unit)
                         <option value="{{ $unit->id }}">{{ $unit->nama }}</option>
                     @endforeach
-                </select>
-                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                    <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </div>
+                </x-form.select>
             </div>
 
             {{-- Filter Jenis Pegawai --}}
-            <div class="relative col-span-1">
-                <select x-model="filters.jenis_pegawai_id" @change="applyFilter()"
-                    class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+            <div>
+                <x-form.select x-model="filters.jenis_pegawai_id" @change="applyFilter()" size="md">
                     <option value="">Semua Jenis</option>
                     @foreach($jenisPegawaiOptions as $jenis)
                         <option value="{{ $jenis->id }}">{{ $jenis->nama }}</option>
                     @endforeach
-                </select>
-                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                    <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </div>
+                </x-form.select>
             </div>
 
             {{-- Filter Status --}}
-            <div class="relative col-span-1">
-                <select x-model="filters.status_pegawai_id" @change="applyFilter()"
-                    class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+            <div>
+                <x-form.select x-model="filters.status_pegawai_id" @change="applyFilter()" size="md">
                     <option value="all">Semua Status</option>
                     @foreach($statusOptions as $status)
                         <option value="{{ $status->id }}">{{ $status->nama }}</option>
                     @endforeach
-                </select>
-                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                    <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </div>
+                </x-form.select>
             </div>
         </x-slot:filters>
 
@@ -404,7 +389,7 @@
         {{-- ---- Custom Body Rows ---- --}}
         <template x-if="!isLoading && pegawaiRows.length > 0">
             <template x-for="p in pegawaiRows" :key="p.id">
-                <tr class="border-b border-border last:border-0 hover:bg-soft/40 transition-colors" :data-id="p.id" :data-nip="p.nip">
+                <x-ui.table-row class="border-b border-border last:border-0" x-bind:data-id="p.id" x-bind:data-nip="p.nip">
 
                     {{-- Checkbox --}}
                     <td class="px-4 py-3">
@@ -414,17 +399,21 @@
                     {{-- Pegawai --}}
                     <td class="px-4 py-3">
                         <div class="flex items-center gap-3">
-                            <a :href="`/pegawai/${p.id}`"
-                               class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-sm font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20">
-                                <img x-show="p.foto_url" :src="p.foto_url" :alt="'Foto ' + p.nama_lengkap"
-                                     class="h-full w-full object-cover object-[center_25%]" loading="lazy"
-                                     x-on:error="$el.classList.add('hidden'); $el.nextElementSibling.classList.remove('hidden')">
-                                <span x-show="!p.foto_url" x-text="p.nama_lengkap.charAt(0).toUpperCase()" aria-hidden="true"></span>
-                            </a>
-                            <div class="min-w-0">
+                            <x-ui.tooltip dynamicText="'Buka detail ' + p.nama_lengkap" position="right">
                                 <a :href="`/pegawai/${p.id}`"
-                                   class="block truncate text-sm font-semibold text-ink transition hover:text-primary"
-                                   x-text="p.nama_lengkap"></a>
+                                   class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-sm font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20">
+                                    <img x-show="p.foto_url" :src="p.foto_url" :alt="'Foto ' + p.nama_lengkap"
+                                         class="h-full w-full object-cover object-[center_25%]" loading="lazy"
+                                         x-on:error="$el.classList.add('hidden'); $el.nextElementSibling.classList.remove('hidden')">
+                                    <span x-show="!p.foto_url" x-text="p.nama_lengkap.charAt(0).toUpperCase()" aria-hidden="true"></span>
+                                </a>
+                            </x-ui.tooltip>
+                            <div class="min-w-0">
+                                <x-ui.tooltip dynamicText="'Buka detail ' + p.nama_lengkap" position="right">
+                                    <a :href="`/pegawai/${p.id}`"
+                                       class="block truncate text-sm font-semibold text-ink transition hover:text-primary"
+                                       x-text="p.nama_lengkap"></a>
+                                </x-ui.tooltip>
                                 <p class="font-mono text-xs text-muted" x-text="'NIP. ' + p.nip"></p>
                             </div>
                         </div>
@@ -479,31 +468,34 @@
                     <td class="px-4 py-3">
                         <div class="flex items-center justify-start gap-1.5">
                             {{-- Detail --}}
-                            <a :href="`/pegawai/${p.id}`"
-                               class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
-                               title="Detail">
-                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                </svg>
-                            </a>
+                            <x-ui.tooltip text="Detail" position="top">
+                                <a :href="`/pegawai/${p.id}`"
+                                   class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm">
+                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                                    </svg>
+                                </a>
+                            </x-ui.tooltip>
                             {{-- Edit --}}
-                            <a :href="`/pegawai/${p.id}/edit`"
-                               class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
-                               title="Edit">
-                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
-                                </svg>
-                            </a>
+                            <x-ui.tooltip text="Edit" position="top">
+                                <a :href="`/pegawai/${p.id}/edit`"
+                                   class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm">
+                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
+                                    </svg>
+                                </a>
+                            </x-ui.tooltip>
                             {{-- Ubah Status --}}
                             <div class="relative" x-data="{ openStatusDropdown: false }" @click.away="openStatusDropdown = false">
-                                <button type="button" @click="openStatusDropdown = !openStatusDropdown"
-                                        class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-ink transition hover:bg-soft shadow-sm"
-                                        title="Ubah Status">
-                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-                                    </svg>
-                                </button>
+                                <x-ui.tooltip text="Ubah Status" position="top-end">
+                                    <button type="button" @click="openStatusDropdown = !openStatusDropdown"
+                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-ink transition hover:bg-soft shadow-sm">
+                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                                        </svg>
+                                    </button>
+                                </x-ui.tooltip>
                                 <div x-show="openStatusDropdown" style="display: none;" x-transition.opacity.duration.200ms
                                      class="absolute right-0 top-full z-50 mt-1 w-36 rounded-lg border border-border bg-surface p-1 shadow-lg">
                                     <button type="button" @click="changeStatus(p.id, 'Aktif'); openStatusDropdown = false"
@@ -520,18 +512,18 @@
                             </div>
                             @if(auth()->user()->role === 'super_admin')
                             {{-- Hapus (Super Admin Only) --}}
-                            <button type="button" @click="deletePegawai(p.id)"
-                                    class="flex h-8 w-8 items-center justify-center rounded-lg border border-danger/30 bg-surface text-danger transition hover:bg-danger/10 shadow-sm"
-                                    title="Hapus Pegawai">
-                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                                </svg>
-                            </button>
+                            <x-ui.tooltip text="Hapus Pegawai" position="top-end">
+                                <button type="button" @click="deletePegawai(p.id)"
+                                        class="flex h-8 w-8 items-center justify-center rounded-lg border border-danger/30 bg-surface text-danger transition hover:bg-danger/10 shadow-sm">
+                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                                    </svg>
+                                </button>
+                            </x-ui.tooltip>
                             @endif
                         </div>
                     </td>
-
-                </tr>
+                </x-ui.table-row>
             </template>
         </template>
 
@@ -636,7 +628,7 @@
                         <label class="text-xs font-semibold text-ink font-sans">Golongan <span class="text-danger">*</span></label>
                         <select x-model="newPangkat.golongan_id" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                             <option value="">Pilih Golongan</option>
-                            @foreach($golonganRefs ?? [] as $ref)
+                            @foreach($golonganRefOptions ?? [] as $ref)
                                 <option value="{{ $ref->id }}">{{ $ref->nama }}</option>
                             @endforeach
                         </select>
@@ -677,7 +669,7 @@
                         <label class="text-xs font-semibold text-ink font-sans">Jabatan <span class="text-danger">*</span></label>
                         <select x-model="newJabatan.jabatan_id" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                             <option value="">Pilih Jabatan</option>
-                            @foreach($jabatanRefs ?? [] as $ref)
+                            @foreach($jabatanOptions ?? [] as $ref)
                                 <option value="{{ $ref->id }}">{{ $ref->nama }}</option>
                             @endforeach
                         </select>
@@ -687,7 +679,7 @@
                         <label class="text-xs font-semibold text-ink font-sans">Jenis Jabatan</label>
                         <select x-model="newJabatan.jenis_jabatan_id" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                             <option value="">Pilih Jenis</option>
-                            @foreach($jenisJabatanRefs ?? [] as $ref)
+                            @foreach($jenisJabatanOptions ?? [] as $ref)
                                 <option value="{{ $ref->id }}">{{ $ref->nama }}</option>
                             @endforeach
                         </select>

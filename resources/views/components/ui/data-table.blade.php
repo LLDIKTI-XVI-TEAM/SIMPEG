@@ -16,6 +16,7 @@
     'caption' => null,
     'colspanCount' => null,
     'checkAllId' => null,   // Jika diisi, kolom dengan key='check' akan menampilkan checkbox select-all
+    'filterClass' => null,
 ])
 
 @php
@@ -29,6 +30,7 @@
         <x-ui.filter-bar
             :searchModel="$searchModel"
             :searchPlaceholder="$searchPlaceholder"
+            :class="$filterClass"
         >
             {{ $filters ?? '' }}
         </x-ui.filter-bar>
@@ -136,7 +138,7 @@
                 <span class="whitespace-nowrap">Tampilkan</span>
                 <select
                     @change="{{ $setPerPage }}"
-                    class="h-8 rounded-md border border-border bg-white text-ink text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary pr-8"
+                    class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center"
                 >
                     <option value="10" :selected="{{ $perPage }} == 10">10</option>
                     <option value="25" :selected="{{ $perPage }} == 25">25</option>
