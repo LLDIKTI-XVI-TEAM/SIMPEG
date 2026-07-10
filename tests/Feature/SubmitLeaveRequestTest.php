@@ -318,7 +318,7 @@ class SubmitLeaveRequestTest extends TestCase
         $this->assertDatabaseCount('leave_requests', 1);
     }
 
-    public function test_menolak_pengajuan_tanpa_atasan_langsung(): void
+    public function test_menolak_pengajuan_tanpa_kepala_bagian(): void
     {
         $jenis = $this->jenisCuti('Cuti Sakit');
 

@@ -132,7 +132,7 @@ class EmployeeIndexTest extends TestCase
         $response->assertOk();
         $response->assertJsonCount(1, 'employees.data');
         $response->assertJsonPath('employees.data.0.nama_lengkap', 'Target Filter');
-        $response->assertJsonPath('employees.data.0.jenis_pegawai.nama', 'PNS');
+        $response->assertJsonPath('employees.data.0.jenis_pegawai', 'PNS');
     }
 
     public function test_sorting_and_pagination_follow_allowed_parameters(): void

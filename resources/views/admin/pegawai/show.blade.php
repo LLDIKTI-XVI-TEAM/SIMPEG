@@ -11,19 +11,11 @@
             ? \Carbon\Carbon::parse($p->tanggal_kgb_berikutnya)->format('d-m-Y')
             : ($p->latestSalary()?->tmt_kgb ? \Carbon\Carbon::parse($p->latestSalary()->tmt_kgb)->addYears(2)->format('d-m-Y') : '-');
         
-        // Logika BUP dinamis berdasarkan jabatan
-        $bup = 58;
-        $jabatanStr = $p->latestPosition()?->jabatan?->nama ?? $p->latestPosition()?->nama_jabatan ?? '';
-        if (str_contains(strtolower($jabatanStr), 'madya') || str_contains(strtolower($jabatanStr), 'utama') || str_contains(strtolower($jabatanStr), 'pimpinan tinggi')) {
-            $bup = 60;
-        }
-
-        $tglLahir = isset($p->tanggal_lahir) ? \Carbon\Carbon::parse($p->tanggal_lahir) : null;
-        $estimasiPensiun = $tglLahir ? $tglLahir->copy()->addYears($bup)->format('d-m-Y') : '-';
+        $pensiunDate = $p->tanggal_pensiun ? \Carbon\Carbon::parse($p->tanggal_pensiun) : null;
+        $estimasiPensiun = $pensiunDate ? $pensiunDate->format('d-m-Y') : '-';
         
         $sisaPensiunStr = '-';
-        if ($tglLahir) {
-            $pensiunDate = $tglLahir->copy()->addYears($bup);
+        if ($pensiunDate) {
             $now = \Carbon\Carbon::now();
             if ($pensiunDate->isFuture()) {
                 $diff = $now->diff($pensiunDate);
@@ -39,6 +31,10 @@
         kinerjaBaik: {{ $p->is_kinerja_baik ? 'true' : 'false' }},
         kinerjaEndpoint: @js(route('pegawai.kinerja.update', $p->id)),
         isUpdatingKinerja: false,
+        satyalancanaEligible: {{ $p->is_satyalancana_eligible ? 'true' : 'false' }},
+        satyalancanaNote: @js($p->satyalancana_note ?? ''),
+        satyalancanaEndpoint: @js(route('pegawai.satyalancana.update', $p->id)),
+        isUpdatingSatyalancana: false,
         showModal: false,
         modalTitle: '',
         modalType: '',
@@ -94,6 +90,42 @@
                 setTimeout(() => this.toast.show = false, 5000);
             } finally {
                 this.isUpdatingKinerja = false;
+            }
+        },
+        async updateSatyalancanaEligibility() {
+            this.isUpdatingSatyalancana = true;
+
+            try {
+                const response = await fetch(this.satyalancanaEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({
+                        is_satyalancana_eligible: this.satyalancanaEligible,
+                        satyalancana_note: this.satyalancanaNote
+                    })
+                });
+
+                if (!response.ok) {
+                    this.toast = { show: true, message: 'Kelayakan Satyalancana gagal diperbarui.', type: 'error' };
+                    setTimeout(() => this.toast.show = false, 5000);
+
+                    return;
+                }
+
+                const result = await response.json();
+                this.satyalancanaEligible = result.is_satyalancana_eligible;
+                this.satyalancanaNote = result.satyalancana_note || '';
+                this.toast = { show: true, message: result.message, type: 'success' };
+                setTimeout(() => this.toast.show = false, 3000);
+            } catch (error) {
+                this.toast = { show: true, message: 'Terjadi kesalahan jaringan.', type: 'error' };
+                setTimeout(() => this.toast.show = false, 5000);
+            } finally {
+                this.isUpdatingSatyalancana = false;
             }
         },
         
@@ -180,15 +212,17 @@
                         });
                         this.newPangkat = { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '' };
                     } else if (this.modalType === 'keluarga') {
+                        const f = result.family;
                         this.keluargaList.unshift({
-                            nama_anggota: this.newKeluarga.nama_anggota,
-                            hubungan: this.newKeluarga.hubungan,
-                            nik: this.newKeluarga.nik,
-                            tempat_lahir: this.newKeluarga.tempat_lahir,
-                            tanggal_lahir: this.newKeluarga.tanggal_lahir,
-                            jenis_kelamin: this.newKeluarga.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan',
-                            pekerjaan: this.newKeluarga.pekerjaan,
-                            status: this.newKeluarga.status_tunjangan === '1' || this.newKeluarga.status_tunjangan === 1 || this.newKeluarga.status_tunjangan === 'true' || this.newKeluarga.status_tunjangan === true ? 'Ditanggung' : 'Tidak Ditanggung'
+                            id: f.id,
+                            nama_anggota: f.nama_anggota,
+                            hubungan: f.hubungan,
+                            nik: f.nik,
+                            tempat_lahir: f.tempat_lahir,
+                            tanggal_lahir: f.tanggal_lahir ? f.tanggal_lahir.split('-').reverse().join('-') : '-',
+                            jenis_kelamin: f.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan',
+                            pekerjaan: f.pekerjaan,
+                            status: f.status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'
                         });
                         this.newKeluarga = { nama_anggota: '', hubungan: 'Istri', nik: '', tempat_lahir: '', tanggal_lahir: '', jenis_kelamin: 'P', status_tunjangan: '0', pekerjaan: '' };
                     } else if (this.modalType === 'pendidikan') {
@@ -208,7 +242,12 @@
                     setTimeout(() => this.toast.show = false, 3000);
                 } else {
                     const errorData = await response.json();
-                    this.modalError = true;
+                    if (errorData.errors) {
+                        const msgs = Object.values(errorData.errors).flat();
+                        this.modalError = msgs.join(' ');
+                    } else {
+                        this.modalError = errorData.message || 'Terdapat kesalahan. Silakan coba lagi.';
+                    }
                 }
             } catch (error) {
                 this.toast = { show: true, message: 'Terjadi kesalahan jaringan', type: 'error' };
@@ -361,8 +400,44 @@
                         </label>
                     </div>
 
+                    {{-- Satyalancana --}}
+                    <div class="space-y-3 p-2 border-l border-border/80 pl-6">
+                        <div class="flex items-center justify-between gap-4">
+                            <div>
+                                <span class="text-xs font-bold text-ink font-sans block">Kelayakan Satyalancana</span>
+                                <p class="text-[10px] text-muted font-sans mt-0.5">Flag dan catatan manual untuk EWS Satyalancana 10/20/30 tahun.</p>
+                                <p x-show="isUpdatingSatyalancana" class="mt-1 text-[10px] text-primary font-sans" style="display: none;">
+                                    Menyimpan kelayakan Satyalancana.
+                                </p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer select-none">
+                                <input type="checkbox" x-model="satyalancanaEligible" @change="updateSatyalancanaEligibility()" :disabled="isUpdatingSatyalancana" aria-label="Toggle Kelayakan Satyalancana" class="sr-only peer">
+                                <div class="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-success"></div>
+                            </label>
+                        </div>
+                        <div class="space-y-1">
+                            <label for="satyalancana-note" class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Catatan Manual</label>
+                            <textarea
+                                id="satyalancana-note"
+                                x-model="satyalancanaNote"
+                                rows="2"
+                                maxlength="1000"
+                                placeholder="Catatan kelayakan Satyalancana"
+                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder-muted shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                            ></textarea>
+                        </div>
+                        <button
+                            type="button"
+                            @click="updateSatyalancanaEligibility()"
+                            :disabled="isUpdatingSatyalancana"
+                            class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-3 py-1.5 text-xs font-semibold text-primary shadow-sm transition-colors hover:bg-soft disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            Simpan Satyalancana
+                        </button>
+                    </div>
+
                     {{-- Kepala Bagian --}}
-                    <div class="flex items-center gap-3 border-l border-border/80 pl-6">
+                    <div class="flex items-center gap-3 md:col-span-2 border-t border-border/80 pt-4">
                         <div class="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold shrink-0">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0 1 12 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 0 1-.673-.38m0 0A2.18 2.18 0 0 1 3 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 0 1 3.413-.387m7.5 0V5.25A2.25 2.25 0 0 0 13.5 3h-3a2.25 2.25 0 0 0-2.25 2.25v.894m7.5 0a48.667 48.667 0 0 0-7.5 0M12 12.75h.008v.008H12v-.008Z" />
@@ -896,7 +971,7 @@
                                     </svg>
                                 </div>
                                 <div class="ml-3">
-                                    <h3 class="text-sm font-medium text-red-800">Terdapat Kesalahan Pengisian Form</h3>
+                                    <h3 class="text-sm font-medium text-red-800" x-text="modalError"></h3>
                                 </div>
                             </div>
                         </div>
@@ -928,14 +1003,13 @@
                                         name="nik"
                                         label="NIK" 
                                         type="text"
-                                        placeholder="16 digit NIK"
+                                        placeholder="16 digit NIK (opsional)"
                                         minlength="16"
                                         maxlength="16" 
                                         pattern="[0-9]{16}"
                                         title="NIK harus berupa 16 digit angka"
                                         x-model="newKeluarga.nik" 
                                         x-on:input="newKeluarga.nik = newKeluarga.nik.replace(/[^0-9]/g, '')"
-                                        required
                                     />
                                 </div>
 

@@ -28,6 +28,15 @@ class EmployeeFileStorageService
         return $this->store($file, 'cuti');
     }
 
+    /**
+     * Menyimpan berkas lainnya (KTP, KK, SK Mutasi, SK Pensiun, dsb.)
+     * ke disk publik per folder employee agar bisa diakses via URL /storage.
+     */
+    public function storeBerkasLainnya(UploadedFile $file, string $employeeId): string
+    {
+        return $this->store($file, "berkas/{$employeeId}");
+    }
+
     public function deletePublicFile(?string $path): void
     {
         if ($path !== null && $path !== '') {

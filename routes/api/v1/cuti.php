@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware([
     'web',
     'keycloak.auth',
-    'role:super_admin,admin_kepegawaian,pimpinan,atasan_langsung,pegawai',
+    'role:super_admin,admin_kepegawaian,pimpinan,kepala_bagian,pegawai',
     'permission:cuti.create',
 ])
     ->prefix('cuti')

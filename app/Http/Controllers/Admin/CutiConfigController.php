@@ -34,7 +34,7 @@ class CutiConfigController extends Controller
     {
         // Kandidat approver dibatasi pada role yang memang berwenang menyetujui cuti,
         // sehingga super_admin tidak salah memilih akun yang tidak relevan.
-        $eligibleUsers = User::whereIn('role', ['admin_kepegawaian', 'pimpinan', 'atasan_langsung'])
+        $eligibleUsers = User::whereIn('role', ['admin_kepegawaian', 'pimpinan', 'kepala_bagian'])
             ->orderBy('name')
             ->get();
 

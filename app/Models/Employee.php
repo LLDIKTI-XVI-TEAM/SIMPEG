@@ -24,7 +24,6 @@ use Illuminate\Support\Carbon;
  * @property string|null $jenis_pegawai_id
  * @property string|null $status_aktif
  * @property string|null $status_pegawai_id
- * @property string|null $atasan_langsung_id
  * @property string|null $kepala_bagian_id
  * @property string|null $kelas_jabatan
  * @property string|null $kelas_jabatan_terakhir
@@ -37,9 +36,10 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $tanggal_akhir_kontrak
  * @property Carbon|null $deleted_at
  * @property bool $is_kinerja_baik
+ * @property bool $is_satyalancana_eligible
+ * @property string|null $satyalancana_note
  * @property bool $is_kepala_lembaga
  * @property-read RefJenisPegawai|null $jenisPegawai
- * @property-read Employee|null $atasanLangsung
  * @property-read Employee|null $kepalaBagian
  * @property-read Collection<int, PositionHistory> $positionHistories
  * @property-read Collection<int, DisciplineRecord> $disciplineRecords
@@ -68,7 +68,6 @@ class Employee extends Model
         'status_pegawai_id',
         'status_keterangan',
         'kepala_bagian_id',
-        'atasan_langsung_id',
 
         // Snapshot fields
         'golongan_terakhir',
@@ -99,6 +98,8 @@ class Employee extends Model
 
         // Flags
         'is_kinerja_baik',
+        'is_satyalancana_eligible',
+        'satyalancana_note',
         'is_kepala_lembaga',
 
         // SSO & RBAC
@@ -115,6 +116,7 @@ class Employee extends Model
             'tanggal_kgb_berikutnya' => 'date',
             'tanggal_akhir_kontrak' => 'date',
             'is_kinerja_baik' => 'boolean',
+            'is_satyalancana_eligible' => 'boolean',
             'is_kepala_lembaga' => 'boolean',
             'nik' => 'encrypted',
             'no_kk' => 'encrypted',
@@ -234,18 +236,6 @@ class Employee extends Model
     }
 
     // --- Supervisor Relations ---
-
-    /** @return BelongsTo<Employee, $this> */
-    public function atasanLangsung(): BelongsTo
-    {
-        return $this->belongsTo(Employee::class, 'kepala_bagian_id');
-    }
-
-    /** @return HasMany<Employee, $this> */
-    public function bawahanLangsung(): HasMany
-    {
-        return $this->hasMany(Employee::class, 'kepala_bagian_id');
-    }
 
     /** @return BelongsTo<Employee, $this> */
     public function kepalaBagian(): BelongsTo
@@ -381,28 +371,6 @@ class Employee extends Model
             set: fn ($value) => [
                 'kelas_jabatan_terakhir' => $value,
                 'kelas_jabatan' => $value,
-            ],
-        );
-    }
-
-    protected function atasanLangsungId(): Attribute
-    {
-        return Attribute::make(
-            get: fn ($value, array $attributes) => $attributes['kepala_bagian_id'] ?? $value,
-            set: fn ($value) => [
-                'atasan_langsung_id' => $value,
-                'kepala_bagian_id' => $value,
-            ],
-        );
-    }
-
-    protected function kepalaBagianId(): Attribute
-    {
-        return Attribute::make(
-            get: fn ($value, array $attributes) => $value ?? ($attributes['atasan_langsung_id'] ?? null),
-            set: fn ($value) => [
-                'kepala_bagian_id' => $value,
-                'atasan_langsung_id' => $value,
             ],
         );
     }

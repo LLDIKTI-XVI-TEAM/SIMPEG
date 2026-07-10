@@ -2,6 +2,7 @@
 
 namespace App\Actions\Profiles;
 
+use App\Actions\Ews\ListActiveEwsAlertsAction;
 use App\Models\LeaveBalance;
 use App\Models\User;
 use App\Support\Documents\DocumentCategory;
@@ -9,6 +10,8 @@ use Illuminate\Support\Carbon;
 
 class ShowProfilePageAction
 {
+    public function __construct(private readonly ListActiveEwsAlertsAction $ewsAlerts) {}
+
     public function execute(User $user): array
     {
         $employee = $user->employee()->with([
@@ -19,7 +22,7 @@ class ShowProfilePageAction
             'disciplineRecords',
             'educationHistories.jenjang',
             'documents',
-            'atasanLangsung',
+            'kepalaBagian',
         ])->first();
 
         $year = (int) now()->year;
@@ -50,6 +53,9 @@ class ShowProfilePageAction
             'estimasiKgbNext' => $this->estimateNextKgbDate($employee),
             'estimasiPensiun' => $this->estimateRetirementDate($employee),
             'sisaPensiunStr' => $this->retirementRemainingLabel($employee),
+            'ewsAlerts' => $employee
+                ? $this->ewsAlerts->execute(null, null, (string) $employee->id)['alerts']
+                : [],
         ];
     }
 
@@ -77,22 +83,20 @@ class ShowProfilePageAction
 
     private function estimateRetirementDate($employee): string
     {
-        if (! $employee?->tanggal_lahir) {
+        if (! $employee?->tanggal_pensiun) {
             return '-';
         }
 
-        return Carbon::parse($employee->tanggal_lahir)
-            ->addYears($this->retirementAge($employee))
-            ->format('d-m-Y');
+        return Carbon::parse($employee->tanggal_pensiun)->format('d-m-Y');
     }
 
     private function retirementRemainingLabel($employee): string
     {
-        if (! $employee?->tanggal_lahir) {
+        if (! $employee?->tanggal_pensiun) {
             return '-';
         }
 
-        $retirementDate = Carbon::parse($employee->tanggal_lahir)->addYears($this->retirementAge($employee));
+        $retirementDate = Carbon::parse($employee->tanggal_pensiun);
 
         if (! $retirementDate->isFuture()) {
             return 'Memasuki Usia Pensiun';
@@ -101,16 +105,5 @@ class ShowProfilePageAction
         $diff = Carbon::now()->diff($retirementDate);
 
         return $diff->y.' Tahun, '.$diff->m.' Bulan lagi';
-    }
-
-    private function retirementAge($employee): int
-    {
-        $position = strtolower($employee?->latestPosition()?->nama_jabatan ?? '');
-
-        return str_contains($position, 'madya')
-            || str_contains($position, 'utama')
-            || str_contains($position, 'pimpinan tinggi')
-                ? 60
-                : 58;
     }
 }

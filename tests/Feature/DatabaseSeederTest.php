@@ -21,7 +21,7 @@ class DatabaseSeederTest extends TestCase
         ]);
         $this->assertDatabaseHas('users', [
             'keycloak_username' => 'demo-klabat-kabag',
-            'role' => 'atasan_langsung',
+            'role' => 'kepala_bagian',
         ]);
         $this->assertDatabaseHas('users', [
             'email' => 'merlina.rahman@example.com',

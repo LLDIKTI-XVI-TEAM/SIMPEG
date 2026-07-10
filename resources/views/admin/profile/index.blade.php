@@ -79,8 +79,107 @@
         </div>
     @else
         <div x-data="{
-            activeTab: new URLSearchParams(window.location.search).get('tab') || 'profile'
+            activeTab: new URLSearchParams(window.location.search).get('tab') || 'profile',
+            keluargaList: {{ $p->families->map(fn($f) => ['id' => $f->id, 'nama_anggota' => $f->nama_anggota, 'hubungan' => $f->hubungan, 'nik' => $f->nik, 'tempat_lahir' => $f->tempat_lahir, 'tanggal_lahir' => $f->tanggal_lahir ? \Carbon\Carbon::parse($f->tanggal_lahir)->format('d-m-Y') : '-', 'jenis_kelamin' => $f->jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan', 'pekerjaan' => $f->pekerjaan, 'status' => $f->status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'])->toJson() }},
+            showModal: false,
+            modalError: '',
+            isSubmitting: false,
+            toast: { show: false, message: '', type: 'success' },
+            newKeluarga: { nama_anggota: '', hubungan: 'Istri', nik: '', tempat_lahir: '', tanggal_lahir: '', jenis_kelamin: 'P', status_tunjangan: '0', pekerjaan: '' },
+            openModal() {
+                this.newKeluarga = { nama_anggota: '', hubungan: 'Istri', nik: '', tempat_lahir: '', tanggal_lahir: '', jenis_kelamin: 'P', status_tunjangan: '0', pekerjaan: '' };
+                this.modalError = '';
+                this.showModal = true;
+            },
+            async submitForm() {
+                this.modalError = '';
+                this.isSubmitting = true;
+                try {
+                    const response = await fetch('/api/v1/profil-saya/keluarga', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                        },
+                        body: JSON.stringify({
+                            nama_anggota: this.newKeluarga.nama_anggota,
+                            hubungan: this.newKeluarga.hubungan,
+                            nik: this.newKeluarga.nik || null,
+                            tempat_lahir: this.newKeluarga.tempat_lahir || null,
+                            tanggal_lahir: this.newKeluarga.tanggal_lahir,
+                            jenis_kelamin: this.newKeluarga.jenis_kelamin,
+                            status_tunjangan: this.newKeluarga.status_tunjangan === '1' || this.newKeluarga.status_tunjangan === true,
+                            pekerjaan: this.newKeluarga.pekerjaan || null,
+                        })
+                    });
+                    if (response.ok) {
+                        const result = await response.json();
+                        const f = result.family;
+                        this.keluargaList.unshift({
+                            id: f.id,
+                            nama_anggota: f.nama_anggota,
+                            hubungan: f.hubungan,
+                            nik: f.nik,
+                            tempat_lahir: f.tempat_lahir,
+                            tanggal_lahir: f.tanggal_lahir ? f.tanggal_lahir.split('-').reverse().join('-') : '-',
+                            jenis_kelamin: f.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan',
+                            pekerjaan: f.pekerjaan,
+                            status: f.status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'
+                        });
+                        this.showModal = false;
+                        this.toast = { show: true, message: 'Data keluarga berhasil ditambahkan!', type: 'success' };
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                        setTimeout(() => this.toast.show = false, 3000);
+                    } else {
+                        const errorData = await response.json();
+                        if (errorData.errors) {
+                            const msgs = Object.values(errorData.errors).flat();
+                            this.modalError = msgs.join(' ');
+                        } else {
+                            this.modalError = errorData.message || 'Terdapat kesalahan. Silakan coba lagi.';
+                        }
+                    }
+                } catch (error) {
+                    this.toast = { show: true, message: 'Terjadi kesalahan jaringan.', type: 'error' };
+                    setTimeout(() => this.toast.show = false, 5000);
+                } finally {
+                    this.isSubmitting = false;
+                }
+            }
         }" class="mx-auto max-w-5xl space-y-6">
+
+            {{-- TOAST NOTIFICATION --}}
+            <div x-show="toast.show" style="display: none;" class="mb-4" x-transition>
+                <template x-if="toast.type === 'success'">
+                    <div class="rounded-lg bg-green-50 p-4 border border-green-200">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <div class="ml-3">
+                                <h3 class="text-sm font-medium text-green-800" x-text="toast.message"></h3>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                <template x-if="toast.type === 'error'">
+                    <div class="rounded-lg bg-red-50 p-4 border border-red-200">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <div class="ml-3">
+                                <h3 class="text-sm font-medium text-red-800" x-text="toast.message"></h3>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
 
             {{-- PAGE HEADER --}}
             <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -95,20 +194,25 @@
             </div>
 
             {{-- EWS WARNING SECTION --}}
-            @if(session('active_role', auth()->user()->role) === 'super_admin' || $sisaPensiunStr === 'Memasuki Usia Pensiun')
+            @if(count($ewsAlerts) > 0)
             <div class="rounded-lg border border-warning/20 bg-warning/10 px-4 py-3 flex items-start gap-3">
                 <svg class="h-5 w-5 text-warning shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
-                <div>
-                    <h4 class="text-sm font-bold text-warning">Peringatan Penting (EWS)</h4>
-                    <ul class="mt-1 text-xs text-warning list-disc list-inside">
-                        @if($sisaPensiunStr === 'Memasuki Usia Pensiun')
-                            <li>Anda telah memasuki usia batas pensiun (BUP). Segera siapkan dokumen terkait pensiun Anda.</li>
+                <div class="min-w-0 flex-1">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <h4 class="text-sm font-bold text-warning">Peringatan Penting (EWS)</h4>
+                        @if(auth()->user()?->role === 'pegawai')
+                            <a href="{{ route('ews.saya') }}" class="text-xs font-semibold text-warning hover:underline">Lihat semua</a>
                         @endif
-                        @if(session('active_role', auth()->user()->role) === 'super_admin')
-                            <li>Terdapat notifikasi sistem yang memerlukan perhatian Super Admin (Mockup EWS).</li>
-                        @endif
+                    </div>
+                    <ul class="mt-1 space-y-1 text-xs text-warning">
+                        @foreach(array_slice($ewsAlerts, 0, 3) as $alert)
+                            <li>
+                                {{ $alert['jenis_event'] }} pada {{ date('d M Y', strtotime($alert['tanggal_target'])) }}
+                                ({{ $alert['sisa_hari'] }} hari, {{ $alert['followup_status_label'] }}).
+                            </li>
+                        @endforeach
                     </ul>
                 </div>
             </div>
@@ -339,9 +443,17 @@
 
                 {{-- TAB 2: DATA KELUARGA --}}
                 <div x-show="activeTab === 'keluarga'" class="space-y-4" style="display: none;" x-transition>
-                    <div>
-                        <h3 class="text-sm font-bold text-ink font-sans">Susunan Anggota Keluarga</h3>
-                        <p class="text-xs text-muted font-sans mt-0.5">Daftar istri/suami dan anak yang tercatat sebagai tanggungan.</p>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-sm font-bold text-ink font-sans">Susunan Anggota Keluarga</h3>
+                            <p class="text-xs text-muted font-sans mt-0.5">Daftar istri/suami dan anak yang tercatat sebagai tanggungan.</p>
+                        </div>
+                        <button type="button" @click="openModal()" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
+                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                            Tambah Keluarga
+                        </button>
                     </div>
                     <div class="overflow-x-auto rounded-lg border border-border">
                         <table class="w-full">
@@ -355,34 +467,35 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-border text-xs font-sans">
-                                @forelse($p->families as $fam)
-                                    <tr class="transition-colors hover:bg-soft/30 text-ink">
-                                        <td class="px-4 py-3">
-                                            <p class="font-bold font-sans">{{ $fam->nama_anggota }}</p>
-                                            <p class="text-[10px] text-muted font-mono">NIK. {{ $fam->nik ?: '-' }}</p>
-                                        </td>
-                                        <td class="px-4 py-3">
-                                            <p class="font-sans">{{ $fam->hubungan }}</p>
-                                            <p class="text-[10px] text-muted font-sans">{{ $fam->jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan' }}</p>
-                                        </td>
-                                        <td class="px-4 py-3">
-                                            <p class="font-sans">{{ $fam->tempat_lahir ?: '-' }}</p>
-                                            <p class="text-[10px] text-muted font-mono">{{ $fam->tanggal_lahir ? \Carbon\Carbon::parse($fam->tanggal_lahir)->format('d-m-Y') : '-' }}</p>
-                                        </td>
-                                        <td class="px-4 py-3 font-sans">{{ $fam->pekerjaan ?: '-' }}</td>
-                                        <td class="px-4 py-3">
-                                            <span class="inline-flex items-center gap-1 text-[10px] font-bold {{ $fam->status_tunjangan ? 'text-success' : 'text-muted' }}">
-                                                {{ $fam->status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung' }}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                @empty
+                                <template x-if="keluargaList.length === 0">
                                     <tr>
                                         <td colspan="5" class="px-0 py-0">
                                             <x-ui.empty-state icon="document" title="Tidak ada data anggota keluarga." />
                                         </td>
                                     </tr>
-                                @endforelse
+                                </template>
+                                <template x-for="(fam, index) in keluargaList" :key="index">
+                                    <tr class="transition-colors hover:bg-soft/30 text-ink">
+                                        <td class="px-4 py-3">
+                                            <p class="font-bold font-sans" x-text="fam.nama_anggota"></p>
+                                            <p class="text-[10px] text-muted font-mono" x-text="fam.nik ? 'NIK. ' + fam.nik : 'NIK. -'"></p>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <p class="font-sans" x-text="fam.hubungan"></p>
+                                            <p class="text-[10px] text-muted font-sans" x-text="fam.jenis_kelamin"></p>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <p class="font-sans" x-text="fam.tempat_lahir || '-'"></p>
+                                            <p class="text-[10px] text-muted font-mono" x-text="fam.tanggal_lahir"></p>
+                                        </td>
+                                        <td class="px-4 py-3 font-sans" x-text="fam.pekerjaan || '-'"></td>
+                                        <td class="px-4 py-3">
+                                            <span class="inline-flex items-center gap-1 text-[10px] font-bold"
+                                                  :class="fam.status === 'Ditanggung' ? 'text-success' : 'text-muted'"
+                                                  x-text="fam.status"></span>
+                                        </td>
+                                    </tr>
+                                </template>
                             </tbody>
                         </table>
                     </div>
@@ -670,6 +783,107 @@
                     </div>
                 </div>
 
+            </div>
+
+            {{-- MODAL TAMBAH KELUARGA --}}
+            <div x-show="showModal" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;" x-transition>
+                <div class="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+                    <div class="fixed inset-0 bg-ink/60 transition-opacity" @click="showModal = false"></div>
+                    <span class="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">&#8203;</span>
+                    <div class="relative z-10 inline-block transform overflow-hidden rounded-lg bg-surface px-4 pt-5 pb-4 text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6 sm:align-middle border border-border">
+                        <div class="flex items-center justify-between border-b border-border pb-3 mb-4">
+                            <h3 class="text-sm font-bold text-ink font-sans">Tambah Anggota Keluarga</h3>
+                            <button @click="showModal = false" class="text-muted hover:text-ink cursor-pointer">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <template x-if="modalError">
+                            <div class="mb-4 rounded-lg bg-red-50 p-4 border border-red-200">
+                                <div class="flex">
+                                    <div class="flex-shrink-0">
+                                        <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
+                                        </svg>
+                                    </div>
+                                    <div class="ml-3">
+                                        <h3 class="text-sm font-medium text-red-800" x-text="modalError"></h3>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+
+                        <form @submit.prevent="submitForm()" class="space-y-4">
+                            <div class="space-y-3">
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Anggota Keluarga <span class="text-red-500">*</span></label>
+                                    <input type="text" x-model="newKeluarga.nama_anggota" required placeholder="Nama lengkap" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                </div>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div class="space-y-1">
+                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Hubungan <span class="text-red-500">*</span></label>
+                                        <select x-model="newKeluarga.hubungan" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                            <option value="Suami">Suami</option>
+                                            <option value="Istri">Istri</option>
+                                            <option value="Anak">Anak</option>
+                                            <option value="Saudara">Saudara</option>
+                                        </select>
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">NIK <span class="text-muted font-normal normal-case">(opsional)</span></label>
+                                        <input type="text" x-model="newKeluarga.nik" placeholder="16 digit NIK" minlength="16" maxlength="16" pattern="[0-9]{16}" title="NIK harus berupa 16 digit angka" x-on:input="newKeluarga.nik = newKeluarga.nik.replace(/[^0-9]/g, '')" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div class="space-y-1">
+                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tempat Lahir</label>
+                                        <input type="text" x-model="newKeluarga.tempat_lahir" placeholder="Kota kelahiran" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Lahir <span class="text-red-500">*</span></label>
+                                        <input type="date" x-model="newKeluarga.tanggal_lahir" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div class="space-y-1">
+                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Kelamin <span class="text-red-500">*</span></label>
+                                        <select x-model="newKeluarga.jenis_kelamin" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                            <option value="L">Laki-laki</option>
+                                            <option value="P">Perempuan</option>
+                                        </select>
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Status Tunjangan <span class="text-red-500">*</span></label>
+                                        <select x-model="newKeluarga.status_tunjangan" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                            <option value="1">Ditanggung</option>
+                                            <option value="0">Tidak Ditanggung</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Pekerjaan <span class="text-muted font-normal normal-case">(opsional)</span></label>
+                                    <input type="text" x-model="newKeluarga.pekerjaan" placeholder="Pekerjaan anggota keluarga" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                </div>
+                            </div>
+
+                            <div class="flex justify-end gap-3 pt-2 border-t border-border">
+                                <button type="button" @click="showModal = false" class="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-ink hover:bg-soft transition cursor-pointer font-sans">
+                                    Batal
+                                </button>
+                                <button type="submit" :disabled="isSubmitting" class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-60 cursor-pointer font-sans">
+                                    <span x-show="isSubmitting" class="animate-spin w-3 h-3 border-2 border-white border-t-transparent rounded-full"></span>
+                                    <span x-text="isSubmitting ? 'Menyimpan...' : 'Simpan'"></span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             </div>
 
             {{-- SUPER ADMIN SHORTCUTS CARD (BOTTOM) --}}

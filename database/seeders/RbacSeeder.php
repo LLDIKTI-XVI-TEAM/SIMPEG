@@ -15,7 +15,7 @@ class RbacSeeder extends Seeder
             'super_admin' => 'Super Admin — akses penuh termasuk konfigurasi sistem dan soft delete/restore',
             'admin_kepegawaian' => 'Admin Kepegawaian — CRUD data pegawai, import, riwayat, cuti, EWS, laporan',
             'pimpinan' => 'Pimpinan (Kepala Lembaga) — dashboard, read-only data, final approval cuti',
-            'atasan_langsung' => 'Atasan Langsung — approval stage 1 cuti, read-only data bawahan',
+            'kepala_bagian' => 'Kepala Bagian — approval stage 1 cuti, read-only data bawahan',
             'pegawai' => 'Pegawai — read-only data sendiri, ajukan cuti, lihat notifikasi',
         ];
 
@@ -109,10 +109,10 @@ class RbacSeeder extends Seeder
                 'cuti.approve_stage3',
                 'cuti.read_all',
             ],
-            'atasan_langsung' => [
+            'kepala_bagian' => [
                 'notifications.read',
                 'notifications.update',
-                // Atasan langsung memegang approval stage 1 atas pengajuan bawahannya.
+                // Kepala bagian memegang approval stage 1 atas pengajuan bawahannya.
                 'cuti.approve',
                 'cuti.approve_stage1',
             ],

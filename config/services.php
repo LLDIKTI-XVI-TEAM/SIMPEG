@@ -69,7 +69,7 @@ return [
                 'password' => 'demo-klabat-kabag',
                 'name' => 'Demo Klabat (Kepala Bagian)',
                 'email' => 'demo-klabat-kabag@example.test',
-                'role' => 'atasan_langsung',
+                'role' => 'kepala_bagian',
                 'label' => 'Kepala Bagian',
             ],
             [

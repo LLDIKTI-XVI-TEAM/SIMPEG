@@ -1,7 +1,8 @@
 @props([
-    'text',
+    'text' => '',
     'position' => 'top', // top, bottom, left, right, top-end, bottom-end
     'nowrap' => true,
+    'dynamicText' => null,
 ])
 
 <div x-data="{ tooltipVisible: false }"
@@ -33,11 +34,13 @@
             style="top: 50%; left: 100%; transform: translate(8px, -50%); display: none;"
          @endif
          x-cloak>
-         {{ $text }}
+         <span @if($dynamicText) x-text="{{ $dynamicText }}" @endif>{{ $text }}</span>
          
          {{-- Arrow --}}
          @if($position === 'top')
             <div class="absolute w-2 h-2 bg-surface border-b border-r border-border transform rotate-45" style="bottom: -4.5px; left: calc(50% - 4px);"></div>
+         @elseif($position === 'top-end')
+            <div class="absolute w-2 h-2 bg-surface border-b border-r border-border transform rotate-45" style="bottom: -4.5px; right: 12px;"></div>
          @elseif($position === 'bottom')
             <div class="absolute w-2 h-2 bg-surface border-t border-l border-border transform rotate-45" style="top: -4.5px; left: calc(50% - 4px);"></div>
          @elseif($position === 'bottom-end')

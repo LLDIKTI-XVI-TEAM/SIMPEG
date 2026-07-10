@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Api\V1;
 use App\Actions\Employees\AssignSupervisorAction;
 use App\Actions\Employees\CreateEmployeeAction;
 use App\Actions\Employees\DeactivateEmployeeAction;
+use App\Actions\Employees\DeleteEmployeeAction;
 use App\Actions\Employees\ListEmployeesAction;
 use App\Actions\Employees\ListInactiveEmployeesAction;
 use App\Actions\Employees\RestoreEmployeeAction;
 use App\Actions\Employees\ShowEmployeeAction;
 use App\Actions\Employees\ShowMyProfileAction;
 use App\Actions\Employees\UpdateEmployeeAction;
+use App\Actions\Employees\UpdateEmployeeStatusAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Employee\ListEmployeesRequest;
 use App\Http\Requests\Employee\StoreEmployeeRequest;
@@ -83,6 +85,35 @@ class EmployeeController extends Controller
         ]);
     }
 
+    public function forceDestroy(Employee $employee, Request $request, DeleteEmployeeAction $action): JsonResponse
+    {
+        $action->execute($employee, $request);
+
+        return response()->json([
+            'message' => 'Data pegawai berhasil dihapus secara permanen.',
+        ]);
+    }
+
+    public function updateStatus(Employee $employee, Request $request, UpdateEmployeeStatusAction $action): JsonResponse
+    {
+        $request->validate([
+            'status' => 'required|string',
+        ]);
+
+        try {
+            $updatedEmployee = $action->execute($employee, $request->status, $request);
+
+            return response()->json([
+                'message' => 'Status pegawai berhasil diperbarui.',
+                'employee' => $this->employeeListPayload($updatedEmployee),
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
     public function restore(string $employee, Request $request, RestoreEmployeeAction $action): JsonResponse
     {
         $restored = $action->execute(Employee::onlyTrashed()->findOrFail($employee), $request);
@@ -119,10 +150,7 @@ class EmployeeController extends Controller
                     'id' => $updatedEmployee->kepalaBagian->id,
                     'nama_lengkap' => $updatedEmployee->kepalaBagian->nama_lengkap,
                 ] : null,
-                'atasan_langsung' => $updatedEmployee->atasanLangsung ? [
-                    'id' => $updatedEmployee->atasanLangsung->id,
-                    'nama_lengkap' => $updatedEmployee->atasanLangsung->nama_lengkap,
-                ] : null,
+
             ],
         ]);
     }
