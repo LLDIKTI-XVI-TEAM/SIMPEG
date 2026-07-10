@@ -106,7 +106,7 @@ class AdminKepegawaianAccessTest extends TestCase
         }
     }
 
-    public function test_rekap_cuti_mendefinisikan_filter_periode_untuk_preview_laporan(): void
+    public function test_rekap_cuti_menyediakan_tautan_export_tanpa_preview_laporan_palsu(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();
 
@@ -115,11 +115,11 @@ class AdminKepegawaianAccessTest extends TestCase
             ->get('/cuti/rekap');
 
         $response->assertOk();
-        $response->assertSee('activeFilters', false);
-        $response->assertSee("periode: 'Semua Periode'", false);
         $response->assertSee('Buka Laporan & Export', false);
         $response->assertSee('/laporan/export-cuti', false);
         $response->assertSee('Admin Saldo Cuti', false);
+        $response->assertDontSee('activeFilters', false);
+        $response->assertDontSee('Preview PDF resmi', false);
     }
 
     public function test_session_tidak_dapat_dipakai_untuk_menaikkan_role(): void

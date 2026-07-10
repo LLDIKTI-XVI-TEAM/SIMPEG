@@ -14,27 +14,7 @@
 
     @endphp
 
-    <div class="space-y-6" x-data="{
-            exportType: null,
-            activeFilters: { periode: 'Semua Periode' },
-            applyExport(type) {
-                this.exportType = type;
-                
-                let targetUrl = '';
-                if (type === 'excel') {
-                    targetUrl = '/laporan/export-cuti/excel';
-                } else if (type === 'pdf') {
-                    // Beralih ke halaman Laporan Export (Preview PDF)
-                    targetUrl = '/laporan/export-cuti';
-                }
-                
-                if (targetUrl) {
-                    window.location.href = targetUrl;
-                }
-                
-                setTimeout(() => this.exportType = null, 1500);
-            }
-        }">
+    <div class="space-y-6">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h2 class="text-2xl font-semibold text-ink font-sans">Rekap Cuti Pegawai</h2>
@@ -102,10 +82,6 @@
                                         Terpakai</x-ui.table-th>
                                     <x-ui.table-th align="right">
                                         Sisa</x-ui.table-th>
-                                    <x-ui.table-th align="right">
-                                        Tahunan</x-ui.table-th>
-                                    <x-ui.table-th align="right">
-                                        Sakit</x-ui.table-th>
                                     <x-ui.table-th>
                                         Status</x-ui.table-th>
                                     <x-ui.table-th align="right">
@@ -127,9 +103,6 @@
                                         <x-ui.table-td align="right" padding="sm" class="font-mono text-sm font-bold text-primary">
                                             {{ $row['sisa'] }}
                                         </x-ui.table-td>
-                                        <x-ui.table-td align="right" padding="sm" class="font-mono text-sm">{{ $row['tahunan'] }}
-                                        </x-ui.table-td>
-                                        <x-ui.table-td align="right" padding="sm" class="font-mono text-sm">{{ $row['sakit'] }}</x-ui.table-td>
                                         <x-ui.table-td padding="sm">
                                             <span
                                                 class="text-xs font-semibold {{ $statusClass[$row['status']] ?? 'text-muted' }}">{{ $row['status'] }}</span>
@@ -146,18 +119,9 @@
                     </div>
                     {{-- TABLE FOOTER --}}
                     <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row">
-                        <div class="flex items-center gap-4">
-                            <div class="flex items-center gap-2">
-                                <span class="text-sm text-muted">Tampilkan</span>
-                                <select class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
-                                    <option value="10" selected>10</option>
-                                    <option value="25">25</option>
-                                    <option value="50">50</option>
-                                </select>
-                                <span class="text-sm text-muted">data per halaman</span>
-                            </div>
+                        <div>
                             @if($leaveBalances->total() > 0)
-                            <p class="text-sm text-muted hidden sm:block">
+                            <p class="text-sm text-muted">
                                 Menampilkan <span class="font-semibold text-ink">{{ $leaveBalances->firstItem() }}</span> hingga <span class="font-semibold text-ink">{{ $leaveBalances->lastItem() }}</span> dari <span class="font-semibold text-ink">{{ $leaveBalances->total() }}</span> hasil
                             </p>
                             @endif
@@ -215,18 +179,9 @@
                     </div>
                     {{-- TABLE FOOTER --}}
                     <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row">
-                        <div class="flex items-center gap-4">
-                            <div class="flex items-center gap-2">
-                                <span class="text-sm text-muted">Tampilkan</span>
-                                <select class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
-                                    <option value="10" selected>10</option>
-                                    <option value="25">25</option>
-                                    <option value="50">50</option>
-                                </select>
-                                <span class="text-sm text-muted">data per halaman</span>
-                            </div>
+                        <div>
                             @if($usageRows->total() > 0)
-                            <p class="text-sm text-muted hidden sm:block">
+                            <p class="text-sm text-muted">
                                 Menampilkan <span class="font-semibold text-ink">{{ $usageRows->firstItem() }}</span> hingga <span class="font-semibold text-ink">{{ $usageRows->lastItem() }}</span> dari <span class="font-semibold text-ink">{{ $usageRows->total() }}</span> hasil
                             </p>
                             @endif
@@ -362,79 +317,6 @@
                 @endif
             </x-ui.card>
         </div>
-
-        <x-ui.card padding="lg">
-            <div class="flex flex-col items-center gap-1 border-b border-border pb-4 text-center">
-                <div class="flex items-center justify-center gap-2">
-                    <p class="text-sm font-bold uppercase tracking-wide text-primary">LLDIKTI Wilayah XVI</p>
-                </div>
-                <h3 class="text-xl font-bold text-ink">Rekap Cuti Pegawai</h3>
-                <p class="text-sm text-muted">Periode Laporan: <span x-text="activeFilters.periode"></span></p>
-            </div>
-
-            <div class="mt-5 overflow-x-auto">
-                <x-ui.table>
-                    <x-ui.table-head>
-                        <x-ui.table-row>
-                            <x-ui.table-th class="px-3 py-3">No
-                            </x-ui.table-th>
-                            <x-ui.table-th class="px-3 py-3">NIP
-                            </x-ui.table-th>
-                            <x-ui.table-th class="px-3 py-3">
-                                Nama</x-ui.table-th>
-                            <x-ui.table-th class="px-3 py-3">
-                                Jenis Cuti</x-ui.table-th>
-                            <x-ui.table-th class="px-3 py-3">
-                                Tanggal Mulai</x-ui.table-th>
-                            <x-ui.table-th class="px-3 py-3">
-                                Tanggal Selesai</x-ui.table-th>
-                            <x-ui.table-th align="right" class="px-3 py-3">
-                                Hari</x-ui.table-th>
-                            <x-ui.table-th class="px-3 py-3">
-                                Status</x-ui.table-th>
-                        </x-ui.table-row>
-                    </x-ui.table-head>
-                    <x-ui.table-body>
-                        @foreach($usageRows as $row)
-                            <x-ui.table-row>
-                                <x-ui.table-td class="px-3 py-3 font-mono text-sm text-muted">{{ $loop->iteration }}</x-ui.table-td>
-                                <x-ui.table-td class="px-3 py-3 font-mono text-muted">{{ $row['nip'] }}</x-ui.table-td>
-                                <x-ui.table-td class="px-3 py-3 text-sm font-semibold">{{ $row['nama'] }}</x-ui.table-td>
-                                <x-ui.table-td class="px-3 py-3 text-sm">{{ $row['jenis'] }}</x-ui.table-td>
-                                <x-ui.table-td class="px-3 py-3 text-sm text-muted">{{ $row['mulai'] }}</x-ui.table-td>
-                                <x-ui.table-td class="px-3 py-3 text-sm text-muted">{{ $row['selesai'] }}</x-ui.table-td>
-                                <x-ui.table-td align="right" class="px-3 py-3 font-mono text-sm">{{ $row['hari'] }}</x-ui.table-td>
-                                <x-ui.table-td class="px-3 py-3">
-                                    <span
-                                        class="text-xs font-semibold {{ $statusClass[$row['status']] ?? 'text-muted' }}">{{ $row['status'] }}</span>
-                                </x-ui.table-td>
-                            </x-ui.table-row>
-                        @endforeach
-                    </x-ui.table-body>
-                </x-ui.table>
-            </div>
-
-            <div class="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2">
-                <div class="rounded-lg border border-border p-4">
-                    <p class="text-xs font-semibold text-muted">Pembuat Laporan</p>
-                    <div class="mt-12 border-t border-border pt-2">
-                        <p class="text-sm font-semibold text-ink">Admin Kepegawaian</p>
-                        <p class="text-xs text-muted">SIMPEG LLDIKTI XVI</p>
-                    </div>
-                </div>
-                <div class="rounded-lg border border-border p-4">
-                    <p class="text-xs font-semibold text-muted">Mengetahui</p>
-                    <div class="mt-12 border-t border-border pt-2">
-                        <p class="text-sm font-semibold text-ink">Pimpinan / PYBMC</p>
-                        <p class="text-xs text-muted">LLDIKTI Wilayah XVI</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="mt-6 border-t border-border pt-3 text-center text-[10px] text-muted">
-                Preview PDF resmi. Halaman 1 dari 1.
-            </div>
-        </x-ui.card>
 
     </div>
 </x-layouts.app>
