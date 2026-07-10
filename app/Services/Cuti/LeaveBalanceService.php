@@ -2,6 +2,7 @@
 
 namespace App\Services\Cuti;
 
+use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceLedger;
@@ -10,6 +11,7 @@ use App\Models\User;
 use App\Services\AuditService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -36,7 +38,7 @@ class LeaveBalanceService
             return 0;
         }
 
-        return $balance === null ? 0 : $this->calculator->availableTotal($this->bucketsFromBalance($balance));
+        return $this->calculator->availableTotal($this->bucketsFromBalance($balance));
     }
 
     /**
@@ -67,27 +69,52 @@ class LeaveBalanceService
         $employee = $this->resolveEmployee($leaveRequest->employee_id);
         $this->ensureAnnualEntitlement($employee, $tahun, $leaveRequest->tanggal_mulai);
 
-        $balance = LeaveBalance::query()
-            ->where('employee_id', $leaveRequest->employee_id)
-            ->where('tahun', $tahun)
-            ->lockForUpdate()
-            ->first();
+        // Method ini bisa dipanggil langsung (bukan hanya dari LeaveApprovalService::approve),
+        // sehingga kepemilikan transaksi ada di sini: kunci baris, tulis ledger per bucket,
+        // sinkronisasi ringkasan, dan audit pemotongan harus commit atau rollback bersama.
+        DB::transaction(function () use ($leaveRequest, $tahun, $requested): void {
+            $balance = LeaveBalance::query()
+                ->where('employee_id', $leaveRequest->employee_id)
+                ->where('tahun', $tahun)
+                ->lockForUpdate()
+                ->first();
 
-        $buckets = $balance === null
-            ? ['n2' => 0, 'n1' => 0, 'current' => 0]
-            : $this->bucketsFromBalance($balance);
-        $allocation = $this->calculator->allocateDeduction($buckets, $requested);
+            // Cek ulang di dalam kunci agar dua approval final paralel tidak memotong saldo dua kali.
+            if ($this->alreadyDeducted($leaveRequest)) {
+                return;
+            }
 
-        if (! $allocation['success'] || $balance === null) {
-            $available = $this->calculator->availableTotal($buckets);
+            $buckets = $balance === null
+                ? ['n2' => 0, 'n1' => 0, 'current' => 0]
+                : $this->bucketsFromBalance($balance);
+            $allocation = $this->calculator->allocateDeduction($buckets, $requested);
 
-            throw ValidationException::withMessages([
-                'status' => "Saldo cuti tahunan tidak mencukupi saat persetujuan final. Sisa {$available} hari, dibutuhkan {$requested} hari.",
-            ]);
-        }
+            if (! $allocation['success'] || $balance === null) {
+                $available = $this->calculator->availableTotal($buckets);
 
-        $this->writeDeductionLedger($leaveRequest, $balance, $allocation['allocations']);
-        $this->updateSummaryAfterDeduction($balance, $allocation['remaining'], $allocation['allocations'], $requested);
+                throw ValidationException::withMessages([
+                    'status' => "Saldo cuti tahunan tidak mencukupi saat persetujuan final. Sisa {$available} hari, dibutuhkan {$requested} hari.",
+                ]);
+            }
+
+            $oldBalance = $this->calculator->availableTotal($buckets);
+            $newBalance = $this->calculator->availableTotal($allocation['remaining']);
+
+            $this->writeDeductionLedger($leaveRequest, $balance, $allocation['allocations']);
+            $this->updateSummaryAfterDeduction($balance, $allocation['remaining'], $allocation['allocations'], $requested);
+
+            // Audit pemotongan ditulis fail-closed di dalam transaksi yang sama dengan ledger/ringkasan,
+            // sehingga kegagalan audit membatalkan seluruh mutasi dan retry idempoten tidak menghasilkan audit ganda.
+            $this->auditDeductionOrFail(
+                leaveRequest: $leaveRequest,
+                balance: $balance,
+                sourceYear: $tahun,
+                requested: $requested,
+                oldBalance: $oldBalance,
+                newBalance: $newBalance,
+                allocations: $allocation['allocations'],
+            );
+        });
     }
 
     /**
@@ -498,6 +525,44 @@ class LeaveBalanceService
         }
 
         AuditService::logAs((string) $actor->id, (string) $actor->name, $event, 'LeaveBalance', $balance->id, $oldValues, $newValues);
+    }
+
+    /**
+     * Menulis audit pemotongan saldo secara fail-closed di dalam transaksi deduction.
+     *
+     * Berbeda dengan AuditService generik yang sengaja fire-and-forget (kegagalan audit tidak boleh
+     * menggagalkan operasi utama seperti login/CRUD), audit pemotongan saldo adalah bagian tak terpisahkan
+     * dari mutasi saldo: jika audit gagal ditulis, ledger dan ringkasan tidak boleh ikut commit.
+     * Karena itu insert dilakukan langsung tanpa try/catch agar exception membubung dan me-rollback transaksi.
+     *
+     * @param  array{n2:int, n1:int, current:int}  $allocations
+     */
+    private function auditDeductionOrFail(LeaveRequest $leaveRequest, LeaveBalance $balance, int $sourceYear, int $requested, int $oldBalance, int $newBalance, array $allocations): void
+    {
+        // Panggilan langsung service (di luar HTTP) sah bila tidak ada user terautentikasi, sehingga aktor bisa null.
+        $actor = Auth::user();
+
+        $payload = [
+            'employee_id' => $balance->employee_id,
+            'tahun' => $balance->tahun,
+            'tahun_sumber' => $sourceYear,
+            'reason' => 'Pemotongan saldo cuti tahunan pada persetujuan final.',
+            'corrected_by' => $actor?->id,
+            'corrected_at' => Carbon::now()->toIso8601String(),
+            'leave_request_id' => $leaveRequest->id,
+            'requested_days' => $requested,
+            'allocations' => $allocations,
+        ];
+
+        AuditLog::create([
+            'user_id' => $actor?->id,
+            'user_name' => $actor?->name,
+            'event' => 'LEAVE_BALANCE_DEDUCTED',
+            'auditable_type' => 'LeaveBalance',
+            'auditable_id' => $balance->id,
+            'old_values' => array_merge($payload, ['old_balance' => $oldBalance]),
+            'new_values' => array_merge($payload, ['new_balance' => $newBalance, 'delta' => $newBalance - $oldBalance]),
+        ]);
     }
 
     private function alreadyDeducted(LeaveRequest $leaveRequest): bool
