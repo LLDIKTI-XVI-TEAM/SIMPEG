@@ -294,6 +294,47 @@ class UpdateEmployeeAction
                 }
             }
 
+            // 5. Berkas Lainnya (KTP, KK, SK Mutasi, SK Pensiun, atau jenis manual)
+            if ($request->filled('berkas_lainnya_jenis')
+                && $request->hasFile('file_berkas_lainnya')
+                && $request->file('file_berkas_lainnya')->isValid()) {
+                $jenis = $validated['berkas_lainnya_jenis'];
+                $jenisEfektif = $jenis === 'Lainnya'
+                    ? trim((string) ($validated['berkas_lainnya_jenis_manual'] ?? ''))
+                    : $jenis;
+
+                // KTP & KK dipetakan ke kategori arsip ktp_kk; sisanya masuk kategori lainnya.
+                $kategori = in_array($jenis, ['KTP', 'KK'], true) ? 'ktp_kk' : 'lainnya';
+
+                $filePath = $this->files->storeBerkasLainnya($request->file('file_berkas_lainnya'), $employee->id);
+
+                Document::create([
+                    'employee_id' => $employee->id,
+                    'jenis_dokumen' => $kategori,
+                    'nama_dokumen' => $jenisEfektif,
+                    'nomor_dokumen' => $validated['berkas_lainnya_nomor'] ?? null,
+                    'tanggal_dokumen' => $validated['berkas_lainnya_tanggal'] ?? null,
+                    'file_path' => $filePath,
+                    'keterangan' => $validated['berkas_lainnya_deskripsi'] ?? null,
+                ]);
+
+                // SK Mutasi/Pensiun otomatis mengubah status pegawai sesuai berkas yang diunggah.
+                $statusTujuan = match ($jenis) {
+                    'SK Mutasi' => 'Mutasi',
+                    'SK Pensiun' => 'Pensiun',
+                    default => null,
+                };
+                if ($statusTujuan !== null) {
+                    $statusPegawai = RefStatusPegawai::where('nama', $statusTujuan)->first();
+                    if ($statusPegawai) {
+                        $employee->update([
+                            'status_pegawai_id' => $statusPegawai->id,
+                            'status_aktif' => $statusPegawai->nama,
+                        ]);
+                    }
+                }
+            }
+
             $employee->refresh();
             AuditService::log('UPDATE', 'Employee', $employee->id, $oldValues, $employee->toArray(), $request);
 
