@@ -393,6 +393,11 @@ class LeaveBalanceAdjustmentTest extends TestCase
         $response->assertSee('Status Rollover', false);
         $response->assertSee('Koreksi tampil di ledger.', false);
         $response->assertDontSee('Jalankan Rollover', false);
+        $response->assertDontSee('data per halaman', false);
+        $response->assertDontSee('Preview PDF resmi', false);
+        $response->assertDontSee('Periode Laporan:', false);
+        $response->assertDontSee('>Tahunan<', false);
+        $response->assertDontSee('>Sakit<', false);
     }
 
     /**

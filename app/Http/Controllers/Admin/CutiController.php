@@ -214,9 +214,6 @@ class CutiController extends Controller
                 'hangus' => $b->hangus,
                 'terpakai' => $b->terpakai,
                 'sisa' => $b->sisa,
-                'tahunan' => $b->terpakai,
-                'sakit' => 0,
-                'lain' => 0,
                 'status' => $status,
             ];
         });
