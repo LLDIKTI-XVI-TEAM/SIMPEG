@@ -213,6 +213,85 @@ class EwsSchedulerTest extends TestCase
         ]);
     }
 
+    public function test_scheduler_creates_satyalancana_alerts_for_h180_h90_h30(): void
+    {
+        foreach ([180, 90, 30] as $days) {
+            $employee = Employee::factory()->create([
+                'is_satyalancana_eligible' => true,
+            ]);
+
+            $tmt = now()->subYears(10)->addDays($days)->toDateString();
+            Appointment::create([
+                'employee_id' => $employee->id,
+                'jenis_pengangkatan' => 'PNS',
+                'tmt_pengangkatan' => $tmt,
+                'no_sk' => 'SK-SATYA-'.$days,
+                'tanggal_sk' => $tmt,
+            ]);
+        }
+
+        app(EwsEngineService::class)->run();
+
+        $this->assertSame(3, EwsAlert::where('type', 'SATYALANCANA')->count());
+        foreach ([180, 90, 30] as $days) {
+            $this->assertDatabaseHas('ews_alerts', [
+                'type' => 'SATYALANCANA',
+                'interval_days' => $days,
+                'followup_status' => EwsAlert::FOLLOWUP_STATUS_ACTIVE,
+            ]);
+        }
+        $this->assertSame(3, SimpegNotification::where('type', 'ews.satyalancana')->count());
+    }
+
+    public function test_scheduler_prevents_duplicate_satyalancana_alerts(): void
+    {
+        $employee = Employee::factory()->create([
+            'is_satyalancana_eligible' => true,
+        ]);
+        $tmt = now()->subYears(10)->addDays(90)->toDateString();
+
+        Appointment::create([
+            'employee_id' => $employee->id,
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => $tmt,
+            'no_sk' => 'SK-SATYA-DUP',
+            'tanggal_sk' => $tmt,
+        ]);
+
+        app(EwsEngineService::class)->run();
+        app(EwsEngineService::class)->run();
+
+        $this->assertSame(1, EwsAlert::where('type', 'SATYALANCANA')->count());
+        $this->assertSame(1, SimpegNotification::where('type', 'ews.satyalancana')->count());
+    }
+
+    public function test_satyalancana_manual_flag_blocks_notification(): void
+    {
+        $employee = Employee::factory()->create([
+            'is_satyalancana_eligible' => false,
+            'satyalancana_note' => 'Belum memenuhi syarat administrasi.',
+        ]);
+        $tmt = now()->subYears(10)->addDays(90)->toDateString();
+
+        Appointment::create([
+            'employee_id' => $employee->id,
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => $tmt,
+            'no_sk' => 'SK-SATYA-FLAG',
+            'tanggal_sk' => $tmt,
+        ]);
+
+        app(EwsEngineService::class)->run();
+
+        $this->assertSame(1, EwsAlert::where('type', 'SATYALANCANA')->count());
+        $alert = EwsAlert::where('type', 'SATYALANCANA')->firstOrFail();
+        $this->assertNull($alert->notified_at);
+        $this->assertDatabaseMissing('notifications', [
+            'user_id' => $employee->id,
+            'type' => 'ews.satyalancana',
+        ]);
+    }
+
     public function test_scheduler_prevents_duplicate_alerts(): void
     {
         $employee = Employee::factory()->create([

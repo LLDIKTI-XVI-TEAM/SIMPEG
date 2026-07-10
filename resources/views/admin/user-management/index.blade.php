@@ -125,7 +125,7 @@
                         <option value="Super Admin">Super Admin</option>
                         <option value="Admin Kepegawaian">Admin Kepegawaian</option>
                         <option value="Pimpinan">Pimpinan</option>
-                        <option value="Atasan Langsung">Atasan Langsung</option>
+                        <option value="Kepala Bagian">Kepala Bagian</option>
                         <option value="Pegawai">Pegawai</option>
                     </select>
                     <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
@@ -187,7 +187,7 @@
                                                'bg-danger/10 text-danger': emp.role === 'super_admin',
                                                'bg-primary/10 text-primary': emp.role === 'admin_kepegawaian',
                                                'bg-soft text-muted': emp.role === 'pimpinan',
-                                               'bg-warning/10 text-warning': emp.role === 'atasan_langsung',
+                                               'bg-warning/10 text-warning': emp.role === 'kepala_bagian',
                                                'bg-success/10 text-success': emp.role === 'pegawai'
                                            }"
                                            x-text="emp.role"
@@ -300,7 +300,7 @@
                                 <option value="Super Admin">Super Admin</option>
                                 <option value="Admin Kepegawaian">Admin Kepegawaian</option>
                                 <option value="Pimpinan">Pimpinan</option>
-                                <option value="Atasan Langsung">Atasan Langsung</option>
+                                <option value="Kepala Bagian">Kepala Bagian</option>
                                 <option value="Pegawai">Pegawai</option>
                             </select>
                             <p class="text-[10px] text-muted font-sans">Pilih tingkat otorisasi internal untuk di-assign ke user ini.</p>

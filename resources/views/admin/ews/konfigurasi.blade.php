@@ -62,6 +62,10 @@
             pppk_m3: '{{ old('pppk_m3', $configs['pppk_m3']) }}',
             pppk_m1: '{{ old('pppk_m1', $configs['pppk_m1']) }}',
 
+            satyalancana_h180: '{{ old('satyalancana_h180', $configs['satyalancana_h180']) }}',
+            satyalancana_h90: '{{ old('satyalancana_h90', $configs['satyalancana_h90']) }}',
+            satyalancana_h30: '{{ old('satyalancana_h30', $configs['satyalancana_h30']) }}',
+
             ews_scheduler_time: '{{ old('ews_scheduler_time', $configs['ews_scheduler_time']) }}',
 
             // Threshold validation
@@ -75,6 +79,8 @@
                 if (+this.pensiun_m6 <= +this.pensiun_m3) warnings.push('Pensiun: Tahap 2 harus > Tahap 3');
                 if (+this.pppk_m6 <= +this.pppk_m3) warnings.push('PPPK: Tahap 1 harus > Tahap 2');
                 if (+this.pppk_m3 <= +this.pppk_m1) warnings.push('PPPK: Tahap 2 harus > Tahap 3');
+                if (+this.satyalancana_h180 <= +this.satyalancana_h90) warnings.push('Satyalancana: Tahap 1 harus > Tahap 2');
+                if (+this.satyalancana_h90 <= +this.satyalancana_h30) warnings.push('Satyalancana: Tahap 2 harus > Tahap 3');
                 return warnings;
             },
 
@@ -107,6 +113,10 @@
             pp6Class() { return +this.pppk_m6 <= +this.pppk_m3 ? 'border-danger focus:ring-danger/20 focus:border-danger' : 'border-border focus:ring-primary/20 focus:border-primary'; },
             pp3Class() { return (+this.pppk_m6 <= +this.pppk_m3 || +this.pppk_m3 <= +this.pppk_m1) ? 'border-danger focus:ring-danger/20 focus:border-danger' : 'border-border focus:ring-primary/20 focus:border-primary'; },
             pp1Class() { return +this.pppk_m3 <= +this.pppk_m1 ? 'border-danger focus:ring-danger/20 focus:border-danger' : 'border-border focus:ring-primary/20 focus:border-primary'; },
+
+            sl180Class() { return +this.satyalancana_h180 <= +this.satyalancana_h90 ? 'border-danger focus:ring-danger/20 focus:border-danger' : 'border-border focus:ring-primary/20 focus:border-primary'; },
+            sl90Class() { return (+this.satyalancana_h180 <= +this.satyalancana_h90 || +this.satyalancana_h90 <= +this.satyalancana_h30) ? 'border-danger focus:ring-danger/20 focus:border-danger' : 'border-border focus:ring-primary/20 focus:border-primary'; },
+            sl30Class() { return +this.satyalancana_h90 <= +this.satyalancana_h30 ? 'border-danger focus:ring-danger/20 focus:border-danger' : 'border-border focus:ring-primary/20 focus:border-primary'; },
 
             openConfirm() {
                 if (this.reason.trim() === '' || this.thresholdWarnings.length > 0) return;
@@ -500,7 +510,59 @@
                     </div>
                 </div>
 
-                {{-- Row 6: Reason input & Action Button --}}
+                {{-- Row 6: Satyalancana --}}
+                <div class="px-5 py-5 grid grid-cols-1 sm:grid-cols-12 gap-4 items-center hover:bg-soft/10 transition-colors">
+                    <div class="sm:col-span-5">
+                        <div class="flex items-center gap-3">
+                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 0 1 3 3h-15a3 3 0 0 1 3-3m9 0v-3.375c0-.621-.504-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.871m0 0a4.5 4.5 0 0 1 4.008 0m-4.008 0L7.5 12.75m6.004 1.5 1.996-1.5m-8 0a3 3 0 1 1 6 0m2 0a3 3 0 1 0-6 0" />
+                                </svg>
+                            </div>
+                            <div>
+                                <span class="text-sm font-semibold text-ink block">Satyalancana</span>
+                                <p class="text-xs text-muted mt-0.5 leading-relaxed">Peringatan menjelang milestone masa kerja 10, 20, dan 30 tahun dari TMT pengangkatan pertama.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="sm:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+                        <!-- Tahap 1 -->
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-success/5 border border-success/15 rounded-xl px-3 py-2.5">
+                            <span class="text-[10px] font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1 (Awal)</span>
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" name="satyalancana_h180" x-model="satyalancana_h180" min="1" step="1"
+                                    aria-label="Satyalancana Tahap 1 (Awal) dalam hari"
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + sl180Class()">
+                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                            </div>
+                            <span class="text-[10px] font-bold text-success min-w-[68px] text-center" x-text="humanLabel(satyalancana_h180)"></span>
+                        </div>
+                        <!-- Tahap 2 -->
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-warning/5 border border-warning/15 rounded-xl px-3 py-2.5">
+                            <span class="text-[10px] font-bold text-warning uppercase tracking-wider block sm:hidden">Tahap 2 (Dekat)</span>
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" name="satyalancana_h90" x-model="satyalancana_h90" min="1" step="1"
+                                    aria-label="Satyalancana Tahap 2 (Dekat) dalam hari"
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + sl90Class()">
+                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                            </div>
+                            <span class="text-[10px] font-bold text-warning min-w-[68px] text-center" x-text="humanLabel(satyalancana_h90)"></span>
+                        </div>
+                        <!-- Tahap 3 -->
+                        <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-danger/5 border border-danger/15 rounded-xl px-3 py-2.5">
+                            <span class="text-[10px] font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3 (Mendesak)</span>
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" name="satyalancana_h30" x-model="satyalancana_h30" min="1" step="1"
+                                    aria-label="Satyalancana Tahap 3 (Mendesak) dalam hari"
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + sl30Class()">
+                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                            </div>
+                            <span class="text-[10px] font-bold text-danger min-w-[68px] text-center" x-text="humanLabel(satyalancana_h30)"></span>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Row 7: Reason input & Action Button --}}
                 <div
                     class="px-5 py-5 flex flex-col md:flex-row md:items-start justify-between gap-6 hover:bg-soft/5 transition-colors">
                     <div class="max-w-md">
@@ -707,6 +769,13 @@
                         <dd class="font-semibold text-ink font-mono">
                             <span x-text="pppk_m6"></span>h / <span x-text="pppk_m3"></span>h / <span
                                 x-text="pppk_m1"></span>h
+                        </dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 border-b border-border pb-1.5">
+                        <dt class="text-muted">Satyalancana Tahap 1 / 2 / 3</dt>
+                        <dd class="font-semibold text-ink font-mono">
+                            <span x-text="satyalancana_h180"></span>h / <span x-text="satyalancana_h90"></span>h / <span
+                                x-text="satyalancana_h30"></span>h
                         </dd>
                     </div>
                     <div class="pt-2 mt-2">

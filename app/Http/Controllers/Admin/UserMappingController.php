@@ -51,7 +51,7 @@ class UserMappingController extends Controller
         $request->validate([
             'email' => 'required|email',
             'keycloak_id' => 'nullable|string',
-            'role' => 'required|string|in:super_admin,admin_kepegawaian,pimpinan,atasan_langsung,pegawai',
+            'role' => 'required|string|in:super_admin,admin_kepegawaian,pimpinan,kepala_bagian,pegawai',
         ]);
 
         $email = $request->input('email');

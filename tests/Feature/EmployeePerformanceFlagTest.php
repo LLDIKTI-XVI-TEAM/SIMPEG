@@ -79,11 +79,11 @@ class EmployeePerformanceFlagTest extends TestCase
         $this->assertTrue($employee->refresh()->is_kinerja_baik);
     }
 
-    public function test_atasan_langsung_cannot_update_performance_flag(): void
+    public function test_kepala_bagian_cannot_update_performance_flag(): void
     {
         $employee = Employee::factory()->create(['is_kinerja_baik' => true]);
 
-        $this->actingAs(User::factory()->atasanLangsung()->create())
+        $this->actingAs(User::factory()->kepalaBagian()->create())
             ->postJsonWithCsrf(route('pegawai.kinerja.update', $employee->id), [
                 'is_kinerja_baik' => false,
             ])

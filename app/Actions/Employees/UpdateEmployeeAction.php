@@ -360,12 +360,6 @@ class UpdateEmployeeAction
             $data['jabatan_terakhir'] = RefJabatan::find($data['jabatan_id'])?->nama;
         }
 
-        $kepalaBagianId = $data['kepala_bagian_id'] ?? $data['atasan_langsung_id'] ?? null;
-        if ($kepalaBagianId !== null) {
-            $data['kepala_bagian_id'] = $kepalaBagianId;
-            $data['atasan_langsung_id'] = $kepalaBagianId;
-        }
-
         if (! empty($data['status_pegawai_id']) && empty($data['status_aktif'])) {
             $data['status_aktif'] = RefStatusPegawai::whereKey($data['status_pegawai_id'])->value('nama') ?? 'Aktif';
         } elseif (empty($data['status_pegawai_id']) && ! empty($data['status_aktif'])) {

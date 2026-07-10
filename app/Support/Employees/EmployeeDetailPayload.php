@@ -95,6 +95,8 @@ class EmployeeDetailPayload
                 'email_pribadi',
                 'kepala_bagian_id',
                 'is_kinerja_baik',
+                'is_satyalancana_eligible',
+                'satyalancana_note',
                 'is_kepala_lembaga',
                 'created_at',
                 'updated_at',
