@@ -708,6 +708,14 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
 
     Route::get('/dashboard/cuti/saldo', [LeaveBalanceController::class, 'showMyBalanceWeb'])
         ->name('cuti.saldo');
+    Route::post('/dashboard/cuti/saldo/{employee}/opening-balance', [LeaveBalanceController::class, 'storeOpeningBalance'])
+        ->whereUuid('employee')
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:cuti.balance.adjust'])
+        ->name('cuti.saldo.opening-balance');
+    Route::post('/dashboard/cuti/saldo/{employee}/adjust', [LeaveBalanceController::class, 'adjust'])
+        ->whereUuid('employee')
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:cuti.balance.adjust'])
+        ->name('cuti.saldo.adjust');
 
     Route::get('/pegawai/legacy', function () {
         return redirect()->route('data-pegawai');

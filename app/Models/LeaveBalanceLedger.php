@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $reason
  * @property string|null $dedup_key
  * @property array<string, mixed>|null $metadata
+ * @property string|null $created_by
  */
 class LeaveBalanceLedger extends Model
 {
@@ -36,6 +37,7 @@ class LeaveBalanceLedger extends Model
         'reason',
         'dedup_key',
         'metadata',
+        'created_by',
         'occurred_at',
     ];
 
