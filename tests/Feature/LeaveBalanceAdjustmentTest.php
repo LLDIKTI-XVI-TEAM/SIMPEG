@@ -11,7 +11,6 @@ use App\Services\Cuti\LeaveBalanceService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -200,32 +199,38 @@ class LeaveBalanceAdjustmentTest extends TestCase
         $this->assertSame(3, $audit->new_values['delta']);
     }
 
-    public function test_manual_adjustment_menangani_bucket_legacy_yang_null(): void
+    public function test_manual_adjustment_menangani_bucket_legacy_yang_kosong(): void
     {
-        if (DB::getDriverName() !== 'pgsql') {
-            $this->markTestSkipped('Regresi bucket null legacy hanya bisa direproduksi pada PostgreSQL.');
-        }
-
+        // Baris legacy pra-ledger: migrasi bucket bersifat additif dengan default 0 (NOT NULL),
+        // sehingga baris lama tetap punya `sisa`/`carry_over` nyata sementara bucket baru masih nol.
+        // Service harus memetakan carry_over ke N-1 dan sisa selebihnya ke tahun berjalan saat koreksi.
         $employee = Employee::factory()->create();
         $actor = User::factory()->adminKepegawaian()->create();
         $balance = LeaveBalance::create($this->balancePayload($employee, 2027, [
-            'jatah_awal' => 0,
-            'sisa' => 0,
+            'jatah_awal' => 12,
+            'carry_over' => 2,
+            'terpakai' => 9,
+            'sisa' => 5,
             'sisa_n2' => 0,
             'sisa_n1' => 0,
             'sisa_tahun_berjalan' => 0,
         ]));
-        DB::table('leave_balances')->where('id', $balance->id)->update([
-            'sisa_n2' => null,
-            'sisa_n1' => null,
-            'sisa_tahun_berjalan' => null,
-        ]);
 
         app(LeaveBalanceService::class)->adjustBalance($employee, 2027, 'current', 1, 'Koreksi dari saldo legacy kosong.', $actor);
 
         $balance->refresh();
-        $this->assertSame(1, $balance->sisa_tahun_berjalan);
-        $this->assertSame(1, $balance->sisa);
+        // carry_over lama (2) dipetakan ke N-1; sisa lama 5 dikurangi N-1 menjadi 3 di tahun berjalan, lalu +1 koreksi.
+        $this->assertSame(0, $balance->sisa_n2);
+        $this->assertSame(2, $balance->sisa_n1);
+        $this->assertSame(4, $balance->sisa_tahun_berjalan);
+        $this->assertSame(6, $balance->sisa);
+        $this->assertDatabaseHas('leave_balance_ledger', [
+            'employee_id' => $employee->id,
+            'tahun' => 2027,
+            'event_type' => 'manual_adjustment',
+            'amount' => 1,
+            'source_year' => 2027,
+        ]);
     }
 
     public function test_manual_adjustment_debit_diclamps_supaya_saldo_tidak_negatif(): void
