@@ -109,7 +109,7 @@ class SaveApprovalChainConfigTest extends TestCase
         [$verifikator, $pimpinan] = $this->buatKandidatApprover();
 
         // Role berwenang approve cuti pun tidak boleh mengonfigurasi approval chain.
-        foreach (['admin_kepegawaian', 'pimpinan', 'atasan_langsung', 'pegawai'] as $role) {
+        foreach (['admin_kepegawaian', 'pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
             $user = User::factory()->state(['role' => $role])->create();
 
             $response = $this->actingAs($user)->post(route('cuti.config.update'), [

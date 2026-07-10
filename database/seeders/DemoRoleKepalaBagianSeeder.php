@@ -7,7 +7,7 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 
-class DemoRoleAtasanLangsungSeeder extends Seeder
+class DemoRoleKepalaBagianSeeder extends Seeder
 {
     public function run(): void
     {
@@ -29,14 +29,14 @@ class DemoRoleAtasanLangsungSeeder extends Seeder
                 'status_aktif' => 'Aktif',
             ]);
         } else {
-            $employee->update(['nama_lengkap' => 'Demo Klabat (Atasan Langsung)']);
+            $employee->update(['nama_lengkap' => 'Demo Klabat (Kepala Bagian)']);
         }
 
         $user = User::firstOrNew(['keycloak_username' => $username]);
         $user->fill([
-            'name' => 'Demo Klabat (Atasan Langsung)',
+            'name' => 'Demo Klabat (Kepala Bagian)',
             'email' => $email,
-            'role' => 'atasan_langsung',
+            'role' => 'kepala_bagian',
             'employee_id' => $employee->id,
             'email_verified_at' => $user->email_verified_at ?? now(),
         ]);
@@ -47,6 +47,6 @@ class DemoRoleAtasanLangsungSeeder extends Seeder
 
         $user->save();
 
-        $this->command->info("Demo user '{$username}' set to role: atasan_langsung.");
+        $this->command->info("Demo user '{$username}' set to role: kepala_bagian.");
     }
 }

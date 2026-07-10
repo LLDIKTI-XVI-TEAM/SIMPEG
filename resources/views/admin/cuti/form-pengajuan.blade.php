@@ -25,7 +25,7 @@
 
                     <div class="p-6 space-y-5">
                         <!-- Alert jika belum ada atasan langsung -->
-                        @if(!$employee || !$employee->atasan_langsung_id)
+                        @if(!$employee || !$employee->kepala_bagian_id)
                         <div class="rounded-lg bg-warning/10 p-4 border-l-4 border-warning">
                             <div class="flex">
                                 <div class="flex-shrink-0">
@@ -35,7 +35,7 @@
                                 </div>
                                 <div class="ml-3">
                                     <p class="text-sm text-warning-dark font-medium text-ink">
-                                        Anda belum memiliki Atasan Langsung yang dikonfigurasi. Pengajuan cuti mungkin tidak dapat diproses.
+                                        Anda belum memiliki Kepala Bagian yang dikonfigurasi. Pengajuan cuti mungkin tidak dapat diproses.
                                     </p>
                                 </div>
                             </div>
@@ -47,7 +47,7 @@
                             <label for="jenis_cuti_id" class="block text-sm font-medium text-ink mb-1">Jenis Cuti <span class="text-danger">*</span></label>
                             <select id="jenis_cuti_id" name="jenis_cuti_id" required x-model="selectedJenisCuti" @change="validateSaldo"
                                 class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                                {{ (!$employee || !$employee->atasan_langsung_id) ? 'disabled' : '' }}>
+                                {{ (!$employee || !$employee->kepala_bagian_id) ? 'disabled' : '' }}>
                                 <option value="">Pilih Jenis Cuti</option>
                                 @foreach($jenisCuti as $jenis)
                                     <option value="{{ $jenis->id }}" data-nama="{{ $jenis->nama }}">{{ $jenis->nama }}</option>
@@ -64,7 +64,7 @@
                                 <label for="tanggal_mulai" class="block text-sm font-medium text-ink mb-1">Tanggal Mulai <span class="text-danger">*</span></label>
                                 <input type="date" id="tanggal_mulai" name="tanggal_mulai" required x-model="startDate" @change="calculateDays"
                                     class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                                    {{ (!$employee || !$employee->atasan_langsung_id) ? 'disabled' : '' }}>
+                                    {{ (!$employee || !$employee->kepala_bagian_id) ? 'disabled' : '' }}>
                                 @error('tanggal_mulai')
                                     <p class="mt-1 text-xs text-danger">{{ $message }}</p>
                                 @enderror
@@ -75,7 +75,7 @@
                                 <label for="tanggal_selesai" class="block text-sm font-medium text-ink mb-1">Tanggal Selesai <span class="text-danger">*</span></label>
                                 <input type="date" id="tanggal_selesai" name="tanggal_selesai" required x-model="endDate" @change="calculateDays"
                                     class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                                    {{ (!$employee || !$employee->atasan_langsung_id) ? 'disabled' : '' }}>
+                                    {{ (!$employee || !$employee->kepala_bagian_id) ? 'disabled' : '' }}>
                                 @error('tanggal_selesai')
                                     <p class="mt-1 text-xs text-danger">{{ $message }}</p>
                                 @enderror
@@ -105,7 +105,7 @@
                             <textarea id="alasan" name="alasan" rows="3" required
                                 class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                                 placeholder="Jelaskan alasan cuti Anda secara singkat..."
-                                {{ (!$employee || !$employee->atasan_langsung_id) ? 'disabled' : '' }}></textarea>
+                                {{ (!$employee || !$employee->kepala_bagian_id) ? 'disabled' : '' }}></textarea>
                             @error('alasan')
                                 <p class="mt-1 text-xs text-danger">{{ $message }}</p>
                             @enderror
@@ -116,7 +116,7 @@
                             <label for="file_lampiran" class="block text-sm font-medium text-ink mb-1">File Lampiran <span class="text-muted font-normal">(Opsional)</span></label>
                             <input type="file" id="file_lampiran" name="file_lampiran" accept=".pdf,.jpg,.jpeg,.png"
                                 class="w-full text-sm text-muted file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 transition-all border border-border rounded-lg bg-surface"
-                                {{ (!$employee || !$employee->atasan_langsung_id) ? 'disabled' : '' }}>
+                                {{ (!$employee || !$employee->kepala_bagian_id) ? 'disabled' : '' }}>
                             <p class="mt-1 text-xs text-muted">Format: PDF, JPG, PNG. Maksimal ukuran file: 10MB.</p>
                             @error('file_lampiran')
                                 <p class="mt-1 text-xs text-danger">{{ $message }}</p>
@@ -127,7 +127,7 @@
                     <div class="bg-soft border-t border-border px-6 py-4 flex items-center justify-end gap-3">
                         <a href="{{ route('cuti') }}" class="px-5 py-2.5 text-sm font-medium text-muted hover:text-ink transition-colors">Batal</a>
                         <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-primary/90 focus:ring-2 focus:ring-primary/20 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                            :disabled="saldoError || {{ (!$employee || !$employee->atasan_langsung_id) ? 'true' : 'false' }}">
+                            :disabled="saldoError || {{ (!$employee || !$employee->kepala_bagian_id) ? 'true' : 'false' }}">
                             <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
                             </svg>
@@ -186,7 +186,7 @@
                         <li class="flex items-start">
                             <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary mr-3 mt-0.5">1</div>
                             <div>
-                                <p class="text-sm font-medium text-ink">Atasan Langsung</p>
+                                <p class="text-sm font-medium text-ink">Kepala Bagian</p>
                                 <p class="text-xs text-muted mt-0.5">Pemeriksaan tahap pertama oleh atasan langsung Anda.</p>
                             </div>
                         </li>

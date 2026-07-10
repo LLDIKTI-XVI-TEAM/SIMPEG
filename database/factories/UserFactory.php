@@ -19,8 +19,6 @@ class UserFactory extends Factory
 
     /**
      * Define the model's default state.
-     *
-     * @return array<model-property<User>, mixed>
      */
     public function definition(): array
     {
@@ -58,10 +56,10 @@ class UserFactory extends Factory
         ]);
     }
 
-    public function atasanLangsung(): static
+    public function kepalaBagian(): static
     {
         return $this->state(fn (array $attributes) => [
-            'role' => 'atasan_langsung',
+            'role' => 'kepala_bagian',
         ]);
     }
 

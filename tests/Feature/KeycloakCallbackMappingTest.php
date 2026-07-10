@@ -425,7 +425,7 @@ class KeycloakCallbackMappingTest extends TestCase
         $expectedUsers = [
             'demo-klabat' => 'super_admin',
             'demo-klabat-kepeg' => 'admin_kepegawaian',
-            'demo-klabat-kabag' => 'atasan_langsung',
+            'demo-klabat-kabag' => 'kepala_bagian',
             'demo-klabat-pimpinan' => 'pimpinan',
             'demo-klabat-pegawai' => 'pegawai',
         ];

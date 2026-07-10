@@ -65,8 +65,14 @@ class EwsEngineService
                 $configDays('pppk_m1', 30),
             ];
 
+            $satyalancanaDays = [
+                $configDays('satyalancana_h180', 180),
+                $configDays('satyalancana_h90', 90),
+                $configDays('satyalancana_h30', 30),
+            ];
+
             // Scan all active employees
-            $employees = Employee::with(['jenisPegawai', 'disciplineRecords'])
+            $employees = Employee::with(['appointments', 'jenisPegawai', 'disciplineRecords'])
                 ->where('status_aktif', 'Aktif')
                 ->get();
 
@@ -175,6 +181,36 @@ class EwsEngineService
                         }
                     }
                 }
+
+                // 5. Satyalancana Karya Satya: pengangkatan pertama + 10/20/30 tahun
+                $firstAppointment = $employee->appointments
+                    ->filter(fn ($appointment): bool => $appointment->tmt_pengangkatan !== null)
+                    ->sortBy('tmt_pengangkatan')
+                    ->first();
+
+                if ($firstAppointment) {
+                    $firstTmt = Carbon::parse($firstAppointment->tmt_pengangkatan)->startOfDay();
+
+                    foreach ([10, 20, 30] as $years) {
+                        $targetDate = $firstTmt->copy()->addYears($years);
+                        $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
+
+                        foreach ($satyalancanaDays as $days) {
+                            if ($diffDays === $days) {
+                                $created = $this->createAlertIfNotExist(
+                                    $employee,
+                                    'SATYALANCANA',
+                                    $targetDate->toDateString(),
+                                    $days,
+                                    'Satyalancana '.$years.' Tahun'
+                                );
+                                if ($created) {
+                                    $alertsCreated++;
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             // Mark scheduler run as successful
@@ -241,6 +277,7 @@ class EwsEngineService
                 'target_date' => $targetDate,
                 'interval_days' => $days,
                 'is_processed' => false,
+                'followup_status' => EwsAlert::FOLLOWUP_STATUS_ACTIVE,
             ]);
         } catch (QueryException $e) {
             // Already created by a concurrent run
@@ -252,6 +289,8 @@ class EwsEngineService
         if ($type === 'KENAIKAN_PANGKAT') {
             $hasActiveDiscipline = $employee->disciplineRecords->contains('is_active', true);
             $isEligible = ($employee->is_kinerja_baik === true) && ! $hasActiveDiscipline;
+        } elseif ($type === 'SATYALANCANA') {
+            $isEligible = $employee->is_satyalancana_eligible === true;
         }
 
         // Send notification only if eligible

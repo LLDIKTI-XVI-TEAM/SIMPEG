@@ -36,7 +36,7 @@ class DemoRoleLoginTest extends TestCase
         ])->assertRedirect(route('dashboard'));
 
         $this->assertAuthenticated();
-        $this->assertSame('atasan_langsung', auth()->user()->role);
+        $this->assertSame('kepala_bagian', auth()->user()->role);
     }
 
     public function test_demo_login_rejects_wrong_password(): void

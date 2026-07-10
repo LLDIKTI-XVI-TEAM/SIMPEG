@@ -13,6 +13,7 @@ use App\Actions\Employees\RestoreEmployeeAction;
 use App\Actions\Employees\StoreEmployeeHistoryAction;
 use App\Actions\Employees\UpdateEmployeeAction;
 use App\Actions\Employees\UpdateEmployeePerformanceFlagAction;
+use App\Actions\Employees\UpdateEmployeeSatyalancanaEligibilityAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Employee\StoreEmployeeRequest;
 use App\Http\Requests\Employee\UpdateEmployeePerformanceFlagRequest;
@@ -329,6 +330,30 @@ class PegawaiController extends Controller
         return response()->json([
             'message' => 'Status kinerja pegawai berhasil diperbarui.',
             'is_kinerja_baik' => $updated->is_kinerja_baik,
+        ]);
+    }
+
+    /**
+     * Memperbarui kelayakan manual Satyalancana untuk eligibility EWS.
+     */
+    public function updateSatyalancanaEligibility(
+        UpdateEmployeeSatyalancanaEligibilityRequest $request,
+        string $id,
+        UpdateEmployeeSatyalancanaEligibilityAction $action,
+    ): JsonResponse {
+        $employee = Employee::findOrFail($id);
+
+        $updated = $action->execute(
+            $employee,
+            $request->boolean('is_satyalancana_eligible'),
+            $request->validated('satyalancana_note'),
+            $request,
+        );
+
+        return response()->json([
+            'message' => 'Kelayakan Satyalancana pegawai berhasil diperbarui.',
+            'is_satyalancana_eligible' => $updated->is_satyalancana_eligible,
+            'satyalancana_note' => $updated->satyalancana_note,
         ]);
     }
 
