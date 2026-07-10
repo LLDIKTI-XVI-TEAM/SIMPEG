@@ -128,7 +128,7 @@
             <x-ui.card>
                 <h3 class="text-lg font-semibold text-ink mb-4">Keputusan Pejabat Berwenang (Pimpinan)</h3>
                 
-                @if($leaveData['status'] === 'Menunggu Keputusan Pimpinan')
+                @if(str_contains(strtolower($leaveData['status']), 'menunggu'))
                     <form action="{{ route('pimpinan.cuti.decision', $leaveData['id']) }}" method="POST" class="space-y-4" x-data="{ keputusan: '' }">
                         @csrf
                         <div>
@@ -152,7 +152,7 @@
                         </div>
 
                         <div class="pt-2">
-                            <x-ui.button type="submit" variant="primary" class="w-full justify-center">
+                            <x-ui.button id="submit-decision" type="submit" variant="primary" class="w-full justify-center">
                                 Simpan Keputusan Final
                             </x-ui.button>
                         </div>

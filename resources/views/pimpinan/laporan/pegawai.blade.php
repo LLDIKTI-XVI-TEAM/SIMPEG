@@ -1,4 +1,4 @@
-<x-layouts.app title="EWS Pimpinan">
+<x-layouts.app title="Laporan Pegawai">
 
 
 <div class="space-y-6">
@@ -19,7 +19,7 @@
 
     <x-ui.card>
         <h3 class="text-lg font-semibold text-ink mb-4">Export Laporan Pegawai</h3>
-        <form action="{{ route('pimpinan.laporan.pegawai.custom') }}" method="POST" class="space-y-4">
+        <form action="{{ route('pimpinan.laporan.pegawai.custom') }}" method="POST" target="_blank" class="space-y-4">
             @csrf
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>

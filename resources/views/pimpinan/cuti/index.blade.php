@@ -46,7 +46,7 @@
                         <option value="">Semua Status</option>
                         <option value="menunggu" {{ request('status') == 'menunggu' ? 'selected' : '' }}>Menunggu Keputusan Pimpinan</option>
                         <option value="disetujui" {{ request('status') == 'disetujui' ? 'selected' : '' }}>Disetujui</option>
-                        <option value="ditangguhkan" {{ request('status') == 'ditangguhkan' ? 'selected' : '' }}>Ditangguhkan / Ditolak</option>
+                        <option value="ditangguhkan" {{ request('status') == 'ditangguhkan' ? 'selected' : '' }}>Ditangguhkan / Tidak Disetujui</option>
                     </select>
                 </div>
 
@@ -117,7 +117,7 @@
                             $variant = match(true) {
                                 str_contains(strtolower($leave['status']), 'menunggu') => 'warning',
                                 str_contains(strtolower($leave['status']), 'disetujui') => 'success',
-                                str_contains(strtolower($leave['status']), 'ditangguhkan') => 'danger',
+                                str_contains(strtolower($leave['status']), 'ditangguhkan') || str_contains(strtolower($leave['status']), 'tidak disetujui') => 'danger',
                                 default => 'muted'
                             };
                             $isWaiting = str_contains(strtolower($leave['status']), 'menunggu');

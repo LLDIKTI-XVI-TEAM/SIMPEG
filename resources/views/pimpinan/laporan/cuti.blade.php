@@ -1,4 +1,4 @@
-<x-layouts.app title="EWS Pimpinan">
+<x-layouts.app title="Laporan Cuti">
 
 
 <div class="space-y-6">
@@ -15,26 +15,29 @@
 
     <x-ui.card>
         <h3 class="text-lg font-semibold text-ink mb-4">Export Laporan Cuti</h3>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-                <label class="block text-sm font-semibold text-ink mb-2">Tahun</label>
-                <select class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
-                    <option value="2026">2026</option>
-                    <option value="2025">2025</option>
-                </select>
+        <form action="{{ route('laporan.cuti.excel') }}" method="GET" target="_blank" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold text-ink mb-2">Tahun</label>
+                    <select name="tahun" class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
+                        <option value="2026">2026</option>
+                        <option value="2025">2025</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-ink mb-2">Bulan</label>
+                    <select name="bulan" class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
+                        <option value="">Semua Bulan</option>
+                        @foreach(range(1, 12) as $m)
+                            <option value="{{ $m }}">{{ \Carbon\Carbon::create()->month($m)->translatedFormat('F') }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <x-ui.button type="submit" variant="primary" class="w-full justify-center">Generate & Export</x-ui.button>
+                </div>
             </div>
-            <div>
-                <label class="block text-sm font-semibold text-ink mb-2">Bulan</label>
-                <select class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
-                    <option value="ALL">Semua Bulan</option>
-                    <option value="08">Agustus</option>
-                </select>
-            </div>
-            <div class="flex items-end">
-                <x-ui.button variant="secondary" class="w-full justify-center text-muted cursor-not-allowed" disabled>Fitur Belum Tersedia</x-ui.button>
-            </div>
-        </div>
-        <p class="mt-4 text-xs text-muted italic">* Fitur export cuti saat ini sedang dalam pengembangan.</p>
+        </form>
     </x-ui.card>
 
     <x-ui.card>

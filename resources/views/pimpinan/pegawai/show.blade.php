@@ -1,6 +1,6 @@
 <x-layouts.app title="Detail Pegawai">
 
-<div class="space-y-6" x-data="{ activeTab: 'profil' }">
+<div class="space-y-6" x-data="{ activeTab: 'profil', visiblePanels: ['profil', 'info'] }">
 
     {{-- PAGE HEADER --}}
     <div class="mb-6">
@@ -44,9 +44,13 @@
             </div>
             
             <div>
-                <a href="{{ route('pimpinan.laporan.pegawai.custom') }}" class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink shadow-sm transition hover:bg-soft">
-                    Cetak Riwayat
-                </a>
+                <form action="{{ route('pimpinan.laporan.pegawai.custom') }}" method="POST" target="_blank" class="inline-flex">
+                    @csrf
+                    <input type="hidden" name="employee_id" value="{{ $employeeData['id'] ?? '' }}">
+                    <button type="submit" class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink shadow-sm transition hover:bg-soft">
+                        Cetak Riwayat
+                    </button>
+                </form>
             </div>
         </div>
     </x-ui.card>
