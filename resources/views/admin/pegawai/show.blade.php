@@ -44,13 +44,15 @@
         arsipDokumen: [],
         loadingArsip: false,
         disiplinFileMode: 'arsip',
+        deletingDisiplinId: null,
+        isDeletingDisiplin: false,
         
         // Mengambil data riwayat riil dari database melalui relasi model Employee
         keluargaList: {{ $p->families->map(fn($f) => ['id' => $f->id, 'nama_anggota' => $f->nama_anggota, 'hubungan' => $f->hubungan, 'nik' => $f->nik, 'tempat_lahir' => $f->tempat_lahir, 'tanggal_lahir' => $f->tanggal_lahir ? \Carbon\Carbon::parse($f->tanggal_lahir)->format('d-m-Y') : '-', 'jenis_kelamin' => $f->jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan', 'pekerjaan' => $f->pekerjaan, 'status' => $f->status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'])->toJson() }},
         pangkatList: {{ $p->rankHistories->map(fn($r) => ['golongan' => $r->golongan->nama ?? '-', 'no_sk' => $r->no_sk, 'tgl_sk' => $r->tanggal_sk, 'tmt' => $r->tmt_pangkat])->toJson() }},
         jabatanList: {{ $p->positionHistories->map(fn($j) => ['jabatan' => $j->jabatan?->nama ?? $j->nama_jabatan, 'unit' => $j->unitKerja->nama ?? '-', 'kelas_jabatan' => $j->kelas_jabatan, 'no_sk' => $j->no_sk, 'tgl_sk' => $j->tanggal_sk, 'tmt' => $j->tmt_jabatan])->toJson() }},
         kgbList: {{ $p->salaryHistories->map(fn($s) => ['gaji' => 'Rp ' . number_format($s->gaji_pokok, 0, ',', '.'), 'no_sk' => $s->no_sk, 'tgl_sk' => $s->tanggal_sk, 'tmt' => $s->tmt_kgb])->toJson() }},
-        disiplinList: {{ $p->disciplineRecords->map(fn($d) => ['jenis' => $d->jenis_hukuman, 'alasan' => $d->deskripsi, 'no_sk' => $d->no_sk, 'tgl_sk' => $d->tanggal_sk ? \Carbon\Carbon::parse($d->tanggal_sk)->format('d-m-Y') : '-', 'masa' => ($d->tanggal_mulai ? \Carbon\Carbon::parse($d->tanggal_mulai)->format('d-m-Y') : '-') . ' s/d ' . ($d->tanggal_berakhir ? \Carbon\Carbon::parse($d->tanggal_berakhir)->format('d-m-Y') : 'Sekarang'), 'is_active' => $d->is_active])->toJson() }},
+        disiplinList: {{ $p->disciplineRecords->map(fn($d) => ['id' => $d->id, 'jenis' => $d->jenis_hukuman, 'alasan' => $d->deskripsi, 'no_sk' => $d->no_sk, 'tgl_sk' => $d->tanggal_sk ? \Carbon\Carbon::parse($d->tanggal_sk)->format('d-m-Y') : '-', 'masa' => ($d->tanggal_mulai ? \Carbon\Carbon::parse($d->tanggal_mulai)->format('d-m-Y') : '-') . ' s/d ' . ($d->tanggal_berakhir ? \Carbon\Carbon::parse($d->tanggal_berakhir)->format('d-m-Y') : 'Sekarang'), 'is_active' => $d->is_active])->toJson() }},
         pendidikanList: {{ $p->educationHistories->map(fn($e) => ['tingkat' => $e->jenjang->nama ?? '-', 'institusi' => $e->nama_institusi, 'prodi' => $e->jurusan, 'lulus' => $e->tahun_lulus, 'no_ijazah' => $e->no_ijazah])->toJson() }},
         
         // Form states
@@ -159,6 +161,31 @@
                 this.loadingArsip = false;
             }
         },
+        async deleteDisiplin(id, index) {
+            if (!window.confirm('Apakah Anda yakin ingin menghapus data hukuman disiplin ini? Tindakan ini tidak dapat dibatalkan.')) return;
+            this.isDeletingDisiplin = true;
+            try {
+                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/disiplin/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    this.toast = { show: true, message: err.message ?? 'Gagal menghapus data hukuman disiplin.', type: 'error' };
+                    return;
+                }
+                this.disiplinList.splice(index, 1);
+                this.toast = { show: true, message: 'Hukuman disiplin berhasil dihapus.', type: 'success' };
+            } catch (e) {
+                this.toast = { show: true, message: 'Terjadi kesalahan jaringan. Coba lagi.', type: 'error' };
+            } finally {
+                this.isDeletingDisiplin = false;
+            }
+        },
         async submitForm() {
             this.modalError = '';
             let payload = { type: this.modalType };
@@ -219,6 +246,7 @@
                         const r   = result.record;
                         const fmt = (d) => d ? d.split('-').reverse().join('-') : '-';
                         this.disiplinList.unshift({
+                            id:        r.id,
                             jenis:     r.jenis_hukuman,
                             alasan:    r.deskripsi,
                             no_sk:     r.no_sk,
@@ -801,10 +829,11 @@
                                 <th class="px-4 py-3">Nomor SK</th>
                                 <th class="px-4 py-3">Tanggal SK</th>
                                 <th class="px-4 py-3">Masa Berlaku</th>
+                                <th class="px-4 py-3 text-right">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border text-xs font-sans">
-                            <template x-for="(d, index) in disiplinList" :key="index">
+                            <template x-for="(d, index) in disiplinList" :key="d.id">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
                                     <td class="px-4 py-3">
                                         <span class="font-bold text-danger" x-text="d.jenis"></span>
@@ -816,10 +845,24 @@
                                     <td class="px-4 py-3 font-mono" x-text="d.no_sk"></td>
                                     <td class="px-4 py-3 font-mono" x-text="d.tgl_sk"></td>
                                     <td class="px-4 py-3 font-mono" x-text="d.masa"></td>
+                                    <td class="px-4 py-3 text-right">
+                                        <button
+                                            type="button"
+                                            @click="deleteDisiplin(d.id, index)"
+                                            :disabled="isDeletingDisiplin"
+                                            class="inline-flex items-center gap-1 text-[10px] font-semibold text-danger hover:underline disabled:opacity-40 font-sans cursor-pointer transition-opacity"
+                                            title="Hapus hukuman disiplin ini"
+                                        >
+                                            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.021-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                            </svg>
+                                            Hapus
+                                        </button>
+                                    </td>
                                 </tr>
                             </template>
                             <tr x-show="disiplinList.length === 0">
-                                <td colspan="5" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
+                                <td colspan="6" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
                                     Pegawai ini tidak memiliki riwayat hukuman disiplin.
                                 </td>
                             </tr>
