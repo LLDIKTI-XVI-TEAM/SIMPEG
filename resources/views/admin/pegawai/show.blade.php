@@ -41,6 +41,9 @@
         modalError: '',
         isSubmitting: false,
         toast: { show: false, message: '', type: 'success' },
+        arsipDokumen: [],
+        loadingArsip: false,
+        disiplinFileMode: 'arsip',
         
         // Mengambil data riwayat riil dari database melalui relasi model Employee
         keluargaList: {{ $p->families->map(fn($f) => ['id' => $f->id, 'nama_anggota' => $f->nama_anggota, 'hubungan' => $f->hubungan, 'nik' => $f->nik, 'tempat_lahir' => $f->tempat_lahir, 'tanggal_lahir' => $f->tanggal_lahir ? \Carbon\Carbon::parse($f->tanggal_lahir)->format('d-m-Y') : '-', 'jenis_kelamin' => $f->jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan', 'pekerjaan' => $f->pekerjaan, 'status' => $f->status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'])->toJson() }},
@@ -55,7 +58,7 @@
         newPangkat: { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '' },
         newJabatan: { jabatan_id: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', kelas_jabatan: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '' },
         newKgb: { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '' },
-        newDisiplin: { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '' },
+        newDisiplin: { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '', file_sk: null, dokumen_id: '' },
         newPendidikan: { tingkat: 'D4 / S1', institusi: '', prodi: '', lulus: '', no_ijazah: '' },
         async updateKinerjaBaik(value) {
             const previous = !value;
@@ -134,6 +137,27 @@
             this.modalTitle = title;
             this.modalError = '';
             this.showModal = true;
+            if (type === 'disiplin') {
+                this.disiplinFileMode = 'arsip';
+                this.fetchArsipDisiplin();
+            }
+        },
+        async fetchArsipDisiplin() {
+            this.loadingArsip = true;
+            this.arsipDokumen = [];
+            try {
+                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/arsip-dokumen?kategori=sk_hukuman_disiplin`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                if (res.ok) {
+                    const json = await res.json();
+                    this.arsipDokumen = json.documents ?? [];
+                }
+            } catch (e) {
+                this.arsipDokumen = [];
+            } finally {
+                this.loadingArsip = false;
+            }
         },
         async submitForm() {
             this.modalError = '';
@@ -162,29 +186,48 @@
             this.isSubmitting = true;
 
             try {
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    body: JSON.stringify(payload)
-                });
+                let fetchOptions;
+                if (this.modalType === 'disiplin') {
+                    const fd = new FormData();
+                    const d  = this.newDisiplin;
+                    fd.append('jenis_hukuman', d.jenis_hukuman);
+                    fd.append('deskripsi', d.deskripsi);
+                    fd.append('no_sk', d.no_sk);
+                    fd.append('tanggal_sk', d.tanggal_sk);
+                    fd.append('tanggal_mulai', d.tanggal_mulai);
+                    if (d.tanggal_berakhir) fd.append('tanggal_berakhir', d.tanggal_berakhir);
+                    if (d.file_sk)          fd.append('file_sk', d.file_sk);
+                    if (d.dokumen_id)       fd.append('dokumen_id', d.dokumen_id);
+                    fetchOptions = {
+                        method:  'POST',
+                        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                        body:    fd,
+                    };
+                } else {
+                    fetchOptions = {
+                        method:  'POST',
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                        body:    JSON.stringify(payload),
+                    };
+                }
+                const response = await fetch(endpoint, fetchOptions);
                 
                 if (response.ok) {
                     const result = await response.json();
                     
                     if (this.modalType === 'disiplin') {
+                        const r   = result.record;
+                        const fmt = (d) => d ? d.split('-').reverse().join('-') : '-';
                         this.disiplinList.unshift({
-                            jenis: this.newDisiplin.jenis_hukuman,
-                            alasan: this.newDisiplin.deskripsi,
-                            no_sk: this.newDisiplin.no_sk,
-                            tgl_sk: this.newDisiplin.tanggal_sk,
-                            masa: this.newDisiplin.tanggal_mulai + ' s/d ' + (this.newDisiplin.tanggal_berakhir ? this.newDisiplin.tanggal_berakhir : 'Sekarang'),
-                            is_active: true
+                            jenis:     r.jenis_hukuman,
+                            alasan:    r.deskripsi,
+                            no_sk:     r.no_sk,
+                            tgl_sk:    fmt(r.tanggal_sk),
+                            masa:      fmt(r.tanggal_mulai) + ' s/d ' + (r.tanggal_berakhir ? fmt(r.tanggal_berakhir) : 'Sekarang'),
+                            is_active: r.is_active,
                         });
-                        this.newDisiplin = { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '' };
+                        this.newDisiplin = { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '', file_sk: null, dokumen_id: '' };
+                        this.disiplinFileMode = 'arsip';
                     } else if (this.modalType === 'kgb') {
                         this.kgbList.unshift({
                             gaji: 'Rp ' + parseInt(this.newKgb.gaji_pokok).toLocaleString('id-ID'),
@@ -1186,6 +1229,79 @@
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK Terbit</label>
                                     <input type="date" x-model="newDisiplin.tanggal_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                </div>
+                                <div class="space-y-2">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
+                                        File SK
+                                        <span class="font-normal normal-case text-muted">(opsional)</span>
+                                    </label>
+
+                                    {{-- Tab toggle: Dari Arsip | Unggah Baru --}}
+                                    <div class="flex gap-0.5 rounded-lg border border-border bg-soft p-0.5 w-fit">
+                                        <button type="button"
+                                            @click="disiplinFileMode = 'arsip'; newDisiplin.file_sk = null; document.getElementById('file_sk_disiplin').value = ''"
+                                            :class="disiplinFileMode === 'arsip' ? 'bg-white shadow-sm text-ink' : 'text-muted hover:text-ink'"
+                                            class="rounded-md px-3 py-1 text-xs font-semibold font-sans transition-all cursor-pointer"
+                                        >Dari Arsip</button>
+                                        <button type="button"
+                                            @click="disiplinFileMode = 'baru'; newDisiplin.dokumen_id = ''"
+                                            :class="disiplinFileMode === 'baru' ? 'bg-white shadow-sm text-ink' : 'text-muted hover:text-ink'"
+                                            class="rounded-md px-3 py-1 text-xs font-semibold font-sans transition-all cursor-pointer"
+                                        >Unggah Baru</button>
+                                    </div>
+
+                                    {{-- Panel: Dari Arsip --}}
+                                    <div x-show="disiplinFileMode === 'arsip'" class="space-y-1">
+                                        <div x-show="loadingArsip" class="text-xs text-muted font-sans py-1">Memuat daftar arsip...</div>
+                                        <template x-if="!loadingArsip">
+                                            <div class="space-y-1">
+                                                <select x-model="newDisiplin.dokumen_id"
+                                                    class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                                    <option value="">-- Pilih dari Arsip Dokumen --</option>
+                                                    <template x-for="dok in arsipDokumen" :key="dok.id">
+                                                        <option :value="dok.id"
+                                                            x-text="dok.nama_dokumen + (dok.nomor_dokumen ? ' (' + dok.nomor_dokumen + ')' : '') + (dok.tanggal ? ' — ' + dok.tanggal : '')">
+                                                        </option>
+                                                    </template>
+                                                </select>
+                                                <p x-show="arsipDokumen.length === 0" class="text-[10px] text-muted italic font-sans">
+                                                    Belum ada arsip SK Hukuman Disiplin untuk pegawai ini.
+                                                    <a href="{{ route('dokumen') }}" target="_blank" class="text-primary underline">Unggah di halaman Arsip Dokumen</a>.
+                                                </p>
+                                            </div>
+                                        </template>
+                                    </div>
+
+                                    {{-- Panel: Unggah Baru --}}
+                                    <div x-show="disiplinFileMode === 'baru'" class="space-y-1">
+                                        <div class="flex items-center gap-2">
+                                            <label for="file_sk_disiplin" class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 font-sans">
+                                                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                                                </svg>
+                                                Pilih File
+                                            </label>
+                                            <input
+                                                type="file"
+                                                id="file_sk_disiplin"
+                                                class="hidden"
+                                                accept=".pdf,.jpg,.jpeg,.png"
+                                                @change="newDisiplin.file_sk = $event.target.files[0] || null"
+                                            >
+                                            <span
+                                                class="min-w-0 flex-1 truncate text-xs font-sans"
+                                                :class="newDisiplin.file_sk ? 'text-ink' : 'text-muted'"
+                                                x-text="newDisiplin.file_sk ? newDisiplin.file_sk.name : 'Belum ada file dipilih'"
+                                            ></span>
+                                            <button
+                                                x-show="newDisiplin.file_sk"
+                                                type="button"
+                                                @click="newDisiplin.file_sk = null; document.getElementById('file_sk_disiplin').value = ''"
+                                                class="shrink-0 text-xs text-danger hover:underline font-sans"
+                                            >Hapus</button>
+                                        </div>
+                                        <p class="text-[10px] text-muted italic font-sans">Format PDF/JPG/PNG, maks. 10 MB. File akan masuk ke Arsip Dokumen otomatis.</p>
+                                    </div>
                                 </div>
                                 <div class="grid grid-cols-2 gap-4">
                                     <div class="space-y-1">

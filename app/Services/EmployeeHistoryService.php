@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\DisciplineRecord;
+use App\Models\Document;
 use App\Models\Employee;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
@@ -190,7 +191,15 @@ class EmployeeHistoryService
      */
     public function createDisciplineRecord(Employee $employee, array $data, ?Request $request = null): DisciplineRecord
     {
+        // Proses upload file SK terlebih dahulu (jika ada file baru)
         $data = $this->storeSkUpload($data);
+
+        // Jika user memilih dari arsip dokumen, gunakan file_path dokumen sebagai file_sk
+        if (empty($data['file_sk']) && ! empty($data['dokumen_id'])) {
+            $doc = Document::find($data['dokumen_id']);
+            $data['file_sk'] = $doc?->file_path;
+        }
+        unset($data['dokumen_id']);
 
         return DB::transaction(function () use ($employee, $data, $request): DisciplineRecord {
             $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
@@ -210,6 +219,17 @@ class EmployeeHistoryService
                 ]),
                 'is_active' => $endDate === null || $endDate->greaterThanOrEqualTo(Carbon::today()),
             ]);
+
+            if ($record->file_sk) {
+                $employee->documents()->create([
+                    'jenis_dokumen'   => 'sk_hukuman_disiplin',
+                    'nama_dokumen'    => 'SK Hukuman Disiplin '.$record->jenis_hukuman,
+                    'nomor_dokumen'   => $record->no_sk,
+                    'tanggal_dokumen' => $record->tanggal_sk,
+                    'file_path'       => $record->file_sk,
+                    'keterangan'      => 'Unggah otomatis dari riwayat hukuman disiplin.',
+                ]);
+            }
 
             AuditService::log('CREATE', 'DisciplineRecord', $record->id, null, Arr::only($record->toArray(), [
                 'id',

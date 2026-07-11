@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\DisciplineRecordController;
 use App\Http\Controllers\Api\V1\EmployeeController;
+use App\Http\Controllers\Api\V1\EmployeeDocumentController;
 use App\Http\Controllers\Api\V1\EmployeeFamilyController;
 use App\Http\Controllers\Api\V1\EmployeeImportController;
 use App\Http\Controllers\Api\V1\KgbHistoryController;
@@ -82,6 +83,10 @@ Route::middleware($employeeGroupMiddleware)
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:discipline_records.create'])
             ->whereUuid('employee')
             ->name('disiplin.store');
+        Route::get('/{employee}/arsip-dokumen', [EmployeeDocumentController::class, 'index'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
+            ->whereUuid('employee')
+            ->name('arsip-dokumen.index');
         Route::get('/{employee}/riwayat-kepangkatan', [RankHistoryController::class, 'index'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_histories.read'])
             ->whereUuid('employee')
