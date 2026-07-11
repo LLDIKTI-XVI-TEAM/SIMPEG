@@ -66,6 +66,26 @@ class MyFamilyController extends Controller
         ]);
     }
 
+    public function destroy(
+        EmployeeFamily $family,
+        \App\Actions\EmployeeFamilies\DeleteEmployeeFamilyAction $action,
+    ): JsonResponse {
+        $employee = $this->resolveEmployee();
+
+        // Lapisan otorisasi eksplisit: pastikan record yang dihapus benar-benar milik pegawai login.
+        abort_unless(
+            $family->employee_id === $employee->id,
+            403,
+            'Anda hanya dapat menghapus data keluarga milik Anda sendiri.',
+        );
+
+        $action->execute($employee, $family, request());
+
+        return response()->json([
+            'message' => 'Data keluarga berhasil dihapus.',
+        ]);
+    }
+
     /**
      * Mengambil model Employee dari user yang sedang login.
      * Guard sudah memastikan user login dan employee_id tidak null (via StoreMyFamilyRequest::authorize).

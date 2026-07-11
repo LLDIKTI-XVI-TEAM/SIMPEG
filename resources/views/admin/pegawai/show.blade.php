@@ -53,7 +53,14 @@
         jabatanList: {{ $p->positionHistories->map(fn($j) => ['jabatan' => $j->jabatan?->nama ?? $j->nama_jabatan, 'unit' => $j->unitKerja->nama ?? '-', 'kelas_jabatan' => $j->kelas_jabatan, 'no_sk' => $j->no_sk, 'tgl_sk' => $j->tanggal_sk, 'tmt' => $j->tmt_jabatan])->toJson() }},
         kgbList: {{ $p->salaryHistories->map(fn($s) => ['gaji' => 'Rp ' . number_format($s->gaji_pokok, 0, ',', '.'), 'no_sk' => $s->no_sk, 'tgl_sk' => $s->tanggal_sk, 'tmt' => $s->tmt_kgb])->toJson() }},
         disiplinList: {{ $p->disciplineRecords->map(fn($d) => ['id' => $d->id, 'jenis' => $d->jenis_hukuman, 'alasan' => $d->deskripsi, 'no_sk' => $d->no_sk, 'tgl_sk' => $d->tanggal_sk ? \Carbon\Carbon::parse($d->tanggal_sk)->format('d-m-Y') : '-', 'masa' => ($d->tanggal_mulai ? \Carbon\Carbon::parse($d->tanggal_mulai)->format('d-m-Y') : '-') . ' s/d ' . ($d->tanggal_berakhir ? \Carbon\Carbon::parse($d->tanggal_berakhir)->format('d-m-Y') : 'Sekarang'), 'is_active' => $d->is_active])->toJson() }},
-        pendidikanList: {{ $p->educationHistories->map(fn($e) => ['tingkat' => $e->jenjang->nama ?? '-', 'institusi' => $e->nama_institusi, 'prodi' => $e->jurusan, 'lulus' => $e->tahun_lulus, 'no_ijazah' => $e->no_ijazah])->toJson() }},
+        pendidikanList: [],
+        pendidikanLoading: false,
+        showEditPendidikan: false,
+        editingPendidikan: null,
+        editPendidikanError: '',
+        editPendidikanForm: { jenjang_id: '', nama_institusi: '', jurusan: '', tahun_lulus: '', no_ijazah: '' },
+        isUpdatingPendidikan: false,
+        isDeletingPendidikan: false,
         
         // Form states
         newKeluarga: { nama_anggota: '', hubungan: 'Istri', nik: '', tempat_lahir: '', tanggal_lahir: '', jenis_kelamin: 'P', status_tunjangan: '0', pekerjaan: '' },
@@ -61,7 +68,7 @@
         newJabatan: { jabatan_id: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', kelas_jabatan: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '' },
         newKgb: { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '' },
         newDisiplin: { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '', file_sk: null, dokumen_id: '' },
-        newPendidikan: { tingkat: 'D4 / S1', institusi: '', prodi: '', lulus: '', no_ijazah: '' },
+        newPendidikan: { jenjang_id: '', nama_institusi: '', jurusan: '', tahun_lulus: '', no_ijazah: '' },
         async updateKinerjaBaik(value) {
             const previous = !value;
             this.isUpdatingKinerja = true;
@@ -186,6 +193,143 @@
                 this.isDeletingDisiplin = false;
             }
         },
+
+        // ===== LAZY FETCH & CACHING RIWAYAT PENDIDIKAN =====
+        _pendidikanCacheKey: 'pendidikan_{{ $p->id }}',
+
+        init() {
+            // Deteksi reload (F5/Ctrl+R): hapus cache pendidikan agar data selalu segar dari server.
+            const navType = performance.getEntriesByType?.('navigation')?.[0]?.type;
+            if (navType === 'reload') {
+                sessionStorage.removeItem(this._pendidikanCacheKey);
+            }
+            // Pantau perpindahan tab: fetch otomatis saat tab pendidikan dibuka pertama kali.
+            this.$watch('activeTab', (tab) => {
+                if (tab === 'pendidikan' && this.pendidikanList.length === 0 && !this.pendidikanLoading) {
+                    this.fetchPendidikan();
+                }
+            });
+            // Langsung fetch jika tab sudah aktif saat init (misal dari URL ?tab=pendidikan).
+            if (this.activeTab === 'pendidikan') {
+                this.fetchPendidikan();
+            }
+        },
+
+        async fetchPendidikan() {
+            // Coba baca dari sessionStorage terlebih dahulu.
+            const cached = sessionStorage.getItem(this._pendidikanCacheKey);
+            if (cached) {
+                try {
+                    this.pendidikanList = JSON.parse(cached);
+                    return;
+                } catch (e) {
+                    sessionStorage.removeItem(this._pendidikanCacheKey);
+                }
+            }
+            this.pendidikanLoading = true;
+            try {
+                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/riwayat-pendidikan`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const json = await res.json();
+                this.pendidikanList = json.histories ?? [];
+                sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify(this.pendidikanList));
+            } catch (e) {
+                console.error('Gagal memuat riwayat pendidikan:', e);
+            } finally {
+                this.pendidikanLoading = false;
+            }
+        },
+
+        openEditPendidikan(edu) {
+            this.editingPendidikan = edu;
+            this.editPendidikanError = '';
+            this.editPendidikanForm = {
+                jenjang_id:     edu.jenjang_id ?? '',
+                nama_institusi: edu.institusi ?? '',
+                jurusan:        edu.prodi ?? '',
+                tahun_lulus:    edu.lulus ?? '',
+                no_ijazah:      edu.no_ijazah ?? '',
+            };
+            this.showEditPendidikan = true;
+        },
+
+        async submitEditPendidikan() {
+            this.editPendidikanError = '';
+            this.isUpdatingPendidikan = true;
+            try {
+                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/riwayat-pendidikan/${this.editingPendidikan.id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: JSON.stringify(this.editPendidikanForm),
+                });
+                const result = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    const msgs = result.errors
+                        ? Object.values(result.errors).flat().join(' ')
+                        : (result.message ?? 'Gagal memperbarui riwayat pendidikan.');
+                    this.editPendidikanError = msgs;
+                    return;
+                }
+                const h = result.history;
+                const idx = this.pendidikanList.findIndex(e => e.id === this.editingPendidikan.id);
+                if (idx !== -1) {
+                    this.pendidikanList[idx] = {
+                        id:        h.id,
+                        jenjang_id: h.jenjang_id,
+                        tingkat:   h.tingkat,
+                        institusi: h.nama_institusi,
+                        prodi:     h.jurusan ?? '-',
+                        lulus:     h.tahun_lulus,
+                        no_ijazah: h.no_ijazah ?? '-',
+                    };
+                }
+                sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify(this.pendidikanList));
+                this.showEditPendidikan = false;
+                this.editingPendidikan = null;
+                this.toast = { show: true, message: 'Riwayat pendidikan berhasil diperbarui.', type: 'success' };
+                setTimeout(() => this.toast.show = false, 3000);
+            } catch (e) {
+                this.editPendidikanError = 'Terjadi kesalahan jaringan. Coba lagi.';
+            } finally {
+                this.isUpdatingPendidikan = false;
+            }
+        },
+
+        async deletePendidikan(id, index) {
+            if (!window.confirm('Apakah Anda yakin ingin menghapus riwayat pendidikan ini? Tindakan ini tidak dapat dibatalkan.')) return;
+            this.isDeletingPendidikan = true;
+            try {
+                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/riwayat-pendidikan/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    this.toast = { show: true, message: err.message ?? 'Gagal menghapus riwayat pendidikan.', type: 'error' };
+                    return;
+                }
+                this.pendidikanList.splice(index, 1);
+                sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify(this.pendidikanList));
+                this.toast = { show: true, message: 'Riwayat pendidikan berhasil dihapus.', type: 'success' };
+                setTimeout(() => this.toast.show = false, 3000);
+            } catch (e) {
+                this.toast = { show: true, message: 'Terjadi kesalahan jaringan. Coba lagi.', type: 'error' };
+            } finally {
+                this.isDeletingPendidikan = false;
+            }
+        },
+
         async submitForm() {
             this.modalError = '';
             let payload = { type: this.modalType };
@@ -203,7 +347,7 @@
                 payload = { ...payload, ...this.newPendidikan };
             }
 
-            let endpoint = `/pegawai/{{ $p->id }}/riwayat`;
+            let endpoint = `/api/v1/pegawai/{{ $p->id }}/riwayat-pendidikan`;
             if (this.modalType === 'pangkat') endpoint = `/api/v1/pegawai/{{ $p->id }}/riwayat-kepangkatan`;
             else if (this.modalType === 'jabatan') endpoint = `/api/v1/pegawai/{{ $p->id }}/riwayat-jabatan`;
             else if (this.modalType === 'kgb') endpoint = `/api/v1/pegawai/{{ $p->id }}/riwayat-kgb`;
@@ -297,14 +441,18 @@
                         });
                         this.newKeluarga = { nama_anggota: '', hubungan: 'Istri', nik: '', tempat_lahir: '', tanggal_lahir: '', jenis_kelamin: 'P', status_tunjangan: '0', pekerjaan: '' };
                     } else if (this.modalType === 'pendidikan') {
+                        const h = result.history;
                         this.pendidikanList.unshift({
-                            tingkat: this.newPendidikan.tingkat,
-                            institusi: this.newPendidikan.institusi,
-                            prodi: this.newPendidikan.prodi,
-                            lulus: this.newPendidikan.lulus,
-                            no_ijazah: this.newPendidikan.no_ijazah
+                            id:             h.id,
+                            tingkat:        h.tingkat,
+                            institusi:      h.nama_institusi,
+                            prodi:          h.jurusan ?? '-',
+                            lulus:          h.tahun_lulus,
+                            no_ijazah:      h.no_ijazah ?? '-',
                         });
-                        this.newPendidikan = { tingkat: 'D4 / S1', institusi: '', prodi: '', lulus: '', no_ijazah: '' };
+                        // Perbarui cache sessionStorage agar navigasi kembali tetap sinkron.
+                        sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify(this.pendidikanList));
+                        this.newPendidikan = { jenjang_id: '', nama_institusi: '', jurusan: '', tahun_lulus: '', no_ijazah: '' };
                     }
                     
                     this.showModal = false;
@@ -885,27 +1033,65 @@
                         Tambah Pendidikan
                     </button>
                 </div>
-                <div class="overflow-x-auto rounded-lg border border-border">
+                {{-- Loading skeleton --}}
+                <div x-show="pendidikanLoading" class="flex items-center justify-center py-10 text-xs text-muted font-sans gap-2">
+                    <svg class="w-4 h-4 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    Memuat riwayat pendidikan...
+                </div>
+
+                <div x-show="!pendidikanLoading" class="overflow-x-auto rounded-lg border border-border">
                     <table class="w-full">
                         <thead class="bg-soft border-b border-border">
                             <tr class="text-left text-xs font-semibold text-muted uppercase tracking-wide font-sans">
-                                <th class="px-4 py-3">Tingkat</th>
+                                <th class="px-4 py-3">Jenjang</th>
                                 <th class="px-4 py-3">Nama Institusi</th>
                                 <th class="px-4 py-3">Program Studi</th>
                                 <th class="px-4 py-3">Tahun Lulus</th>
                                 <th class="px-4 py-3">Nomor Ijazah</th>
+                                <th class="px-4 py-3 text-right">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border text-xs font-sans">
-                            <template x-for="p in pendidikanList" :key="p.no_ijazah">
+                            <template x-for="(edu, index) in pendidikanList" :key="edu.id ?? edu.no_ijazah">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
-                                    <td class="px-4 py-3 font-bold" x-text="p.tingkat"></td>
-                                    <td class="px-4 py-3" x-text="p.institusi"></td>
-                                    <td class="px-4 py-3" x-text="p.prodi"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="p.lulus"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="p.no_ijazah"></td>
+                                    <td class="px-4 py-3 font-bold" x-text="edu.tingkat"></td>
+                                    <td class="px-4 py-3" x-text="edu.institusi"></td>
+                                    <td class="px-4 py-3" x-text="edu.prodi ?? '-'"></td>
+                                    <td class="px-4 py-3 font-mono" x-text="edu.lulus"></td>
+                                    <td class="px-4 py-3 font-mono" x-text="edu.no_ijazah ?? '-'"></td>
+                                    <td class="px-4 py-3 text-right">
+                                        <div class="inline-flex items-center gap-3">
+                                            <button
+                                                type="button"
+                                                @click="openEditPendidikan(edu)"
+                                                :disabled="isDeletingPendidikan"
+                                                class="text-[10px] font-semibold text-primary hover:underline disabled:opacity-40 font-sans cursor-pointer transition-opacity"
+                                                title="Edit riwayat pendidikan"
+                                            >Edit</button>
+                                            <button
+                                                type="button"
+                                                @click="deletePendidikan(edu.id, index)"
+                                                :disabled="isDeletingPendidikan"
+                                                class="inline-flex items-center gap-1 text-[10px] font-semibold text-danger hover:underline disabled:opacity-40 font-sans cursor-pointer transition-opacity"
+                                                title="Hapus riwayat pendidikan"
+                                            >
+                                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.021-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                                </svg>
+                                                Hapus
+                                            </button>
+                                        </div>
+                                    </td>
                                 </tr>
                             </template>
+                            <tr x-show="!pendidikanLoading && pendidikanList.length === 0">
+                                <td colspan="6" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
+                                    Pegawai ini belum memiliki riwayat pendidikan formal.
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -1364,34 +1550,31 @@
                         <template x-if="modalType === 'pendidikan'">
                             <div class="space-y-4">
                                 <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tingkat Pendidikan</label>
-                                    <select x-model="newPendidikan.tingkat" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                        <option value="SD">SD</option>
-                                        <option value="SMP">SMP</option>
-                                        <option value="SMA / SMK / Sederajat">SMA / SMK / Sederajat</option>
-                                        <option value="D1">D1</option>
-                                        <option value="D2">D2</option>
-                                        <option value="D3">D3</option>
-                                        <option value="D4 / S1">D4 / S1</option>
-                                        <option value="S2 / Profesi">S2 / Profesi</option>
-                                        <option value="S3">S3</option>
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenjang Pendidikan <span class="text-danger">*</span></label>
+                                    <select x-model="newPendidikan.jenjang_id" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                        <option value="">-- Pilih Jenjang --</option>
+                                        @foreach($jenjangOptions as $jenjang)
+                                            <option value="{{ $jenjang->id }}">{{ $jenjang->nama }}</option>
+                                        @endforeach
                                     </select>
                                 </div>
                                 <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Institusi</label>
-                                    <input type="text" x-model="newPendidikan.institusi" required placeholder="Universitas Sam Ratulangi" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Institusi <span class="text-danger">*</span></label>
+                                    <input type="text" x-model="newPendidikan.nama_institusi" required placeholder="Universitas Sam Ratulangi" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Program Studi</label>
-                                    <input type="text" x-model="newPendidikan.prodi" placeholder="Manajemen Keuangan" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="text" x-model="newPendidikan.jurusan" placeholder="Manajemen Keuangan" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tahun Lulus</label>
-                                    <input type="number" x-model="newPendidikan.lulus" required placeholder="2007" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor Ijazah</label>
-                                    <input type="text" x-model="newPendidikan.no_ijazah" placeholder="IJZ-S1-MAN-2007" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div class="space-y-1">
+                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tahun Lulus <span class="text-danger">*</span></label>
+                                        <input type="number" x-model="newPendidikan.tahun_lulus" required placeholder="2007" min="1900" :max="new Date().getFullYear() + 1" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor Ijazah</label>
+                                        <input type="text" x-model="newPendidikan.no_ijazah" placeholder="IJZ-S1-MAN-2007" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    </div>
                                 </div>
                             </div>
                         </template>
@@ -1434,5 +1617,93 @@
             </div>
         </div>
 
+    {{-- ============================================================ --}}
+    {{-- MODAL EDIT RIWAYAT PENDIDIKAN                                --}}
+    {{-- ============================================================ --}}
+    <div
+        x-show="showEditPendidikan"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4"
+        style="display:none;"
+        @keydown.escape.window="showEditPendidikan = false"
+    >
+        <div
+            @click.outside="showEditPendidikan = false"
+            class="w-full max-w-lg rounded-2xl bg-surface shadow-xl border border-border overflow-hidden"
+        >
+            {{-- Header --}}
+            <div class="flex items-center justify-between px-6 py-4 border-b border-border">
+                <h3 class="text-sm font-bold text-ink font-sans">Edit Riwayat Pendidikan</h3>
+                <button type="button" @click="showEditPendidikan = false" class="text-muted hover:text-ink transition cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            {{-- Body --}}
+            <form @submit.prevent="submitEditPendidikan()" class="px-6 py-5 space-y-4">
+                {{-- Error --}}
+                <div x-show="editPendidikanError" class="rounded-lg bg-danger/10 border border-danger/20 px-3 py-2 text-xs text-danger font-sans" x-text="editPendidikanError"></div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenjang Pendidikan <span class="text-danger">*</span></label>
+                    <select x-model="editPendidikanForm.jenjang_id" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                        <option value="">-- Pilih Jenjang --</option>
+                        @foreach($jenjangOptions as $jenjang)
+                            <option value="{{ $jenjang->id }}">{{ $jenjang->nama }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Institusi <span class="text-danger">*</span></label>
+                    <input type="text" x-model="editPendidikanForm.nama_institusi" required placeholder="Universitas Sam Ratulangi" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Program Studi</label>
+                    <input type="text" x-model="editPendidikanForm.jurusan" placeholder="Manajemen Keuangan" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tahun Lulus <span class="text-danger">*</span></label>
+                        <input type="number" x-model="editPendidikanForm.tahun_lulus" required placeholder="2007" min="1900" :max="new Date().getFullYear() + 1" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor Ijazah</label>
+                        <input type="text" x-model="editPendidikanForm.no_ijazah" placeholder="IJZ-S1-2007" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                    </div>
+                </div>
+
+                {{-- Footer --}}
+                <div class="flex justify-end gap-3 pt-2 border-t border-border mt-4">
+                    <button type="button" @click="showEditPendidikan = false" :disabled="isUpdatingPendidikan"
+                        class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink hover:bg-soft transition font-sans cursor-pointer disabled:opacity-50">
+                        Batal
+                    </button>
+                    <button type="submit" :disabled="isUpdatingPendidikan"
+                        class="inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm font-sans cursor-pointer min-w-[120px] disabled:opacity-50">
+                        <span x-show="!isUpdatingPendidikan">Simpan Perubahan</span>
+                        <span x-show="isUpdatingPendidikan" class="flex items-center gap-2">
+                            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                            </svg>
+                            Menyimpan...
+                        </span>
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
+
+</div>{{-- /x-data utama --}}
+
 </x-layouts.app>

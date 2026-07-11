@@ -267,8 +267,9 @@ class PegawaiController extends Controller
         $jenisJabatanOptions = RefJenisJabatan::all();
         $unitKerjaOptions = RefUnitKerja::all();
         $eselonOptions = RefEselon::all();
+        $jenjangOptions = \App\Models\RefJenjangPendidikan::orderBy('urutan')->get();
 
-        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions'));
+        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions'));
     }
 
     public function edit($id, PrepareEmployeeEditFormDataAction $action)
