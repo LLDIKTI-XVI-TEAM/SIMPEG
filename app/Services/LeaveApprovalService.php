@@ -6,7 +6,9 @@ use App\Models\Employee;
 use App\Models\LeaveApproval;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
+use App\Models\User;
 use App\Services\Cuti\LeaveBalanceService;
+use App\Services\Cuti\LeaveProofService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -29,14 +31,35 @@ class LeaveApprovalService
     private const STATUS_TIDAK_DISETUJUI = 'tidak_disetujui';
 
     /**
-     * Menyetujui step aktif. Step berikutnya diaktifkan, duplikasi approver dilewati, dan final approval memotong saldo.
+     * LeaveProofService di-inject agar penerbitan bukti final ikut dalam transaksi persetujuan.
+     * Injeksi konstruktor dipilih ketimbang service locator agar dependensi eksplisit dan mudah diuji.
      */
-    public function approve(LeaveRequest $leaveRequest, Employee $actor, ?string $komentar = null): LeaveRequest
+    public function __construct(
+        private readonly LeaveProofService $proofs,
+    ) {}
+
+    /**
+     * Menyetujui step aktif. Step berikutnya diaktifkan, duplikasi approver dilewati, dan final approval memotong saldo.
+     *
+     * Aktor Employee adalah approver snapshot yang berwenang atas step aktif; parameter opsional User adalah
+     * akun manusia yang benar-benar menekan aksi. Keduanya dibedakan karena bukti final menyimpan jejak akun
+     * (FK generated_by -> users), sedangkan otorisasi step tetap berbasis employee. actingUser diletakkan di
+     * akhir signature agar pemanggil lama (tes langsung service) tetap kompatibel secara sumber.
+     */
+    public function approve(LeaveRequest $leaveRequest, Employee $actor, ?string $komentar = null, ?User $actingUser = null): LeaveRequest
     {
+        // Akun user yang menekan aksi wajib merupakan akun milik approver Employee yang sama, karena jejak
+        // audit bukti final (generated_by -> users) harus menunjuk manusia yang benar-benar menyetujui.
+        // Dijalankan sebelum transaksi/mutasi agar penolakan tidak menyisakan efek samping; employee_id yang
+        // null pun dianggap tidak cocok (fail-closed) sehingga akun tanpa keterikatan pegawai tidak lolos.
+        if ($actingUser !== null && $actingUser->employee_id !== $actor->id) {
+            throw new AuthorizationException('Akun Anda tidak cocok dengan approver yang berwenang untuk tahap persetujuan ini.');
+        }
+
         $this->assertApprovalActionable($leaveRequest);
         $this->assertActorIsApprover($leaveRequest, $actor, $this->pendingStageOrFail($leaveRequest));
 
-        return DB::transaction(function () use ($leaveRequest, $actor, $komentar): LeaveRequest {
+        return DB::transaction(function () use ($leaveRequest, $actor, $komentar, $actingUser): LeaveRequest {
             $locked = LeaveRequest::query()->whereKey($leaveRequest->id)->lockForUpdate()->firstOrFail();
             $this->assertApprovalActionable($locked);
             $activeStep = $this->activeStepOrFail($locked);
@@ -58,10 +81,15 @@ class LeaveApprovalService
                 return $locked;
             }
 
+            // Cabang final saja: potong saldo, tandai disetujui, lalu terbitkan bukti. Urutan penting agar
+            // bukti dibangun dari status final yang sudah tersimpan. Penerbitan bukti (termasuk audit fail-closed)
+            // berjalan dalam transaksi luar ini; jika gagal, exception membubung dan me-rollback status, saldo,
+            // ledger, catatan approval, serta bukti secara atomik.
             $this->deductBalanceIfRequired($locked);
             $locked->forceFill(['status' => self::STATUS_DISETUJUI])->save();
+            $this->proofs->generateForApprovedRequest($locked->refresh(), $actor, $actingUser);
 
-            return $locked;
+            return $locked->refresh();
         });
     }
 

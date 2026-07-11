@@ -95,8 +95,10 @@ class CutiFoundationSchemaTest extends TestCase
                 'leave_request_id',
                 'token',
                 'document_path',
+                'document_mime',
                 'generated_by',
                 'generated_at',
+                'metadata',
             ],
         ];
 
@@ -162,15 +164,27 @@ class CutiFoundationSchemaTest extends TestCase
             'event_type' => 'opening_balance_set',
             'amount' => 12,
         ]);
-        LeaveProof::create([
+        $proof = LeaveProof::create([
             'leave_request_id' => $cuti->id,
             'token' => 'token-uji-fondasi',
+            'document_mime' => 'application/pdf',
+            'metadata' => [
+                'snapshot' => [
+                    'nomor_pengajuan' => 'CUTI-2026-0001',
+                ],
+            ],
         ]);
 
         $this->assertCount(1, $chain->steps);
         $this->assertCount(1, $cuti->steps);
         $this->assertTrue($saldo->ledgerEntries()->where('event_type', 'opening_balance_set')->exists());
         $this->assertSame('token-uji-fondasi', $cuti->proof->token);
+        $this->assertSame('application/pdf', $proof->document_mime);
+        $this->assertSame([
+            'snapshot' => [
+                'nomor_pengajuan' => 'CUTI-2026-0001',
+            ],
+        ], $proof->fresh()->metadata);
     }
 
     public function test_constraint_fondasi_revisi_cuti_menolak_duplikasi_kritis(): void

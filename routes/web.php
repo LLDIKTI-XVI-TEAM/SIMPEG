@@ -18,6 +18,7 @@ use App\Http\Controllers\Admin\RbacController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\UserMappingController;
 use App\Http\Controllers\Auth\KeycloakAuthController;
+use App\Http\Controllers\Cuti\VerifyLeaveProofController;
 use App\Models\Employee;
 use App\Models\Permission;
 use App\Models\Role;
@@ -40,6 +41,11 @@ Route::get('/login', [KeycloakAuthController::class, 'redirectToKeycloak'])->nam
 Route::get('/login/keycloak', [KeycloakAuthController::class, 'redirectToKeycloak'])->name('auth.keycloak.redirect');
 Route::get('/auth/keycloak/callback', [KeycloakAuthController::class, 'handleCallback'])->name('auth.keycloak.callback');
 Route::post('/logout', [KeycloakAuthController::class, 'logout'])->name('logout');
+
+Route::get('/cuti/verifikasi/{token}', VerifyLeaveProofController::class)
+    ->middleware('throttle:60,1')
+    ->where('token', '[A-Za-z0-9_-]{64,120}')
+    ->name('cuti.verify');
 
 if (app()->environment(['local', 'testing'])) {
     Route::get('/dev-login', [KeycloakAuthController::class, 'defaultDemoLogin']);
