@@ -454,7 +454,7 @@ class CutiController extends Controller
         $user = request()->user();
 
         $cuti = LeaveRequest::query()
-            ->with(['employee', 'jenisCuti', 'approvals.approver', 'steps.approver'])
+            ->with(['employee', 'jenisCuti', 'proof', 'approvals.approver', 'steps.approver'])
             ->findOrFail($id);
 
         // Tombol setujui/tunda hanya muncul bila pengguna ini adalah approver tahap yang sedang menunggu;
