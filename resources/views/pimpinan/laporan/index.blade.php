@@ -1,4 +1,4 @@
-<x-layouts.app title="EWS Pimpinan">
+<x-layouts.app title="Laporan & Statistik">
 
 
 <div class="space-y-6">

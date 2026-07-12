@@ -12,8 +12,10 @@ use Illuminate\Support\Carbon;
  *
  * @property string $token
  * @property string|null $document_path
+ * @property string|null $generated_by
  * @property Carbon|null $generated_at
  * @property-read LeaveRequest|null $leaveRequest
+ * @property-read User|null $generatedBy
  */
 class LeaveProof extends Model
 {
@@ -23,6 +25,7 @@ class LeaveProof extends Model
         'leave_request_id',
         'token',
         'document_path',
+        'generated_by',
         'generated_at',
     ];
 
@@ -37,5 +40,11 @@ class LeaveProof extends Model
     public function leaveRequest(): BelongsTo
     {
         return $this->belongsTo(LeaveRequest::class);
+    }
+
+    /** @return BelongsTo<User, $this> */
+    public function generatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'generated_by');
     }
 }

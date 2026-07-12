@@ -2,7 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Actions\Reports\ExportCustomEmployeeReportAction;
+use App\Actions\Reports\ExportLeaveReportAction;
+use App\Actions\Reports\ExportRankHistoryPdfAction;
+use App\Actions\Reports\ExportRankHistoryReportAction;
+use App\Http\Requests\Reports\ExportCustomEmployeeReportRequest;
+use App\Http\Requests\Reports\LeaveReportFilterRequest;
+use App\Http\Requests\Reports\RankHistoryReportFilterRequest;
 
 class PimpinanReportController extends Controller
 {
@@ -11,41 +17,61 @@ class PimpinanReportController extends Controller
         return view('pimpinan.laporan.index');
     }
 
-    public function employees()
+    public function employees(ExportCustomEmployeeReportRequest $request, ExportCustomEmployeeReportAction $action)
     {
-        // Dummy table for employees report preview
-        $previewData = [
-            ['nip' => '198001012005011001', 'nama' => 'Budi Santoso', 'golongan' => 'IV/a', 'jabatan' => 'Analis Kepegawaian Muda', 'status' => 'aktif'],
-            ['nip' => '198205122008012003', 'nama' => 'Siti Aminah', 'golongan' => 'III/d', 'jabatan' => 'Perancang Peraturan', 'status' => 'aktif'],
-            ['nip' => '197511202000121001', 'nama' => 'Andi Darmawan', 'golongan' => 'IV/c', 'jabatan' => 'Auditor Utama', 'status' => 'aktif'],
-        ];
-        return view('pimpinan.laporan.pegawai', compact('previewData'));
+        $payload = $request->validated();
+        $filters = array_diff_key($payload, ['columns' => true]);
+
+        return view('pimpinan.laporan.pegawai', [
+            'previewData' => $action->preview($filters),
+            'filterOptions' => $action->filterOptions(),
+            'filters' => $filters,
+            'selectedColumns' => $payload['columns'] ?? null,
+        ]);
     }
 
-    public function customEmployees(Request $request)
+    public function customEmployees(ExportCustomEmployeeReportRequest $request, ExportCustomEmployeeReportAction $action)
     {
-        // Dummy redirect back with success message for export trigger
-        return redirect()->route('pimpinan.laporan.pegawai')
-            ->with('success', 'Laporan Custom Pegawai berhasil di-generate dan akan segera diunduh.');
+        return $action->execute($request->validated());
     }
 
-    public function leaves()
+    public function leaves(LeaveReportFilterRequest $request, ExportLeaveReportAction $action)
     {
-        // Dummy table for leaves report preview
-        $previewData = [
-            ['nama' => 'Budi Santoso', 'jenis' => 'Cuti Tahunan', 'mulai' => '2026-08-01', 'selesai' => '2026-08-05', 'lama' => '5 Hari', 'status' => 'Disetujui'],
-            ['nama' => 'Rina Mulyani', 'jenis' => 'Cuti Alasan Penting', 'mulai' => '2026-07-20', 'selesai' => '2026-07-25', 'lama' => '5 Hari', 'status' => 'Ditangguhkan'],
-        ];
-        return view('pimpinan.laporan.cuti', compact('previewData'));
+        $filters = $request->validated();
+
+        return view('pimpinan.laporan.cuti', [
+            'previewData' => $action->preview($filters),
+            'filterOptions' => $action->filterOptions(),
+            'filters' => $filters,
+        ]);
     }
 
-    public function rankHistories()
+    public function exportLeaves(LeaveReportFilterRequest $request, ExportLeaveReportAction $action)
     {
-        // Dummy table for rank histories report preview
-        $previewData = [
-            ['nama' => 'Budi Santoso', 'golongan_lama' => 'III/d', 'golongan_baru' => 'IV/a', 'tmt' => '2025-10-01', 'sk' => '01/KEP/2025', 'status' => 'Selesai'],
-            ['nama' => 'Siti Aminah', 'golongan_lama' => 'III/c', 'golongan_baru' => 'III/d', 'tmt' => '2026-04-01', 'sk' => '45/KEP/2026', 'status' => 'Selesai'],
-        ];
-        return view('pimpinan.laporan.kepangkatan', compact('previewData'));
+        return $action->execute($request->validated());
+    }
+
+    public function rankHistories(RankHistoryReportFilterRequest $request, ExportRankHistoryReportAction $action)
+    {
+        $filters = $request->validated();
+
+        return view('pimpinan.laporan.kepangkatan', [
+            'previewData' => $action->preview($filters),
+            'filterOptions' => $action->filterOptions(),
+            'filters' => $filters,
+        ]);
+    }
+
+    public function exportRankHistoriesExcel(RankHistoryReportFilterRequest $request, ExportRankHistoryReportAction $action)
+    {
+        return $action->executeExcel($request->validated());
+    }
+
+    public function exportRankHistoriesPdf(
+        RankHistoryReportFilterRequest $request,
+        ExportRankHistoryReportAction $report,
+        ExportRankHistoryPdfAction $pdf,
+    ) {
+        return $pdf->execute($report->rows($request->validated()));
     }
 }

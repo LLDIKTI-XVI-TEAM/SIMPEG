@@ -1,174 +1,223 @@
 <x-layouts.app title="Detail Pengajuan Cuti">
+    @php
+        $status = match ($leave->status) {
+            'menunggu_approval' => ['label' => 'Menunggu Keputusan', 'variant' => 'warning'],
+            'disetujui' => ['label' => 'Disetujui', 'variant' => 'success'],
+            'ditangguhkan' => ['label' => 'Ditangguhkan', 'variant' => 'warning'],
+            'perlu_perubahan' => ['label' => 'Perubahan', 'variant' => 'info'],
+            'tidak_disetujui' => ['label' => 'Tidak Disetujui', 'variant' => 'danger'],
+            default => ['label' => $leave->status, 'variant' => 'muted'],
+        };
+        $currentYear = now()->year;
+    @endphp
 
+    <div class="space-y-6">
+        @if (session('success'))
+            <x-ui.alert variant="success">{{ session('success') }}</x-ui.alert>
+        @endif
 
-<div class="space-y-6">
-
-    {{-- PAGE HEADER --}}
-    <div class="mb-6">
-        <h2 class="text-2xl font-semibold text-ink">Detail Pengajuan Cuti</h2>
-        <x-ui.breadcrumb :items="[
-            ['label' => 'Dashboard', 'url' => route('pimpinan.dashboard')],
-            ['label' => 'Monitoring Cuti', 'url' => route('pimpinan.cuti.index')],
-            ['label' => 'Detail Pengajuan']
-        ]" />
-    </div>
-
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        <div class="lg:col-span-2 space-y-6">
-            <x-ui.card>
-                <div class="flex items-center justify-between mb-4 border-b border-border pb-4">
-                    <div>
-                        <h2 class="text-xl font-bold text-ink">Formulir Permintaan Cuti</h2>
-                        <p class="text-sm text-muted">Nomor Tiket: #CT-{{ strtoupper(substr($leaveData['id'], 0, 8)) }}</p>
-                    </div>
-                    <span class="rounded-full px-3 py-1 text-xs font-semibold bg-warning/10 text-warning">
-                        {{ $leaveData['status'] }}
-                    </span>
-                </div>
-
-                <div class="space-y-6 text-sm">
-                    {{-- Data Pegawai --}}
-                    <div>
-                        <h3 class="text-xs font-bold uppercase tracking-wider text-muted mb-3">1. Data Pegawai</h3>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-soft/50 p-4 rounded-lg">
-                            <div>
-                                <span class="block text-xs text-muted mb-1">Nama</span>
-                                <span class="font-medium text-ink">{{ $leaveData['nama'] }}</span>
-                            </div>
-                            <div>
-                                <span class="block text-xs text-muted mb-1">NIP</span>
-                                <span class="font-mono text-ink">{{ $leaveData['nip'] }}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {{-- Data Cuti --}}
-                    <div>
-                        <h3 class="text-xs font-bold uppercase tracking-wider text-muted mb-3">2. Detail Cuti</h3>
-                        <div class="space-y-4 bg-soft/50 p-4 rounded-lg">
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <span class="block text-xs text-muted mb-1">Jenis Cuti</span>
-                                    <span class="font-medium text-ink">{{ $leaveData['jenis_cuti'] }}</span>
-                                </div>
-                                <div>
-                                    <span class="block text-xs text-muted mb-1">Lama Cuti</span>
-                                    <span class="font-medium text-ink">{{ $leaveData['lama_cuti'] }}</span>
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <span class="block text-xs text-muted mb-1">Tanggal Mulai</span>
-                                    <span class="font-medium text-ink">{{ \Carbon\Carbon::parse($leaveData['tanggal_mulai'])->format('d M Y') }}</span>
-                                </div>
-                                <div>
-                                    <span class="block text-xs text-muted mb-1">Tanggal Selesai</span>
-                                    <span class="font-medium text-ink">{{ \Carbon\Carbon::parse($leaveData['tanggal_selesai'])->format('d M Y') }}</span>
-                                </div>
-                            </div>
-                            <div>
-                                <span class="block text-xs text-muted mb-1">Alasan Cuti</span>
-                                <span class="text-ink">{{ $leaveData['alasan'] }}</span>
-                            </div>
-                            <div>
-                                <span class="block text-xs text-muted mb-1">Alamat Selama Cuti</span>
-                                <span class="text-ink">{{ $leaveData['alamat_cuti'] }} (Telp: {{ $leaveData['telepon'] }})</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </x-ui.card>
-
-            <x-ui.card>
-                <h3 class="text-lg font-semibold text-ink mb-4 border-b border-border pb-2">Catatan Persetujuan Atasan Langsung</h3>
-                <div class="flex items-start gap-4">
-                    <div class="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                        <span class="text-lg font-bold text-primary">{{ substr($leaveData['approval_atasan']['nama'], 0, 1) }}</span>
-                    </div>
-                    <div>
-                        <p class="font-medium text-ink">{{ $leaveData['approval_atasan']['nama'] }}</p>
-                        <p class="text-xs text-muted">{{ $leaveData['approval_atasan']['jabatan'] }}</p>
-                        
-                        <div class="mt-3 p-3 bg-success/5 border border-success/20 rounded-lg text-sm text-ink">
-                            <div class="flex items-center gap-2 mb-2">
-                                <span class="rounded bg-success/20 px-2 py-0.5 text-[10px] font-bold text-success uppercase">
-                                    {{ $leaveData['approval_atasan']['status'] }}
-                                </span>
-                                <span class="text-xs text-muted">{{ $leaveData['approval_atasan']['tanggal'] }}</span>
-                            </div>
-                            <p>"{!! nl2br(e($leaveData['approval_atasan']['catatan'])) !!}"</p>
-                        </div>
-                    </div>
-                </div>
-            </x-ui.card>
+        <div>
+            <h1 class="text-2xl font-semibold text-ink">Detail Pengajuan Cuti</h1>
+            <x-ui.breadcrumb :items="[
+                ['label' => 'Dashboard', 'url' => route('pimpinan.dashboard')],
+                ['label' => 'Monitoring Cuti', 'url' => route('pimpinan.cuti.index')],
+                ['label' => 'Detail Pengajuan'],
+            ]" />
         </div>
 
-        <div class="lg:col-span-1 space-y-6">
-            {{-- Sisa Cuti --}}
-            <x-ui.card>
-                <h3 class="text-sm font-semibold text-ink mb-4">Sisa Cuti Tahunan</h3>
-                <div class="space-y-3">
-                    <div class="flex justify-between items-center text-sm">
-                        <span class="text-muted">Tahun {{ date('Y') }} (N)</span>
-                        <span class="font-bold text-ink">{{ $leaveData['sisa_cuti']['N'] }} Hari</span>
-                    </div>
-                    <div class="flex justify-between items-center text-sm border-t border-border pt-2">
-                        <span class="text-muted">Tahun {{ date('Y')-1 }} (N-1)</span>
-                        <span class="font-bold text-ink">{{ $leaveData['sisa_cuti']['N_1'] }} Hari</span>
-                    </div>
-                    <div class="flex justify-between items-center text-sm border-t border-border pt-2">
-                        <span class="text-muted">Tahun {{ date('Y')-2 }} (N-2)</span>
-                        <span class="font-bold text-ink">{{ $leaveData['sisa_cuti']['N_2'] }} Hari</span>
-                    </div>
-                </div>
-            </x-ui.card>
-
-            {{-- Form Keputusan --}}
-            <x-ui.card>
-                <h3 class="text-lg font-semibold text-ink mb-4">Keputusan Pejabat Berwenang (Pimpinan)</h3>
-                
-                @if(str_contains(strtolower($leaveData['status']), 'menunggu'))
-                    <form action="{{ route('pimpinan.cuti.decision', $leaveData['id']) }}" method="POST" class="space-y-4" x-data="{ keputusan: '' }">
-                        @csrf
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div class="space-y-6 lg:col-span-2">
+                <x-ui.card>
+                    <div class="mb-4 flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
-                            <label class="block text-sm font-semibold text-ink mb-2">Ambil Keputusan</label>
-                            <select name="keputusan" x-model="keputusan" class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none" required>
-                                <option value="">-- Pilih Keputusan --</option>
-                                <option value="DISETUJUI">1. Disetujui</option>
-                                <option value="PERUBAHAN">2. Disetujui dengan Perubahan</option>
-                                <option value="DITANGGUHKAN">3. Ditangguhkan</option>
-                                <option value="TIDAK_DISETUJUI">4. Tidak Disetujui</option>
-                            </select>
+                            <h2 class="text-xl font-semibold text-ink">Formulir Permintaan Cuti</h2>
+                            <p class="text-sm text-muted">Nomor tiket: <span class="font-mono">#CT-{{ strtoupper(substr($leave->id, 0, 8)) }}</span></p>
                         </div>
-                        
+                        <x-ui.badge :variant="$status['variant']" size="md" dot>{{ $status['label'] }}</x-ui.badge>
+                    </div>
+
+                    <dl class="space-y-6 text-sm">
                         <div>
-                            <label class="block text-sm font-semibold text-ink mb-2">
-                                Catatan Tambahan 
-                                <span x-show="keputusan === 'PERUBAHAN' || keputusan === 'DITANGGUHKAN' || keputusan === 'TIDAK_DISETUJUI'" class="text-danger">* (Wajib)</span>
-                                <span x-show="keputusan === '' || keputusan === 'DISETUJUI'" class="text-muted font-normal">(Opsional)</span>
-                            </label>
-                            <textarea name="catatan" :required="keputusan === 'PERUBAHAN' || keputusan === 'DITANGGUHKAN' || keputusan === 'TIDAK_DISETUJUI'" rows="3" class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none" placeholder="Tulis catatan jika ada perubahan atau penangguhan..."></textarea>
+                            <dt class="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">Data Pegawai</dt>
+                            <dd class="grid grid-cols-1 gap-4 rounded-lg bg-soft p-4 sm:grid-cols-2">
+                                <div>
+                                    <p class="text-xs text-muted">Nama</p>
+                                    <p class="font-medium text-ink">{{ $leave->employee?->nama_lengkap ?? 'Pegawai tidak tersedia' }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-muted">NIP</p>
+                                    <p class="font-mono text-ink">{{ $leave->employee?->nip ?? '-' }}</p>
+                                </div>
+                            </dd>
                         </div>
 
-                        <div class="pt-2">
-                            <x-ui.button id="submit-decision" type="submit" variant="primary" class="w-full justify-center">
-                                Simpan Keputusan Final
-                            </x-ui.button>
+                        <div>
+                            <dt class="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">Detail Cuti</dt>
+                            <dd class="space-y-4 rounded-lg bg-soft p-4">
+                                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <div>
+                                        <p class="text-xs text-muted">Jenis Cuti</p>
+                                        <p class="font-medium text-ink">{{ $leave->jenisCuti?->nama ?? '-' }}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs text-muted">Lama Cuti</p>
+                                        <p class="font-medium text-ink">{{ $leave->jumlah_hari_kerja }} hari kerja</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs text-muted">Tanggal Mulai</p>
+                                        <p class="font-medium text-ink">{{ $leave->tanggal_mulai?->translatedFormat('d M Y') ?? '-' }}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs text-muted">Tanggal Selesai</p>
+                                        <p class="font-medium text-ink">{{ $leave->tanggal_selesai?->translatedFormat('d M Y') ?? '-' }}</p>
+                                    </div>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-muted">Alasan Cuti</p>
+                                    <p class="text-ink">{{ $leave->alasan }}</p>
+                                </div>
+                            </dd>
                         </div>
-                    </form>
-                @else
-                    <div class="rounded-lg bg-soft p-4 text-center">
-                        <p class="text-sm text-muted">Keputusan final telah diberikan.</p>
-                        <x-ui.button variant="secondary" class="mt-4 w-full justify-center" disabled>
-                            Sudah Diproses
-                        </x-ui.button>
-                    </div>
-                @endif
-            </x-ui.card>
+                        <div>
+                            <dt class="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">Lampiran Pendukung</dt>
+                            <dd>
+                                @if ($attachmentAvailable)
+                                    <a href="{{ route('pimpinan.cuti.attachment.download', $leave) }}" class="inline-flex items-center justify-center rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/30">Unduh Lampiran Pendukung</a>
+                                @else
+                                    <p class="rounded-lg bg-soft p-3 text-sm text-muted">Tidak ada lampiran pendukung.</p>
+                                @endif
+                            </dd>
+                        </div>
+                        @if ($leave->status === 'disetujui' && $leave->proof?->document_path)
+                            <div>
+                                <dt class="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">Dokumen Cuti</dt>
+                                <dd class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                                    <a href="{{ route('pimpinan.cuti.document.show', $leave) }}" class="inline-flex items-center justify-center rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/30">Lihat Formulir Cuti</a>
+                                    <a href="{{ route('pimpinan.cuti.document.download', $leave) }}" class="inline-flex items-center justify-center rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/30">Unduh Dokumen Cuti</a>
+                                    <a href="{{ route('cuti.verify', $leave->proof->token) }}" class="inline-flex items-center justify-center rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/30">Verifikasi QR</a>
+                                </dd>
+                            </div>
+                        @endif
+                    </dl>
+                </x-ui.card>
+
+                <x-ui.card>
+                    <h2 class="mb-4 border-b border-border pb-2 text-lg font-semibold text-ink">Riwayat Persetujuan</h2>
+                    <ol class="space-y-4">
+                        @forelse ($leave->steps->sortBy('step_order') as $step)
+                            @php
+                                $stepStatus = match ($step->status) {
+                                    'approved' => ['label' => 'Disetujui', 'variant' => 'success'],
+                                    'rejected' => ['label' => 'Tidak Disetujui', 'variant' => 'danger'],
+                                    'active' => ['label' => 'Menunggu Tindakan', 'variant' => 'warning'],
+                                    'skipped' => ['label' => 'Dilewati', 'variant' => 'muted'],
+                                    default => ['label' => 'Menunggu Tahap', 'variant' => 'muted'],
+                                };
+                            @endphp
+                            <li class="rounded-lg border border-border p-4">
+                                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                    <div>
+                                        <p class="font-medium text-ink">Tahap {{ $step->step_order }} · {{ $step->role_label }}</p>
+                                        <p class="text-sm text-muted">{{ $step->approver?->nama_lengkap ?? 'Approver belum dipetakan' }}</p>
+                                    </div>
+                                    <x-ui.badge :variant="$stepStatus['variant']" size="sm" dot>{{ $stepStatus['label'] }}</x-ui.badge>
+                                </div>
+                                @if ($step->decision_note)
+                                    <p class="mt-3 rounded bg-soft p-3 text-sm text-ink">{{ $step->decision_note }}</p>
+                                @endif
+                                @if ($step->acted_at)
+                                    <p class="mt-2 text-xs text-muted">Diproses {{ $step->acted_at->translatedFormat('d M Y H:i') }}</p>
+                                @endif
+                            </li>
+                        @empty
+                            <li class="rounded-lg bg-soft p-4 text-sm text-muted">Snapshot approval belum tersedia untuk pengajuan ini.</li>
+                        @endforelse
+                    </ol>
+                </x-ui.card>
+                <x-ui.card>
+                    <h2 class="mb-4 border-b border-border pb-2 text-lg font-semibold text-ink">Riwayat Tindakan Resmi</h2>
+                    <ol class="space-y-4">
+                        @forelse ($leave->approvals->sortBy('acted_at') as $approval)
+                            @php
+                                $action = match ($approval->action) {
+                                    'APPROVE' => ['label' => 'Disetujui', 'variant' => 'success'],
+                                    'REQUEST_CHANGES' => ['label' => 'Perubahan', 'variant' => 'info'],
+                                    'POSTPONE' => ['label' => 'Ditangguhkan', 'variant' => 'warning'],
+                                    'REJECT' => ['label' => 'Tidak Disetujui', 'variant' => 'danger'],
+                                    default => ['label' => 'Dilewati', 'variant' => 'muted'],
+                                };
+                            @endphp
+                            <li class="rounded-lg border border-border p-4">
+                                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                    <p class="font-medium text-ink">Tahap {{ $approval->stage }} · {{ $approval->approver?->nama_lengkap ?? 'Approver tidak tersedia' }}</p>
+                                    <x-ui.badge :variant="$action['variant']" size="sm" dot>{{ $action['label'] }}</x-ui.badge>
+                                </div>
+                                @if ($approval->komentar)
+                                    <p class="mt-3 rounded bg-soft p-3 text-sm text-ink">{{ $approval->komentar }}</p>
+                                @endif
+                                @if ($approval->acted_at)
+                                    <p class="mt-2 text-xs text-muted">Diproses {{ $approval->acted_at->translatedFormat('d M Y H:i') }}</p>
+                                @endif
+                            </li>
+                        @empty
+                            <li class="rounded-lg bg-soft p-4 text-sm text-muted">Belum ada tindakan resmi pada pengajuan ini.</li>
+                        @endforelse
+                    </ol>
+                </x-ui.card>
+            </div>
+
+            <div class="space-y-6">
+                <x-ui.card>
+                    <h2 class="mb-4 text-sm font-semibold text-ink">Saldo Cuti Tahunan</h2>
+                    <dl class="space-y-3 text-sm">
+                        @foreach ([$currentYear, $currentYear - 1, $currentYear - 2] as $year)
+                            <div class="flex items-center justify-between {{ $loop->first ? '' : 'border-t border-border pt-3' }}">
+                                <dt class="text-muted">Tahun {{ $year }}</dt>
+                                <dd class="font-semibold text-ink">{{ $balances->get($year)?->sisa ?? 0 }} Hari</dd>
+                            </div>
+                        @endforeach
+                    </dl>
+                </x-ui.card>
+
+                <x-ui.card>
+                    <h2 class="mb-4 text-lg font-semibold text-ink">Keputusan Pejabat Berwenang</h2>
+                    @if ($canDecide)
+                        <form action="{{ route('pimpinan.cuti.decision', $leave) }}" method="POST" class="space-y-4" x-data="{ keputusan: '{{ old('keputusan', '') }}' }">
+                            @csrf
+                            <div>
+                                <label for="keputusan" class="mb-2 block text-sm font-semibold text-ink">Ambil Keputusan</label>
+                                <select id="keputusan" name="keputusan" x-model="keputusan" required aria-describedby="decision-note-help{{ $errors->has('keputusan') ? ' keputusan-error' : '' }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                                    <option value="">Pilih keputusan</option>
+                                    <option value="DISETUJUI">1. Disetujui</option>
+                                    <option value="PERUBAHAN">2. Perubahan</option>
+                                    <option value="DITANGGUHKAN">3. Ditangguhkan</option>
+                                    <option value="TIDAK_DISETUJUI">4. Tidak Disetujui</option>
+                                </select>
+                                @error('keputusan')
+                                    <p id="keputusan-error" class="mt-1 text-sm text-danger">{{ $message }}</p>
+                                @enderror
+                            </div>
+                            <div>
+                                <label for="catatan" class="mb-2 block text-sm font-semibold text-ink">Catatan Keputusan</label>
+                                <textarea id="catatan" name="catatan" rows="4" :required="keputusan !== '' && keputusan !== 'DISETUJUI'" aria-describedby="decision-note-help{{ $errors->has('catatan') ? ' catatan-error' : '' }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="Tulis catatan keputusan bila diperlukan">{{ old('catatan') }}</textarea>
+                                <p id="decision-note-help" class="mt-1 text-xs text-muted">Catatan wajib untuk Perubahan atau Ditangguhkan. Catatan juga wajib untuk Tidak Disetujui.</p>
+                                @error('catatan')
+                                    <p id="catatan-error" class="mt-1 text-sm text-danger">{{ $message }}</p>
+                                @enderror
+                            </div>
+                            <button id="submit-decision" type="submit" class="inline-flex w-full items-center justify-center rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary/30">Simpan Keputusan</button>
+                        </form>
+                    @else
+                        <p class="rounded-lg bg-soft p-4 text-sm text-muted">
+                            @if ($activeStep)
+                                Tahap aktif ditujukan kepada {{ $activeStep->approver?->nama_lengkap ?? 'approver yang dipetakan' }}.
+                            @else
+                                Keputusan tidak tersedia karena pengajuan tidak memiliki tahap approval aktif.
+                            @endif
+                        </p>
+                    @endif
+                </x-ui.card>
+            </div>
         </div>
-
     </div>
-
-</div>
 </x-layouts.app>
