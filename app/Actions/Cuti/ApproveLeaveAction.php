@@ -37,7 +37,13 @@ class ApproveLeaveAction
             ->where('approver_employee_id', $actor->id)
             ->first();
 
-        $leaveRequest = $this->approvals->approve($leaveRequest, $actor, $komentar);
+        // Aktor manusia dipisahkan dari approver Employee: user menjadi jejak akun penerbit bukti final,
+        // sedangkan otorisasi step tetap berbasis employee. Request::user() dapat mengembalikan
+        // Authenticatable|null, jadi dipersempit lewat instanceof alih-alih cast tak aman.
+        $requestUser = $request->user();
+        $actingUser = $requestUser instanceof User ? $requestUser : null;
+
+        $leaveRequest = $this->approvals->approve($leaveRequest, $actor, $komentar, $actingUser);
         $auditPayload = $this->decisionAuditPayload($statusSebelum, $leaveRequest, $stepSebelum, $actor, 'APPROVE', $komentar);
 
         // Audit dan notifikasi bersifat fire-and-forget setelah transaksi persetujuan berhasil di service,

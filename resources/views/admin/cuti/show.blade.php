@@ -2,7 +2,7 @@
     <div class="mx-auto max-w-7xl space-y-6">
 
         @php
-            // Status runtime Phase 4 memakai token snake_case; label dipisahkan agar UI tidak bergantung status lama.
+            // Status runtime memakai token snake_case; label dipisahkan agar UI tidak bergantung pada status lama.
             $status = $cuti->status;
             $statusVariant = match ($status) {
                 'disetujui' => 'success',
@@ -93,6 +93,15 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
                             </svg>
                             Lihat lampiran
+                        </a>
+                    </div>
+                @endif
+                @if ($cuti->proof !== null)
+                    <div class="space-y-1 sm:col-span-2">
+                        <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Bukti Persetujuan Cuti</span>
+                        <p class="text-sm text-muted font-sans">Buka bukti persetujuan untuk memeriksa status pengajuan.</p>
+                        <a href="{{ route('cuti.verify', ['token' => $cuti->proof->token]) }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline">
+                            Lihat bukti persetujuan
                         </a>
                     </div>
                 @endif

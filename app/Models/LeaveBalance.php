@@ -13,6 +13,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $carry_over
  * @property int $terpakai
  * @property int $sisa
+ * @property int $sisa_n2
+ * @property int $sisa_n1
+ * @property int $sisa_tahun_berjalan
+ * @property int $terpakai_tahun_berjalan
+ * @property int $hangus
  */
 class LeaveBalance extends Model
 {
@@ -25,6 +30,11 @@ class LeaveBalance extends Model
         'carry_over',
         'terpakai',
         'sisa',
+        'sisa_n2',
+        'sisa_n1',
+        'sisa_tahun_berjalan',
+        'terpakai_tahun_berjalan',
+        'hangus',
     ];
 
     protected function casts(): array
@@ -35,6 +45,11 @@ class LeaveBalance extends Model
             'carry_over' => 'integer',
             'terpakai' => 'integer',
             'sisa' => 'integer',
+            'sisa_n2' => 'integer',
+            'sisa_n1' => 'integer',
+            'sisa_tahun_berjalan' => 'integer',
+            'terpakai_tahun_berjalan' => 'integer',
+            'hangus' => 'integer',
         ];
     }
 

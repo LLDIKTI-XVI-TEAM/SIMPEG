@@ -36,11 +36,17 @@ class GenerateLeaveProofAction
             'verificationUrl' => $verificationUrl,
         ])->setPaper('a4')->output());
 
-        $proof->forceFill([
+        $updates = [
             'document_path' => $path,
-            'generated_by' => $generatedBy?->id,
-            'generated_at' => now(),
-        ])->save();
+            'document_mime' => 'application/pdf',
+        ];
+
+        if ($proof->wasRecentlyCreated) {
+            $updates['generated_by'] = $generatedBy?->id;
+            $updates['generated_at'] = now();
+        }
+
+        $proof->forceFill($updates)->save();
 
         return $proof;
     }

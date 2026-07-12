@@ -12,8 +12,10 @@ use Illuminate\Support\Carbon;
  *
  * @property string $token
  * @property string|null $document_path
+ * @property string|null $document_mime
  * @property string|null $generated_by
  * @property Carbon|null $generated_at
+ * @property array<string, mixed>|null $metadata Snapshot data pengajuan saat bukti diterbitkan.
  * @property-read LeaveRequest|null $leaveRequest
  * @property-read User|null $generatedBy
  */
@@ -25,14 +27,17 @@ class LeaveProof extends Model
         'leave_request_id',
         'token',
         'document_path',
+        'document_mime',
         'generated_by',
         'generated_at',
+        'metadata',
     ];
 
     protected function casts(): array
     {
         return [
             'generated_at' => 'datetime',
+            'metadata' => 'array',
         ];
     }
 

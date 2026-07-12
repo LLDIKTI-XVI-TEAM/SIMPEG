@@ -108,4 +108,21 @@ class LeaveBalanceTest extends TestCase
         $response->assertViewHas('balance');
         $response->assertViewHas('history');
     }
+
+    public function test_personal_saldo_web_tidak_membuat_saldo_saat_dibuka(): void
+    {
+        $employee = Employee::factory()->create();
+        $user = User::factory()->pegawai()->create([
+            'employee_id' => $employee->id,
+        ]);
+
+        $response = $this->actingAs($user)->get('/dashboard/cuti/saldo');
+
+        $response->assertOk();
+        $response->assertSee('Saldo cuti tahunan belum tersedia', false);
+        $this->assertDatabaseMissing('leave_balances', [
+            'employee_id' => $employee->id,
+            'tahun' => now()->year,
+        ]);
+    }
 }

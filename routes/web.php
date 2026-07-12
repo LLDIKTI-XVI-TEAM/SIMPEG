@@ -18,7 +18,7 @@ use App\Http\Controllers\Admin\RbacController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\UserMappingController;
 use App\Http\Controllers\Auth\KeycloakAuthController;
-use App\Http\Controllers\LeaveVerificationController;
+use App\Http\Controllers\Cuti\VerifyLeaveProofController;
 use App\Http\Controllers\PimpinanDashboardController;
 use App\Http\Controllers\PimpinanEmployeeController;
 use App\Http\Controllers\PimpinanEwsController;
@@ -49,7 +49,9 @@ Route::get('/login/keycloak', [KeycloakAuthController::class, 'redirectToKeycloa
 Route::get('/auth/keycloak/callback', [KeycloakAuthController::class, 'handleCallback'])->name('auth.keycloak.callback');
 Route::post('/logout', [KeycloakAuthController::class, 'logout'])->name('logout');
 Route::get('/logout', [KeycloakAuthController::class, 'logout'])->name('logout.get');
-Route::get('/cuti/verify/{token}', [LeaveVerificationController::class, 'show'])->name('cuti.verify');
+Route::get('/cuti/verifikasi/{token}', VerifyLeaveProofController::class)
+    ->middleware('throttle:60,1')
+    ->name('cuti.verify');
 
 if (app()->environment(['local', 'testing'])) {
     Route::get('/dev-login', [KeycloakAuthController::class, 'defaultDemoLogin']);
@@ -725,6 +727,14 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
 
     Route::get('/dashboard/cuti/saldo', [LeaveBalanceController::class, 'showMyBalanceWeb'])
         ->name('cuti.saldo');
+    Route::post('/dashboard/cuti/saldo/{employee}/opening-balance', [LeaveBalanceController::class, 'storeOpeningBalance'])
+        ->whereUuid('employee')
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:cuti.balance.adjust'])
+        ->name('cuti.saldo.opening-balance');
+    Route::post('/dashboard/cuti/saldo/{employee}/adjust', [LeaveBalanceController::class, 'adjust'])
+        ->whereUuid('employee')
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:cuti.balance.adjust'])
+        ->name('cuti.saldo.adjust');
 
     Route::get('/pegawai/legacy', function () {
         return redirect()->route('data-pegawai');

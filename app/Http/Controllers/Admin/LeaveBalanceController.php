@@ -2,9 +2,15 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\Cuti\AdjustLeaveBalanceAction;
+use App\Actions\Cuti\SetOpeningLeaveBalanceAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Cuti\AdjustLeaveBalanceRequest;
+use App\Http\Requests\Cuti\OpeningLeaveBalanceRequest;
+use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class LeaveBalanceController extends Controller
@@ -22,10 +28,10 @@ class LeaveBalanceController extends Controller
         }
 
         $tahun = (int) now()->year;
-        $balance = LeaveBalance::firstOrCreate(
-            ['employee_id' => $employee->id, 'tahun' => $tahun],
-            ['jatah_awal' => 12, 'carry_over' => 0, 'terpakai' => 0, 'sisa' => 12]
-        );
+        $balance = LeaveBalance::query()
+            ->where('employee_id', $employee->id)
+            ->where('tahun', $tahun)
+            ->first();
 
         $history = LeaveRequest::where('employee_id', $employee->id)
             ->with(['jenisCuti'])
@@ -33,5 +39,48 @@ class LeaveBalanceController extends Controller
             ->paginate(10);
 
         return view('admin.cuti.personal-saldo', compact('balance', 'history'));
+    }
+
+    /**
+     * Menyimpan koreksi saldo dari halaman admin.
+     * Route dan request final akan memvalidasi detail input; method ini ada agar gate backend aktif lebih dulu.
+     */
+    public function storeOpeningBalance(OpeningLeaveBalanceRequest $request, Employee $employee, SetOpeningLeaveBalanceAction $action)
+    {
+        $actor = $request->user();
+        abort_unless($actor instanceof User, 403);
+        $payload = $request->validated();
+
+        $action->execute($employee, $payload, $actor);
+
+        return $this->redirectToAdminBalancePanel($employee, (int) $payload['tahun'])
+            ->with('success', 'Saldo awal cuti berhasil disimpan.');
+    }
+
+    /**
+     * Menyimpan koreksi saldo dari halaman admin.
+     * Request menangani validasi dan otorisasi; action menjaga controller tetap bebas logika bisnis.
+     */
+    public function adjust(AdjustLeaveBalanceRequest $request, Employee $employee, AdjustLeaveBalanceAction $action)
+    {
+        $actor = $request->user();
+        abort_unless($actor instanceof User, 403);
+        $payload = $request->validated();
+
+        $action->execute($employee, $payload, $actor);
+
+        return $this->redirectToAdminBalancePanel($employee, (int) $payload['tahun'])
+            ->with('success', 'Koreksi saldo cuti berhasil disimpan.');
+    }
+
+    /**
+     * Mengembalikan admin ke panel saldo pegawai yang baru dikoreksi agar konteks audit dan ledger tetap terlihat.
+     */
+    private function redirectToAdminBalancePanel(Employee $employee, int $tahun)
+    {
+        return redirect()->to(route('cuti.rekap', [
+            'pegawai' => $employee->id,
+            'periode' => $tahun,
+        ]).'#admin-saldo-cuti');
     }
 }
