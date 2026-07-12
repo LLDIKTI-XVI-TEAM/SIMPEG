@@ -388,7 +388,7 @@
 
         {{-- ---- Custom Body Rows ---- --}}
         <template x-if="!isLoading && pegawaiRows.length > 0">
-            <template x-for="p in pegawaiRows" :key="p.id">
+            <template x-for="(p, index) in pegawaiRows" :key="p.id">
                 <x-ui.table-row class="border-b border-border last:border-0" x-bind:data-id="p.id" x-bind:data-nip="p.nip">
 
                     {{-- Checkbox --}}
@@ -497,7 +497,8 @@
                                     </button>
                                 </x-ui.tooltip>
                                 <div x-show="openStatusDropdown" style="display: none;" x-transition.opacity.duration.200ms
-                                     class="absolute right-0 top-full z-50 mt-1 w-36 rounded-lg border border-border bg-surface p-1 shadow-lg">
+                                     :class="index >= Math.max(0, pegawaiRows.length - 2) ? 'bottom-full mb-1' : 'top-full mt-1'"
+                                     class="absolute right-0 z-50 w-36 rounded-lg border border-border bg-surface p-1 shadow-lg">
                                     <button type="button" @click="changeStatus(p.id, 'Aktif'); openStatusDropdown = false"
                                             class="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-sm text-success hover:bg-soft transition text-left">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
