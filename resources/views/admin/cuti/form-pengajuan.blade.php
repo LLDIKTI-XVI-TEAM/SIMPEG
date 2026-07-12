@@ -15,6 +15,7 @@
 
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div class="lg:col-span-2">
+                @if(!$isKepalaLembaga)
                 <form action="{{ route('cuti.store') }}" method="POST" enctype="multipart/form-data" class="rounded-xl border border-border bg-surface shadow-sm overflow-hidden" x-data="cutiForm()">
                     @csrf
                     
@@ -24,30 +25,38 @@
                     </div>
 
                     <div class="p-6 space-y-5">
-                        <!-- Alert jika belum ada atasan langsung -->
-                        @if(!$employee || !$employee->kepala_bagian_id)
-                        <div class="rounded-lg bg-warning/10 p-4 border-l-4 border-warning">
+                        @php
+                            // Form dikunci ketika chain approval belum siap agar pemohon tidak mengirim pengajuan yang pasti ditolak server.
+                            $formLocked = ! $chainReady;
+                        @endphp
+
+                        <!-- Peringatan bila rantai approval cuti belum dikonfigurasi -->
+                        @unless($chainReady)
+                        <div role="alert" class="rounded-lg border border-warning/40 bg-warning/10 p-4">
                             <div class="flex">
                                 <div class="flex-shrink-0">
-                                    <svg class="h-5 w-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <svg class="h-5 w-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                                     </svg>
                                 </div>
                                 <div class="ml-3">
-                                    <p class="text-sm text-warning-dark font-medium text-ink">
-                                        Anda belum memiliki Kepala Bagian yang dikonfigurasi. Pengajuan cuti mungkin tidak dapat diproses.
+                                    <p class="text-sm font-semibold text-ink">
+                                        Konfigurasi approval cuti belum tersedia.
+                                    </p>
+                                    <p class="mt-1 text-sm text-warning-dark">
+                                        Silakan hubungi Admin Kepegawaian untuk mengatur rantai approval sebelum mengajukan cuti.
                                     </p>
                                 </div>
                             </div>
                         </div>
-                        @endif
+                        @endunless
 
                         <!-- Jenis Cuti -->
                         <div>
                             <label for="jenis_cuti_id" class="block text-sm font-medium text-ink mb-1">Jenis Cuti <span class="text-danger">*</span></label>
                             <select id="jenis_cuti_id" name="jenis_cuti_id" required x-model="selectedJenisCuti" @change="validateSaldo"
                                 class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                                {{ (!$employee || !$employee->kepala_bagian_id) ? 'disabled' : '' }}>
+                                {{ $formLocked ? 'disabled' : '' }}>
                                 <option value="">Pilih Jenis Cuti</option>
                                 @foreach($jenisCuti as $jenis)
                                     <option value="{{ $jenis->id }}" data-nama="{{ $jenis->nama }}">{{ $jenis->nama }}</option>
@@ -64,7 +73,7 @@
                                 <label for="tanggal_mulai" class="block text-sm font-medium text-ink mb-1">Tanggal Mulai <span class="text-danger">*</span></label>
                                 <input type="date" id="tanggal_mulai" name="tanggal_mulai" required x-model="startDate" @change="calculateDays"
                                     class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                                    {{ (!$employee || !$employee->kepala_bagian_id) ? 'disabled' : '' }}>
+                                    {{ $formLocked ? 'disabled' : '' }}>
                                 @error('tanggal_mulai')
                                     <p class="mt-1 text-xs text-danger">{{ $message }}</p>
                                 @enderror
@@ -75,7 +84,7 @@
                                 <label for="tanggal_selesai" class="block text-sm font-medium text-ink mb-1">Tanggal Selesai <span class="text-danger">*</span></label>
                                 <input type="date" id="tanggal_selesai" name="tanggal_selesai" required x-model="endDate" @change="calculateDays"
                                     class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                                    {{ (!$employee || !$employee->kepala_bagian_id) ? 'disabled' : '' }}>
+                                    {{ $formLocked ? 'disabled' : '' }}>
                                 @error('tanggal_selesai')
                                     <p class="mt-1 text-xs text-danger">{{ $message }}</p>
                                 @enderror
@@ -87,16 +96,23 @@
                             <label for="jumlah_hari_kerja" class="block text-sm font-medium text-ink mb-1">Jumlah Hari Kerja</label>
                             <div class="relative">
                                 <input type="number" id="jumlah_hari_kerja" name="jumlah_hari_kerja" readonly x-model="workDays"
+                                    :aria-busy="isCalculating" aria-describedby="jumlah_hari_kerja-help"
                                     class="w-full rounded-lg border border-border bg-soft px-4 py-2.5 text-sm text-muted cursor-not-allowed transition-all">
                                 <div class="absolute inset-y-0 right-0 flex items-center pr-3" x-show="isCalculating">
-                                    <svg class="animate-spin h-4 w-4 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <svg class="animate-spin h-4 w-4 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                     </svg>
                                 </div>
                             </div>
-                            <p class="mt-1 text-xs text-muted" x-show="!isCalculating">Dihitung otomatis (mengabaikan akhir pekan dan libur nasional).</p>
-                            <p class="mt-1 text-xs text-danger font-medium" x-show="saldoError" x-text="saldoErrorMsg"></p>
+                            <p id="jumlah_hari_kerja-help" class="mt-1 text-xs text-muted" x-show="!isCalculating">Dihitung otomatis (mengabaikan akhir pekan dan libur nasional).</p>
+                            <div class="mt-1 space-y-1 text-xs" aria-live="polite">
+                                <template x-for="warning in workdayWarnings" :key="warning">
+                                    <p class="text-warning-dark" x-text="warning"></p>
+                                </template>
+                                <p class="text-danger font-medium" x-show="workdayError" x-text="workdayError"></p>
+                                <p class="text-danger font-medium" x-show="saldoError" x-text="saldoErrorMsg"></p>
+                            </div>
                         </div>
 
                         <!-- Alasan -->
@@ -105,7 +121,7 @@
                             <textarea id="alasan" name="alasan" rows="3" required
                                 class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                                 placeholder="Jelaskan alasan cuti Anda secara singkat..."
-                                {{ (!$employee || !$employee->kepala_bagian_id) ? 'disabled' : '' }}></textarea>
+                                {{ $formLocked ? 'disabled' : '' }}></textarea>
                             @error('alasan')
                                 <p class="mt-1 text-xs text-danger">{{ $message }}</p>
                             @enderror
@@ -113,12 +129,12 @@
 
                         <!-- Lampiran -->
                         <div>
-                            <label for="file_lampiran" class="block text-sm font-medium text-ink mb-1">File Lampiran <span class="text-muted font-normal">(Opsional)</span></label>
-                            <input type="file" id="file_lampiran" name="file_lampiran" accept=".pdf,.jpg,.jpeg,.png"
+                            <label for="lampiran" class="block text-sm font-medium text-ink mb-1">File Lampiran <span class="text-muted font-normal">(Opsional)</span></label>
+                            <input type="file" id="lampiran" name="lampiran" accept=".pdf,.jpg,.jpeg,.png" aria-describedby="lampiran-help"
                                 class="w-full text-sm text-muted file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 transition-all border border-border rounded-lg bg-surface"
-                                {{ (!$employee || !$employee->kepala_bagian_id) ? 'disabled' : '' }}>
-                            <p class="mt-1 text-xs text-muted">Format: PDF, JPG, PNG. Maksimal ukuran file: 10MB.</p>
-                            @error('file_lampiran')
+                                {{ $formLocked ? 'disabled' : '' }}>
+                            <p id="lampiran-help" class="mt-1 text-xs text-muted">Format: PDF, JPG, PNG. Maksimal ukuran file: 10MB.</p>
+                            @error('lampiran')
                                 <p class="mt-1 text-xs text-danger">{{ $message }}</p>
                             @enderror
                         </div>
@@ -127,7 +143,7 @@
                     <div class="bg-soft border-t border-border px-6 py-4 flex items-center justify-end gap-3">
                         <a href="{{ route('cuti') }}" class="px-5 py-2.5 text-sm font-medium text-muted hover:text-ink transition-colors">Batal</a>
                         <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-primary/90 focus:ring-2 focus:ring-primary/20 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                            :disabled="saldoError || {{ (!$employee || !$employee->kepala_bagian_id) ? 'true' : 'false' }}">
+                            :disabled="saldoError || {{ $formLocked ? 'true' : 'false' }}">
                             <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
                             </svg>
@@ -135,6 +151,20 @@
                         </button>
                     </div>
                 </form>
+                @else
+                {{-- Cuti Kepala Lembaga diproses melalui kementerian, bukan lewat SIMPEG; form pengajuan sengaja tidak ditampilkan. --}}
+                <div role="note" class="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
+                    <div class="border-b border-border bg-soft px-6 py-4">
+                        <h3 class="text-lg font-semibold text-ink">Pengajuan Cuti Kepala Lembaga</h3>
+                    </div>
+                    <div class="p-6">
+                        <p class="text-sm text-ink">
+                            Pengajuan cuti untuk Kepala Lembaga tidak diproses melalui SIMPEG.
+                            Pengajuan diproses melalui kementerian.
+                        </p>
+                    </div>
+                </div>
+                @endif
             </div>
 
             <!-- Sidebar Info -->
@@ -164,7 +194,8 @@
                         </div>
                         <div class="flex justify-between items-center pt-1">
                             <span class="text-sm font-semibold text-ink">Sisa Saldo</span>
-                            <span class="text-lg font-bold text-success">{{ $saldoTahunan->sisa }} Hari</span>
+                            {{-- Angka otoritatif diambil dari saldo ledger (saldoTersedia), sumber yang sama dengan validasi saat submit. --}}
+                            <span class="text-lg font-bold text-success">{{ $saldoTersedia }} Hari</span>
                         </div>
                     </div>
                     @else
@@ -182,28 +213,19 @@
                         </svg>
                         Proses Persetujuan
                     </h3>
+                    {{-- Tahapan persetujuan dirender dari chain approval efektif pemohon (bukan label tetap) agar sesuai konfigurasi sebenarnya. --}}
                     <ul class="space-y-4">
+                        @forelse($chainRoleLabels as $i => $roleLabel)
                         <li class="flex items-start">
-                            <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary mr-3 mt-0.5">1</div>
+                            <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary mr-3 mt-0.5">{{ $i + 1 }}</div>
                             <div>
-                                <p class="text-sm font-medium text-ink">Kepala Bagian</p>
-                                <p class="text-xs text-muted mt-0.5">Pemeriksaan tahap pertama oleh atasan langsung Anda.</p>
+                                <p class="text-sm font-medium text-ink">{{ $roleLabel }}</p>
+                                <p class="text-xs text-muted mt-0.5">Tahap persetujuan ke-{{ $i + 1 }} sesuai rantai approval Anda.</p>
                             </div>
                         </li>
-                        <li class="flex items-start">
-                            <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary mr-3 mt-0.5">2</div>
-                            <div>
-                                <p class="text-sm font-medium text-ink">Verifikator / Kabag</p>
-                                <p class="text-xs text-muted mt-0.5">Verifikasi lanjutan sesuai struktur unit kerja.</p>
-                            </div>
-                        </li>
-                        <li class="flex items-start">
-                            <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary mr-3 mt-0.5">3</div>
-                            <div>
-                                <p class="text-sm font-medium text-ink">Pimpinan</p>
-                                <p class="text-xs text-muted mt-0.5">Persetujuan akhir oleh pimpinan.</p>
-                            </div>
-                        </li>
+                        @empty
+                        <li class="text-sm text-muted">Rantai approval belum dikonfigurasi.</li>
+                        @endforelse
                     </ul>
                 </div>
             </div>
@@ -217,9 +239,12 @@
                 startDate: '',
                 endDate: '',
                 workDays: 0,
+                workdayWarnings: [],
+                workdayError: '',
                 isCalculating: false,
+                workdayRequestId: 0,
                 selectedJenisCuti: '',
-                sisaSaldoTahunan: {{ $saldoTahunan ? $saldoTahunan->sisa : 0 }},
+                sisaSaldoTahunan: {{ (int) $saldoTersedia }},
                 saldoError: false,
                 saldoErrorMsg: '',
                 
@@ -240,34 +265,73 @@
                 },
                 
                 async calculateDays() {
-                    if (!this.startDate || !this.endDate) {
+                    const requestId = ++this.workdayRequestId;
+                    const startDate = this.startDate;
+                    const endDate = this.endDate;
+
+                    if (!startDate || !endDate) {
                         this.workDays = 0;
+                        this.workdayWarnings = [];
+                        this.workdayError = '';
+                        this.saldoError = false;
+                        this.saldoErrorMsg = '';
+                        this.isCalculating = false;
                         return;
                     }
                     
-                    const start = new Date(this.startDate);
-                    const end = new Date(this.endDate);
+                    const start = new Date(startDate);
+                    const end = new Date(endDate);
                     
                     if (start > end) {
                         this.workDays = 0;
+                        this.workdayWarnings = [];
+                        this.workdayError = '';
+                        this.saldoError = false;
+                        this.saldoErrorMsg = '';
+                        this.isCalculating = false;
                         return;
                     }
                     
                     this.isCalculating = true;
                     
                     try {
-                        const response = await fetch(`/api/v1/cuti/calculate-workdays?start=${this.startDate}&end=${this.endDate}`);
+                        const response = await fetch(`/api/v1/cuti/calculate-workdays?start=${startDate}&end=${endDate}`);
                         if (response.ok) {
                             const result = await response.json();
-                            this.workDays = result.data;
+                            // Abaikan respons lama agar tidak menimpa perhitungan tanggal terbaru.
+                            if (requestId !== this.workdayRequestId) {
+                                return;
+                            }
+
+                            this.workDays = result.data?.jumlah_hari_kerja ?? 0;
+                            this.workdayWarnings = result.data?.warnings ?? [];
+                            this.workdayError = '';
                             this.validateSaldo();
                         } else {
-                            console.error('Failed to calculate workdays');
+                            if (requestId !== this.workdayRequestId) {
+                                return;
+                            }
+
+                            this.workDays = 0;
+                            this.workdayWarnings = [];
+                            this.saldoError = false;
+                            this.saldoErrorMsg = '';
+                            this.workdayError = 'Gagal menghitung hari kerja. Coba lagi.';
                         }
                     } catch (error) {
-                        console.error('Error fetching workdays', error);
+                        if (requestId !== this.workdayRequestId) {
+                            return;
+                        }
+
+                        this.workDays = 0;
+                        this.workdayWarnings = [];
+                        this.saldoError = false;
+                        this.saldoErrorMsg = '';
+                        this.workdayError = 'Terjadi kesalahan saat menghitung hari kerja.';
                     } finally {
-                        this.isCalculating = false;
+                        if (requestId === this.workdayRequestId) {
+                            this.isCalculating = false;
+                        }
                     }
                 }
             }));

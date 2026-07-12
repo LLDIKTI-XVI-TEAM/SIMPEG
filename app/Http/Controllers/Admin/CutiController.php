@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Actions\Cuti\ApproveLeaveAction;
 use App\Actions\Cuti\PostponeLeaveAction;
+use App\Actions\Cuti\PrepareLeaveRequestFormAction;
 use App\Actions\Cuti\RejectLeaveAction;
 use App\Actions\Cuti\RequestChangesLeaveAction;
 use App\Actions\Cuti\ResubmitLeaveRequestAction;
@@ -425,24 +426,16 @@ class CutiController extends Controller
 
     /**
      * Menampilkan form pengajuan cuti baru.
+     * Penyusunan data form (saldo ledger, jenis cuti, kesiapan chain) didelegasikan ke Action agar controller tetap tipis.
      */
-    public function create()
+    public function create(PrepareLeaveRequestFormAction $action)
     {
-        $user = request()->user();
-        $employee = $user->employee;
+        $employee = request()->user()?->employee;
 
-        // Jenis cuti dropdown
-        $jenisCuti = RefJenisCuti::all();
+        // Akun tanpa data pegawai tidak boleh mengajukan cuti; tolak di backend, bukan hanya menyembunyikan menu.
+        abort_if($employee === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat mengajukan cuti.');
 
-        // Cek saldo cuti tahunan (opsional untuk ditampilkan di UI)
-        $saldoTahunan = null;
-        if ($employee) {
-            $saldoTahunan = LeaveBalance::where('employee_id', $employee->id)
-                ->where('tahun', now()->year)
-                ->first();
-        }
-
-        return view('admin.cuti.form-pengajuan', compact('employee', 'jenisCuti', 'saldoTahunan'));
+        return view('admin.cuti.form-pengajuan', $action->execute($employee));
     }
 
     /**

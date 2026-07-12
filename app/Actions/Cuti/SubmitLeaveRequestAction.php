@@ -12,6 +12,7 @@ use App\Services\WorkdayCalculator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Mengoordinasikan pengajuan cuti oleh pegawai.
@@ -34,6 +35,15 @@ class SubmitLeaveRequestAction
      */
     public function execute(Employee $employee, array $data, Request $request): LeaveRequest
     {
+        // Cuti Kepala Lembaga diproses melalui kementerian, bukan lewat SIMPEG.
+        // Guard ini fail-closed dan wajib berada sebelum perhitungan hari kerja maupun penyimpanan apa pun,
+        // sehingga POST langsung tetap ditolak walau tampilan form sudah disembunyikan di sisi UI.
+        if ($employee->is_kepala_lembaga) {
+            throw ValidationException::withMessages([
+                'jenis_cuti_id' => 'Pengajuan cuti Kepala Lembaga diproses melalui kementerian, bukan melalui SIMPEG.',
+            ]);
+        }
+
         $mulai = Carbon::createFromFormat('Y-m-d', (string) $data['tanggal_mulai'])->startOfDay();
         $selesai = Carbon::createFromFormat('Y-m-d', (string) $data['tanggal_selesai'])->startOfDay();
 
