@@ -1588,7 +1588,7 @@
                                             class="rounded-md px-3 py-1 text-xs font-semibold font-sans transition-all cursor-pointer"
                                         >Dari Arsip</button>
                                         <button type="button"
-                                            @click="disiplinFileMode = 'baru'; newDisiplin.dokumen_id = ''"
+                                            @click="disiplinFileMode = 'baru'; newDisiplin.dokumen_id = ''; newDisiplin.no_sk = ''; newDisiplin.tanggal_sk = ''"
                                             :class="disiplinFileMode === 'baru' ? 'bg-white shadow-sm text-ink' : 'text-muted hover:text-ink'"
                                             class="rounded-md px-3 py-1 text-xs font-semibold font-sans transition-all cursor-pointer"
                                         >Unggah Baru</button>
@@ -1600,6 +1600,13 @@
                                         <template x-if="!loadingArsip">
                                             <div class="space-y-1">
                                                 <select x-model="newDisiplin.dokumen_id"
+                                                    @change="
+                                                        const dok = arsipDokumen.find(d => d.id == $event.target.value);
+                                                        if (dok) {
+                                                            if (dok.nomor_dokumen) newDisiplin.no_sk = dok.nomor_dokumen;
+                                                            if (dok.tanggal) newDisiplin.tanggal_sk = dok.tanggal;
+                                                        }
+                                                    "
                                                     class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                                     <option value="">-- Pilih dari Arsip Dokumen --</option>
                                                     <template x-for="dok in arsipDokumen" :key="dok.id">
