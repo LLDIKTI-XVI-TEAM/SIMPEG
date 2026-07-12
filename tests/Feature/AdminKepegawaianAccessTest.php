@@ -46,7 +46,7 @@ class AdminKepegawaianAccessTest extends TestCase
             'cuti.rekap',
             'ews',
             'laporan.pegawai',
-            'laporan.cuti',
+            'cuti.laporan',
             'audit-log',
         ] as $allowedRoute) {
             $response->assertSee('href="'.route($allowedRoute).'"', false);
@@ -94,7 +94,7 @@ class AdminKepegawaianAccessTest extends TestCase
             '/cuti/rekap',
             '/ews',
             '/laporan/export-pegawai',
-            '/laporan/export-cuti',
+            '/cuti/laporan',
             '/dashboard/audit',
             '/notifications',
         ] as $uri) {
@@ -116,7 +116,8 @@ class AdminKepegawaianAccessTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Buka Laporan & Export', false);
-        $response->assertSee('/laporan/export-cuti', false);
+        $response->assertSee(route('cuti.laporan'), false);
+        $response->assertDontSee('/laporan/export-cuti', false);
         $response->assertSee('Admin Saldo Cuti', false);
         $response->assertDontSee('activeFilters', false);
         $response->assertDontSee('Preview PDF resmi', false);

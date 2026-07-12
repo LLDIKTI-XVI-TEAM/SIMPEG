@@ -99,7 +99,7 @@
                     'data-master',
                     'laporan',
                     'laporan.pegawai',
-                    'laporan.cuti',
+            'cuti.laporan',
                     'cuti.rekap',
                     'ews',
                     'ews.config',
@@ -117,7 +117,7 @@
                     'data-master',
                     'laporan',
                     'laporan.pegawai',
-                    'laporan.cuti',
+            'cuti.laporan',
                     'cuti.rekap',
                     'ews',
                     'ews.config',
@@ -132,7 +132,7 @@
                     'ews.config',
                     'laporan',
                     'laporan.pegawai',
-                    'laporan.cuti',
+            'cuti.laporan',
                     'user-management',
                     'rbac',
                     'data-master',
@@ -181,7 +181,7 @@
                     'group' => 'Laporan',
                     'items' => [
                         ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up'],
-                        ['label' => 'Export Cuti', 'route' => 'laporan.cuti', 'icon' => 'document-arrow-down'],
+                    ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down'],
                     ]
                 ],
                 [

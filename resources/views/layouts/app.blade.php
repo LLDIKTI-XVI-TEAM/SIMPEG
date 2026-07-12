@@ -100,7 +100,7 @@
                     'data-master',
                     'laporan',
                     'laporan.pegawai',
-                    'laporan.cuti',
+                    'cuti.laporan',
                     'ews.config',
                 ],
                 'kepala_bagian' => [
@@ -116,7 +116,7 @@
                     'data-master',
                     'laporan',
                     'laporan.pegawai',
-                    'laporan.cuti',
+                    'cuti.laporan',
                     'ews.config',
                 ],
                 'pegawai' => [
@@ -129,7 +129,7 @@
                     'ews.config',
                     'laporan',
                     'laporan.pegawai',
-                    'laporan.cuti',
+                    'cuti.laporan',
                     'user-management',
                     'rbac',
                     'data-master',
@@ -179,7 +179,7 @@
                     'group' => 'Laporan',
                     'items' => [
                         ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up'],
-                        ['label' => 'Export Cuti', 'route' => 'laporan.cuti', 'icon' => 'document-arrow-down'],
+                        ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down'],
                     ]
                 ],
                 [
