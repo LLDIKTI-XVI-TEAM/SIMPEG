@@ -200,6 +200,16 @@
         _keluargaCacheKey:  'keluarga_{{ $p->id }}',
         _pendidikanCacheKey: 'pendidikan_{{ $p->id }}',
 
+        formatDate(dateString) {
+            if (!dateString || dateString === '-') return '-';
+            const datePart = String(dateString).split('T')[0];
+            const parts = datePart.split('-');
+            if (parts.length === 3 && parts[0].length === 4) {
+                return `${parts[2]}-${parts[1]}-${parts[0]}`;
+            }
+            return dateString;
+        },
+
         init() {
             // Deteksi reload (F5/Ctrl+R): buang semua cache tab agar data selalu segar.
             const navType = performance.getEntriesByType?.('navigation')?.[0]?.type;
@@ -247,7 +257,7 @@
                     hubungan:      f.hubungan,
                     nik:           f.nik,
                     tempat_lahir:  f.tempat_lahir,
-                    tanggal_lahir: f.tanggal_lahir ? f.tanggal_lahir.split('-').reverse().join('-') : '-',
+                    tanggal_lahir: f.tanggal_lahir,
                     jenis_kelamin: f.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan',
                     pekerjaan:     f.pekerjaan,
                     status:        f.status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung',
@@ -509,7 +519,7 @@
                             hubungan: f.hubungan,
                             nik: f.nik,
                             tempat_lahir: f.tempat_lahir,
-                            tanggal_lahir: f.tanggal_lahir ? f.tanggal_lahir.split('-').reverse().join('-') : '-',
+                            tanggal_lahir: f.tanggal_lahir,
                             jenis_kelamin: f.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan',
                             pekerjaan: f.pekerjaan,
                             status: f.status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'
@@ -927,7 +937,7 @@
                                     </td>
                                     <td class="px-4 py-3">
                                         <p class="font-sans" x-text="fam.tempat_lahir || '-'"></p>
-                                        <p class="text-[10px] text-muted font-mono" x-text="fam.tanggal_lahir"></p>
+                                        <p class="text-[10px] text-muted font-mono" x-text="formatDate(fam.tanggal_lahir)"></p>
                                     </td>
                                     <td class="px-4 py-3 font-sans" x-text="fam.pekerjaan || '-'"></td>
                                     <td class="px-4 py-3">
@@ -984,8 +994,8 @@
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
                                     <td class="px-4 py-3 font-bold" x-text="p.golongan"></td>
                                     <td class="px-4 py-3 font-mono" x-text="p.no_sk"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="p.tgl_sk"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="p.tmt"></td>
+                                    <td class="px-4 py-3 font-mono" x-text="formatDate(p.tgl_sk)"></td>
+                                    <td class="px-4 py-3 font-mono" x-text="formatDate(p.tmt)"></td>
                                 </tr>
                             </template>
                         </tbody>
@@ -1162,10 +1172,10 @@
                         <tbody class="divide-y divide-border text-xs font-sans">
                             <template x-for="(edu, index) in pendidikanList" :key="edu.id ?? edu.no_ijazah">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
-                                    <td class="px-4 py-3 font-bold" x-text="edu.tingkat"></td>
-                                    <td class="px-4 py-3" x-text="edu.institusi"></td>
-                                    <td class="px-4 py-3" x-text="edu.prodi ?? '-'"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="edu.lulus"></td>
+                                    <td class="px-4 py-3 font-bold" x-text="edu.tingkat ?? edu.jenjang?.nama ?? '-'"></td>
+                                    <td class="px-4 py-3" x-text="edu.institusi ?? edu.nama_institusi ?? '-'"></td>
+                                    <td class="px-4 py-3" x-text="edu.prodi ?? edu.jurusan ?? '-'"></td>
+                                    <td class="px-4 py-3 font-mono" x-text="edu.lulus ?? edu.tahun_lulus ?? '-'"></td>
                                     <td class="px-4 py-3 font-mono" x-text="edu.no_ijazah ?? '-'"></td>
                                     <td class="px-4 py-3 text-right">
                                         <div class="inline-flex items-center gap-3">
