@@ -47,8 +47,10 @@
         deletingDisiplinId: null,
         isDeletingDisiplin: false,
         
-        // Mengambil data riwayat riil dari database melalui relasi model Employee
-        keluargaList: {{ $p->families->map(fn($f) => ['id' => $f->id, 'nama_anggota' => $f->nama_anggota, 'hubungan' => $f->hubungan, 'nik' => $f->nik, 'tempat_lahir' => $f->tempat_lahir, 'tanggal_lahir' => $f->tanggal_lahir ? \Carbon\Carbon::parse($f->tanggal_lahir)->format('d-m-Y') : '-', 'jenis_kelamin' => $f->jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan', 'pekerjaan' => $f->pekerjaan, 'status' => $f->status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'])->toJson() }},
+        // Data keluarga di-fetch lazily saat tab dibuka, disimpan di sessionStorage.
+        keluargaList: [],
+        keluargaLoading: false,
+        isDeletingKeluarga: false,
         pangkatList: {{ $p->rankHistories->map(fn($r) => ['golongan' => $r->golongan->nama ?? '-', 'no_sk' => $r->no_sk, 'tgl_sk' => $r->tanggal_sk, 'tmt' => $r->tmt_pangkat])->toJson() }},
         jabatanList: {{ $p->positionHistories->map(fn($j) => ['jabatan' => $j->jabatan?->nama ?? $j->nama_jabatan, 'unit' => $j->unitKerja->nama ?? '-', 'kelas_jabatan' => $j->kelas_jabatan, 'no_sk' => $j->no_sk, 'tgl_sk' => $j->tanggal_sk, 'tmt' => $j->tmt_jabatan])->toJson() }},
         kgbList: {{ $p->salaryHistories->map(fn($s) => ['gaji' => 'Rp ' . number_format($s->gaji_pokok, 0, ',', '.'), 'no_sk' => $s->no_sk, 'tgl_sk' => $s->tanggal_sk, 'tmt' => $s->tmt_kgb])->toJson() }},
@@ -194,24 +196,97 @@
             }
         },
 
-        // ===== LAZY FETCH & CACHING RIWAYAT PENDIDIKAN =====
+        // ===== LAZY FETCH & CACHING KELUARGA + PENDIDIKAN =====
+        _keluargaCacheKey:  'keluarga_{{ $p->id }}',
         _pendidikanCacheKey: 'pendidikan_{{ $p->id }}',
 
         init() {
-            // Deteksi reload (F5/Ctrl+R): hapus cache pendidikan agar data selalu segar dari server.
+            // Deteksi reload (F5/Ctrl+R): buang semua cache tab agar data selalu segar.
             const navType = performance.getEntriesByType?.('navigation')?.[0]?.type;
             if (navType === 'reload') {
+                sessionStorage.removeItem(this._keluargaCacheKey);
                 sessionStorage.removeItem(this._pendidikanCacheKey);
             }
-            // Pantau perpindahan tab: fetch otomatis saat tab pendidikan dibuka pertama kali.
+
+            // Pantau perpindahan tab — fetch otomatis saat tab dibuka pertama kali.
             this.$watch('activeTab', (tab) => {
+                if (tab === 'keluarga' && this.keluargaList.length === 0 && !this.keluargaLoading) {
+                    this.fetchKeluarga();
+                }
                 if (tab === 'pendidikan' && this.pendidikanList.length === 0 && !this.pendidikanLoading) {
                     this.fetchPendidikan();
                 }
             });
-            // Langsung fetch jika tab sudah aktif saat init (misal dari URL ?tab=pendidikan).
-            if (this.activeTab === 'pendidikan') {
-                this.fetchPendidikan();
+
+            // Langsung fetch jika tab sudah aktif saat init (misal dari URL ?tab=keluarga).
+            if (this.activeTab === 'keluarga')  this.fetchKeluarga();
+            if (this.activeTab === 'pendidikan') this.fetchPendidikan();
+        },
+
+        async fetchKeluarga() {
+            const cached = sessionStorage.getItem(this._keluargaCacheKey);
+            if (cached) {
+                try {
+                    this.keluargaList = JSON.parse(cached);
+                    return;
+                } catch (e) {
+                    sessionStorage.removeItem(this._keluargaCacheKey);
+                }
+            }
+            this.keluargaLoading = true;
+            try {
+                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/keluarga`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const json = await res.json();
+                // Normalisasi format tanggal dan label sesuai tampilan tabel.
+                this.keluargaList = (json.families ?? []).map(f => ({
+                    id:            f.id,
+                    nama_anggota:  f.nama_anggota,
+                    hubungan:      f.hubungan,
+                    nik:           f.nik,
+                    tempat_lahir:  f.tempat_lahir,
+                    tanggal_lahir: f.tanggal_lahir ? f.tanggal_lahir.split('-').reverse().join('-') : '-',
+                    jenis_kelamin: f.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan',
+                    pekerjaan:     f.pekerjaan,
+                    status:        f.status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung',
+                }));
+                sessionStorage.setItem(this._keluargaCacheKey, JSON.stringify(this.keluargaList));
+            } catch (e) {
+                console.error('Gagal memuat data keluarga:', e);
+            } finally {
+                this.keluargaLoading = false;
+            }
+        },
+
+        async deleteKeluarga(id, index) {
+            if (!window.confirm('Apakah Anda yakin ingin menghapus data anggota keluarga ini? Tindakan ini tidak dapat dibatalkan.')) return;
+            this.isDeletingKeluarga = true;
+            try {
+                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/keluarga/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    this.toast = { show: true, message: err.message ?? 'Gagal menghapus data keluarga.', type: 'error' };
+                    setTimeout(() => this.toast.show = false, 4000);
+                    return;
+                }
+                this.keluargaList.splice(index, 1);
+                sessionStorage.setItem(this._keluargaCacheKey, JSON.stringify(this.keluargaList));
+                this.toast = { show: true, message: 'Anggota keluarga berhasil dihapus.', type: 'success' };
+                setTimeout(() => this.toast.show = false, 3000);
+            } catch (e) {
+                this.toast = { show: true, message: 'Terjadi kesalahan jaringan. Coba lagi.', type: 'error' };
+                setTimeout(() => this.toast.show = false, 4000);
+            } finally {
+                this.isDeletingKeluarga = false;
             }
         },
 
@@ -440,6 +515,8 @@
                             status: f.status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'
                         });
                         this.newKeluarga = { nama_anggota: '', hubungan: 'Istri', nik: '', tempat_lahir: '', tanggal_lahir: '', jenis_kelamin: 'P', status_tunjangan: '0', pekerjaan: '' };
+                        // Perbarui cache agar navigasi kembali ke tab keluarga tetap sinkron.
+                        sessionStorage.setItem(this._keluargaCacheKey, JSON.stringify(this.keluargaList));
                     } else if (this.modalType === 'pendidikan') {
                         const h = result.history;
                         this.pendidikanList.unshift({
@@ -815,7 +892,17 @@
                         Tambah Keluarga
                     </button>
                 </div>
-                <div class="overflow-x-auto rounded-lg border border-border">
+
+                {{-- Loading skeleton --}}
+                <div x-show="keluargaLoading" class="flex items-center justify-center py-10 text-xs text-muted font-sans gap-2">
+                    <svg class="w-4 h-4 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    Memuat data keluarga...
+                </div>
+
+                <div x-show="!keluargaLoading" class="overflow-x-auto rounded-lg border border-border">
                     <table class="w-full">
                         <thead class="bg-soft border-b border-border">
                             <tr class="text-left text-xs font-semibold text-muted uppercase tracking-wide font-sans">
@@ -828,7 +915,7 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border text-xs font-sans">
-                            <template x-for="(fam, index) in keluargaList" :key="index">
+                            <template x-for="(fam, index) in keluargaList" :key="fam.id">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
                                     <td class="px-4 py-3">
                                         <p class="font-bold font-sans" x-text="fam.nama_anggota"></p>
@@ -848,9 +935,27 @@
                                               :class="fam.status === 'Ditanggung' ? 'text-success' : 'text-muted'"
                                               x-text="fam.status"></span>
                                     </td>
-                                    <td class="px-4 py-3 text-right text-muted">-</td>
+                                    <td class="px-4 py-3 text-right">
+                                        <button
+                                            type="button"
+                                            @click="deleteKeluarga(fam.id, index)"
+                                            :disabled="isDeletingKeluarga"
+                                            class="inline-flex items-center gap-1 text-[10px] font-semibold text-danger hover:underline disabled:opacity-40 font-sans cursor-pointer transition-opacity"
+                                            title="Hapus anggota keluarga ini"
+                                        >
+                                            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.021-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                            </svg>
+                                            Hapus
+                                        </button>
+                                    </td>
                                 </tr>
                             </template>
+                            <tr x-show="!keluargaLoading && keluargaList.length === 0">
+                                <td colspan="6" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
+                                    Pegawai ini belum memiliki data anggota keluarga.
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
