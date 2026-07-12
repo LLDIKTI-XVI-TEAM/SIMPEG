@@ -810,6 +810,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::post('/dashboard/dokumen/upload', [DokumenController::class, 'store'])
         ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('dokumen.store');
+    Route::post('/dashboard/dokumen/{id}', [DokumenController::class, 'update'])
+        ->middleware(['role:super_admin,admin_kepegawaian'])
+        ->name('dokumen.update')
+        ->whereUuid('id');
     Route::get('/dashboard/dokumen/{id}', [DokumenController::class, 'show'])
         ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('dokumen.show')
@@ -817,6 +821,14 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/dashboard/dokumen/{id}/download', [DokumenController::class, 'download'])
         ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('dokumen.download')
+        ->whereUuid('id');
+    Route::delete('/dashboard/dokumen/{id}', [DokumenController::class, 'destroy'])
+        ->middleware(['role:super_admin'])
+        ->name('dokumen.destroy')
+        ->whereUuid('id');
+    Route::get('/dashboard/dokumen/{id}/check-impact', [DokumenController::class, 'checkImpact'])
+        ->middleware(['role:super_admin'])
+        ->name('dokumen.check-impact')
         ->whereUuid('id');
 
     Route::get('/dashboard/dokumen/legacy', function () {
