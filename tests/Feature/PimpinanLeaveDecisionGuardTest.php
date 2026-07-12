@@ -64,7 +64,7 @@ class PimpinanLeaveDecisionGuardTest extends TestCase
             'employee_id' => Employee::factory()->create()->id,
             'jenis_cuti_id' => RefJenisCuti::create([
                 'nama' => 'Cuti Sakit '.fake()->unique()->word(),
-                'code' => fake()->unique()->slug(),
+                'code' => 'cuti-sakit-pimpinan',
                 'mengurangi_saldo_tahunan' => false,
                 'khusus_pns' => false,
             ])->id,
