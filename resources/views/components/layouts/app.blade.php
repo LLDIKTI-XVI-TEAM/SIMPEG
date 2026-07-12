@@ -158,6 +158,7 @@
                         in_array($activeRole, ['kepala_bagian', 'kepala_bagian']) ? ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'] : null,
                         ['label' => 'Data Nonaktif', 'route' => 'data-nonaktif', 'icon' => 'user-minus'],
                         ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open'],
+                        ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up'],
                     ])
                 ],
                 [
@@ -166,6 +167,7 @@
                         in_array($activeRole, ['kepala_bagian', 'kepala_bagian']) ? ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge'] : null,
                         ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
                         ['label' => 'Rekap Cuti', 'route' => 'cuti.rekap', 'icon' => 'document-text'],
+                        ['label' => 'Export Cuti', 'route' => 'laporan.cuti', 'icon' => 'document-arrow-down'],
                     ])
                 ],
                 [
@@ -177,13 +179,7 @@
                         ['label' => 'Konfigurasi EWS', 'route' => 'ews.config', 'icon' => 'cog-6-tooth'],
                     ])
                 ],
-                [
-                    'group' => 'Laporan',
-                    'items' => [
-                        ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up'],
-                        ['label' => 'Export Cuti', 'route' => 'laporan.cuti', 'icon' => 'document-arrow-down'],
-                    ]
-                ],
+
                 [
                     'group' => 'Administrasi Sistem',
                     'items' => [
@@ -196,6 +192,42 @@
                     ]
                 ]
             ];
+
+            if ($activeRole === 'pimpinan') {
+                $menuGroups = [
+                    [
+                        'group' => '',
+                        'items' => [
+                            ['label' => 'Dashboard', 'route' => 'pimpinan.dashboard', 'icon' => 'squares-2x2'],
+                        ]
+                    ],
+                    [
+                        'group' => 'Kepegawaian',
+                        'items' => [
+                            ['label' => 'Data Pegawai', 'route' => 'pimpinan.pegawai.index', 'icon' => 'users'],
+                        ]
+                    ],
+                    [
+                        'group' => 'Cuti',
+                        'items' => [
+                            ['label' => 'Monitoring Cuti', 'route' => 'pimpinan.cuti.index', 'icon' => 'calendar'],
+                        ]
+                    ],
+                    [
+                        'group' => 'EWS & Notifikasi',
+                        'items' => [
+                            ['label' => 'EWS', 'route' => 'pimpinan.ews.index', 'icon' => 'exclamation-triangle'],
+                            ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
+                        ]
+                    ],
+                    [
+                        'group' => 'Laporan',
+                        'items' => [
+                            ['label' => 'Laporan', 'route' => 'pimpinan.laporan.index', 'icon' => 'document-chart-bar'],
+                        ]
+                    ]
+                ];
+            }
 
             $allMenuRoutes = [];
             foreach ($menuGroups as $g) {
@@ -278,7 +310,7 @@
                             @elseif($menu['icon'] === 'document-arrow-down')
                                 <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9.75v6.75m0 0-3-3m3 3 3-3M6.75 19.5h10.5a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 16.5 4.5H7.5A2.25 2.25 0 0 0 5.25 6.75v10.5A2.25 2.25 0 0 0 6.75 19.5Z" /></svg>
                             @elseif($menu['icon'] === 'document-chart-bar')
-                                <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12h9m-9 3H12m1.5-4.5H18" /></svg>
+                                <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25M9 16.5v.75m3-3v3M15 12v5.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
                             @elseif($menu['icon'] === 'clipboard-document-list')
                                 <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" /></svg>
                             @elseif($menu['icon'] === 'calendar-days')
@@ -314,7 +346,7 @@
                 </div>
                 <div class="min-w-0 flex-1">
                     <p class="truncate text-sm font-semibold text-ink">
-                        {{ auth()->user()->name ?? 'Pengguna' }}
+                        {{ str_replace(['(', ')'], '', auth()->user()->name ?? 'Pengguna') }}
                     </p>
                     <p class="truncate text-xs text-muted">{{ ucwords(str_replace('_', ' ', $activeRole)) }}</p>
                 </div>
@@ -336,11 +368,12 @@
                     @click="sidebarOpen = !sidebarOpen"
                     id="sidebar-toggle"
                     class="inline-flex items-center justify-center rounded-lg border border-border p-2 text-muted transition-colors hover:bg-soft hover:text-ink lg:hidden"
-                    aria-label="Toggle sidebar"
+                    aria-label="Buka atau tutup menu navigasi"
                 >
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
                 </button>
 
+                @if (in_array($activeRole, ['super_admin', 'admin_kepegawaian'], true))
                 {{-- Search Bar --}}
                 <div class="relative w-full hidden sm:block" x-data="globalSearch()">
                     <input
@@ -385,6 +418,7 @@
                         </div>
                     </div>
                 </div>
+                @endif
             </div>
 
             {{-- Right: notif bell + profile dropdown --}}
@@ -406,7 +440,7 @@
                         </div>
                         <div class="hidden text-left md:block">
                             <p class="text-sm font-semibold leading-tight text-ink font-sans">
-                                {{ auth()->user()->name ?? 'Pengguna' }}
+                                {{ str_replace(['(', ')'], '', auth()->user()->name ?? 'Pengguna') }}
                             </p>
                             <p class="text-[11px] leading-tight text-muted font-sans">{{ ucwords(str_replace('_', ' ', $activeRole)) }}</p>
                         </div>
@@ -426,7 +460,7 @@
                         style="display: none;"
                     >
                         <div class="border-b border-border px-4 py-3">
-                            <p class="text-xs font-semibold text-ink font-sans">{{ auth()->user()->name ?? 'Pengguna' }}</p>
+                            <p class="text-xs font-semibold text-ink font-sans">{{ str_replace(['(', ')'], '', auth()->user()->name ?? 'Pengguna') }}</p>
                             <p class="mt-0.5 text-xs text-muted font-sans font-mono">{{ auth()->user()->email ?? '' }}</p>
                         </div>
                         <div class="p-1.5 space-y-0.5">

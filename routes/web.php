@@ -19,6 +19,13 @@ use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\UserMappingController;
 use App\Http\Controllers\Auth\KeycloakAuthController;
 use App\Http\Controllers\Cuti\VerifyLeaveProofController;
+use App\Http\Controllers\PimpinanDashboardController;
+use App\Http\Controllers\PimpinanEmployeeController;
+use App\Http\Controllers\PimpinanEwsController;
+use App\Http\Controllers\PimpinanLeaveController;
+use App\Http\Controllers\PimpinanLeaveDecisionController;
+use App\Http\Controllers\PimpinanLeaveDocumentController;
+use App\Http\Controllers\PimpinanReportController;
 use App\Models\Employee;
 use App\Models\Permission;
 use App\Models\Role;
@@ -41,10 +48,9 @@ Route::get('/login', [KeycloakAuthController::class, 'redirectToKeycloak'])->nam
 Route::get('/login/keycloak', [KeycloakAuthController::class, 'redirectToKeycloak'])->name('auth.keycloak.redirect');
 Route::get('/auth/keycloak/callback', [KeycloakAuthController::class, 'handleCallback'])->name('auth.keycloak.callback');
 Route::post('/logout', [KeycloakAuthController::class, 'logout'])->name('logout');
-
+Route::get('/logout', [KeycloakAuthController::class, 'logout'])->name('logout.get');
 Route::get('/cuti/verifikasi/{token}', VerifyLeaveProofController::class)
     ->middleware('throttle:60,1')
-    ->where('token', '[A-Za-z0-9_-]{64,120}')
     ->name('cuti.verify');
 
 if (app()->environment(['local', 'testing'])) {
@@ -101,6 +107,11 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/dashboard', function (Request $request, ListActiveEwsAlertsAction $ewsAlerts) {
         $user = $request->user();
         $role = $user?->role;
+
+        if ($role === 'pimpinan') {
+            return redirect()->route('pimpinan.dashboard');
+        }
+
         $isPegawai = $role === 'pegawai';
         $employeeId = $isPegawai ? (string) ($user?->employee_id ?? '') : null;
         $dashboardEwsData = $employeeId !== '' || ! $isPegawai
@@ -116,11 +127,13 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
             'dashboardEwsInfo' => collect($dashboardEwsAlerts)->where('urgency', 'success')->count(),
             'dashboardEwsLink' => $isPegawai
                 ? route('ews.saya')
-                : (in_array($role, ['super_admin', 'admin_kepegawaian', 'pimpinan'], true) ? route('ews') : '#ews-section'),
+                : (in_array($role, ['super_admin', 'admin_kepegawaian'], true) ? route('ews') : '#ews-section'),
         ]);
     })->name('dashboard');
 
-    Route::get('/admin/search', [GlobalSearchController::class, 'search'])->name('global.search');
+    Route::get('/admin/search', [GlobalSearchController::class, 'search'])
+        ->middleware('role:super_admin,admin_kepegawaian')
+        ->name('global.search');
 
     Route::get('/change-role/{role}', function (Request $request, string $role) {
         abort_unless($request->user()?->role === $role, 403, 'Role aktif harus sesuai dengan role akun.');
@@ -879,6 +892,49 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('pegawai.export');
 
+    // =========================================================================
+    // ROUTES PIMPINAN
+    // =========================================================================
+    Route::middleware(['role:pimpinan'])
+        ->prefix('pimpinan')
+        ->name('pimpinan.')
+        ->group(function () {
+            Route::get('/dashboard', [PimpinanDashboardController::class, 'index'])->name('dashboard');
+
+            Route::get('/pegawai', [PimpinanEmployeeController::class, 'index'])->name('pegawai.index');
+            Route::get('/pegawai/{employee}', [PimpinanEmployeeController::class, 'show'])
+                ->whereUuid('employee')
+                ->name('pegawai.show');
+
+            Route::get('/cuti', [PimpinanLeaveController::class, 'index'])->name('cuti.index');
+            Route::get('/cuti/{leave}', [PimpinanLeaveController::class, 'show'])
+                ->whereUuid('leave')
+                ->name('cuti.show');
+            Route::post('/cuti/{leave}/decision', [PimpinanLeaveDecisionController::class, 'store'])
+                ->whereUuid('leave')
+                ->name('cuti.decision');
+            Route::get('/cuti/{leave}/dokumen', [PimpinanLeaveDocumentController::class, 'show'])
+                ->whereUuid('leave')
+                ->name('cuti.document.show');
+            Route::get('/cuti/{leave}/dokumen/download', [PimpinanLeaveDocumentController::class, 'download'])
+                ->whereUuid('leave')
+                ->name('cuti.document.download');
+            Route::get('/cuti/{leave}/lampiran', [PimpinanLeaveDocumentController::class, 'downloadAttachment'])
+                ->whereUuid('leave')
+                ->name('cuti.attachment.download');
+
+            Route::get('/ews', [PimpinanEwsController::class, 'index'])->name('ews.index');
+
+            Route::get('/laporan', [PimpinanReportController::class, 'index'])->name('laporan.index');
+            Route::get('/laporan/pegawai', [PimpinanReportController::class, 'employees'])->name('laporan.pegawai');
+            Route::get('/laporan/pegawai/custom', [PimpinanReportController::class, 'customEmployees'])->name('laporan.pegawai.custom');
+            Route::get('/laporan/cuti', [PimpinanReportController::class, 'leaves'])->name('laporan.cuti');
+            Route::get('/laporan/cuti/excel', [PimpinanReportController::class, 'exportLeaves'])->name('laporan.cuti.excel');
+            Route::get('/laporan/kepangkatan', [PimpinanReportController::class, 'rankHistories'])->name('laporan.kepangkatan');
+            Route::get('/laporan/kepangkatan/excel', [PimpinanReportController::class, 'exportRankHistoriesExcel'])->name('laporan.kepangkatan.excel');
+            Route::get('/laporan/kepangkatan/pdf', [PimpinanReportController::class, 'exportRankHistoriesPdf'])->name('laporan.kepangkatan.pdf');
+        });
+
     // UI DUMMY ROUTES FOR KEPALA BAGIAN
     Route::get('/kepala-bagian/bawahan', function () {
         return view('kabag.bawahan.index');
@@ -899,5 +955,4 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/kepala-bagian/ews', function () {
         return view('kabag.ews.index');
     })->name('kepala-bagian.ews.index');
-
 });

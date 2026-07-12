@@ -13,6 +13,9 @@
 
     /* Brand Colors */
     --color-primary: #122E92;
+    --color-primary-hover: #1A3EBC;
+    --color-primary-gradient-start: #173292;
+    --color-primary-gradient-end: #2143c2;
     --color-secondary: #D6AC48;
 
     /* Surface Colors */

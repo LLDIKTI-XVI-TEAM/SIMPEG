@@ -36,8 +36,7 @@
                 <path d="M 200 -50 Q 50 200 200 450" fill="none" stroke="currentColor" stroke-width="40"/>
                 <path d="M 280 -50 Q 130 200 280 450" fill="none" stroke="currentColor" stroke-width="20"/>
             </svg>
-            <!-- Small floating ring -->
-            <div class="absolute bottom-1/4 right-[40%] w-3 h-3 border-[2px] border-white/20 rounded-full"></div>
+
         </div>
 
         <!-- Content Left -->

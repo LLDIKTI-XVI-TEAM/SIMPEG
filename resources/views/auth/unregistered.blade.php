@@ -20,12 +20,21 @@
 
     <div class="mt-4">
         <a
-            href="{{ route('login') }}"
+            href="{{ route('logout.get') }}"
             id="retry-login-btn"
             class="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90"
         >
             Coba Login Kembali
         </a>
+        
+        @if(app()->environment('local'))
+        <a
+            href="{{ route('dev-login') }}"
+            class="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-secondary px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90"
+        >
+            Gunakan Demo Login (Lokal)
+        </a>
+        @endif
     </div>
 
 </x-layouts.auth>
