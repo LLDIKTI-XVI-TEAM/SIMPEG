@@ -4,7 +4,9 @@ namespace App\Actions\Documents;
 
 use App\Models\Document;
 use App\Support\Documents\DocumentCategory;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Storage;
 
 class ListDocumentsAction
@@ -17,8 +19,8 @@ class ListDocumentsAction
      */
     public function execute(array $validated): LengthAwarePaginator
     {
-        $perPage     = (int) ($validated['per_page'] ?? 10);
-        $filterUnit  = $validated['unit_kerja'] ?? null;
+        $perPage = (int) ($validated['per_page'] ?? 10);
+        $filterUnit = $validated['unit_kerja'] ?? null;
         $filterStatus = $validated['status'] ?? null;
 
         $query = Document::query()
@@ -42,7 +44,7 @@ class ListDocumentsAction
         if (! empty($filterUnit)) {
             $query->whereHas('employee.positionHistories', function ($q) use ($filterUnit): void {
                 $q->where('is_latest', true)
-                  ->whereHas('unitKerja', fn ($uq) => $uq->where('nama', $filterUnit));
+                    ->whereHas('unitKerja', fn ($uq) => $uq->where('nama', $filterUnit));
             });
             // Eager load unit_kerja hanya jika filter aktif (sudah pasti ada)
             $query->with(['employee.positionHistories' => fn ($q) => $q
@@ -60,7 +62,7 @@ class ListDocumentsAction
             $keyword = '%'.mb_strtolower($validated['search']).'%';
             $query->where(function ($q) use ($keyword): void {
                 $q->whereRaw('lower(nama_dokumen) like ?', [$keyword])
-                  ->orWhereRaw('lower(nomor_dokumen) like ?', [$keyword]);
+                    ->orWhereRaw('lower(nomor_dokumen) like ?', [$keyword]);
             });
         }
 
@@ -71,8 +73,8 @@ class ListDocumentsAction
         $paginator = $query->latest('documents.created_at')->paginate($perPage)->withQueryString();
 
         // Batch-check file existence sekaligus — satu operasi disk bukan N operasi
-        $disk        = Storage::disk(Document::STORAGE_DISK);
-        $filePaths   = $paginator->pluck('file_path')->filter()->unique()->values()->all();
+        $disk = Storage::disk(Document::STORAGE_DISK);
+        $filePaths = $paginator->pluck('file_path')->filter()->unique()->values()->all();
         $existingMap = [];
         foreach ($filePaths as $path) {
             $existingMap[$path] = $disk->exists($path);
@@ -81,7 +83,9 @@ class ListDocumentsAction
         // Eager load positionHistories hanya jika unit_kerja filter tidak aktif
         // (kalau aktif sudah di-load di atas)
         if (empty($filterUnit)) {
-            $paginator->loadMissing(['employee.positionHistories' => fn ($q) => $q
+            /** @var Collection<int, Document> $collection */
+            $collection = $paginator->getCollection();
+            $collection->loadMissing(['employee.positionHistories' => fn ($q) => $q
                 ->with('unitKerja:id,nama')
                 ->where('is_latest', true)
                 ->limit(1),
@@ -89,11 +93,11 @@ class ListDocumentsAction
         }
 
         /** @var \Illuminate\Pagination\LengthAwarePaginator<int, array<string, mixed>> $result */
-        $result = $paginator->through(function (Document $document) use ($filterStatus, $existingMap): array {
+        $result = $paginator->through(function (Document $document) use ($filterStatus, $existingMap, $disk): array {
             $currentPosition = $document->employee?->positionHistories?->first();
             $unit = $currentPosition?->unitKerja?->nama ?? '-';
 
-            $fileExists    = $existingMap[$document->file_path] ?? false;
+            $fileExists = $existingMap[$document->file_path] ?? false;
             $statusDokumen = $fileExists ? 'tersedia' : 'file_tidak_ditemukan';
 
             if ($filterStatus && $statusDokumen !== $filterStatus) {
@@ -101,29 +105,29 @@ class ListDocumentsAction
             }
 
             return [
-                'id'            => $document->id,
-                'jenis'         => DocumentCategory::label($document->jenis_dokumen),
-                'nama'          => $document->nama_dokumen,
-                'nomor'         => $document->nomor_dokumen ?? '-',
-                'tanggal'       => $document->tanggal_dokumen ? $document->tanggal_dokumen->format('Y-m-d') : '-',
-                'kategori'      => $document->jenis_dokumen,
-                'kategori_label'=> DocumentCategory::label($document->jenis_dokumen),
-                'nama_pegawai'  => $document->employee?->nama_lengkap ?? 'Pegawai Nonaktif',
-                'nip_pegawai'   => $document->employee?->nip ?? '-',
-                'foto_pegawai'  => $document->employee?->foto_url ?? null,
-                'unit_pegawai'  => $unit,
-                'file_path'     => $document->file_path,
-                'file_size'     => $this->fileSizeLabel($document->file_path, $fileExists, $disk),
-                'status_dokumen'=> $statusDokumen,
-                'status_label'  => $fileExists ? 'File tersedia' : 'File tidak ditemukan',
-                'deskripsi'     => $document->keterangan ?? '',
+                'id' => $document->id,
+                'jenis' => DocumentCategory::label($document->jenis_dokumen),
+                'nama' => $document->nama_dokumen,
+                'nomor' => $document->nomor_dokumen ?? '-',
+                'tanggal' => $document->tanggal_dokumen ? $document->tanggal_dokumen->format('Y-m-d') : '-',
+                'kategori' => $document->jenis_dokumen,
+                'kategori_label' => DocumentCategory::label($document->jenis_dokumen),
+                'nama_pegawai' => $document->employee?->nama_lengkap ?? 'Pegawai Nonaktif',
+                'nip_pegawai' => $document->employee?->nip ?? '-',
+                'foto_pegawai' => $document->employee?->foto_url ?? null,
+                'unit_pegawai' => $unit,
+                'file_path' => $document->file_path,
+                'file_size' => $this->fileSizeLabel($document->file_path, $fileExists, $disk),
+                'status_dokumen' => $statusDokumen,
+                'status_label' => $fileExists ? 'File tersedia' : 'File tidak ditemukan',
+                'deskripsi' => $document->keterangan ?? '',
                 // Extra fields used by edit modal
-                'employee_id'   => $document->employee_id,
+                'employee_id' => $document->employee_id,
                 'jenis_dokumen' => $document->jenis_dokumen,
-                'nama_dokumen'  => $document->nama_dokumen,
+                'nama_dokumen' => $document->nama_dokumen,
                 'nomor_dokumen' => $document->nomor_dokumen,
                 'tanggal_dokumen' => $document->tanggal_dokumen?->format('Y-m-d'),
-                'keterangan'    => $document->keterangan,
+                'keterangan' => $document->keterangan,
             ];
         });
 
@@ -133,7 +137,7 @@ class ListDocumentsAction
     /**
      * Hitung label ukuran file dari hasil batch disk check yang sudah ada.
      */
-    private function fileSizeLabel(string $path, bool $exists, \Illuminate\Contracts\Filesystem\Filesystem $disk): string
+    private function fileSizeLabel(string $path, bool $exists, Filesystem $disk): string
     {
         if (! $exists) {
             return 'File tidak ditemukan';

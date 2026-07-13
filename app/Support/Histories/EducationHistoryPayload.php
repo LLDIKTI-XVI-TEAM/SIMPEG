@@ -3,6 +3,7 @@
 namespace App\Support\Histories;
 
 use App\Models\EducationHistory;
+use App\Models\RefJenjangPendidikan;
 
 class EducationHistoryPayload
 {
@@ -13,11 +14,14 @@ class EducationHistoryPayload
      */
     public function response(EducationHistory $history): array
     {
+        /** @var RefJenjangPendidikan|null $jenjang */
+        $jenjang = $history->jenjang;
+
         return [
             'id' => $history->id,
             'employee_id' => $history->employee_id,
             'jenjang_id' => $history->jenjang_id,
-            'tingkat' => $history->jenjang?->nama ?? '-',
+            'tingkat' => $jenjang?->nama ?? '-',
             'nama_institusi' => $history->nama_institusi,
             'jurusan' => $history->jurusan,
             'tahun_lulus' => $history->tahun_lulus,

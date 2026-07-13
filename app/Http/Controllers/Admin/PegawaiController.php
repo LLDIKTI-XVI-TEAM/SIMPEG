@@ -20,6 +20,7 @@ use App\Http\Requests\Employee\StoreEmployeeRequest;
 use App\Http\Requests\Employee\UpdateEmployeePerformanceFlagRequest;
 use App\Http\Requests\Employee\UpdateEmployeeRequest;
 use App\Http\Requests\Employee\UpdateEmployeeSatyalancanaEligibilityRequest;
+use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\RefAgama;
 use App\Models\RefEselon;
@@ -35,6 +36,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PegawaiController extends Controller
@@ -462,9 +464,9 @@ class PegawaiController extends Controller
         }
 
         $validIds = $employees->pluck('id')->all();
-        $count    = count($validIds);
-        $now      = now();
-        $user     = $request->user();
+        $count = count($validIds);
+        $now = now();
+        $user = $request->user();
 
         DB::transaction(function () use ($validIds, $employees, $now, $user, $request): void {
             // Satu UPDATE soft-delete semua sekaligus
@@ -472,20 +474,20 @@ class PegawaiController extends Controller
 
             // Batch insert audit log
             $auditRows = $employees->map(fn ($e) => [
-                'id'             => (string) \Illuminate\Support\Str::uuid(),
-                'user_id'        => $user?->id,
-                'user_name'      => $user?->name,
-                'event'          => 'SOFT_DELETE',
+                'id' => (string) Str::uuid(),
+                'user_id' => $user?->id,
+                'user_name' => $user?->name,
+                'event' => 'SOFT_DELETE',
                 'auditable_type' => 'Employee',
-                'auditable_id'   => $e->id,
-                'old_values'     => json_encode(['deleted_at' => null]),
-                'new_values'     => json_encode(['deleted_at' => $now->toIso8601String()]),
-                'ip_address'     => $request->ip(),
-                'user_agent'     => $request->userAgent(),
-                'created_at'     => $now,
+                'auditable_id' => $e->id,
+                'old_values' => json_encode(['deleted_at' => null]),
+                'new_values' => json_encode(['deleted_at' => $now->toIso8601String()]),
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'created_at' => $now,
             ])->all();
 
-            \App\Models\AuditLog::insert($auditRows);
+            AuditLog::insert($auditRows);
         });
 
         return back()
@@ -529,9 +531,9 @@ class PegawaiController extends Controller
         }
 
         $validIds = $employees->pluck('id')->all();
-        $count    = count($validIds);
-        $now      = now();
-        $user     = $request->user();
+        $count = count($validIds);
+        $now = now();
+        $user = $request->user();
 
         DB::transaction(function () use ($validIds, $employees, $now, $user, $request): void {
             // Satu UPDATE — set deleted_at = null untuk semua sekaligus
@@ -541,20 +543,20 @@ class PegawaiController extends Controller
 
             // Batch insert audit log — satu INSERT untuk semua, jauh lebih cepat dari N inserts
             $auditRows = $employees->map(fn ($e) => [
-                'id'             => (string) \Illuminate\Support\Str::uuid(),
-                'user_id'        => $user?->id,
-                'user_name'      => $user?->name,
-                'event'          => 'RESTORE',
+                'id' => (string) Str::uuid(),
+                'user_id' => $user?->id,
+                'user_name' => $user?->name,
+                'event' => 'RESTORE',
                 'auditable_type' => 'Employee',
-                'auditable_id'   => $e->id,
-                'old_values'     => json_encode(['deleted_at' => $now->toIso8601String()]),
-                'new_values'     => json_encode(['deleted_at' => null]),
-                'ip_address'     => $request->ip(),
-                'user_agent'     => $request->userAgent(),
-                'created_at'     => $now,
+                'auditable_id' => $e->id,
+                'old_values' => json_encode(['deleted_at' => $now->toIso8601String()]),
+                'new_values' => json_encode(['deleted_at' => null]),
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'created_at' => $now,
             ])->all();
 
-            \App\Models\AuditLog::insert($auditRows);
+            AuditLog::insert($auditRows);
         });
 
         return redirect()->route('data-backup')
