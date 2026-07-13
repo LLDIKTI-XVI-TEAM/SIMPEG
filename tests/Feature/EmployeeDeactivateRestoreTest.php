@@ -43,7 +43,7 @@ class EmployeeDeactivateRestoreTest extends TestCase
 
     public function test_admin_can_deactivate_employee_via_api_and_audit_is_written(): void
     {
-        $user = User::factory()->adminKepegawaian()->create();
+        $user = User::factory()->superAdmin()->create();
         $employee = Employee::factory()->create([
             'nama_lengkap' => 'Pegawai Nonaktif API',
             'status_aktif' => 'Aktif',
