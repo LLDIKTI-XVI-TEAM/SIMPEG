@@ -111,8 +111,9 @@ return new class extends Migration
                     return true;
                 }
             }
+
             return false;
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return false;
         }
     }
