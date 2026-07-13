@@ -7,10 +7,14 @@ use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveRequest;
 use App\Queries\Cuti\CutiRekapQuery;
+use App\Support\Cuti\CutiReportStatusFormatter;
 
 class ShowCutiRekapAction
 {
-    public function __construct(private readonly CutiRekapQuery $rekapQuery) {}
+    public function __construct(
+        private readonly CutiRekapQuery $rekapQuery,
+        private readonly CutiReportStatusFormatter $statusFormatter,
+    ) {}
 
     /**
      * Menyusun seluruh view model rekap dari query kanonis dan sumber yang tetap terbatas.
@@ -46,6 +50,7 @@ class ShowCutiRekapAction
             'selesai' => $leaveRequest->tanggal_selesai?->format('d M Y') ?? '-',
             'hari' => $leaveRequest->jumlah_hari_kerja,
             'status' => $leaveRequest->status,
+            'status_label' => $this->statusFormatter->format($leaveRequest),
         ]);
 
         $selectedEmployee = $pegawaiId === null
@@ -99,6 +104,7 @@ class ShowCutiRekapAction
             'terpakai' => $balance->terpakai,
             'sisa' => $balance->sisa,
             'status' => $status,
+            'status_label' => $status,
         ];
     }
 

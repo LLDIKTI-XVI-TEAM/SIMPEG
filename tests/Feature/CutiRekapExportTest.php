@@ -259,6 +259,64 @@ class CutiRekapExportTest extends TestCase
             ->assertSee($expected);
     }
 
+    public function test_rekap_menampilkan_label_status_resmi_bukan_token_internal(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $pegawai = Employee::factory()->create();
+        $jenis = RefJenisCuti::create(['nama' => 'Cuti Label Rekap']);
+        $this->createLeaveRequest($pegawai, $jenis, '2026-06-15', 'perlu_perubahan');
+
+        $this->actingAs($user)->get(route('cuti.rekap', ['pegawai' => $pegawai->id]))
+            ->assertOk()
+            ->assertSee('Perubahan')
+            ->assertDontSee('perlu_perubahan', false);
+    }
+
+    public function test_rekap_menampilkan_label_status_saldo(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $pegawai = Employee::factory()->create();
+        LeaveBalance::create([
+            'employee_id' => $pegawai->id,
+            'tahun' => 2026,
+            'sisa' => 7,
+        ]);
+
+        $this->actingAs($user)->get(route('cuti.rekap', [
+            'pegawai' => $pegawai->id,
+            'periode' => '2026',
+        ]))
+            ->assertOk()
+            ->assertSee('Aman');
+    }
+
+    #[DataProvider('rekapWaitingStatusProvider')]
+    public function test_rekap_menampilkan_label_tahap_persetujuan_aktif(
+        ?string $roleLabel,
+        string $expected,
+    ): void {
+        $user = User::factory()->superAdmin()->create();
+        $pegawai = Employee::factory()->create();
+        $jenis = RefJenisCuti::create(['nama' => 'Cuti Tahap Rekap '.$expected]);
+        $leaveRequest = $this->createLeaveRequest($pegawai, $jenis, '2026-06-15', 'menunggu_approval');
+
+        if ($roleLabel !== null) {
+            LeaveRequestStep::create([
+                'leave_request_id' => $leaveRequest->id,
+                'step_order' => 1,
+                'step_type' => 'verifikator',
+                'role_label' => $roleLabel,
+                'status' => 'active',
+                'is_final' => false,
+            ]);
+        }
+
+        $this->actingAs($user)->get(route('cuti.rekap', ['pegawai' => $pegawai->id]))
+            ->assertOk()
+            ->assertSee($expected)
+            ->assertDontSee('menunggu_approval', false);
+    }
+
     /** @return array<string, array{string, string|null, string}> */
     public static function officialStatusProvider(): array
     {
@@ -269,6 +327,15 @@ class CutiRekapExportTest extends TestCase
             'tidak disetujui' => ['tidak_disetujui', null, 'Tidak Disetujui'],
             'tahap aktif' => ['menunggu_approval', 'active', 'Menunggu Verifikator'],
             'fallback approver' => ['menunggu_approval', null, 'Menunggu Approver'],
+        ];
+    }
+
+    /** @return array<string, array{string|null, string}> */
+    public static function rekapWaitingStatusProvider(): array
+    {
+        return [
+            'tahap aktif' => ['Verifikator', 'Menunggu Verifikator'],
+            'fallback approver' => [null, 'Menunggu Approver'],
         ];
     }
 

@@ -29,7 +29,7 @@ class KepalaLembagaSupportingDocumentController extends Controller
         $kepalaLembaga = Employee::query()
             ->where('is_kepala_lembaga', true)
             ->orderBy('nama_lengkap')
-            ->get(['id', 'nama_lengkap']);
+            ->get(['id', 'nama_lengkap', 'is_kepala_lembaga']);
 
         $requestedId = $request->query('employee');
         $selected = is_string($requestedId) && Str::isUuid($requestedId)

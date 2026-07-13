@@ -1,18 +1,19 @@
 <x-layouts.app title="Cuti Pegawai">
 
     @php
+        // Peta status runtime resmi (spec 3.2). Kunci memakai token runtime mentah dari Action.
         $statusVariant = [
-            'menunggu'  => 'warning',
+            'menunggu_approval' => 'info',
             'disetujui' => 'success',
-            'ditunda'   => 'danger',
+            'ditangguhkan' => 'warning',
             'perlu_perubahan' => 'danger',
             'tidak_disetujui' => 'danger',
         ];
-
+        
         $statusLabel = [
-            'menunggu'  => 'Menunggu',
+            'menunggu_approval' => 'Menunggu',
             'disetujui' => 'Disetujui',
-            'ditunda'   => 'Ditangguhkan',
+            'ditangguhkan' => 'Ditangguhkan',
             'perlu_perubahan' => 'Perlu Perubahan',
             'tidak_disetujui' => 'Tidak Disetujui',
         ];
@@ -157,13 +158,13 @@
                             <x-ui.table-th class="select-none">Unit Kerja</x-ui.table-th>
                             <x-ui.table-th class="select-none">Detail Cuti</x-ui.table-th>
                             <x-ui.table-th class="select-none">Tanggal & Durasi</x-ui.table-th>
-                            <x-ui.table-th class="select-none">Stage Approval</x-ui.table-th>
+                            <x-ui.table-th class="select-none">Langkah Aktif</x-ui.table-th>
                             <x-ui.table-th class="select-none">Status Akhir</x-ui.table-th>
                             <x-ui.table-th align="right" class="select-none">Aksi</x-ui.table-th>
                         </x-ui.table-row>
                     </x-ui.table-head>
                     <x-ui.table-body>
-                        @foreach($riwayatCuti as $r)
+                        @forelse($riwayatCuti as $r)
                         <x-ui.table-row data-nama="{{ $r['nama'] }}" data-nip="{{ $r['nip'] }}" data-unit="{{ $r['unit'] }}" data-jenis="{{ $r['jenis'] }}" data-status="{{ $r['status'] }}" data-periode="{{ $r['periode'] }}" :interactive="true">
                             <x-ui.table-td>
 
@@ -190,14 +191,14 @@
                                 <p class="text-xs text-primary font-semibold mt-0.5 leading-none">{{ $r['hari'] }} Hari Kerja</p>
                             </x-ui.table-td>
                             <x-ui.table-td>
-
-                                <div class="flex flex-col gap-1 text-[11px] font-medium text-ink font-sans">
-                                    <div>
-                                        <span>Atasan: <strong class="capitalize">{{ $r['stage_atasan'] }}</strong></span>
-                                    </div>
-                                    <div>
-                                        <span>Kepala: <strong class="capitalize">{{ $r['stage_kepala'] }}</strong></span>
-                                    </div>
+                                <div class="text-[11px] font-medium text-ink font-sans">
+                                    @if($r['status'] === 'menunggu_approval' && $r['current_step'])
+                                        <span>Menunggu <strong>{{ $r['current_step'] }}</strong></span>
+                                    @elseif($r['current_step'])
+                                        <span>Langkah aktif: <strong>{{ $r['current_step'] }}</strong></span>
+                                    @else
+                                        <span class="text-muted">-</span>
+                                    @endif
                                 </div>
                             </x-ui.table-td>
                             <x-ui.table-td>
@@ -218,7 +219,13 @@
                                 </div>
                             </x-ui.table-td>
                         </x-ui.table-row>
-                        @endforeach
+                        @empty
+                        <x-ui.table-row>
+                            <x-ui.table-td colspan="7" align="center" class="px-6 py-8 text-muted">
+                                Belum ada pengajuan cuti yang sesuai dengan filter.
+                            </x-ui.table-td>
+                        </x-ui.table-row>
+                        @endforelse
                     </x-ui.table-body>
                 </x-ui.table>
             </div>

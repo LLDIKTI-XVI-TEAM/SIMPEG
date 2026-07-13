@@ -105,7 +105,7 @@
                                         </x-ui.table-td>
                                         <x-ui.table-td padding="sm">
                                             <span
-                                                class="text-xs font-semibold {{ $statusClass[$row['status']] ?? 'text-muted' }}">{{ $row['status'] }}</span>
+                                                class="text-xs font-semibold {{ $statusClass[$row['status']] ?? 'text-muted' }}">{{ $row['status_label'] }}</span>
                                         </x-ui.table-td>
                                         <x-ui.table-td align="right" padding="sm">
                                             <a href="{{ route('cuti.rekap', array_filter(['pegawai' => $row['employee_id'], 'periode' => $row['tahun']])) }}#admin-saldo-cuti"
@@ -170,7 +170,7 @@
                                         <x-ui.table-td align="right" padding="sm" class="font-mono text-sm">{{ $row['hari'] }}</x-ui.table-td>
                                         <x-ui.table-td padding="sm">
                                             <span
-                                                class="text-xs font-semibold {{ $statusClass[$row['status']] ?? 'text-muted' }}">{{ $row['status'] }}</span>
+                                                class="text-xs font-semibold {{ $statusClass[$row['status']] ?? 'text-muted' }}">{{ $row['status_label'] }}</span>
                                         </x-ui.table-td>
                                     </x-ui.table-row>
                                 @endforeach

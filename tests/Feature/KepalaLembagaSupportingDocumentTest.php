@@ -417,6 +417,25 @@ class KepalaLembagaSupportingDocumentTest extends TestCase
             ->assertViewHas('selected', fn ($selected): bool => $selected !== null && $selected->id === $first->id);
     }
 
+    public function test_index_lists_uploaded_document_for_selected_kepala_lembaga(): void
+    {
+        Storage::fake('local');
+        $employee = Employee::factory()->create(['is_kepala_lembaga' => true]);
+        $admin = User::factory()->adminKepegawaian()->create();
+
+        app(StoreKepalaLembagaSupportingDocumentAction::class)->execute(
+            $employee,
+            UploadedFile::fake()->create('persetujuan-kementerian.pdf', 200, 'application/pdf'),
+            $admin,
+        );
+
+        $this->actingAs($admin)
+            ->get(route('cuti.dokumen-kepala-lembaga.index', ['employee' => $employee->id]))
+            ->assertOk()
+            ->assertSee('persetujuan-kementerian.pdf')
+            ->assertViewHas('documents', fn ($documents): bool => $documents->total() === 1);
+    }
+
     public function test_retry_purges_physical_files_for_tombstoned_documents(): void
     {
         Storage::fake('local');
