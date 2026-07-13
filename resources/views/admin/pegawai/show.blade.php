@@ -41,22 +41,36 @@
         modalError: '',
         isSubmitting: false,
         toast: { show: false, message: '', type: 'success' },
+        arsipDokumen: [],
+        loadingArsip: false,
+        disiplinFileMode: 'arsip',
+        deletingDisiplinId: null,
+        isDeletingDisiplin: false,
         
-        // Mengambil data riwayat riil dari database melalui relasi model Employee
-        keluargaList: {{ $p->families->map(fn($f) => ['id' => $f->id, 'nama_anggota' => $f->nama_anggota, 'hubungan' => $f->hubungan, 'nik' => $f->nik, 'tempat_lahir' => $f->tempat_lahir, 'tanggal_lahir' => $f->tanggal_lahir ? \Carbon\Carbon::parse($f->tanggal_lahir)->format('d-m-Y') : '-', 'jenis_kelamin' => $f->jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan', 'pekerjaan' => $f->pekerjaan, 'status' => $f->status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'])->toJson() }},
+        // Data keluarga di-fetch lazily saat tab dibuka, disimpan di sessionStorage.
+        keluargaList: [],
+        keluargaLoading: false,
+        isDeletingKeluarga: false,
         pangkatList: {{ $p->rankHistories->map(fn($r) => ['golongan' => $r->golongan->nama ?? '-', 'no_sk' => $r->no_sk, 'tgl_sk' => $r->tanggal_sk, 'tmt' => $r->tmt_pangkat])->toJson() }},
         jabatanList: {{ $p->positionHistories->map(fn($j) => ['jabatan' => $j->jabatan?->nama ?? $j->nama_jabatan, 'unit' => $j->unitKerja->nama ?? '-', 'kelas_jabatan' => $j->kelas_jabatan, 'no_sk' => $j->no_sk, 'tgl_sk' => $j->tanggal_sk, 'tmt' => $j->tmt_jabatan])->toJson() }},
         kgbList: {{ $p->salaryHistories->map(fn($s) => ['gaji' => 'Rp ' . number_format($s->gaji_pokok, 0, ',', '.'), 'no_sk' => $s->no_sk, 'tgl_sk' => $s->tanggal_sk, 'tmt' => $s->tmt_kgb])->toJson() }},
-        disiplinList: {{ $p->disciplineRecords->map(fn($d) => ['jenis' => $d->jenis_hukuman, 'alasan' => $d->deskripsi, 'no_sk' => $d->no_sk, 'tgl_sk' => $d->tanggal_sk ? \Carbon\Carbon::parse($d->tanggal_sk)->format('d-m-Y') : '-', 'masa' => ($d->tanggal_mulai ? \Carbon\Carbon::parse($d->tanggal_mulai)->format('d-m-Y') : '-') . ' s/d ' . ($d->tanggal_berakhir ? \Carbon\Carbon::parse($d->tanggal_berakhir)->format('d-m-Y') : 'Sekarang'), 'is_active' => $d->is_active])->toJson() }},
-        pendidikanList: {{ $p->educationHistories->map(fn($e) => ['tingkat' => $e->jenjang->nama ?? '-', 'institusi' => $e->nama_institusi, 'prodi' => $e->jurusan, 'lulus' => $e->tahun_lulus, 'no_ijazah' => $e->no_ijazah])->toJson() }},
+        disiplinList: {{ $p->disciplineRecords->map(fn($d) => ['id' => $d->id, 'jenis' => $d->jenis_hukuman, 'alasan' => $d->deskripsi, 'no_sk' => $d->no_sk, 'tgl_sk' => $d->tanggal_sk ? \Carbon\Carbon::parse($d->tanggal_sk)->format('d-m-Y') : '-', 'masa' => ($d->tanggal_mulai ? \Carbon\Carbon::parse($d->tanggal_mulai)->format('d-m-Y') : '-') . ' s/d ' . ($d->tanggal_berakhir ? \Carbon\Carbon::parse($d->tanggal_berakhir)->format('d-m-Y') : 'Sekarang'), 'is_active' => $d->is_active])->toJson() }},
+        pendidikanList: [],
+        pendidikanLoading: false,
+        showEditPendidikan: false,
+        editingPendidikan: null,
+        editPendidikanError: '',
+        editPendidikanForm: { jenjang_id: '', nama_institusi: '', jurusan: '', tahun_lulus: '', no_ijazah: '' },
+        isUpdatingPendidikan: false,
+        isDeletingPendidikan: false,
         
         // Form states
         newKeluarga: { nama_anggota: '', hubungan: 'Istri', nik: '', tempat_lahir: '', tanggal_lahir: '', jenis_kelamin: 'P', status_tunjangan: '0', pekerjaan: '' },
         newPangkat: { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '' },
         newJabatan: { jabatan_id: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', kelas_jabatan: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '' },
         newKgb: { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '' },
-        newDisiplin: { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '' },
-        newPendidikan: { tingkat: 'D4 / S1', institusi: '', prodi: '', lulus: '', no_ijazah: '' },
+        newDisiplin: { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '', file_sk: null, dokumen_id: '' },
+        newPendidikan: { jenjang_id: '', nama_institusi: '', jurusan: '', tahun_lulus: '', no_ijazah: '' },
         async updateKinerjaBaik(value) {
             const previous = !value;
             this.isUpdatingKinerja = true;
@@ -134,7 +148,273 @@
             this.modalTitle = title;
             this.modalError = '';
             this.showModal = true;
+            if (type === 'disiplin') {
+                this.disiplinFileMode = 'arsip';
+                this.fetchArsipDisiplin();
+            }
         },
+        async fetchArsipDisiplin() {
+            this.loadingArsip = true;
+            this.arsipDokumen = [];
+            try {
+                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/arsip-dokumen?kategori=sk_hukuman_disiplin`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                if (res.ok) {
+                    const json = await res.json();
+                    this.arsipDokumen = json.documents ?? [];
+                }
+            } catch (e) {
+                this.arsipDokumen = [];
+            } finally {
+                this.loadingArsip = false;
+            }
+        },
+        async deleteDisiplin(id, index) {
+            if (!window.confirm('Apakah Anda yakin ingin menghapus data hukuman disiplin ini? Tindakan ini tidak dapat dibatalkan.')) return;
+            this.isDeletingDisiplin = true;
+            try {
+                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/disiplin/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    this.toast = { show: true, message: err.message ?? 'Gagal menghapus data hukuman disiplin.', type: 'error' };
+                    return;
+                }
+                this.disiplinList.splice(index, 1);
+                this.toast = { show: true, message: 'Hukuman disiplin berhasil dihapus.', type: 'success' };
+            } catch (e) {
+                this.toast = { show: true, message: 'Terjadi kesalahan jaringan. Coba lagi.', type: 'error' };
+            } finally {
+                this.isDeletingDisiplin = false;
+            }
+        },
+
+        // ===== LAZY FETCH & CACHING KELUARGA + PENDIDIKAN =====
+        _keluargaCacheKey:  'keluarga_{{ $p->id }}',
+        _pendidikanCacheKey: 'pendidikan_{{ $p->id }}',
+
+        formatDate(dateString) {
+            if (!dateString || dateString === '-') return '-';
+            const datePart = String(dateString).split('T')[0];
+            const parts = datePart.split('-');
+            if (parts.length === 3 && parts[0].length === 4) {
+                return `${parts[2]}-${parts[1]}-${parts[0]}`;
+            }
+            return dateString;
+        },
+
+        init() {
+            // Deteksi reload (F5/Ctrl+R): buang semua cache tab agar data selalu segar.
+            const navType = performance.getEntriesByType?.('navigation')?.[0]?.type;
+            if (navType === 'reload') {
+                sessionStorage.removeItem(this._keluargaCacheKey);
+                sessionStorage.removeItem(this._pendidikanCacheKey);
+            }
+
+            // Pantau perpindahan tab — fetch otomatis saat tab dibuka pertama kali.
+            this.$watch('activeTab', (tab) => {
+                if (tab === 'keluarga' && this.keluargaList.length === 0 && !this.keluargaLoading) {
+                    this.fetchKeluarga();
+                }
+                if (tab === 'pendidikan' && this.pendidikanList.length === 0 && !this.pendidikanLoading) {
+                    this.fetchPendidikan();
+                }
+            });
+
+            // Langsung fetch jika tab sudah aktif saat init (misal dari URL ?tab=keluarga).
+            if (this.activeTab === 'keluarga')  this.fetchKeluarga();
+            if (this.activeTab === 'pendidikan') this.fetchPendidikan();
+        },
+
+        async fetchKeluarga() {
+            const cached = sessionStorage.getItem(this._keluargaCacheKey);
+            if (cached) {
+                try {
+                    this.keluargaList = JSON.parse(cached);
+                    return;
+                } catch (e) {
+                    sessionStorage.removeItem(this._keluargaCacheKey);
+                }
+            }
+            this.keluargaLoading = true;
+            try {
+                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/keluarga`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const json = await res.json();
+                // Normalisasi format tanggal dan label sesuai tampilan tabel.
+                this.keluargaList = (json.families ?? []).map(f => ({
+                    id:            f.id,
+                    nama_anggota:  f.nama_anggota,
+                    hubungan:      f.hubungan,
+                    nik:           f.nik,
+                    tempat_lahir:  f.tempat_lahir,
+                    tanggal_lahir: f.tanggal_lahir,
+                    jenis_kelamin: f.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan',
+                    pekerjaan:     f.pekerjaan,
+                    status:        f.status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung',
+                }));
+                sessionStorage.setItem(this._keluargaCacheKey, JSON.stringify(this.keluargaList));
+            } catch (e) {
+                console.error('Gagal memuat data keluarga:', e);
+            } finally {
+                this.keluargaLoading = false;
+            }
+        },
+
+        async deleteKeluarga(id, index) {
+            if (!window.confirm('Apakah Anda yakin ingin menghapus data anggota keluarga ini? Tindakan ini tidak dapat dibatalkan.')) return;
+            this.isDeletingKeluarga = true;
+            try {
+                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/keluarga/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    this.toast = { show: true, message: err.message ?? 'Gagal menghapus data keluarga.', type: 'error' };
+                    setTimeout(() => this.toast.show = false, 4000);
+                    return;
+                }
+                this.keluargaList.splice(index, 1);
+                sessionStorage.setItem(this._keluargaCacheKey, JSON.stringify(this.keluargaList));
+                this.toast = { show: true, message: 'Anggota keluarga berhasil dihapus.', type: 'success' };
+                setTimeout(() => this.toast.show = false, 3000);
+            } catch (e) {
+                this.toast = { show: true, message: 'Terjadi kesalahan jaringan. Coba lagi.', type: 'error' };
+                setTimeout(() => this.toast.show = false, 4000);
+            } finally {
+                this.isDeletingKeluarga = false;
+            }
+        },
+
+        async fetchPendidikan() {
+            // Coba baca dari sessionStorage terlebih dahulu.
+            const cached = sessionStorage.getItem(this._pendidikanCacheKey);
+            if (cached) {
+                try {
+                    this.pendidikanList = JSON.parse(cached);
+                    return;
+                } catch (e) {
+                    sessionStorage.removeItem(this._pendidikanCacheKey);
+                }
+            }
+            this.pendidikanLoading = true;
+            try {
+                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/riwayat-pendidikan`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const json = await res.json();
+                this.pendidikanList = json.histories ?? [];
+                sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify(this.pendidikanList));
+            } catch (e) {
+                console.error('Gagal memuat riwayat pendidikan:', e);
+            } finally {
+                this.pendidikanLoading = false;
+            }
+        },
+
+        openEditPendidikan(edu) {
+            this.editingPendidikan = edu;
+            this.editPendidikanError = '';
+            this.editPendidikanForm = {
+                jenjang_id:     edu.jenjang_id ?? '',
+                nama_institusi: edu.institusi ?? '',
+                jurusan:        edu.prodi ?? '',
+                tahun_lulus:    edu.lulus ?? '',
+                no_ijazah:      edu.no_ijazah ?? '',
+            };
+            this.showEditPendidikan = true;
+        },
+
+        async submitEditPendidikan() {
+            this.editPendidikanError = '';
+            this.isUpdatingPendidikan = true;
+            try {
+                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/riwayat-pendidikan/${this.editingPendidikan.id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: JSON.stringify(this.editPendidikanForm),
+                });
+                const result = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    const msgs = result.errors
+                        ? Object.values(result.errors).flat().join(' ')
+                        : (result.message ?? 'Gagal memperbarui riwayat pendidikan.');
+                    this.editPendidikanError = msgs;
+                    return;
+                }
+                const h = result.history;
+                const idx = this.pendidikanList.findIndex(e => e.id === this.editingPendidikan.id);
+                if (idx !== -1) {
+                    this.pendidikanList[idx] = {
+                        id:        h.id,
+                        jenjang_id: h.jenjang_id,
+                        tingkat:   h.tingkat,
+                        institusi: h.nama_institusi,
+                        prodi:     h.jurusan ?? '-',
+                        lulus:     h.tahun_lulus,
+                        no_ijazah: h.no_ijazah ?? '-',
+                    };
+                }
+                sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify(this.pendidikanList));
+                this.showEditPendidikan = false;
+                this.editingPendidikan = null;
+                this.toast = { show: true, message: 'Riwayat pendidikan berhasil diperbarui.', type: 'success' };
+                setTimeout(() => this.toast.show = false, 3000);
+            } catch (e) {
+                this.editPendidikanError = 'Terjadi kesalahan jaringan. Coba lagi.';
+            } finally {
+                this.isUpdatingPendidikan = false;
+            }
+        },
+
+        async deletePendidikan(id, index) {
+            if (!window.confirm('Apakah Anda yakin ingin menghapus riwayat pendidikan ini? Tindakan ini tidak dapat dibatalkan.')) return;
+            this.isDeletingPendidikan = true;
+            try {
+                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/riwayat-pendidikan/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    this.toast = { show: true, message: err.message ?? 'Gagal menghapus riwayat pendidikan.', type: 'error' };
+                    return;
+                }
+                this.pendidikanList.splice(index, 1);
+                sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify(this.pendidikanList));
+                this.toast = { show: true, message: 'Riwayat pendidikan berhasil dihapus.', type: 'success' };
+                setTimeout(() => this.toast.show = false, 3000);
+            } catch (e) {
+                this.toast = { show: true, message: 'Terjadi kesalahan jaringan. Coba lagi.', type: 'error' };
+            } finally {
+                this.isDeletingPendidikan = false;
+            }
+        },
+
         async submitForm() {
             this.modalError = '';
             let payload = { type: this.modalType };
@@ -152,7 +432,7 @@
                 payload = { ...payload, ...this.newPendidikan };
             }
 
-            let endpoint = `/pegawai/{{ $p->id }}/riwayat`;
+            let endpoint = `/api/v1/pegawai/{{ $p->id }}/riwayat-pendidikan`;
             if (this.modalType === 'pangkat') endpoint = `/api/v1/pegawai/{{ $p->id }}/riwayat-kepangkatan`;
             else if (this.modalType === 'jabatan') endpoint = `/api/v1/pegawai/{{ $p->id }}/riwayat-jabatan`;
             else if (this.modalType === 'kgb') endpoint = `/api/v1/pegawai/{{ $p->id }}/riwayat-kgb`;
@@ -162,29 +442,49 @@
             this.isSubmitting = true;
 
             try {
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    body: JSON.stringify(payload)
-                });
+                let fetchOptions;
+                if (this.modalType === 'disiplin') {
+                    const fd = new FormData();
+                    const d  = this.newDisiplin;
+                    fd.append('jenis_hukuman', d.jenis_hukuman);
+                    fd.append('deskripsi', d.deskripsi);
+                    fd.append('no_sk', d.no_sk);
+                    fd.append('tanggal_sk', d.tanggal_sk);
+                    fd.append('tanggal_mulai', d.tanggal_mulai);
+                    if (d.tanggal_berakhir) fd.append('tanggal_berakhir', d.tanggal_berakhir);
+                    if (d.file_sk)          fd.append('file_sk', d.file_sk);
+                    if (d.dokumen_id)       fd.append('dokumen_id', d.dokumen_id);
+                    fetchOptions = {
+                        method:  'POST',
+                        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                        body:    fd,
+                    };
+                } else {
+                    fetchOptions = {
+                        method:  'POST',
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                        body:    JSON.stringify(payload),
+                    };
+                }
+                const response = await fetch(endpoint, fetchOptions);
                 
                 if (response.ok) {
                     const result = await response.json();
                     
                     if (this.modalType === 'disiplin') {
+                        const r   = result.record;
+                        const fmt = (d) => d ? d.split('-').reverse().join('-') : '-';
                         this.disiplinList.unshift({
-                            jenis: this.newDisiplin.jenis_hukuman,
-                            alasan: this.newDisiplin.deskripsi,
-                            no_sk: this.newDisiplin.no_sk,
-                            tgl_sk: this.newDisiplin.tanggal_sk,
-                            masa: this.newDisiplin.tanggal_mulai + ' s/d ' + (this.newDisiplin.tanggal_berakhir ? this.newDisiplin.tanggal_berakhir : 'Sekarang'),
-                            is_active: true
+                            id:        r.id,
+                            jenis:     r.jenis_hukuman,
+                            alasan:    r.deskripsi,
+                            no_sk:     r.no_sk,
+                            tgl_sk:    fmt(r.tanggal_sk),
+                            masa:      fmt(r.tanggal_mulai) + ' s/d ' + (r.tanggal_berakhir ? fmt(r.tanggal_berakhir) : 'Sekarang'),
+                            is_active: r.is_active,
                         });
-                        this.newDisiplin = { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '' };
+                        this.newDisiplin = { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '', file_sk: null, dokumen_id: '' };
+                        this.disiplinFileMode = 'arsip';
                     } else if (this.modalType === 'kgb') {
                         this.kgbList.unshift({
                             gaji: 'Rp ' + parseInt(this.newKgb.gaji_pokok).toLocaleString('id-ID'),
@@ -219,21 +519,27 @@
                             hubungan: f.hubungan,
                             nik: f.nik,
                             tempat_lahir: f.tempat_lahir,
-                            tanggal_lahir: f.tanggal_lahir ? f.tanggal_lahir.split('-').reverse().join('-') : '-',
+                            tanggal_lahir: f.tanggal_lahir,
                             jenis_kelamin: f.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan',
                             pekerjaan: f.pekerjaan,
                             status: f.status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'
                         });
                         this.newKeluarga = { nama_anggota: '', hubungan: 'Istri', nik: '', tempat_lahir: '', tanggal_lahir: '', jenis_kelamin: 'P', status_tunjangan: '0', pekerjaan: '' };
+                        // Perbarui cache agar navigasi kembali ke tab keluarga tetap sinkron.
+                        sessionStorage.setItem(this._keluargaCacheKey, JSON.stringify(this.keluargaList));
                     } else if (this.modalType === 'pendidikan') {
+                        const h = result.history;
                         this.pendidikanList.unshift({
-                            tingkat: this.newPendidikan.tingkat,
-                            institusi: this.newPendidikan.institusi,
-                            prodi: this.newPendidikan.prodi,
-                            lulus: this.newPendidikan.lulus,
-                            no_ijazah: this.newPendidikan.no_ijazah
+                            id:             h.id,
+                            tingkat:        h.tingkat,
+                            institusi:      h.nama_institusi,
+                            prodi:          h.jurusan ?? '-',
+                            lulus:          h.tahun_lulus,
+                            no_ijazah:      h.no_ijazah ?? '-',
                         });
-                        this.newPendidikan = { tingkat: 'D4 / S1', institusi: '', prodi: '', lulus: '', no_ijazah: '' };
+                        // Perbarui cache sessionStorage agar navigasi kembali tetap sinkron.
+                        sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify(this.pendidikanList));
+                        this.newPendidikan = { jenjang_id: '', nama_institusi: '', jurusan: '', tahun_lulus: '', no_ijazah: '' };
                     }
                     
                     this.showModal = false;
@@ -578,7 +884,17 @@
                         Tambah Keluarga
                     </button>
                 </div>
-                <div class="overflow-x-auto rounded-lg border border-border">
+
+                {{-- Loading skeleton --}}
+                <div x-show="keluargaLoading" class="flex items-center justify-center py-10 text-xs text-muted font-sans gap-2">
+                    <svg class="w-4 h-4 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    Memuat data keluarga...
+                </div>
+
+                <div x-show="!keluargaLoading" class="overflow-x-auto rounded-lg border border-border">
                     <table class="w-full">
                         <thead class="bg-soft border-b border-border">
                             <tr class="text-left text-xs font-semibold text-muted uppercase tracking-wide font-sans">
@@ -591,7 +907,7 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border text-xs font-sans">
-                            <template x-for="(fam, index) in keluargaList" :key="index">
+                            <template x-for="(fam, index) in keluargaList" :key="fam.id">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
                                     <td class="px-4 py-3">
                                         <p class="font-bold font-sans" x-text="fam.nama_anggota"></p>
@@ -603,7 +919,7 @@
                                     </td>
                                     <td class="px-4 py-3">
                                         <p class="font-sans" x-text="fam.tempat_lahir || '-'"></p>
-                                        <p class="text-[10px] text-muted font-mono" x-text="fam.tanggal_lahir"></p>
+                                        <p class="text-[10px] text-muted font-mono" x-text="formatDate(fam.tanggal_lahir)"></p>
                                     </td>
                                     <td class="px-4 py-3 font-sans" x-text="fam.pekerjaan || '-'"></td>
                                     <td class="px-4 py-3">
@@ -611,9 +927,27 @@
                                               :class="fam.status === 'Ditanggung' ? 'text-success' : 'text-muted'"
                                               x-text="fam.status"></span>
                                     </td>
-                                    <td class="px-4 py-3 text-right text-muted">-</td>
+                                    <td class="px-4 py-3 text-right">
+                                        <button
+                                            type="button"
+                                            @click="deleteKeluarga(fam.id, index)"
+                                            :disabled="isDeletingKeluarga"
+                                            class="inline-flex items-center gap-1 text-[10px] font-semibold text-danger hover:underline disabled:opacity-40 font-sans cursor-pointer transition-opacity"
+                                            title="Hapus anggota keluarga ini"
+                                        >
+                                            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.021-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                            </svg>
+                                            Hapus
+                                        </button>
+                                    </td>
                                 </tr>
                             </template>
+                            <tr x-show="!keluargaLoading && keluargaList.length === 0">
+                                <td colspan="6" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
+                                    Pegawai ini belum memiliki data anggota keluarga.
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -642,8 +976,8 @@
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
                                     <td class="px-4 py-3 font-bold" x-text="p.golongan"></td>
                                     <td class="px-4 py-3 font-mono" x-text="p.no_sk"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="p.tgl_sk"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="p.tmt"></td>
+                                    <td class="px-4 py-3 font-mono" x-text="formatDate(p.tgl_sk)"></td>
+                                    <td class="px-4 py-3 font-mono" x-text="formatDate(p.tmt)"></td>
                                 </tr>
                             </template>
                         </tbody>
@@ -740,10 +1074,11 @@
                                 <th class="px-4 py-3">Nomor SK</th>
                                 <th class="px-4 py-3">Tanggal SK</th>
                                 <th class="px-4 py-3">Masa Berlaku</th>
+                                <th class="px-4 py-3 text-right">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border text-xs font-sans">
-                            <template x-for="(d, index) in disiplinList" :key="index">
+                            <template x-for="(d, index) in disiplinList" :key="d.id">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
                                     <td class="px-4 py-3">
                                         <span class="font-bold text-danger" x-text="d.jenis"></span>
@@ -755,10 +1090,24 @@
                                     <td class="px-4 py-3 font-mono" x-text="d.no_sk"></td>
                                     <td class="px-4 py-3 font-mono" x-text="d.tgl_sk"></td>
                                     <td class="px-4 py-3 font-mono" x-text="d.masa"></td>
+                                    <td class="px-4 py-3 text-right">
+                                        <button
+                                            type="button"
+                                            @click="deleteDisiplin(d.id, index)"
+                                            :disabled="isDeletingDisiplin"
+                                            class="inline-flex items-center gap-1 text-[10px] font-semibold text-danger hover:underline disabled:opacity-40 font-sans cursor-pointer transition-opacity"
+                                            title="Hapus hukuman disiplin ini"
+                                        >
+                                            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.021-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                            </svg>
+                                            Hapus
+                                        </button>
+                                    </td>
                                 </tr>
                             </template>
                             <tr x-show="disiplinList.length === 0">
-                                <td colspan="5" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
+                                <td colspan="6" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
                                     Pegawai ini tidak memiliki riwayat hukuman disiplin.
                                 </td>
                             </tr>
@@ -781,27 +1130,65 @@
                         Tambah Pendidikan
                     </button>
                 </div>
-                <div class="overflow-x-auto rounded-lg border border-border">
+                {{-- Loading skeleton --}}
+                <div x-show="pendidikanLoading" class="flex items-center justify-center py-10 text-xs text-muted font-sans gap-2">
+                    <svg class="w-4 h-4 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    Memuat riwayat pendidikan...
+                </div>
+
+                <div x-show="!pendidikanLoading" class="overflow-x-auto rounded-lg border border-border">
                     <table class="w-full">
                         <thead class="bg-soft border-b border-border">
                             <tr class="text-left text-xs font-semibold text-muted uppercase tracking-wide font-sans">
-                                <th class="px-4 py-3">Tingkat</th>
+                                <th class="px-4 py-3">Jenjang</th>
                                 <th class="px-4 py-3">Nama Institusi</th>
                                 <th class="px-4 py-3">Program Studi</th>
                                 <th class="px-4 py-3">Tahun Lulus</th>
                                 <th class="px-4 py-3">Nomor Ijazah</th>
+                                <th class="px-4 py-3 text-right">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border text-xs font-sans">
-                            <template x-for="p in pendidikanList" :key="p.no_ijazah">
+                            <template x-for="(edu, index) in pendidikanList" :key="edu.id ?? edu.no_ijazah">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
-                                    <td class="px-4 py-3 font-bold" x-text="p.tingkat"></td>
-                                    <td class="px-4 py-3" x-text="p.institusi"></td>
-                                    <td class="px-4 py-3" x-text="p.prodi"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="p.lulus"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="p.no_ijazah"></td>
+                                    <td class="px-4 py-3 font-bold" x-text="edu.tingkat ?? edu.jenjang?.nama ?? '-'"></td>
+                                    <td class="px-4 py-3" x-text="edu.institusi ?? edu.nama_institusi ?? '-'"></td>
+                                    <td class="px-4 py-3" x-text="edu.prodi ?? edu.jurusan ?? '-'"></td>
+                                    <td class="px-4 py-3 font-mono" x-text="edu.lulus ?? edu.tahun_lulus ?? '-'"></td>
+                                    <td class="px-4 py-3 font-mono" x-text="edu.no_ijazah ?? '-'"></td>
+                                    <td class="px-4 py-3 text-right">
+                                        <div class="inline-flex items-center gap-3">
+                                            <button
+                                                type="button"
+                                                @click="openEditPendidikan(edu)"
+                                                :disabled="isDeletingPendidikan"
+                                                class="text-[10px] font-semibold text-primary hover:underline disabled:opacity-40 font-sans cursor-pointer transition-opacity"
+                                                title="Edit riwayat pendidikan"
+                                            >Edit</button>
+                                            <button
+                                                type="button"
+                                                @click="deletePendidikan(edu.id, index)"
+                                                :disabled="isDeletingPendidikan"
+                                                class="inline-flex items-center gap-1 text-[10px] font-semibold text-danger hover:underline disabled:opacity-40 font-sans cursor-pointer transition-opacity"
+                                                title="Hapus riwayat pendidikan"
+                                            >
+                                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.021-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                                </svg>
+                                                Hapus
+                                            </button>
+                                        </div>
+                                    </td>
                                 </tr>
                             </template>
+                            <tr x-show="!pendidikanLoading && pendidikanList.length === 0">
+                                <td colspan="6" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
+                                    Pegawai ini belum memiliki riwayat pendidikan formal.
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -1169,6 +1556,86 @@
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK Terbit</label>
                                     <input type="date" x-model="newDisiplin.tanggal_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
+                                <div class="space-y-2">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
+                                        File SK
+                                        <span class="font-normal normal-case text-muted">(opsional)</span>
+                                    </label>
+
+                                    {{-- Tab toggle: Dari Arsip | Unggah Baru --}}
+                                    <div class="flex gap-0.5 rounded-lg border border-border bg-soft p-0.5 w-fit">
+                                        <button type="button"
+                                            @click="disiplinFileMode = 'arsip'; newDisiplin.file_sk = null; document.getElementById('file_sk_disiplin').value = ''"
+                                            :class="disiplinFileMode === 'arsip' ? 'bg-white shadow-sm text-ink' : 'text-muted hover:text-ink'"
+                                            class="rounded-md px-3 py-1 text-xs font-semibold font-sans transition-all cursor-pointer"
+                                        >Dari Arsip</button>
+                                        <button type="button"
+                                            @click="disiplinFileMode = 'baru'; newDisiplin.dokumen_id = ''; newDisiplin.no_sk = ''; newDisiplin.tanggal_sk = ''"
+                                            :class="disiplinFileMode === 'baru' ? 'bg-white shadow-sm text-ink' : 'text-muted hover:text-ink'"
+                                            class="rounded-md px-3 py-1 text-xs font-semibold font-sans transition-all cursor-pointer"
+                                        >Unggah Baru</button>
+                                    </div>
+
+                                    {{-- Panel: Dari Arsip --}}
+                                    <div x-show="disiplinFileMode === 'arsip'" class="space-y-1">
+                                        <div x-show="loadingArsip" class="text-xs text-muted font-sans py-1">Memuat daftar arsip...</div>
+                                        <template x-if="!loadingArsip">
+                                            <div class="space-y-1">
+                                                <select x-model="newDisiplin.dokumen_id"
+                                                    @change="
+                                                        const dok = arsipDokumen.find(d => d.id == $event.target.value);
+                                                        if (dok) {
+                                                            if (dok.nomor_dokumen) newDisiplin.no_sk = dok.nomor_dokumen;
+                                                            if (dok.tanggal) newDisiplin.tanggal_sk = dok.tanggal;
+                                                        }
+                                                    "
+                                                    class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                                    <option value="">-- Pilih dari Arsip Dokumen --</option>
+                                                    <template x-for="dok in arsipDokumen" :key="dok.id">
+                                                        <option :value="dok.id"
+                                                            x-text="dok.nama_dokumen + (dok.nomor_dokumen ? ' (' + dok.nomor_dokumen + ')' : '') + (dok.tanggal ? ' — ' + dok.tanggal : '')">
+                                                        </option>
+                                                    </template>
+                                                </select>
+                                                <p x-show="arsipDokumen.length === 0" class="text-[10px] text-muted italic font-sans">
+                                                    Belum ada arsip SK Hukuman Disiplin untuk pegawai ini.
+                                                    <a href="{{ route('dokumen') }}" target="_blank" class="text-primary underline">Unggah di halaman Arsip Dokumen</a>.
+                                                </p>
+                                            </div>
+                                        </template>
+                                    </div>
+
+                                    {{-- Panel: Unggah Baru --}}
+                                    <div x-show="disiplinFileMode === 'baru'" class="space-y-1">
+                                        <div class="flex items-center gap-2">
+                                            <label for="file_sk_disiplin" class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 font-sans">
+                                                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                                                </svg>
+                                                Pilih File
+                                            </label>
+                                            <input
+                                                type="file"
+                                                id="file_sk_disiplin"
+                                                class="hidden"
+                                                accept=".pdf,.jpg,.jpeg,.png"
+                                                @change="newDisiplin.file_sk = $event.target.files[0] || null"
+                                            >
+                                            <span
+                                                class="min-w-0 flex-1 truncate text-xs font-sans"
+                                                :class="newDisiplin.file_sk ? 'text-ink' : 'text-muted'"
+                                                x-text="newDisiplin.file_sk ? newDisiplin.file_sk.name : 'Belum ada file dipilih'"
+                                            ></span>
+                                            <button
+                                                x-show="newDisiplin.file_sk"
+                                                type="button"
+                                                @click="newDisiplin.file_sk = null; document.getElementById('file_sk_disiplin').value = ''"
+                                                class="shrink-0 text-xs text-danger hover:underline font-sans"
+                                            >Hapus</button>
+                                        </div>
+                                        <p class="text-[10px] text-muted italic font-sans">Format PDF/JPG/PNG, maks. 10 MB. File akan masuk ke Arsip Dokumen otomatis.</p>
+                                    </div>
+                                </div>
                                 <div class="grid grid-cols-2 gap-4">
                                     <div class="space-y-1">
                                         <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Mulai</label>
@@ -1187,34 +1654,31 @@
                         <template x-if="modalType === 'pendidikan'">
                             <div class="space-y-4">
                                 <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tingkat Pendidikan</label>
-                                    <select x-model="newPendidikan.tingkat" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                        <option value="SD">SD</option>
-                                        <option value="SMP">SMP</option>
-                                        <option value="SMA / SMK / Sederajat">SMA / SMK / Sederajat</option>
-                                        <option value="D1">D1</option>
-                                        <option value="D2">D2</option>
-                                        <option value="D3">D3</option>
-                                        <option value="D4 / S1">D4 / S1</option>
-                                        <option value="S2 / Profesi">S2 / Profesi</option>
-                                        <option value="S3">S3</option>
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenjang Pendidikan <span class="text-danger">*</span></label>
+                                    <select x-model="newPendidikan.jenjang_id" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                        <option value="">-- Pilih Jenjang --</option>
+                                        @foreach($jenjangOptions as $jenjang)
+                                            <option value="{{ $jenjang->id }}">{{ $jenjang->nama }}</option>
+                                        @endforeach
                                     </select>
                                 </div>
                                 <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Institusi</label>
-                                    <input type="text" x-model="newPendidikan.institusi" required placeholder="Universitas Sam Ratulangi" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Institusi <span class="text-danger">*</span></label>
+                                    <input type="text" x-model="newPendidikan.nama_institusi" required placeholder="Universitas Sam Ratulangi" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Program Studi</label>
-                                    <input type="text" x-model="newPendidikan.prodi" placeholder="Manajemen Keuangan" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <input type="text" x-model="newPendidikan.jurusan" placeholder="Manajemen Keuangan" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tahun Lulus</label>
-                                    <input type="number" x-model="newPendidikan.lulus" required placeholder="2007" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor Ijazah</label>
-                                    <input type="text" x-model="newPendidikan.no_ijazah" placeholder="IJZ-S1-MAN-2007" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div class="space-y-1">
+                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tahun Lulus <span class="text-danger">*</span></label>
+                                        <input type="number" x-model="newPendidikan.tahun_lulus" required placeholder="2007" min="1900" :max="new Date().getFullYear() + 1" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor Ijazah</label>
+                                        <input type="text" x-model="newPendidikan.no_ijazah" placeholder="IJZ-S1-MAN-2007" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    </div>
                                 </div>
                             </div>
                         </template>
@@ -1257,5 +1721,93 @@
             </div>
         </div>
 
+    {{-- ============================================================ --}}
+    {{-- MODAL EDIT RIWAYAT PENDIDIKAN                                --}}
+    {{-- ============================================================ --}}
+    <div
+        x-show="showEditPendidikan"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4"
+        style="display:none;"
+        @keydown.escape.window="showEditPendidikan = false"
+    >
+        <div
+            @click.outside="showEditPendidikan = false"
+            class="w-full max-w-lg rounded-2xl bg-surface shadow-xl border border-border overflow-hidden"
+        >
+            {{-- Header --}}
+            <div class="flex items-center justify-between px-6 py-4 border-b border-border">
+                <h3 class="text-sm font-bold text-ink font-sans">Edit Riwayat Pendidikan</h3>
+                <button type="button" @click="showEditPendidikan = false" class="text-muted hover:text-ink transition cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            {{-- Body --}}
+            <form @submit.prevent="submitEditPendidikan()" class="px-6 py-5 space-y-4">
+                {{-- Error --}}
+                <div x-show="editPendidikanError" class="rounded-lg bg-danger/10 border border-danger/20 px-3 py-2 text-xs text-danger font-sans" x-text="editPendidikanError"></div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenjang Pendidikan <span class="text-danger">*</span></label>
+                    <select x-model="editPendidikanForm.jenjang_id" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                        <option value="">-- Pilih Jenjang --</option>
+                        @foreach($jenjangOptions as $jenjang)
+                            <option value="{{ $jenjang->id }}">{{ $jenjang->nama }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Institusi <span class="text-danger">*</span></label>
+                    <input type="text" x-model="editPendidikanForm.nama_institusi" required placeholder="Universitas Sam Ratulangi" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Program Studi</label>
+                    <input type="text" x-model="editPendidikanForm.jurusan" placeholder="Manajemen Keuangan" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tahun Lulus <span class="text-danger">*</span></label>
+                        <input type="number" x-model="editPendidikanForm.tahun_lulus" required placeholder="2007" min="1900" :max="new Date().getFullYear() + 1" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor Ijazah</label>
+                        <input type="text" x-model="editPendidikanForm.no_ijazah" placeholder="IJZ-S1-2007" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                    </div>
+                </div>
+
+                {{-- Footer --}}
+                <div class="flex justify-end gap-3 pt-2 border-t border-border mt-4">
+                    <button type="button" @click="showEditPendidikan = false" :disabled="isUpdatingPendidikan"
+                        class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink hover:bg-soft transition font-sans cursor-pointer disabled:opacity-50">
+                        Batal
+                    </button>
+                    <button type="submit" :disabled="isUpdatingPendidikan"
+                        class="inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm font-sans cursor-pointer min-w-[120px] disabled:opacity-50">
+                        <span x-show="!isUpdatingPendidikan">Simpan Perubahan</span>
+                        <span x-show="isUpdatingPendidikan" class="flex items-center gap-2">
+                            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                            </svg>
+                            Menyimpan...
+                        </span>
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
+
+</div>{{-- /x-data utama --}}
+
 </x-layouts.app>

@@ -43,7 +43,7 @@ class EmployeeDeactivateRestoreTest extends TestCase
 
     public function test_admin_can_deactivate_employee_via_api_and_audit_is_written(): void
     {
-        $user = User::factory()->adminKepegawaian()->create();
+        $user = User::factory()->superAdmin()->create();
         $employee = Employee::factory()->create([
             'nama_lengkap' => 'Pegawai Nonaktif API',
             'status_aktif' => 'Aktif',
@@ -135,7 +135,7 @@ class EmployeeDeactivateRestoreTest extends TestCase
         $this->actingAs($user);
         $response = $this->postWithCsrf(route('pegawai.restore', $employee->id));
 
-        $response->assertRedirect(route('data-nonaktif'));
+        $response->assertRedirect(route('data-backup'));
         $this->assertDatabaseHas('employees', [
             'id' => $employee->id,
             'deleted_at' => null,

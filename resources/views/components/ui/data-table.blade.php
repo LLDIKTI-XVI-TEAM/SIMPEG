@@ -16,6 +16,7 @@
     'caption' => null,
     'colspanCount' => null,
     'checkAllId' => null,   // Jika diisi, kolom dengan key='check' akan menampilkan checkbox select-all
+    'checkAllAction' => null, // Alpine expression untuk @change pada checkbox select-all, mis. "toggleAll($event.target.checked)"
     'filterClass' => null,
 ])
 
@@ -55,6 +56,7 @@
                                         class="h-4 w-4 rounded border-border text-primary focus:ring-primary/20 cursor-pointer"
                                         title="Pilih semua"
                                         aria-label="Pilih semua baris"
+                                        @if($checkAllAction) @change="{{ $checkAllAction }}" @endif
                                     >
                                 @elseif (!empty($col['sortable']) && $setSort && $sort && $direction)
                                     <button

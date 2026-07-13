@@ -32,6 +32,7 @@ class StoreDisciplineRecordRequest extends FormRequest
             'no_sk' => ['required', 'string', 'max:100'],
             'tanggal_sk' => ['required', 'date'],
             'file_sk' => SkFilePathRules::nullableUploadOrControlledPath(),
+            'dokumen_id' => ['nullable', 'uuid', 'exists:documents,id'],
         ];
     }
 }

@@ -29,7 +29,7 @@ class UpdateEmployeeStatusAction
                 'status_pegawai_id' => $status->id,
             ]);
 
-            AuditService::log('UPDATE_STATUS', 'Employee', $employee->id, $oldValues, $employee->getAttributes(), $request);
+            AuditService::log('UPDATE', 'Employee', $employee->id, $oldValues, $employee->getAttributes(), $request);
 
             return $employee->fresh();
         });
