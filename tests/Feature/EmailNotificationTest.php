@@ -2,12 +2,18 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Cuti\ApproveLeaveAction;
+use App\Actions\Cuti\RejectLeaveAction;
 use App\Jobs\SendSimpegNotificationEmailJob;
 use App\Mail\SimpegNotificationMail;
 use App\Models\Employee;
+use App\Models\LeaveRequest;
+use App\Models\RefJenisCuti;
+use App\Models\SimpegNotification;
 use App\Models\User;
 use App\Services\NotificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -26,6 +32,46 @@ class EmailNotificationTest extends TestCase
             type: 'cuti.pengajuan_baru',
             title: 'Pengajuan Cuti Menunggu Persetujuan',
             body: 'Pegawai mengajukan cuti.',
+            data: ['url' => '/dashboard/cuti'],
+        );
+
+        Queue::assertPushed(SendSimpegNotificationEmailJob::class, 1);
+        Queue::assertPushed(
+            SendSimpegNotificationEmailJob::class,
+            fn (SendSimpegNotificationEmailJob $job): bool => $job->employeeId === $employee->id
+        );
+    }
+
+    public function test_cuti_revision_request_queues_email_to_primary_recipient(): void
+    {
+        Queue::fake();
+        $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+
+        app(NotificationService::class)->createForEmployee(
+            employee: $employee,
+            type: 'cuti.perlu_perubahan',
+            title: 'Pengajuan Cuti Perlu Perubahan',
+            body: 'Lengkapi data pengajuan cuti.',
+            data: ['url' => '/dashboard/cuti'],
+        );
+
+        Queue::assertPushed(SendSimpegNotificationEmailJob::class, 1);
+        Queue::assertPushed(
+            SendSimpegNotificationEmailJob::class,
+            fn (SendSimpegNotificationEmailJob $job): bool => $job->employeeId === $employee->id
+        );
+    }
+
+    public function test_cuti_rejection_queues_email_to_primary_recipient(): void
+    {
+        Queue::fake();
+        $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+
+        app(NotificationService::class)->createForEmployee(
+            employee: $employee,
+            type: 'cuti.tidak_disetujui',
+            title: 'Pengajuan Cuti Tidak Disetujui',
+            body: 'Pengajuan cuti tidak dapat disetujui.',
             data: ['url' => '/dashboard/cuti'],
         );
 
@@ -144,5 +190,107 @@ class EmailNotificationTest extends TestCase
 
         $this->assertStringContainsString(route('dashboard'), $html);
         $this->assertStringNotContainsString('https://example.net/phishing', $html);
+    }
+
+    public function test_cuti_rejection_notification_carries_internal_detail_url(): void
+    {
+        Queue::fake();
+        $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+        $approver = Employee::factory()->create();
+        $leave = $this->makeLeaveRequestWithSteps($employee, [$approver]);
+
+        app(RejectLeaveAction::class)->execute($leave, $approver, 'Dokumen pendukung tidak sesuai.', Request::create('/'));
+
+        $notification = SimpegNotification::query()
+            ->where('user_id', $employee->id)
+            ->where('type', 'cuti.tidak_disetujui')
+            ->firstOrFail();
+
+        // Pemohon harus diarahkan ke detail pengajuannya lewat path internal relatif, dengan referensi id tetap dibawa.
+        $this->assertSame($leave->id, $notification->data['leave_request_id']);
+        $this->assertSame("/dashboard/cuti/{$leave->id}", $notification->data['url']);
+    }
+
+    public function test_intermediate_approval_notifies_next_approver_with_internal_approval_url(): void
+    {
+        Queue::fake();
+        $employee = Employee::factory()->create();
+        $kepalaBagian = Employee::factory()->create(['email' => 'kabag@example.test']);
+        $pybmc = Employee::factory()->create(['email' => 'pybmc@example.test']);
+        $leave = $this->makeLeaveRequestWithSteps($employee, [$kepalaBagian, $pybmc]);
+
+        app(ApproveLeaveAction::class)->execute($leave, $kepalaBagian, null, Request::create('/'));
+
+        $notification = SimpegNotification::query()
+            ->where('user_id', $pybmc->id)
+            ->where('type', 'cuti.menunggu_persetujuan')
+            ->firstOrFail();
+
+        // Approver tahap berikutnya diarahkan ke antrean approval lewat path internal relatif tanpa parameter.
+        $this->assertSame($leave->id, $notification->data['leave_request_id']);
+        $this->assertSame('/cuti/approval', $notification->data['url']);
+    }
+
+    public function test_email_cta_renders_internal_leave_detail_url(): void
+    {
+        $detailPath = '/dashboard/cuti/0f9c6f7e-1d2b-4c3a-8e5f-123456789abc';
+
+        $html = (new SimpegNotificationMail('Pengajuan Cuti Disetujui', 'Pengajuan cuti Anda telah disetujui.', [
+            'url' => $detailPath,
+            'leave_request_id' => '0f9c6f7e-1d2b-4c3a-8e5f-123456789abc',
+        ]))->render();
+
+        // CTA email harus membuka halaman detail cuti internal, bukan fallback dashboard.
+        $this->assertStringContainsString(url($detailPath), $html);
+    }
+
+    /**
+     * Membuat pengajuan cuti beserta snapshot step aktif pertama untuk menguji wiring notifikasi.
+     * Fixture sengaja minimal (tanpa saldo/proof) karena fokus uji hanya pada payload url notifikasi.
+     *
+     * @param  list<Employee>  $approvers
+     */
+    private function makeLeaveRequestWithSteps(Employee $employee, array $approvers): LeaveRequest
+    {
+        $jenis = RefJenisCuti::create([
+            'nama' => 'Cuti Sakit',
+            'code' => 'cuti_sakit',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+
+        $leave = LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $jenis->id,
+            'tanggal_mulai' => '2026-07-06',
+            'tanggal_selesai' => '2026-07-08',
+            'jumlah_hari_kerja' => 3,
+            'alasan' => 'Keperluan keluarga.',
+            'status' => 'menunggu_approval',
+        ]);
+
+        $firstActiveAssigned = false;
+
+        foreach ($approvers as $index => $approver) {
+            $order = $index + 1;
+            $isFinal = $order === count($approvers);
+            $status = 'pending';
+
+            if (! $firstActiveAssigned) {
+                $status = 'active';
+                $firstActiveAssigned = true;
+            }
+
+            $leave->steps()->create([
+                'step_order' => $order,
+                'step_type' => $isFinal ? 'pybmc' : 'kepala_bagian',
+                'role_label' => $isFinal ? 'PYBMC' : 'Kepala Bagian',
+                'approver_employee_id' => $approver->id,
+                'status' => $status,
+                'is_final' => $isFinal,
+            ]);
+        }
+
+        return $leave;
     }
 }

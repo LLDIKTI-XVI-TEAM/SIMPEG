@@ -57,7 +57,8 @@ class PostponeLeaveAction
                 'cuti.ditunda',
                 'Pengajuan Cuti Ditangguhkan',
                 'Pengajuan cuti Anda ditangguhkan oleh approver. Silakan periksa catatan penangguhan.',
-                ['leave_request_id' => $leaveRequest->id],
+                // Pemohon diarahkan ke detail pengajuannya; path relatif internal agar link aman lintas host.
+                ['leave_request_id' => $leaveRequest->id, 'url' => route('cuti.show', ['id' => $leaveRequest->id], false)],
             );
         }
 

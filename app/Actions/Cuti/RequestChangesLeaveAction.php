@@ -48,7 +48,8 @@ class RequestChangesLeaveAction
                 'cuti.perlu_perubahan',
                 'Pengajuan Cuti Perlu Perubahan',
                 'Pengajuan cuti Anda perlu diperbaiki sebelum dapat diproses lanjut.',
-                ['leave_request_id' => $leaveRequest->id],
+                // Pemohon diarahkan ke detail pengajuannya untuk perbaikan; path relatif internal agar link aman lintas host.
+                ['leave_request_id' => $leaveRequest->id, 'url' => route('cuti.show', ['id' => $leaveRequest->id], false)],
             );
         }
 

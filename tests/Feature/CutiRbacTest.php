@@ -129,12 +129,16 @@ class CutiRbacTest extends TestCase
             ->firstOrFail();
 
         $this->assertSame([
+            'leave_request_id' => $cuti->id,
+            'employee_id' => $pemohon->id,
             'status' => 'menunggu_approval',
             'step_order' => 1,
             'step_label' => 'Verifikator',
             'approver_id' => $approver->id,
         ], $audit->old_values);
         $this->assertSame([
+            'leave_request_id' => $cuti->id,
+            'employee_id' => $pemohon->id,
             'status' => 'disetujui',
             'decision' => 'APPROVE',
             'step_order' => 1,
