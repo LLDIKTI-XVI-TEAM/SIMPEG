@@ -76,14 +76,14 @@
                     'data-master',
                     'hari-libur',
                     'ews.config',
-                    'data-nonaktif',
+                    'data-backup',
                 ],
                 'pimpinan' => [
                     'audit-log',
                     'pengaturan',
                     'user-management',
                     'rbac',
-                    'data-nonaktif',
+                    'data-backup',
                     'ews.config',
                 ],
                 'kepala_bagian' => [
@@ -95,7 +95,7 @@
                     'pengaturan',
                     'user-management',
                     'rbac',
-                    'data-nonaktif',
+                    'data-backup',
                     'data-master',
                     'laporan',
                     'laporan.pegawai',
@@ -113,7 +113,7 @@
                     'pengaturan',
                     'user-management',
                     'rbac',
-                    'data-nonaktif',
+                    'data-backup',
                     'data-master',
                     'laporan',
                     'laporan.pegawai',
@@ -125,7 +125,7 @@
                 'pegawai' => [
                     'data-pegawai',
                     'pegawai.import',
-                    'data-nonaktif',
+                    'data-backup',
                     'dokumen',
                     'cuti.rekap',
                     'ews',
@@ -156,7 +156,7 @@
                     'items' => array_filter([
                         ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users'],
                         in_array($activeRole, ['kepala_bagian', 'kepala_bagian']) ? ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'] : null,
-                        ['label' => 'Data Nonaktif', 'route' => 'data-nonaktif', 'icon' => 'user-minus'],
+                        ['label' => 'Data Backup', 'route' => 'data-backup', 'icon' => 'user-minus'],
                         ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open'],
                         ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up'],
                     ])

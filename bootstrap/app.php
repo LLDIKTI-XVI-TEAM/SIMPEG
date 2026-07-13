@@ -22,6 +22,13 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('app:run-ews')
             ->timezone('Asia/Makassar')
             ->dailyAt($schedulerTime);
+
+        // Purge permanen pegawai yang sudah ≥ 30 hari di trash — jalan setiap hari pukul 02:00
+        $schedule->command('employees:purge-deleted')
+            ->timezone('Asia/Makassar')
+            ->dailyAt('02:00')
+            ->withoutOverlapping()
+            ->appendOutputTo(storage_path('logs/purge-deleted-employees.log'));
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([

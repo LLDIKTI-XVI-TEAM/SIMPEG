@@ -213,6 +213,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.restore'])
         ->name('data-nonaktif');
 
+    Route::get('/pegawai/data-backup', [PegawaiController::class, 'backup'])
+        ->middleware(['role:super_admin'])
+        ->name('data-backup');
+
     Route::get('/cuti/rekap', [CutiController::class, 'rekap'])
         ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('cuti.rekap');
@@ -716,6 +720,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.restore'])
         ->name('pegawai.restore');
+    Route::post('/pegawai/bulk-restore', [PegawaiController::class, 'bulkRestore'])
+        ->middleware(['role:super_admin', 'permission:employees.restore'])
+        ->name('pegawai.bulkRestore');
     Route::post('/pegawai/{id}/riwayat', [PegawaiController::class, 'storeRiwayat'])
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
@@ -829,6 +836,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::post('/dashboard/dokumen/upload', [DokumenController::class, 'store'])
         ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('dokumen.store');
+    Route::post('/dashboard/dokumen/{id}', [DokumenController::class, 'update'])
+        ->middleware(['role:super_admin,admin_kepegawaian'])
+        ->name('dokumen.update')
+        ->whereUuid('id');
     Route::get('/dashboard/dokumen/{id}', [DokumenController::class, 'show'])
         ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('dokumen.show')
@@ -836,6 +847,14 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/dashboard/dokumen/{id}/download', [DokumenController::class, 'download'])
         ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('dokumen.download')
+        ->whereUuid('id');
+    Route::delete('/dashboard/dokumen/{id}', [DokumenController::class, 'destroy'])
+        ->middleware(['role:super_admin'])
+        ->name('dokumen.destroy')
+        ->whereUuid('id');
+    Route::get('/dashboard/dokumen/{id}/check-impact', [DokumenController::class, 'checkImpact'])
+        ->middleware(['role:super_admin'])
+        ->name('dokumen.check-impact')
         ->whereUuid('id');
 
     Route::get('/dashboard/dokumen/legacy', function () {
