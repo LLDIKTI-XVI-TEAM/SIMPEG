@@ -212,15 +212,17 @@
                         });
                         this.newPangkat = { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '' };
                     } else if (this.modalType === 'keluarga') {
+                        const f = result.family;
                         this.keluargaList.unshift({
-                            nama_anggota: this.newKeluarga.nama_anggota,
-                            hubungan: this.newKeluarga.hubungan,
-                            nik: this.newKeluarga.nik,
-                            tempat_lahir: this.newKeluarga.tempat_lahir,
-                            tanggal_lahir: this.newKeluarga.tanggal_lahir,
-                            jenis_kelamin: this.newKeluarga.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan',
-                            pekerjaan: this.newKeluarga.pekerjaan,
-                            status: this.newKeluarga.status_tunjangan === '1' || this.newKeluarga.status_tunjangan === 1 || this.newKeluarga.status_tunjangan === 'true' || this.newKeluarga.status_tunjangan === true ? 'Ditanggung' : 'Tidak Ditanggung'
+                            id: f.id,
+                            nama_anggota: f.nama_anggota,
+                            hubungan: f.hubungan,
+                            nik: f.nik,
+                            tempat_lahir: f.tempat_lahir,
+                            tanggal_lahir: f.tanggal_lahir ? f.tanggal_lahir.split('-').reverse().join('-') : '-',
+                            jenis_kelamin: f.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan',
+                            pekerjaan: f.pekerjaan,
+                            status: f.status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'
                         });
                         this.newKeluarga = { nama_anggota: '', hubungan: 'Istri', nik: '', tempat_lahir: '', tanggal_lahir: '', jenis_kelamin: 'P', status_tunjangan: '0', pekerjaan: '' };
                     } else if (this.modalType === 'pendidikan') {
@@ -240,7 +242,12 @@
                     setTimeout(() => this.toast.show = false, 3000);
                 } else {
                     const errorData = await response.json();
-                    this.modalError = true;
+                    if (errorData.errors) {
+                        const msgs = Object.values(errorData.errors).flat();
+                        this.modalError = msgs.join(' ');
+                    } else {
+                        this.modalError = errorData.message || 'Terdapat kesalahan. Silakan coba lagi.';
+                    }
                 }
             } catch (error) {
                 this.toast = { show: true, message: 'Terjadi kesalahan jaringan', type: 'error' };
@@ -938,7 +945,18 @@
 
                     {{-- Modal Error --}}
                     <template x-if="modalError">
-                        <x-ui.alert variant="danger" title="Terdapat Kesalahan Pengisian Form" class="mb-4" />
+                        <div class="mb-4 rounded-lg bg-red-50 p-4 border border-red-200">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
+                                    </svg>
+                                </div>
+                                <div class="ml-3">
+                                    <h3 class="text-sm font-medium text-red-800" x-text="modalError"></h3>
+                                </div>
+                            </div>
+                        </div>
                     </template>
 
                     <form @submit.prevent="submitForm()" class="space-y-4">
@@ -967,14 +985,13 @@
                                         name="nik"
                                         label="NIK" 
                                         type="text"
-                                        placeholder="16 digit NIK"
+                                        placeholder="16 digit NIK (opsional)"
                                         minlength="16"
                                         maxlength="16" 
                                         pattern="[0-9]{16}"
                                         title="NIK harus berupa 16 digit angka"
                                         x-model="newKeluarga.nik" 
                                         x-on:input="newKeluarga.nik = newKeluarga.nik.replace(/[^0-9]/g, '')"
-                                        required
                                     />
                                 </div>
 

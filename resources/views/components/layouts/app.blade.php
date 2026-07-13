@@ -368,11 +368,12 @@
                     @click="sidebarOpen = !sidebarOpen"
                     id="sidebar-toggle"
                     class="inline-flex items-center justify-center rounded-lg border border-border p-2 text-muted transition-colors hover:bg-soft hover:text-ink lg:hidden"
-                    aria-label="Toggle sidebar"
+                    aria-label="Buka atau tutup menu navigasi"
                 >
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
                 </button>
 
+                @if (in_array($activeRole, ['super_admin', 'admin_kepegawaian'], true))
                 {{-- Search Bar --}}
                 <div class="relative w-full hidden sm:block" x-data="globalSearch()">
                     <input
@@ -417,6 +418,7 @@
                         </div>
                     </div>
                 </div>
+                @endif
             </div>
 
             {{-- Right: notif bell + profile dropdown --}}

@@ -5,6 +5,7 @@ namespace App\Http\Requests\Cuti;
 use App\Models\Employee;
 use App\Models\RefJenisCuti;
 use App\Services\Cuti\ApprovalChainResolver;
+use App\Services\Cuti\LeaveBalanceService;
 use App\Services\WorkdayCalculator;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -143,10 +144,8 @@ class StoreLeaveRequestRequest extends FormRequest
 
         $hariKerja = app(WorkdayCalculator::class)->calculate($mulai, $selesai);
 
-        // Saldo dibebankan ke tahun tanggal mulai; rentang sudah dipastikan tidak melintasi tahun di atas.
-        $sisaSaldo = (int) ($employee->leaveBalances()
-            ->where('tahun', $mulai->year)
-            ->value('sisa') ?? 0);
+        // Saldo dibebankan ke tahun tanggal mulai; service saldo membaca bucket ledger summary N-2/N-1/tahun berjalan.
+        $sisaSaldo = app(LeaveBalanceService::class)->availableFor($employee, $mulai->year, $mulai);
 
         // Pengecekan saldo di sini bersifat indikatif dan tidak mengunci baris saldo. Pemotongan saldo final
         // beserta pengecekan terhadap akumulasi pengajuan yang masih menunggu harus dilakukan pada tahap
