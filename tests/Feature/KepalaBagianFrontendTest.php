@@ -189,7 +189,7 @@ class KepalaBagianFrontendTest extends TestCase
             'employee_id' => $applicant->id,
             'jenis_cuti_id' => RefJenisCuti::create([
                 'nama' => 'Cuti Sakit '.fake()->unique()->word(),
-                'code' => 'cuti-sakit-kabag-'.fake()->unique()->slug(),
+                'code' => 'cuti-sakit-kabag-'.fake()->unique()->numerify('############'),
                 'mengurangi_saldo_tahunan' => false,
                 'khusus_pns' => false,
             ])->id,
