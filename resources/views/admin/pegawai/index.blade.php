@@ -13,6 +13,17 @@
     newJabatan: { jabatan_id: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', kelas_jabatan: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '', file_sk: null },
     newKgb: { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '', file_sk: null },
 
+    // ===== State Modal Change Status =====
+    showStatusModal: false,
+    statusPegawaiId: null,
+    statusNewValue: null,
+    isChangingStatus: false,
+
+    // ===== State Modal Deactivate =====
+    showDeactivateModal: false,
+    deactivatePegawaiId: null,
+    isDeactivating: false,
+
     // ===== State Modal Delete =====
     showDeleteModal: false,
     deletePegawaiId: null,
@@ -123,16 +134,24 @@
         this.fetchPage(1);
     },
 
-    async changeStatus(id, newStatus) {
+    promptChangeStatus(id, newStatus) {
+        this.statusPegawaiId = id;
+        this.statusNewValue = newStatus;
+        this.showStatusModal = true;
+    },
+
+    async confirmChangeStatus() {
+        if (!this.statusPegawaiId || !this.statusNewValue) return;
+        this.isChangingStatus = true;
         try {
-            const res = await fetch(`/api/v1/pegawai/${id}/status`, {
+            const res = await fetch(`/api/v1/pegawai/${this.statusPegawaiId}/status`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '{{ csrf_token() }}'
                 },
-                body: JSON.stringify({ status: newStatus })
+                body: JSON.stringify({ status: this.statusNewValue })
             });
             if (!res.ok) {
                 const data = await res.json();
@@ -140,9 +159,44 @@
             }
             this.clearCache();
             this.fetchPage(this.meta.current_page);
+            this.showStatusModal = false;
         } catch (error) {
             console.error('Error changing status:', error);
             alert('Gagal mengubah status: ' + error.message);
+        } finally {
+            this.isChangingStatus = false;
+        }
+    },
+
+    deactivatePegawai(id) {
+        this.deactivatePegawaiId = id;
+        this.showDeactivateModal = true;
+    },
+
+    async confirmDeactivatePegawai() {
+        if (!this.deactivatePegawaiId) return;
+        this.isDeactivating = true;
+        try {
+            const res = await fetch(`/api/v1/pegawai/${this.deactivatePegawaiId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '{{ csrf_token() }}'
+                }
+            });
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.message || `HTTP ${res.status}`);
+            }
+            this.clearCache();
+            this.fetchPage(this.meta.current_page);
+            this.showDeactivateModal = false;
+        } catch (error) {
+            console.error('Error deactivating pegawai:', error);
+            alert('Gagal menonaktifkan pegawai: ' + error.message);
+        } finally {
+            this.isDeactivating = false;
+            this.deactivatePegawaiId = null;
         }
     },
 
@@ -494,6 +548,7 @@
                                     </svg>
                                 </a>
                             </x-ui.tooltip>
+                            @if(auth()->user()->role === 'super_admin')
                             {{-- Ubah Status --}}
                             <div class="relative" x-data="{ openStatusDropdown: false }" @click.away="openStatusDropdown = false">
                                 <x-ui.tooltip text="Ubah Status" position="top-end">
@@ -507,18 +562,30 @@
                                 <div x-show="openStatusDropdown" style="display: none;" x-transition.opacity.duration.200ms
                                      :class="index >= Math.max(0, pegawaiRows.length - 2) ? 'bottom-full mb-1' : 'top-full mt-1'"
                                      class="absolute right-0 z-50 w-36 rounded-lg border border-border bg-surface p-1 shadow-lg">
-                                    <button type="button" @click="changeStatus(p.id, 'Aktif'); openStatusDropdown = false"
+                                    <button type="button" @click="promptChangeStatus(p.id, 'Aktif'); openStatusDropdown = false"
                                             class="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-sm text-success hover:bg-soft transition text-left">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                         Aktif
                                     </button>
-                                    <button type="button" @click="changeStatus(p.id, 'Non-Aktif'); openStatusDropdown = false"
+                                    <button type="button" @click="promptChangeStatus(p.id, 'Non-Aktif'); openStatusDropdown = false"
                                             class="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-sm text-warning hover:bg-soft transition text-left">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
                                         Non Aktif
                                     </button>
                                 </div>
                             </div>
+                            @endif
+                            @if(auth()->user()->role === 'super_admin')
+                            {{-- Nonaktifkan --}}
+                            <x-ui.tooltip text="Nonaktifkan Pegawai" position="top-end">
+                                <button type="button" @click="deactivatePegawai(p.id)"
+                                        class="flex h-8 w-8 items-center justify-center rounded-lg border border-warning/30 bg-surface text-warning transition hover:bg-warning/10 shadow-sm">
+                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
+                                    </svg>
+                                </button>
+                            </x-ui.tooltip>
+                            @endif
                             @if(auth()->user()->role === 'super_admin')
                             {{-- Hapus (Super Admin Only) --}}
                             <x-ui.tooltip text="Hapus Pegawai" position="top-end">
@@ -567,6 +634,64 @@
             Batal Pilih
         </button>
     </div>
+
+    {{-- ============================================================ --}}
+    {{-- MODAL UBAH STATUS PEGAWAI --}}
+    {{-- ============================================================ --}}
+    <x-ui.modal
+        show="showStatusModal"
+        title="Ubah Status Pegawai"
+        closeAction="showStatusModal = false"
+        maxWidth="sm"
+    >
+        <div class="space-y-4">
+            <p class="text-sm text-ink font-sans">
+                Apakah Anda yakin ingin mengubah status pegawai ini menjadi <strong x-text="statusNewValue" class="text-primary"></strong>?
+            </p>
+            <div class="flex justify-end gap-3 pt-2 border-t border-border">
+                <button type="button" @click="showStatusModal = false" :disabled="isChangingStatus"
+                    class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft cursor-pointer font-sans disabled:opacity-50">
+                    Batal
+                </button>
+                <button type="button" @click="confirmChangeStatus()" :disabled="isChangingStatus"
+                    class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 cursor-pointer font-sans disabled:opacity-50">
+                    <svg x-show="isChangingStatus" class="mr-2 h-4 w-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Simpan
+                </button>
+            </div>
+        </div>
+    </x-ui.modal>
+
+    {{-- ============================================================ --}}
+    {{-- MODAL NONAKTIFKAN PEGAWAI --}}
+    {{-- ============================================================ --}}
+    <x-ui.modal
+        show="showDeactivateModal"
+        title="Nonaktifkan Pegawai"
+        closeAction="showDeactivateModal = false"
+        maxWidth="sm"
+    >
+        <div class="space-y-4">
+            <p class="text-sm text-ink font-sans">Tindakan ini akan mengubah status pegawai menjadi Nonaktif (Soft Delete). Pegawai akan disembunyikan dari daftar aktif dan dipindahkan ke daftar pegawai non-aktif.</p>
+            <div class="flex justify-end gap-3 pt-2 border-t border-border">
+                <button type="button" @click="showDeactivateModal = false" :disabled="isDeactivating"
+                    class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft cursor-pointer font-sans disabled:opacity-50">
+                    Batal
+                </button>
+                <button type="button" @click="confirmDeactivatePegawai()" :disabled="isDeactivating"
+                    class="inline-flex items-center justify-center rounded-lg bg-warning px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 cursor-pointer font-sans disabled:opacity-50">
+                    <svg x-show="isDeactivating" class="mr-2 h-4 w-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Nonaktifkan
+                </button>
+            </div>
+        </div>
+    </x-ui.modal>
 
     {{-- ============================================================ --}}
     {{-- MODAL HAPUS PEGAWAI --}}
