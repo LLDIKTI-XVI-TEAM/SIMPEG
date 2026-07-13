@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\EwsConfigController;
 use App\Http\Controllers\Admin\EwsController;
 use App\Http\Controllers\Admin\GlobalSearchController;
 use App\Http\Controllers\Admin\HariLiburController;
+use App\Http\Controllers\Admin\KepalaLembagaSupportingDocumentController;
 use App\Http\Controllers\Admin\LeaveBalanceController;
 use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\PegawaiController;
@@ -213,6 +214,25 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/cuti/laporan/excel', [CutiReportController::class, 'excel'])
         ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('cuti.laporan.excel');
+
+    Route::middleware(['role:super_admin,admin_kepegawaian', 'permission:cuti.kepala_lembaga_documents.manage'])
+        ->prefix('cuti/dokumen-kepala-lembaga')
+        ->name('cuti.dokumen-kepala-lembaga.')
+        ->group(function (): void {
+            Route::get('/', [KepalaLembagaSupportingDocumentController::class, 'index'])->name('index');
+            Route::post('/{employee}', [KepalaLembagaSupportingDocumentController::class, 'store'])
+                ->whereUuid('employee')
+                ->name('store');
+            Route::get('/{document}/view', [KepalaLembagaSupportingDocumentController::class, 'view'])
+                ->whereUuid('document')
+                ->name('view');
+            Route::get('/{document}/download', [KepalaLembagaSupportingDocumentController::class, 'download'])
+                ->whereUuid('document')
+                ->name('download');
+            Route::delete('/{document}', [KepalaLembagaSupportingDocumentController::class, 'destroy'])
+                ->whereUuid('document')
+                ->name('destroy');
+        });
 
     Route::get('/konfigurasi', [EwsConfigController::class, 'index'])
         ->middleware(['role:super_admin'])
