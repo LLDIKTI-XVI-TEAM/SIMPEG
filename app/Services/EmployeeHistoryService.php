@@ -222,12 +222,12 @@ class EmployeeHistoryService
 
             if ($record->file_sk) {
                 $employee->documents()->create([
-                    'jenis_dokumen'   => 'sk_hukuman_disiplin',
-                    'nama_dokumen'    => 'SK Hukuman Disiplin '.$record->jenis_hukuman,
-                    'nomor_dokumen'   => $record->no_sk,
+                    'jenis_dokumen' => 'sk_hukuman_disiplin',
+                    'nama_dokumen' => 'SK Hukuman Disiplin '.$record->jenis_hukuman,
+                    'nomor_dokumen' => $record->no_sk,
                     'tanggal_dokumen' => $record->tanggal_sk,
-                    'file_path'       => $record->file_sk,
-                    'keterangan'      => 'Unggah otomatis dari riwayat hukuman disiplin.',
+                    'file_path' => $record->file_sk,
+                    'keterangan' => 'Unggah otomatis dari riwayat hukuman disiplin.',
                 ]);
             }
 

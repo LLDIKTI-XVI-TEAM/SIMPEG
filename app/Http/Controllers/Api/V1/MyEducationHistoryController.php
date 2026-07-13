@@ -32,7 +32,7 @@ class MyEducationHistoryController extends Controller
 
         return response()->json([
             'employee_id' => $employee->id,
-            'histories'   => $action->execute($employee),
+            'histories' => $action->execute($employee),
         ]);
     }
 

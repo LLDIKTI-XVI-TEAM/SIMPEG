@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -23,7 +24,7 @@ return new class extends Migration
         Schema::table('education_histories', function (Blueprint $table): void {
             // Isi kolom yang NULL dengan string kosong sebelum menghapus nullable,
             // agar rollback tidak gagal karena data yang sudah ada.
-            \Illuminate\Support\Facades\DB::statement(
+            DB::statement(
                 "UPDATE education_histories SET no_ijazah = '' WHERE no_ijazah IS NULL"
             );
             $table->string('no_ijazah', 100)->nullable(false)->change();

@@ -39,7 +39,7 @@ class DokumenController extends Controller
     public function update(string $id, UpdateDocumentRequest $request, UpdateDocumentAction $action)
     {
         $document = Document::findOrFail($id);
-        
+
         $document = $action->execute($document, $request->validated(), $request->file('berkas'));
 
         return redirect()->route('dokumen')

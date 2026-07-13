@@ -26,6 +26,7 @@ use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
+use App\Models\RefJenjangPendidikan;
 use App\Models\RefStatusPegawai;
 use App\Models\RefStatusPerkawinan;
 use App\Models\RefUnitKerja;
@@ -267,7 +268,7 @@ class PegawaiController extends Controller
         $jenisJabatanOptions = RefJenisJabatan::all();
         $unitKerjaOptions = RefUnitKerja::all();
         $eselonOptions = RefEselon::all();
-        $jenjangOptions = \App\Models\RefJenjangPendidikan::orderBy('urutan')->get();
+        $jenjangOptions = RefJenjangPendidikan::orderBy('urutan')->get();
 
         return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions'));
     }

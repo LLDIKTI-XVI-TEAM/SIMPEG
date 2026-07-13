@@ -18,7 +18,7 @@ class UpdateDocumentAction
         return DB::transaction(function () use ($document, $payload, $file): Document {
             $oldFilePath = $document->file_path;
             $oldNomorSk = $document->nomor_dokumen;
-            
+
             $filePath = $oldFilePath;
 
             if ($file) {
@@ -30,7 +30,7 @@ class UpdateDocumentAction
                 $category = $payload['kategori_dokumen'];
                 $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension());
                 $filename = $document->employee_id.'_'.$category.'_'.now()->format('YmdHis').'.'.$extension;
-                
+
                 // Simpan file baru
                 $filePath = $file->storeAs($document->employee_id.'/'.$category, $filename, Document::STORAGE_DISK);
             }
@@ -47,7 +47,7 @@ class UpdateDocumentAction
             // Jika nomor SK atau file berubah, kita juga perlu mengupdate riwayat yang terhubung
             // (yang awalnya memiliki nomor SK / file yang sama dengan dokumen ini)
             $newNomorSk = $document->nomor_dokumen;
-            
+
             if (($oldNomorSk && $oldNomorSk !== $newNomorSk) || $oldFilePath !== $filePath) {
                 // Update Kenaikan Pangkat
                 RankHistory::where('employee_id', $document->employee_id)

@@ -24,17 +24,17 @@ class EmployeeDocumentController extends Controller
 
         $documents = $query->get(['id', 'nama_dokumen', 'nomor_dokumen', 'tanggal_dokumen', 'file_path', 'jenis_dokumen'])
             ->map(fn ($doc) => [
-                'id'             => $doc->id,
-                'nama_dokumen'   => $doc->nama_dokumen,
-                'nomor_dokumen'  => $doc->nomor_dokumen,
-                'tanggal'        => $doc->tanggal_dokumen?->format('d-m-Y'),
-                'file_path'      => $doc->file_path,
-                'jenis_dokumen'  => $doc->jenis_dokumen,
+                'id' => $doc->id,
+                'nama_dokumen' => $doc->nama_dokumen,
+                'nomor_dokumen' => $doc->nomor_dokumen,
+                'tanggal' => $doc->tanggal_dokumen?->format('d-m-Y'),
+                'file_path' => $doc->file_path,
+                'jenis_dokumen' => $doc->jenis_dokumen,
             ]);
 
         return response()->json([
             'employee_id' => $employee->id,
-            'documents'   => $documents,
+            'documents' => $documents,
         ]);
     }
 }

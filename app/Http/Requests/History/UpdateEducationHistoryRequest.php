@@ -21,11 +21,11 @@ class UpdateEducationHistoryRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'jenjang_id'     => ['required', 'uuid', 'exists:ref_jenjang_pendidikan,id'],
+            'jenjang_id' => ['required', 'uuid', 'exists:ref_jenjang_pendidikan,id'],
             'nama_institusi' => ['required', 'string', 'max:255'],
-            'jurusan'        => ['nullable', 'string', 'max:255'],
-            'tahun_lulus'    => ['required', 'integer', 'min:1900', 'max:' . (date('Y') + 1)],
-            'no_ijazah'      => ['nullable', 'string', 'max:100'],
+            'jurusan' => ['nullable', 'string', 'max:255'],
+            'tahun_lulus' => ['required', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
+            'no_ijazah' => ['nullable', 'string', 'max:100'],
         ];
     }
 }

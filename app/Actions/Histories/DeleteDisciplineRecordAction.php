@@ -29,8 +29,8 @@ class DeleteDisciplineRecordAction
         $this->abortIfRecordOutsideEmployee($employee, $record);
 
         $oldValues = $this->payload->response($record);
-        $recordId  = $record->id;
-        $filePath  = $record->file_sk;
+        $recordId = $record->id;
+        $filePath = $record->file_sk;
 
         DB::transaction(function () use ($employee, $record, $filePath): void {
             // Hapus entry dokumen yang dibuat otomatis (keterangan "Unggah otomatis...")
