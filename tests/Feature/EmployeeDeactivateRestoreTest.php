@@ -135,7 +135,7 @@ class EmployeeDeactivateRestoreTest extends TestCase
         $this->actingAs($user);
         $response = $this->postWithCsrf(route('pegawai.restore', $employee->id));
 
-        $response->assertRedirect(route('data-nonaktif'));
+        $response->assertRedirect(route('data-backup'));
         $this->assertDatabaseHas('employees', [
             'id' => $employee->id,
             'deleted_at' => null,

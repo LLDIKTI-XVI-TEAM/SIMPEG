@@ -19,14 +19,11 @@
     statusNewValue: null,
     isChangingStatus: false,
 
-    // ===== State Modal Deactivate =====
-    showDeactivateModal: false,
-    deactivatePegawaiId: null,
-    isDeactivating: false,
-
-    // ===== State Modal Delete =====
+    // ===== State Modal Delete / Backup =====
     showDeleteModal: false,
     deletePegawaiId: null,
+    deletePegawaiName: '',
+    isDeleting: false,
 
     // ===== State Tabel Pegawai =====
     pegawaiRows: @js($initialRows),
@@ -168,47 +165,18 @@
         }
     },
 
-    deactivatePegawai(id) {
-        this.deactivatePegawaiId = id;
-        this.showDeactivateModal = true;
-    },
-
-    async confirmDeactivatePegawai() {
-        if (!this.deactivatePegawaiId) return;
-        this.isDeactivating = true;
-        try {
-            const res = await fetch(`/api/v1/pegawai/${this.deactivatePegawaiId}`, {
-                method: 'DELETE',
-                headers: {
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '{{ csrf_token() }}'
-                }
-            });
-            if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data.message || `HTTP ${res.status}`);
-            }
-            this.clearCache();
-            this.fetchPage(this.meta.current_page);
-            this.showDeactivateModal = false;
-        } catch (error) {
-            console.error('Error deactivating pegawai:', error);
-            alert('Gagal menonaktifkan pegawai: ' + error.message);
-        } finally {
-            this.isDeactivating = false;
-            this.deactivatePegawaiId = null;
-        }
-    },
-
-    deletePegawai(id) {
+    deletePegawai(id, name) {
         this.deletePegawaiId = id;
+        this.deletePegawaiName = name || '';
         this.showDeleteModal = true;
     },
 
     async confirmDeletePegawai() {
         if (!this.deletePegawaiId) return;
+        this.isDeleting = true;
         try {
-            const res = await fetch(`/api/v1/pegawai/${this.deletePegawaiId}/force`, {
+            // Soft delete — data masuk backup 30 hari, bisa dipulihkan
+            const res = await fetch(`/api/v1/pegawai/${this.deletePegawaiId}`, {
                 method: 'DELETE',
                 headers: {
                     'Accept': 'application/json',
@@ -221,12 +189,14 @@
             }
             this.clearCache();
             this.fetchPage(this.meta.current_page);
+            this.showDeleteModal = false;
         } catch (error) {
-            console.error('Error deleting pegawai:', error);
+            console.error('Error menghapus pegawai:', error);
             alert('Gagal menghapus pegawai: ' + error.message);
         } finally {
-            this.showDeleteModal = false;
+            this.isDeleting = false;
             this.deletePegawaiId = null;
+            this.deletePegawaiName = '';
         }
     },
 
@@ -338,12 +308,12 @@
                 </svg>
                 Export Excel
             </button>
-            <a href="{{ route('data-nonaktif') }}" id="nonaktif-list-btn"
-                class="inline-flex items-center justify-center rounded-lg border border-danger/15 bg-surface px-4 py-2 text-sm font-semibold text-danger transition hover:bg-danger/5 shadow-sm cursor-pointer">
-                <svg class="w-4 h-4 mr-1.5 text-danger shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M22 10.5h-6m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM4 19.235A10.19 10.19 0 0 1 12.75 15c2.015 0 3.907.585 5.5 1.59m-14.25 2.645A9.903 9.903 0 0 1 12.75 18a9.903 9.903 0 0 1 6.002 2.235" />
+            <a href="{{ route('data-backup') }}" id="nonaktif-list-btn"
+                class="inline-flex items-center justify-center rounded-lg border border-warning/20 bg-surface px-4 py-2 text-sm font-semibold text-warning transition hover:bg-warning/5 shadow-sm cursor-pointer">
+                <svg class="w-4 h-4 mr-1.5 text-warning shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m6 4.125l2.25 2.25m0 0l2.25 2.25M12 13.875l2.25-2.25M12 13.875l-2.25-2.25M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
                 </svg>
-                Pegawai Nonaktif
+                Data Backup
             </a>
             <div class="relative" x-data="{ open: false }">
                 <button @click="open = !open" @click.outside="open = false" id="add-pegawai-btn"
@@ -576,9 +546,9 @@
                             </div>
                             @endif
                             @if(auth()->user()->role === 'super_admin')
-                            {{-- Hapus (Super Admin Only) --}}
-                            <x-ui.tooltip text="Hapus Pegawai" position="top-end">
-                                <button type="button" @click="deletePegawai(p.id)"
+                            {{-- Hapus → masuk Backup (Super Admin Only) --}}
+                            <x-ui.tooltip text="Hapus ke Backup" position="top-end">
+                                <button type="button" @click="deletePegawai(p.id, p.nama_lengkap)"
                                         class="flex h-8 w-8 items-center justify-center rounded-lg border border-danger/30 bg-surface text-danger transition hover:bg-danger/10 shadow-sm">
                                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
@@ -610,13 +580,13 @@
         <button @click="
             const count = document.querySelectorAll('.row-check:checked').length;
             if (count === 0) { window.alert('Tidak ada data pegawai yang dipilih.'); return; }
-            document.getElementById('modal-title-bulk-delete').innerText = 'Nonaktifkan ' + count + ' Pegawai Terpilih';
+            document.getElementById('modal-title-bulk-delete').innerText = 'Hapus ' + count + ' Pegawai ke Backup';
             $dispatch('open-confirm-bulk-delete');
         " class="inline-flex items-center gap-1.5 text-xs font-semibold text-danger hover:underline transition-colors cursor-pointer">
             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M22 10.5h-6m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM4 19.235A10.19 10.19 0 0 1 12.75 15c2.015 0 3.907.585 5.5 1.59m-14.25 2.645A9.903 9.903 0 0 1 12.75 18a9.903 9.903 0 0 1 6.002 2.235" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
             </svg>
-            Nonaktifkan Pilihan
+            Hapus ke Backup
         </button>
         <button onclick="document.querySelectorAll(\'.row-check\').forEach(c => c.checked = false); updateBulkBar();"
             class="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:underline transition-colors cursor-pointer">
@@ -655,59 +625,113 @@
     </x-ui.modal>
 
     {{-- ============================================================ --}}
-    {{-- MODAL NONAKTIFKAN PEGAWAI --}}
+    {{-- MODAL HAPUS PEGAWAI → BACKUP (Super Admin Only) --}}
     {{-- ============================================================ --}}
     <x-ui.modal
-        show="showDeactivateModal"
-        title="Nonaktifkan Pegawai"
-        closeAction="showDeactivateModal = false"
+        show="showDeleteModal"
+        title="Hapus Pegawai ke Backup"
+        closeAction="showDeleteModal = false"
         maxWidth="sm"
     >
         <div class="space-y-4">
-            <p class="text-sm text-ink font-sans">Tindakan ini akan mengubah status pegawai menjadi Nonaktif (Soft Delete). Pegawai akan disembunyikan dari daftar aktif dan dipindahkan ke daftar pegawai non-aktif.</p>
+            {{-- Info backup --}}
+            <div class="flex items-start gap-3 rounded-lg bg-warning/10 border border-warning/20 p-3">
+                <svg class="w-5 h-5 mt-0.5 shrink-0 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
+                </svg>
+                <div>
+                    <p class="text-sm font-semibold text-ink font-sans">
+                        Data akan dipindahkan ke Backup
+                    </p>
+                    <p class="text-xs text-muted font-sans mt-1">
+                        Pegawai <strong x-text="deletePegawaiName" class="text-ink"></strong> akan dihapus dari daftar aktif
+                        dan disimpan di <strong>Data Backup</strong> selama <strong>30 hari</strong>.
+                        Dalam masa tersebut data masih bisa dipulihkan.
+                        Setelah 30 hari, data beserta semua riwayat dan file akan <span class="text-danger font-semibold">dihapus permanen otomatis</span>.
+                    </p>
+                </div>
+            </div>
             <div class="flex justify-end gap-3 pt-2 border-t border-border">
-                <button type="button" @click="showDeactivateModal = false" :disabled="isDeactivating"
+                <button type="button" @click="showDeleteModal = false" :disabled="isDeleting"
                     class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft cursor-pointer font-sans disabled:opacity-50">
                     Batal
                 </button>
-                <button type="button" @click="confirmDeactivatePegawai()" :disabled="isDeactivating"
-                    class="inline-flex items-center justify-center rounded-lg bg-warning px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 cursor-pointer font-sans disabled:opacity-50">
-                    <svg x-show="isDeactivating" class="mr-2 h-4 w-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <button type="button" @click="confirmDeletePegawai()" :disabled="isDeleting"
+                    class="inline-flex items-center justify-center rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 cursor-pointer font-sans disabled:opacity-50">
+                    <svg x-show="isDeleting" class="mr-2 h-4 w-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    Nonaktifkan
+                    <svg x-show="!isDeleting" class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                    </svg>
+                    <span x-text="isDeleting ? 'Memproses...' : 'Ya, Hapus ke Backup'"></span>
                 </button>
             </div>
         </div>
     </x-ui.modal>
 
     {{-- ============================================================ --}}
-    {{-- MODAL HAPUS PEGAWAI --}}
+    {{-- MODAL BULK HAPUS KE BACKUP (Super Admin Only) --}}
     {{-- ============================================================ --}}
-    <x-ui.modal
-        show="showDeleteModal"
-        title="Hapus Data Pegawai"
-        closeAction="showDeleteModal = false"
-        maxWidth="sm"
-    >
-        <div class="space-y-4">
-            <p class="text-sm text-ink font-sans">Tindakan ini akan menghapus data pegawai secara permanen dari sistem dan tidak dapat dibatalkan.</p>
-            <div class="flex justify-end gap-3 pt-2 border-t border-border">
-                <button type="button" @click="showDeleteModal = false"
-                    class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft cursor-pointer font-sans">
-                    Batal
-                </button>
-                <button type="button" @click="confirmDeletePegawai()"
-                    class="inline-flex items-center justify-center rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 cursor-pointer font-sans">
-                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+    <div x-data="{ open: false, isBulkDeleting: false }"
+        @open-confirm-bulk-delete.window="open = true">
+        <x-ui.modal
+            show="open"
+            title=""
+            closeAction="open = false"
+            maxWidth="sm"
+        >
+            <div class="space-y-4">
+                <p id="modal-title-bulk-delete" class="text-sm font-bold text-ink font-sans">Hapus Pegawai ke Backup</p>
+                <div class="flex items-start gap-3 rounded-lg bg-warning/10 border border-warning/20 p-3">
+                    <svg class="w-5 h-5 mt-0.5 shrink-0 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
                     </svg>
-                    Hapus Permanen
-                </button>
+                    <p class="text-xs text-muted font-sans">
+                        Pegawai terpilih akan dipindahkan ke <strong class="text-ink">Data Backup</strong> selama <strong class="text-ink">30 hari</strong>.
+                        Dalam masa tersebut data masih bisa dipulihkan.
+                        Setelah 30 hari, data beserta semua riwayat dan file akan
+                        <span class="text-danger font-semibold">dihapus permanen otomatis</span>.
+                    </p>
+                </div>
+
+                <form id="bulk-destroy-form" method="POST" action="{{ route('pegawai.bulkDestroy') }}">
+                    @csrf
+                </form>
+
+                <div class="flex justify-end gap-3 pt-2 border-t border-border">
+                    <button type="button" @click="open = false" :disabled="isBulkDeleting"
+                        class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft cursor-pointer font-sans disabled:opacity-50">
+                        Batal
+                    </button>
+                    <button type="button" :disabled="isBulkDeleting"
+                        @click="
+                            isBulkDeleting = true;
+                            const form = document.getElementById('bulk-destroy-form');
+                            form.querySelectorAll('input[name=\'ids[]\']').forEach(el => el.remove());
+                            document.querySelectorAll('.row-check:checked').forEach(cb => {
+                                const inp = document.createElement('input');
+                                inp.type = 'hidden'; inp.name = 'ids[]';
+                                inp.value = cb.closest('tr')?.dataset.id ?? cb.value;
+                                form.appendChild(inp);
+                            });
+                            form.submit();
+                        "
+                        class="inline-flex items-center justify-center rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 cursor-pointer font-sans disabled:opacity-50">
+                        <svg x-show="isBulkDeleting" class="mr-2 h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        <svg x-show="!isBulkDeleting" class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                        </svg>
+                        <span x-text="isBulkDeleting ? 'Memproses...' : 'Ya, Hapus ke Backup'"></span>
+                    </button>
+                </div>
             </div>
-        </div>
-    </x-ui.modal>
+        </x-ui.modal>
+    </div>
 
     {{-- ============================================================ --}}
     {{-- MODAL TAMBAH RIWAYAT (Pangkat / Jabatan / KGB) --}}

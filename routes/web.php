@@ -194,6 +194,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.restore'])
         ->name('data-nonaktif');
 
+    Route::get('/pegawai/data-backup', [PegawaiController::class, 'backup'])
+        ->middleware(['role:super_admin'])
+        ->name('data-backup');
+
     Route::get('/cuti/rekap', [CutiController::class, 'rekap'])
         ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('cuti.rekap');
@@ -697,6 +701,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.restore'])
         ->name('pegawai.restore');
+    Route::post('/pegawai/bulk-restore', [PegawaiController::class, 'bulkRestore'])
+        ->middleware(['role:super_admin', 'permission:employees.restore'])
+        ->name('pegawai.bulkRestore');
     Route::post('/pegawai/{id}/riwayat', [PegawaiController::class, 'storeRiwayat'])
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
