@@ -19,6 +19,11 @@ use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\UserMappingController;
 use App\Http\Controllers\Auth\KeycloakAuthController;
 use App\Http\Controllers\Cuti\VerifyLeaveProofController;
+use App\Http\Controllers\KepalaBagianDashboardController;
+use App\Http\Controllers\KepalaBagianEmployeeController;
+use App\Http\Controllers\KepalaBagianEwsController;
+use App\Http\Controllers\KepalaBagianLeaveController;
+use App\Http\Controllers\KepalaBagianLeaveDecisionController;
 use App\Http\Controllers\PimpinanDashboardController;
 use App\Http\Controllers\PimpinanEmployeeController;
 use App\Http\Controllers\PimpinanEwsController;
@@ -110,6 +115,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
 
         if ($role === 'pimpinan') {
             return redirect()->route('pimpinan.dashboard');
+        }
+
+        if ($role === 'kepala_bagian') {
+            return redirect()->route('kepala-bagian.dashboard');
         }
 
         $isPegawai = $role === 'pegawai';
@@ -954,24 +963,28 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
             Route::get('/laporan/kepangkatan/pdf', [PimpinanReportController::class, 'exportRankHistoriesPdf'])->name('laporan.kepangkatan.pdf');
         });
 
-    // UI DUMMY ROUTES FOR KEPALA BAGIAN
-    Route::get('/kepala-bagian/bawahan', function () {
-        return view('kabag.bawahan.index');
-    })->name('kepala-bagian.bawahan.index');
+    Route::middleware(['role:kepala_bagian'])
+        ->prefix('kepala-bagian')
+        ->name('kepala-bagian.')
+        ->group(function (): void {
+            Route::get('/dashboard', [KepalaBagianDashboardController::class, 'index'])->name('dashboard');
 
-    Route::get('/kepala-bagian/bawahan/{id}', function ($id) {
-        return view('kabag.bawahan.show', compact('id'));
-    })->name('kepala-bagian.bawahan.show');
+            Route::get('/bawahan', [KepalaBagianEmployeeController::class, 'index'])->name('bawahan.index');
+            Route::get('/bawahan/{employee}', [KepalaBagianEmployeeController::class, 'show'])
+                ->whereUuid('employee')
+                ->name('bawahan.show');
 
-    Route::get('/kepala-bagian/cuti', function () {
-        return view('kabag.cuti.index');
-    })->name('kepala-bagian.cuti.index');
+            Route::get('/cuti', [KepalaBagianLeaveController::class, 'index'])->name('cuti.index');
+            Route::get('/cuti/{leave}', [KepalaBagianLeaveController::class, 'show'])
+                ->whereUuid('leave')
+                ->name('cuti.show');
+            Route::post('/cuti/{leave}/keputusan', [KepalaBagianLeaveDecisionController::class, 'store'])
+                ->whereUuid('leave')
+                ->name('cuti.decision');
+            Route::get('/cuti/{leave}/lampiran', [KepalaBagianLeaveController::class, 'downloadAttachment'])
+                ->whereUuid('leave')
+                ->name('cuti.attachment.download');
 
-    Route::get('/kepala-bagian/cuti/{id}', function ($id) {
-        return view('kabag.cuti.show', compact('id'));
-    })->name('kepala-bagian.cuti.show');
-
-    Route::get('/kepala-bagian/ews', function () {
-        return view('kabag.ews.index');
-    })->name('kepala-bagian.ews.index');
+            Route::get('/ews', [KepalaBagianEwsController::class, 'index'])->name('ews.index');
+        });
 });

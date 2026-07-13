@@ -21,7 +21,7 @@
 </head>
 <body class="h-full bg-page font-sans">
 
-<div class="flex h-screen overflow-hidden" x-data="{ sidebarOpen: false }">
+<div class="flex h-screen overflow-hidden" x-data="{ sidebarOpen: false }" @keydown.escape.window="sidebarOpen = false">
 
     {{-- ================================================================== --}}
     {{-- MOBILE OVERLAY --}}
@@ -229,6 +229,36 @@
                 ];
             }
 
+            if ($activeRole === 'kepala_bagian') {
+                $menuGroups = [
+                    [
+                        'group' => '',
+                        'items' => [
+                            ['label' => 'Dashboard', 'route' => 'kepala-bagian.dashboard', 'icon' => 'squares-2x2'],
+                        ],
+                    ],
+                    [
+                        'group' => 'Kepegawaian',
+                        'items' => [
+                            ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'],
+                        ],
+                    ],
+                    [
+                        'group' => 'Cuti',
+                        'items' => [
+                            ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'calendar'],
+                        ],
+                    ],
+                    [
+                        'group' => 'EWS & Notifikasi',
+                        'items' => [
+                            ['label' => 'EWS Bawahan', 'route' => 'kepala-bagian.ews.index', 'icon' => 'exclamation-triangle'],
+                            ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
+                        ],
+                    ],
+                ];
+            }
+
             $allMenuRoutes = [];
             foreach ($menuGroups as $g) {
                 foreach ($g['items'] as $item) {
@@ -368,7 +398,9 @@
                     @click="sidebarOpen = !sidebarOpen"
                     id="sidebar-toggle"
                     class="inline-flex items-center justify-center rounded-lg border border-border p-2 text-muted transition-colors hover:bg-soft hover:text-ink lg:hidden"
-                    aria-label="Buka atau tutup menu navigasi"
+                    :aria-expanded="sidebarOpen.toString()"
+                    :aria-label="sidebarOpen ? 'Tutup menu navigasi' : 'Buka menu navigasi'"
+                    aria-controls="sidebar-nav"
                 >
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
                 </button>

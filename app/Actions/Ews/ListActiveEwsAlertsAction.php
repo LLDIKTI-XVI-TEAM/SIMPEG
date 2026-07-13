@@ -36,13 +36,23 @@ class ListActiveEwsAlertsAction
      *
      * @return array{alerts: array<int, array<string, mixed>>, type_labels: array<string, string>, followup_status_labels: array<string, string>}
      */
-    public function execute(?string $filterEvent, ?string $filterStatus = null, ?string $employeeId = null): array
-    {
+    public function execute(
+        ?string $filterEvent,
+        ?string $filterStatus = null,
+        ?string $employeeId = null,
+        ?array $employeeIds = null,
+    ): array {
         $query = EwsAlert::query()
             ->with(['employee.disciplineRecords', 'handledBy']);
 
         if ($employeeId !== null && $employeeId !== '') {
             $query->where('employee_id', $employeeId);
+        }
+
+        if ($employeeIds !== null) {
+            $employeeIds === []
+                ? $query->whereRaw('1 = 0')
+                : $query->whereIn('employee_id', $employeeIds);
         }
 
         $status = $this->statusFromFilter($filterStatus);
@@ -70,6 +80,17 @@ class ListActiveEwsAlertsAction
             'type_labels' => $this->typeLabels,
             'followup_status_labels' => $this->followupStatusLabels,
         ];
+    }
+
+    /**
+     * Mengambil alert aktif untuk daftar pegawai yang sudah dibatasi oleh scope pemanggil.
+     *
+     * @param  list<string>  $employeeIds
+     * @return array{alerts: array<int, array<string, mixed>>, type_labels: array<string, string>, followup_status_labels: array<string, string>}
+     */
+    public function executeForEmployees(array $employeeIds, ?string $filterEvent, ?string $filterStatus = null): array
+    {
+        return $this->execute($filterEvent, $filterStatus, null, $employeeIds);
     }
 
     private function typeFromLabel(?string $label): ?string
