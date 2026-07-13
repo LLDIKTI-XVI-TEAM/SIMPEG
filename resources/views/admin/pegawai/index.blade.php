@@ -576,17 +576,6 @@
                             </div>
                             @endif
                             @if(auth()->user()->role === 'super_admin')
-                            {{-- Nonaktifkan --}}
-                            <x-ui.tooltip text="Nonaktifkan Pegawai" position="top-end">
-                                <button type="button" @click="deactivatePegawai(p.id)"
-                                        class="flex h-8 w-8 items-center justify-center rounded-lg border border-warning/30 bg-surface text-warning transition hover:bg-warning/10 shadow-sm">
-                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
-                                    </svg>
-                                </button>
-                            </x-ui.tooltip>
-                            @endif
-                            @if(auth()->user()->role === 'super_admin')
                             {{-- Hapus (Super Admin Only) --}}
                             <x-ui.tooltip text="Hapus Pegawai" position="top-end">
                                 <button type="button" @click="deletePegawai(p.id)"
