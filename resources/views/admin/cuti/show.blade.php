@@ -12,9 +12,9 @@
                 default => 'warning',
             };
             $statusLabel = match ($status) {
-                'menunggu_approval' => 'Menunggu Approval',
+                'menunggu_approval' => 'Menunggu Keputusan',
                 'ditangguhkan' => 'Ditangguhkan',
-                'perlu_perubahan' => 'Perlu Perubahan',
+                'perlu_perubahan' => 'Perubahan',
                 'disetujui' => 'Disetujui',
                 'tidak_disetujui' => 'Tidak Disetujui',
                 default => $status,
@@ -164,7 +164,7 @@
                                     $actionLabel = match ($approval->action) {
                                         'APPROVE' => 'Setuju',
                                         'POSTPONE' => 'Tunda',
-                                        'REQUEST_CHANGES' => 'Perlu Perubahan',
+                                        'REQUEST_CHANGES' => 'Perubahan',
                                         'REJECT' => 'Tidak Disetujui',
                                         'SKIP' => 'Dilewati',
                                         default => $approval->action,
@@ -276,7 +276,7 @@
                             Tunda
                         </button>
                         <button type="button" class="{{ $buttonStyles['danger'] }}" @click="decisionForm = 'requestChanges'">
-                            Perlu Perubahan
+                            Perubahan
                         </button>
                         <button type="button" class="{{ $buttonStyles['danger'] }}" @click="decisionForm = 'reject'">
                             Tidak Setujui

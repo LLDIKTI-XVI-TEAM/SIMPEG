@@ -10,10 +10,10 @@
         ];
 
         $statusLabel = [
-            'menunggu'  => 'Menunggu',
+            'menunggu'  => 'Menunggu Keputusan',
             'disetujui' => 'Disetujui',
             'ditunda'   => 'Ditangguhkan',
-            'perlu_perubahan' => 'Perlu Perubahan',
+            'perlu_perubahan' => 'Perubahan',
             'tidak_disetujui' => 'Tidak Disetujui',
         ];
     @endphp
@@ -98,10 +98,10 @@
             <div class="relative">
                 <select id="filter-status" name="status" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Status</option>
-                    <option value="menunggu" @selected($status === 'menunggu' || $status === 'pending')>Menunggu</option>
+                    <option value="menunggu" @selected($status === 'menunggu' || $status === 'pending')>Menunggu Keputusan</option>
                     <option value="disetujui" @selected($status === 'disetujui')>Disetujui</option>
                     <option value="ditunda" @selected($status === 'ditunda' || $status === 'ditangguhkan')>Ditangguhkan</option>
-                    <option value="perlu_perubahan" @selected($status === 'perlu_perubahan')>Perlu Perubahan</option>
+                    <option value="perlu_perubahan" @selected($status === 'perlu_perubahan')>Perubahan</option>
                     <option value="tidak_disetujui" @selected($status === 'tidak_disetujui')>Tidak Disetujui</option>
                 </select>
             </div>

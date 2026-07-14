@@ -102,9 +102,9 @@
                                         dot
                                     >
                                         {{ match ($r->status) {
-                                            'menunggu_approval' => 'Menunggu Approval',
+                                            'menunggu_approval' => 'Menunggu Keputusan',
                                             'ditangguhkan' => 'Ditangguhkan',
-                                            'perlu_perubahan' => 'Perlu Perubahan',
+                                            'perlu_perubahan' => 'Perubahan',
                                             'disetujui' => 'Disetujui',
                                             'tidak_disetujui' => 'Tidak Disetujui',
                                             default => $r->status,

@@ -50,11 +50,22 @@ class ListKepalaBagianEmployeesAction
                 });
             })
             ->when(($filters['status'] ?? '') === 'aktif', fn ($query) => $query
-                ->whereHas('statusPegawai', fn ($statuses) => $statuses->where('nama', 'Aktif')))
+                ->whereHas('statusPegawai', fn ($statuses) => $statuses->where('nama', 'Aktif'))
+                ->whereDoesntHave('leaveRequests', fn ($leaves) => $leaves
+                    ->where('status', 'disetujui')
+                    ->whereDate('tanggal_mulai', '<=', $today)
+                    ->whereDate('tanggal_selesai', '>=', $today)
+                ))
             ->when(($filters['status'] ?? '') === 'cuti', fn ($query) => $query->whereHas('leaveRequests', fn ($leaves) => $leaves
                 ->where('status', 'disetujui')
                 ->whereDate('tanggal_mulai', '<=', $today)
                 ->whereDate('tanggal_selesai', '>=', $today)))
+            ->when($filters['golongan'] ?? null, fn ($query, $val) => $query
+                ->where('golongan_terakhir', 'LIKE', $val.'/%'))
+            ->when($filters['unit_kerja_id'] ?? null, fn ($query, $val) => $query
+                ->whereHas('positionHistories', fn ($ph) => $ph->where('is_latest', true)->where('unit_kerja_id', $val)))
+            ->when($filters['jenis_pegawai_id'] ?? null, fn ($query, $val) => $query
+                ->where('jenis_pegawai_id', $val))
             ->orderBy('nama_lengkap')
             ->paginate(in_array($perPage, [10, 25, 50], true) ? $perPage : 10)
             ->withQueryString();

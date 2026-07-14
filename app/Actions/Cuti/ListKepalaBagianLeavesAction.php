@@ -18,10 +18,7 @@ class ListKepalaBagianLeavesAction
         return LeaveRequest::query()
             ->with(['employee:id,nama_lengkap,nip', 'jenisCuti:id,nama'])
             ->whereIn('employee_id', $reportIds)
-            ->whereIn('status', ['menunggu_approval', 'ditangguhkan'])
-            ->whereHas('steps', fn ($steps) => $steps
-                ->where('status', 'active')
-                ->where('approver_employee_id', $user->employee_id))
+            ->when($filters['status'] ?? null, fn ($query, string $status) => $query->where('status', $status))
             ->when($filters['search'] ?? null, function ($query, string $search): void {
                 $keyword = '%'.mb_strtolower(trim($search)).'%';
                 $query->whereHas('employee', fn ($employees) => $employees

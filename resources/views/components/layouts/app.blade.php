@@ -19,7 +19,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('head')
 </head>
-<body class="h-full bg-page font-sans">
+<body class="h-full bg-page font-sans overflow-hidden">
 
 <div class="flex h-screen overflow-hidden" x-data="{ sidebarOpen: false }" @keydown.escape.window="sidebarOpen = false">
 
@@ -104,24 +104,7 @@
                     'ews',
                     'ews.config',
                 ],
-                'kepala_bagian' => [
-                    'data-pegawai',
-                    'pegawai.import',
-                    'hari-libur',
-                    'dokumen',
-                    'audit-log',
-                    'pengaturan',
-                    'user-management',
-                    'rbac',
-                    'data-backup',
-                    'data-master',
-                    'laporan',
-                    'laporan.pegawai',
-                    'laporan.cuti',
-                    'cuti.rekap',
-                    'ews',
-                    'ews.config',
-                ],
+
                 'pegawai' => [
                     'data-pegawai',
                     'pegawai.import',
@@ -387,7 +370,7 @@
     {{-- ================================================================== --}}
     {{-- MAIN COLUMN — scrolls independently --}}
     {{-- ================================================================== --}}
-    <div class="flex flex-1 flex-col min-w-0 overflow-hidden">
+    <div class="flex flex-1 flex-col min-w-0 min-h-0 overflow-hidden">
 
         {{-- NAVBAR --}}
         <header class="sticky top-0 z-40 flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface/80 backdrop-blur-md px-4 lg:px-6">
@@ -405,7 +388,7 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
                 </button>
 
-                @if (in_array($activeRole, ['super_admin', 'admin_kepegawaian'], true))
+                @if (in_array($activeRole, ['super_admin', 'admin_kepegawaian', 'kepala_bagian'], true))
                 {{-- Search Bar --}}
                 <div class="relative w-full hidden sm:block" x-data="globalSearch()">
                     <input
@@ -539,7 +522,7 @@
 
 
         {{-- PAGE CONTENT --}}
-        <main class="flex-1 overflow-y-auto bg-page scrollbar-hide">
+        <main class="flex-1 overflow-y-auto bg-page scrollbar-hide min-h-0">
             <div class="mx-auto max-w-7xl px-4 py-6 lg:px-6">
                 @php($sessionTimeoutMessage = session()->pull('simpeg_session_timeout_message'))
                 @if ($sessionTimeoutMessage)

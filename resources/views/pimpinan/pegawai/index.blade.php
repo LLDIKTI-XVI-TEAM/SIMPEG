@@ -148,7 +148,7 @@
                                     <x-ui.tooltip text="Buka detail {{ $emp['nama_lengkap'] }}" position="right">
                                         <a
                                             href="{{ route('pimpinan.pegawai.show', $emp['id']) }}"
-                                            class="block truncate text-sm font-semibold text-ink transition hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 rounded"
+                                            class="block truncate text-sm font-semibold text-ink transition hover:text-primary focus:outline-none rounded"
                                         >
                                             {{ $emp['nama_lengkap'] }}
                                         </a>

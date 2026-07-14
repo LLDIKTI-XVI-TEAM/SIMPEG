@@ -6,6 +6,8 @@ use App\Actions\Employees\ListKepalaBagianEmployeesAction;
 use App\Actions\Employees\ShowKepalaBagianEmployeeAction;
 use App\Http\Requests\Employee\KepalaBagianEmployeeFilterRequest;
 use App\Models\Employee;
+use App\Models\RefJenisPegawai;
+use App\Models\RefUnitKerja;
 use Illuminate\Http\Request;
 
 class KepalaBagianEmployeeController extends Controller
@@ -17,6 +19,8 @@ class KepalaBagianEmployeeController extends Controller
         return view('kabag.bawahan.index', [
             'employees' => $action->execute($request->user(), $request->validated()),
             'filters' => $request->validated(),
+            'unitKerjas' => RefUnitKerja::orderBy('nama')->get(),
+            'jenisPegawais' => RefJenisPegawai::orderBy('nama')->get(),
         ]);
     }
 

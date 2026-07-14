@@ -56,7 +56,7 @@
                                 $remaining = $alert['sisa_hari'] < 0 ? 'Lewat '.abs($alert['sisa_hari']).' hari' : $alert['sisa_hari'].' hari';
                             @endphp
                             <tr class="transition-colors hover:bg-soft/60">
-                                <th scope="row" class="px-4 py-3.5 text-left text-sm text-ink"><a href="{{ route('pimpinan.pegawai.show', $alert['pegawai_id']) }}" class="font-semibold text-ink transition hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/30">{{ $alert['nama'] }}</a><p class="font-mono text-xs text-muted">{{ $alert['nip'] }}</p></th>
+                                <th scope="row" class="px-4 py-3.5 text-left text-sm text-ink"><a href="{{ route('pimpinan.pegawai.show', $alert['pegawai_id']) }}" class="font-semibold text-ink transition hover:text-primary focus:outline-none rounded">{{ $alert['nama'] }}</a><p class="font-mono text-xs text-muted">{{ $alert['nip'] }}</p></th>
                                 <td class="px-4 py-3.5 text-sm text-ink">{{ $alert['jenis_event'] }}<p class="mt-1 text-xs text-muted">{{ $alert['threshold_label'] }}</p></td>
                                 <td class="px-4 py-3.5 text-sm text-ink">{{ \Carbon\Carbon::parse($alert['tanggal_target'])->translatedFormat('d M Y') }}</td>
                                 <td class="px-4 py-3.5"><x-ui.badge :variant="$alert['urgency']" size="sm" dot>{{ $remaining }}</x-ui.badge></td>

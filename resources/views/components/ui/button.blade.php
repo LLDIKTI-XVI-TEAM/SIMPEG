@@ -16,7 +16,7 @@
     };
 
     $variants = [
-        'primary' => 'border border-transparent bg-gradient-to-r from-primary to-[#1A3EBC] text-white shadow-md shadow-primary/20 hover:opacity-90 hover:shadow-lg focus:ring-primary/30',
+        'primary' => 'border border-transparent bg-primary text-white shadow-sm hover:opacity-90 focus:ring-primary/30',
         'secondary' => 'border border-border bg-surface text-primary shadow-sm hover:bg-soft hover:border-primary/30 focus:ring-primary/30',
         'muted' => 'border border-border bg-surface text-ink shadow-sm hover:bg-soft focus:ring-primary/20',
         'danger' => 'border border-danger/20 bg-surface text-danger shadow-sm hover:bg-danger/5 focus:ring-danger/20',
@@ -50,27 +50,41 @@
 @endphp
 
 @if ($title)
-<x-ui.tooltip text="{{ $title }}" position="{{ $tooltipPosition }}">
-@endif
-
-@if ($tag === 'a')
-    <a
-        @if ($href) href="{{ $href }}" @endif
-        @if ($isDisabled) aria-disabled="true" tabindex="-1" @endif
-        {{ $attributes->except('title')->class($classes) }}
-    >
-        {{ $slot }}
-    </a>
+    <x-ui.tooltip text="{{ $title }}" position="{{ $tooltipPosition }}">
+        @if ($tag === 'a')
+            <a
+                @if ($href) href="{{ $href }}" @endif
+                @if ($isDisabled) aria-disabled="true" tabindex="-1" @endif
+                {{ $attributes->except('title')->class($classes) }}
+            >
+                {{ $slot }}
+            </a>
+        @else
+            <button
+                type="{{ $type }}"
+                @disabled($isDisabled)
+                {{ $attributes->except('title')->class($classes) }}
+            >
+                {{ $slot }}
+            </button>
+        @endif
+    </x-ui.tooltip>
 @else
-    <button
-        type="{{ $type }}"
-        @disabled($isDisabled)
-        {{ $attributes->except('title')->class($classes) }}
-    >
-        {{ $slot }}
-    </button>
-@endif
-
-@if ($title)
-</x-ui.tooltip>
+    @if ($tag === 'a')
+        <a
+            @if ($href) href="{{ $href }}" @endif
+            @if ($isDisabled) aria-disabled="true" tabindex="-1" @endif
+            {{ $attributes->except('title')->class($classes) }}
+        >
+            {{ $slot }}
+        </a>
+    @else
+        <button
+            type="{{ $type }}"
+            @disabled($isDisabled)
+            {{ $attributes->except('title')->class($classes) }}
+        >
+            {{ $slot }}
+        </button>
+    @endif
 @endif
