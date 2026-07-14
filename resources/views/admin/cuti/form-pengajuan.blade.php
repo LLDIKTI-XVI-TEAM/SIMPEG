@@ -127,6 +127,31 @@
                             @enderror
                         </div>
 
+                        <div>
+                            <label for="alamat_selama_cuti" class="block text-sm font-medium text-ink mb-1">Alamat Selama Cuti <span class="text-danger">*</span></label>
+                            <textarea id="alamat_selama_cuti" name="alamat_selama_cuti" rows="2" maxlength="1000" required autocomplete="street-address" aria-describedby="{{ $errors->has('alamat_selama_cuti') ? 'alamat_selama_cuti-help alamat_selama_cuti-error' : 'alamat_selama_cuti-help' }}"
+                                @if ($errors->has('alamat_selama_cuti')) aria-invalid="true" @endif
+                                class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                                {{ $formLocked ? 'disabled' : '' }}>{{ old('alamat_selama_cuti') }}</textarea>
+                            <p id="alamat_selama_cuti-help" class="mt-1 text-xs text-muted">Digunakan pada formulir Cuti resmi dan untuk menghubungi Anda selama cuti.</p>
+                            @error('alamat_selama_cuti')
+                                <p id="alamat_selama_cuti-error" class="mt-1 text-xs text-danger" role="alert">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div>
+                            <label for="nomor_telepon" class="block text-sm font-medium text-ink mb-1">Nomor Telepon <span class="text-danger">*</span></label>
+                            <input id="nomor_telepon" name="nomor_telepon" type="tel" inputmode="tel" maxlength="20" required autocomplete="tel" aria-describedby="{{ $errors->has('nomor_telepon') ? 'nomor_telepon-help nomor_telepon-error' : 'nomor_telepon-help' }}"
+                                @if ($errors->has('nomor_telepon')) aria-invalid="true" @endif
+                                value="{{ old('nomor_telepon') }}"
+                                class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                                {{ $formLocked ? 'disabled' : '' }}>
+                            <p id="nomor_telepon-help" class="mt-1 text-xs text-muted">Digunakan pada formulir Cuti resmi dan untuk menghubungi Anda selama cuti.</p>
+                            @error('nomor_telepon')
+                                <p id="nomor_telepon-error" class="mt-1 text-xs text-danger" role="alert">{{ $message }}</p>
+                            @enderror
+                        </div>
+
                         <!-- Lampiran -->
                         <div>
                             <label for="lampiran" class="block text-sm font-medium text-ink mb-1">File Lampiran <span class="text-muted font-normal">(Opsional)</span></label>

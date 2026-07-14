@@ -15,6 +15,8 @@ use Illuminate\Support\Carbon;
  * @property string $status
  * @property int $jumlah_hari_kerja
  * @property string $alasan
+ * @property string|null $alamat_selama_cuti
+ * @property string|null $nomor_telepon
  * @property Carbon $tanggal_mulai
  * @property Carbon $tanggal_selesai
  * @property Carbon|null $created_at
@@ -33,6 +35,8 @@ class LeaveRequest extends Model
         'tanggal_selesai',
         'jumlah_hari_kerja',
         'alasan',
+        'alamat_selama_cuti',
+        'nomor_telepon',
         'lampiran_path',
         'status',
     ];

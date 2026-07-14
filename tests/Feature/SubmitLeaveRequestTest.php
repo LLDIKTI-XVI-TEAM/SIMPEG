@@ -129,6 +129,8 @@ class SubmitLeaveRequestTest extends TestCase
             'tanggal_mulai' => '2026-07-06',
             'tanggal_selesai' => '2026-07-10',
             'alasan' => 'Keperluan keluarga.',
+            'alamat_selama_cuti' => 'Jl. Sam Ratulangi No. 1, Manado',
+            'nomor_telepon' => '+62 (431) 123-456',
         ], $override);
     }
 
@@ -588,6 +590,8 @@ class SubmitLeaveRequestTest extends TestCase
             'tanggal_mulai' => '2026-07-13',
             'tanggal_selesai' => '2026-07-15',
             'alasan' => 'Revisi tanggal sesuai arahan approver.',
+            'alamat_selama_cuti' => 'Jl. Sam Ratulangi No. 2, Manado',
+            'nomor_telepon' => '+62 (431) 123-457',
         ]);
 
         $response->assertRedirect(route('cuti.show', $leave));
@@ -665,6 +669,8 @@ class SubmitLeaveRequestTest extends TestCase
         $this->assertMatchesRegularExpression('/<input\\b(?=[^>]*\\bid="tanggal_mulai")(?=[^>]*\\bname="tanggal_mulai")[^>]*\\bdisabled\\b[^>]*>/', $content);
         $this->assertMatchesRegularExpression('/<input\\b(?=[^>]*\\bid="tanggal_selesai")(?=[^>]*\\bname="tanggal_selesai")[^>]*\\bdisabled\\b[^>]*>/', $content);
         $this->assertMatchesRegularExpression('/<textarea\\b(?=[^>]*\\bid="alasan")(?=[^>]*\\bname="alasan")[^>]*\\bdisabled\\b[^>]*>/', $content);
+        $this->assertMatchesRegularExpression('/<textarea\\b(?=[^>]*\\bid="alamat_selama_cuti")(?=[^>]*\\bname="alamat_selama_cuti")[^>]*\\bdisabled\\b[^>]*>/', $content);
+        $this->assertMatchesRegularExpression('/<input\\b(?=[^>]*\\bid="nomor_telepon")(?=[^>]*\\bname="nomor_telepon")[^>]*\\bdisabled\\b[^>]*>/', $content);
         $this->assertMatchesRegularExpression('/<input\\b(?=[^>]*\\bid="lampiran")(?=[^>]*\\bname="lampiran")[^>]*\\bdisabled\\b[^>]*>/', $content);
         $this->assertMatchesRegularExpression('/<button\\b(?=[^>]*\\btype="submit")(?=[^>]*:disabled="saldoError \\|\\| true")[^>]*>/', $content);
     }

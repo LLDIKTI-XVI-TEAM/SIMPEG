@@ -229,6 +229,18 @@
                                 @error('alasan')<p class="mt-1 text-xs text-danger">{{ $message }}</p>@enderror
                             </div>
                             <div class="md:col-span-2">
+                                <label for="alamat_selama_cuti" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Alamat Selama Cuti <span class="text-danger">*</span></label>
+                                <textarea id="alamat_selama_cuti" name="alamat_selama_cuti" rows="2" maxlength="1000" required autocomplete="street-address" aria-describedby="{{ $errors->has('alamat_selama_cuti') ? 'alamat_selama_cuti-help alamat_selama_cuti-error' : 'alamat_selama_cuti-help' }}" @if ($errors->has('alamat_selama_cuti')) aria-invalid="true" @endif class="mt-1 w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink">{{ old('alamat_selama_cuti', $cuti->alamat_selama_cuti) }}</textarea>
+                                <p id="alamat_selama_cuti-help" class="mt-1 text-xs text-muted font-sans">Digunakan pada formulir Cuti resmi dan untuk menghubungi Anda selama cuti.</p>
+                                @error('alamat_selama_cuti')<p id="alamat_selama_cuti-error" class="mt-1 text-xs text-danger" role="alert">{{ $message }}</p>@enderror
+                            </div>
+                            <div>
+                                <label for="nomor_telepon" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor Telepon <span class="text-danger">*</span></label>
+                                <input id="nomor_telepon" name="nomor_telepon" type="tel" inputmode="tel" maxlength="20" required autocomplete="tel" aria-describedby="{{ $errors->has('nomor_telepon') ? 'nomor_telepon-help nomor_telepon-error' : 'nomor_telepon-help' }}" @if ($errors->has('nomor_telepon')) aria-invalid="true" @endif value="{{ old('nomor_telepon', $cuti->nomor_telepon) }}" class="mt-1 w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink">
+                                <p id="nomor_telepon-help" class="mt-1 text-xs text-muted font-sans">Digunakan pada formulir Cuti resmi dan untuk menghubungi Anda selama cuti.</p>
+                                @error('nomor_telepon')<p id="nomor_telepon-error" class="mt-1 text-xs text-danger" role="alert">{{ $message }}</p>@enderror
+                            </div>
+                            <div class="md:col-span-2">
                                 <label for="lampiran" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Lampiran Baru <span class="font-normal text-muted">(opsional)</span></label>
                                 <input id="lampiran" name="lampiran" type="file" accept=".pdf,.jpg,.jpeg,.png" class="mt-1 w-full rounded-lg border border-border bg-surface text-sm text-muted file:mr-4 file:border-0 file:bg-primary/10 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary">
                                 @error('lampiran')<p class="mt-1 text-xs text-danger">{{ $message }}</p>@enderror
@@ -278,6 +290,12 @@
                     <a href="{{ route('cuti') }}" class="{{ $buttonStyles['secondary'] }}">
                         Kembali ke Daftar
                     </a>
+
+                    @if ($canDownloadFormulir)
+                        <a href="{{ route('cuti.formulir-pdf', $cuti) }}" aria-label="Unduh Formulir Cuti (PDF)" class="{{ $buttonStyles['secondary'] }}">
+                            Unduh Formulir Cuti (PDF)
+                        </a>
+                    @endif
 
                     @if ($canAct)
                         <button type="button" class="{{ $buttonStyles['warning'] }}" @click="open('postpone', $event)">

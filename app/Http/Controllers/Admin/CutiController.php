@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Actions\Cuti\ApproveLeaveAction;
+use App\Actions\Cuti\DownloadOfficialLeavePdfAction;
 use App\Actions\Cuti\ListLeaveRequestsAction;
 use App\Actions\Cuti\ListPendingLeaveApprovalsAction;
 use App\Actions\Cuti\PostponeLeaveAction;
@@ -21,9 +22,16 @@ use App\Http\Requests\Cuti\StoreLeaveRequestRequest;
 use App\Models\LeaveRequest;
 use App\Services\LeaveApprovalService;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 class CutiController extends Controller
 {
+    /** Menyajikan formulir resmi setelah otorisasi rekam ditegakkan Action. */
+    public function formulirPdf(LeaveRequest $leaveRequest, DownloadOfficialLeavePdfAction $action): Response
+    {
+        return $action->execute($leaveRequest, request()->user());
+    }
+
     public function rekap(Request $request, ShowCutiRekapAction $action)
     {
         return view('admin.cuti.rekap', $action->execute($request->query()));
@@ -60,7 +68,7 @@ class CutiController extends Controller
      * Menampilkan detail satu pengajuan cuti.
      * Pegawai tanpa hak memantau hanya boleh membuka pengajuan miliknya sendiri (cegah akses lintas pegawai).
      */
-    public function show($id, LeaveApprovalService $approvals)
+    public function show($id, LeaveApprovalService $approvals, DownloadOfficialLeavePdfAction $pdfAction)
     {
         $user = request()->user();
 
@@ -73,14 +81,16 @@ class CutiController extends Controller
         $stage = $approvals->pendingStage($cuti);
         $canAct = $stage !== null
             && $approvals->approverEmployeeIdForStage($cuti, $stage) === $user->employee_id;
+        $canDownloadFormulir = $pdfAction->canDownload($cuti, $user);
 
-        if (! $user->hasPermission('cuti.read_all') && $cuti->employee_id !== $user->employee_id && ! $canAct) {
+        if (! $user->hasPermission('cuti.read_all') && $cuti->employee_id !== $user->employee_id && ! $canAct && ! $canDownloadFormulir) {
             abort(403);
         }
 
         return view('admin.cuti.show', [
             'cuti' => $cuti,
             'canAct' => $canAct,
+            'canDownloadFormulir' => $canDownloadFormulir,
             'canResubmit' => $cuti->status === 'perlu_perubahan' && $cuti->employee_id === $user->employee_id,
             'activeStep' => $stage === null ? null : $cuti->steps->firstWhere('step_order', $stage),
         ]);

@@ -144,6 +144,8 @@ class CutiAuditCoverageTest extends TestCase
             'tanggal_mulai' => '2026-07-06',
             'tanggal_selesai' => '2026-07-10',
             'alasan' => 'Keperluan keluarga.',
+            'alamat_selama_cuti' => 'Jl. Sam Ratulangi No. 1, Manado',
+            'nomor_telepon' => '+62 (431) 123-456',
         ];
     }
 }

@@ -67,6 +67,8 @@ class SubmitLeaveRequestAction
                 'tanggal_selesai' => $selesai->toDateString(),
                 'jumlah_hari_kerja' => $jumlahHariKerja,
                 'alasan' => $data['alasan'],
+                'alamat_selama_cuti' => $data['alamat_selama_cuti'],
+                'nomor_telepon' => $data['nomor_telepon'],
                 'lampiran_path' => $lampiranPath,
                 // Pengajuan baru selalu masuk engine snapshot dinamis; step aktif pertama disimpan di leave_request_steps.
                 'status' => 'menunggu_approval',
@@ -105,8 +107,14 @@ class SubmitLeaveRequestAction
             return $leaveRequest;
         });
 
+        // Snapshot kontak tetap disimpan pada cuti, tetapi audit hanya mencatat status pengisiannya untuk melindungi PII.
+        $auditValues = $leaveRequest->toArray();
+        unset($auditValues['alamat_selama_cuti'], $auditValues['nomor_telepon']);
+        $auditValues['alamat_selama_cuti_diisi'] = $leaveRequest->alamat_selama_cuti !== null;
+        $auditValues['nomor_telepon_diisi'] = $leaveRequest->nomor_telepon !== null;
+
         // Audit bersifat fire-and-forget sehingga sengaja di luar transaksi agar kegagalan audit tidak membatalkan pengajuan.
-        AuditService::log('CREATE', 'LeaveRequest', $leaveRequest->id, null, $leaveRequest->toArray(), $request);
+        AuditService::log('CREATE', 'LeaveRequest', $leaveRequest->id, null, $auditValues, $request);
 
         return $leaveRequest;
     }

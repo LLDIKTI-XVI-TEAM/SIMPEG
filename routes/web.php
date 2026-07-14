@@ -513,6 +513,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware('permission:cuti.create')
         ->name('cuti.resubmit')
         ->whereUuid('leaveRequest');
+    Route::get('/dashboard/cuti/{leaveRequest}/formulir-pdf', [CutiController::class, 'formulirPdf'])
+        ->name('cuti.formulir-pdf')
+        ->whereUuid('leaveRequest');
     // Antrean dan tindakan approval cuti digerbang ganda: role allowlist sebagai pagar kasar
     // dan permission level-aksi; kelayakan approver per-tahap (person-based) ditegakkan di service.
     Route::get('/cuti/approval', [CutiController::class, 'approval'])

@@ -31,6 +31,7 @@ class CutiPdfExportTest extends TestCase
         $this->assertSame('portrait', config('dompdf.options.default_paper_orientation'));
         $this->assertFalse(config('dompdf.options.enable_remote'));
         $this->assertFalse(config('dompdf.options.enable_php'));
+        $this->assertFalse(config('dompdf.options.enable_javascript'));
         $this->assertTrue(config('dompdf.options.enable_html5_parser'));
         $this->assertSame($expectedChroot, config('dompdf.options.chroot'));
     }
