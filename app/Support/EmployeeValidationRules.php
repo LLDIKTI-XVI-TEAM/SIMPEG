@@ -16,17 +16,17 @@ class EmployeeValidationRules
         return [
             'nama_lengkap' => ['required', 'string', 'max:255'],
             'nama_dengan_gelar' => ['nullable', 'string', 'max:255'],
-            'nip' => ['required', 'string', 'size:18', 'unique:employees,nip'],
+            'nip' => ['nullable', 'string', 'size:18', 'unique:employees,nip'],
             'nik' => ['nullable', 'string', 'size:16'],
             'no_kk' => ['nullable', 'string', 'size:16'],
             'tempat_lahir' => ['nullable', 'string', 'max:100'],
-            'tanggal_lahir' => ['required', 'date', 'before:today'],
+            'tanggal_lahir' => ['nullable', 'date', 'before:today'],
             'jenis_kelamin' => ['nullable', 'in:L,P'],
             'agama_id' => ['nullable', 'uuid', 'exists:ref_agama,id'],
             'status_kawin_id' => ['nullable', 'uuid', 'exists:ref_status_perkawinan,id'],
             'golongan_darah' => ['nullable', 'in:A,B,AB,O'],
             'foto' => ['nullable', File::image()->types(['jpg', 'jpeg', 'png'])->max('10mb')],
-            'jenis_pegawai_id' => ['required', 'uuid', 'exists:ref_jenis_pegawai,id'],
+            'jenis_pegawai_id' => ['nullable', 'uuid', 'exists:ref_jenis_pegawai,id'],
             'status_aktif' => ['nullable', 'in:Aktif,Non-Aktif,Pensiun,Mutasi'],
             'status_pegawai_id' => ['nullable', 'uuid', 'exists:ref_status_pegawai,id'],
             'status_keterangan' => ['nullable', 'string', 'max:2000'],
@@ -69,7 +69,7 @@ class EmployeeValidationRules
         $rules = self::create();
 
         $rules['nip'] = [
-            'required',
+            'nullable',
             'string',
             'size:18',
             Rule::unique('employees', 'nip')->ignore($employee->id),
@@ -107,7 +107,7 @@ class EmployeeValidationRules
             'nip' => ['required', 'string', 'size:18', 'unique:employees,nip'],
             'email_pribadi' => ['required', 'email', 'max:255', 'unique:employees,email_pribadi'],
             'email' => ['nullable', 'email', 'max:255', 'unique:employees,email'],
-            'tanggal_lahir' => ['required', 'date', 'before:today'],
+            'tanggal_lahir' => ['nullable', 'date', 'before:today'],
             'jenis_pegawai' => ['required', 'in:PNS,PPPK,CPNS'],
             'golongan_terakhir' => ['required', 'string', 'max:20'],
             'pangkat_terakhir' => ['nullable', 'string', 'max:100'],
