@@ -36,6 +36,7 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 Route::get('/', function () {
@@ -229,37 +230,69 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->name('ews.config.update');
 
     Route::get('/laporan/export-pegawai', function () {
-        $pegawai = Employee::all()->map(function ($emp) {
+        $employees = Employee::with(['jenisPegawai:id,nama', 'statusPegawai:id,nama'])
+            ->orderBy('nama_lengkap')
+            ->get();
+
+        $pegawai = $employees->map(function ($emp) {
             return [
                 'id' => $emp->id,
                 'nama' => $emp->nama_lengkap,
                 'nip' => $emp->nip,
                 'unit' => $emp->unitKerja?->nama ?? '-',
                 'golongan' => $emp->golongan_terakhir ?? '-',
+                'jabatan' => $emp->jabatan_terakhir ?? '-',
                 'jenis' => $emp->jenisPegawai?->nama ?? '-',
-                'status' => $emp->status_aktif ?? 'Aktif',
+                'status' => $emp->statusPegawai?->nama ?? $emp->status_aktif ?? '-',
+                'email' => $emp->email_pribadi ?? '-',
+                'no_hp' => $emp->no_hp ?? '-',
+                'tanggal_lahir' => $emp->tanggal_lahir?->translatedFormat('d F Y') ?? '-',
+                'tanggal_pensiun' => $emp->tanggal_pensiun?->translatedFormat('d F Y') ?? '-',
+                'pendidikan' => $emp->pendidikan_terakhir ?? '-',
+                'pangkat' => $emp->pangkat_terakhir ?? '-',
             ];
         })->toArray();
 
+        $unitList = collect($pegawai)->pluck('unit')->unique()->filter(fn ($v) => $v !== '-')->sort()->values();
+        $golonganList = collect($pegawai)->pluck('golongan')->unique()->filter(fn ($v) => $v !== '-')->sort()->values();
+        $jenisList = collect($pegawai)->pluck('jenis')->unique()->filter(fn ($v) => $v !== '-')->sort()->values();
+        $statusList = collect($pegawai)->pluck('status')->unique()->filter(fn ($v) => $v !== '-')->sort()->values();
+
         return view('admin.laporan.export-pegawai', [
             'pegawai' => $pegawai,
+            'unitList' => $unitList,
+            'golonganList' => $golonganList,
+            'jenisList' => $jenisList,
+            'statusList' => $statusList,
             'title' => 'Laporan - Export Pegawai',
         ]);
     })->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('laporan.pegawai');
 
     Route::get('/laporan/export-pegawai/excel', function (Request $request) {
-        $pegawai = Employee::all()->map(function ($emp) {
+        // Ambil semua pegawai dengan field lengkap
+        $employees = Employee::with(['jenisPegawai:id,nama', 'statusPegawai:id,nama'])
+            ->orderBy('nama_lengkap')
+            ->get();
+
+        $allData = $employees->map(function ($emp) {
             return [
                 'id' => $emp->id,
                 'nama' => $emp->nama_lengkap,
                 'nip' => $emp->nip,
                 'unit' => $emp->unitKerja?->nama ?? '-',
                 'golongan' => $emp->golongan_terakhir ?? '-',
+                'jabatan' => $emp->jabatan_terakhir ?? '-',
                 'jenis' => $emp->jenisPegawai?->nama ?? '-',
-                'status' => $emp->status_aktif ?? 'Aktif',
+                'status' => $emp->statusPegawai?->nama ?? $emp->status_aktif ?? '-',
+                'email' => $emp->email_pribadi ?? '-',
+                'no_hp' => $emp->no_hp ?? '-',
+                'tanggal_lahir' => $emp->tanggal_lahir?->translatedFormat('d F Y') ?? '-',
+                'tanggal_pensiun' => $emp->tanggal_pensiun?->translatedFormat('d F Y') ?? '-',
+                'pendidikan' => $emp->pendidikan_terakhir ?? '-',
+                'pangkat' => $emp->pangkat_terakhir ?? '-',
             ];
-        })->toArray();
+        });
 
         // Apply filters
         $search = strtolower(trim($request->query('search', '')));
@@ -268,128 +301,150 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         $jenis = $request->query('jenis', '');
         $status = $request->query('status', '');
         $sortBy = $request->query('sort', 'nama');
+        $sortDir = $request->query('sort_dir', 'asc') === 'desc' ? 'desc' : 'asc';
+        $prefixField = trim($request->query('prefix_field', ''));
+        $prefixValue = strtolower(trim($request->query('prefix_value', '')));
+        $rowStart = max(1, (int) $request->query('row_start', 1));
+        $rowEnd = $request->query('row_end', null);
 
-        $filtered = array_filter($pegawai, function ($p) use ($search, $unit, $golongan, $jenis, $status) {
-            $matchesSearch = true;
+        $filtered = $allData->filter(function ($p) use ($search, $unit, $golongan, $jenis, $status, $prefixField, $prefixValue) {
             if ($search !== '') {
                 $pNama = strtolower($p['nama']);
                 $pNip = str_replace(' ', '', $p['nip']);
-                $qClean = str_replace(' ', '', $search);
-                if (strpos($pNama, $search) === false && strpos($pNip, $qClean) === false) {
-                    $matchesSearch = false;
+                $q = str_replace(' ', '', $search);
+                if (strpos($pNama, $search) === false && strpos($pNip, $q) === false) {
+                    return false;
+                }
+            }
+            if ($unit !== '' && $p['unit'] !== $unit) {
+                return false;
+            }
+            if ($golongan !== '' && $p['golongan'] !== $golongan) {
+                return false;
+            }
+            if ($jenis !== '' && $p['jenis'] !== $jenis) {
+                return false;
+            }
+            if ($status !== '' && $p['status'] !== $status) {
+                return false;
+            }
+            // Filter awalan (prefix)
+            if ($prefixValue !== '' && isset($p[$prefixField])) {
+                if (! str_starts_with(strtolower((string) $p[$prefixField]), $prefixValue)) {
+                    return false;
                 }
             }
 
-            $matchesUnit = ($unit === '') || ($p['unit'] === $unit);
-            $matchesGolongan = ($golongan === '') || ($p['golongan'] === $golongan);
-            $matchesJenis = ($jenis === '') || ($p['jenis'] === $jenis);
-            $matchesStatus = ($status === '') || ($p['status'] === $status);
-
-            return $matchesSearch && $matchesUnit && $matchesGolongan && $matchesJenis && $matchesStatus;
+            return true;
         });
 
-        // Apply sorting
-        $golonganOrder = [
-            'IV/e' => 1,
-            'IV/d' => 2,
-            'IV/c' => 3,
-            'IV/b' => 4,
-            'IV/a' => 5,
-            'III/d' => 6,
-            'III/c' => 7,
-            'III/b' => 8,
-            'III/a' => 9,
-            'II/d' => 10,
-            'II/c' => 11,
-            'II/b' => 12,
-            'II/a' => 13,
-            'I/d' => 14,
-            'I/c' => 15,
-            'I/b' => 16,
-            'I/a' => 17,
-        ];
+        // Step 1: Potong row range DULU dari hasil filter (urutan asli)
+        $slice = $filtered->slice($rowStart - 1, $rowEnd !== null ? ((int) $rowEnd - $rowStart + 1) : null)->values();
 
-        usort($filtered, function ($a, $b) use ($sortBy, $golonganOrder) {
-            if ($sortBy === 'nama') {
-                return strcmp($a['nama'], $b['nama']);
-            } elseif ($sortBy === 'nip') {
-                return strcmp($a['nip'], $b['nip']);
-            } elseif ($sortBy === 'golongan') {
-                $rankA = $golonganOrder[$a['golongan']] ?? 99;
-                $rankB = $golonganOrder[$b['golongan']] ?? 99;
-
-                return $rankA - $rankB;
+        // Step 2: Sort dari subset yang sudah dipotong
+        $golonganOrder = ['IV/e' => 1, 'IV/d' => 2, 'IV/c' => 3, 'IV/b' => 4, 'IV/a' => 5, 'III/d' => 6, 'III/c' => 7, 'III/b' => 8, 'III/a' => 9, 'II/d' => 10, 'II/c' => 11, 'II/b' => 12, 'II/a' => 13, 'I/d' => 14, 'I/c' => 15, 'I/b' => 16, 'I/a' => 17];
+        $sortFn = function ($p) use ($sortBy, $golonganOrder) {
+            if ($sortBy === 'golongan') {
+                return $golonganOrder[$p['golongan']] ?? 99;
             }
 
-            return 0;
-        });
+            return strtolower((string) ($p[$sortBy] ?? ''));
+        };
+        $slice = ($sortDir === 'desc')
+            ? $slice->sortByDesc($sortFn)->values()
+            : $slice->sortBy($sortFn)->values();
 
-        // Buat spreadsheet
+        // Kolom yang dipilih (default semua)
+        $allColumns = [
+            'no' => 'No',
+            'nip' => 'NIP',
+            'nama' => 'Nama Pegawai',
+            'golongan' => 'Golongan',
+            'jabatan' => 'Jabatan',
+            'unit' => 'Unit Kerja',
+            'jenis' => 'Jenis Pegawai',
+            'status' => 'Status',
+            'email' => 'Email',
+            'no_hp' => 'No. HP',
+            'tanggal_lahir' => 'Tanggal Lahir',
+            'tanggal_pensiun' => 'Tgl. Pensiun',
+            'pendidikan' => 'Pendidikan Terakhir',
+            'pangkat' => 'Pangkat',
+        ];
+        $selectedKeys = $request->query('columns', array_keys($allColumns));
+        $columns = collect($selectedKeys)
+            ->filter(fn ($k) => isset($allColumns[$k]))
+            ->mapWithKeys(fn ($k) => [$k => $allColumns[$k]]);
+        if ($columns->isEmpty()) {
+            $columns = collect($allColumns);
+        }
+
+        // Build Spreadsheet
         $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
-        $sheet->setTitle('Daftar Nominatif Pegawai');
+        $sheet->setTitle('Daftar Pegawai');
+        $sheet->setShowGridlines(false);
 
-        // Kolom sesuai US-9.1 AC-3: No, NIP, Nama, Golongan, Jabatan, Unit Kerja, Jenis Pegawai, Status.
-        $cols = [
-            'A' => ['No', 5],
-            'B' => ['NIP', 24],
-            'C' => ['Nama Pegawai', 32],
-            'D' => ['Golongan', 12],
-            'E' => ['Jabatan', 38],
-            'F' => ['Unit Kerja', 20],
-            'G' => ['Jenis Pegawai', 18],
-            'H' => ['Status', 15],
-        ];
+        $colLetters = range('A', 'Z');
+        $colIndex = 0;
 
-        // Isi header & set lebar kolom
-        foreach ($cols as $col => [$label, $width]) {
-            $sheet->getColumnDimension($col)->setWidth($width);
-            $sheet->setCellValue($col.'1', $label);
+        foreach ($columns as $key => $label) {
+            $letter = $colLetters[$colIndex];
+            $width = match ($key) {
+                'no' => 5, 'nip' => 22, 'nama' => 32, 'golongan' => 12, 'jabatan' => 36,
+                'unit' => 20, 'jenis' => 16, 'status' => 18, 'email' => 28,
+                'no_hp' => 18, 'tanggal_lahir' => 20, 'tanggal_pensiun' => 20,
+                'pendidikan' => 22, 'pangkat' => 20, default => 18,
+            };
+            $sheet->getColumnDimension($letter)->setWidth($width);
+            $sheet->setCellValue($letter.'1', $label);
+            $colIndex++;
         }
+        $lastCol = $colLetters[$colIndex - 1];
         $sheet->getRowDimension(1)->setRowHeight(30);
-
-        // Style header (biru #122E92, teks putih, bold, centered, border)
-        $sheet->getStyle('A1:H1')->applyFromArray([
-            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 11, 'name' => 'Calibri'],
-            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '122E92']],
+        $sheet->getStyle('A1:'.$lastCol.'1')->applyFromArray([
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 10, 'name' => 'Calibri'],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1F5A83']],
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => true],
-            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CACFE0']]],
+            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '69BFE3']]],
         ]);
 
-        // Isi baris data
-        $index = 0;
-        foreach ($filtered as $row) {
-            $r = $index + 2;
-
-            $sheet->setCellValue('A'.$r, $index + 1);
-            $sheet->setCellValueExplicit('B'.$r, $row['nip'], DataType::TYPE_STRING);
-            $sheet->setCellValue('C'.$r, $row['nama']);
-            $sheet->setCellValue('D'.$r, $row['golongan']);
-            $sheet->setCellValue('E'.$r, $row['jabatan']);
-            $sheet->setCellValue('F'.$r, $row['unit']);
-            $sheet->setCellValue('G'.$r, $row['jenis']);
-            $sheet->setCellValue('H'.$r, $row['status']);
-
-            $sheet->getRowDimension($r)->setRowHeight(18);
-
-            // Alternating stripe: putih / biru muda
-            $bg = ($index % 2 === 0) ? 'FFFFFF' : 'EEF2FF';
-            $sheet->getStyle('A'.$r.':H'.$r)->applyFromArray([
-                'font' => ['size' => 10, 'name' => 'Calibri'],
+        foreach ($slice as $i => $row) {
+            $r = $i + 2;
+            $ci = 0;
+            foreach ($columns as $key => $label) {
+                $letter = $colLetters[$ci];
+                $value = ($key === 'no') ? ($i + 1) : ($row[$key] ?? '-');
+                if (in_array($key, ['nip', 'no_hp'])) {
+                    $sheet->setCellValueExplicit($letter.$r, $value, DataType::TYPE_STRING);
+                } else {
+                    $sheet->setCellValue($letter.$r, $value);
+                }
+                $ci++;
+            }
+            $bg = ($i % 2 === 0) ? 'FFFFFF' : 'D9F2FB';
+            $sheet->getRowDimension($r)->setRowHeight(20);
+            $sheet->getStyle('A'.$r.':'.$lastCol.$r)->applyFromArray([
+                'font' => ['size' => 10, 'name' => 'Calibri', 'color' => ['rgb' => '111827']],
                 'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $bg]],
                 'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
-                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CACFE0']]],
+                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '69BFE3']]],
             ]);
-            $index++;
         }
 
-        // Freeze header row & auto-filter
+        $lastRow = $slice->count() + 1;
         $sheet->freezePane('A2');
-        if ($index > 0) {
-            $sheet->setAutoFilter('A1:H'.($index + 1));
+        if ($slice->isNotEmpty()) {
+            $sheet->setAutoFilter('A1:'.$lastCol.$lastRow);
         }
+        $sheet->getPageSetup()
+            ->setOrientation(PageSetup::ORIENTATION_LANDSCAPE)
+            ->setPaperSize(PageSetup::PAPERSIZE_A4)
+            ->setFitToWidth(1)
+            ->setFitToHeight(0);
+        $sheet->getPageMargins()->setTop(0.3)->setRight(0.25)->setBottom(0.3)->setLeft(0.25);
+        $sheet->getPageSetup()->setRowsToRepeatAtTopByStartAndEnd(1, 1);
 
-        // Download: US-9.1 AC-5: Daftar_Pegawai_LLDIKTI_XVI_{tanggal}.xlsx
         $filename = 'Daftar_Pegawai_LLDIKTI_XVI_'.now()->format('Ymd').'.xlsx';
 
         return response()->streamDownload(function () use ($spreadsheet) {
