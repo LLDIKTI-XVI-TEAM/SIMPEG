@@ -1,15 +1,22 @@
 <x-layouts.app title="Daftar Nominatif Pegawai">
 
     <div x-data="{
-        searchQuery: '',
-        activeUnit: '',
-        activeGolongan: '',
-        activeJenis: '',
-        activeStatus: '',
-        sortBy: 'nama',
+        searchQuery: @js($initialFilters['search']),
+        activeUnit: @js($initialFilters['unit']),
+        activeGolongan: @js($initialFilters['golongan']),
+        activeJenis: @js($initialFilters['jenis']),
+        activeStatus: @js($initialFilters['status']),
+        sortBy: @js($initialFilters['sort']),
         currentPage: 1,
         perPage: 5,
-        documents: {{ json_encode($pegawai) }},
+        documents: @js($pegawai),
+        filterOptions: @js($filterOptions),
+        showCustomExportModal: @js($errors->has('columns')),
+        customColumns: @js(old('columns', ['nip', 'nama', 'golongan', 'jabatan', 'unit', 'jenis', 'status'])),
+        customJabatan: @js(old('jabatan', '')),
+        customPensiunDari: @js(old('pensiun_dari', '')),
+        customPensiunSampai: @js(old('pensiun_sampai', '')),
+        customError: @js($errors->first('columns')),
         init() {
             this.$watch('searchQuery', () => this.currentPage = 1);
             this.$watch('activeUnit', () => this.currentPage = 1);
@@ -65,6 +72,15 @@
         },
         printReport() {
             window.print();
+        },
+        submitCustomExport(event) {
+            this.customError = '';
+            if (!this.customColumns.length) {
+                this.customError = 'Pilih minimal satu kolom untuk export custom.';
+                return;
+            }
+
+            event.target.submit();
         }
     }" class="space-y-6">
 
@@ -94,7 +110,7 @@
                 ]" />
             </div>
             
-            <div class="flex shrink-0 items-center gap-3">
+            <div class="flex shrink-0 flex-wrap items-center gap-3">
                 {{-- Export PDF Button --}}
                 <button
                     @click="printReport()"
@@ -108,7 +124,7 @@
 
                 {{-- Export Excel Button --}}
                 <a
-                    :href="'/laporan/export-pegawai/excel?search=' + searchQuery + '&unit=' + activeUnit + '&golongan=' + activeGolongan + '&jenis=' + activeJenis + '&status=' + activeStatus + '&sort=' + sortBy"
+                    :href="'{{ route('laporan.pegawai.excel') }}?search=' + encodeURIComponent(searchQuery) + '&unit=' + encodeURIComponent(activeUnit) + '&golongan=' + encodeURIComponent(activeGolongan) + '&jenis=' + encodeURIComponent(activeJenis) + '&status=' + encodeURIComponent(activeStatus) + '&sort=' + encodeURIComponent(sortBy)"
                     class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 cursor-pointer font-sans"
                 >
                     <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
@@ -116,6 +132,14 @@
                     </svg>
                     Export Excel (.xlsx)
                 </a>
+
+                <button
+                    type="button"
+                    @click="showCustomExportModal = true"
+                    class="inline-flex items-center justify-center rounded-lg border border-primary/20 bg-surface px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition hover:bg-soft cursor-pointer font-sans"
+                >
+                    Export Custom
+                </button>
             </div>
         </div>
 
@@ -131,10 +155,9 @@
             <div class="relative col-span-1 sm:col-span-1 lg:col-span-4">
                 <select x-model="activeUnit" class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Unit Kerja</option>
-                    <option>Bag. Umum</option>
-                    <option>Bag. Keuangan</option>
-                    <option>Bag. SDM</option>
-                    <option>Bag. IT</option>
+                    <template x-for="unit in filterOptions.units" :key="unit">
+                        <option :value="unit" x-text="unit"></option>
+                    </template>
                 </select>
                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -149,12 +172,9 @@
             <div class="relative col-span-1 sm:col-span-1 lg:col-span-4">
                 <select x-model="activeGolongan" class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Golongan</option>
-                    <option>IV/a</option>
-                    <option>III/c</option>
-                    <option>III/b</option>
-                    <option>III/a</option>
-                    <option>II/d</option>
-                    <option>II/c</option>
+                    <template x-for="golongan in filterOptions.golongan" :key="golongan">
+                        <option :value="golongan" x-text="golongan"></option>
+                    </template>
                 </select>
                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -167,8 +187,9 @@
             <div class="relative col-span-1 sm:col-span-1 lg:col-span-4">
                 <select x-model="activeJenis" class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                     <option value="">Semua Jenis</option>
-                    <option>PNS</option>
-                    <option>PPPK</option>
+                    <template x-for="jenis in filterOptions.jenis" :key="jenis">
+                        <option :value="jenis" x-text="jenis"></option>
+                    </template>
                 </select>
                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -180,10 +201,9 @@
             {{-- Filter Status --}}
             <div class="relative col-span-1 sm:col-span-1 lg:col-span-4">
                 <select x-model="activeStatus" class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                    <option value="">Semua Status</option>
-                    <option value="aktif">Aktif</option>
-                    <option value="cuti">Cuti</option>
-                    <option value="nonaktif">Nonaktif</option>
+                    <template x-for="status in filterOptions.status" :key="status">
+                        <option :value="status" x-text="status"></option>
+                    </template>
                 </select>
                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -248,7 +268,7 @@
                                 </x-ui.table-td>
                                 <x-ui.table-td>
                                     <span class="font-semibold text-xs capitalize"
-                                          :class="p.status === 'aktif' ? 'text-success' : 'text-warning'"
+                                          :class="p.status === 'Aktif' ? 'text-success' : 'text-warning'"
                                           x-text="p.status"></span>
                                 </x-ui.table-td>
                             </x-ui.table-row>
@@ -304,6 +324,69 @@
                 </div>
             </div>
         </x-ui.card>
+
+        <x-ui.modal
+            show="showCustomExportModal"
+            title="Export Nominatif Custom"
+            closeAction="showCustomExportModal = false"
+            maxWidth="2xl"
+            bodyClass="p-6"
+        >
+            <form method="POST" action="{{ route('laporan.pegawai.custom') }}" @submit.prevent="submitCustomExport($event)" class="space-y-5">
+                @csrf
+
+                <input type="hidden" name="search" :value="searchQuery">
+                <input type="hidden" name="unit" :value="activeUnit">
+                <input type="hidden" name="golongan" :value="activeGolongan">
+                <input type="hidden" name="jenis" :value="activeJenis">
+                <input type="hidden" name="status" :value="activeStatus">
+                <input type="hidden" name="sort" :value="sortBy">
+
+                <div>
+                    <p class="text-sm text-ink font-sans">Pilih kolom laporan. NIK, No. KK, kontak pribadi, dan data sensitif lain tidak tersedia.</p>
+                    <p class="mt-1 text-xs text-muted font-sans">Filter aktif pada halaman ini ikut digunakan. Tambahkan jabatan dan periode pensiun di bawah bila diperlukan.</p>
+                </div>
+
+                <fieldset aria-describedby="custom-columns-help custom-columns-error">
+                    <legend class="text-sm font-semibold text-ink font-sans">Kolom laporan <span class="text-danger">*</span></legend>
+                    <p id="custom-columns-help" class="mt-1 text-xs text-muted font-sans">Kolom yang dipilih akan selalu memakai urutan baku laporan: NIP, Nama, Golongan, Jabatan, Unit Kerja, Jenis Pegawai, Status, Pendidikan Terakhir, lalu Tanggal Pensiun.</p>
+                    <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        @foreach (\App\Http\Requests\Laporan\CustomEmployeeExportRequest::ALLOWED_COLUMNS as $key => $label)
+                            <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-soft px-3 py-2 text-sm text-ink transition hover:border-primary/40">
+                                <input type="checkbox" name="columns[]" value="{{ $key }}" x-model="customColumns" class="h-4 w-4 rounded border-border text-primary focus:ring-primary">
+                                <span>{{ $label }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                    <p x-cloak x-show="customError" id="custom-columns-error" role="alert" class="mt-2 text-sm text-danger" x-text="customError"></p>
+                </fieldset>
+
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div>
+                        <label for="custom-jabatan" class="mb-1 block text-xs font-semibold text-ink">Jabatan</label>
+                        <select id="custom-jabatan" name="jabatan" x-model="customJabatan" class="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            <option value="">Semua Jabatan</option>
+                            <template x-for="jabatan in filterOptions.jabatan" :key="jabatan">
+                                <option :value="jabatan" x-text="jabatan"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="custom-pensiun-dari" class="mb-1 block text-xs font-semibold text-ink">Pensiun dari</label>
+                        <input id="custom-pensiun-dari" type="date" name="pensiun_dari" x-model="customPensiunDari" class="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                    </div>
+                    <div>
+                        <label for="custom-pensiun-sampai" class="mb-1 block text-xs font-semibold text-ink">Pensiun sampai</label>
+                        <input id="custom-pensiun-sampai" type="date" name="pensiun_sampai" x-model="customPensiunSampai" class="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 border-t border-border pt-4">
+                    <button type="button" @click="showCustomExportModal = false" class="rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft">Batal</button>
+                    <button type="submit" class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90">Download Excel Custom</button>
+                </div>
+            </form>
+        </x-ui.modal>
 
         {{-- PRINT ONLY FOOTER --}}
         <div id="print-footer" class="hidden print:block"></div>

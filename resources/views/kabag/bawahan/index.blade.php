@@ -4,12 +4,12 @@
         @php
             // DUMMY DATA UNTUK UI
             $daftarBawahan = [
-                ['id' => '9b6574f2-959c-4876-880f-90e822e11fa1', 'nama' => 'Ahmad Fauzi', 'nip' => '198123456789100000', 'jabatan' => 'Analis Kepegawaian Ahli Muda', 'unit' => 'Bagian Umum', 'golongan' => 'I/d', 'jenis' => 'PNS', 'status' => 'Aktif'],
-                ['id' => '9b6574f2-959c-4876-880f-90e822e11fa2', 'nama' => 'Siti Rahayu', 'nip' => '198512345678910000', 'jabatan' => 'Pranata Komputer Ahli Pertama', 'unit' => 'Subbagian Tata Usaha', 'golongan' => 'III/a', 'jenis' => 'PNS', 'status' => 'Cuti Tahunan'],
-                ['id' => '9b6574f2-959c-4876-880f-90e822e11fa3', 'nama' => 'Budi Santoso', 'nip' => '199012345678910000', 'jabatan' => 'Pengelola Keuangan', 'unit' => 'Subbagian Perencanaan', 'golongan' => 'II/c', 'jenis' => 'PNS', 'status' => 'Dinas Luar'],
-                ['id' => '9b6574f2-959c-4876-880f-90e822e11fa4', 'nama' => 'Dewi Pertiwi', 'nip' => '737741487614535936', 'jabatan' => 'Pengelola Data', 'unit' => 'Subbagian Informasi', 'golongan' => 'III/b', 'jenis' => 'PPPK', 'status' => 'Aktif'],
-                ['id' => '9b6574f2-959c-4876-880f-90e822e11fa5', 'nama' => 'Rudi Hermawan', 'nip' => '198812345678910000', 'jabatan' => 'Pranata Humas Ahli Muda', 'unit' => 'Bagian Humas', 'golongan' => 'III/b', 'jenis' => 'PNS', 'status' => 'Aktif'],
-                ['id' => '9b6574f2-959c-4876-880f-90e822e11fa6', 'nama' => 'Nadia Kusuma', 'nip' => '199512345678910000', 'jabatan' => 'Analis Hukum Ahli Pertama', 'unit' => 'Subbagian Hukum', 'golongan' => 'III/a', 'jenis' => 'PNS', 'status' => 'Cuti Sakit'],
+                ['id' => '9b6574f2-959c-4876-880f-90e822e11fa1', 'nama' => 'Ahmad Fauzi', 'nip' => '198123456789100000', 'jabatan' => 'Analis Kepegawaian Ahli Muda', 'unit' => 'Bagian Umum', 'golongan' => 'I/d', 'jenis' => 'PNS', 'status' => 'Aktif', 'status_filter' => 'aktif'],
+                ['id' => '9b6574f2-959c-4876-880f-90e822e11fa2', 'nama' => 'Siti Rahayu', 'nip' => '198512345678910000', 'jabatan' => 'Pranata Komputer Ahli Pertama', 'unit' => 'Subbagian Tata Usaha', 'golongan' => 'III/a', 'jenis' => 'PNS', 'status' => 'Cuti Tahunan', 'status_filter' => 'cuti'],
+                ['id' => '9b6574f2-959c-4876-880f-90e822e11fa3', 'nama' => 'Budi Santoso', 'nip' => '199012345678910000', 'jabatan' => 'Pengelola Keuangan', 'unit' => 'Subbagian Perencanaan', 'golongan' => 'II/c', 'jenis' => 'PNS', 'status' => 'Dinas Luar', 'status_filter' => 'dinas_luar'],
+                ['id' => '9b6574f2-959c-4876-880f-90e822e11fa4', 'nama' => 'Dewi Pertiwi', 'nip' => '737741487614535936', 'jabatan' => 'Pengelola Data', 'unit' => 'Subbagian Informasi', 'golongan' => 'III/b', 'jenis' => 'PPPK', 'status' => 'Aktif', 'status_filter' => 'aktif'],
+                ['id' => '9b6574f2-959c-4876-880f-90e822e11fa5', 'nama' => 'Rudi Hermawan', 'nip' => '198812345678910000', 'jabatan' => 'Pranata Humas Ahli Muda', 'unit' => 'Bagian Humas', 'golongan' => 'III/b', 'jenis' => 'PNS', 'status' => 'Aktif', 'status_filter' => 'aktif'],
+                ['id' => '9b6574f2-959c-4876-880f-90e822e11fa6', 'nama' => 'Nadia Kusuma', 'nip' => '199512345678910000', 'jabatan' => 'Analis Hukum Ahli Pertama', 'unit' => 'Subbagian Hukum', 'golongan' => 'III/a', 'jenis' => 'PNS', 'status' => 'Cuti Sakit', 'status_filter' => 'cuti'],
             ];
         @endphp
 
@@ -27,7 +27,7 @@
         {{-- FILTER BAR --}}
         <div id="filter-form" class="mb-6">
             <x-ui.filter-bar searchId="search-input" searchName="search" searchPlaceholder="Cari nama atau NIP..."
-                class="lg:grid-cols-5" x-model="search">
+                searchModel="search" class="lg:grid-cols-5">
                 {{-- Filter Golongan --}}
                 <div>
                     <x-form.select id="filter-golongan" name="golongan" size="md" x-model="filterGolongan">
@@ -61,9 +61,9 @@
                 <div>
                     <x-form.select id="filter-status" name="status_pegawai_id" size="md" x-model="filterStatus">
                         <option value="">Semua Status</option>
-                        <option value="Aktif">Aktif</option>
-                        <option value="Cuti">Cuti</option>
-                        <option value="Pensiun">Pensiun</option>
+                        <option value="aktif">Aktif</option>
+                        <option value="cuti">Cuti</option>
+                        <option value="pensiun">Pensiun</option>
                     </x-form.select>
                 </div>
             </x-ui.filter-bar>
@@ -94,7 +94,7 @@
                                     (filterGolongan === '' || '{{ $bawahan['golongan'] }}'.includes(filterGolongan)) &&
                                     (filterUnit === '' || '{{ $bawahan['unit'] }}' === filterUnit) &&
                                     (filterJenis === '' || '{{ $bawahan['jenis'] }}' === filterJenis) &&
-                                    (filterStatus === '' || '{{ $bawahan['status'] }}'.includes(filterStatus))">
+                                    (filterStatus === '' || '{{ $bawahan['status_filter'] }}' === filterStatus)">
                                 <x-ui.table-td padding="comfortable">
                                     <div class="flex items-center gap-3">
                                         <x-ui.tooltip text="Buka detail {{ $bawahan['nama'] }}" position="right">

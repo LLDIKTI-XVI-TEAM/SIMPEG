@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\EwsConfigController;
 use App\Http\Controllers\Admin\EwsController;
 use App\Http\Controllers\Admin\GlobalSearchController;
 use App\Http\Controllers\Admin\HariLiburController;
+use App\Http\Controllers\Admin\LaporanController;
 use App\Http\Controllers\Admin\LeaveBalanceController;
 use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\PegawaiController;
@@ -228,182 +229,17 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin'])
         ->name('ews.config.update');
 
-    Route::get('/laporan/export-pegawai', function () {
-        $pegawai = Employee::all()->map(function ($emp) {
-            return [
-                'id' => $emp->id,
-                'nama' => $emp->nama_lengkap,
-                'nip' => $emp->nip,
-                'unit' => $emp->unitKerja?->nama ?? '-',
-                'golongan' => $emp->golongan_terakhir ?? '-',
-                'jenis' => $emp->jenisPegawai?->nama ?? '-',
-                'status' => $emp->status_aktif ?? 'Aktif',
-            ];
-        })->toArray();
-
-        return view('admin.laporan.export-pegawai', [
-            'pegawai' => $pegawai,
-            'title' => 'Laporan - Export Pegawai',
-        ]);
-    })->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+    Route::get('/laporan/export-pegawai', [LaporanController::class, 'exportPegawai'])
+        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('laporan.pegawai');
 
-    Route::get('/laporan/export-pegawai/excel', function (Request $request) {
-        $pegawai = Employee::all()->map(function ($emp) {
-            return [
-                'id' => $emp->id,
-                'nama' => $emp->nama_lengkap,
-                'nip' => $emp->nip,
-                'unit' => $emp->unitKerja?->nama ?? '-',
-                'golongan' => $emp->golongan_terakhir ?? '-',
-                'jenis' => $emp->jenisPegawai?->nama ?? '-',
-                'status' => $emp->status_aktif ?? 'Aktif',
-            ];
-        })->toArray();
-
-        // Apply filters
-        $search = strtolower(trim($request->query('search', '')));
-        $unit = $request->query('unit', '');
-        $golongan = $request->query('golongan', '');
-        $jenis = $request->query('jenis', '');
-        $status = $request->query('status', '');
-        $sortBy = $request->query('sort', 'nama');
-
-        $filtered = array_filter($pegawai, function ($p) use ($search, $unit, $golongan, $jenis, $status) {
-            $matchesSearch = true;
-            if ($search !== '') {
-                $pNama = strtolower($p['nama']);
-                $pNip = str_replace(' ', '', $p['nip']);
-                $qClean = str_replace(' ', '', $search);
-                if (strpos($pNama, $search) === false && strpos($pNip, $qClean) === false) {
-                    $matchesSearch = false;
-                }
-            }
-
-            $matchesUnit = ($unit === '') || ($p['unit'] === $unit);
-            $matchesGolongan = ($golongan === '') || ($p['golongan'] === $golongan);
-            $matchesJenis = ($jenis === '') || ($p['jenis'] === $jenis);
-            $matchesStatus = ($status === '') || ($p['status'] === $status);
-
-            return $matchesSearch && $matchesUnit && $matchesGolongan && $matchesJenis && $matchesStatus;
-        });
-
-        // Apply sorting
-        $golonganOrder = [
-            'IV/e' => 1,
-            'IV/d' => 2,
-            'IV/c' => 3,
-            'IV/b' => 4,
-            'IV/a' => 5,
-            'III/d' => 6,
-            'III/c' => 7,
-            'III/b' => 8,
-            'III/a' => 9,
-            'II/d' => 10,
-            'II/c' => 11,
-            'II/b' => 12,
-            'II/a' => 13,
-            'I/d' => 14,
-            'I/c' => 15,
-            'I/b' => 16,
-            'I/a' => 17,
-        ];
-
-        usort($filtered, function ($a, $b) use ($sortBy, $golonganOrder) {
-            if ($sortBy === 'nama') {
-                return strcmp($a['nama'], $b['nama']);
-            } elseif ($sortBy === 'nip') {
-                return strcmp($a['nip'], $b['nip']);
-            } elseif ($sortBy === 'golongan') {
-                $rankA = $golonganOrder[$a['golongan']] ?? 99;
-                $rankB = $golonganOrder[$b['golongan']] ?? 99;
-
-                return $rankA - $rankB;
-            }
-
-            return 0;
-        });
-
-        // Buat spreadsheet
-        $spreadsheet = new Spreadsheet;
-        $sheet = $spreadsheet->getActiveSheet();
-        $sheet->setTitle('Daftar Nominatif Pegawai');
-
-        // Kolom sesuai US-9.1 AC-3: No, NIP, Nama, Golongan, Jabatan, Unit Kerja, Jenis Pegawai, Status.
-        $cols = [
-            'A' => ['No', 5],
-            'B' => ['NIP', 24],
-            'C' => ['Nama Pegawai', 32],
-            'D' => ['Golongan', 12],
-            'E' => ['Jabatan', 38],
-            'F' => ['Unit Kerja', 20],
-            'G' => ['Jenis Pegawai', 18],
-            'H' => ['Status', 15],
-        ];
-
-        // Isi header & set lebar kolom
-        foreach ($cols as $col => [$label, $width]) {
-            $sheet->getColumnDimension($col)->setWidth($width);
-            $sheet->setCellValue($col.'1', $label);
-        }
-        $sheet->getRowDimension(1)->setRowHeight(30);
-
-        // Style header (biru #122E92, teks putih, bold, centered, border)
-        $sheet->getStyle('A1:H1')->applyFromArray([
-            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 11, 'name' => 'Calibri'],
-            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '122E92']],
-            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => true],
-            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CACFE0']]],
-        ]);
-
-        // Isi baris data
-        $index = 0;
-        foreach ($filtered as $row) {
-            $r = $index + 2;
-
-            $sheet->setCellValue('A'.$r, $index + 1);
-            $sheet->setCellValueExplicit('B'.$r, $row['nip'], DataType::TYPE_STRING);
-            $sheet->setCellValue('C'.$r, $row['nama']);
-            $sheet->setCellValue('D'.$r, $row['golongan']);
-            $sheet->setCellValue('E'.$r, $row['jabatan']);
-            $sheet->setCellValue('F'.$r, $row['unit']);
-            $sheet->setCellValue('G'.$r, $row['jenis']);
-            $sheet->setCellValue('H'.$r, $row['status']);
-
-            $sheet->getRowDimension($r)->setRowHeight(18);
-
-            // Alternating stripe: putih / biru muda
-            $bg = ($index % 2 === 0) ? 'FFFFFF' : 'EEF2FF';
-            $sheet->getStyle('A'.$r.':H'.$r)->applyFromArray([
-                'font' => ['size' => 10, 'name' => 'Calibri'],
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $bg]],
-                'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
-                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CACFE0']]],
-            ]);
-            $index++;
-        }
-
-        // Freeze header row & auto-filter
-        $sheet->freezePane('A2');
-        if ($index > 0) {
-            $sheet->setAutoFilter('A1:H'.($index + 1));
-        }
-
-        // Download: US-9.1 AC-5: Daftar_Pegawai_LLDIKTI_XVI_{tanggal}.xlsx
-        $filename = 'Daftar_Pegawai_LLDIKTI_XVI_'.now()->format('Ymd').'.xlsx';
-
-        return response()->streamDownload(function () use ($spreadsheet) {
-            $writer = new Xlsx($spreadsheet);
-            $writer->save('php://output');
-        }, $filename, [
-            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
-            'Cache-Control' => 'no-cache, no-store, must-revalidate',
-            'Pragma' => 'no-cache',
-            'Expires' => '0',
-        ]);
-    })->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+    Route::get('/laporan/export-pegawai/excel', [LaporanController::class, 'exportPegawaiExcel'])
+        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('laporan.pegawai.excel');
+
+    Route::post('/laporan/export-pegawai/custom', [LaporanController::class, 'exportPegawaiCustom'])
+        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+        ->name('laporan.pegawai.custom');
 
     Route::get('/laporan/export-cuti', function () {
         $riwayatCuti = CutiController::$riwayatCuti;
