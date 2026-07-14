@@ -1,0 +1,182 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Employee;
+use App\Models\PositionHistory;
+use App\Models\RefJenisJabatan;
+use App\Models\RefJenisPegawai;
+use App\Models\RefStatusPegawai;
+use App\Models\RefUnitKerja;
+use App\Models\User;
+use Database\Seeders\RbacSeeder;
+use Database\Seeders\ReferenceSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use Tests\TestCase;
+
+class EmployeeReportExportTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed([ReferenceSeeder::class, RbacSeeder::class]);
+    }
+
+    public function test_guest_and_unauthorized_role_cannot_access_employee_export(): void
+    {
+        $this->get(route('laporan.pegawai'))->assertRedirect(route('login'));
+
+        $pegawai = User::factory()->pegawai()->create();
+
+        $this->actingAs($pegawai)
+            ->get(route('laporan.pegawai'))
+            ->assertForbidden();
+    }
+
+    public function test_preview_and_standard_excel_use_real_active_employee_data_and_same_filter(): void
+    {
+        $admin = User::factory()->adminKepegawaian()->create();
+        $unitKepegawaian = RefUnitKerja::query()->where('nama', 'Bagian SDM')->firstOrFail();
+        $unitLain = RefUnitKerja::query()->where('nama', 'Bagian Umum')->firstOrFail();
+
+        $included = $this->createEmployee($unitKepegawaian, [
+            'nama_lengkap' => 'Ahmad Export',
+            'nip' => '198503122010011001',
+            'jabatan_terakhir' => 'Analis Kepegawaian',
+            'golongan_terakhir' => 'III/c',
+        ]);
+        $this->createEmployee($unitLain, [
+            'nama_lengkap' => 'Bukan Hasil Filter',
+            'nip' => '198503122010011002',
+        ]);
+        $this->createEmployee($unitKepegawaian, [
+            'nama_lengkap' => 'Pegawai Pensiun',
+            'nip' => '198503122010011003',
+            'status_aktif' => 'Pensiun',
+            'status_pegawai_id' => RefStatusPegawai::query()->where('nama', 'Pensiun')->value('id'),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('laporan.pegawai'))
+            ->assertOk()
+            ->assertSee('Ahmad Export')
+            ->assertSee('Pegawai Pensiun');
+
+        $response = $this->actingAs($admin)->get(route('laporan.pegawai.excel', [
+            'unit' => $unitKepegawaian->nama,
+            'sort' => 'nama',
+        ]));
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        $this->assertStringContainsString(
+            'Daftar_Pegawai_LLDIKTI_XVI_'.now()->format('Ymd').'.xlsx',
+            (string) $response->headers->get('Content-Disposition')
+        );
+
+        $spreadsheet = $this->loadSpreadsheet($response->streamedContent());
+
+        try {
+            $sheet = $spreadsheet->getActiveSheet();
+
+            $this->assertSame('Daftar Nominatif Pegawai', $sheet->getTitle());
+            $this->assertSame('No', $sheet->getCell('A1')->getValue());
+            $this->assertSame('NIP', $sheet->getCell('B1')->getValue());
+            $this->assertSame('Nama', $sheet->getCell('C1')->getValue());
+            $this->assertSame('Golongan', $sheet->getCell('D1')->getValue());
+            $this->assertSame('Jabatan', $sheet->getCell('E1')->getValue());
+            $this->assertSame('Unit Kerja', $sheet->getCell('F1')->getValue());
+            $this->assertSame('Jenis Pegawai', $sheet->getCell('G1')->getValue());
+            $this->assertSame('Status', $sheet->getCell('H1')->getValue());
+            $this->assertSame($included->nip, $sheet->getCell('B2')->getValue());
+            $this->assertSame('Ahmad Export', $sheet->getCell('C2')->getValue());
+            $this->assertSame('Analis Kepegawaian', $sheet->getCell('E2')->getValue());
+            $this->assertSame('Bagian SDM', $sheet->getCell('F2')->getValue());
+            $this->assertSame('A2', $sheet->getFreezePane());
+        } finally {
+            $spreadsheet->disconnectWorksheets();
+        }
+    }
+
+    public function test_custom_export_uses_canonical_column_order_and_rejects_sensitive_columns(): void
+    {
+        $admin = User::factory()->adminKepegawaian()->create();
+        $employee = $this->createEmployee(RefUnitKerja::query()->where('nama', 'Bagian SDM')->firstOrFail(), [
+            'nama_lengkap' => 'Nadia Custom',
+            'nip' => '198503122010011004',
+            'tanggal_pensiun' => '2038-08-17',
+        ]);
+
+        $response = $this->actingAs($admin)->post(route('laporan.pegawai.custom'), [
+            'columns' => ['tanggal_pensiun', 'nama', 'nip'],
+            'status' => 'Aktif',
+        ]);
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+        $spreadsheet = $this->loadSpreadsheet($response->streamedContent());
+
+        try {
+            $sheet = $spreadsheet->getActiveSheet();
+
+            $this->assertSame('NIP', $sheet->getCell('A1')->getValue());
+            $this->assertSame('Nama', $sheet->getCell('B1')->getValue());
+            $this->assertSame('Tanggal Pensiun', $sheet->getCell('C1')->getValue());
+            $this->assertSame($employee->nip, $sheet->getCell('A2')->getValue());
+            $this->assertSame('Nadia Custom', $sheet->getCell('B2')->getValue());
+            $this->assertSame('2038-08-17', $sheet->getCell('C2')->getValue());
+        } finally {
+            $spreadsheet->disconnectWorksheets();
+        }
+
+        $this->actingAs($admin)
+            ->from(route('laporan.pegawai'))
+            ->post(route('laporan.pegawai.custom'), ['columns' => ['nik']])
+            ->assertRedirect(route('laporan.pegawai'))
+            ->assertSessionHasErrors('columns.0');
+    }
+
+    /** @param array<string, mixed> $overrides */
+    private function createEmployee(RefUnitKerja $unit, array $overrides = []): Employee
+    {
+        $jenis = RefJenisPegawai::query()->where('nama', 'PNS')->firstOrFail();
+        $status = RefStatusPegawai::query()->where('nama', $overrides['status_aktif'] ?? 'Aktif')->firstOrFail();
+        $employee = Employee::factory()->create([
+            'jenis_pegawai_id' => $jenis->id,
+            'status_pegawai_id' => $status->id,
+            'status_aktif' => $status->nama,
+            ...$overrides,
+        ]);
+
+        PositionHistory::create([
+            'employee_id' => $employee->id,
+            'nama_jabatan' => $employee->jabatan_terakhir,
+            'jenis_jabatan_id' => RefJenisJabatan::query()->firstOrFail()->id,
+            'unit_kerja_id' => $unit->id,
+            'no_sk' => 'SK-EXPORT-'.substr($employee->nip, -6),
+            'tanggal_sk' => '2020-01-01',
+            'tmt_jabatan' => '2020-01-01',
+            'is_latest' => true,
+        ]);
+
+        return $employee;
+    }
+
+    private function loadSpreadsheet(string $content): Spreadsheet
+    {
+        $temporaryFile = tempnam(sys_get_temp_dir(), 'simpeg-employee-report-');
+        file_put_contents($temporaryFile, $content);
+
+        try {
+            return IOFactory::load($temporaryFile);
+        } finally {
+            @unlink($temporaryFile);
+        }
+    }
+}
