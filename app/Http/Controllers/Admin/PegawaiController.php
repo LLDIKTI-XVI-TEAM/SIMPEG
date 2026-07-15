@@ -191,8 +191,10 @@ class PegawaiController extends Controller
         $jabatanOptions = RefJabatan::with('jenisJabatan')->orderBy('nama')->get();
         $jenisJabatanOptions = RefJenisJabatan::all();
         $statusPegawai = RefStatusPegawai::orderByDesc('is_default')->orderBy('nama')->get();
+        $golonganRefOptions = RefGolongan::orderBy('kode')->get();
+        $eselonOptions = RefEselon::orderBy('nama')->get();
 
-        return view('admin.pegawai.create', compact('jenisPegawai', 'agama', 'statusKawin', 'unitKerja', 'jabatanOptions', 'jenisJabatanOptions', 'statusPegawai'));
+        return view('admin.pegawai.create', compact('jenisPegawai', 'agama', 'statusKawin', 'unitKerja', 'jabatanOptions', 'jenisJabatanOptions', 'statusPegawai', 'golonganRefOptions', 'eselonOptions'));
     }
 
     public function inactive(Request $request, ListInactiveEmployeesAction $action)

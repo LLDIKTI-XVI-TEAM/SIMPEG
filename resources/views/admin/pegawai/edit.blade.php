@@ -217,7 +217,7 @@
             validateNik() {
                 this.nik = this.nik.replace(/\D/g, '');
                 if (this.nik.length > 0 && this.nik.length < 16) {
-                    this.nikError = 'NIK harus tepat 16 digit (Saat ini: ' + this.nik.length + ' digit)';
+                    this.nikError = '';
                 } else {
                     this.nikError = '';
                 }
@@ -225,7 +225,7 @@
             validateKk() {
                 this.kk = this.kk.replace(/\D/g, '');
                 if (this.kk.length > 0 && this.kk.length < 16) {
-                    this.kkError = 'Nomor KK harus tepat 16 digit (Saat ini: ' + this.kk.length + ' digit)';
+                    this.kkError = '';
                 } else {
                     this.kkError = '';
                 }
@@ -233,7 +233,7 @@
             validateNip() {
                 this.nip = this.nip.replace(/\D/g, '');
                 if (this.nip.length > 0 && this.nip.length < 18) {
-                    this.nipError = 'NIP harus tepat 18 digit (Saat ini: ' + this.nip.length + ' digit)';
+                    this.nipError = '';
                 } else {
                     this.nipError = '';
                 }
@@ -808,7 +808,7 @@
                             <div class="space-y-1">
                                 <label for="pangkat_golongan_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Golongan <span class="text-danger">*</span></label>
                                 <div class="relative">
-                                    <select id="pangkat_golongan_id" name="pangkat_golongan_id" required x-model="pangkatForm.golongan_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <select id="pangkat_golongan_id" name="pangkat_golongan_id"  x-model="pangkatForm.golongan_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
                                         <option value="" disabled>Pilih Golongan</option>
                                         @foreach($golonganRefOptions as $gol)
                                             <option value="{{ $gol->id }}">{{ $gol->kode }} - {{ $gol->nama }}</option>
@@ -825,19 +825,19 @@
                             {{-- Nomor SK Pangkat --}}
                             <div class="space-y-1">
                                 <label for="pangkat_no_sk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Pangkat <span class="text-danger">*</span></label>
-                                <input id="pangkat_no_sk" name="pangkat_no_sk" type="text" required placeholder="SK-PANGKAT-321-KP-2026" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" x-model="pangkatForm.no_sk">
+                                <input id="pangkat_no_sk" name="pangkat_no_sk" type="text"  placeholder="SK-PANGKAT-321-KP-2026" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" x-model="pangkatForm.no_sk">
                             </div>
 
                             {{-- Tanggal SK Pangkat --}}
                             <div class="space-y-1">
                                 <label for="pangkat_tanggal_sk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK <span class="text-danger">*</span></label>
-                                <input id="pangkat_tanggal_sk" name="pangkat_tanggal_sk" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" x-model="pangkatForm.tanggal_sk">
+                                <input id="pangkat_tanggal_sk" name="pangkat_tanggal_sk" type="date"  class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" x-model="pangkatForm.tanggal_sk">
                             </div>
 
                             {{-- TMT Pangkat --}}
                             <div class="space-y-1">
                                 <label for="pangkat_tmt_pangkat" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Pangkat <span class="text-danger">*</span></label>
-                                <input id="pangkat_tmt_pangkat" name="pangkat_tmt_pangkat" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" x-model="pangkatForm.tmt_pangkat">
+                                <input id="pangkat_tmt_pangkat" name="pangkat_tmt_pangkat" type="date"  class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" x-model="pangkatForm.tmt_pangkat">
                             </div>
 
                             {{-- Upload / Pilih Arsip SK Pangkat --}}
@@ -929,7 +929,7 @@
                             <div class="space-y-1">
                                 <label for="jabatan_jabatan_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jabatan <span class="text-danger">*</span></label>
                                 <div class="relative">
-                                    <select id="jabatan_jabatan_id" name="jabatan_jabatan_id" required x-model="jabatanForm.jabatan_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <select id="jabatan_jabatan_id" name="jabatan_jabatan_id"  x-model="jabatanForm.jabatan_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
                                         <option value="" disabled>Pilih Jabatan</option>
                                         @foreach($jabatanOptions as $jabatan)
                                             <option value="{{ $jabatan->id }}">{{ $jabatan->nama }}{{ $jabatan->jenisJabatan ? ' - '.$jabatan->jenisJabatan->nama : '' }}</option>
@@ -989,7 +989,7 @@
                             <div class="space-y-1">
                                 <label for="jabatan_unit_kerja_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Unit Kerja <span class="text-danger">*</span></label>
                                 <div class="relative">
-                                    <select id="jabatan_unit_kerja_id" name="jabatan_unit_kerja_id" required x-model="jabatanForm.unit_kerja_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <select id="jabatan_unit_kerja_id" name="jabatan_unit_kerja_id"  x-model="jabatanForm.unit_kerja_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
                                         <option value="" disabled>Pilih Unit Kerja</option>
                                         @foreach($unitKerja as $unit)
                                             <option value="{{ $unit->id }}">{{ $unit->nama }}</option>
@@ -1006,19 +1006,19 @@
                             {{-- Nomor SK Jabatan --}}
                             <div class="space-y-1">
                                 <label for="jabatan_no_sk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Jabatan <span class="text-danger">*</span></label>
-                                <input id="jabatan_no_sk" name="jabatan_no_sk" type="text" required placeholder="SK-JABATAN-910-JAB-2026" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" x-model="jabatanForm.no_sk">
+                                <input id="jabatan_no_sk" name="jabatan_no_sk" type="text"  placeholder="SK-JABATAN-910-JAB-2026" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" x-model="jabatanForm.no_sk">
                             </div>
 
                             {{-- Tanggal SK Jabatan --}}
                             <div class="space-y-1">
                                 <label for="jabatan_tanggal_sk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK <span class="text-danger">*</span></label>
-                                <input id="jabatan_tanggal_sk" name="jabatan_tanggal_sk" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" x-model="jabatanForm.tanggal_sk">
+                                <input id="jabatan_tanggal_sk" name="jabatan_tanggal_sk" type="date"  class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" x-model="jabatanForm.tanggal_sk">
                             </div>
 
                             {{-- TMT Jabatan --}}
                             <div class="space-y-1 sm:col-span-2">
                                 <label for="jabatan_tmt_jabatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Jabatan <span class="text-danger">*</span></label>
-                                <input id="jabatan_tmt_jabatan" name="jabatan_tmt_jabatan" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" x-model="jabatanForm.tmt_jabatan">
+                                <input id="jabatan_tmt_jabatan" name="jabatan_tmt_jabatan" type="date"  class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" x-model="jabatanForm.tmt_jabatan">
                             </div>
 
                             {{-- Upload / Pilih Arsip SK Jabatan --}}
@@ -1098,26 +1098,26 @@
                                     <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
                                         <span class="text-muted text-sm font-semibold">Rp</span>
                                     </div>
-                                    <input id="kgb_gaji_pokok" name="kgb_gaji_pokok" type="number" required placeholder="5000000" class="w-full rounded-lg border border-border bg-surface pl-12 pr-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" x-model="kgbForm.gaji_pokok">
+                                    <input id="kgb_gaji_pokok" name="kgb_gaji_pokok" type="number"  placeholder="5000000" class="w-full rounded-lg border border-border bg-surface pl-12 pr-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" x-model="kgbForm.gaji_pokok">
                                 </div>
                             </div>
 
                             {{-- Nomor SK KGB --}}
                             <div class="space-y-1">
                                 <label for="kgb_no_sk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK KGB <span class="text-danger">*</span></label>
-                                <input id="kgb_no_sk" name="kgb_no_sk" type="text" required placeholder="SK-KGB-543-2026" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" x-model="kgbForm.no_sk">
+                                <input id="kgb_no_sk" name="kgb_no_sk" type="text"  placeholder="SK-KGB-543-2026" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" x-model="kgbForm.no_sk">
                             </div>
 
                             {{-- Tanggal SK KGB --}}
                             <div class="space-y-1">
                                 <label for="kgb_tanggal_sk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK <span class="text-danger">*</span></label>
-                                <input id="kgb_tanggal_sk" name="kgb_tanggal_sk" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" x-model="kgbForm.tanggal_sk">
+                                <input id="kgb_tanggal_sk" name="kgb_tanggal_sk" type="date"  class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" x-model="kgbForm.tanggal_sk">
                             </div>
 
                             {{-- TMT KGB --}}
                             <div class="space-y-1">
                                 <label for="kgb_tmt_kgb" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT KGB <span class="text-danger">*</span></label>
-                                <input id="kgb_tmt_kgb" name="kgb_tmt_kgb" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" x-model="kgbForm.tmt_kgb">
+                                <input id="kgb_tmt_kgb" name="kgb_tmt_kgb" type="date"  class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" x-model="kgbForm.tmt_kgb">
                             </div>
 
                             {{-- Upload / Pilih Arsip SK KGB --}}
@@ -1175,7 +1175,7 @@
                             <div class="space-y-1">
                                 <label for="pengangkatan_jenis_pengangkatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Pengangkatan <span class="text-danger">*</span></label>
                                 <div class="relative">
-                                    <select id="pengangkatan_jenis_pengangkatan" name="pengangkatan_jenis_pengangkatan" required class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <select id="pengangkatan_jenis_pengangkatan" name="pengangkatan_jenis_pengangkatan"  class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
                                         <option value="" disabled {{ empty($p->appointment->jenis_pengangkatan) ? 'selected' : '' }}>Pilih Jenis Pengangkatan</option>
                                         <option value="CPNS" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'CPNS' ? 'selected' : '' }}>CPNS</option>
                                         <option value="PNS" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'PNS' ? 'selected' : '' }}>PNS</option>
@@ -1192,19 +1192,19 @@
                             {{-- TMT Pengangkatan --}}
                             <div class="space-y-1">
                                 <label for="pengangkatan_tmt_pengangkatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Pengangkatan <span class="text-danger">*</span></label>
-                                <input id="pengangkatan_tmt_pengangkatan" name="pengangkatan_tmt_pengangkatan" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" value="{{ $p->appointment && $p->appointment->tmt_pengangkatan ? \Carbon\Carbon::parse($p->appointment->tmt_pengangkatan)->format('Y-m-d') : '' }}" >
+                                <input id="pengangkatan_tmt_pengangkatan" name="pengangkatan_tmt_pengangkatan" type="date"  class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" value="{{ $p->appointment && $p->appointment->tmt_pengangkatan ? \Carbon\Carbon::parse($p->appointment->tmt_pengangkatan)->format('Y-m-d') : '' }}" >
                             </div>
 
                             {{-- Nomor SK Pengangkatan --}}
                             <div class="space-y-1">
                                 <label for="pengangkatan_no_sk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Pengangkatan <span class="text-danger">*</span></label>
-                                <input id="pengangkatan_no_sk" name="pengangkatan_no_sk" type="text" required placeholder="SK-882-KP-2024" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->appointment ? $p->appointment->no_sk : '' }}" >
+                                <input id="pengangkatan_no_sk" name="pengangkatan_no_sk" type="text"  placeholder="SK-882-KP-2024" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->appointment ? $p->appointment->no_sk : '' }}" >
                             </div>
 
                             {{-- Tanggal SK --}}
                             <div class="space-y-1">
                                 <label for="pengangkatan_tanggal_sk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK Terbit <span class="text-danger">*</span></label>
-                                <input id="pengangkatan_tanggal_sk" name="pengangkatan_tanggal_sk" type="date" required class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" value="{{ $p->appointment && $p->appointment->tanggal_sk ? \Carbon\Carbon::parse($p->appointment->tanggal_sk)->format('Y-m-d') : '' }}" >
+                                <input id="pengangkatan_tanggal_sk" name="pengangkatan_tanggal_sk" type="date"  class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" value="{{ $p->appointment && $p->appointment->tanggal_sk ? \Carbon\Carbon::parse($p->appointment->tanggal_sk)->format('Y-m-d') : '' }}" >
                             </div>
 
                             {{-- Upload / Pilih Arsip SK Pengangkatan --}}
@@ -1376,8 +1376,8 @@
 
                         {{-- Tombol Simpan --}}
                         <button type="submit" 
-                                :disabled="isSubmitting || nip.length < 18 || (nik.length > 0 && nik.length < 16) || (kk.length > 0 && kk.length < 16) || skPangkatError !== '' || skJabatanError !== '' || skKgbError !== '' || skPengangkatanError !== ''"
-                                :class="(isSubmitting || nip.length < 18 || (nik.length > 0 && nik.length < 16) || (kk.length > 0 && kk.length < 16) || skPangkatError !== '' || skJabatanError !== '' || skKgbError !== '' || skPengangkatanError !== '') ? 'opacity-50 cursor-not-allowed' : ''"
+                                :disabled="isSubmitting || skPangkatError !== '' || skJabatanError !== '' || skKgbError !== '' || skPengangkatanError !== ''"
+                                :class="(isSubmitting || skPangkatError !== '' || skJabatanError !== '' || skKgbError !== '' || skPengangkatanError !== '') ? 'opacity-50 cursor-not-allowed' : ''"
                                 class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 font-sans cursor-pointer">
                             <svg x-show="!isSubmitting" class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
