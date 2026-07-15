@@ -310,6 +310,21 @@ class SubmitLeaveRequestTest extends TestCase
         $this->assertDatabaseCount('leave_requests', 0);
     }
 
+    public function test_form_pppk_tidak_menampilkan_jenis_cuti_khusus_pns(): void
+    {
+        $aktor = $this->makePemohon('PPPK');
+        $umum = $this->jenisCuti('Cuti Sakit');
+        $khususPns = $this->jenisCuti('Cuti Besar', khususPns: true);
+
+        $response = $this->actingAs($aktor['user'])->get(route('cuti.create'));
+
+        $response->assertOk();
+        $response->assertViewHas('jenisCuti', function ($jenisCuti) use ($umum, $khususPns): bool {
+            return $jenisCuti->contains('id', $umum->id)
+                && ! $jenisCuti->contains('id', $khususPns->id);
+        });
+    }
+
     public function test_pns_boleh_jenis_cuti_khusus_pns(): void
     {
         $aktor = $this->makePemohon('PNS');

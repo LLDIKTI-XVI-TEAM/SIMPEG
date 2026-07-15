@@ -81,6 +81,23 @@ class AdminKepegawaianAccessTest extends TestCase
             ->assertSee('Pengaturan Sistem');
     }
 
+    public function test_halaman_pengaturan_mengarahkan_konfigurasi_cuti_ke_halaman_chain_pegawai(): void
+    {
+        $superAdmin = User::factory()->superAdmin()->create();
+
+        $response = $this->actingAs($superAdmin)
+            ->withSession(['active_role' => 'super_admin'])
+            ->get(route('pengaturan'));
+
+        $response->assertOk();
+        $response->assertSee('Konfigurasi Approval Cuti');
+        $response->assertSee(route('cuti.config'), false);
+        $response->assertSee('Kepala Bagian, nol atau lebih verifikator, dan PYBMC');
+        $response->assertDontSee('Stage 2');
+        $response->assertDontSee('Stage 3');
+        $response->assertDontSee('Riza Hamzah, S.Sos.');
+    }
+
     public function test_admin_kepegawaian_dapat_membuka_halaman_operasional_sesuai_dokumen(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();

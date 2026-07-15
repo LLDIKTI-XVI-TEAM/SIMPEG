@@ -14,8 +14,12 @@ use App\Models\User;
 use App\Services\NotificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Queue\Events\JobFailed;
+use Illuminate\Queue\WorkerOptions;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
+use RuntimeException;
 use Tests\TestCase;
 
 class EmailNotificationTest extends TestCase
@@ -167,6 +171,62 @@ class EmailNotificationTest extends TestCase
         Mail::assertSent(SimpegNotificationMail::class, function (SimpegNotificationMail $mail): bool {
             return $mail->hasTo('pegawai@example.test') && $mail->title === 'Judul Notifikasi';
         });
+    }
+
+    public function test_kegagalan_email_terminal_tercatat_di_failed_jobs_native(): void
+    {
+        config([
+            'queue.default' => 'database',
+            'queue.connections.database.connection' => config('database.default'),
+            'queue.failed.driver' => 'database-uuids',
+            'queue.failed.database' => config('database.default'),
+        ]);
+        app()->forgetInstance('queue.failer');
+        app()->forgetInstance('queue.worker');
+        Event::listen(JobFailed::class, function (JobFailed $event): void {
+            app('queue.failer')->log(
+                $event->connectionName,
+                $event->job->getQueue(),
+                $event->job->getRawBody(),
+                $event->exception,
+            );
+        });
+        $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+        Mail::shouldReceive('to')->once()->andThrow(new RuntimeException('SMTP gagal dengan password rahasia-test'));
+
+        $job = new SendSimpegNotificationEmailJob(
+            $employee->id,
+            'Pengajuan Cuti Disetujui',
+            'Pengajuan cuti Anda telah disetujui sepenuhnya.',
+        );
+        $job->tries = 1;
+        Queue::connection('database')->push($job);
+
+        app('queue.worker')->runNextJob('database', 'default', new WorkerOptions(maxTries: 1));
+
+        $this->assertDatabaseCount('jobs', 0);
+        $this->assertDatabaseCount('failed_jobs', 1);
+        $this->assertDatabaseHas('failed_jobs', [
+            'connection' => 'database',
+            'queue' => 'default',
+        ]);
+    }
+
+    public function test_persetujuan_final_dan_notifikasi_in_app_tetap_committed_sebelum_email_diproses(): void
+    {
+        Queue::fake();
+        $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+        $pybmc = Employee::factory()->create();
+        $leave = $this->makeLeaveRequestWithSteps($employee, [$pybmc]);
+
+        app(ApproveLeaveAction::class)->execute($leave, $pybmc, null, Request::create('/'));
+
+        $this->assertSame('disetujui', $leave->fresh()->status);
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $employee->id,
+            'type' => 'cuti.disetujui',
+        ]);
+        Queue::assertPushed(SendSimpegNotificationEmailJob::class);
     }
 
     public function test_email_template_contains_title_body_and_cta_without_sensitive_payload(): void

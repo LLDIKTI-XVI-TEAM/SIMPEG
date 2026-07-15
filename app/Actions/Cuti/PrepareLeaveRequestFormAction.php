@@ -47,7 +47,11 @@ class PrepareLeaveRequestFormAction
         // Baris summary tahunan dipakai hanya untuk info jatah/carry/terpakai, bukan sebagai angka otoritatif.
         $saldoTahunan = $employee->leaveBalances()->where('tahun', $tahun)->first();
 
-        $jenisCuti = RefJenisCuti::orderBy('nama')->get();
+        // Metadata khusus_pns adalah sumber yang sama dengan validasi submit, bukan tebakan dari nama tampilan.
+        $jenisCuti = RefJenisCuti::query()
+            ->when($employee->jenisPegawai?->nama !== 'PNS', fn ($query) => $query->where('khusus_pns', false))
+            ->orderBy('nama')
+            ->get();
 
         // Saat render form (GET), chain approval yang belum terkonfigurasi bukan kondisi fatal;
         // default belum siap, dan hanya ditandai siap bila resolver mengembalikan step yang benar-benar ada.
