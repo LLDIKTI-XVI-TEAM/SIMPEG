@@ -70,14 +70,14 @@
                         <div class="space-y-1">
                             <label for="nama_dengan_gelar" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama dengan Gelar</label>
                             <input id="nama_dengan_gelar" name="nama_dengan_gelar" type="text" placeholder="Grantly Sorongan, S.Kom." class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ old('nama_dengan_gelar') }}">
-                            <p class="text-[10px] text-muted font-sans mt-0.5">Nama yang ditampilkan pada kartu &amp; header. Boleh kosong jika sama dengan nama lengkap.</p>
+                            <p class="text-xs text-muted">Nama yang ditampilkan pada kartu &amp; header. Boleh kosong jika sama dengan nama lengkap.</p>
                         </div>
 
                         {{-- Nama Lengkap (tanpa gelar) --}}
                         <div class="space-y-1">
                             <label for="nama_lengkap" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Lengkap (tanpa gelar) <span class="text-danger">*</span></label>
-                            <input id="nama_lengkap" name="nama_lengkap" type="text"  placeholder="Grantly Antonio Edward Sorongan" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ old('nama_lengkap') }}">
-                            <p class="text-[10px] text-muted font-sans mt-0.5">Nama lengkap resmi sesuai KTP atau SK, tanpa gelar akademik.</p>
+                            <input id="nama_lengkap" name="nama_lengkap" type="text" required placeholder="Grantly Antonio Edward Sorongan" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ old('nama_lengkap') }}">
+                            <p class="text-xs text-muted">Nama lengkap resmi sesuai KTP atau SK, tanpa gelar akademik.</p>
                         </div>
 
                         {{-- NIP --}}

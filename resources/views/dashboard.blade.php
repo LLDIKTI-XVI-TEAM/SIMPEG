@@ -57,7 +57,7 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008zM9.75 15h.008v.008H9.75V15zm0 2.25h.008v.008H9.75v-.008zM7.5 15h.008v.008H7.5V15zm0 2.25h.008v.008H7.5v-.008zm6.75-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H16.5v-.008zm0 2.25h.008v.008H16.5V15z" /></svg>
                     </div>
                     <div class="w-px h-6 bg-white/20"></div>
-                    <div class="flex flex-col">
+                    <div class="flex flex-col mt-0.5">
                         <span class="text-[12px] font-medium text-white/90 leading-none">{{ now()->translatedFormat('l, d F Y') }}</span>
                         <span class="text-[10px] text-white/70 mt-0.5">Hari ini</span>
                     </div>
@@ -69,7 +69,7 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0012 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75z" /></svg>
                     </div>
                     <div class="w-px h-6 bg-white/20"></div>
-                    <div class="flex flex-col">
+                    <div class="flex flex-col mt-0.5">
                         <span class="text-[12px] font-medium text-white/90 leading-none">Sistem Informasi Kepegawaian</span>
                         <span class="text-[10px] text-white/70 mt-0.5">LLDIKTI Wilayah XVI</span>
                     </div>
@@ -192,7 +192,7 @@
             <div class="flex items-center justify-between border-b border-border px-6 py-4 bg-surface">
                 <div>
                     <h3 class="text-sm font-bold text-ink font-sans">Kenaikan Pangkat Terdekat</h3>
-                    <p class="text-[10px] text-muted font-sans mt-0.5">Pegawai yang dijadwalkan naik pangkat bulan ini</p>
+                    <p class="text-xs text-muted">Pegawai yang dijadwalkan naik pangkat bulan ini</p>
                 </div>
                 <a href="{{ route('data-pegawai', ['filter' => 'pangkat']) }}" class="text-xs font-semibold text-primary hover:underline font-sans">
                     Kelola
@@ -218,14 +218,14 @@
                                     </div>
                                     <div class="min-w-0">
                                         <p class="text-xs font-bold text-ink font-sans leading-tight">Ahmad Fauzi</p>
-                                        <p class="text-[10px] text-muted font-sans leading-none mt-0.5">NIP. 19850312 201001 1 001</p>
+                                        <p class="text-xs text-muted">NIP. 19850312 201001 1 001</p>
                                     </div>
                                 </div>
 
                             </x-ui.table-td>
                             <x-ui.table-td padding="xl" class="text-muted font-medium">III/c (Penata)</x-ui.table-td>
                             <x-ui.table-td padding="xl" class="text-muted font-medium">III/d (Penata Tingkat 1)</x-ui.table-td>
-                            <x-ui.table-td padding="xl" class="font-semibold font-mono">01-07-2026</x-ui.table-td>
+                            <x-ui.table-td padding="xl" class="font-semibold">01-07-2026</x-ui.table-td>
                             <x-ui.table-td align="right" padding="xl">
 
                                 <div class="flex items-center justify-end">
@@ -246,14 +246,14 @@
                                     </div>
                                     <div class="min-w-0">
                                         <p class="text-xs font-bold text-ink font-sans leading-tight">Siti Rahayu</p>
-                                        <p class="text-[10px] text-muted font-sans leading-none mt-0.5">NIP. 19901120 201501 2 003</p>
+                                        <p class="text-xs text-muted">NIP. 19901120 201501 2 003</p>
                                     </div>
                                 </div>
 
                             </x-ui.table-td>
                             <x-ui.table-td padding="xl" class="text-muted font-medium">II/d (Pengatur Tkt. 1)</x-ui.table-td>
                             <x-ui.table-td padding="xl" class="text-muted font-medium">III/a (Penata Muda)</x-ui.table-td>
-                            <x-ui.table-td padding="xl" class="font-semibold font-mono">01-07-2026</x-ui.table-td>
+                            <x-ui.table-td padding="xl" class="font-semibold">01-07-2026</x-ui.table-td>
                             <x-ui.table-td align="right" padding="xl">
 
                                 <div class="flex items-center justify-end">
@@ -289,7 +289,7 @@
                             <circle class="text-secondary" stroke="currentColor" stroke-width="4.5" stroke-dasharray="18.4 81.6" stroke-dashoffset="-81.6" fill="none" cx="18" cy="18" r="15.915" stroke-linecap="round"></circle>
                         </svg>
                         <div class="absolute flex flex-col items-center justify-center">
-                            <span class="text-xl font-mono font-extrabold text-ink leading-none">228</span>
+                            <span class="text-xl font-extrabold text-ink leading-none">228</span>
                             <span class="text-[9px] text-muted font-sans font-bold uppercase tracking-wider mt-1">Aktif</span>
                         </div>
                     </div>
@@ -302,14 +302,14 @@
                             <span class="h-2.5 w-2.5 rounded-full bg-primary shrink-0"></span>
                             <span class="font-medium text-ink">PNS</span>
                         </div>
-                        <span class="font-bold text-primary font-mono">186 (81.6%)</span>
+                        <span class="font-bold text-primary">186 (81.6%)</span>
                     </div>
                     <div class="flex items-center justify-between text-xs">
                         <div class="flex items-center gap-2">
                             <span class="h-2.5 w-2.5 rounded-full bg-secondary shrink-0"></span>
                             <span class="font-medium text-ink">PPPK</span>
                         </div>
-                        <span class="font-bold text-secondary font-mono">42 (18.4%)</span>
+                        <span class="font-bold text-secondary">42 (18.4%)</span>
                     </div>
                 </div>
             </div>
@@ -327,7 +327,7 @@
             <div class="flex items-center justify-between border-b border-border px-6 py-4 bg-surface">
                 <div>
                     <h3 class="text-sm font-bold text-ink font-sans">Daftar EWS Aktif</h3>
-                    <p class="text-[10px] text-muted font-sans mt-0.5">Peringatan otomatis masa berlaku dokumen & kepegawaian</p>
+                    <p class="text-xs text-muted">Peringatan otomatis masa berlaku dokumen & kepegawaian</p>
                 </div>
                 <a href="{{ $dashboardEwsLink }}" class="text-xs font-semibold text-primary hover:underline font-sans">
                     Lihat Semua
@@ -417,7 +417,7 @@
                 <div class="flex items-center justify-between border-b border-border px-6 py-4 bg-surface">
                     <div>
                         <h3 class="text-sm font-bold text-ink font-sans">Otorisasi Cuti Pending</h3>
-                        <p class="text-[10px] text-muted font-sans mt-0.5">Menunggu keputusan persetujuan</p>
+                        <p class="text-xs text-muted">Menunggu keputusan persetujuan</p>
                     </div>
                     <span class="text-xs font-bold font-sans text-warning">3</span>
                 </div>
@@ -484,7 +484,7 @@
                     <div>
                         <div class="flex items-center justify-between text-xs mb-1">
                             <span class="font-medium text-ink">{{ $dg['gol'] }}</span>
-                            <span class="font-bold text-primary font-mono">{{ $dg['jumlah'] }} ({{ $dg['persen'] }})</span>
+                            <span class="font-bold text-primary">{{ $dg['jumlah'] }} ({{ $dg['persen'] }})</span>
                         </div>
                         <div class="h-2 w-full bg-soft rounded-full overflow-hidden">
                             <div class="h-2 rounded-full {{ $dg['color'] }}" style="width: {{ $dg['persen'] }}"></div>
@@ -567,7 +567,7 @@
             <div class="flex items-center justify-between border-b border-border px-6 py-4 bg-surface">
                 <div>
                     <h3 class="text-sm font-bold text-ink font-sans">Pegawai Terbaru</h3>
-                    <p class="text-[10px] text-muted font-sans mt-0.5">Penambahan data kepegawaian terakhir</p>
+                    <p class="text-xs text-muted">Penambahan data kepegawaian terakhir</p>
                 </div>
                 <a href="{{ route('data-pegawai') }}" class="text-xs font-semibold text-primary hover:underline font-sans">
                     Lihat Semua
@@ -603,7 +603,7 @@
                                     </div>
                                     <div class="min-w-0">
                                         <p class="text-xs font-bold text-ink font-sans leading-tight">{{ $p['nama'] }}</p>
-                                        <p class="text-[10px] text-muted font-sans leading-none mt-0.5">NIP. {{ $p['nip'] }}</p>
+                                        <p class="text-xs text-muted">NIP. {{ $p['nip'] }}</p>
                                     </div>
                                 </div>
                             </x-ui.table-td>
@@ -640,7 +640,7 @@
             <div class="flex items-center justify-between border-b border-border px-6 py-4 bg-surface">
                 <div>
                     <h3 class="text-sm font-bold text-ink font-sans">Aktivitas Terkini</h3>
-                    <p class="text-[10px] text-muted font-sans mt-0.5">Log perubahan sistem kepegawaian hari ini</p>
+                    <p class="text-xs text-muted">Log perubahan sistem kepegawaian hari ini</p>
                 </div>
                 <a href="{{ route('audit-log') }}" class="text-xs font-semibold text-primary hover:underline font-sans">Audit Log</a>
             </div>
@@ -687,7 +687,7 @@
         <div class="flex items-center justify-between border-b border-border pb-4 mb-5">
             <div>
                 <h3 class="text-sm font-bold text-ink font-sans">Hari Libur Mendatang</h3>
-                <p class="text-[10px] text-muted font-sans mt-0.5">Garis waktu 3-4 bulan ke depan</p>
+                <p class="text-xs text-muted">Garis waktu 3-4 bulan ke depan</p>
             </div>
             @if(auth()->user()?->role === 'super_admin')
                 <a href="{{ route('hari-libur') }}" class="text-xs font-semibold text-primary hover:underline font-sans">Kelola</a>

@@ -102,7 +102,7 @@
                                         </div>
                                         <div class="min-w-0">
                                             <p class="block truncate text-sm font-semibold text-ink transition hover:text-primary">{{ $employee->nama_lengkap }}</p>
-                                            <p class="font-mono text-xs text-muted">NIP. {{ $employee->nip }}</p>
+                                            <p class="text-xs text-muted">NIP. {{ $employee->nip }}</p>
                                         </div>
                                     </div>
                                 </x-ui.table-td>
@@ -118,7 +118,7 @@
                                         {{ $statusNama }}
                                     </x-ui.badge>
                                     @if($employee->updated_at)
-                                        <p class="mt-1 font-mono text-xs text-muted">{{ $employee->updated_at->format('d/m/Y H:i') }}</p>
+                                        <p class="mt-1 text-xs text-muted">{{ $employee->updated_at->format('d/m/Y H:i') }}</p>
                                     @endif
                                 </x-ui.table-td>
                                 <x-ui.table-td>

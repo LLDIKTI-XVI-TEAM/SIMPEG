@@ -52,7 +52,7 @@
                 <div class="space-y-1">
                     <span class="text-xs font-semibold text-muted font-sans uppercase tracking-wider">Pemilik Dokumen (Pegawai)</span>
                     <p class="text-sm font-semibold text-ink font-sans">{{ $doc['nama_pegawai'] ?? '-' }}</p>
-                    <p class="text-xs text-muted font-mono">{{ $doc['nip_pegawai'] ?? '-' }}</p>
+                    <p class="text-xs text-muted">{{ $doc['nip_pegawai'] ?? '-' }}</p>
                 </div>
                 <div class="space-y-1">
                     <span class="text-xs font-semibold text-muted font-sans uppercase tracking-wider">Unit Kerja</span>
@@ -60,11 +60,11 @@
                 </div>
                 <div class="space-y-1">
                     <span class="text-xs font-semibold text-muted font-sans uppercase tracking-wider">Nomor Dokumen</span>
-                    <p class="text-sm font-semibold text-ink font-mono">{{ $doc['nomor'] }}</p>
+                    <p class="text-sm font-semibold text-ink">{{ $doc['nomor'] }}</p>
                 </div>
                 <div class="space-y-1">
                     <span class="text-xs font-semibold text-muted font-sans uppercase tracking-wider">Tanggal Terbit</span>
-                    <p class="text-sm font-semibold text-ink font-mono">{{ $doc['tanggal'] !== '-' ? \Carbon\Carbon::parse($doc['tanggal'])->translatedFormat('d F Y') : '-' }}</p>
+                    <p class="text-sm font-semibold text-ink">{{ $doc['tanggal'] !== '-' ? \Carbon\Carbon::parse($doc['tanggal'])->translatedFormat('d F Y') : '-' }}</p>
                 </div>
                 <div class="col-span-1 sm:col-span-2 space-y-1 mt-2">
                     <span class="text-xs font-semibold text-muted font-sans uppercase tracking-wider">Deskripsi Dokumen</span>
@@ -72,7 +72,7 @@
                 </div>
                 <div class="col-span-1 sm:col-span-2 space-y-1 mt-2">
                     <span class="text-xs font-semibold text-muted font-sans uppercase tracking-wider">Penyimpanan File</span>
-                    <p class="text-xs text-muted font-mono bg-soft/50 rounded-lg p-3 border border-border overflow-x-auto">{{ $doc['file_path'] }}</p>
+                    <p class="text-xs text-muted bg-soft/50 rounded-lg p-3 border border-border overflow-x-auto">{{ $doc['file_path'] }}</p>
                 </div>
             </div>
         </x-ui.card>

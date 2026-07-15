@@ -19,9 +19,9 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('head')
 </head>
-<body class="h-full bg-page font-sans">
+<body class="h-full bg-page font-sans overflow-hidden">
 
-<div class="flex h-screen overflow-hidden" x-data="{ sidebarOpen: false }">
+<div class="flex h-screen overflow-hidden" x-data="{ sidebarOpen: false }" @keydown.escape.window="sidebarOpen = false">
 
     {{-- ================================================================== --}}
     {{-- MOBILE OVERLAY --}}
@@ -104,24 +104,7 @@
                     'ews',
                     'ews.config',
                 ],
-                'kepala_bagian' => [
-                    'data-pegawai',
-                    'pegawai.import',
-                    'hari-libur',
-                    'dokumen',
-                    'audit-log',
-                    'pengaturan',
-                    'user-management',
-                    'rbac',
-                    'data-backup',
-                    'data-master',
-                    'laporan',
-                    'laporan.pegawai',
-                    'laporan.cuti',
-                    'cuti.rekap',
-                    'ews',
-                    'ews.config',
-                ],
+
                 'pegawai' => [
                     'data-pegawai',
                     'pegawai.import',
@@ -226,6 +209,36 @@
                             ['label' => 'Laporan', 'route' => 'pimpinan.laporan.index', 'icon' => 'document-chart-bar'],
                         ]
                     ]
+                ];
+            }
+
+            if ($activeRole === 'kepala_bagian') {
+                $menuGroups = [
+                    [
+                        'group' => '',
+                        'items' => [
+                            ['label' => 'Dashboard', 'route' => 'kepala-bagian.dashboard', 'icon' => 'squares-2x2'],
+                        ],
+                    ],
+                    [
+                        'group' => 'Kepegawaian',
+                        'items' => [
+                            ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'],
+                        ],
+                    ],
+                    [
+                        'group' => 'Cuti',
+                        'items' => [
+                            ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'calendar'],
+                        ],
+                    ],
+                    [
+                        'group' => 'EWS & Notifikasi',
+                        'items' => [
+                            ['label' => 'EWS Bawahan', 'route' => 'kepala-bagian.ews.index', 'icon' => 'exclamation-triangle'],
+                            ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
+                        ],
+                    ],
                 ];
             }
 
@@ -357,7 +370,7 @@
     {{-- ================================================================== --}}
     {{-- MAIN COLUMN — scrolls independently --}}
     {{-- ================================================================== --}}
-    <div class="flex flex-1 flex-col min-w-0 overflow-hidden">
+    <div class="flex flex-1 flex-col min-w-0 min-h-0 overflow-hidden">
 
         {{-- NAVBAR --}}
         <header class="sticky top-0 z-40 flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface/80 backdrop-blur-md px-4 lg:px-6">
@@ -368,7 +381,9 @@
                     @click="sidebarOpen = !sidebarOpen"
                     id="sidebar-toggle"
                     class="inline-flex items-center justify-center rounded-lg border border-border p-2 text-muted transition-colors hover:bg-soft hover:text-ink lg:hidden"
-                    aria-label="Buka atau tutup menu navigasi"
+                    :aria-expanded="sidebarOpen.toString()"
+                    :aria-label="sidebarOpen ? 'Tutup menu navigasi' : 'Buka menu navigasi'"
+                    aria-controls="sidebar-nav"
                 >
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
                 </button>
@@ -461,7 +476,7 @@
                     >
                         <div class="border-b border-border px-4 py-3">
                             <p class="text-xs font-semibold text-ink font-sans">{{ str_replace(['(', ')'], '', auth()->user()->name ?? 'Pengguna') }}</p>
-                            <p class="mt-0.5 text-xs text-muted font-sans font-mono">{{ auth()->user()->email ?? '' }}</p>
+                            <p class="mt-0.5 text-xs text-muted font-sans">{{ auth()->user()->email ?? '' }}</p>
                         </div>
                         <div class="p-1.5 space-y-0.5">
                             <a href="{{ route('profil') }}" id="profile-link" class="flex items-center gap-2.5 rounded-lg px-4 py-2 text-sm text-ink transition-colors hover:bg-soft font-sans font-medium">
@@ -507,7 +522,7 @@
 
 
         {{-- PAGE CONTENT --}}
-        <main class="flex-1 overflow-y-auto bg-page scrollbar-hide">
+        <main class="flex-1 overflow-y-auto bg-page scrollbar-hide min-h-0">
             <div class="mx-auto max-w-7xl px-4 py-6 lg:px-6">
                 @php($sessionTimeoutMessage = session()->pull('simpeg_session_timeout_message'))
                 @if ($sessionTimeoutMessage)

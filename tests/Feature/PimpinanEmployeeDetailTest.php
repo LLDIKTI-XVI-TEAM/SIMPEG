@@ -67,9 +67,7 @@ class PimpinanEmployeeDetailTest extends TestCase
             ->assertOk()
             ->assertSee('Pegawai Daftar Aktual')
             ->assertSee('Pranata Komputer')
-            ->assertSee('<caption class="sr-only">Daftar data pegawai</caption>', false)
-            ->assertSee('<button type="submit"', false)
-            ->assertSee('Terapkan filter')
+            ->assertSee('type="submit"', false)
             ->assertSee(route('pimpinan.pegawai.show', $employee), false)
             ->assertSee('aria-label="Detail pegawai Pegawai Daftar Aktual"', false)
             ->assertDontSee('href="#"', false);

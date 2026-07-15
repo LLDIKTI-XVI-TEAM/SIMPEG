@@ -49,7 +49,7 @@
                                     </div>
                                     <div>
                                         <p class="text-sm font-semibold text-ink font-sans leading-tight">{{ $r->employee->nama_lengkap ?? 'Pegawai' }}</p>
-                                        <p class="text-[10px] text-muted font-sans mt-0.5">Pengajuan: {{ $r->created_at?->translatedFormat('d M Y') }}</p>
+                                        <p class="text-xs text-muted">Pengajuan: {{ $r->created_at?->translatedFormat('d M Y') }}</p>
                                     </div>
                                 </div>
                             </x-ui.table-td>
@@ -59,7 +59,7 @@
                                     {{ $activeStep?->role_label ?? 'Approver' }}
                                 </div>
                             </x-ui.table-td>
-                            <x-ui.table-td padding="comfortable" class="text-sm font-mono">{{ $r->jumlah_hari_kerja }} Hari Kerja<br><span class="text-[10px] text-muted font-sans">{{ $r->tanggal_mulai?->translatedFormat('d M') }} - {{ $r->tanggal_selesai?->translatedFormat('d M Y') }}</span></x-ui.table-td>
+                            <x-ui.table-td padding="comfortable" class="text-sm">{{ $r->jumlah_hari_kerja }} Hari Kerja<br><span class="text-[10px] text-muted font-sans">{{ $r->tanggal_mulai?->translatedFormat('d M') }} - {{ $r->tanggal_selesai?->translatedFormat('d M Y') }}</span></x-ui.table-td>
                             <x-ui.table-td title="{{ $r->alasan }}" padding="comfortable" class="text-muted max-w-xs truncate">{{ $r->alasan }}</x-ui.table-td>
                             <x-ui.table-td align="right" padding="comfortable">
                                 <div class="flex items-center justify-end gap-2.5">

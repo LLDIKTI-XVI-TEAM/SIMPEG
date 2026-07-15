@@ -191,7 +191,7 @@
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1 max-w-2xl">
                 <div>
                     <span class="text-[9px] font-bold text-muted uppercase tracking-wider block">Waktu Harian</span>
-                    <span class="text-xs font-mono font-semibold text-ink"><span x-text="ews_scheduler_time"></span>
+                    <span class="text-xs font-semibold text-ink"><span x-text="ews_scheduler_time"></span>
                         WITA</span>
                 </div>
                 <div>
@@ -218,7 +218,7 @@
                     </svg>
                     <div>
                         <span class="text-xs font-semibold text-danger">Pesan Error Eksekusi Terakhir:</span>
-                        <p class="text-xs text-danger font-mono mt-1 whitespace-pre-wrap">{{ $schedulerStatus['error_message'] }}</p>
+                        <p class="text-xs text-danger mt-1 whitespace-pre-wrap">{{ $schedulerStatus['error_message'] }}</p>
                     </div>
                 </div>
             </div>
@@ -294,7 +294,7 @@
                         <div class="w-full sm:w-auto">
                             <input type="time" id="cfg-scheduler-time" name="ews_scheduler_time"
                                 x-model="ews_scheduler_time"
-                                class="w-full sm:w-40 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono font-semibold">
+                                class="w-full sm:w-40 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-semibold">
                             @error('ews_scheduler_time')
                                 <p class="text-xs text-danger mt-1">{{ $message }}</p>
                             @enderror
@@ -324,7 +324,7 @@
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="pangkat_h90" x-model="pangkat_h90" min="1" step="1"
                                     aria-label="Kenaikan Pangkat Tahap 1 (Awal) dalam hari"
-                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + p90Class()">
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + p90Class()">
                                 <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
                             <span class="text-[10px] font-bold text-success min-w-[68px] text-center" x-text="humanLabel(pangkat_h90)"></span>
@@ -335,7 +335,7 @@
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="pangkat_h60" x-model="pangkat_h60" min="1" step="1"
                                     aria-label="Kenaikan Pangkat Tahap 2 (Dekat) dalam hari"
-                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + p60Class()">
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + p60Class()">
                                 <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
                             <span class="text-[10px] font-bold text-warning min-w-[68px] text-center" x-text="humanLabel(pangkat_h60)"></span>
@@ -346,7 +346,7 @@
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="pangkat_h30" x-model="pangkat_h30" min="1" step="1"
                                     aria-label="Kenaikan Pangkat Tahap 3 (Mendesak) dalam hari"
-                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + p30Class()">
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + p30Class()">
                                 <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
                             <span class="text-[10px] font-bold text-danger min-w-[68px] text-center" x-text="humanLabel(pangkat_h30)"></span>
@@ -376,7 +376,7 @@
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="kgb_h60" x-model="kgb_h60" min="1" step="1"
                                     aria-label="Kenaikan Gaji Berkala Tahap 1 (Awal) dalam hari"
-                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + k60Class()">
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + k60Class()">
                                 <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
                             <span class="text-[10px] font-bold text-success min-w-[68px] text-center" x-text="humanLabel(kgb_h60)"></span>
@@ -387,7 +387,7 @@
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="kgb_h30" x-model="kgb_h30" min="1" step="1"
                                     aria-label="Kenaikan Gaji Berkala Tahap 2 (Dekat) dalam hari"
-                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + k30Class()">
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + k30Class()">
                                 <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
                             <span class="text-[10px] font-bold text-warning min-w-[68px] text-center" x-text="humanLabel(kgb_h30)"></span>
@@ -398,7 +398,7 @@
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="kgb_h14" x-model="kgb_h14" min="1" step="1"
                                     aria-label="Kenaikan Gaji Berkala Tahap 3 (Mendesak) dalam hari"
-                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + k14Class()">
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + k14Class()">
                                 <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
                             <span class="text-[10px] font-bold text-danger min-w-[68px] text-center" x-text="humanLabel(kgb_h14)"></span>
@@ -428,7 +428,7 @@
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="pensiun_y1" x-model="pensiun_y1" min="1" step="1"
                                     aria-label="Batas Usia Pensiun Tahap 1 (Awal) dalam hari"
-                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + py1Class()">
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + py1Class()">
                                 <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
                             <span class="text-[10px] font-bold text-success min-w-[68px] text-center" x-text="humanLabel(pensiun_y1)"></span>
@@ -439,7 +439,7 @@
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="pensiun_m6" x-model="pensiun_m6" min="1" step="1"
                                     aria-label="Batas Usia Pensiun Tahap 2 (Dekat) dalam hari"
-                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + pm6Class()">
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + pm6Class()">
                                 <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
                             <span class="text-[10px] font-bold text-warning min-w-[68px] text-center" x-text="humanLabel(pensiun_m6)"></span>
@@ -450,7 +450,7 @@
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="pensiun_m3" x-model="pensiun_m3" min="1" step="1"
                                     aria-label="Batas Usia Pensiun Tahap 3 (Mendesak) dalam hari"
-                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + pm3Class()">
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + pm3Class()">
                                 <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
                             <span class="text-[10px] font-bold text-danger min-w-[68px] text-center" x-text="humanLabel(pensiun_m3)"></span>
@@ -480,7 +480,7 @@
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="pppk_m6" x-model="pppk_m6" min="1" step="1"
                                     aria-label="Kontrak PPPK Tahap 1 (Awal) dalam hari"
-                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + pp6Class()">
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + pp6Class()">
                                 <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
                             <span class="text-[10px] font-bold text-success min-w-[68px] text-center" x-text="humanLabel(pppk_m6)"></span>
@@ -491,7 +491,7 @@
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="pppk_m3" x-model="pppk_m3" min="1" step="1"
                                     aria-label="Kontrak PPPK Tahap 2 (Dekat) dalam hari"
-                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + pp3Class()">
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + pp3Class()">
                                 <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
                             <span class="text-[10px] font-bold text-warning min-w-[68px] text-center" x-text="humanLabel(pppk_m3)"></span>
@@ -502,7 +502,7 @@
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="pppk_m1" x-model="pppk_m1" min="1" step="1"
                                     aria-label="Kontrak PPPK Tahap 3 (Mendesak) dalam hari"
-                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + pp1Class()">
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + pp1Class()">
                                 <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
                             <span class="text-[10px] font-bold text-danger min-w-[68px] text-center" x-text="humanLabel(pppk_m1)"></span>
@@ -532,7 +532,7 @@
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="satyalancana_h180" x-model="satyalancana_h180" min="1" step="1"
                                     aria-label="Satyalancana Tahap 1 (Awal) dalam hari"
-                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + sl180Class()">
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + sl180Class()">
                                 <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
                             <span class="text-[10px] font-bold text-success min-w-[68px] text-center" x-text="humanLabel(satyalancana_h180)"></span>
@@ -543,7 +543,7 @@
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="satyalancana_h90" x-model="satyalancana_h90" min="1" step="1"
                                     aria-label="Satyalancana Tahap 2 (Dekat) dalam hari"
-                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + sl90Class()">
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + sl90Class()">
                                 <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
                             <span class="text-[10px] font-bold text-warning min-w-[68px] text-center" x-text="humanLabel(satyalancana_h90)"></span>
@@ -554,7 +554,7 @@
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="satyalancana_h30" x-model="satyalancana_h30" min="1" step="1"
                                     aria-label="Satyalancana Tahap 3 (Mendesak) dalam hari"
-                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 font-mono bg-surface ' + sl30Class()">
+                                    :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + sl30Class()">
                                 <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
                             <span class="text-[10px] font-bold text-danger min-w-[68px] text-center" x-text="humanLabel(satyalancana_h30)"></span>
@@ -646,12 +646,12 @@
                                 <x-ui.table-td padding="wide" class="text-muted whitespace-nowrap">{{ $row['time'] }}</x-ui.table-td>
                                 <x-ui.table-td padding="wide">
                                     <span class="font-semibold text-ink block">{{ $row['actor'] }}</span>
-                                    <span class="text-[9px] text-muted block font-mono">{{ $row['ip_address'] }}</span>
+                                    <span class="text-[9px] text-muted block">{{ $row['ip_address'] }}</span>
                                 </x-ui.table-td>
                                 <x-ui.table-td padding="wide" class="font-medium">{{ $row['field'] }}</x-ui.table-td>
-                                <x-ui.table-td align="right" padding="wide" class="font-mono text-muted">{{ $row['before'] }}</x-ui.table-td>
+                                <x-ui.table-td align="right" padding="wide" class="text-muted">{{ $row['before'] }}</x-ui.table-td>
                                 <x-ui.table-td align="center" class="px-3 py-3.5 text-muted">→</x-ui.table-td>
-                                <x-ui.table-td padding="wide" class="font-mono font-bold text-success">{{ $row['after'] }}</x-ui.table-td>
+                                <x-ui.table-td padding="wide" class="font-bold text-success">{{ $row['after'] }}</x-ui.table-td>
                                 <x-ui.table-td title="{{ $row['reason'] }}" padding="wide" class="text-muted italic max-w-[200px] truncate">{{ $row['reason'] }}</x-ui.table-td>
                             </x-ui.table-row>
 
@@ -665,7 +665,7 @@
                                         <div class="space-y-1">
                                             <span class="text-[10px] font-bold uppercase tracking-wider text-muted">Event
                                                 Type</span>
-                                            <p class="text-sm font-semibold text-ink font-mono">
+                                            <p class="text-sm font-semibold text-ink">
                                                 {{ $row['event'] ?? 'UPDATE_EWS_CONFIG' }}
                                             </p>
                                         </div>
@@ -673,14 +673,14 @@
                                         <div class="space-y-1">
                                             <span class="text-[10px] font-bold uppercase tracking-wider text-muted">IP
                                                 Address</span>
-                                            <p class="text-sm text-ink font-mono">{{ $row['ip_address'] ?? '127.0.0.1' }}
+                                            <p class="text-sm text-ink">{{ $row['ip_address'] ?? '127.0.0.1' }}
                                             </p>
                                         </div>
                                         {{-- User Agent --}}
                                         <div class="space-y-1 sm:col-span-2">
                                             <span class="text-[10px] font-bold uppercase tracking-wider text-muted">User
                                                 Agent</span>
-                                            <p class="text-xs text-muted truncate font-mono"
+                                            <p class="text-xs text-muted truncate"
                                                 title="{{ $row['user_agent'] ?? 'Mozilla/5.0' }}">
                                                 {{ $row['user_agent'] ?? 'Mozilla/5.0' }}
                                             </p>
@@ -691,7 +691,7 @@
                                                 Lama (JSON)</span>
                                             <div class="rounded-md border border-danger/20 bg-danger/5 px-3 py-2">
                                                 <code
-                                                    class="text-xs text-danger font-mono">{{ json_encode(['value' => $row['before']], JSON_PRETTY_PRINT) }}</code>
+                                                    class="text-xs text-danger">{{ json_encode(['value' => $row['before']], JSON_PRETTY_PRINT) }}</code>
                                             </div>
                                         </div>
                                         {{-- New Values --}}
@@ -700,7 +700,7 @@
                                                 Baru (JSON)</span>
                                             <div class="rounded-md border border-success/20 bg-success/5 px-3 py-2">
                                                 <code
-                                                    class="text-xs text-success font-mono">{{ json_encode(['value' => $row['after']], JSON_PRETTY_PRINT) }}</code>
+                                                    class="text-xs text-success">{{ json_encode(['value' => $row['after']], JSON_PRETTY_PRINT) }}</code>
                                             </div>
                                         </div>
                                         {{-- Reason --}}
@@ -745,35 +745,35 @@
                 <dl class="space-y-3 text-xs">
                     <div class="flex items-center justify-between gap-4 border-b border-border pb-1.5">
                         <dt class="text-muted">Scheduler Time (WITA)</dt>
-                        <dd class="font-semibold text-ink font-mono" x-text="ews_scheduler_time"></dd>
+                        <dd class="font-semibold text-ink" x-text="ews_scheduler_time"></dd>
                     </div>
                     <div class="flex items-center justify-between gap-4 border-b border-border pb-1.5">
                         <dt class="text-muted">Pangkat Tahap 1 / 2 / 3</dt>
-                        <dd class="font-semibold text-ink font-mono"><span x-text="pangkat_h90"></span> / <span
+                        <dd class="font-semibold text-ink"><span x-text="pangkat_h90"></span> / <span
                                 x-text="pangkat_h60"></span> / <span x-text="pangkat_h30"></span></dd>
                     </div>
                     <div class="flex items-center justify-between gap-4 border-b border-border pb-1.5">
                         <dt class="text-muted">KGB Tahap 1 / 2 / 3</dt>
-                        <dd class="font-semibold text-ink font-mono"><span x-text="kgb_h60"></span> / <span
+                        <dd class="font-semibold text-ink"><span x-text="kgb_h60"></span> / <span
                                 x-text="kgb_h30"></span> / <span x-text="kgb_h14"></span></dd>
                     </div>
                     <div class="flex items-center justify-between gap-4 border-b border-border pb-1.5">
                         <dt class="text-muted">Pensiun (BUP) Tahap 1 / 2 / 3</dt>
-                        <dd class="font-semibold text-ink font-mono">
+                        <dd class="font-semibold text-ink">
                             <span x-text="pensiun_y1"></span>h / <span x-text="pensiun_m6"></span>h / <span
                                 x-text="pensiun_m3"></span>h
                         </dd>
                     </div>
                     <div class="flex items-center justify-between gap-4 border-b border-border pb-1.5">
                         <dt class="text-muted">PPPK Kontrak Tahap 1 / 2 / 3</dt>
-                        <dd class="font-semibold text-ink font-mono">
+                        <dd class="font-semibold text-ink">
                             <span x-text="pppk_m6"></span>h / <span x-text="pppk_m3"></span>h / <span
                                 x-text="pppk_m1"></span>h
                         </dd>
                     </div>
                     <div class="flex items-center justify-between gap-4 border-b border-border pb-1.5">
                         <dt class="text-muted">Satyalancana Tahap 1 / 2 / 3</dt>
-                        <dd class="font-semibold text-ink font-mono">
+                        <dd class="font-semibold text-ink">
                             <span x-text="satyalancana_h180"></span>h / <span x-text="satyalancana_h90"></span>h / <span
                                 x-text="satyalancana_h30"></span>h
                         </dd>

@@ -401,21 +401,21 @@
                         <div class="space-y-1">
                             <label for="nama_dengan_gelar" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama dengan Gelar</label>
                             <input id="nama_dengan_gelar" name="nama_dengan_gelar" type="text" placeholder="Grantly Sorongan, S.Kom." class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ old('nama_dengan_gelar', $p->nama_dengan_gelar) }}">
-                            <p class="text-[10px] text-muted font-sans mt-0.5">Nama yang ditampilkan pada kartu &amp; header. Boleh kosong jika sama dengan nama lengkap.</p>
+                            <p class="text-xs text-muted">Nama yang ditampilkan pada kartu &amp; header. Boleh kosong jika sama dengan nama lengkap.</p>
                         </div>
 
                         {{-- Nama Lengkap (tanpa gelar) --}}
                         <div class="space-y-1">
                             <label for="nama_lengkap" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Lengkap (tanpa gelar)</label>
                             <input id="nama_lengkap" name="nama_lengkap" type="text" placeholder="Grantly Antonio Edward Sorongan" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ old('nama_lengkap', $p->nama_lengkap) }}">
-                            <p class="text-[10px] text-muted font-sans mt-0.5">Nama lengkap resmi sesuai KTP atau SK, tanpa gelar akademik. Data ini penting untuk dilengkapi.</p>
+                            <p class="text-xs text-muted">Nama lengkap resmi sesuai KTP atau SK, tanpa gelar akademik. Data ini penting untuk dilengkapi.</p>
                         </div>
 
                         {{-- NIP --}}
                         <div class="space-y-1">
                             <label for="nip" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">NIP</label>
                             <input id="nip" name="nip" type="text" maxlength="18" x-model="nip" @input="validateNip" value="{{ $p->nip }}" placeholder="198503122010011001" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                            <p class="text-[10px] text-muted font-sans mt-0.5">Data ini penting untuk dilengkapi.</p>
+                            <p class="text-xs text-muted">Data ini penting untuk dilengkapi.</p>
                             <p x-show="nipError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="nipError"></p>
                         </div>
 
@@ -461,7 +461,7 @@
                         <div class="space-y-1">
                             <label for="tanggal_lahir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Lahir</label>
                             <input id="tanggal_lahir" name="tanggal_lahir" type="date" max="{{ date('Y-m-d') }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" value="{{ $p->tanggal_lahir ? \Carbon\Carbon::parse($p->tanggal_lahir)->format('Y-m-d') : '' }}" >
-                            <p class="text-[10px] text-muted font-sans mt-0.5">Data ini penting untuk dilengkapi.</p>
+                            <p class="text-xs text-muted">Data ini penting untuk dilengkapi.</p>
                         </div>
 
                         {{-- Penanda eksplisit agar alur cuti tidak menebak Kepala Lembaga dari nama jabatan bebas. --}}
@@ -578,14 +578,14 @@
                                     </svg>
                                 </div>
                             </div>
-                            <p class="text-[10px] text-muted font-sans mt-0.5">Data ini penting untuk dilengkapi.</p>
+                            <p class="text-xs text-muted">Data ini penting untuk dilengkapi.</p>
                         </div>
 
                         {{-- Program Studi --}}
                         <div class="space-y-1">
                             <label for="prodi_pendidikan_terakhir" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Program Studi</label>
                             <input id="prodi_pendidikan_terakhir" name="prodi_pendidikan_terakhir" type="text" placeholder="Teknik Informatika" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->prodi_pendidikan_terakhir }}" >
-                            <p class="text-[10px] text-muted font-sans mt-0.5">Data ini penting untuk dilengkapi.</p>
+                            <p class="text-xs text-muted">Data ini penting untuk dilengkapi.</p>
                         </div>
 
                         
@@ -605,7 +605,7 @@
                         <div class="space-y-1">
                             <label for="nik" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">NIK (No. KTP)</label>
                             <input id="nik" name="nik" type="text" maxlength="16" x-model="nik" @input="validateNik" placeholder="3273251203850002" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                            <p class="text-[10px] text-muted font-sans mt-0.5">Data ini penting untuk dilengkapi.</p>
+                            <p class="text-xs text-muted">Data ini penting untuk dilengkapi.</p>
                             <p x-show="nikError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="nikError"></p>
                         </div>
 
@@ -727,7 +727,7 @@
                         <div class="space-y-1">
                             <label for="no_hp" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor HP</label>
                             <input id="no_hp" name="no_hp" type="tel" placeholder="081234567890" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" value="{{ $p->no_hp }}" >
-                            <p class="text-[10px] text-muted font-sans mt-0.5">Data ini penting untuk dilengkapi.</p>
+                            <p class="text-xs text-muted">Data ini penting untuk dilengkapi.</p>
                         </div>
 
                         {{-- Telepon Rumah --}}
@@ -746,7 +746,7 @@
                         <div class="space-y-1 sm:col-span-2">
                             <label for="alamat" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Alamat Tempat Tinggal</label>
                             <textarea id="alamat" name="alamat" rows="3" placeholder="Jl. Buah Batu No. 120, Lengkong, Bandung" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans resize-none">{{ $p->alamat }}</textarea>
-                            <p class="text-[10px] text-muted font-sans mt-0.5">Data ini penting untuk dilengkapi.</p>
+                            <p class="text-xs text-muted">Data ini penting untuk dilengkapi.</p>
                         </div>
                     </div>
                 </div>
@@ -864,7 +864,7 @@
                                         </svg>
                                         <p class="text-xs text-ink font-semibold mt-2 font-sans">Klik atau Seret berkas SK Pangkat (PDF/JPG/PNG, maks 10MB)</p>
                                         <template x-if="skPangkatName && skPangkatMode === 'upload'">
-                                            <div class="mt-3 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink font-mono shadow-sm">
+                                            <div class="mt-3 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink shadow-sm">
                                                 <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                                                 <span x-text="skPangkatName"></span>
                                                 <span class="text-muted" x-show="skPangkatSize" x-text="'(' + skPangkatSize + ')'"></span>
@@ -872,7 +872,7 @@
                                         </template>
                                         @if($latestRank && $latestRank->file_sk)
                                             <div class="mt-2 text-xs text-muted" x-show="!skPangkatSize">
-                                                Berkas saat ini: <a href="{{ asset('storage/' . $latestRank->file_sk) }}" target="_blank" class="text-primary hover:underline font-semibold font-mono">{{ basename($latestRank->file_sk) }}</a>
+                                                Berkas saat ini: <a href="{{ asset('storage/' . $latestRank->file_sk) }}" target="_blank" class="text-primary hover:underline font-semibold">{{ basename($latestRank->file_sk) }}</a>
                                             </div>
                                         @endif
                                         <p x-show="skPangkatError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skPangkatError"></p>
@@ -1036,7 +1036,7 @@
                                         <svg class="mx-auto h-10 w-10 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" /></svg>
                                         <p class="text-xs text-ink font-semibold mt-2 font-sans">Klik atau Seret berkas SK Jabatan (PDF/JPG/PNG, maks 10MB)</p>
                                         <template x-if="skJabatanName && skJabatanMode === 'upload'">
-                                            <div class="mt-3 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink font-mono shadow-sm">
+                                            <div class="mt-3 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink shadow-sm">
                                                 <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                                                 <span x-text="skJabatanName"></span>
                                                 <span class="text-muted" x-show="skJabatanSize" x-text="'(' + skJabatanSize + ')'"></span>
@@ -1044,7 +1044,7 @@
                                         </template>
                                         @if($latestPosition && $latestPosition->file_sk)
                                             <div class="mt-2 text-xs text-muted" x-show="!skJabatanSize">
-                                                Berkas saat ini: <a href="{{ asset('storage/' . $latestPosition->file_sk) }}" target="_blank" class="text-primary hover:underline font-semibold font-mono">{{ basename($latestPosition->file_sk) }}</a>
+                                                Berkas saat ini: <a href="{{ asset('storage/' . $latestPosition->file_sk) }}" target="_blank" class="text-primary hover:underline font-semibold">{{ basename($latestPosition->file_sk) }}</a>
                                             </div>
                                         @endif
                                         <p x-show="skJabatanError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skJabatanError"></p>
@@ -1135,7 +1135,7 @@
                                         <svg class="mx-auto h-10 w-10 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" /></svg>
                                         <p class="text-xs text-ink font-semibold mt-2 font-sans">Klik atau Seret berkas SK KGB (PDF/JPG/PNG, maks 10MB)</p>
                                         <template x-if="skKgbName && skKgbMode === 'upload'">
-                                            <div class="mt-3 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink font-mono shadow-sm">
+                                            <div class="mt-3 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink shadow-sm">
                                                 <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                                                 <span x-text="skKgbName"></span>
                                                 <span class="text-muted" x-show="skKgbSize" x-text="'(' + skKgbSize + ')'"></span>
@@ -1143,7 +1143,7 @@
                                         </template>
                                         @if($latestSalary && $latestSalary->file_sk)
                                             <div class="mt-2 text-xs text-muted" x-show="!skKgbSize">
-                                                Berkas saat ini: <a href="{{ asset('storage/' . $latestSalary->file_sk) }}" target="_blank" class="text-primary hover:underline font-semibold font-mono">{{ basename($latestSalary->file_sk) }}</a>
+                                                Berkas saat ini: <a href="{{ asset('storage/' . $latestSalary->file_sk) }}" target="_blank" class="text-primary hover:underline font-semibold">{{ basename($latestSalary->file_sk) }}</a>
                                             </div>
                                         @endif
                                         <p x-show="skKgbError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skKgbError"></p>
@@ -1222,7 +1222,7 @@
                                         <svg class="mx-auto h-10 w-10 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" /></svg>
                                         <p class="text-xs text-ink font-semibold mt-2 font-sans">Klik atau Seret berkas SK Pengangkatan (PDF/JPG/PNG, maks 10MB)</p>
                                         <template x-if="skPengangkatanName && skPengangkatanMode === 'upload'">
-                                            <div class="mt-3 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink font-mono shadow-sm">
+                                            <div class="mt-3 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink shadow-sm">
                                                 <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                                                 <span x-text="skPengangkatanName"></span>
                                                 <span class="text-muted" x-show="skPengangkatanSize" x-text="'(' + skPengangkatanSize + ')'"></span>
@@ -1230,7 +1230,7 @@
                                         </template>
                                         @if($p->appointment && $p->appointment->file_sk)
                                             <div class="mt-2 text-xs text-muted" x-show="!skPengangkatanSize">
-                                                Berkas saat ini: <a href="{{ asset('storage/' . $p->appointment->file_sk) }}" target="_blank" class="text-primary hover:underline font-semibold font-mono">{{ basename($p->appointment->file_sk) }}</a>
+                                                Berkas saat ini: <a href="{{ asset('storage/' . $p->appointment->file_sk) }}" target="_blank" class="text-primary hover:underline font-semibold">{{ basename($p->appointment->file_sk) }}</a>
                                             </div>
                                         @endif
                                         <p x-show="skPengangkatanError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skPengangkatanError"></p>
@@ -1304,7 +1304,7 @@
                             <div class="space-y-1">
                                 <label for="berkas_lainnya_tanggal" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Berkas</label>
                                 <input id="berkas_lainnya_tanggal" name="berkas_lainnya_tanggal" type="date" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" x-model="berkasLainnyaForm.tanggal">
-                                <p class="text-[10px] text-muted font-sans mt-0.5">Boleh dikosongkan jika tidak relevan.</p>
+                                <p class="text-xs text-muted">Boleh dikosongkan jika tidak relevan.</p>
                             </div>
 
                             {{-- Upload Berkas Lainnya --}}
@@ -1316,7 +1316,7 @@
                                         <svg class="mx-auto h-10 w-10 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" /></svg>
                                         <p class="text-xs text-ink font-semibold mt-2 font-sans">Klik atau Seret berkas (PDF/JPG/PNG, maks 10MB)</p>
                                         <template x-if="berkasLainnyaName">
-                                            <div class="mt-3 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink font-mono shadow-sm">
+                                            <div class="mt-3 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink shadow-sm">
                                                 <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                                                 <span x-text="berkasLainnyaName"></span>
                                                 <span class="text-muted" x-show="berkasLainnyaSize" x-text="'(' + berkasLainnyaSize + ')'"></span>

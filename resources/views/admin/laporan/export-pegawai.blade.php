@@ -18,7 +18,7 @@
                 <div class="text-center">
                     <h1 class="text-lg font-bold uppercase font-sans leading-tight">Kementerian Pendidikan Tinggi, Sains, dan Teknologi</h1>
                     <h2 class="text-base font-bold uppercase font-sans text-primary leading-tight">Lembaga Layanan Pendidikan Tinggi (LLDIKTI) Wilayah XVI</h2>
-                    <p class="text-[10px] text-muted font-sans mt-0.5">Jl. Prof. Dr. Aloei Saboe, Wongkaditi, Kota Gorontalo</p>
+                    <p class="text-xs text-muted">Jl. Prof. Dr. Aloei Saboe, Wongkaditi, Kota Gorontalo</p>
                 </div>
             </div>
             <div class="text-center mt-6">
@@ -40,22 +40,20 @@
             </div>
             <div class="flex shrink-0 items-center gap-3">
                 {{-- Cetak PDF --}}
-                <button @click="printReport()"
-                    class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition hover:bg-soft cursor-pointer font-sans">
+                <x-ui.button @click="printReport()" variant="secondary">
                     <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.617 0-1.11-.476-1.12-1.09l-.23-2.523M19.5 10.5v.375c0 .621-.504 1.125-1.125 1.125H5.625A1.125 1.125 0 0 1 4.5 11.25v-.375m15 0V9a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 9v1.5m15 0A1.5 1.5 0 0 0 18 9h-3V6a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3H6a1.5 1.5 0 0 0-1.5 1.5" />
                     </svg>
                     Cetak / PDF
-                </button>
+                </x-ui.button>
                 {{-- Export Excel --}}
-                <a :href="exportUrl"
-                    class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 cursor-pointer font-sans">
+                <x-ui.button x-bind:href="exportUrl" variant="primary">
                     <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                     </svg>
                     Export Excel
                     <span class="ml-1.5 rounded-full bg-white/20 px-1.5 py-0.5 text-xs font-bold" x-text="exportRows.length + ' data'"></span>
-                </a>
+                </x-ui.button>
             </div>
         </div>
 
@@ -317,48 +315,47 @@
                 </div>
                 <div class="flex items-center gap-2">
                     <span class="text-xs text-muted font-sans">Tampilkan:</span>
-                    <select x-model.number="perPage" @change="currentPage = 1"
-                        class="appearance-none rounded-lg border border-border bg-surface pl-3 pr-8 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <x-form.select x-model.number="perPage" @change="currentPage = 1" class="w-auto py-1.5 pl-3 pr-8 text-xs font-sans">
                         <option value="10">10 / hal</option>
                         <option value="25">25 / hal</option>
                         <option value="50">50 / hal</option>
-                    </select>
+                    </x-form.select>
                 </div>
             </div>
 
             {{-- Table --}}
             <div class="overflow-x-auto print:overflow-visible">
-                <table class="min-w-full divide-y divide-border print:border-collapse print:border print:border-black">
-                    <thead class="bg-soft print:bg-gray-100">
-                        <tr>
+                <x-ui.table class="print:border-collapse print:border print:border-black">
+                    <x-ui.table-head class="print:bg-gray-100">
+                        <x-ui.table-row>
                             <template x-for="col in activeColumns" :key="col.key">
-                                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted font-sans select-none print:border print:border-black print:text-black"
-                                    x-text="col.label"></th>
+                                <x-ui.table-th class="select-none print:border print:border-black print:text-black"
+                                    x-text="col.label"></x-ui.table-th>
                             </template>
                             <template x-if="activeColumns.length === 0">
-                                <th class="px-4 py-3 text-xs text-muted font-sans">Pilih minimal satu kolom</th>
+                                <x-ui.table-th>Pilih minimal satu kolom</x-ui.table-th>
                             </template>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border/60 bg-background print:divide-y print:divide-black">
+                        </x-ui.table-row>
+                    </x-ui.table-head>
+                    <x-ui.table-body class="print:divide-y print:divide-black">
                         {{-- SCREEN VIEW: paginasi --}}
                         <template x-for="(row, index) in paginatedPreview" :key="row.id">
-                            <tr class="transition hover:bg-soft/60 print:hidden">
+                            <x-ui.table-row :interactive="true" class="print:hidden">
                                 <template x-for="col in activeColumns" :key="col.key">
-                                    <td class="px-4 py-3 text-sm text-ink font-sans whitespace-nowrap print:border print:border-black"
-                                        x-text="getCellValue(row, col.key, (currentPage - 1) * perPage + index)"></td>
+                                    <x-ui.table-td class="whitespace-nowrap print:border print:border-black"
+                                        x-text="getCellValue(row, col.key, (currentPage - 1) * perPage + index)"></x-ui.table-td>
                                 </template>
-                            </tr>
+                            </x-ui.table-row>
                         </template>
 
                         {{-- PRINT VIEW: semua export rows --}}
                         <template x-for="(row, index) in exportRows" :key="'print-' + row.id">
-                            <tr class="hidden print:table-row">
+                            <x-ui.table-row class="hidden print:table-row">
                                 <template x-for="col in activeColumns" :key="col.key">
-                                    <td class="px-4 py-2 text-sm font-sans border border-black"
-                                        x-text="getCellValue(row, col.key, index)"></td>
+                                    <x-ui.table-td class="border border-black"
+                                        x-text="getCellValue(row, col.key, index)"></x-ui.table-td>
                                 </template>
-                            </tr>
+                            </x-ui.table-row>
                         </template>
 
                         {{-- Empty state --}}
@@ -367,8 +364,8 @@
                                 <x-ui.empty-state icon="document" title="Tidak ada data yang cocok dengan konfigurasi Anda." />
                             </td>
                         </tr>
-                    </tbody>
-                </table>
+                    </x-ui.table-body>
+                </x-ui.table>
             </div>
 
             {{-- Footer: Paginasi (Screen only) --}}
@@ -441,8 +438,8 @@
                 </div>
 
                 <div class="flex justify-end gap-3 border-t border-border pt-4">
-                    <button type="button" @click="showCustomExportModal = false" class="rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft">Batal</button>
-                    <button type="submit" class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90">Download Excel Custom</button>
+                    <x-ui.button type="button" @click="showCustomExportModal = false" variant="secondary">Batal</x-ui.button>
+                    <x-ui.button type="submit" variant="primary">Download Excel Custom</x-ui.button>
                 </div>
             </form>
         </x-ui.modal>

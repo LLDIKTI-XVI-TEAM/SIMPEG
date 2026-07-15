@@ -20,6 +20,11 @@ use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\UserMappingController;
 use App\Http\Controllers\Auth\KeycloakAuthController;
 use App\Http\Controllers\Cuti\VerifyLeaveProofController;
+use App\Http\Controllers\KepalaBagianDashboardController;
+use App\Http\Controllers\KepalaBagianEmployeeController;
+use App\Http\Controllers\KepalaBagianEwsController;
+use App\Http\Controllers\KepalaBagianLeaveController;
+use App\Http\Controllers\KepalaBagianLeaveDecisionController;
 use App\Http\Controllers\PimpinanDashboardController;
 use App\Http\Controllers\PimpinanEmployeeController;
 use App\Http\Controllers\PimpinanEwsController;
@@ -37,7 +42,6 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
-use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 Route::get('/', function () {
@@ -112,6 +116,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
 
         if ($role === 'pimpinan') {
             return redirect()->route('pimpinan.dashboard');
+        }
+
+        if ($role === 'kepala_bagian') {
+            return redirect()->route('kepala-bagian.dashboard');
         }
 
         $isPegawai = $role === 'pegawai';
@@ -270,195 +278,8 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     })->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('laporan.pegawai');
 
-    Route::get('/laporan/export-pegawai/excel', function (Request $request) {
-        // Ambil semua pegawai dengan field lengkap
-        $employees = Employee::with(['jenisPegawai:id,nama', 'statusPegawai:id,nama'])
-            ->orderBy('nama_lengkap')
-            ->get();
-
-        $allData = $employees->map(function ($emp) {
-            return [
-                'id' => $emp->id,
-                'nama' => $emp->nama_lengkap,
-                'nip' => $emp->nip,
-                'unit' => $emp->unitKerja?->nama ?? '-',
-                'golongan' => $emp->golongan_terakhir ?? '-',
-                'jabatan' => $emp->jabatan_terakhir ?? '-',
-                'jenis' => $emp->jenisPegawai?->nama ?? '-',
-                'status' => $emp->statusPegawai?->nama ?? $emp->status_aktif ?? '-',
-                'email' => $emp->email_pribadi ?? '-',
-                'no_hp' => $emp->no_hp ?? '-',
-                'tanggal_lahir' => $emp->tanggal_lahir?->translatedFormat('d F Y') ?? '-',
-                'tanggal_pensiun' => $emp->tanggal_pensiun?->translatedFormat('d F Y') ?? '-',
-                'pendidikan' => $emp->pendidikan_terakhir ?? '-',
-                'pangkat' => $emp->pangkat_terakhir ?? '-',
-            ];
-        });
-
-        // Apply filters
-        $search = strtolower(trim($request->query('search', '')));
-        $unit = $request->query('unit', '');
-        $golongan = $request->query('golongan', '');
-        $jenis = $request->query('jenis', '');
-        $status = $request->query('status', '');
-        $sortBy = $request->query('sort', 'nama');
-        $sortDir = $request->query('sort_dir', 'asc') === 'desc' ? 'desc' : 'asc';
-        $prefixField = trim($request->query('prefix_field', ''));
-        $prefixValue = strtolower(trim($request->query('prefix_value', '')));
-        $rowStart = max(1, (int) $request->query('row_start', 1));
-        $rowEnd = $request->query('row_end', null);
-
-        $filtered = $allData->filter(function ($p) use ($search, $unit, $golongan, $jenis, $status, $prefixField, $prefixValue) {
-            if ($search !== '') {
-                $pNama = strtolower($p['nama']);
-                $pNip = str_replace(' ', '', $p['nip']);
-                $q = str_replace(' ', '', $search);
-                if (strpos($pNama, $search) === false && strpos($pNip, $q) === false) {
-                    return false;
-                }
-            }
-            if ($unit !== '' && $p['unit'] !== $unit) {
-                return false;
-            }
-            if ($golongan !== '' && $p['golongan'] !== $golongan) {
-                return false;
-            }
-            if ($jenis !== '' && $p['jenis'] !== $jenis) {
-                return false;
-            }
-            if ($status !== '' && $p['status'] !== $status) {
-                return false;
-            }
-            // Filter awalan (prefix)
-            if ($prefixValue !== '' && isset($p[$prefixField])) {
-                if (! str_starts_with(strtolower((string) $p[$prefixField]), $prefixValue)) {
-                    return false;
-                }
-            }
-
-            return true;
-        });
-
-        // Step 1: Potong row range DULU dari hasil filter (urutan asli)
-        $slice = $filtered->slice($rowStart - 1, $rowEnd !== null ? ((int) $rowEnd - $rowStart + 1) : null)->values();
-
-        // Step 2: Sort dari subset yang sudah dipotong
-        $golonganOrder = ['IV/e' => 1, 'IV/d' => 2, 'IV/c' => 3, 'IV/b' => 4, 'IV/a' => 5, 'III/d' => 6, 'III/c' => 7, 'III/b' => 8, 'III/a' => 9, 'II/d' => 10, 'II/c' => 11, 'II/b' => 12, 'II/a' => 13, 'I/d' => 14, 'I/c' => 15, 'I/b' => 16, 'I/a' => 17];
-        $sortFn = function ($p) use ($sortBy, $golonganOrder) {
-            if ($sortBy === 'golongan') {
-                return $golonganOrder[$p['golongan']] ?? 99;
-            }
-
-            return strtolower((string) ($p[$sortBy] ?? ''));
-        };
-        $slice = ($sortDir === 'desc')
-            ? $slice->sortByDesc($sortFn)->values()
-            : $slice->sortBy($sortFn)->values();
-
-        // Kolom yang dipilih (default semua)
-        $allColumns = [
-            'no' => 'No',
-            'nip' => 'NIP',
-            'nama' => 'Nama Pegawai',
-            'golongan' => 'Golongan',
-            'jabatan' => 'Jabatan',
-            'unit' => 'Unit Kerja',
-            'jenis' => 'Jenis Pegawai',
-            'status' => 'Status',
-            'email' => 'Email',
-            'no_hp' => 'No. HP',
-            'tanggal_lahir' => 'Tanggal Lahir',
-            'tanggal_pensiun' => 'Tgl. Pensiun',
-            'pendidikan' => 'Pendidikan Terakhir',
-            'pangkat' => 'Pangkat',
-        ];
-        $selectedKeys = $request->query('columns', array_keys($allColumns));
-        $columns = collect($selectedKeys)
-            ->filter(fn ($k) => isset($allColumns[$k]))
-            ->mapWithKeys(fn ($k) => [$k => $allColumns[$k]]);
-        if ($columns->isEmpty()) {
-            $columns = collect($allColumns);
-        }
-
-        // Build Spreadsheet
-        $spreadsheet = new Spreadsheet;
-        $sheet = $spreadsheet->getActiveSheet();
-        $sheet->setTitle('Daftar Pegawai');
-        $sheet->setShowGridlines(false);
-
-        $colLetters = range('A', 'Z');
-        $colIndex = 0;
-
-        foreach ($columns as $key => $label) {
-            $letter = $colLetters[$colIndex];
-            $width = match ($key) {
-                'no' => 5, 'nip' => 22, 'nama' => 32, 'golongan' => 12, 'jabatan' => 36,
-                'unit' => 20, 'jenis' => 16, 'status' => 18, 'email' => 28,
-                'no_hp' => 18, 'tanggal_lahir' => 20, 'tanggal_pensiun' => 20,
-                'pendidikan' => 22, 'pangkat' => 20, default => 18,
-            };
-            $sheet->getColumnDimension($letter)->setWidth($width);
-            $sheet->setCellValue($letter.'1', $label);
-            $colIndex++;
-        }
-        $lastCol = $colLetters[$colIndex - 1];
-        $sheet->getRowDimension(1)->setRowHeight(30);
-        $sheet->getStyle('A1:'.$lastCol.'1')->applyFromArray([
-            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 10, 'name' => 'Calibri'],
-            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1F5A83']],
-            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => true],
-            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '69BFE3']]],
-        ]);
-
-        foreach ($slice as $i => $row) {
-            $r = $i + 2;
-            $ci = 0;
-            foreach ($columns as $key => $label) {
-                $letter = $colLetters[$ci];
-                $value = ($key === 'no') ? ($i + 1) : ($row[$key] ?? '-');
-                if (in_array($key, ['nip', 'no_hp'])) {
-                    $sheet->setCellValueExplicit($letter.$r, $value, DataType::TYPE_STRING);
-                } else {
-                    $sheet->setCellValue($letter.$r, $value);
-                }
-                $ci++;
-            }
-            $bg = ($i % 2 === 0) ? 'FFFFFF' : 'D9F2FB';
-            $sheet->getRowDimension($r)->setRowHeight(20);
-            $sheet->getStyle('A'.$r.':'.$lastCol.$r)->applyFromArray([
-                'font' => ['size' => 10, 'name' => 'Calibri', 'color' => ['rgb' => '111827']],
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $bg]],
-                'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
-                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '69BFE3']]],
-            ]);
-        }
-
-        $lastRow = $slice->count() + 1;
-        $sheet->freezePane('A2');
-        if ($slice->isNotEmpty()) {
-            $sheet->setAutoFilter('A1:'.$lastCol.$lastRow);
-        }
-        $sheet->getPageSetup()
-            ->setOrientation(PageSetup::ORIENTATION_LANDSCAPE)
-            ->setPaperSize(PageSetup::PAPERSIZE_A4)
-            ->setFitToWidth(1)
-            ->setFitToHeight(0);
-        $sheet->getPageMargins()->setTop(0.3)->setRight(0.25)->setBottom(0.3)->setLeft(0.25);
-        $sheet->getPageSetup()->setRowsToRepeatAtTopByStartAndEnd(1, 1);
-
-        $filename = 'Daftar_Pegawai_LLDIKTI_XVI_'.now()->format('Ymd').'.xlsx';
-
-        return response()->streamDownload(function () use ($spreadsheet) {
-            $writer = new Xlsx($spreadsheet);
-            $writer->save('php://output');
-        }, $filename, [
-            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
-            'Cache-Control' => 'no-cache, no-store, must-revalidate',
-            'Pragma' => 'no-cache',
-            'Expires' => '0',
-        ]);
-    })->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+    Route::get('/laporan/export-pegawai/excel', [LaporanController::class, 'exportPegawaiExcel'])
+        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('laporan.pegawai.excel');
 
     Route::post('/laporan/export-pegawai/custom', [LaporanController::class, 'exportPegawaiCustom'])
@@ -1014,24 +835,28 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
             Route::get('/laporan/kepangkatan/pdf', [PimpinanReportController::class, 'exportRankHistoriesPdf'])->name('laporan.kepangkatan.pdf');
         });
 
-    // UI DUMMY ROUTES FOR KEPALA BAGIAN
-    Route::get('/kepala-bagian/bawahan', function () {
-        return view('kabag.bawahan.index');
-    })->name('kepala-bagian.bawahan.index');
+    Route::middleware(['role:kepala_bagian'])
+        ->prefix('kepala-bagian')
+        ->name('kepala-bagian.')
+        ->group(function (): void {
+            Route::get('/dashboard', [KepalaBagianDashboardController::class, 'index'])->name('dashboard');
 
-    Route::get('/kepala-bagian/bawahan/{id}', function ($id) {
-        return view('kabag.bawahan.show', compact('id'));
-    })->name('kepala-bagian.bawahan.show');
+            Route::get('/bawahan', [KepalaBagianEmployeeController::class, 'index'])->name('bawahan.index');
+            Route::get('/bawahan/{employee}', [KepalaBagianEmployeeController::class, 'show'])
+                ->whereUuid('employee')
+                ->name('bawahan.show');
 
-    Route::get('/kepala-bagian/cuti', function () {
-        return view('kabag.cuti.index');
-    })->name('kepala-bagian.cuti.index');
+            Route::get('/cuti', [KepalaBagianLeaveController::class, 'index'])->name('cuti.index');
+            Route::get('/cuti/{leave}', [KepalaBagianLeaveController::class, 'show'])
+                ->whereUuid('leave')
+                ->name('cuti.show');
+            Route::post('/cuti/{leave}/keputusan', [KepalaBagianLeaveDecisionController::class, 'store'])
+                ->whereUuid('leave')
+                ->name('cuti.decision');
+            Route::get('/cuti/{leave}/lampiran', [KepalaBagianLeaveController::class, 'downloadAttachment'])
+                ->whereUuid('leave')
+                ->name('cuti.attachment.download');
 
-    Route::get('/kepala-bagian/cuti/{id}', function ($id) {
-        return view('kabag.cuti.show', compact('id'));
-    })->name('kepala-bagian.cuti.show');
-
-    Route::get('/kepala-bagian/ews', function () {
-        return view('kabag.ews.index');
-    })->name('kepala-bagian.ews.index');
+            Route::get('/ews', [KepalaBagianEwsController::class, 'index'])->name('ews.index');
+        });
 });

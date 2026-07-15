@@ -18,51 +18,51 @@
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <div>
                         <label for="tahun" class="mb-2 block text-sm font-semibold text-ink">Tahun</label>
-                        <input id="tahun" name="tahun" value="{{ $filters['tahun'] ?? now()->year }}" type="number" min="2000" max="2100" class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20" aria-describedby="leave-report-help tahun-error">
+                        <x-form.input id="tahun" name="tahun" :value="$filters['tahun'] ?? now()->year" type="number" min="2000" max="2100" size="md" aria-describedby="leave-report-help tahun-error" />
                         @error('tahun')
                             <p id="tahun-error" class="mt-2 text-sm text-danger">{{ $message }}</p>
                         @enderror
                     </div>
                     <div>
                         <label for="bulan" class="mb-2 block text-sm font-semibold text-ink">Bulan</label>
-                        <select id="bulan" name="bulan" aria-describedby="leave-report-help" class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <x-form.select id="bulan" name="bulan" aria-describedby="leave-report-help" size="md">
                             <option value="">Semua Bulan</option>
                             @foreach(range(1, 12) as $month)
                                 <option value="{{ $month }}" @selected((string) ($filters['bulan'] ?? '') === (string) $month)>{{ \Carbon\Carbon::create()->month($month)->translatedFormat('F') }}</option>
                             @endforeach
-                        </select>
+                        </x-form.select>
                     </div>
                     <div>
                         <label for="employee_id" class="mb-2 block text-sm font-semibold text-ink">Pegawai</label>
-                        <select id="employee_id" name="employee_id" aria-describedby="leave-report-help" class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <x-form.select id="employee_id" name="employee_id" aria-describedby="leave-report-help" size="md">
                             <option value="">Semua Pegawai</option>
                             @foreach($filterOptions['employees'] as $employee)
                                 <option value="{{ $employee->id }}" @selected(($filters['employee_id'] ?? '') === $employee->id)>{{ $employee->nama_lengkap }} — {{ $employee->nip }}</option>
                             @endforeach
-                        </select>
+                        </x-form.select>
                     </div>
                     <div>
                         <label for="unit_kerja_id" class="mb-2 block text-sm font-semibold text-ink">Unit/Tim Kerja</label>
-                        <select id="unit_kerja_id" name="unit_kerja_id" aria-describedby="leave-report-help" class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <x-form.select id="unit_kerja_id" name="unit_kerja_id" aria-describedby="leave-report-help" size="md">
                             <option value="">Semua Unit/Tim</option>
                             @foreach($filterOptions['units'] as $unit)
                                 <option value="{{ $unit->id }}" @selected(($filters['unit_kerja_id'] ?? '') === $unit->id)>{{ $unit->nama }}</option>
                             @endforeach
-                        </select>
+                        </x-form.select>
                     </div>
                     <div>
                         <label for="jenis_cuti_id" class="mb-2 block text-sm font-semibold text-ink">Jenis Cuti</label>
-                        <select id="jenis_cuti_id" name="jenis_cuti_id" aria-describedby="leave-report-help" class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <x-form.select id="jenis_cuti_id" name="jenis_cuti_id" aria-describedby="leave-report-help" size="md">
                             <option value="">Semua Jenis Cuti</option>
                             @foreach($filterOptions['leaveTypes'] as $leaveType)
                                 <option value="{{ $leaveType->id }}" @selected(($filters['jenis_cuti_id'] ?? '') === $leaveType->id)>{{ $leaveType->nama }}</option>
                             @endforeach
-                        </select>
+                        </x-form.select>
                     </div>
                 </div>
                 <div class="flex flex-col gap-3 sm:flex-row sm:justify-end">
-                    <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-[background-color,border-color,box-shadow,opacity] duration-200 hover:border-primary/30 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/30">Terapkan Filter</button>
-                    <button type="submit" formaction="{{ route('pimpinan.laporan.cuti.excel') }}" formtarget="_blank" class="inline-flex items-center justify-center gap-2 rounded-xl border border-transparent bg-gradient-to-r from-primary to-primary-hover px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-primary/20 transition-[background-color,border-color,box-shadow,opacity] duration-200 hover:opacity-90 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/30">Unduh Excel (.xlsx)</button>
+                    <x-ui.button type="submit" variant="secondary" size="md">Terapkan Filter</x-ui.button>
+                    <x-ui.button type="submit" variant="primary" size="md" formaction="{{ route('pimpinan.laporan.cuti.excel') }}" formtarget="_blank">Unduh Excel (.xlsx)</x-ui.button>
                 </div>
             </form>
         </x-ui.card>
@@ -73,33 +73,33 @@
                 <p class="text-sm text-muted">Menampilkan maksimal 10 pengajuan sesuai filter aktif.</p>
             </div>
             <div class="overflow-x-auto">
-                <table class="w-full text-left text-sm">
+                <x-ui.table>
                     <caption class="sr-only">Preview pengajuan cuti sesuai filter laporan aktif</caption>
-                    <thead class="bg-soft text-xs uppercase tracking-wide text-muted">
-                        <tr>
-                            <th scope="col" class="px-4 py-3">Nama Pegawai</th>
-                            <th scope="col" class="px-4 py-3">Jenis Cuti</th>
-                            <th scope="col" class="px-4 py-3">Tanggal Pelaksanaan</th>
-                            <th scope="col" class="px-4 py-3">Jumlah Hari</th>
-                            <th scope="col" class="px-4 py-3">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
+                    <x-ui.table-head>
+                        <x-ui.table-row>
+                            <x-ui.table-th padding="lg">Nama Pegawai</x-ui.table-th>
+                            <x-ui.table-th padding="lg">Jenis Cuti</x-ui.table-th>
+                            <x-ui.table-th padding="lg">Tanggal Pelaksanaan</x-ui.table-th>
+                            <x-ui.table-th padding="lg">Jumlah Hari</x-ui.table-th>
+                            <x-ui.table-th padding="lg">Status</x-ui.table-th>
+                        </x-ui.table-row>
+                    </x-ui.table-head>
+                    <x-ui.table-body>
                         @forelse($previewData as $row)
-                            <tr class="hover:bg-soft/50">
-                                <td class="px-4 py-3 font-medium text-ink">{{ $row['nama'] }}</td>
-                                <td class="px-4 py-3 text-ink">{{ $row['jenis'] }}</td>
-                                <td class="px-4 py-3 text-muted">{{ \Carbon\Carbon::parse($row['mulai'])->translatedFormat('d M Y') }} — {{ \Carbon\Carbon::parse($row['selesai'])->translatedFormat('d M Y') }}</td>
-                                <td class="px-4 py-3 text-ink">{{ $row['hari'] }} hari kerja</td>
-                                <td class="px-4 py-3 font-semibold text-ink">{{ $row['status'] }}</td>
-                            </tr>
+                            <x-ui.table-row class="hover:bg-soft transition-colors border-b border-border/50">
+                                <x-ui.table-td class="px-4 py-3 font-medium text-ink">{{ $row['nama'] }}</x-ui.table-td>
+                                <x-ui.table-td class="px-4 py-3 text-ink">{{ $row['jenis'] }}</x-ui.table-td>
+                                <x-ui.table-td class="px-4 py-3 text-muted">{{ \Carbon\Carbon::parse($row['mulai'])->translatedFormat('d M Y') }} — {{ \Carbon\Carbon::parse($row['selesai'])->translatedFormat('d M Y') }}</x-ui.table-td>
+                                <x-ui.table-td class="px-4 py-3 text-ink">{{ $row['hari'] }} hari kerja</x-ui.table-td>
+                                <x-ui.table-td class="px-4 py-3 font-semibold text-ink">{{ $row['status'] }}</x-ui.table-td>
+                            </x-ui.table-row>
                         @empty
-                            <tr>
-                                <td colspan="5" class="px-4 py-8 text-center text-muted">Tidak ada pengajuan cuti pada periode ini.</td>
-                            </tr>
+                            <x-ui.table-row>
+                                <x-ui.table-td colspan="5" class="px-4 py-8 text-center text-muted">Tidak ada pengajuan cuti pada periode ini.</x-ui.table-td>
+                            </x-ui.table-row>
                         @endforelse
-                    </tbody>
-                </table>
+                    </x-ui.table-body>
+                </x-ui.table>
             </div>
         </x-ui.card>
     </div>

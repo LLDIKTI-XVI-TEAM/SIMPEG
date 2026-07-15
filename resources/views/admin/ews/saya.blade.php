@@ -52,7 +52,7 @@
                                     <div class="mt-1 text-xs text-muted">{{ $alert['threshold_label'] }}</div>
                                 </x-ui.table-td>
                                 <x-ui.table-td padding="lg">
-                                    <div class="font-mono text-sm font-semibold text-ink">{{ date('d M Y', strtotime($alert['tanggal_target'])) }}</div>
+                                    <div class="text-sm font-semibold text-ink">{{ date('d M Y', strtotime($alert['tanggal_target'])) }}</div>
                                     <div class="mt-1 text-xs text-muted">Tanggal target</div>
                                 </x-ui.table-td>
                                 <x-ui.table-td padding="lg">
