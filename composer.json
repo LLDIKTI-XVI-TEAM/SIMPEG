@@ -53,7 +53,7 @@
         ],
         "test": [
             "@php artisan config:clear --ansi",
-            "@php -d memory_limit=1G artisan test"
+            "@php -d memory_limit=-1 artisan test"
         ],
         "format": "@php vendor/bin/pint",
         "format:check": "@php vendor/bin/pint --test",
