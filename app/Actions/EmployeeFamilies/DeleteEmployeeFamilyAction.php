@@ -13,7 +13,7 @@ class DeleteEmployeeFamilyAction
     public function __construct(private readonly EmployeeFamilyPayload $payload) {}
 
     /**
-     * Menonaktifkan data keluarga dengan soft delete dan audit tanpa NIK.
+     * Menonaktifkan data keluarga dengan soft delete dan mencatat audit tanpa NIK.
      */
     public function execute(Employee $employee, EmployeeFamily $family, Request $request): void
     {

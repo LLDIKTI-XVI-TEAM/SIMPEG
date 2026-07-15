@@ -31,7 +31,7 @@ class CutiNoDummyDataTest extends TestCase
             $source = $view->getContents();
             $path = $view->getRelativePathname();
 
-            foreach (['laporan.cuti', '/laporan/export-cuti', 'admin.laporan.export-cuti'] as $legacyReference) {
+            foreach (["route('laporan.cuti')", 'route("laporan.cuti")', '/laporan/export-cuti', 'admin.laporan.export-cuti'] as $legacyReference) {
                 $this->assertStringNotContainsString($legacyReference, $source, "Referensi legacy ditemukan di {$path}");
             }
         }

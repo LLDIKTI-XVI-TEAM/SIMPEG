@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Controllers\Api\V1\DisciplineRecordController;
+use App\Http\Controllers\Api\V1\EducationHistoryController;
 use App\Http\Controllers\Api\V1\EmployeeController;
+use App\Http\Controllers\Api\V1\EmployeeDocumentController;
 use App\Http\Controllers\Api\V1\EmployeeFamilyController;
 use App\Http\Controllers\Api\V1\EmployeeImportController;
 use App\Http\Controllers\Api\V1\KgbHistoryController;
@@ -34,8 +36,11 @@ Route::middleware($employeeGroupMiddleware)
         Route::get('/nonaktif', [EmployeeController::class, 'inactive'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
             ->name('inactive');
+        Route::get('/backup', [EmployeeController::class, 'backup'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.restore', 'role:super_admin'])
+            ->name('backup');
         Route::delete('/{employee}', [EmployeeController::class, 'destroy'])
-            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.deactivate'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.deactivate', 'role:super_admin'])
             ->whereUuid('employee')
             ->name('destroy');
         Route::delete('/{employee}/force', [EmployeeController::class, 'forceDestroy'])
@@ -43,7 +48,7 @@ Route::middleware($employeeGroupMiddleware)
             ->whereUuid('employee')
             ->name('force-destroy');
         Route::patch('/{employee}/status', [EmployeeController::class, 'updateStatus'])
-            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.update'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.update', 'role:super_admin'])
             ->whereUuid('employee')
             ->name('update-status');
         Route::post('/{employee}/restore', [EmployeeController::class, 'restore'])
@@ -82,6 +87,14 @@ Route::middleware($employeeGroupMiddleware)
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:discipline_records.create'])
             ->whereUuid('employee')
             ->name('disiplin.store');
+        Route::delete('/{employee}/disiplin/{discipline}', [DisciplineRecordController::class, 'destroy'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:discipline_records.delete'])
+            ->whereUuid(['employee', 'discipline'])
+            ->name('disiplin.destroy');
+        Route::get('/{employee}/arsip-dokumen', [EmployeeDocumentController::class, 'index'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
+            ->whereUuid('employee')
+            ->name('arsip-dokumen.index');
         Route::get('/{employee}/riwayat-kepangkatan', [RankHistoryController::class, 'index'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_histories.read'])
             ->whereUuid('employee')
@@ -106,6 +119,22 @@ Route::middleware($employeeGroupMiddleware)
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_histories.create'])
             ->whereUuid('employee')
             ->name('riwayat-kgb.store');
+        Route::get('/{employee}/riwayat-pendidikan', [EducationHistoryController::class, 'index'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_histories.read'])
+            ->whereUuid('employee')
+            ->name('riwayat-pendidikan.index');
+        Route::post('/{employee}/riwayat-pendidikan', [EducationHistoryController::class, 'store'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_histories.create'])
+            ->whereUuid('employee')
+            ->name('riwayat-pendidikan.store');
+        Route::put('/{employee}/riwayat-pendidikan/{education}', [EducationHistoryController::class, 'update'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_histories.create'])
+            ->whereUuid(['employee', 'education'])
+            ->name('riwayat-pendidikan.update');
+        Route::delete('/{employee}/riwayat-pendidikan/{education}', [EducationHistoryController::class, 'destroy'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_histories.create'])
+            ->whereUuid(['employee', 'education'])
+            ->name('riwayat-pendidikan.destroy');
         Route::post('/{employee}/assign-atasan', [EmployeeController::class, 'assignSupervisor'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.update', 'role:super_admin'])
             ->whereUuid('employee')

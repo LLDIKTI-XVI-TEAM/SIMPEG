@@ -23,6 +23,7 @@ class ApproveLeaveAction
     public function __construct(
         private readonly LeaveApprovalService $approvals,
         private readonly NotificationService $notifications,
+        private readonly GenerateLeaveProofAction $proofs,
     ) {}
 
     /**
@@ -57,6 +58,10 @@ class ApproveLeaveAction
         );
 
         $this->notifyAfterApproval($leaveRequest);
+
+        if ($leaveRequest->status === 'disetujui') {
+            $this->proofs->execute($leaveRequest, $request->user() instanceof User ? $request->user() : null);
+        }
 
         return $leaveRequest;
     }

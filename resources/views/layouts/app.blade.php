@@ -83,7 +83,7 @@
                     'pengaturan',
                     'user-management',
                     'rbac',
-                    'data-nonaktif',
+                    'data-backup',
                     'ews.config',
                     'kepala-bagian.bawahan.index',
                 ],
@@ -96,23 +96,7 @@
                     'pengaturan',
                     'user-management',
                     'rbac',
-                    'data-nonaktif',
-                    'data-master',
-                    'laporan',
-                    'laporan.pegawai',
-                    'cuti.laporan',
-                    'ews.config',
-                ],
-                'kepala_bagian' => [
-                    'data-pegawai',
-                    'pegawai.import',
-                    'hari-libur',
-                    'dokumen',
-                    'audit-log',
-                    'pengaturan',
-                    'user-management',
-                    'rbac',
-                    'data-nonaktif',
+                    'data-backup',
                     'data-master',
                     'laporan',
                     'laporan.pegawai',
@@ -122,7 +106,7 @@
                 'pegawai' => [
                     'data-pegawai',
                     'pegawai.import',
-                    'data-nonaktif',
+                    'data-backup',
                     'dokumen',
                     'cuti.rekap',
                     'ews',
@@ -154,8 +138,9 @@
                     'items' => [
                         ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users'],
                         ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'],
-                        ['label' => 'Data Nonaktif', 'route' => 'data-nonaktif', 'icon' => 'user-minus'],
+                        ['label' => 'Data Backup', 'route' => 'data-backup', 'icon' => 'user-minus'],
                         ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open'],
+                        ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up'],
                     ]
                 ],
                 [
@@ -164,6 +149,7 @@
                         ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge'],
                         ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
                         ['label' => 'Rekap Cuti', 'route' => 'cuti.rekap', 'icon' => 'document-text'],
+                        ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down'],
                     ]
                 ],
                 [
@@ -173,13 +159,6 @@
                         ['label' => 'EWS Aktif', 'route' => 'ews', 'icon' => 'exclamation-triangle'],
                         ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
                         ['label' => 'Konfigurasi EWS', 'route' => 'ews.config', 'icon' => 'cog-6-tooth'],
-                    ]
-                ],
-                [
-                    'group' => 'Laporan',
-                    'items' => [
-                        ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up'],
-                        ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down'],
                     ]
                 ],
                 [
@@ -194,6 +173,22 @@
                     ]
                 ]
             ];
+
+            if ($activeRole === 'pimpinan') {
+                $menuGroups = [
+                    [
+                        'group' => '',
+                        'items' => [
+                            ['label' => 'Dashboard', 'route' => 'pimpinan.dashboard', 'icon' => 'squares-2x2'],
+                            ['label' => 'Data Pegawai', 'route' => 'pimpinan.pegawai.index', 'icon' => 'users'],
+                            ['label' => 'Cuti', 'route' => 'pimpinan.cuti.index', 'icon' => 'calendar'],
+                            ['label' => 'EWS', 'route' => 'pimpinan.ews.index', 'icon' => 'exclamation-triangle'],
+                            ['label' => 'Laporan', 'route' => 'pimpinan.laporan.index', 'icon' => 'document-chart-bar'],
+                            ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
+                        ]
+                    ]
+                ];
+            }
 
             $allMenuRoutes = [];
             foreach ($menuGroups as $g) {
@@ -313,7 +308,7 @@
                 </div>
                 <div class="min-w-0 flex-1">
                     <p class="truncate text-sm font-semibold text-ink">
-                        {{ auth()->user()->name ?? 'Pengguna' }}
+                        {{ str_replace(['(', ')'], '', auth()->user()->name ?? 'Pengguna') }}
                     </p>
                     <p class="truncate text-xs text-muted">{{ ucwords(str_replace('_', ' ', $activeRole)) }}</p>
                 </div>
@@ -361,7 +356,7 @@
                         </div>
                         <div class="hidden text-left md:block">
                             <p class="text-sm font-semibold leading-tight text-ink font-sans">
-                                {{ auth()->user()->name ?? 'Pengguna' }}
+                                {{ str_replace(['(', ')'], '', auth()->user()->name ?? 'Pengguna') }}
                             </p>
                             <p class="text-[11px] leading-tight text-muted font-sans">{{ ucwords(str_replace('_', ' ', $activeRole)) }}</p>
                         </div>
@@ -381,8 +376,8 @@
                         style="display: none;"
                     >
                         <div class="border-b border-border px-4 py-3">
-                            <p class="text-xs font-semibold text-ink font-sans">{{ auth()->user()->name ?? 'Pengguna' }}</p>
-                            <p class="mt-0.5 text-xs text-muted font-sans font-mono">{{ auth()->user()->email ?? '' }}</p>
+                            <p class="text-xs font-semibold text-ink font-sans">{{ str_replace(['(', ')'], '', auth()->user()->name ?? 'Pengguna') }}</p>
+                            <p class="mt-0.5 text-xs text-muted font-sans">{{ auth()->user()->email ?? '' }}</p>
                         </div>
                         <div class="p-1.5 space-y-0.5">
                             <a href="{{ route('profil') }}" id="profile-link" class="flex items-center gap-2.5 rounded-lg px-4 py-2 text-sm text-ink transition-colors hover:bg-soft font-sans font-medium">

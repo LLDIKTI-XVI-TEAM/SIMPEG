@@ -9,6 +9,7 @@ use App\Actions\Employees\ExportEmployeeAction;
 use App\Actions\Employees\ListEmployeesAction;
 use App\Actions\Employees\ListInactiveEmployeesAction;
 use App\Actions\Employees\PrepareEmployeeEditFormDataAction;
+use App\Actions\Employees\PurgeDeletedEmployeesAction;
 use App\Actions\Employees\RestoreEmployeeAction;
 use App\Actions\Employees\StoreEmployeeHistoryAction;
 use App\Actions\Employees\UpdateEmployeeAction;
@@ -19,6 +20,7 @@ use App\Http\Requests\Employee\StoreEmployeeRequest;
 use App\Http\Requests\Employee\UpdateEmployeePerformanceFlagRequest;
 use App\Http\Requests\Employee\UpdateEmployeeRequest;
 use App\Http\Requests\Employee\UpdateEmployeeSatyalancanaEligibilityRequest;
+use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\RefAgama;
 use App\Models\RefEselon;
@@ -26,6 +28,7 @@ use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
+use App\Models\RefJenjangPendidikan;
 use App\Models\RefStatusPegawai;
 use App\Models\RefStatusPerkawinan;
 use App\Models\RefUnitKerja;
@@ -33,6 +36,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PegawaiController extends Controller
@@ -187,8 +191,10 @@ class PegawaiController extends Controller
         $jabatanOptions = RefJabatan::with('jenisJabatan')->orderBy('nama')->get();
         $jenisJabatanOptions = RefJenisJabatan::all();
         $statusPegawai = RefStatusPegawai::orderByDesc('is_default')->orderBy('nama')->get();
+        $golonganRefOptions = RefGolongan::orderBy('kode')->get();
+        $eselonOptions = RefEselon::orderBy('nama')->get();
 
-        return view('admin.pegawai.create', compact('jenisPegawai', 'agama', 'statusKawin', 'unitKerja', 'jabatanOptions', 'jenisJabatanOptions', 'statusPegawai'));
+        return view('admin.pegawai.create', compact('jenisPegawai', 'agama', 'statusKawin', 'unitKerja', 'jabatanOptions', 'jenisJabatanOptions', 'statusPegawai', 'golonganRefOptions', 'eselonOptions'));
     }
 
     public function inactive(Request $request, ListInactiveEmployeesAction $action)
@@ -231,6 +237,88 @@ class PegawaiController extends Controller
         ));
     }
 
+    /**
+     * Halaman Data Backup — pegawai dalam masa retensi trash (soft deleted).
+     * Data akan dihapus permanen setelah 30 hari. Hanya super_admin.
+     * Caching dilakukan client-side via sessionStorage di Alpine.js.
+     */
+    public function backup(Request $request)
+    {
+        $perPage = (int) $request->query('per_page', 10);
+        $perPage = in_array($perPage, [10, 25, 50, 100], true) ? $perPage : 10;
+        $search = trim((string) $request->query('search', ''));
+        $retentionDays = PurgeDeletedEmployeesAction::RETENTION_DAYS;
+        $dataChanged = session()->pull('backup_data_changed', false);
+
+        // SSR initial load — sama persis seperti pola halaman data-pegawai
+        $query = Employee::onlyTrashed()
+            ->with([
+                'jenisPegawai:id,nama',
+                'positionHistories' => fn ($q) => $q
+                    ->with(['jabatan:id,nama', 'unitKerja:id,nama'])
+                    ->where('is_latest', true)
+                    ->limit(1),
+            ])
+            ->orderByDesc('deleted_at');
+
+        if ($search !== '') {
+            $keyword = '%'.mb_strtolower($search).'%';
+            $query->where(function ($q) use ($keyword): void {
+                $q->whereRaw('LOWER(nama_lengkap) LIKE ?', [$keyword])
+                    ->orWhereRaw('LOWER(nip) LIKE ?', [$keyword]);
+            });
+        }
+
+        $paginator = $query->paginate($perPage)->withQueryString();
+
+        $initialRows = $paginator->map(function (Employee $employee) use ($retentionDays): array {
+            $latestPosition = $employee->positionHistories->first();
+            $deletedAt = $employee->deleted_at;
+            $purgeAt = $deletedAt?->copy()->addDays($retentionDays);
+            $sisaHari = $purgeAt ? (int) now()->diffInDays($purgeAt, false) : 0;
+
+            return [
+                'id' => $employee->id,
+                'nama_lengkap' => $employee->nama_lengkap,
+                'nip' => $employee->nip,
+                'foto_url' => $employee->foto_url,
+                'jabatan' => $latestPosition?->jabatan?->nama ?? $employee->jabatan_terakhir ?? '-',
+                'unit_kerja' => $latestPosition?->unitKerja?->nama ?? '-',
+                'golongan_terakhir' => $employee->golongan_terakhir ?? '-',
+                'jenis_pegawai' => $employee->jenisPegawai?->nama ?? '-',
+                'deleted_at_human' => $deletedAt?->format('d/m/Y H:i') ?? '-',
+                'purge_at_human' => $purgeAt?->format('d/m/Y') ?? '-',
+                'sisa_hari' => $sisaHari,
+                'is_expired' => $sisaHari <= 0,
+                'is_urgent' => $sisaHari > 0 && $sisaHari <= 3,
+                'is_warning' => $sisaHari > 3 && $sisaHari <= 7,
+            ];
+        })->values()->all();
+
+        $initialMeta = [
+            'total' => $paginator->total(),
+            'current_page' => $paginator->currentPage(),
+            'last_page' => $paginator->lastPage(),
+            'from' => $paginator->firstItem() ?? 0,
+            'to' => $paginator->lastItem() ?? 0,
+            'per_page' => $paginator->perPage(),
+        ];
+
+        $expiredCount = Employee::onlyTrashed()
+            ->where('deleted_at', '<=', now()->subDays($retentionDays))
+            ->count();
+
+        return view('admin.pegawai.backup', compact(
+            'perPage',
+            'search',
+            'retentionDays',
+            'expiredCount',
+            'initialRows',
+            'initialMeta',
+            'dataChanged',
+        ));
+    }
+
     public function store(StoreEmployeeRequest $request, CreateEmployeeAction $action)
     {
         try {
@@ -267,8 +355,9 @@ class PegawaiController extends Controller
         $jenisJabatanOptions = RefJenisJabatan::all();
         $unitKerjaOptions = RefUnitKerja::all();
         $eselonOptions = RefEselon::all();
+        $jenjangOptions = RefJenjangPendidikan::orderBy('urutan')->get();
 
-        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions'));
+        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions'));
     }
 
     public function edit($id, PrepareEmployeeEditFormDataAction $action)
@@ -308,8 +397,9 @@ class PegawaiController extends Controller
         $action->execute($employee, $request);
 
         return redirect()->route('data-pegawai')
-            ->with('success', 'Data pegawai '.$nama.' berhasil dinonaktifkan.')
-            ->with('employee_data_changed', true);
+            ->with('success', 'Data pegawai '.$nama.' berhasil dihapus ke backup.')
+            ->with('employee_data_changed', true)
+            ->with('backup_data_changed', true);
     }
 
     /**
@@ -358,40 +448,54 @@ class PegawaiController extends Controller
         ]);
     }
 
-    public function bulkDestroy(Request $request, DeactivateEmployeeAction $action)
+    public function bulkDestroy(Request $request)
     {
-        $ids = $request->input('ids', []);
+        $ids = array_values(array_filter(
+            (array) $request->input('ids', []),
+            fn ($id) => is_string($id) && $id !== ''
+        ));
 
         if (empty($ids)) {
             return back()->with('error', 'Tidak ada data pegawai yang dipilih.');
         }
 
-        try {
-            DB::beginTransaction();
+        $employees = Employee::whereIn('id', $ids)->get(['id', 'nama_lengkap', 'nip']);
 
-            $employees = Employee::whereIn('id', $ids)->get();
-            $count = $employees->count();
-
-            if ($count === 0) {
-                DB::rollBack();
-
-                return back()->with('error', 'Data pegawai tidak ditemukan.');
-            }
-
-            foreach ($employees as $employee) {
-                $action->execute($employee, $request);
-            }
-
-            DB::commit();
-
-            return back()
-                ->with('success', $count.' pegawai berhasil dinonaktifkan.')
-                ->with('employee_data_changed', true);
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            return back()->with('error', 'Terjadi kesalahan saat menonaktifkan pegawai: '.$e->getMessage());
+        if ($employees->isEmpty()) {
+            return back()->with('error', 'Data pegawai tidak ditemukan.');
         }
+
+        $validIds = $employees->pluck('id')->all();
+        $count = count($validIds);
+        $now = now();
+        $user = $request->user();
+
+        DB::transaction(function () use ($validIds, $employees, $now, $user, $request): void {
+            // Satu UPDATE soft-delete semua sekaligus
+            Employee::whereIn('id', $validIds)->update(['deleted_at' => $now]);
+
+            // Batch insert audit log
+            $auditRows = $employees->map(fn ($e) => [
+                'id' => (string) Str::uuid(),
+                'user_id' => $user?->id,
+                'user_name' => $user?->name,
+                'event' => 'SOFT_DELETE',
+                'auditable_type' => 'Employee',
+                'auditable_id' => $e->id,
+                'old_values' => json_encode(['deleted_at' => null]),
+                'new_values' => json_encode(['deleted_at' => $now->toIso8601String()]),
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'created_at' => $now,
+            ])->all();
+
+            AuditLog::insert($auditRows);
+        });
+
+        return back()
+            ->with('success', $count.' pegawai berhasil dihapus ke backup.')
+            ->with('employee_data_changed', true)
+            ->with('backup_data_changed', true);
     }
 
     public function restore($id, Request $request, RestoreEmployeeAction $action)
@@ -401,8 +505,65 @@ class PegawaiController extends Controller
 
         $action->execute($employee, $request);
 
-        return redirect()->route('data-nonaktif')
-            ->with('success', 'Data pegawai '.$nama.' berhasil diaktifkan kembali.');
+        return redirect()->route('data-backup')
+            ->with('success', 'Data pegawai '.$nama.' berhasil dipulihkan ke daftar pegawai aktif.')
+            ->with('backup_data_changed', true);
+    }
+
+    public function bulkRestore(Request $request)
+    {
+        $ids = array_values(array_filter(
+            (array) $request->input('ids', []),
+            fn ($id) => is_string($id) && $id !== ''
+        ));
+
+        if (empty($ids)) {
+            return redirect()->route('data-backup')
+                ->with('error', 'Tidak ada pegawai yang dipilih.');
+        }
+
+        // Ambil hanya yang memang ada di trash — validasi sekaligus
+        $employees = Employee::onlyTrashed()
+            ->whereIn('id', $ids)
+            ->get(['id', 'nama_lengkap', 'nip']);
+
+        if ($employees->isEmpty()) {
+            return redirect()->route('data-backup')
+                ->with('error', 'Data pegawai tidak ditemukan di backup.');
+        }
+
+        $validIds = $employees->pluck('id')->all();
+        $count = count($validIds);
+        $now = now();
+        $user = $request->user();
+
+        DB::transaction(function () use ($validIds, $employees, $now, $user, $request): void {
+            // Satu UPDATE — set deleted_at = null untuk semua sekaligus
+            Employee::onlyTrashed()
+                ->whereIn('id', $validIds)
+                ->update(['deleted_at' => null]);
+
+            // Batch insert audit log — satu INSERT untuk semua, jauh lebih cepat dari N inserts
+            $auditRows = $employees->map(fn ($e) => [
+                'id' => (string) Str::uuid(),
+                'user_id' => $user?->id,
+                'user_name' => $user?->name,
+                'event' => 'RESTORE',
+                'auditable_type' => 'Employee',
+                'auditable_id' => $e->id,
+                'old_values' => json_encode(['deleted_at' => $now->toIso8601String()]),
+                'new_values' => json_encode(['deleted_at' => null]),
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'created_at' => $now,
+            ])->all();
+
+            AuditLog::insert($auditRows);
+        });
+
+        return redirect()->route('data-backup')
+            ->with('success', $count.' pegawai berhasil dipulihkan ke daftar pegawai aktif.')
+            ->with('backup_data_changed', true);
     }
 
     public function storeRiwayat($id, Request $request, StoreEmployeeHistoryAction $action)

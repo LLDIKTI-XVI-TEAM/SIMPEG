@@ -18,7 +18,9 @@ class LogoutFromKeycloakAction
     {
         $user = Auth::user();
 
-        AuditService::logAs($user?->id, $user?->name ?? 'unknown', 'LOGOUT', 'User', $user?->id, null, null, $request);
+        if ($user) {
+            AuditService::logAs($user->id, $user->name, 'LOGOUT', 'User', $user->id, null, null, $request);
+        }
 
         Auth::logout();
         $request->session()->invalidate();

@@ -136,7 +136,7 @@ $permissionPaths = [
                     </div>
                     <div class="mt-4 border-t border-border/50 pt-2 flex items-baseline justify-between">
                         <span class="text-[10px] text-muted font-sans font-medium">Izin Aktif:</span>
-                        <span class="text-base font-bold text-ink font-mono">{{ $role->permissions->count() }}</span>
+                        <span class="text-base font-bold text-ink">{{ $role->permissions->count() }}</span>
                     </div>
                 </x-ui.card>
             @endforeach
@@ -151,7 +151,7 @@ $permissionPaths = [
                 <div class="px-6 py-4 border-b border-border bg-surface flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h3 class="text-sm font-semibold text-ink font-sans">Matriks Konfigurasi RBAC</h3>
-                        <p class="text-[10px] text-muted font-sans mt-0.5">Tentukan daftar permission dan modul yang diizinkan untuk setiap level peran.</p>
+                        <p class="text-xs text-muted">Tentukan daftar permission dan modul yang diizinkan untuk setiap level peran.</p>
                     </div>
                     <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                         {{-- Dropdown Filter Modul --}}
@@ -235,10 +235,10 @@ $permissionPaths = [
                                         @endphp
                                         <x-ui.table-row x-show="(moduleFilter === '' || moduleFilter === '{{ $moduleName }}') && (searchQuery === '' || '{{ strtolower($permission->name) }}'.includes(searchQuery.toLowerCase()) || '{{ strtolower($displayPath) }}'.includes(searchQuery.toLowerCase()) || '{{ strtolower($permission->description) }}'.includes(searchQuery.toLowerCase()))"
                                             class="hover:bg-soft/30 transition-colors">
-                                            <x-ui.table-td class="font-mono text-muted">{{ $globalIndex++ }}</x-ui.table-td>
+                                            <x-ui.table-td class="text-muted">{{ $globalIndex++ }}</x-ui.table-td>
                                             <x-ui.table-td>
                                                 <div class="flex items-center gap-1.5 flex-wrap">
-                                                    <span class="font-bold text-primary font-mono text-[11px]">{{ $displayPath }}</span>
+                                                    <span class="font-bold text-primary text-[11px]">{{ $displayPath }}</span>
                                                     @if($isSensitive)
                                                         <span class="inline-flex items-center text-[9px] font-bold uppercase tracking-wider text-danger leading-none">⚠️ High Risk / Sensitif</span>
                                                     @endif

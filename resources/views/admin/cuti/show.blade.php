@@ -12,9 +12,9 @@
                 default => 'warning',
             };
             $statusLabel = match ($status) {
-                'menunggu_approval' => 'Menunggu Approval',
+                'menunggu_approval' => 'Menunggu Keputusan',
                 'ditangguhkan' => 'Ditangguhkan',
-                'perlu_perubahan' => 'Perlu Perubahan',
+                'perlu_perubahan' => 'Perubahan',
                 'disetujui' => 'Disetujui',
                 'tidak_disetujui' => 'Tidak Disetujui',
                 default => $status,
@@ -71,15 +71,15 @@
                 </div>
                 <div class="space-y-1">
                     <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Durasi Cuti</span>
-                    <p class="text-sm font-bold text-ink font-mono">{{ $cuti->jumlah_hari_kerja }} Hari Kerja</p>
+                    <p class="text-sm font-bold text-ink">{{ $cuti->jumlah_hari_kerja }} Hari Kerja</p>
                 </div>
                 <div class="space-y-1">
                     <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Tanggal Mulai</span>
-                    <p class="text-sm font-semibold text-ink font-mono">{{ $cuti->tanggal_mulai?->translatedFormat('d F Y') }}</p>
+                    <p class="text-sm font-semibold text-ink">{{ $cuti->tanggal_mulai?->translatedFormat('d F Y') }}</p>
                 </div>
                 <div class="space-y-1">
                     <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Tanggal Selesai</span>
-                    <p class="text-sm font-semibold text-ink font-mono">{{ $cuti->tanggal_selesai?->translatedFormat('d F Y') }}</p>
+                    <p class="text-sm font-semibold text-ink">{{ $cuti->tanggal_selesai?->translatedFormat('d F Y') }}</p>
                 </div>
                 <div class="space-y-1 sm:col-span-2">
                     <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Alasan / Keterangan</span>
@@ -164,7 +164,7 @@
                                     $actionLabel = match ($approval->action) {
                                         'APPROVE' => 'Setuju',
                                         'POSTPONE' => 'Tunda',
-                                        'REQUEST_CHANGES' => 'Perlu Perubahan',
+                                        'REQUEST_CHANGES' => 'Perubahan',
                                         'REJECT' => 'Tidak Disetujui',
                                         'SKIP' => 'Dilewati',
                                         default => $approval->action,
@@ -184,7 +184,7 @@
                                         {{ $approval->approver?->nama_lengkap ?? 'Approver' }}
                                         <span class="text-muted font-normal">- Tahap {{ $approval->stage }} ({{ $stepLabels[$approval->stage]?->role_label ?? '-' }})</span>
                                     </p>
-                                    <p class="text-[10px] text-muted font-sans mt-0.5">{{ $approval->acted_at?->translatedFormat('d M Y, H:i') }}</p>
+                                    <p class="text-xs text-muted">{{ $approval->acted_at?->translatedFormat('d M Y, H:i') }}</p>
                                     @if ($approval->komentar)
                                         <p class="text-xs text-ink font-sans mt-1.5 italic">{{ $approval->komentar }}</p>
                                     @endif

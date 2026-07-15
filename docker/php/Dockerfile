@@ -28,6 +28,8 @@ RUN apt-get update && apt-get install -y \
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 COPY docker/php/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
+COPY docker/php/timeout.ini /usr/local/etc/php/conf.d/timeout.ini
+COPY docker/php/www.conf    /usr/local/etc/php-fpm.d/www.conf
 
 # Custom PHP settings
 RUN echo "upload_max_filesize = 100M" > /usr/local/etc/php/conf.d/uploads.ini \

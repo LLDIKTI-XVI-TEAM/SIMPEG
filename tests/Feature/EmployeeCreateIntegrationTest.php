@@ -51,11 +51,11 @@ class EmployeeCreateIntegrationTest extends TestCase
             'pangkat_terakhir' => 'Penata Muda',
             'jabatan_terakhir' => 'Analis Sistem Informasi',
             'kelas_jabatan' => '7',
-            'tmt' => '2024-01-01',
-            'jenis_pengangkatan' => 'PNS',
-            'nomor_sk' => 'SK-UJI-001',
-            'tanggal_sk' => '2023-12-01',
-            'file_sk' => UploadedFile::fake()->create('sk-pengangkatan.pdf', 500, 'application/pdf'),
+            'pengangkatan_tmt_pengangkatan' => '2024-01-01',
+            'pengangkatan_jenis_pengangkatan' => 'PNS',
+            'pengangkatan_no_sk' => 'SK-UJI-001',
+            'pengangkatan_tanggal_sk' => '2023-12-01',
+            'file_sk_pengangkatan' => UploadedFile::fake()->create('sk-pengangkatan.pdf', 500, 'application/pdf'),
             'is_kepala_lembaga' => true,
         ];
 
@@ -88,7 +88,7 @@ class EmployeeCreateIntegrationTest extends TestCase
 
         $documentPath = $employee->documents()->where('jenis_dokumen', 'sk_pengangkatan')->value('file_path');
         $this->assertIsString($documentPath);
-        $this->assertStringStartsWith('sk/', $documentPath);
+        $this->assertStringStartsWith('appointments/sk/', $documentPath);
         /** @var FilesystemAdapter $disk */
         $disk = Storage::disk('public');
         $disk->assertExists($documentPath);

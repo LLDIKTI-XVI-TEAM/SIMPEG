@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\EmployeeFamilies\CreateEmployeeFamilyAction;
+use App\Actions\EmployeeFamilies\DeleteEmployeeFamilyAction;
 use App\Actions\EmployeeFamilies\ListEmployeeFamiliesAction;
 use App\Actions\EmployeeFamilies\UpdateEmployeeFamilyAction;
 use App\Http\Controllers\Controller;
@@ -63,6 +64,26 @@ class MyFamilyController extends Controller
         return response()->json([
             'message' => 'Data keluarga berhasil diperbarui.',
             'family' => $payload->response($family),
+        ]);
+    }
+
+    public function destroy(
+        EmployeeFamily $family,
+        DeleteEmployeeFamilyAction $action,
+    ): JsonResponse {
+        $employee = $this->resolveEmployee();
+
+        // Lapisan otorisasi eksplisit: pastikan record yang dihapus benar-benar milik pegawai login.
+        abort_unless(
+            $family->employee_id === $employee->id,
+            403,
+            'Anda hanya dapat menghapus data keluarga milik Anda sendiri.',
+        );
+
+        $action->execute($employee, $family, request());
+
+        return response()->json([
+            'message' => 'Data keluarga berhasil dihapus.',
         ]);
     }
 

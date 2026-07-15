@@ -91,7 +91,7 @@
     ];
     $surfaceClass = $surface === 'soft' ? $tone['surface'] : '';
     $labelClasses = trim('text-[10px] font-bold text-muted uppercase tracking-wider font-sans ' . $labelClass);
-    $valueClasses = trim('mt-1 text-2xl font-extrabold leading-none font-mono ' . $dimension['value'] . ' ' . $tone['text'] . ' ' . $valueClass);
+    $valueClasses = trim('mt-1 text-2xl font-extrabold leading-none ' . $dimension['value'] . ' ' . $tone['text'] . ' ' . $valueClass);
     $inlineValueClasses = trim(str_replace('mt-1', '', $valueClasses));
     $unitClasses = trim('text-sm text-muted font-sans ' . $unitClass);
     $descriptionClasses = trim('text-[10px] text-muted font-sans ' . $descriptionClass);

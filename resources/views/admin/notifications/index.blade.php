@@ -73,6 +73,16 @@
                         str_contains($typeLower, 'kenaikan_pangkat') => 'success',
                         default => 'primary',
                     };
+                    
+                    $styleMap = [
+                        'warning' => ['border' => 'border-l-warning', 'bg' => 'bg-warning/10', 'text' => 'text-warning'],
+                        'danger' =>  ['border' => 'border-l-danger',  'bg' => 'bg-danger/10',  'text' => 'text-danger'],
+                        'info' =>    ['border' => 'border-l-info',    'bg' => 'bg-info/10',    'text' => 'text-info'],
+                        'success' => ['border' => 'border-l-success', 'bg' => 'bg-success/10', 'text' => 'text-success'],
+                        'primary' => ['border' => 'border-l-primary', 'bg' => 'bg-primary/10', 'text' => 'text-primary'],
+                    ];
+                    $notifStyle = $styleMap[$color];
+                    
                     $subText = $notif->data['label'] ?? 'Notifikasi Sistem';
                     $targetUrl = $notif->data['url']
                         ?? $notif->data['link']
@@ -82,17 +92,17 @@
                 <button
                     type="button"
                     @click="openNotification(@js($notif->id), @js($targetUrl))"
-                    class="flex w-full items-start gap-4 rounded-lg border border-border border-l-4 border-l-{{ $color }} bg-surface p-5 text-left shadow-sm transition-colors hover:bg-soft/20"
+                    class="flex w-full items-start gap-4 rounded-lg border border-border border-l-4 {{ $notifStyle['border'] }} bg-surface p-5 text-left shadow-sm transition-colors hover:bg-soft/20"
                 >
-                    <div class="rounded-lg bg-{{ $color }}/10 p-2.5 text-{{ $color }} shrink-0 mt-0.5">
+                    <div class="rounded-lg {{ $notifStyle['bg'] }} p-2.5 {{ $notifStyle['text'] }} shrink-0 mt-0.5">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
                         </svg>
                     </div>
                     <div class="min-w-0 flex-1 space-y-1">
                         <div class="flex items-center justify-between">
-                            <span class="text-[10px] font-bold uppercase tracking-wider text-{{ $color }} font-sans">{{ $subText }}</span>
-                            <span class="text-[10px] text-muted font-sans font-mono shrink-0">{{ $notif->created_at->format('d F Y, H:i') }}</span>
+                            <span class="text-[10px] font-bold uppercase tracking-wider {{ $notifStyle['text'] }} font-sans">{{ $subText }}</span>
+                            <span class="text-[10px] text-muted font-sans shrink-0">{{ $notif->created_at->format('d F Y, H:i') }}</span>
                         </div>
                         <h3 class="text-sm font-bold text-ink font-sans leading-snug">{{ $notif->title }}</h3>
                         <p class="text-xs text-muted font-sans leading-relaxed">{{ $notif->body }}</p>

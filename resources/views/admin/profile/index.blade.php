@@ -246,7 +246,7 @@
                                     </span>
                                 @endif
                             </div>
-                            <p class="text-xs text-muted font-sans font-mono mt-0.5">NIP. {{ $p->nip }} &bull; Email: {{ auth()->user()->email }}</p>
+                            <p class="text-xs text-muted">NIP. {{ $p->nip }} &bull; Email: {{ auth()->user()->email }}</p>
                             <div class="mt-1.5 flex flex-wrap items-center gap-2">
                                 <span class="inline-block rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-semibold font-sans uppercase">{{ $p->jenisPegawai->nama ?? '-' }}</span>
                                 <span class="inline-block rounded-full bg-secondary/10 text-secondary px-2.5 py-0.5 text-xs font-semibold font-sans">Role: {{ auth()->user()->role ?? 'Pegawai' }}</span>
@@ -294,7 +294,7 @@
                             <div>
                                 <span class="text-[9px] font-bold text-muted uppercase tracking-wider font-sans block">Atasan Langsung Anda</span>
                                 <p class="text-xs font-bold text-ink font-sans">{{ $p->currentSupervisor()?->supervisor->nama_lengkap ?? '-' }}</p>
-                                <p class="text-[10px] text-muted font-mono leading-none mt-0.5">NIP. {{ $p->currentSupervisor()?->supervisor->nip ?? '-' }} ({{ $p->currentSupervisor()?->supervisor->latestPosition()?->nama_jabatan ?? '-' }})</p>
+                                <p class="text-xs text-muted">NIP. {{ $p->currentSupervisor()?->supervisor->nip ?? '-' }} ({{ $p->currentSupervisor()?->supervisor->latestPosition()?->nama_jabatan ?? '-' }})</p>
                             </div>
                         </div>
                     </div>
@@ -330,11 +330,11 @@
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                                 <div class="space-y-0.5">
                                     <span class="font-semibold text-muted font-sans">NIK (KTP)</span>
-                                    <p class="text-ink font-mono font-bold">{{ $p->nik ?? '-' }}</p>
+                                    <p class="text-ink font-bold">{{ $p->nik ?? '-' }}</p>
                                 </div>
                                 <div class="space-y-0.5">
                                     <span class="font-semibold text-muted font-sans">No. Kartu Keluarga (KK)</span>
-                                    <p class="text-ink font-mono font-bold">{{ $p->no_kk ?? '-' }}</p>
+                                    <p class="text-ink font-bold">{{ $p->no_kk ?? '-' }}</p>
                                 </div>
                                 <div class="space-y-0.5">
                                     <span class="font-semibold text-muted font-sans">Tempat / Tanggal Lahir</span>
@@ -364,19 +364,19 @@
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                                 <div class="space-y-0.5">
                                     <span class="font-semibold text-muted font-sans">Email Dinas</span>
-                                    <p class="text-ink font-sans font-mono">-</p>
+                                    <p class="text-ink font-sans">-</p>
                                 </div>
                                 <div class="space-y-0.5">
                                     <span class="font-semibold text-muted font-sans">Email Pribadi</span>
-                                    <p class="text-ink font-sans font-mono">{{ $p->email ?? '-' }}</p>
+                                    <p class="text-ink font-sans">{{ $p->email ?? '-' }}</p>
                                 </div>
                                 <div class="space-y-0.5">
                                     <span class="font-semibold text-muted font-sans">Nomor HP</span>
-                                    <p class="text-ink font-sans font-mono">{{ $p->no_hp ?? '-' }}</p>
+                                    <p class="text-ink font-sans">{{ $p->no_hp ?? '-' }}</p>
                                 </div>
                                 <div class="space-y-0.5">
                                     <span class="font-semibold text-muted font-sans">Telepon Rumah</span>
-                                    <p class="text-ink font-sans font-mono">{{ $p->no_telepon_rumah ?? '-' }}</p>
+                                    <p class="text-ink font-sans">{{ $p->no_telepon_rumah ?? '-' }}</p>
                                 </div>
                                 <div class="space-y-0.5 sm:col-span-2">
                                     <span class="font-semibold text-muted font-sans">Alamat</span>
@@ -412,7 +412,7 @@
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">TMT Golongan</span>
-                                <p class="text-ink font-mono">{{ $p->latestRank()?->tmt_pangkat ? \Carbon\Carbon::parse($p->latestRank()->tmt_pangkat)->format('d-m-Y') : '-' }}</p>
+                                <p class="text-ink">{{ $p->latestRank()?->tmt_pangkat ? \Carbon\Carbon::parse($p->latestRank()->tmt_pangkat)->format('d-m-Y') : '-' }}</p>
                             </div>
                         </div>
                     </div>
@@ -478,7 +478,7 @@
                                     <tr class="transition-colors hover:bg-soft/30 text-ink">
                                         <td class="px-4 py-3">
                                             <p class="font-bold font-sans" x-text="fam.nama_anggota"></p>
-                                            <p class="text-[10px] text-muted font-mono" x-text="fam.nik ? 'NIK. ' + fam.nik : 'NIK. -'"></p>
+                                            <p class="text-[10px] text-muted" x-text="fam.nik ? 'NIK. ' + fam.nik : 'NIK. -'"></p>
                                         </td>
                                         <td class="px-4 py-3">
                                             <p class="font-sans" x-text="fam.hubungan"></p>
@@ -486,7 +486,7 @@
                                         </td>
                                         <td class="px-4 py-3">
                                             <p class="font-sans" x-text="fam.tempat_lahir || '-'"></p>
-                                            <p class="text-[10px] text-muted font-mono" x-text="fam.tanggal_lahir"></p>
+                                            <p class="text-[10px] text-muted" x-text="fam.tanggal_lahir"></p>
                                         </td>
                                         <td class="px-4 py-3 font-sans" x-text="fam.pekerjaan || '-'"></td>
                                         <td class="px-4 py-3">
@@ -521,9 +521,9 @@
                                 @forelse($p->rankHistories as $r)
                                     <tr class="transition-colors hover:bg-soft/30 text-ink">
                                         <td class="px-4 py-3 font-bold">{{ $r->golongan->nama ?? '-' }}</td>
-                                        <td class="px-4 py-3 font-mono">{{ $r->no_sk }}</td>
-                                        <td class="px-4 py-3 font-mono">{{ $r->tanggal_sk }}</td>
-                                        <td class="px-4 py-3 font-mono">{{ $r->tmt_pangkat }}</td>
+                                        <td class="px-4 py-3">{{ $r->no_sk }}</td>
+                                        <td class="px-4 py-3">{{ $r->tanggal_sk }}</td>
+                                        <td class="px-4 py-3">{{ $r->tmt_pangkat }}</td>
                                     </tr>
                                 @empty
                                     <tr>
@@ -559,9 +559,9 @@
                                     <tr class="transition-colors hover:bg-soft/30 text-ink">
                                         <td class="px-4 py-3 font-bold">{{ $j->nama_jabatan }}</td>
                                         <td class="px-4 py-3">{{ $j->unitKerja->nama ?? '-' }}</td>
-                                        <td class="px-4 py-3 font-mono">{{ $j->no_sk }}</td>
-                                        <td class="px-4 py-3 font-mono">{{ $j->tanggal_sk }}</td>
-                                        <td class="px-4 py-3 font-mono">{{ $j->tmt_jabatan }}</td>
+                                        <td class="px-4 py-3">{{ $j->no_sk }}</td>
+                                        <td class="px-4 py-3">{{ $j->tanggal_sk }}</td>
+                                        <td class="px-4 py-3">{{ $j->tmt_jabatan }}</td>
                                     </tr>
                                 @empty
                                     <tr>
@@ -595,9 +595,9 @@
                                 @forelse($p->salaryHistories as $k)
                                     <tr class="transition-colors hover:bg-soft/30 text-ink">
                                         <td class="px-4 py-3 font-bold">Rp {{ number_format($k->gaji_pokok, 0, ',', '.') }}</td>
-                                        <td class="px-4 py-3 font-mono">{{ $k->no_sk }}</td>
-                                        <td class="px-4 py-3 font-mono">{{ $k->tanggal_sk }}</td>
-                                        <td class="px-4 py-3 font-mono">{{ $k->tmt_kgb }}</td>
+                                        <td class="px-4 py-3">{{ $k->no_sk }}</td>
+                                        <td class="px-4 py-3">{{ $k->tanggal_sk }}</td>
+                                        <td class="px-4 py-3">{{ $k->tmt_kgb }}</td>
                                     </tr>
                                 @empty
                                     <tr>
@@ -638,9 +638,9 @@
                                             @endif
                                         </td>
                                         <td class="px-4 py-3">{{ $d->deskripsi }}</td>
-                                        <td class="px-4 py-3 font-mono">{{ $d->no_sk }}</td>
-                                        <td class="px-4 py-3 font-mono">{{ $d->tanggal_sk ? \Carbon\Carbon::parse($d->tanggal_sk)->format('d-m-Y') : '-' }}</td>
-                                        <td class="px-4 py-3 font-mono">{{ $d->tanggal_mulai ? \Carbon\Carbon::parse($d->tanggal_mulai)->format('d-m-Y') : '-' }} s/d {{ $d->tanggal_berakhir ? \Carbon\Carbon::parse($d->tanggal_berakhir)->format('d-m-Y') : 'Sekarang' }}</td>
+                                        <td class="px-4 py-3">{{ $d->no_sk }}</td>
+                                        <td class="px-4 py-3">{{ $d->tanggal_sk ? \Carbon\Carbon::parse($d->tanggal_sk)->format('d-m-Y') : '-' }}</td>
+                                        <td class="px-4 py-3">{{ $d->tanggal_mulai ? \Carbon\Carbon::parse($d->tanggal_mulai)->format('d-m-Y') : '-' }} s/d {{ $d->tanggal_berakhir ? \Carbon\Carbon::parse($d->tanggal_berakhir)->format('d-m-Y') : 'Sekarang' }}</td>
                                     </tr>
                                 @empty
                                     <tr>
@@ -677,8 +677,8 @@
                                         <td class="px-4 py-3 font-bold">{{ $e->jenjang->nama ?? '-' }}</td>
                                         <td class="px-4 py-3">{{ $e->nama_institusi }}</td>
                                         <td class="px-4 py-3">{{ $e->jurusan }}</td>
-                                        <td class="px-4 py-3 font-mono">{{ $e->tahun_lulus }}</td>
-                                        <td class="px-4 py-3 font-mono">{{ $e->no_ijazah }}</td>
+                                        <td class="px-4 py-3">{{ $e->tahun_lulus }}</td>
+                                        <td class="px-4 py-3">{{ $e->no_ijazah }}</td>
                                     </tr>
                                 @empty
                                     <tr>
@@ -707,17 +707,17 @@
                                 </div>
                                 <div class="flex justify-between border-b border-border pb-1">
                                     <span class="font-semibold text-muted">Nomor SK Pengangkatan:</span>
-                                    <span class="text-ink font-mono font-bold">{{ $p->appointment->no_sk ?? '-' }}</span>
+                                    <span class="text-ink font-bold">{{ $p->appointment->no_sk ?? '-' }}</span>
                                 </div>
                                 <div class="flex justify-between border-b border-border pb-1">
                                     <span class="font-semibold text-muted">Tanggal SK Terbit:</span>
-                                    <span class="text-ink font-mono">{{ $p->appointment?->tanggal_sk ? \Carbon\Carbon::parse($p->appointment->tanggal_sk)->format('d-m-Y') : '-' }}</span>
+                                    <span class="text-ink">{{ $p->appointment?->tanggal_sk ? \Carbon\Carbon::parse($p->appointment->tanggal_sk)->format('d-m-Y') : '-' }}</span>
                                 </div>
                             </div>
                             <div class="space-y-2">
                                 <div class="flex justify-between border-b border-border pb-1">
                                     <span class="font-semibold text-muted">TMT Pengangkatan:</span>
-                                    <span class="text-ink font-mono font-bold">{{ $p->appointment?->tmt_pengangkatan ? \Carbon\Carbon::parse($p->appointment->tmt_pengangkatan)->format('d-m-Y') : '-' }}</span>
+                                    <span class="text-ink font-bold">{{ $p->appointment?->tmt_pengangkatan ? \Carbon\Carbon::parse($p->appointment->tmt_pengangkatan)->format('d-m-Y') : '-' }}</span>
                                 </div>
                                 <div class="flex justify-between border-b border-border pb-1">
                                     <span class="font-semibold text-muted">Pejabat yang Menetapkan:</span>
@@ -762,14 +762,14 @@
                                             </div>
                                             <div class="min-w-0">
                                                 <p class="font-bold font-sans truncate">{{ $doc['nama'] }}</p>
-                                                <p class="text-[10px] text-muted font-sans mt-0.5 truncate">{{ $doc['keterangan'] }}</p>
+                                                <p class="text-xs text-muted truncate">{{ $doc['keterangan'] }}</p>
                                             </div>
                                         </div>
                                     </td>
                                     <td class="px-4 py-3 text-muted font-sans">{{ $doc['kategori_label'] }}</td>
-                                    <td class="px-4 py-3 font-mono text-muted">{{ $doc['nomor'] }}</td>
-                                    <td class="px-4 py-3 font-mono text-muted">{{ $doc['tanggal'] }}</td>
-                                    <td class="px-4 py-3 font-mono text-muted">{{ $doc['file_size'] }}</td>
+                                    <td class="px-4 py-3 text-muted">{{ $doc['nomor'] }}</td>
+                                    <td class="px-4 py-3 text-muted">{{ $doc['tanggal'] }}</td>
+                                    <td class="px-4 py-3 text-muted">{{ $doc['file_size'] }}</td>
                                 </tr>
                                 @empty
                                 <tr>
@@ -947,15 +947,15 @@
                         </div>
                     </a>
 
-                    <a href="{{ route('data-nonaktif') }}" class="flex h-full items-start gap-4 p-5 rounded-xl border border-border bg-surface hover:border-primary hover:shadow-lg transition-all duration-300 group">
+                    <a href="{{ route('data-backup') }}" class="flex h-full items-start gap-4 p-5 rounded-xl border border-border bg-surface hover:border-primary hover:shadow-lg transition-all duration-300 group">
                         <div class="h-12 w-12 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
                             </svg>
                         </div>
                         <div>
-                            <h4 class="font-bold text-ink text-sm">Pegawai Nonaktif</h4>
-                            <p class="text-[11px] text-muted mt-1 leading-relaxed">Manajemen Soft Delete untuk pegawai yang diberhentikan atau mutasi.</p>
+                            <h4 class="font-bold text-ink text-sm">Data Backup</h4>
+                            <p class="text-[11px] text-muted mt-1 leading-relaxed">Riwayat penghapusan data pegawai (soft delete & hard delete) dari sistem.</p>
                         </div>
                     </a>
 
