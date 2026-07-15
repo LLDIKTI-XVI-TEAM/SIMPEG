@@ -272,7 +272,7 @@
                                 </div>
                                 <div class="min-w-0">
                                     <p class="block truncate text-sm font-semibold text-ink" x-text="doc.nama_pegawai"></p>
-                                    <p class="font-mono text-xs text-muted" x-text="'NIP. ' + doc.nip_pegawai"></p>
+                                    <p class="text-xs text-muted" x-text="'NIP. ' + doc.nip_pegawai"></p>
                                 </div>
                             </div>
                         </td>
@@ -300,10 +300,10 @@
                         <td class="px-4 py-3.5 text-xs text-muted font-sans" x-text="doc.kategori_label"></td>
 
                         {{-- Nomor Dokumen --}}
-                        <td class="px-4 py-3.5 text-xs font-mono text-muted" x-text="doc.nomor"></td>
+                        <td class="px-4 py-3.5 text-xs text-muted" x-text="doc.nomor"></td>
 
                         {{-- Tanggal --}}
-                        <td class="px-4 py-3.5 text-xs font-mono text-muted" x-text="doc.tanggal"></td>
+                        <td class="px-4 py-3.5 text-xs text-muted" x-text="doc.tanggal"></td>
 
                         {{-- Status --}}
                         <td class="px-4 py-3.5">

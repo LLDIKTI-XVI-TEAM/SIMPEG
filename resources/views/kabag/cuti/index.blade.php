@@ -1,124 +1,74 @@
-<x-layouts.app title="Pengajuan Cuti Bawahan" subtitle="Kelola dan berikan persetujuan untuk cuti bawahan Anda.">
-    <div x-data="{ search: '', filterStatus: '', filterJenis: '', filterTahun: '' }">
-
-    @php
-        // DUMMY DATA UNTUK UI
-        $cutiList = [
-            [
-                'id' => 1,
-                'nama' => 'Ahmad Fauzi',
-                'nip' => '198123456789100000',
-                'jenis_cuti' => 'Cuti Tahunan',
-                'tgl_mulai' => '20 Jun 2026',
-                'tgl_selesai' => '24 Jun 2026',
-                'jml_hari' => '5 Hari',
-                'alasan' => 'Acara keluarga di kampung halaman...',
-                'status' => 'Menunggu Tindakan Saya',
-                'tgl_ajukan' => '15 Jun 2026',
-            ],
-            [
-                'id' => 2,
-                'nama' => 'Nadia Kusuma',
-                'nip' => '198512345678910000',
-                'jenis_cuti' => 'Cuti Sakit',
-                'tgl_mulai' => '19 Jun 2026',
-                'tgl_selesai' => '21 Jun 2026',
-                'jml_hari' => '3 Hari',
-                'alasan' => 'Sakit demam berdarah (surat dokter terlampir)...',
-                'status' => 'Menunggu Tindakan Saya',
-                'tgl_ajukan' => '19 Jun 2026',
-            ],
-            [
-                'id' => 3,
-                'nama' => 'Budi Santoso',
-                'nip' => '199012345678910000',
-                'jenis_cuti' => 'Cuti Alasan Penting',
-                'tgl_mulai' => '10 Jul 2026',
-                'tgl_selesai' => '15 Jul 2026',
-                'jml_hari' => '4 Hari',
-                'alasan' => 'Menemani istri melahirkan...',
-                'status' => 'Ditangguhkan',
-                'tgl_ajukan' => '10 Jun 2026',
-            ],
-            [
-                'id' => 4,
-                'nama' => 'Siti Rahayu',
-                'nip' => '198812345678910000',
-                'jenis_cuti' => 'Cuti Tahunan',
-                'tgl_mulai' => '01 Agu 2026',
-                'tgl_selesai' => '05 Agu 2026',
-                'jml_hari' => '5 Hari',
-                'alasan' => 'Liburan akhir tahun bersama keluarga...',
-                'status' => 'Perubahan',
-                'tgl_ajukan' => '05 Jun 2026',
-            ],
-            [
-                'id' => 5,
-                'nama' => 'Teguh Wibowo',
-                'nip' => '197512345678910000',
-                'jenis_cuti' => 'Cuti Besar',
-                'tgl_mulai' => '01 Sep 2026',
-                'tgl_selesai' => '30 Sep 2026',
-                'jml_hari' => '22 Hari',
-                'alasan' => 'Ibadah Haji (surat pengantar dari biro terlampir)...',
-                'status' => 'Selesai',
-                'tgl_ajukan' => '01 Jun 2026',
-            ],
-        ];
-    @endphp
-
+<x-layouts.app title="Pengajuan Cuti Bawahan" subtitle="Daftar seluruh permohonan cuti dari bawahan langsung Anda.">
+    
     {{-- PAGE HEADER --}}
     <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
             <h2 class="text-2xl font-semibold text-ink">Pengajuan Cuti Bawahan</h2>
             <x-ui.breadcrumb :items="[
-                ['label' => 'Dashboard', 'url' => route('dashboard')],
+                ['label' => 'Dashboard', 'url' => route('kepala-bagian.dashboard')],
                 ['label' => 'Cuti Bawahan']
             ]" />
         </div>
     </div>
 
+    <x-ui.alert variant="info" title="Informasi Cuti" class="mb-6">
+        Daftar ini memuat seluruh riwayat dan pengajuan cuti dari bawahan langsung Anda.
+    </x-ui.alert>
+
     <!-- FILTER & PENCARIAN -->
-    <x-ui.filter-bar searchId="search" searchName="search" searchPlaceholder="Cari nama pegawai..." searchCols="lg:col-span-1" x-model="search">
-        <!-- Filter Status -->
-        <div>
-            <x-form.select size="md" x-model="filterStatus">
-                <option value="">Semua Status</option>
-                <option value="Menunggu Tindakan Saya">Menunggu Tindakan Saya</option>
-                <option value="Perubahan">Perubahan</option>
-                <option value="Ditangguhkan">Ditangguhkan</option>
-                <option value="Selesai">Selesai</option>
-            </x-form.select>
-        </div>
+    <form method="GET" action="{{ route('kepala-bagian.cuti.index') }}">
+        <input type="hidden" name="per_page" value="{{ request('per_page', 10) }}">
+        <x-ui.filter-bar class="!grid-cols-1 sm:!grid-cols-2 lg:!grid-cols-5" searchId="search" searchName="search" searchValue="{{ $filters['search'] ?? '' }}" searchPlaceholder="Cari nama pegawai atau NIP..." searchCols="lg:col-span-1">
+            
+            <!-- Filter Status -->
+            <div>
+                <x-form.select size="md" name="status" id="status" onchange="this.form.submit()">
+                    <option value="">Semua Status</option>
+                    <option value="menunggu_approval" @selected(($filters['status'] ?? '') === 'menunggu_approval')>Menunggu Keputusan</option>
+                    <option value="disetujui" @selected(($filters['status'] ?? '') === 'disetujui')>Disetujui</option>
+                    <option value="perlu_perubahan" @selected(($filters['status'] ?? '') === 'perlu_perubahan')>Perubahan</option>
+                    <option value="ditangguhkan" @selected(($filters['status'] ?? '') === 'ditangguhkan')>Ditangguhkan</option>
+                    <option value="tidak_disetujui" @selected(($filters['status'] ?? '') === 'tidak_disetujui')>Tidak Disetujui</option>
+                </x-form.select>
+            </div>
+            
+            <!-- Filter Jenis Cuti -->
+            <div>
+                <x-form.select size="md" name="jenis_cuti_id" id="jenis_cuti_id" onchange="this.form.submit()">
+                    <option value="">Semua Jenis Cuti</option>
+                    @foreach ($jenisCutiOptions as $jenisCuti)
+                        <option value="{{ $jenisCuti->id }}" @selected(($filters['jenis_cuti_id'] ?? '') == $jenisCuti->id)>{{ $jenisCuti->nama }}</option>
+                    @endforeach
+                </x-form.select>
+            </div>
+            
+            <!-- Filter Tahun -->
+            <div>
+                <x-form.select size="md" name="tahun" id="tahun" onchange="this.form.submit()">
+                    <option value="">Semua Tahun</option>
+                    @for ($y = date('Y'); $y >= date('Y') - 5; $y--)
+                        <option value="{{ $y }}" @selected(($filters['tahun'] ?? '') == $y)>{{ $y }}</option>
+                    @endfor
+                </x-form.select>
+            </div>
 
-        <!-- Filter Jenis Cuti -->
-        <div>
-            <x-form.select size="md" x-model="filterJenis">
-                <option value="">Semua Jenis Cuti</option>
-                <option value="Cuti Tahunan">Cuti Tahunan</option>
-                <option value="Cuti Sakit">Cuti Sakit</option>
-                <option value="Cuti Alasan Penting">Cuti Alasan Penting</option>
-                <option value="Cuti Melahirkan">Cuti Melahirkan</option>
-                <option value="Cuti Besar">Cuti Besar</option>
-                <option value="Cuti di Luar Tanggungan Negara">Cuti di Luar Tanggungan Negara</option>
-            </x-form.select>
-        </div>
-
-        <!-- Filter Tahun/Periode -->
-        <div>
-            <x-form.select size="md" x-model="filterTahun">
-                <option value="">Semua Tahun</option>
-                <option value="2026">Tahun 2026</option>
-                <option value="2025">Tahun 2025</option>
-            </x-form.select>
-        </div>
-    </x-ui.filter-bar>
+            <!-- Filter Bulan -->
+            <div>
+                <x-form.select size="md" name="bulan" id="bulan" onchange="this.form.submit()">
+                    <option value="">Semua Bulan</option>
+                    @foreach (range(1, 12) as $month)
+                        <option value="{{ $month }}" @selected((string) ($filters['bulan'] ?? '') === (string) $month)>{{ \Carbon\Carbon::create()->month($month)->translatedFormat('F') }}</option>
+                    @endforeach
+                </x-form.select>
+            </div>
+        </x-ui.filter-bar>
+    </form>
 
     <!-- MAIN TABLE -->
     <x-ui.card padding="none" class="overflow-hidden">
         <div class="border-b border-border px-6 py-4 bg-surface">
             <h3 class="text-sm font-semibold text-ink font-sans">Daftar Permohonan Cuti Bawahan</h3>
-            <p class="text-[10px] text-muted font-sans">Menampilkan pengajuan cuti dari bawahan langsung yang memerlukan persetujuan atau sekadar riwayat.</p>
+            <p class="text-xs text-muted">Menampilkan seluruh data pengajuan cuti bawahan.</p>
         </div>
         <div class="overflow-x-auto">
             <x-ui.table>
@@ -128,71 +78,60 @@
                         <x-ui.table-th class="px-6 py-3.5">Pegawai</x-ui.table-th>
                         <x-ui.table-th class="px-6 py-3.5">Jenis Cuti</x-ui.table-th>
                         <x-ui.table-th class="px-6 py-3.5">Durasi & Tanggal</x-ui.table-th>
-                        <x-ui.table-th class="px-6 py-3.5">Alasan</x-ui.table-th>
                         <x-ui.table-th class="px-6 py-3.5">Status</x-ui.table-th>
                         <x-ui.table-th align="right" class="px-6 py-3.5">Aksi</x-ui.table-th>
                     </x-ui.table-row>
                 </x-ui.table-head>
                 <x-ui.table-body>
-                    @foreach($cutiList as $index => $cuti)
-                    <x-ui.table-row 
-                        class="hover:bg-soft transition-colors group"
-                        x-show="(search === '' || '{{ strtolower($cuti['nama']) }}'.includes(search.toLowerCase()) || '{{ $cuti['nip'] }}'.includes(search)) && 
-                                (filterStatus === '' || '{{ $cuti['status'] }}' === filterStatus) &&
-                                (filterJenis === '' || '{{ $cuti['jenis_cuti'] }}' === filterJenis) &&
-                                (filterTahun === '' || '{{ $cuti['tgl_mulai'] }}'.includes(filterTahun))"
-                    >
+                    @forelse($leaves as $index => $leave)
+                    @php
+                        $statusProps = match ($leave->status) {
+                            'disetujui' => ['label' => 'Disetujui', 'variant' => 'success'],
+                            'tidak_disetujui' => ['label' => 'Tidak Disetujui', 'variant' => 'danger'],
+                            'perlu_perubahan' => ['label' => 'Perubahan', 'variant' => 'info'],
+                            'ditangguhkan' => ['label' => 'Ditangguhkan', 'variant' => 'warning'],
+                            default => ['label' => 'Menunggu Keputusan', 'variant' => 'warning'],
+                        };
+                    @endphp
+                    <x-ui.table-row class="hover:bg-soft transition-colors group">
                         <!-- NOMOR -->
-                        <x-ui.table-td align="center" padding="comfortable" class="font-mono text-sm font-semibold text-muted">
-                            {{ $index + 1 }}
+                        <x-ui.table-td align="center" padding="comfortable" class="text-sm font-semibold text-muted">
+                            {{ ($leaves->currentPage() - 1) * $leaves->perPage() + $loop->iteration }}
                         </x-ui.table-td>
                         
                         <!-- NAMA PEGAWAI -->
                         <x-ui.table-td padding="comfortable">
-                            <x-ui.tooltip text="Buka detail pengajuan cuti {{ $cuti['nama'] }}" position="right">
-                                <a href="{{ route('kepala-bagian.cuti.show', ['id' => $cuti['id']]) }}" class="block truncate text-sm font-semibold text-ink transition-colors hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 rounded leading-tight">
-                                    {{ $cuti['nama'] }}
+                            <x-ui.tooltip text="Buka detail pengajuan cuti {{ $leave->employee?->nama_lengkap ?? 'Pegawai tidak tersedia' }}" position="right">
+                                <a href="{{ route('kepala-bagian.cuti.show', $leave) }}" class="block truncate text-sm font-semibold text-ink transition-colors hover:text-primary focus:outline-none rounded leading-tight">
+                                    {{ $leave->employee?->nama_lengkap ?? 'Pegawai tidak tersedia' }}
                                 </a>
                             </x-ui.tooltip>
-                            <p class="text-[11px] text-muted font-sans leading-none mt-1 font-mono">NIP. {{ $cuti['nip'] }}</p>
+                            <p class="text-xs text-muted">NIP. {{ $leave->employee?->nip ?? '-' }}</p>
                         </x-ui.table-td>
                         
                         <!-- JENIS CUTI & TGL AJUKAN -->
                         <x-ui.table-td padding="comfortable" class="text-sm font-medium text-ink">
-                            {{ $cuti['jenis_cuti'] }}
+                            {{ $leave->jenisCuti?->nama ?? '-' }}
                             <div class="mt-1 text-[10px] font-semibold text-muted font-sans">
-                                Ajukan: {{ $cuti['tgl_ajukan'] }}
+                                Ajukan: {{ $leave->created_at?->translatedFormat('d M Y') ?? '-' }}
                             </div>
                         </x-ui.table-td>
 
                         <!-- DURASI & TANGGAL -->
-                        <x-ui.table-td padding="comfortable" class="text-sm font-mono">
-                            {{ $cuti['jml_hari'] }}
+                        <x-ui.table-td padding="comfortable" class="text-sm">
+                            {{ $leave->jumlah_hari_kerja }} hari
                             <br>
-                            <span class="text-[10px] text-muted font-sans">{{ $cuti['tgl_mulai'] }} - {{ $cuti['tgl_selesai'] }}</span>
-                        </x-ui.table-td>
-
-                        <!-- ALASAN SINGKAT -->
-                        <x-ui.table-td title="{{ $cuti['alasan'] }}" padding="comfortable" class="text-xs text-muted max-w-[200px] truncate">
-                            {{ $cuti['alasan'] }}
+                            <span class="text-[10px] text-muted font-sans">{{ $leave->tanggal_mulai?->translatedFormat('d M') ?? '-' }} - {{ $leave->tanggal_selesai?->translatedFormat('d M Y') ?? '-' }}</span>
                         </x-ui.table-td>
 
                         <!-- STATUS -->
                         <x-ui.table-td padding="comfortable">
-                            @if($cuti['status'] === 'Menunggu Tindakan Saya')
-                                <x-ui.badge variant="warning" size="sm" dot>Menunggu Tindakan</x-ui.badge>
-                            @elseif($cuti['status'] === 'Selesai')
-                                <x-ui.badge variant="success" size="sm" dot>{{ $cuti['status'] }}</x-ui.badge>
-                            @elseif($cuti['status'] === 'Perubahan')
-                                <x-ui.badge variant="info" size="sm" dot>{{ $cuti['status'] }}</x-ui.badge>
-                            @else
-                                <x-ui.badge variant="danger" size="sm" dot>{{ $cuti['status'] }}</x-ui.badge>
-                            @endif
+                            <x-ui.badge :variant="$statusProps['variant']" size="sm" dot>{{ $statusProps['label'] }}</x-ui.badge>
                         </x-ui.table-td>
 
                         <!-- AKSI -->
                         <x-ui.table-td align="right" padding="comfortable">
-                            <x-ui.button as="a" href="{{ route('kepala-bagian.cuti.show', ['id' => $cuti['id']]) }}" variant="secondary" size="icon" title="Lihat Detail" tooltip-position="top-end" aria-label="Lihat Detail">
+                            <x-ui.button as="a" href="{{ route('kepala-bagian.cuti.show', $leave) }}" variant="secondary" size="icon" title="Lihat Detail" tooltip-position="top-end" aria-label="Lihat Detail">
                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
@@ -200,35 +139,45 @@
                             </x-ui.button>
                         </x-ui.table-td>
                     </x-ui.table-row>
-                    @endforeach
+                    @empty
+                    <x-ui.table-row>
+                        <x-ui.table-td colspan="6" class="px-6 py-10 text-center text-sm text-muted">
+                            Tidak ada data cuti bawahan yang ditemukan.
+                        </x-ui.table-td>
+                    </x-ui.table-row>
+                    @endforelse
                 </x-ui.table-body>
             </x-ui.table>
         </div>
         
-        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border px-6 py-4 bg-soft/20" x-data="{ currentPage: 1, totalPages: 1, perPage: 10 }">
-            <div class="flex items-center gap-3 text-sm text-muted">
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border px-6 py-4 bg-soft/20">
+            <form method="GET" action="{{ route('kepala-bagian.cuti.index') }}" class="flex items-center gap-3 text-sm text-muted">
+                <input type="hidden" name="search" value="{{ request('search') }}">
+                <input type="hidden" name="status" value="{{ request('status') }}">
+                <input type="hidden" name="jenis_cuti_id" value="{{ request('jenis_cuti_id') }}">
+                <input type="hidden" name="tahun" value="{{ request('tahun') }}">
+                <input type="hidden" name="bulan" value="{{ request('bulan') }}">
                 <span class="whitespace-nowrap">Tampilkan</span>
-                <select x-model="perPage" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
-                    <option value="10">10</option>
-                    <option value="25">25</option>
-                    <option value="50">50</option>
-                    <option value="100">100</option>
+                <select name="per_page" onchange="this.form.submit()" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
+                    @foreach ([10, 25, 50, 100] as $perPage)
+                        <option value="{{ $perPage }}" @selected((int) request('per_page', 10) === $perPage)>{{ $perPage }}</option>
+                    @endforeach
                 </select>
                 <span class="hidden sm:inline">data</span>
 
                 {{-- Meta Info --}}
-                <div class="hidden md:block ml-2 border-l border-border pl-4">
-                    Menampilkan <span class="font-medium text-ink">1</span>
-                    - <span class="font-medium text-ink">5</span>
-                    dari <span class="font-medium text-ink">5</span>
-                </div>
-            </div>
+                @if($leaves->total() > 0)
+                    <div class="hidden md:block ml-2 border-l border-border pl-4">
+                        Menampilkan <span class="font-medium text-ink">{{ $leaves->firstItem() }}</span>
+                        - <span class="font-medium text-ink">{{ $leaves->lastItem() }}</span>
+                        dari <span class="font-medium text-ink">{{ $leaves->total() }}</span>
+                    </div>
+                @endif
+            </form>
 
-            <div class="w-full sm:w-auto" x-show="totalPages > 1">
-                <x-ui.pagination />
+            <div class="w-full sm:w-auto">
+                    {{ $leaves->appends(request()->query())->links('vendor.pagination.simpeg') }}
             </div>
         </div>
     </x-ui.card>
-
-    </div>
 </x-layouts.app>

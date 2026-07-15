@@ -297,7 +297,7 @@
                                           x-text="h.tipe === 'libur_nasional' ? 'Libur Nasional' : 'Cuti Bersama'">
                                     </span>
                                 </x-ui.table-td>
-                                <x-ui.table-td x-text="new Date(h.tanggal).getFullYear()" padding="comfortable" class="text-sm text-muted font-mono"></x-ui.table-td>
+                                <x-ui.table-td x-text="new Date(h.tanggal).getFullYear()" padding="comfortable" class="text-sm text-muted"></x-ui.table-td>
                                 <x-ui.table-td padding="comfortable">
                                     <div class="flex items-center gap-1.5">
                                         {{-- Edit Button --}}

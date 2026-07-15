@@ -430,27 +430,27 @@
         <x-ui.card padding="sm" class="select-none">
             <div class="flex items-center justify-between max-w-4xl mx-auto text-xs font-semibold overflow-x-auto pb-1">
                 <div class="flex items-center gap-2 shrink-0">
-                    <span :class="step >= 1 ? 'bg-primary text-white' : 'bg-soft text-muted border border-border'" class="h-6 w-6 rounded-full flex items-center justify-center font-mono">1</span>
+                    <span :class="step >= 1 ? 'bg-primary text-white' : 'bg-soft text-muted border border-border'" class="h-6 w-6 rounded-full flex items-center justify-center">1</span>
                     <span :class="step >= 1 ? 'text-primary font-bold' : 'text-muted'" class="font-sans">Upload</span>
                 </div>
                 <div :class="step > 1 ? 'bg-primary' : 'bg-border'" class="h-0.5 flex-1 mx-3 min-w-8 max-w-[72px]"></div>
                 <div class="flex items-center gap-2 shrink-0">
-                    <span :class="step >= 2 ? 'bg-primary text-white' : 'bg-soft text-muted border border-border'" class="h-6 w-6 rounded-full flex items-center justify-center font-mono">2</span>
+                    <span :class="step >= 2 ? 'bg-primary text-white' : 'bg-soft text-muted border border-border'" class="h-6 w-6 rounded-full flex items-center justify-center">2</span>
                     <span :class="step >= 2 ? 'text-primary font-bold' : 'text-muted'" class="font-sans">Preview & Edit</span>
                 </div>
                 <div :class="step > 2 ? 'bg-primary' : 'bg-border'" class="h-0.5 flex-1 mx-3 min-w-8 max-w-[72px]"></div>
                 <div class="flex items-center gap-2 shrink-0">
-                    <span :class="step >= 3 ? 'bg-primary text-white' : 'bg-soft text-muted border border-border'" class="h-6 w-6 rounded-full flex items-center justify-center font-mono">3</span>
+                    <span :class="step >= 3 ? 'bg-primary text-white' : 'bg-soft text-muted border border-border'" class="h-6 w-6 rounded-full flex items-center justify-center">3</span>
                     <span :class="step >= 3 ? 'text-primary font-bold' : 'text-muted'" class="font-sans">Validasi</span>
                 </div>
                 <div :class="step > 3 ? 'bg-primary' : 'bg-border'" class="h-0.5 flex-1 mx-3 min-w-8 max-w-[72px]"></div>
                 <div class="flex items-center gap-2 shrink-0">
-                    <span :class="step >= 4 ? 'bg-primary text-white' : 'bg-soft text-muted border border-border'" class="h-6 w-6 rounded-full flex items-center justify-center font-mono">4</span>
+                    <span :class="step >= 4 ? 'bg-primary text-white' : 'bg-soft text-muted border border-border'" class="h-6 w-6 rounded-full flex items-center justify-center">4</span>
                     <span :class="step >= 4 ? 'text-primary font-bold' : 'text-muted'" class="font-sans">Proses</span>
                 </div>
                 <div :class="step > 4 ? 'bg-primary' : 'bg-border'" class="h-0.5 flex-1 mx-3 min-w-8 max-w-[72px]"></div>
                 <div class="flex items-center gap-2 shrink-0">
-                    <span :class="step >= 5 ? 'bg-primary text-white' : 'bg-soft text-muted border border-border'" class="h-6 w-6 rounded-full flex items-center justify-center font-mono">5</span>
+                    <span :class="step >= 5 ? 'bg-primary text-white' : 'bg-soft text-muted border border-border'" class="h-6 w-6 rounded-full flex items-center justify-center">5</span>
                     <span :class="step >= 5 ? 'text-primary font-bold' : 'text-muted'" class="font-sans">Hasil</span>
                 </div>
             </div>
@@ -507,7 +507,7 @@
                     <p class="text-sm text-ink font-semibold mt-3 font-sans">Pilih berkas atau seret berkas Anda di sini</p>
                     <p class="text-xs text-muted mt-1 font-sans">Format: XLSX, XLS, atau CSV UTF-8. Maksimal 10MB.</p>
                     <template x-if="fileName">
-                        <div class="mt-4 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink font-mono shadow-sm">
+                        <div class="mt-4 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink shadow-sm">
                             <svg class="w-4 h-4 text-success shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                             <span x-text="fileName"></span>
                             <span class="text-muted" x-text="'(' + fileSize + ')'"></span>
@@ -579,14 +579,14 @@
                         <x-ui.table-body>
                             <template x-for="(rowObj, rIndex) in paginatedRows" :key="rowObj.row">
                                 <x-ui.table-row class="group hover:bg-primary/[0.02]">
-                                    <x-ui.table-td x-text="(previewPage - 1) * previewPerPage + rIndex + 1" align="center" class="px-3 py-1.5 border-r border-border font-mono text-muted"></x-ui.table-td>
+                                    <x-ui.table-td x-text="(previewPage - 1) * previewPerPage + rIndex + 1" align="center" class="px-3 py-1.5 border-r border-border text-muted"></x-ui.table-td>
                                     <template x-for="header in mainHeaders" :key="header">
                                         <x-ui.table-td class="px-0.5 py-0.5 border-r border-border">
                                             <input 
                                                 type="text"
                                                 :value="rowObj.data[header] ?? ''"
                                                 @input="rowObj.data[header] = $event.target.value; onCellEdit((previewPage - 1) * previewPerPage + rIndex, header)"
-                                                class="w-full px-2 py-1.5 text-xs font-mono text-ink bg-transparent border border-transparent rounded hover:border-border hover:bg-soft/10 focus:border-primary focus:bg-surface focus:outline-none focus:ring-1 focus:ring-primary/30 transition min-w-[200px]"
+                                                class="w-full px-2 py-1.5 text-xs text-ink bg-transparent border border-transparent rounded hover:border-border hover:bg-soft/10 focus:border-primary focus:bg-surface focus:outline-none focus:ring-1 focus:ring-primary/30 transition min-w-[200px]"
                                                 :placeholder="header"
                                             >
                                         </x-ui.table-td>
@@ -685,7 +685,7 @@
                                     'bg-primary/[0.03]': item.status === 'skip',
                                     '': item.status === 'valid'
                                 }">
-                                    <x-ui.table-td x-text="item.row" align="center" class="px-3 py-1.5 border-r border-border font-mono text-muted"></x-ui.table-td>
+                                    <x-ui.table-td x-text="item.row" align="center" class="px-3 py-1.5 border-r border-border text-muted"></x-ui.table-td>
                                     <x-ui.table-td align="center" class="px-3 py-1.5 border-r border-border">
                                         <x-ui.badge
                                             variant="none"
@@ -709,12 +709,12 @@
                                                     :value="allRows[item.dataIndex]?.data[header] ?? ''"
                                                 @input="if (item.dataIndex >= 0) { allRows[item.dataIndex].data[header] = $event.target.value; onCellEdit(item.dataIndex, header) }"
                                                     :class="item.col && item.col.includes(header) ? 'border-danger/50 bg-danger/[0.03]' : 'border-transparent'"
-                                                    class="w-full px-2 py-1.5 text-xs font-mono text-ink bg-transparent border rounded hover:border-border hover:bg-soft/10 focus:border-primary focus:bg-surface focus:outline-none focus:ring-1 focus:ring-primary/30 transition min-w-[200px]"
+                                                    class="w-full px-2 py-1.5 text-xs text-ink bg-transparent border rounded hover:border-border hover:bg-soft/10 focus:border-primary focus:bg-surface focus:outline-none focus:ring-1 focus:ring-primary/30 transition min-w-[200px]"
                                                 >
                                             </template>
                                             {{-- Valid rows: read-only --}}
                                             <template x-if="item.status === 'valid'">
-                                                <span class="px-2 py-1.5 text-xs font-mono text-ink block min-w-[200px]" x-text="allRows[item.dataIndex]?.data[header] ?? '-'"></span>
+                                                <span class="px-2 py-1.5 text-xs text-ink block min-w-[200px]" x-text="allRows[item.dataIndex]?.data[header] ?? '-'"></span>
                                             </template>
                                         </x-ui.table-td>
                                     </template>
@@ -782,7 +782,7 @@
                     <div class="w-full bg-soft rounded-full h-2.5 overflow-hidden border border-border">
                         <div class="bg-primary h-2.5 rounded-full transition-all duration-300" :style="'width: ' + progress + '%'"></div>
                     </div>
-                    <span class="text-[10px] font-bold text-muted font-mono" x-text="progress + '%'"></span>
+                    <span class="text-[10px] font-bold text-muted" x-text="progress + '%'"></span>
                 </div>
                 <div class="border-t border-border pt-4 flex justify-center">
                     <a href="{{ route('data-pegawai') }}"
@@ -840,8 +840,8 @@
                     <div class="border-t border-border/80 pt-3 space-y-1 text-muted text-[11px]">
                         <span class="font-bold text-ink uppercase tracking-wider block text-[9px] mb-1">📝 Audit Log</span>
                         <p>• Operator: <span class="font-semibold text-ink">{{ session('active_role') ?? 'admin_kepegawaian' }}</span></p>
-                        <p>• Timestamp: <span class="font-mono text-ink">{{ date('Y-m-d H:i:s') }} WITA</span></p>
-                        <p>• Berkas: <span class="font-mono text-ink" x-text="fileName"></span></p>
+                        <p>• Timestamp: <span class="text-ink">{{ date('Y-m-d H:i:s') }} WITA</span></p>
+                        <p>• Berkas: <span class="text-ink" x-text="fileName"></span></p>
                     </div>
                 </div>
 

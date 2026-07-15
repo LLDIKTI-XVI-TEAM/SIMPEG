@@ -6,6 +6,7 @@
     'searchPlaceholder' => 'Cari...',
     'searchCols' => 'col-span-1 sm:col-span-2 lg:col-span-1',
     'searchLabel' => null,
+    'gridClass' => 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4',
 ])
 
 <div class="rounded-lg border border-border bg-surface p-4 flex flex-col gap-4 shadow-sm mb-4 print:hidden">
@@ -20,7 +21,7 @@
         </div>
     @endisset
 
-    <div {{ $attributes->merge(['class' => 'grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4']) }}>
+    <div {{ $attributes->merge(['class' => "grid gap-3 $gridClass"]) }}>
         @if($searchModel || $searchId)
             {{-- Search input --}}
             <div class="{{ $searchCols }} space-y-1.5 flex flex-col justify-end">

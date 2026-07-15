@@ -308,13 +308,6 @@
                 </svg>
                 Export Excel
             </button>
-            <a href="{{ route('data-backup') }}" id="nonaktif-list-btn"
-                class="inline-flex items-center justify-center rounded-lg border border-warning/20 bg-surface px-4 py-2 text-sm font-semibold text-warning transition hover:bg-warning/5 shadow-sm cursor-pointer">
-                <svg class="w-4 h-4 mr-1.5 text-warning shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m6 4.125l2.25 2.25m0 0l2.25 2.25M12 13.875l2.25-2.25M12 13.875l-2.25-2.25M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-                </svg>
-                Data Backup
-            </a>
             <div class="relative" x-data="{ open: false }">
                 <button @click="open = !open" @click.outside="open = false" id="add-pegawai-btn"
                     class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
@@ -446,7 +439,7 @@
                                        class="block truncate text-sm font-semibold text-ink transition hover:text-primary"
                                        x-text="p.nama_lengkap"></a>
                                 </x-ui.tooltip>
-                                <p class="font-mono text-xs text-muted" x-text="'NIP. ' + p.nip"></p>
+                                <p class="text-xs text-muted" x-text="'NIP. ' + p.nip"></p>
                             </div>
                         </div>
                     </td>
@@ -464,7 +457,7 @@
 
                     {{-- TMT --}}
                     <td class="px-4 py-3">
-                        <p class="text-sm text-ink font-mono" x-text="p.tmt ?? '-'"></p>
+                        <p class="text-sm text-ink" x-text="p.tmt ?? '-'"></p>
                     </td>
 
                     {{-- Status --}}

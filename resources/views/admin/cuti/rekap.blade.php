@@ -93,14 +93,14 @@
                                     <x-ui.table-row :interactive="true">
                                         <x-ui.table-td padding="sm">
                                             <p class="text-sm font-semibold text-ink">{{ $row['nama'] }}</p>
-                                            <p class="font-mono text-xs text-muted">{{ $row['nip'] }}</p>
+                                            <p class="text-xs text-muted">{{ $row['nip'] }}</p>
                                         </x-ui.table-td>
                                         <x-ui.table-td padding="sm" class="text-sm">{{ $row['unit'] }}</x-ui.table-td>
-                                        <x-ui.table-td align="right" padding="sm" class="font-mono text-sm">{{ $row['jatah'] }}</x-ui.table-td>
-                                        <x-ui.table-td align="right" padding="sm" class="font-mono text-sm">{{ $row['carry'] }}</x-ui.table-td>
-                                        <x-ui.table-td align="right" padding="sm" class="font-mono text-sm">{{ $row['terpakai'] }}
+                                        <x-ui.table-td align="right" padding="sm" class="text-sm">{{ $row['jatah'] }}</x-ui.table-td>
+                                        <x-ui.table-td align="right" padding="sm" class="text-sm">{{ $row['carry'] }}</x-ui.table-td>
+                                        <x-ui.table-td align="right" padding="sm" class="text-sm">{{ $row['terpakai'] }}
                                         </x-ui.table-td>
-                                        <x-ui.table-td align="right" padding="sm" class="font-mono text-sm font-bold text-primary">
+                                        <x-ui.table-td align="right" padding="sm" class="text-sm font-bold text-primary">
                                             {{ $row['sisa'] }}
                                         </x-ui.table-td>
                                         <x-ui.table-td padding="sm">
@@ -159,15 +159,15 @@
                             <x-ui.table-body>
                                 @foreach($usageRows as $row)
                                     <x-ui.table-row :interactive="true">
-                                        <x-ui.table-td padding="sm" class="font-mono text-sm text-muted">{{ $loop->iteration }}</x-ui.table-td>
+                                        <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $loop->iteration }}</x-ui.table-td>
                                         <x-ui.table-td padding="sm">
                                             <p class="text-sm font-semibold text-ink">{{ $row['nama'] }}</p>
-                                            <p class="font-mono text-xs text-muted">{{ $row['nip'] }}</p>
+                                            <p class="text-xs text-muted">{{ $row['nip'] }}</p>
                                         </x-ui.table-td>
                                         <x-ui.table-td padding="sm" class="text-sm">{{ $row['jenis'] }}</x-ui.table-td>
                                         <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $row['mulai'] }}</x-ui.table-td>
                                         <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $row['selesai'] }}</x-ui.table-td>
-                                        <x-ui.table-td align="right" padding="sm" class="font-mono text-sm">{{ $row['hari'] }}</x-ui.table-td>
+                                        <x-ui.table-td align="right" padding="sm" class="text-sm">{{ $row['hari'] }}</x-ui.table-td>
                                         <x-ui.table-td padding="sm">
                                             <span
                                                 class="text-xs font-semibold {{ $statusClass[$row['status']] ?? 'text-muted' }}">{{ $row['status'] }}</span>
@@ -216,7 +216,7 @@
                             ] as $label => $value)
                                 <div class="rounded-xl border border-border bg-soft/40 p-3">
                                     <p class="text-[10px] font-bold uppercase tracking-wide text-muted">{{ $label }}</p>
-                                    <p class="mt-1 font-mono text-xl font-bold text-ink">{{ $value }}</p>
+                                    <p class="mt-1 text-xl font-bold text-ink">{{ $value }}</p>
                                 </div>
                             @endforeach
                         </div>
@@ -266,7 +266,7 @@
                             <div class="rounded-xl border border-border p-3">
                                 <div class="flex items-center justify-between gap-3">
                                     <p class="text-xs font-semibold text-ink">{{ $rollover->event_type }}</p>
-                                    <span class="font-mono text-xs text-muted">{{ $rollover->tahun }}</span>
+                                    <span class="text-xs text-muted">{{ $rollover->tahun }}</span>
                                 </div>
                                 <p class="mt-1 text-xs text-muted">{{ $rollover->reason }}</p>
                             </div>
@@ -297,9 +297,9 @@
                             @forelse($ledgerRows as $ledger)
                                 <x-ui.table-row>
                                     <x-ui.table-td padding="sm" class="text-xs text-muted">{{ optional($ledger->occurred_at)->translatedFormat('d M Y H:i') }}</x-ui.table-td>
-                                    <x-ui.table-td padding="sm" class="font-mono text-xs text-ink">{{ $ledger->event_type }}</x-ui.table-td>
-                                    <x-ui.table-td align="right" padding="sm" class="font-mono text-sm font-semibold {{ $ledger->amount < 0 ? 'text-danger' : 'text-success' }}">{{ $ledger->amount }}</x-ui.table-td>
-                                    <x-ui.table-td padding="sm" class="font-mono text-xs text-muted">{{ $ledger->source_year ?? '-' }}</x-ui.table-td>
+                                    <x-ui.table-td padding="sm" class="text-xs text-ink">{{ $ledger->event_type }}</x-ui.table-td>
+                                    <x-ui.table-td align="right" padding="sm" class="text-sm font-semibold {{ $ledger->amount < 0 ? 'text-danger' : 'text-success' }}">{{ $ledger->amount }}</x-ui.table-td>
+                                    <x-ui.table-td padding="sm" class="text-xs text-muted">{{ $ledger->source_year ?? '-' }}</x-ui.table-td>
                                     <x-ui.table-td padding="sm" class="max-w-md text-sm text-muted">{{ $ledger->reason ?? '-' }}</x-ui.table-td>
                                 </x-ui.table-row>
                             @empty

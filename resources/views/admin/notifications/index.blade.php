@@ -102,7 +102,7 @@
                     <div class="min-w-0 flex-1 space-y-1">
                         <div class="flex items-center justify-between">
                             <span class="text-[10px] font-bold uppercase tracking-wider {{ $notifStyle['text'] }} font-sans">{{ $subText }}</span>
-                            <span class="text-[10px] text-muted font-sans font-mono shrink-0">{{ $notif->created_at->format('d F Y, H:i') }}</span>
+                            <span class="text-[10px] text-muted font-sans shrink-0">{{ $notif->created_at->format('d F Y, H:i') }}</span>
                         </div>
                         <h3 class="text-sm font-bold text-ink font-sans leading-snug">{{ $notif->title }}</h3>
                         <p class="text-xs text-muted font-sans leading-relaxed">{{ $notif->body }}</p>

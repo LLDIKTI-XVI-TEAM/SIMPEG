@@ -298,7 +298,7 @@
                             </div>
                             <div class="min-w-0">
                                 <p class="block truncate text-sm font-semibold text-ink font-sans" x-text="p.nama_lengkap"></p>
-                                <p class="font-mono text-xs text-muted" x-text="'NIP. ' + p.nip"></p>
+                                <p class="text-xs text-muted" x-text="'NIP. ' + p.nip"></p>
                             </div>
                         </div>
                     </td>
@@ -316,8 +316,8 @@
 
                     {{-- Dihapus Pada --}}
                     <td class="px-4 py-3.5">
-                        <p class="text-xs font-mono text-ink" x-text="p.deleted_at_human.split(' ')[0]"></p>
-                        <p class="text-[10px] font-mono text-muted" x-text="p.deleted_at_human.split(' ')[1] ?? ''"></p>
+                        <p class="text-xs text-ink" x-text="p.deleted_at_human.split(' ')[0]"></p>
+                        <p class="text-[10px] text-muted" x-text="p.deleted_at_human.split(' ')[1] ?? ''"></p>
                     </td>
 
                     {{-- Sisa Waktu --}}

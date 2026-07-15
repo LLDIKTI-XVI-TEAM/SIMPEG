@@ -252,12 +252,12 @@
                                 <x-ui.table-td padding="wide" class="text-muted whitespace-nowrap">{{ $row->created_at?->format('d M Y, H:i') }}</x-ui.table-td>
                                 <x-ui.table-td padding="wide">
                                     <span class="font-semibold text-ink block">{{ $row->user_name ?? 'Sistem' }}</span>
-                                    <span class="text-[9px] text-muted block font-mono">{{ $row->ip_address }}</span>
+                                    <span class="text-[9px] text-muted block">{{ $row->ip_address }}</span>
                                 </x-ui.table-td>
                                 <x-ui.table-td padding="wide" class="font-medium">{{ $tahap }}</x-ui.table-td>
-                                <x-ui.table-td align="right" padding="wide" class="font-mono text-muted">{{ $oldName }}</x-ui.table-td>
+                                <x-ui.table-td align="right" padding="wide" class="text-muted">{{ $oldName }}</x-ui.table-td>
                                 <x-ui.table-td align="center" class="px-3 py-3.5 text-muted">&rarr;</x-ui.table-td>
-                                <x-ui.table-td padding="wide" class="font-mono font-bold text-success">{{ $newName }}</x-ui.table-td>
+                                <x-ui.table-td padding="wide" class="font-bold text-success">{{ $newName }}</x-ui.table-td>
                                 <x-ui.table-td title="{{ $reasonText }}" padding="wide" class="text-muted italic max-w-[200px] truncate">{{ $reasonText }}</x-ui.table-td>
                             </x-ui.table-row>
 
@@ -267,11 +267,11 @@
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs">
                                         <div class="space-y-1">
                                             <span class="text-[10px] font-bold uppercase tracking-wider text-muted">IP Address</span>
-                                            <p class="text-sm text-ink font-mono">{{ $row->ip_address ?? '-' }}</p>
+                                            <p class="text-sm text-ink">{{ $row->ip_address ?? '-' }}</p>
                                         </div>
                                         <div class="space-y-1">
                                             <span class="text-[10px] font-bold uppercase tracking-wider text-muted">User Agent</span>
-                                            <p class="text-xs text-muted truncate font-mono" title="{{ $row->user_agent }}">{{ $row->user_agent ?? '-' }}</p>
+                                            <p class="text-xs text-muted truncate" title="{{ $row->user_agent }}">{{ $row->user_agent ?? '-' }}</p>
                                         </div>
                                         <div class="space-y-1 sm:col-span-2 font-sans">
                                             <span class="text-[10px] font-bold uppercase tracking-wider text-muted">Alasan Perubahan</span>
