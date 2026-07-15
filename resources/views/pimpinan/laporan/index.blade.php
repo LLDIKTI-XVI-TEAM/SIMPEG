@@ -31,7 +31,7 @@
             <div class="flex gap-4 pt-4">
                 <div class="w-12 shrink-0"></div>
                 <div>
-                    <a href="{{ route('pimpinan.laporan.pegawai') }}" class="text-sm font-semibold text-primary hover:underline">Buka Laporan</a>
+                    <x-ui.button href="{{ route('pimpinan.laporan.pegawai') }}" variant="primary" size="sm">Buka Laporan</x-ui.button>
                 </div>
             </div>
         </x-ui.card>
@@ -51,7 +51,7 @@
             <div class="flex gap-4 pt-4">
                 <div class="w-12 shrink-0"></div>
                 <div>
-                    <a href="{{ route('pimpinan.laporan.cuti') }}" class="text-sm font-semibold text-primary hover:underline">Buka Laporan</a>
+                    <x-ui.button href="{{ route('pimpinan.laporan.cuti') }}" variant="primary" size="sm">Buka Laporan</x-ui.button>
                 </div>
             </div>
         </x-ui.card>
@@ -71,7 +71,7 @@
             <div class="flex gap-4 pt-4">
                 <div class="w-12 shrink-0"></div>
                 <div>
-                    <a href="{{ route('pimpinan.laporan.kepangkatan') }}" class="text-sm font-semibold text-primary hover:underline">Buka Laporan</a>
+                    <x-ui.button href="{{ route('pimpinan.laporan.kepangkatan') }}" variant="primary" size="sm">Buka Laporan</x-ui.button>
                 </div>
             </div>
         </x-ui.card>

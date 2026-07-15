@@ -27,67 +27,60 @@
     </div>
 
     {{-- FILTER BAR --}}
-    <x-ui.card padding="none" class="mb-6">
-        <form id="filter-form" method="GET" action="{{ route('pimpinan.pegawai.index') }}" class="flex flex-col gap-4 p-4">
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            {{-- Search input --}}
-            <div class="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5">
-                <label class="sr-only" for="search-input">Cari nama atau NIP</label>
-                <svg class="w-4 h-4 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-                </svg>
-                <input id="search-input" name="search" value="{{ $filters['search'] }}" type="search" placeholder="Cari nama atau NIP..." class="flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none font-sans">
-            </div>
-            
-            {{-- Filter Golongan --}}
-            <div class="relative">
-                <label class="sr-only" for="filter-golongan">Filter golongan</label>
-                <select id="filter-golongan" name="golongan" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                    <option value="">Semua Golongan</option>
-                    @foreach ($golonganOptions as $golongan)
-                        <option value="{{ $golongan }}" @selected($filters['golongan'] === $golongan)>Golongan {{ $golongan }}</option>
-                    @endforeach
-                </select>
-            </div>
+        <form id="filter-form" method="GET" action="{{ route('pimpinan.pegawai.index') }}" class="mb-6">
+            <input type="hidden" name="per_page" value="{{ request('per_page', 10) }}">
+            <x-ui.filter-bar 
+                searchId="search-input" 
+                searchName="search" 
+                :searchValue="$filters['search'] ?? ''"
+                searchPlaceholder="Cari nama atau NIP..."
+                class="lg:grid-cols-5">
+                
+                {{-- Filter Golongan --}}
+                <div>
+                    <label class="sr-only" for="filter-golongan">Filter golongan</label>
+                    <x-form.select id="filter-golongan" name="golongan" size="md" onchange="this.form.submit()">
+                        <option value="">Semua Golongan</option>
+                        @foreach ($golonganOptions as $golongan)
+                            <option value="{{ $golongan }}" @selected($filters['golongan'] === $golongan)>Golongan {{ $golongan }}</option>
+                        @endforeach
+                    </x-form.select>
+                </div>
 
-            {{-- Filter Unit --}}
-            <div class="relative">
-                <label class="sr-only" for="filter-unit">Filter unit kerja</label>
-                <select id="filter-unit" name="unit_kerja_id" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                    <option value="">Semua Unit</option>
-                    @foreach ($unitKerjaOptions as $unitKerja)
-                        <option value="{{ $unitKerja->id }}" @selected($filters['unit_kerja_id'] === $unitKerja->id)>{{ $unitKerja->nama }}</option>
-                    @endforeach
-                </select>
-            </div>
+                {{-- Filter Unit --}}
+                <div>
+                    <label class="sr-only" for="filter-unit">Filter unit kerja</label>
+                    <x-form.select id="filter-unit" name="unit_kerja_id" size="md" onchange="this.form.submit()">
+                        <option value="">Semua Unit</option>
+                        @foreach ($unitKerjaOptions as $unitKerja)
+                            <option value="{{ $unitKerja->id }}" @selected($filters['unit_kerja_id'] === $unitKerja->id)>{{ $unitKerja->nama }}</option>
+                        @endforeach
+                    </x-form.select>
+                </div>
 
-            {{-- Filter Jenis --}}
-            <div class="relative">
-                <label class="sr-only" for="filter-jenis">Filter jenis pegawai</label>
-                <select id="filter-jenis" name="jenis_pegawai_id" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                    <option value="">Semua Jenis</option>
-                    @foreach ($jenisPegawaiOptions as $jenisPegawai)
-                        <option value="{{ $jenisPegawai->id }}" @selected($filters['jenis_pegawai_id'] === $jenisPegawai->id)>{{ $jenisPegawai->nama }}</option>
-                    @endforeach
-                </select>
-            </div>
+                {{-- Filter Jenis --}}
+                <div>
+                    <label class="sr-only" for="filter-jenis">Filter jenis pegawai</label>
+                    <x-form.select id="filter-jenis" name="jenis_pegawai_id" size="md" onchange="this.form.submit()">
+                        <option value="">Semua Jenis</option>
+                        @foreach ($jenisPegawaiOptions as $jenisPegawai)
+                            <option value="{{ $jenisPegawai->id }}" @selected($filters['jenis_pegawai_id'] === $jenisPegawai->id)>{{ $jenisPegawai->nama }}</option>
+                        @endforeach
+                    </x-form.select>
+                </div>
 
-            {{-- Filter Status --}}
-            <div class="relative">
-                <label class="sr-only" for="filter-status">Filter status pegawai</label>
-                <select id="filter-status" name="status_pegawai_id" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                    <option value="">Pegawai aktif</option>
-                    @foreach ($statusOptions as $status)
-                        <option value="{{ $status->id }}" @selected($filters['status_pegawai_id'] === $status->id)>{{ $status->nama }}</option>
-                    @endforeach
-                </select>
-            </div>
-            </div>
-            <div class="flex justify-end">
-                <button type="submit" class="inline-flex items-center justify-center rounded-xl border border-border bg-surface px-3.5 py-1.5 text-xs font-semibold text-primary shadow-sm transition hover:bg-soft hover:border-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/30">Terapkan filter</button>
-            </div>
+                {{-- Filter Status --}}
+                <div>
+                    <label class="sr-only" for="filter-status">Filter status pegawai</label>
+                    <x-form.select id="filter-status" name="status_pegawai_id" size="md" onchange="this.form.submit()">
+                        <option value="">Semua Status</option>
+                        @foreach ($statusOptions as $status)
+                            <option value="{{ $status->id }}" @selected($filters['status_pegawai_id'] === $status->id)>{{ $status->nama }}</option>
+                        @endforeach
+                    </x-form.select>
+                </div>
+            </x-ui.filter-bar>
         </form>
-    </x-ui.card>
 
     {{-- TABLE --}}
     @php
@@ -132,12 +125,12 @@
                     @endphp
 
                     <x-ui.table-row :interactive="true">
-                        <th scope="row" class="px-4 py-3.5 text-left text-xs text-ink font-sans">
+                        <x-ui.table-td class="font-sans">
                             <div class="flex items-center gap-3">
-                                <x-ui.tooltip text="Buka detail profil {{ $emp['nama_lengkap'] }}" position="right">
+                                <x-ui.tooltip text="Buka detail {{ $emp['nama_lengkap'] }}" position="right">
                                     <a
                                         href="{{ route('pimpinan.pegawai.show', $emp['id']) }}"
-                                        class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-sm font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                        class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-xs font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30"
                                     >
                                         <span aria-hidden="true">
                                             {{ strtoupper(substr($emp['nama_lengkap'], 0, 1)) }}
@@ -153,10 +146,10 @@
                                             {{ $emp['nama_lengkap'] }}
                                         </a>
                                     </x-ui.tooltip>
-                                    <p class="font-mono text-xs text-muted">NIP. {{ $emp['nip'] }}</p>
+                                    <p class="text-xs text-muted">NIP. {{ $emp['nip'] }}</p>
                                 </div>
                             </div>
-                        </th>
+                        </x-ui.table-td>
                         <x-ui.table-td>
                             <p class="text-sm font-medium text-ink">{{ $emp['jabatan'] }}</p>
                             <p class="text-xs text-muted">{{ $emp['unit_kerja'] }}</p>
@@ -172,7 +165,7 @@
                         <x-ui.table-td class="text-right">
                             <div class="flex items-center justify-end gap-1.5">
                                 {{-- Detail --}}
-                                <x-ui.button href="{{ route('pimpinan.pegawai.show', $emp['id']) }}" variant="secondary" size="icon" title="Detail" tooltip-position="top-end" aria-label="Detail pegawai {{ $emp['nama_lengkap'] }}">
+                                <x-ui.button href="{{ route('pimpinan.pegawai.show', $emp['id']) }}" variant="secondary" size="icon" title="Lihat Detail" tooltip-position="top-end" aria-label="Detail pegawai {{ $emp['nama_lengkap'] }}">
                                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
@@ -193,24 +186,33 @@
         </div>
 
         {{-- TABLE FOOTER --}}
-        <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row">
-            <div class="flex items-center gap-4">
-                <div class="flex items-center gap-2">
-                    <span class="text-sm text-muted">Tampilkan</span>
-                    <label class="sr-only" for="per-page">Jumlah hasil per halaman</label>
-                    <select id="per-page" name="per_page" form="filter-form" onchange="this.form.submit()" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
-                        @foreach ([10, 25, 50] as $option)
-                            <option value="{{ $option }}" @selected($perPage === $option)>{{ $option }}</option>
-                        @endforeach
-                    </select>
-                    <span class="text-sm text-muted">data per halaman</span>
-                </div>
-                <p class="text-sm text-muted hidden sm:block">
-                    Menampilkan <span class="font-semibold text-ink">{{ $employees->firstItem() ?? 0 }}</span> hingga <span class="font-semibold text-ink">{{ $employees->lastItem() ?? 0 }}</span> dari <span class="font-semibold text-ink">{{ $employees->total() }}</span> hasil
-                </p>
-            </div>
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border px-6 py-4 bg-soft/20">
+            <form method="GET" action="{{ route('pimpinan.pegawai.index') }}" class="flex items-center gap-3 text-sm text-muted">
+                <input type="hidden" name="search" value="{{ request('search') }}">
+                <input type="hidden" name="status_pegawai_id" value="{{ request('status_pegawai_id') }}">
+                <input type="hidden" name="golongan" value="{{ request('golongan') }}">
+                <input type="hidden" name="unit_kerja_id" value="{{ request('unit_kerja_id') }}">
+                <input type="hidden" name="jenis_pegawai_id" value="{{ request('jenis_pegawai_id') }}">
+                <span class="whitespace-nowrap">Tampilkan</span>
+                <select name="per_page" onchange="this.form.submit()" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
+                    @foreach ([10, 25, 50, 100] as $optPerPage)
+                        <option value="{{ $optPerPage }}" @selected((int) request('per_page', 10) === $optPerPage)>{{ $optPerPage }}</option>
+                    @endforeach
+                </select>
+                <span class="hidden sm:inline">data</span>
+
+                {{-- Meta Info --}}
+                @if($employees->total() > 0)
+                    <div class="hidden md:block ml-2 border-l border-border pl-4">
+                        Menampilkan <span class="font-medium text-ink">{{ $employees->firstItem() }}</span>
+                        - <span class="font-medium text-ink">{{ $employees->lastItem() }}</span>
+                        dari <span class="font-medium text-ink">{{ $employees->total() }}</span>
+                    </div>
+                @endif
+            </form>
+
             <div class="w-full sm:w-auto">
-                {{ $employees->onEachSide(1)->links() }}
+                {{ $employees->appends(request()->query())->links('vendor.pagination.simpeg') }}
             </div>
         </div>
     </x-ui.card>

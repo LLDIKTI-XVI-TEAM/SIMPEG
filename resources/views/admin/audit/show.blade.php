@@ -66,11 +66,11 @@
                 </div>
                 <div class="space-y-0.5">
                     <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">IP Address</span>
-                    <p class="text-sm font-semibold text-ink font-mono">{{ $log['ip_address'] }}</p>
+                    <p class="text-sm font-semibold text-ink">{{ $log['ip_address'] }}</p>
                 </div>
                 <div class="space-y-0.5">
                     <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">ID Record</span>
-                    <p class="text-sm font-semibold text-ink font-mono truncate">{{ $log['record_id'] }}</p>
+                    <p class="text-sm font-semibold text-ink truncate">{{ $log['record_id'] }}</p>
                 </div>
                 <div class="space-y-0.5">
                     <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Kategori</span>
@@ -98,9 +98,9 @@
                         <x-ui.table-body class="text-[11px] font-sans">
                             @forelse($diffs as $diff)
                                 <x-ui.table-row>
-                                    <x-ui.table-td padding="xs" class="font-semibold font-mono">{{ $diff['field'] }}</x-ui.table-td>
-                                    <x-ui.table-td padding="xs" class="text-danger font-mono bg-danger/5">{{ $diff['old'] }}</x-ui.table-td>
-                                    <x-ui.table-td padding="xs" class="text-success font-mono bg-success/5">{{ $diff['new'] }}</x-ui.table-td>
+                                    <x-ui.table-td padding="xs" class="font-semibold">{{ $diff['field'] }}</x-ui.table-td>
+                                    <x-ui.table-td padding="xs" class="text-danger bg-danger/5">{{ $diff['old'] }}</x-ui.table-td>
+                                    <x-ui.table-td padding="xs" class="text-success bg-success/5">{{ $diff['new'] }}</x-ui.table-td>
                                 </x-ui.table-row>
                             @empty
                                 <x-ui.table-row>

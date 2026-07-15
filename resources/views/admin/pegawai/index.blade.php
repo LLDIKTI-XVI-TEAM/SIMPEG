@@ -446,7 +446,7 @@
                                        class="block truncate text-sm font-semibold text-ink transition hover:text-primary"
                                        x-text="p.nama_lengkap"></a>
                                 </x-ui.tooltip>
-                                <p class="font-mono text-xs text-muted" x-text="'NIP. ' + p.nip"></p>
+                                <p class="text-xs text-muted" x-text="'NIP. ' + p.nip"></p>
                             </div>
                         </div>
                     </td>
@@ -464,7 +464,7 @@
 
                     {{-- TMT --}}
                     <td class="px-4 py-3">
-                        <p class="text-sm text-ink font-mono" x-text="p.tmt ?? '-'"></p>
+                        <p class="text-sm text-ink" x-text="p.tmt ?? '-'"></p>
                     </td>
 
                     {{-- Status --}}

@@ -68,7 +68,7 @@
     <x-ui.card padding="none" class="overflow-hidden">
         <div class="border-b border-border px-6 py-4 bg-surface">
             <h3 class="text-sm font-semibold text-ink font-sans">Daftar Permohonan Cuti Bawahan</h3>
-            <p class="text-[10px] text-muted font-sans mt-0.5">Menampilkan seluruh data pengajuan cuti bawahan.</p>
+            <p class="text-xs text-muted">Menampilkan seluruh data pengajuan cuti bawahan.</p>
         </div>
         <div class="overflow-x-auto">
             <x-ui.table>
@@ -95,7 +95,7 @@
                     @endphp
                     <x-ui.table-row class="hover:bg-soft transition-colors group">
                         <!-- NOMOR -->
-                        <x-ui.table-td align="center" padding="comfortable" class="font-mono text-sm font-semibold text-muted">
+                        <x-ui.table-td align="center" padding="comfortable" class="text-sm font-semibold text-muted">
                             {{ ($leaves->currentPage() - 1) * $leaves->perPage() + $loop->iteration }}
                         </x-ui.table-td>
                         
@@ -106,7 +106,7 @@
                                     {{ $leave->employee?->nama_lengkap ?? 'Pegawai tidak tersedia' }}
                                 </a>
                             </x-ui.tooltip>
-                            <p class="text-[11px] text-muted font-sans leading-none mt-1 font-mono">NIP. {{ $leave->employee?->nip ?? '-' }}</p>
+                            <p class="text-xs text-muted">NIP. {{ $leave->employee?->nip ?? '-' }}</p>
                         </x-ui.table-td>
                         
                         <!-- JENIS CUTI & TGL AJUKAN -->
@@ -118,7 +118,7 @@
                         </x-ui.table-td>
 
                         <!-- DURASI & TANGGAL -->
-                        <x-ui.table-td padding="comfortable" class="text-sm font-mono">
+                        <x-ui.table-td padding="comfortable" class="text-sm">
                             {{ $leave->jumlah_hari_kerja }} hari
                             <br>
                             <span class="text-[10px] text-muted font-sans">{{ $leave->tanggal_mulai?->translatedFormat('d M') ?? '-' }} - {{ $leave->tanggal_selesai?->translatedFormat('d M Y') ?? '-' }}</span>

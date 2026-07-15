@@ -91,7 +91,7 @@
                 <div class="text-center">
                     <h1 class="text-lg font-bold uppercase font-sans leading-tight">Kementerian Pendidikan Tinggi, Sains, dan Teknologi</h1>
                     <h2 class="text-base font-bold uppercase font-sans text-primary leading-tight">Lembaga Layanan Pendidikan Tinggi (LLDIKTI) Wilayah XVI</h2>
-                    <p class="text-[10px] text-muted font-sans mt-0.5">Jl. Prof. Dr. Aloei Saboe, Wongkaditi, Kota Gorontalo</p>
+                    <p class="text-xs text-muted">Jl. Prof. Dr. Aloei Saboe, Wongkaditi, Kota Gorontalo</p>
                 </div>
             </div>
             <div class="text-center mt-6">
@@ -233,7 +233,7 @@
             {{-- Header (Screen only) --}}
             <div class="px-6 py-4 border-b border-border bg-surface print:hidden">
                 <h3 class="text-sm font-semibold text-ink font-sans">Pratinjau Daftar Nominatif Pegawai</h3>
-                <p class="text-[10px] text-muted font-sans mt-0.5">Menampilkan rekap pegawai aktif yang siap diexport berdasarkan filter pencarian di atas.</p>
+                <p class="text-xs text-muted">Menampilkan rekap pegawai aktif yang siap diexport berdasarkan filter pencarian di atas.</p>
             </div>
 
             {{-- Table Render --}}
@@ -255,10 +255,10 @@
                         {{-- SCREEN VIEW --}}
                         <template x-for="(p, index) in paginatedPegawai" :key="p.id">
                             <x-ui.table-row :interactive="true" class="print:hidden">
-                                <x-ui.table-td x-text="(currentPage - 1) * perPage + index + 1" class="font-mono text-muted"></x-ui.table-td>
-                                <x-ui.table-td x-text="p.nip" class="font-mono"></x-ui.table-td>
+                                <x-ui.table-td x-text="(currentPage - 1) * perPage + index + 1" class="text-muted"></x-ui.table-td>
+                                <x-ui.table-td x-text="p.nip" class=""></x-ui.table-td>
                                 <x-ui.table-td x-text="p.nama" class="font-bold"></x-ui.table-td>
-                                <x-ui.table-td x-text="p.golongan" class="font-mono text-muted"></x-ui.table-td>
+                                <x-ui.table-td x-text="p.golongan" class="text-muted"></x-ui.table-td>
                                 <x-ui.table-td x-text="p.jabatan"></x-ui.table-td>
                                 <x-ui.table-td x-text="p.unit" class="text-muted"></x-ui.table-td>
                                 <x-ui.table-td>
@@ -277,10 +277,10 @@
                         {{-- PRINT ONLY VIEW (Tampilkan semua baris terfilter sekaligus) --}}
                         <template x-for="(p, index) in filteredPegawai" :key="'print-' + p.id">
                             <x-ui.table-row class="hidden print:table-row">
-                                <x-ui.table-td x-text="index + 1" class="px-4 py-2 font-mono border border-black"></x-ui.table-td>
-                                <x-ui.table-td x-text="p.nip" class="px-4 py-2 font-mono border border-black"></x-ui.table-td>
+                                <x-ui.table-td x-text="index + 1" class="px-4 py-2 border border-black"></x-ui.table-td>
+                                <x-ui.table-td x-text="p.nip" class="px-4 py-2 border border-black"></x-ui.table-td>
                                 <x-ui.table-td x-text="p.nama" class="px-4 py-2 font-bold border border-black"></x-ui.table-td>
-                                <x-ui.table-td x-text="p.golongan" class="px-4 py-2 font-mono border border-black"></x-ui.table-td>
+                                <x-ui.table-td x-text="p.golongan" class="px-4 py-2 border border-black"></x-ui.table-td>
                                 <x-ui.table-td x-text="p.jabatan" class="px-4 py-2 border border-black"></x-ui.table-td>
                                 <x-ui.table-td x-text="p.unit" class="px-4 py-2 border border-black"></x-ui.table-td>
                                 <x-ui.table-td x-text="p.jenis" class="px-4 py-2 border border-black"></x-ui.table-td>

@@ -312,7 +312,7 @@
                                 </div>
 
                                 @if($step->acted_at)
-                                    <p class="text-[9px] font-mono font-medium text-muted mt-1">
+                                    <p class="text-[9px] font-medium text-muted mt-1">
                                         {{ $step->acted_at->translatedFormat('d M Y H:i') }}</p>
                                 @endif
                             </x-ui.timeline-item>

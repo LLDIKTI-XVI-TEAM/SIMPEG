@@ -173,7 +173,7 @@
                                     </div>
                                     <div class="min-w-0">
                                         <p class="text-sm font-semibold text-ink">{{ $r['nama'] }}</p>
-                                        <p class="font-mono text-xs text-muted">{{ $r['nip'] }}</p>
+                                        <p class="text-xs text-muted">{{ $r['nip'] }}</p>
                                     </div>
                                 </div>
                             </x-ui.table-td>
@@ -185,7 +185,7 @@
                                 <p class="text-xs text-muted font-sans mt-0.5 max-w-xs truncate" title="{{ $r['alasan'] }}">{{ $r['alasan'] }}</p>
                             </x-ui.table-td>
                             <x-ui.table-td>
-                                <p class="text-sm text-ink font-mono">{{ \Carbon\Carbon::parse($r['mulai'])->translatedFormat('d M') }} - {{ \Carbon\Carbon::parse($r['selesai'])->translatedFormat('d M Y') }}</p>
+                                <p class="text-sm text-ink">{{ \Carbon\Carbon::parse($r['mulai'])->translatedFormat('d M') }} - {{ \Carbon\Carbon::parse($r['selesai'])->translatedFormat('d M Y') }}</p>
 
                                 <p class="text-xs text-primary font-semibold mt-0.5 leading-none">{{ $r['hari'] }} Hari Kerja</p>
                             </x-ui.table-td>

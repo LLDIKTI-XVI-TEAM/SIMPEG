@@ -69,11 +69,11 @@
                 <x-ui.table>
                     <x-ui.table-head>
                         <x-ui.table-row>
-                            <x-ui.table-th padding="comfortable" class="text-xs text-muted uppercase tracking-wider font-bold">PEGAWAI</x-ui.table-th>
-                            <x-ui.table-th padding="comfortable" class="text-xs text-muted uppercase tracking-wider font-bold">JABATAN & UNIT</x-ui.table-th>
-                            <x-ui.table-th padding="comfortable" class="text-xs text-muted uppercase tracking-wider font-bold">GOL. / JENIS</x-ui.table-th>
-                            <x-ui.table-th padding="comfortable" class="text-xs text-muted uppercase tracking-wider font-bold">STATUS</x-ui.table-th>
-                            <x-ui.table-th padding="comfortable" class="text-xs text-muted uppercase tracking-wider font-bold text-right">AKSI</x-ui.table-th>
+                            <x-ui.table-th padding="comfortable" class="text-xs text-muted uppercase tracking-wider ">PEGAWAI</x-ui.table-th>
+                            <x-ui.table-th padding="comfortable" class="text-xs text-muted uppercase tracking-wider ">JABATAN & UNIT</x-ui.table-th>
+                            <x-ui.table-th padding="comfortable" class="text-xs text-muted uppercase tracking-wider ">GOL. / JENIS</x-ui.table-th>
+                            <x-ui.table-th padding="comfortable" class="text-xs text-muted uppercase tracking-wider ">STATUS</x-ui.table-th>
+                            <x-ui.table-th padding="comfortable" class="text-xs text-muted uppercase tracking-wider  text-right">AKSI</x-ui.table-th>
                         </x-ui.table-row>
                     </x-ui.table-head>
                     <x-ui.table-body class="divide-y divide-border">
@@ -94,7 +94,7 @@
                                                 <a href="{{ route('kepala-bagian.bawahan.show', $employee) }}"
                                                     class="block truncate text-sm font-semibold text-ink transition hover:text-primary focus:outline-none rounded leading-tight">{{ $employee->nama_lengkap }}</a>
                                             </x-ui.tooltip>
-                                            <p class="text-[11px] text-muted font-sans leading-none mt-1 font-mono">NIP. {{ $employee->nip }}</p>
+                                            <p class="text-xs text-muted">NIP. {{ $employee->nip }}</p>
                                         </div>
                                     </div>
                                 </x-ui.table-td>

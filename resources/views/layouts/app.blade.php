@@ -394,7 +394,7 @@
                     >
                         <div class="border-b border-border px-4 py-3">
                             <p class="text-xs font-semibold text-ink font-sans">{{ str_replace(['(', ')'], '', auth()->user()->name ?? 'Pengguna') }}</p>
-                            <p class="mt-0.5 text-xs text-muted font-sans font-mono">{{ auth()->user()->email ?? '' }}</p>
+                            <p class="mt-0.5 text-xs text-muted font-sans">{{ auth()->user()->email ?? '' }}</p>
                         </div>
                         <div class="p-1.5 space-y-0.5">
                             <a href="{{ route('profil') }}" id="profile-link" class="flex items-center gap-2.5 rounded-lg px-4 py-2 text-sm text-ink transition-colors hover:bg-soft font-sans font-medium">

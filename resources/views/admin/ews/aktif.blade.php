@@ -179,12 +179,12 @@
                                 }
                             @endphp
                             <x-ui.table-row x-show="search === '' || '{{ strtolower($alert['nama']) }}'.includes(search.toLowerCase()) || '{{ str_replace(' ', '', $alert['nip']) }}'.includes(search.replace(/\s+/g, ''))" :interactive="true" class="align-top {{ $rowColorClass }}">
-                                <x-ui.table-td align="center" padding="lg" class="font-mono text-sm font-semibold text-muted">{{ $index + 1 }}</x-ui.table-td>
+                                <x-ui.table-td align="center" padding="lg" class="text-sm font-semibold text-muted">{{ $index + 1 }}</x-ui.table-td>
                                 <x-ui.table-td padding="lg" class="text-sm">
                                     <div class="font-semibold leading-snug text-ink transition-colors hover:text-primary">
                                         <a href="{{ route('pegawai.show', $alert['pegawai_id']) }}">{{ $alert['nama'] }}</a>
                                     </div>
-                                    <div class="mt-1 font-mono text-xs text-muted">{{ $alert['nip'] }}</div>
+                                    <div class="mt-1 text-xs text-muted">{{ $alert['nip'] }}</div>
                                 </x-ui.table-td>
                                 <x-ui.table-td padding="lg" class="text-sm">
                                     <div class="space-y-1.5">
@@ -221,7 +221,7 @@
                                     </div>
                                 </x-ui.table-td>
                                 <x-ui.table-td padding="lg" class="text-sm">
-                                    <div class="font-mono text-sm font-semibold text-ink">{{ date('d M Y', strtotime($alert['tanggal_target'])) }}</div>
+                                    <div class="text-sm font-semibold text-ink">{{ date('d M Y', strtotime($alert['tanggal_target'])) }}</div>
                                     <div class="mt-1 text-[11px] font-medium text-muted">Tanggal target</div>
                                 </x-ui.table-td>
                                 <x-ui.table-td padding="lg" class="text-sm">

@@ -156,7 +156,7 @@
         >
             <x-slot:header>
                 <h3 class="text-sm font-semibold text-ink font-sans">Filter & Pencarian</h3>
-                <p class="text-[10px] text-muted font-sans mt-0.5">Saring jejak audit berdasarkan kriteria spesifik di bawah ini.</p>
+                <p class="text-xs text-muted">Saring jejak audit berdasarkan kriteria spesifik di bawah ini.</p>
             </x-slot:header>
 
             <x-slot:actions>
@@ -250,7 +250,7 @@
             <div class="px-6 py-4 border-b border-border flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-surface">
                 <div>
                     <h3 class="text-sm font-semibold text-ink font-sans">Rekam Jejak Aktivitas (Audit Log)</h3>
-                    <p class="text-[10px] text-muted font-sans mt-0.5">Catatan mutasi data dan otentikasi sistem kepegawaian secara kronologis.</p>
+                    <p class="text-xs text-muted">Catatan mutasi data dan otentikasi sistem kepegawaian secara kronologis.</p>
                 </div>
             </div>
 
@@ -322,7 +322,7 @@
                     <tbody class="divide-y divide-border">
                         <template x-for="log in paginatedLogs" :key="log.id">
                             <tr @click="selectedLogId = log.id; showDrawer = true" class="transition-colors hover:bg-soft/50 cursor-pointer">
-                                <td class="px-4 py-3.5 text-xs font-mono text-ink" x-text="log.timestamp"></td>
+                                <td class="px-4 py-3.5 text-xs text-ink" x-text="log.timestamp"></td>
                                 <td class="px-4 py-3.5 text-sm font-semibold text-ink font-sans" x-text="log.operator"></td>
                                 <td class="px-4 py-3.5">
                                     <span class="inline-flex items-center gap-1.5 text-xs font-semibold font-sans"
@@ -410,7 +410,7 @@
                     <div class="px-6 py-5 border-b border-border flex items-center justify-between bg-surface">
                         <div>
                             <h3 class="text-sm font-bold text-ink font-sans">Detail Log Aktivitas</h3>
-                            <p class="text-[10px] text-muted font-sans mt-0.5">Metadata operasional dan perubahan database.</p>
+                            <p class="text-xs text-muted">Metadata operasional dan perubahan database.</p>
                         </div>
                         <button @click="showDrawer = false" class="rounded-lg p-1.5 text-muted hover:bg-soft hover:text-ink transition-colors cursor-pointer focus:outline-none" aria-label="Close panel">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
@@ -430,7 +430,7 @@
                             </div>
                             <div class="space-y-0.5">
                                 <p class="font-semibold text-muted font-sans">Waktu</p>
-                                <p class="text-ink font-mono" x-text="selectedLog.timestamp"></p>
+                                <p class="text-ink" x-text="selectedLog.timestamp"></p>
                             </div>
                             <div class="space-y-0.5">
                                 <p class="font-semibold text-muted font-sans">Pegawai</p>
@@ -438,7 +438,7 @@
                             </div>
                             <div class="space-y-0.5">
                                 <p class="font-semibold text-muted font-sans">IP Address</p>
-                                <p class="text-ink font-mono" x-text="selectedLog.ip_address"></p>
+                                <p class="text-ink" x-text="selectedLog.ip_address"></p>
                             </div>
                             <div class="col-span-2 space-y-0.5">
                                 <p class="font-semibold text-muted font-sans">Browser / User Agent</p>
@@ -450,7 +450,7 @@
                             </div>
                             <div class="space-y-0.5">
                                 <p class="font-semibold text-muted font-sans">ID Record</p>
-                                <p class="text-ink font-mono truncate" x-text="selectedLog.record_id"></p>
+                                <p class="text-ink truncate" x-text="selectedLog.record_id"></p>
                             </div>
                         </div>
 
@@ -470,9 +470,9 @@
                                     <tbody class="divide-y divide-border text-[11px] font-sans">
                                         <template x-for="item in getDiffFields(selectedLog)" :key="item.field">
                                             <tr>
-                                                <td class="px-3 py-2 font-semibold text-ink font-mono" x-text="item.field"></td>
-                                                <td class="px-3 py-2 text-danger font-mono bg-danger/5" x-text="typeof item.old === 'object' ? JSON.stringify(item.old) : item.old"></td>
-                                                <td class="px-3 py-2 text-success font-mono bg-success/5" x-text="typeof item.new === 'object' ? JSON.stringify(item.new) : item.new"></td>
+                                                <td class="px-3 py-2 font-semibold text-ink" x-text="item.field"></td>
+                                                <td class="px-3 py-2 text-danger bg-danger/5" x-text="typeof item.old === 'object' ? JSON.stringify(item.old) : item.old"></td>
+                                                <td class="px-3 py-2 text-success bg-success/5" x-text="typeof item.new === 'object' ? JSON.stringify(item.new) : item.new"></td>
                                             </tr>
                                         </template>
                                         <template x-if="getDiffFields(selectedLog).length === 0">

@@ -429,10 +429,10 @@
                                 <template x-for="user in filteredUsers" :key="user.id">
                                     <x-ui.table-row :interactive="true">
                                         <x-ui.table-td x-text="user.name" padding="sm" class="text-sm font-semibold"></x-ui.table-td>
-                                        <x-ui.table-td x-text="user.nip" padding="sm" class="font-mono text-muted"></x-ui.table-td>
+                                        <x-ui.table-td x-text="user.nip" padding="sm" class="text-muted"></x-ui.table-td>
                                         <x-ui.table-td padding="sm">
                                             <div class="font-semibold" x-text="user.keycloak_id || '-'"></div>
-                                            <div class="text-[10px] text-muted font-mono mt-0.5" x-text="user.email"></div>
+                                            <div class="text-[10px] text-muted mt-0.5" x-text="user.email"></div>
                                         </x-ui.table-td>
                                         <x-ui.table-td padding="sm">
                                             <x-ui.badge
@@ -476,8 +476,8 @@
                             <div class="border border-border rounded-lg p-4 bg-soft/40 flex flex-col justify-between shadow-sm">
                                 <div class="space-y-1">
                                     <div class="flex items-center justify-between">
-                                        <span class="text-xs font-mono font-bold text-primary" x-text="master.tabel"></span>
-                                        <span class="rounded bg-soft px-2 py-0.5 text-[9px] font-mono text-muted" x-text="master.sprint"></span>
+                                        <span class="text-xs font-bold text-primary" x-text="master.tabel"></span>
+                                        <span class="rounded bg-soft px-2 py-0.5 text-[9px] text-muted" x-text="master.sprint"></span>
                                     </div>
                                     <p class="text-xs text-ink font-sans font-semibold pt-1" x-text="master.deskripsi"></p>
                                     <p class="text-[10px] text-muted font-sans" x-text="master.baris + ' baris data terdaftar'"></p>

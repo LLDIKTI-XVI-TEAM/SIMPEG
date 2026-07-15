@@ -206,7 +206,7 @@
             {{-- Header (Screen only) --}}
             <div class="px-6 py-4 border-b border-border bg-surface print:hidden">
                 <h3 class="text-sm font-semibold text-ink font-sans">Pratinjau Rekap Penggunaan Cuti</h3>
-                <p class="text-[10px] text-muted font-sans mt-0.5">Menampilkan pengajuan riwayat cuti pegawai berdasarkan filter pencarian dan periode laporan di atas.</p>
+                <p class="text-xs text-muted">Menampilkan pengajuan riwayat cuti pegawai berdasarkan filter pencarian dan periode laporan di atas.</p>
             </div>
 
             {{-- Table Render --}}
@@ -228,12 +228,12 @@
                         {{-- SCREEN VIEW --}}
                         <template x-for="(c, index) in paginatedCuti" :key="c.id">
                             <x-ui.table-row :interactive="true" class="print:hidden">
-                                <x-ui.table-td x-text="(currentPage - 1) * perPage + index + 1" class="font-mono text-muted"></x-ui.table-td>
-                                <x-ui.table-td x-text="c.nip" class="font-mono"></x-ui.table-td>
+                                <x-ui.table-td x-text="(currentPage - 1) * perPage + index + 1" class="text-muted"></x-ui.table-td>
+                                <x-ui.table-td x-text="c.nip" class=""></x-ui.table-td>
                                 <x-ui.table-td x-text="c.nama" class="font-bold"></x-ui.table-td>
                                 <x-ui.table-td x-text="c.jenis"></x-ui.table-td>
-                                <x-ui.table-td x-text="c.mulai" class="font-mono text-muted"></x-ui.table-td>
-                                <x-ui.table-td x-text="c.selesai" class="font-mono text-muted"></x-ui.table-td>
+                                <x-ui.table-td x-text="c.mulai" class="text-muted"></x-ui.table-td>
+                                <x-ui.table-td x-text="c.selesai" class="text-muted"></x-ui.table-td>
                                 <x-ui.table-td x-text="c.hari + ' hari'"></x-ui.table-td>
                                 <x-ui.table-td>
                                     <x-ui.badge
@@ -249,12 +249,12 @@
                         {{-- PRINT ONLY VIEW --}}
                         <template x-for="(c, index) in filteredCuti" :key="'print-' + c.id">
                             <x-ui.table-row class="hidden print:table-row">
-                                <x-ui.table-td x-text="index + 1" class="px-4 py-2 font-mono border border-black"></x-ui.table-td>
-                                <x-ui.table-td x-text="c.nip" class="px-4 py-2 font-mono border border-black"></x-ui.table-td>
+                                <x-ui.table-td x-text="index + 1" class="px-4 py-2 border border-black"></x-ui.table-td>
+                                <x-ui.table-td x-text="c.nip" class="px-4 py-2 border border-black"></x-ui.table-td>
                                 <x-ui.table-td x-text="c.nama" class="px-4 py-2 font-bold border border-black"></x-ui.table-td>
                                 <x-ui.table-td x-text="c.jenis" class="px-4 py-2 border border-black"></x-ui.table-td>
-                                <x-ui.table-td x-text="c.mulai" class="px-4 py-2 font-mono border border-black"></x-ui.table-td>
-                                <x-ui.table-td x-text="c.selesai" class="px-4 py-2 font-mono border border-black"></x-ui.table-td>
+                                <x-ui.table-td x-text="c.mulai" class="px-4 py-2 border border-black"></x-ui.table-td>
+                                <x-ui.table-td x-text="c.selesai" class="px-4 py-2 border border-black"></x-ui.table-td>
                                 <x-ui.table-td x-text="c.hari + ' Hari'" class="px-4 py-2 border border-black"></x-ui.table-td>
                                 <x-ui.table-td x-text="c.status" class="px-4 py-2 border border-black"></x-ui.table-td>
                             </x-ui.table-row>

@@ -163,7 +163,7 @@
                 <div class="px-6 py-5 border-b border-border/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface">
                     <div>
                         <h3 class="text-sm font-bold text-ink font-sans">Pengajuan Cuti Bawahan</h3>
-                        <p class="text-[10px] text-muted font-sans mt-0.5">Menunggu keputusan Anda</p>
+                        <p class="text-xs text-muted">Menunggu keputusan Anda</p>
                     </div>
                     <div class="flex items-center gap-3">
                         <a href="{{ route('kepala-bagian.cuti.index') }}" class="text-xs font-semibold text-primary hover:underline font-sans flex items-center gap-1">
@@ -194,7 +194,7 @@
                                             <x-ui.tooltip text="Buka detail pengajuan cuti {{ $leave->employee?->nama_lengkap ?? 'Pegawai tidak tersedia' }}" position="right">
                                                 <a href="{{ route('kepala-bagian.cuti.show', $leave) }}" class="block truncate text-xs font-semibold text-ink transition hover:text-primary focus:outline-none rounded leading-tight">{{ $leave->employee?->nama_lengkap ?? 'Pegawai tidak tersedia' }}</a>
                                             </x-ui.tooltip>
-                                            <span class="block truncate text-[10px] text-muted font-sans mt-0.5">NIP. {{ $leave->employee?->nip ?? '-' }}</span>
+                                            <span class="block truncate text-xs text-muted">NIP. {{ $leave->employee?->nip ?? '-' }}</span>
                                         </div>
                                     </div>
                                 </x-ui.table-td>
@@ -221,7 +221,7 @@
                 <div class="px-6 py-5 border-b border-border/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface">
                     <div>
                         <h3 class="text-sm font-bold text-ink font-sans">EWS Bawahan Aktif</h3>
-                        <p class="text-[10px] text-muted font-sans mt-0.5">Peringatan aktif dengan target terdekat</p>
+                        <p class="text-xs text-muted">Peringatan aktif dengan target terdekat</p>
                     </div>
                     <a href="{{ route('kepala-bagian.ews.index') }}" class="text-xs font-semibold text-primary hover:underline font-sans flex items-center gap-1">
                         Lihat Semua
@@ -250,7 +250,7 @@
                                             <x-ui.tooltip text="Buka detail {{ $alert['nama'] }}" position="right">
                                                 <a href="{{ route('kepala-bagian.bawahan.show', $alert['pegawai_id']) }}" class="block truncate text-xs font-semibold text-ink transition hover:text-primary focus:outline-none rounded leading-tight">{{ $alert['nama'] }}</a>
                                             </x-ui.tooltip>
-                                            <span class="block truncate text-[10px] text-muted font-sans mt-0.5">NIP. {{ $alert['nip'] ?? '-' }}</span>
+                                            <span class="block truncate text-xs text-muted">NIP. {{ $alert['nip'] ?? '-' }}</span>
                                         </div>
                                     </div>
                                 </x-ui.table-td>
@@ -285,7 +285,7 @@
             <div class="px-6 py-5 border-b border-border/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface">
                 <div>
                     <h3 class="text-sm font-bold text-ink font-sans">Daftar Bawahan</h3>
-                    <p class="text-[10px] text-muted font-sans mt-0.5">Menampilkan lima bawahan aktif pertama berdasarkan nama</p>
+                    <p class="text-xs text-muted">Menampilkan lima bawahan aktif pertama berdasarkan nama</p>
                 </div>
                 <a href="{{ route('kepala-bagian.bawahan.index') }}" class="text-xs font-semibold text-primary hover:underline font-sans flex items-center gap-1">
                     Buka Daftar Bawahan
@@ -317,7 +317,7 @@
                                         <x-ui.tooltip text="Buka detail {{ $employee->nama_lengkap }}" position="right">
                                             <a href="{{ route('kepala-bagian.bawahan.show', $employee) }}" class="block truncate text-xs font-semibold text-ink transition hover:text-primary focus:outline-none rounded leading-tight">{{ $employee->nama_lengkap }}</a>
                                         </x-ui.tooltip>
-                                        <p class="text-[10px] text-muted font-sans leading-none mt-0.5">NIP. {{ $employee->nip }}</p>
+                                        <p class="text-xs text-muted">NIP. {{ $employee->nip }}</p>
                                     </div>
                                 </div>
                             </x-ui.table-td>

@@ -130,13 +130,13 @@
                                 $remaining = $alert['sisa_hari'] < 0 ? 'Lewat '.abs($alert['sisa_hari']).' hari' : $alert['sisa_hari'].' hari';
                             @endphp
                             <x-ui.table-row x-show="search === '' || '{{ strtolower($alert['nama']) }}'.includes(search.toLowerCase()) || '{{ str_replace(' ', '', $alert['nip']) }}'.includes(search.replace(/\s+/g, ''))" class="align-middle hover:bg-soft transition-colors border-b border-border/50 group">
-                                <x-ui.table-td align="center" padding="lg" class="font-mono text-sm font-semibold text-muted">{{ $index + 1 }}</x-ui.table-td>
+                                <x-ui.table-td align="center" padding="lg" class="text-sm font-semibold text-muted">{{ $index + 1 }}</x-ui.table-td>
                                 <x-ui.table-td padding="lg" class="text-sm">
                                     <div class="w-full min-w-0">
                                         <x-ui.tooltip text="Buka detail {{ $alert['nama'] }}" position="right">
                                             <a href="{{ route('kepala-bagian.bawahan.show', $alert['pegawai_id']) }}" class="block truncate text-sm font-semibold text-ink transition-colors hover:text-primary focus:outline-none rounded leading-tight">{{ $alert['nama'] }}</a>
                                         </x-ui.tooltip>
-                                        <p class="text-[11px] text-muted font-sans leading-none mt-1 font-mono">NIP. {{ $alert['nip'] }}</p>
+                                        <p class="text-xs text-muted">NIP. {{ $alert['nip'] }}</p>
                                     </div>
                                 </x-ui.table-td>
                                 <x-ui.table-td padding="lg" class="text-sm">

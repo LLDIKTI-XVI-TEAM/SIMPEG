@@ -621,7 +621,7 @@
                         @if($p->nama_dengan_gelar)
                             <p class="text-xs text-muted font-sans mt-0.5">{{ $p->nama_lengkap }}</p>
                         @endif
-                        <p class="text-xs text-muted font-sans font-mono mt-0.5">NIP. {{ $p->nip }}</p>
+                        <p class="text-xs text-muted">NIP. {{ $p->nip }}</p>
                         <div class="flex items-center gap-2 mt-1.5">
                             <x-ui.badge variant="primary" size="md" class="!font-bold">
                                 {{ $p->jenisPegawai->nama ?? '-' }}
@@ -677,7 +677,7 @@
                     <div class="flex items-center justify-between p-2">
                         <div>
                             <span class="text-xs font-bold text-ink font-sans block">Toggle Flag "Kinerja Baik"</span>
-                            <p class="text-[10px] text-muted font-sans mt-0.5">Flag manual pengganti SKP sementara untuk menentukan eligibility kenaikan pangkat di EWS.</p>
+                            <p class="text-xs text-muted">Flag manual pengganti SKP sementara untuk menentukan eligibility kenaikan pangkat di EWS.</p>
                             <p x-show="isUpdatingKinerja" class="mt-1 text-[10px] text-primary font-sans" style="display: none;">
                                 Menyimpan status kinerja.
                             </p>
@@ -693,7 +693,7 @@
                         <div class="flex items-center justify-between gap-4">
                             <div>
                                 <span class="text-xs font-bold text-ink font-sans block">Kelayakan Satyalancana</span>
-                                <p class="text-[10px] text-muted font-sans mt-0.5">Flag dan catatan manual untuk EWS Satyalancana 10/20/30 tahun.</p>
+                                <p class="text-xs text-muted">Flag dan catatan manual untuk EWS Satyalancana 10/20/30 tahun.</p>
                                 <p x-show="isUpdatingSatyalancana" class="mt-1 text-[10px] text-primary font-sans" style="display: none;">
                                     Menyimpan kelayakan Satyalancana.
                                 </p>
@@ -734,7 +734,7 @@
                         <div>
                             <span class="text-[9px] font-bold text-muted uppercase tracking-wider font-sans block">Kepala Bagian</span>
                             <p class="text-xs font-bold text-ink font-sans">{{ $p->currentSupervisor()?->supervisor->nama_lengkap ?? '-' }}</p>
-                            <p class="text-[10px] text-muted font-mono leading-none mt-0.5">NIP. {{ $p->currentSupervisor()?->supervisor->nip ?? '-' }} ({{ $p->currentSupervisor()?->supervisor->latestPosition()?->nama_jabatan ?? '-' }})</p>
+                            <p class="text-xs text-muted">NIP. {{ $p->currentSupervisor()?->supervisor->nip ?? '-' }} ({{ $p->currentSupervisor()?->supervisor->latestPosition()?->nama_jabatan ?? '-' }})</p>
                         </div>
                     </div>
                 </div>
@@ -778,11 +778,11 @@
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">NIK (KTP)</span>
-                                <p class="text-ink font-mono font-bold">{{ $p->nik ?? '-' }}</p>
+                                <p class="text-ink font-bold">{{ $p->nik ?? '-' }}</p>
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">No. Kartu Keluarga (KK)</span>
-                                <p class="text-ink font-mono font-bold">{{ $p->no_kk ?? '-' }}</p>
+                                <p class="text-ink font-bold">{{ $p->no_kk ?? '-' }}</p>
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Tempat / Tanggal Lahir</span>
@@ -816,19 +816,19 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Email Dinas</span>
-                                <p class="text-ink font-sans font-mono">{{ '-' ?? '-' }}</p>
+                                <p class="text-ink font-sans">{{ '-' ?? '-' }}</p>
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Email Pribadi</span>
-                                <p class="text-ink font-sans font-mono">{{ $p->email_pribadi ?? '-' }}</p>
+                                <p class="text-ink font-sans">{{ $p->email_pribadi ?? '-' }}</p>
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Nomor HP</span>
-                                <p class="text-ink font-sans font-mono">{{ $p->no_hp ?? '-' }}</p>
+                                <p class="text-ink font-sans">{{ $p->no_hp ?? '-' }}</p>
                             </div>
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Telepon Rumah</span>
-                                <p class="text-ink font-sans font-mono">{{ $p->no_telepon_rumah ?? '-' }}</p>
+                                <p class="text-ink font-sans">{{ $p->no_telepon_rumah ?? '-' }}</p>
                             </div>
                             <div class="space-y-0.5 sm:col-span-2">
                                 <span class="font-semibold text-muted font-sans">Alamat</span>
@@ -864,7 +864,7 @@
                         </div>
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">TMT Golongan</span>
-                            <p class="text-ink font-mono">{{ $p->latestRank()?->tmt_pangkat ? \Carbon\Carbon::parse($p->latestRank()->tmt_pangkat)->format('d-m-Y') : '-' }}</p>
+                            <p class="text-ink">{{ $p->latestRank()?->tmt_pangkat ? \Carbon\Carbon::parse($p->latestRank()->tmt_pangkat)->format('d-m-Y') : '-' }}</p>
                         </div>
                     </div>
                 </div>
@@ -911,7 +911,7 @@
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
                                     <td class="px-4 py-3">
                                         <p class="font-bold font-sans" x-text="fam.nama_anggota"></p>
-                                        <p class="text-[10px] text-muted font-mono" x-text="fam.nik ? 'NIK. ' + fam.nik : 'NIK. -'"></p>
+                                        <p class="text-[10px] text-muted" x-text="fam.nik ? 'NIK. ' + fam.nik : 'NIK. -'"></p>
                                     </td>
                                     <td class="px-4 py-3">
                                         <p class="font-sans" x-text="fam.hubungan"></p>
@@ -919,7 +919,7 @@
                                     </td>
                                     <td class="px-4 py-3">
                                         <p class="font-sans" x-text="fam.tempat_lahir || '-'"></p>
-                                        <p class="text-[10px] text-muted font-mono" x-text="formatDate(fam.tanggal_lahir)"></p>
+                                        <p class="text-[10px] text-muted" x-text="formatDate(fam.tanggal_lahir)"></p>
                                     </td>
                                     <td class="px-4 py-3 font-sans" x-text="fam.pekerjaan || '-'"></td>
                                     <td class="px-4 py-3">
@@ -975,9 +975,9 @@
                             <template x-for="p in pangkatList" :key="p.no_sk">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
                                     <td class="px-4 py-3 font-bold" x-text="p.golongan"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="p.no_sk"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="formatDate(p.tgl_sk)"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="formatDate(p.tmt)"></td>
+                                    <td class="px-4 py-3" x-text="p.no_sk"></td>
+                                    <td class="px-4 py-3" x-text="formatDate(p.tgl_sk)"></td>
+                                    <td class="px-4 py-3" x-text="formatDate(p.tmt)"></td>
                                 </tr>
                             </template>
                         </tbody>
@@ -1009,9 +1009,9 @@
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
                                     <td class="px-4 py-3 font-bold" x-text="j.jabatan"></td>
                                     <td class="px-4 py-3" x-text="j.unit"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="j.no_sk"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="j.tgl_sk"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="j.tmt"></td>
+                                    <td class="px-4 py-3" x-text="j.no_sk"></td>
+                                    <td class="px-4 py-3" x-text="j.tgl_sk"></td>
+                                    <td class="px-4 py-3" x-text="j.tmt"></td>
                                 </tr>
                             </template>
                         </tbody>
@@ -1041,9 +1041,9 @@
                             <template x-for="k in kgbList" :key="k.no_sk">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
                                     <td class="px-4 py-3 font-bold" x-text="k.gaji"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="k.no_sk"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="k.tgl_sk"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="k.tmt"></td>
+                                    <td class="px-4 py-3" x-text="k.no_sk"></td>
+                                    <td class="px-4 py-3" x-text="k.tgl_sk"></td>
+                                    <td class="px-4 py-3" x-text="k.tmt"></td>
                                 </tr>
                             </template>
                         </tbody>
@@ -1087,9 +1087,9 @@
                                         </template>
                                     </td>
                                     <td class="px-4 py-3" x-text="d.alasan"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="d.no_sk"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="d.tgl_sk"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="d.masa"></td>
+                                    <td class="px-4 py-3" x-text="d.no_sk"></td>
+                                    <td class="px-4 py-3" x-text="d.tgl_sk"></td>
+                                    <td class="px-4 py-3" x-text="d.masa"></td>
                                     <td class="px-4 py-3 text-right">
                                         <button
                                             type="button"
@@ -1157,8 +1157,8 @@
                                     <td class="px-4 py-3 font-bold" x-text="edu.tingkat ?? edu.jenjang?.nama ?? '-'"></td>
                                     <td class="px-4 py-3" x-text="edu.institusi ?? edu.nama_institusi ?? '-'"></td>
                                     <td class="px-4 py-3" x-text="edu.prodi ?? edu.jurusan ?? '-'"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="edu.lulus ?? edu.tahun_lulus ?? '-'"></td>
-                                    <td class="px-4 py-3 font-mono" x-text="edu.no_ijazah ?? '-'"></td>
+                                    <td class="px-4 py-3" x-text="edu.lulus ?? edu.tahun_lulus ?? '-'"></td>
+                                    <td class="px-4 py-3" x-text="edu.no_ijazah ?? '-'"></td>
                                     <td class="px-4 py-3 text-right">
                                         <div class="inline-flex items-center gap-3">
                                             <button
@@ -1209,17 +1209,17 @@
                             </div>
                             <div class="flex justify-between border-b border-border pb-1">
                                 <span class="font-semibold text-muted">Nomor SK Pengangkatan:</span>
-                                <span class="text-ink font-mono font-bold">{{ $p->appointment->no_sk ?? '-' }}</span>
+                                <span class="text-ink font-bold">{{ $p->appointment->no_sk ?? '-' }}</span>
                             </div>
                             <div class="flex justify-between border-b border-border pb-1">
                                 <span class="font-semibold text-muted">Tanggal SK Terbit:</span>
-                                <span class="text-ink font-mono">{{ $p->appointment?->tanggal_sk ? \Carbon\Carbon::parse($p->appointment->tanggal_sk)->format('d-m-Y') : '-' }}</span>
+                                <span class="text-ink">{{ $p->appointment?->tanggal_sk ? \Carbon\Carbon::parse($p->appointment->tanggal_sk)->format('d-m-Y') : '-' }}</span>
                             </div>
                         </div>
                         <div class="space-y-2">
                             <div class="flex justify-between border-b border-border pb-1">
                                 <span class="font-semibold text-muted">TMT Pengangkatan:</span>
-                                <span class="text-ink font-mono font-bold">{{ $p->appointment?->tmt_pengangkatan ? \Carbon\Carbon::parse($p->appointment->tmt_pengangkatan)->format('d-m-Y') : '-' }}</span>
+                                <span class="text-ink font-bold">{{ $p->appointment?->tmt_pengangkatan ? \Carbon\Carbon::parse($p->appointment->tmt_pengangkatan)->format('d-m-Y') : '-' }}</span>
                             </div>
                             <div class="flex justify-between border-b border-border pb-1">
                                 <span class="font-semibold text-muted">Pejabat yang Menetapkan:</span>
@@ -1265,14 +1265,14 @@
                                         </div>
                                         <div class="min-w-0">
                                             <p class="font-bold font-sans truncate">{{ $doc->nama_dokumen }}</p>
-                                            <p class="text-[10px] text-muted font-sans mt-0.5 truncate">{{ $doc->keterangan ?? '-' }}</p>
+                                            <p class="text-xs text-muted truncate">{{ $doc->keterangan ?? '-' }}</p>
                                         </div>
                                     </div>
                                 </td>
                                 <td class="px-4 py-3 text-muted font-sans">{{ \App\Support\Documents\DocumentCategory::label($doc->jenis_dokumen) }}</td>
-                                <td class="px-4 py-3 font-mono text-muted">{{ $doc->nomor_dokumen ?? '-' }}</td>
-                                <td class="px-4 py-3 font-mono text-muted">{{ $doc->tanggal_dokumen ? \Carbon\Carbon::parse($doc->tanggal_dokumen)->format('d-m-Y') : '-' }}</td>
-                                <td class="px-4 py-3 font-mono text-muted">{{ $doc->fileSizeLabel() }}</td>
+                                <td class="px-4 py-3 text-muted">{{ $doc->nomor_dokumen ?? '-' }}</td>
+                                <td class="px-4 py-3 text-muted">{{ $doc->tanggal_dokumen ? \Carbon\Carbon::parse($doc->tanggal_dokumen)->format('d-m-Y') : '-' }}</td>
+                                <td class="px-4 py-3 text-muted">{{ $doc->fileSizeLabel() }}</td>
                                 <td class="px-4 py-3 text-left">
                                     <div class="flex items-center justify-start gap-1.5">
                                         <a href="{{ route('dokumen.show', $doc->id) }}"

@@ -56,10 +56,15 @@ class ListActiveEwsAlertsAction
         }
 
         $status = $this->statusFromFilter($filterStatus);
-        if ($filterStatus !== null && $filterStatus !== '' && $status === null) {
+        $status = $this->statusFromFilter($filterStatus);
+        if ($filterStatus === 'semua') {
+            // Do not filter by followup_status
+        } elseif ($filterStatus === '' || $filterStatus === null) {
+            $query->where('followup_status', EwsAlert::FOLLOWUP_STATUS_ACTIVE);
+        } elseif ($status === null) {
             $query->whereRaw('1 = 0');
         } else {
-            $query->where('followup_status', $status ?? EwsAlert::FOLLOWUP_STATUS_ACTIVE);
+            $query->where('followup_status', $status);
         }
 
         if ($filterEvent !== null && $filterEvent !== '') {

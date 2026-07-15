@@ -155,7 +155,7 @@
         <x-ui.card padding="none" class="overflow-hidden">
             <div class="px-6 py-4 border-b border-border bg-surface">
                 <h3 class="text-sm font-semibold text-ink font-sans">Pemetaan Akun SSO & Otorisasi RBAC</h3>
-                <p class="text-[10px] text-muted font-sans mt-0.5">Hubungkan email Keycloak SSO dengan data pegawai internal serta kelola role.</p>
+                <p class="text-xs text-muted">Hubungkan email Keycloak SSO dengan data pegawai internal serta kelola role.</p>
             </div>            <div class="overflow-x-auto">
                 <x-ui.table class="border-collapse">
                     <x-ui.table-head class="border-b border-border">
@@ -173,11 +173,11 @@
                     <x-ui.table-body>
                         <template x-for="(emp, index) in paginatedEmployees" :key="emp.nip">
                             <x-ui.table-row :interactive="true">
-                                <x-ui.table-td x-text="(currentPage - 1) * perPage + index + 1" class="font-mono text-muted whitespace-nowrap"></x-ui.table-td>
+                                <x-ui.table-td x-text="(currentPage - 1) * perPage + index + 1" class="text-muted whitespace-nowrap"></x-ui.table-td>
                                 <x-ui.table-td x-text="emp.nama" class="font-bold whitespace-nowrap"></x-ui.table-td>
-                                <x-ui.table-td x-text="emp.nip" class="font-mono text-muted whitespace-nowrap"></x-ui.table-td>
-                                <x-ui.table-td x-text="emp.mapped_email" class="font-mono whitespace-nowrap"></x-ui.table-td>
-                                <x-ui.table-td : x-text="emp.keycloak_id || '-'" class="font-mono whitespace-nowrap"></x-ui.table-td>
+                                <x-ui.table-td x-text="emp.nip" class="text-muted whitespace-nowrap"></x-ui.table-td>
+                                <x-ui.table-td x-text="emp.mapped_email" class="whitespace-nowrap"></x-ui.table-td>
+                                <x-ui.table-td : x-text="emp.keycloak_id || '-'" class="whitespace-nowrap"></x-ui.table-td>
                                 <x-ui.table-td class="whitespace-nowrap">
                                      <x-ui.badge
                                            variant="none"
@@ -284,7 +284,7 @@
 
                         <div class="space-y-1">
                             <label class="text-xs font-semibold text-ink font-sans">Email Pegawai (Read-only)</label>
-                            <input type="text" :value="selectedEmployee.email" disabled class="h-[44px] w-full rounded-lg border border-border bg-soft px-4 py-2.5 text-xs text-muted font-mono font-sans select-none focus:outline-none">
+                            <input type="text" :value="selectedEmployee.email" disabled class="h-[44px] w-full rounded-lg border border-border bg-soft px-4 py-2.5 text-xs text-muted font-sans select-none focus:outline-none">
                         </div>
 
                         <div class="space-y-1">

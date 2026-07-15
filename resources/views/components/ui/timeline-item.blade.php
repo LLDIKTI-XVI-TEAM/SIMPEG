@@ -43,7 +43,7 @@
             <p class="text-xs {{ $variant === 'muted' ? 'font-medium' : 'font-bold' }} {{ $v['text'] }} font-sans">{{ $title }}</p>
         @endif
         @if($description)
-            <p class="text-[10px] text-muted font-sans mt-0.5">{{ $description }}</p>
+            <p class="text-xs text-muted">{{ $description }}</p>
         @endif
         {{ $slot }}
     </div>
