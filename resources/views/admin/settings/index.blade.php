@@ -307,11 +307,11 @@
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div class="space-y-1 col-span-1 md:col-span-2">
                                             <label class="text-[10px] font-semibold text-ink font-sans">Pilih Approver Default (Dropdown)</label>
-                                            <select @change="updateStage2($event.target.value)" class="h-[44px] w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                            <x-form.select @change="updateStage2($event.target.value)">
                                                 <option value="Riza Hamzah, S.Sos.|197804122005012002" :selected="cutiConfig.stage2_nip === '197804122005012002'">Riza Hamzah, S.Sos. (NIP: 197804122005012002)</option>
                                                 <option value="Ahmad Fauzi|198503122010011001" :selected="cutiConfig.stage2_nip === '198503122010011001'">Ahmad Fauzi (NIP: 198503122010011001)</option>
                                                 <option value="Nadia Kusuma|199508222020012002" :selected="cutiConfig.stage2_nip === '199508222020012002'">Nadia Kusuma (NIP: 199508222020012002)</option>
-                                            </select>
+                                            </x-form.select>
                                         </div>
                                         <div class="space-y-1">
                                             <label class="text-[10px] font-semibold text-ink font-sans">Nama Approver Terpilih</label>
@@ -336,11 +336,11 @@
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div class="space-y-1 col-span-1 md:col-span-2">
                                             <label class="text-[10px] font-semibold text-ink font-sans">Pilih Approver Default (Dropdown)</label>
-                                            <select @change="updateStage3($event.target.value)" class="h-[44px] w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                            <x-form.select @change="updateStage3($event.target.value)">
                                                 <option value="Munawir Sadzali Razak, S.I.P., M.A.|198305142009121003" :selected="cutiConfig.stage3_nip === '198305142009121003'">Munawir Sadzali Razak, S.I.P., M.A. (NIP: 198305142009121003)</option>
                                                 <option value="Siraajuddin Laluv, OE., M.|197212311984011062" :selected="cutiConfig.stage3_nip === '197212311984011062'">Siraajuddin Laluv, OE., M. (NIP: 197212311984011062)</option>
                                                 <option value="Yucna Dara, S.P., M.M.|198401202009922002" :selected="cutiConfig.stage3_nip === '198401202009922002'">Yucna Dara, S.P., M.M. (NIP: 198401202009922002)</option>
-                                            </select>
+                                            </x-form.select>
                                         </div>
                                         <div class="space-y-1">
                                             <label class="text-[10px] font-semibold text-ink font-sans">Nama Approver Terpilih</label>
@@ -523,13 +523,13 @@
 
                         <div class="space-y-1">
                             <label class="text-xs font-semibold text-ink font-sans">Role Internal</label>
-                            <select x-model="selectedUser.role" class="h-[44px] w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <x-form.select x-model="selectedUser.role">
                                 <option value="Super Admin">Super Admin</option>
                                 <option value="Admin Kepegawaian">Admin Kepegawaian</option>
                                 <option value="Pimpinan">Pimpinan</option>
                                 <option value="Kepala Bagian">Kepala Bagian</option>
                                 <option value="Pegawai">Pegawai</option>
-                            </select>
+                            </x-form.select>
                         </div>
                     </div>
 

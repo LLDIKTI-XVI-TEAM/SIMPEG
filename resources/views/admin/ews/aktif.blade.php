@@ -140,7 +140,7 @@
                     <input 
                         type="text" 
                         x-model="search"
-                        placeholder="Cari nama atau NIP..." 
+                        placeholder="Cari nama atau NIP" 
                         class="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-4 text-sm text-ink placeholder-muted shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                     />
                 </div>

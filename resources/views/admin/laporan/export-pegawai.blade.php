@@ -122,7 +122,7 @@
                                 <div class="relative">
                                     <label class="block text-xs font-semibold text-muted font-sans mb-1">Cari Nama / NIP</label>
                                     <div class="relative">
-                                        <input type="text" x-model="searchQuery" placeholder="Cari nama atau NIP..."
+                                        <input type="text" x-model="searchQuery" placeholder="Cari nama atau NIP"
                                             class="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans" />
                                         <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">

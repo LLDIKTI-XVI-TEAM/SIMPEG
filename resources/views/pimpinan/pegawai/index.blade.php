@@ -33,7 +33,7 @@
                 searchId="search-input" 
                 searchName="search" 
                 :searchValue="$filters['search'] ?? ''"
-                searchPlaceholder="Cari nama atau NIP..."
+                searchPlaceholder="Cari nama atau NIP"
                 class="lg:grid-cols-5">
                 
                 {{-- Filter Golongan --}}

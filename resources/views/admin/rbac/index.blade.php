@@ -159,17 +159,12 @@ $permissionPaths = [
                             @php
                                 $modules = array_keys($permissionsByModule->toArray());
                             @endphp
-                            <select x-model="moduleFilter" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-xs text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                            <x-form.select x-model="moduleFilter">
                                 <option value="">Semua Modul</option>
                                 @foreach($modules as $m)
                                     <option value="{{ $m }}">{{ $m }}</option>
                                 @endforeach
-                            </select>
-                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                </svg>
-                            </div>
+                            </x-form.select>
                         </div>
 
                         {{-- Search Input --}}

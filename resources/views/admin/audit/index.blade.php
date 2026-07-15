@@ -173,7 +173,7 @@
             <div class="space-y-1.5">
                 <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Jenis Event</label>
                 <div class="relative">
-                    <select x-model="filterEvent" class="h-10 w-full appearance-none rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
+                    <x-form.select x-model="filterEvent">
                         <option value="all">Semua Event</option>
                         <option value="LOGIN">LOGIN</option>
                         <option value="LOGOUT">LOGOUT</option>
@@ -185,12 +185,7 @@
                         <option value="APPROVE">APPROVE</option>
                         <option value="POSTPONE">POSTPONE</option>
                         <option value="IMPORT">IMPORT</option>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
+                    </x-form.select>
                 </div>
             </div>
 
@@ -198,17 +193,12 @@
             <div class="space-y-1.5">
                 <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">User / Operator</label>
                 <div class="relative">
-                    <select x-model="filterUser" class="h-10 w-full appearance-none rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
+                    <x-form.select x-model="filterUser">
                         <option value="all">Semua User</option>
                         <template x-for="op in [...new Set(logs.map(l => l.operator))]" :key="op">
                             <option :value="op" x-text="op"></option>
                         </template>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
+                    </x-form.select>
                 </div>
             </div>
 
@@ -216,17 +206,12 @@
             <div class="space-y-1.5">
                 <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Modul / Tabel</label>
                 <div class="relative">
-                    <select x-model="filterModul" class="h-10 w-full appearance-none rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
+                    <x-form.select x-model="filterModul">
                         <option value="all">Semua Modul</option>
                         <template x-for="mod in [...new Set(logs.map(l => l.modul))]" :key="mod">
                             <option :value="mod" x-text="mod"></option>
                         </template>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
+                    </x-form.select>
                 </div>
             </div>
 

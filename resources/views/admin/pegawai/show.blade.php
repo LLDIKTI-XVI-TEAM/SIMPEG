@@ -1431,12 +1431,12 @@
                             <div class="space-y-4">
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Golongan</label>
-                                    <select x-model="newPangkat.golongan_id" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <x-form.select x-model="newPangkat.golongan_id" required>
                                         <option value="">-- Pilih Golongan --</option>
                                         @foreach($golonganOptions as $gol)
                                             <option value="{{ $gol->id }}">{{ $gol->nama }} ({{ $gol->pangkat }})</option>
                                         @endforeach
-                                    </select>
+                                    </x-form.select>
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Pangkat</label>
@@ -1458,21 +1458,21 @@
                             <div class="space-y-4">
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jabatan</label>
-                                    <select x-model="newJabatan.jabatan_id" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <x-form.select x-model="newJabatan.jabatan_id" required>
                                         <option value="">-- Pilih Jabatan --</option>
                                         @foreach($jabatanOptions as $jabatan)
                                             <option value="{{ $jabatan->id }}">{{ $jabatan->nama }}{{ $jabatan->jenisJabatan ? ' - '.$jabatan->jenisJabatan->nama : '' }}</option>
                                         @endforeach
-                                    </select>
+                                    </x-form.select>
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Jabatan</label>
-                                    <select x-model="newJabatan.jenis_jabatan_id" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <x-form.select x-model="newJabatan.jenis_jabatan_id">
                                         <option value="">-- Pilih Jenis Jabatan --</option>
                                         @foreach($jenisJabatanOptions as $jj)
                                             <option value="{{ $jj->id }}">{{ $jj->nama }}</option>
                                         @endforeach
-                                    </select>
+                                    </x-form.select>
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Kelas Jabatan</label>
@@ -1480,21 +1480,21 @@
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Eselon (Opsional)</label>
-                                    <select x-model="newJabatan.eselon_id" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <x-form.select x-model="newJabatan.eselon_id">
                                         <option value="">-- Pilih Eselon --</option>
                                         @foreach($eselonOptions as $esl)
                                             <option value="{{ $esl->id }}">{{ $esl->nama }}</option>
                                         @endforeach
-                                    </select>
+                                    </x-form.select>
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Unit Kerja</label>
-                                    <select x-model="newJabatan.unit_kerja_id" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <x-form.select x-model="newJabatan.unit_kerja_id" required>
                                         <option value="">-- Pilih Unit Kerja --</option>
                                         @foreach($unitKerjaOptions as $unit)
                                             <option value="{{ $unit->id }}">{{ $unit->nama }}</option>
                                         @endforeach
-                                    </select>
+                                    </x-form.select>
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Jabatan</label>
@@ -1538,11 +1538,11 @@
                             <div class="space-y-4">
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Hukuman</label>
-                                    <select x-model="newDisiplin.jenis_hukuman" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <x-form.select x-model="newDisiplin.jenis_hukuman">
                                         <option value="Ringan">Ringan</option>
                                         <option value="Sedang">Sedang</option>
                                         <option value="Berat">Berat</option>
-                                    </select>
+                                    </x-form.select>
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Deskripsi Pelanggaran</label>
@@ -1581,7 +1581,7 @@
                                         <div x-show="loadingArsip" class="text-xs text-muted font-sans py-1">Memuat daftar arsip...</div>
                                         <template x-if="!loadingArsip">
                                             <div class="space-y-1">
-                                                <select x-model="newDisiplin.dokumen_id"
+                                                <x-form.select x-model="newDisiplin.dokumen_id"
                                                     @change="
                                                         const dok = arsipDokumen.find(d => d.id == $event.target.value);
                                                         if (dok) {
@@ -1596,7 +1596,7 @@
                                                             x-text="dok.nama_dokumen + (dok.nomor_dokumen ? ' (' + dok.nomor_dokumen + ')' : '') + (dok.tanggal ? ' — ' + dok.tanggal : '')">
                                                         </option>
                                                     </template>
-                                                </select>
+                                                </x-form.select>
                                                 <p x-show="arsipDokumen.length === 0" class="text-[10px] text-muted italic font-sans">
                                                     Belum ada arsip SK Hukuman Disiplin untuk pegawai ini.
                                                     <a href="{{ route('dokumen') }}" target="_blank" class="text-primary underline">Unggah di halaman Arsip Dokumen</a>.
@@ -1655,12 +1655,12 @@
                             <div class="space-y-4">
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenjang Pendidikan <span class="text-danger">*</span></label>
-                                    <select x-model="newPendidikan.jenjang_id" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <x-form.select x-model="newPendidikan.jenjang_id" required>
                                         <option value="">-- Pilih Jenjang --</option>
                                         @foreach($jenjangOptions as $jenjang)
                                             <option value="{{ $jenjang->id }}">{{ $jenjang->nama }}</option>
                                         @endforeach
-                                    </select>
+                                    </x-form.select>
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Institusi <span class="text-danger">*</span></label>
@@ -1757,12 +1757,12 @@
 
                 <div class="space-y-1">
                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenjang Pendidikan <span class="text-danger">*</span></label>
-                    <select x-model="editPendidikanForm.jenjang_id" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                    <x-form.select x-model="editPendidikanForm.jenjang_id" required>
                         <option value="">-- Pilih Jenjang --</option>
                         @foreach($jenjangOptions as $jenjang)
                             <option value="{{ $jenjang->id }}">{{ $jenjang->nama }}</option>
                         @endforeach
-                    </select>
+                    </x-form.select>
                 </div>
 
                 <div class="space-y-1">

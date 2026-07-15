@@ -45,7 +45,7 @@
                 <div class="flex flex-col gap-3 sm:flex-row sm:justify-end">
                     <x-ui.button type="submit" variant="secondary" size="md">Terapkan Filter</x-ui.button>
                     <x-ui.button type="submit" variant="secondary" size="md" formaction="{{ route('pimpinan.laporan.kepangkatan.pdf') }}" formtarget="_blank">Unduh PDF</x-ui.button>
-                    <x-ui.button type="submit" variant="primary" size="md" formaction="{{ route('pimpinan.laporan.kepangkatan.excel') }}" formtarget="_blank">Unduh Excel (.xlsx)</x-ui.button>
+                    <x-ui.button type="submit" variant="primary" size="md" formaction="{{ route('pimpinan.laporan.kepangkatan.excel') }}" formtarget="_blank">Unduh Excel</x-ui.button>
                 </div>
             </form>
         </x-ui.card>

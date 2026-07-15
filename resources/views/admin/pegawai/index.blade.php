@@ -339,14 +339,14 @@
         rows="pegawaiRows"
         meta="meta"
         :columns="[
-            ['key' => 'check',           'label' => '', 'width' => 'w-10'],
-            ['key' => 'nama_lengkap',    'label' => 'Pegawai',       'sortable' => true],
-            ['key' => 'jabatan',         'label' => 'Jabatan & Unit','sortable' => true],
-            ['key' => 'golongan_terakhir','label' => 'Gol. / Jenis', 'sortable' => true],
-            ['key' => 'tmt',             'label' => 'TMT'],
-            ['key' => 'status_nama',     'label' => 'Status'],
-            ['key' => 'is_lengkap',      'label' => 'Dokumen'],
-            ['key' => 'aksi',            'label' => 'Aksi'],
+            ['key' => 'check',           'label' => '', 'width' => 'w-10 !px-2.5'],
+            ['key' => 'nama_lengkap',    'label' => 'Pegawai',       'sortable' => true, 'width' => '!px-2.5'],
+            ['key' => 'jabatan',         'label' => 'Jabatan & Unit','sortable' => true, 'width' => '!px-2.5'],
+            ['key' => 'golongan_terakhir','label' => 'Gol. / Jenis', 'sortable' => true, 'width' => 'whitespace-nowrap !px-2.5'],
+            ['key' => 'tmt',             'label' => 'TMT', 'width' => 'whitespace-nowrap !px-2.5'],
+            ['key' => 'status_nama',     'label' => 'Status', 'width' => 'whitespace-nowrap !px-2.5'],
+            ['key' => 'is_lengkap',      'label' => 'Dokumen', 'width' => 'whitespace-nowrap !px-2.5'],
+            ['key' => 'aksi',            'label' => 'Aksi', 'width' => 'whitespace-nowrap !px-2.5'],
         ]"
         fetchPage="fetchPage(page)"
         isLoading="isLoading"
@@ -356,7 +356,7 @@
         direction="direction"
         setSort="setSort(col)"
         searchModel="filters.search"
-        searchPlaceholder="Cari nama atau NIP..."
+        searchPlaceholder="Cari nama atau NIP"
         emptyTitle="Tidak ada data pegawai yang sesuai."
         emptyIcon="search"
         :colspanCount="8"
@@ -417,12 +417,12 @@
                 <x-ui.table-row class="border-b border-border last:border-0" x-bind:data-id="p.id" x-bind:data-nip="p.nip">
 
                     {{-- Checkbox --}}
-                    <td class="px-4 py-3">
+                    <td class="!px-2.5 py-2.5">
                         <x-form.checkbox size="sm" class="row-check" />
                     </td>
 
                     {{-- Pegawai --}}
-                    <td class="px-4 py-3">
+                    <td class="!px-2.5 py-2.5">
                         <div class="flex items-center gap-3">
                             <x-ui.tooltip dynamicText="'Buka detail ' + p.nama_lengkap" position="right">
                                 <a :href="`/pegawai/${p.id}`"
@@ -445,23 +445,23 @@
                     </td>
 
                     {{-- Jabatan & Unit --}}
-                    <td class="px-4 py-3">
+                    <td class="!px-2.5 py-2.5">
                         <p class="text-sm font-medium text-ink" x-text="p.jabatan"></p>
                         <p class="text-xs text-muted" x-text="p.unit_kerja"></p>
                     </td>
 
                     {{-- Golongan / Jenis --}}
-                    <td class="px-4 py-3">
+                    <td class="!px-2.5 py-2.5">
                         <span class="text-sm font-medium text-ink" x-text="p.golongan_terakhir + ' / ' + p.jenis_pegawai"></span>
                     </td>
 
                     {{-- TMT --}}
-                    <td class="px-4 py-3">
+                    <td class="!px-2.5 py-2.5">
                         <p class="text-sm text-ink" x-text="p.tmt ?? '-'"></p>
                     </td>
 
                     {{-- Status --}}
-                    <td class="px-4 py-3">
+                    <td class="!px-2.5 py-2.5">
                         <span class="inline-flex items-center gap-1.5 font-medium font-sans leading-none px-2.5 py-1 text-xs rounded-md"
                             :class="{
                                 'bg-success/10 text-success': p.status_key === 'aktif',
@@ -481,7 +481,7 @@
                     </td>
 
                     {{-- Dokumen --}}
-                    <td class="px-4 py-3">
+                    <td class="!px-2.5 py-2.5">
                         <span class="inline-flex items-center gap-1.5 font-medium text-xs rounded-md px-2.5 py-1 whitespace-nowrap"
                             :class="p.is_lengkap ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'">
                             <span class="h-1.5 w-1.5 rounded-full" :class="p.is_lengkap ? 'bg-success' : 'bg-warning'"></span>
@@ -490,7 +490,7 @@
                     </td>
 
                     {{-- Aksi --}}
-                    <td class="px-4 py-3">
+                    <td class="!px-2.5 py-2.5">
                         <div class="flex items-center justify-start gap-1.5">
                             {{-- Detail --}}
                             <x-ui.tooltip text="Detail" position="top">

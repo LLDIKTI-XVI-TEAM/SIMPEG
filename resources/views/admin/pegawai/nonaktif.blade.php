@@ -22,37 +22,37 @@
                     <svg class="w-4 h-4 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                     </svg>
-                    <input id="search-input" name="search" type="text" value="{{ $filters['search'] ?? '' }}" placeholder="Cari nama atau NIP..." class="flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none font-sans">
+                    <input id="search-input" name="search" type="text" value="{{ $filters['search'] ?? '' }}" placeholder="Cari nama atau NIP" class="flex-1 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none font-sans">
                 </div>
 
                 {{-- Filter Golongan --}}
                 <div class="relative">
-                    <select id="filter-golongan" name="golongan" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <x-form.select id="filter-golongan" name="golongan">
                         <option value="">Semua Golongan</option>
                         @foreach($golonganOptions as $golongan)
                             <option value="{{ $golongan }}" @selected($filters['golongan'] === $golongan)>Golongan {{ $golongan }}</option>
                         @endforeach
-                    </select>
+                    </x-form.select>
                 </div>
 
                 {{-- Filter Unit --}}
                 <div class="relative">
-                    <select id="filter-unit" name="unit_kerja_id" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <x-form.select id="filter-unit" name="unit_kerja_id">
                         <option value="">Semua Unit</option>
                         @foreach($unitKerjaOptions as $unit)
                             <option value="{{ $unit->id }}" @selected($filters['unit_kerja_id'] === $unit->id)>{{ $unit->nama }}</option>
                         @endforeach
-                    </select>
+                    </x-form.select>
                 </div>
 
                 {{-- Filter Jenis --}}
                 <div class="relative">
-                    <select id="filter-jenis" name="jenis_pegawai_id" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <x-form.select id="filter-jenis" name="jenis_pegawai_id">
                         <option value="">Semua Jenis</option>
                         @foreach($jenisPegawaiOptions as $jenis)
                             <option value="{{ $jenis->id }}" @selected($filters['jenis_pegawai_id'] === $jenis->id)>{{ $jenis->nama }}</option>
                         @endforeach
-                    </select>
+                    </x-form.select>
                 </div>
             </div>
         </form>

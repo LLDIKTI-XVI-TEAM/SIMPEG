@@ -8,7 +8,6 @@
                     ['label' => 'EWS'],
                 ]" />
             </div>
-            <x-ui.button href="{{ route('pimpinan.laporan.index') }}" variant="primary" size="md">Semua Laporan</x-ui.button>
         </div>
 
         <form method="GET" action="{{ route('pimpinan.ews.index') }}" id="filter-form" class="mb-6">
@@ -16,7 +15,7 @@
                 searchId="search" 
                 searchName="search" 
                 :searchValue="request('search')"
-                searchPlaceholder="Cari pegawai..."
+                searchPlaceholder="Cari pegawai"
                 gridClass="grid-cols-1 md:grid-cols-3"
             >
                 <div>

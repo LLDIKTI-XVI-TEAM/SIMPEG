@@ -120,33 +120,23 @@
 
                 {{-- Filter Role --}}
                 <div class="col-span-1 lg:col-span-3 relative">
-                    <select x-model="filterRole" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <x-form.select x-model="filterRole">
                         <option value="">Semua Role</option>
                         <option value="Super Admin">Super Admin</option>
                         <option value="Admin Kepegawaian">Admin Kepegawaian</option>
                         <option value="Pimpinan">Pimpinan</option>
                         <option value="Kepala Bagian">Kepala Bagian</option>
                         <option value="Pegawai">Pegawai</option>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
+                    </x-form.select>
                 </div>
 
                 {{-- Filter Status Mapping --}}
                 <div class="col-span-1 lg:col-span-3 relative">
-                    <select x-model="filterStatus" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <x-form.select x-model="filterStatus">
                         <option value="">Semua Status SSO</option>
                         <option value="connected">Terhubung</option>
                         <option value="disconnected">Belum Terhubung</option>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
+                    </x-form.select>
                 </div>
             </div>
         </x-ui.card>
@@ -296,13 +286,13 @@
  
                         <div class="space-y-1">
                             <label class="text-xs font-semibold text-ink font-sans">Role Internal SIMPEG</label>
-                            <select name="role" x-model="selectedEmployee.role" class="h-[44px] w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <x-form.select name="role" x-model="selectedEmployee.role">
                                 <option value="Super Admin">Super Admin</option>
                                 <option value="Admin Kepegawaian">Admin Kepegawaian</option>
                                 <option value="Pimpinan">Pimpinan</option>
                                 <option value="Kepala Bagian">Kepala Bagian</option>
                                 <option value="Pegawai">Pegawai</option>
-                            </select>
+                            </x-form.select>
                             <p class="text-[10px] text-muted font-sans">Pilih tingkat otorisasi internal untuk di-assign ke user ini.</p>
                             <p class="text-[10px] text-warning font-semibold font-sans mt-1">⚠️ Catatan: Perubahan role baru akan aktif setelah user melakukan login berikutnya.</p>
                         </div>

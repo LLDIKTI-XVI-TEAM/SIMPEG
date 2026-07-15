@@ -73,13 +73,13 @@
                         <p class="text-xs text-muted mt-0.5 leading-relaxed">Memverifikasi pengajuan setelah disetujui atasan langsung.</p>
                     </div>
                     <div class="sm:col-span-7">
-                        <select id="cfg-stage2" name="stage2_approver_id" x-model="stage2"
-                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        <x-form.select id="cfg-stage2" name="stage2_approver_id" x-model="stage2"
+                           >
                             <option value="">-- Pilih Approver --</option>
                             @foreach($eligibleUsers as $user)
                                 <option value="{{ $user->id }}">{{ $user->name }} ({{ $user->role }})</option>
                             @endforeach
-                        </select>
+                        </x-form.select>
                         @error('stage2_approver_id')
                             <p class="text-xs text-danger mt-1">{{ $message }}</p>
                         @enderror
@@ -93,13 +93,13 @@
                         <p class="text-xs text-muted mt-0.5 leading-relaxed">Memberi persetujuan final. Setelah tahap ini pengajuan berstatus Disetujui.</p>
                     </div>
                     <div class="sm:col-span-7">
-                        <select id="cfg-stage3" name="stage3_approver_id" x-model="stage3"
-                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        <x-form.select id="cfg-stage3" name="stage3_approver_id" x-model="stage3"
+                           >
                             <option value="">-- Pilih Approver --</option>
                             @foreach($eligibleUsers as $user)
                                 <option value="{{ $user->id }}">{{ $user->name }} ({{ $user->role }})</option>
                             @endforeach
-                        </select>
+                        </x-form.select>
                         @error('stage3_approver_id')
                             <p class="text-xs text-danger mt-1">{{ $message }}</p>
                         @enderror
@@ -179,15 +179,15 @@
                 <form method="POST" action="{{ route('cuti.config.pybmc-global') }}" class="w-full max-w-md space-y-3">
                     @csrf
                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans" for="pybmc-global-approver">Pegawai PYBMC <span class="text-danger">*</span></label>
-                    <select id="pybmc-global-approver" name="approver_employee_id"
-                        class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                    <x-form.select id="pybmc-global-approver" name="approver_employee_id"
+                       >
                         <option value="">-- Pilih PYBMC --</option>
                         @foreach($eligibleUsers as $user)
                             @if($user->employee_id)
                                 <option value="{{ $user->employee_id }}" @selected(old('approver_employee_id', $globalPybmc?->approver_employee_id) === $user->employee_id)>{{ $user->name }} ({{ $user->role }})</option>
                             @endif
                         @endforeach
-                    </select>
+                    </x-form.select>
                     @error('approver_employee_id')
                         <p class="text-[11px] text-danger font-semibold font-sans">{{ $message }}</p>
                     @enderror

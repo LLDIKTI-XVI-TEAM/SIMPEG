@@ -91,50 +91,50 @@
             searchId="search-cuti"
             searchName="search"
             searchValue="{{ $search }}"
-            searchPlaceholder="Cari nama atau NIP..."
+            searchPlaceholder="Cari nama atau NIP"
             class="sm:grid-cols-2 lg:grid-cols-5"
         >
             {{-- Filter Status --}}
             <div class="relative">
-                <select id="filter-status" name="status" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                <x-form.select id="filter-status" name="status">
                     <option value="">Semua Status</option>
                     <option value="menunggu" @selected($status === 'menunggu' || $status === 'pending')>Menunggu Keputusan</option>
                     <option value="disetujui" @selected($status === 'disetujui')>Disetujui</option>
                     <option value="ditunda" @selected($status === 'ditunda' || $status === 'ditangguhkan')>Ditangguhkan</option>
                     <option value="perlu_perubahan" @selected($status === 'perlu_perubahan')>Perubahan</option>
                     <option value="tidak_disetujui" @selected($status === 'tidak_disetujui')>Tidak Disetujui</option>
-                </select>
+                </x-form.select>
             </div>
 
 
             {{-- Filter Jenis Cuti --}}
             <div class="relative">
-                <select id="filter-jenis" name="jenis" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                <x-form.select id="filter-jenis" name="jenis">
                     <option value="">Semua Jenis Cuti</option>
                     @foreach($optJenisCutis as $namaJenis)
                         <option value="{{ $namaJenis }}" @selected($jenis === $namaJenis)>{{ $namaJenis }}</option>
                     @endforeach
-                </select>
+                </x-form.select>
             </div>
 
             {{-- Filter Unit Kerja --}}
             <div class="relative">
-                <select id="filter-unit" name="unit" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                <x-form.select id="filter-unit" name="unit">
                     <option value="">Semua Unit Kerja</option>
                     @foreach($optUnits as $namaUnit)
                         <option value="{{ $namaUnit }}" @selected($unit === $namaUnit)>{{ $namaUnit }}</option>
                     @endforeach
-                </select>
+                </x-form.select>
             </div>
 
             {{-- Filter Periode Bulan --}}
             <div class="relative">
-                <select id="filter-periode" name="periode" class="w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                <x-form.select id="filter-periode" name="periode">
                     <option value="">Semua Periode</option>
                     @foreach($optPeriodes as $periodeOption)
                         <option value="{{ $periodeOption }}" @selected($periode === $periodeOption)>{{ \Carbon\Carbon::createFromFormat('Y-m', $periodeOption)->translatedFormat('F Y') }}</option>
                     @endforeach
-                </select>
+                </x-form.select>
             </div>
 
             <div class="flex gap-2">

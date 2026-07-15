@@ -45,14 +45,14 @@
                         <!-- Jenis Cuti -->
                         <div>
                             <label for="jenis_cuti_id" class="block text-sm font-medium text-ink mb-1">Jenis Cuti <span class="text-danger">*</span></label>
-                            <select id="jenis_cuti_id" name="jenis_cuti_id" required x-model="selectedJenisCuti" @change="validateSaldo"
-                                class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                            <x-form.select id="jenis_cuti_id" name="jenis_cuti_id" required x-model="selectedJenisCuti" @change="validateSaldo"
+                               
                                 {{ (!$employee || !$employee->kepala_bagian_id) ? 'disabled' : '' }}>
                                 <option value="">Pilih Jenis Cuti</option>
                                 @foreach($jenisCuti as $jenis)
                                     <option value="{{ $jenis->id }}" data-nama="{{ $jenis->nama }}">{{ $jenis->nama }}</option>
                                 @endforeach
-                            </select>
+                            </x-form.select>
                             @error('jenis_cuti_id')
                                 <p class="mt-1 text-xs text-danger">{{ $message }}</p>
                             @enderror

@@ -988,11 +988,11 @@
                         </div>
                         <div>
                             <label class="mb-1 block text-sm font-semibold text-ink">Khusus PNS?</label>
-                            <select
-                                class="w-full rounded-lg border border-primary/15 bg-transparent px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30">
+                            <x-form.select
+                               >
                                 <option value="Tidak">Tidak</option>
                                 <option value="Ya">Ya</option>
-                            </select>
+                            </x-form.select>
                         </div>
                     </div>
 
@@ -1090,11 +1090,11 @@
                         </div>
                         <div>
                             <label class="mb-1 block text-sm font-semibold text-ink">Jenis</label>
-                            <select
-                                class="w-full rounded-lg border border-primary/15 bg-transparent px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30">
+                            <x-form.select
+                               >
                                 <option value="Hari Libur Nasional">Hari Libur Nasional</option>
                                 <option value="Cuti Bersama">Cuti Bersama</option>
-                            </select>
+                            </x-form.select>
                         </div>
                     </div>
 

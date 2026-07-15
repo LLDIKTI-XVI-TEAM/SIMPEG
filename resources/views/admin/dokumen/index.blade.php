@@ -209,44 +209,35 @@
             <x-slot:filters>
                 {{-- Filter Unit Kerja --}}
                 <div class="relative col-span-1">
-                    <select x-model="filters.unit_kerja"
-                        class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <x-form.select x-model="filters.unit_kerja"
+                       >
                         <option value="">Semua Unit Kerja</option>
                         <option>Bag. Umum</option>
                         <option>Bag. Keuangan</option>
                         <option>Bag. SDM</option>
                         <option>Bag. IT</option>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                        <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </div>
+                    </x-form.select>
                 </div>
 
                 {{-- Filter Kategori Dokumen --}}
                 <div class="relative col-span-1">
-                    <select x-model="filters.kategori"
-                        class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <x-form.select x-model="filters.kategori"
+                       >
                         <option value="">Semua Kategori Dokumen</option>
                         @foreach ($categoryLabels as $value => $label)
                             <option value="{{ $value }}">{{ $label }}</option>
                         @endforeach
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                        <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </div>
+                    </x-form.select>
                 </div>
 
                 {{-- Filter Status --}}
                 <div class="relative col-span-1">
-                    <select x-model="filters.status"
-                        class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                    <x-form.select x-model="filters.status"
+                       >
                         <option value="">Semua Status</option>
                         <option value="tersedia">File tersedia</option>
                         <option value="file_tidak_ditemukan">File tidak ditemukan</option>
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                        <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </div>
+                    </x-form.select>
                 </div>
             </x-slot:filters>
 
@@ -433,7 +424,7 @@
                         <div x-show="open" style="display: none;" x-transition
                             class="absolute z-10 w-full mt-1 bg-surface border border-border rounded-lg shadow-lg overflow-hidden">
                             <div class="p-2 border-b border-border bg-soft/50">
-                                <input type="text" x-model="search" placeholder="Cari nama atau NIP..."
+                                <input type="text" x-model="search" placeholder="Cari nama atau NIP"
                                     class="w-full rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-ink focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans"
                                     @click.stop>
                             </div>
@@ -458,15 +449,12 @@
                 <div class="space-y-1">
                     <label class="text-xs font-semibold text-ink font-sans">Kategori Dokumen <span class="text-danger">*</span></label>
                     <div class="relative">
-                        <select name="kategori_dokumen" required
-                            class="w-full appearance-none rounded-lg border border-border bg-surface pl-4 pr-10 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                        <x-form.select name="kategori_dokumen" required
+                           >
                             @foreach ($categoryLabels as $value => $label)
                                 <option value="{{ $value }}">{{ $label }}</option>
                             @endforeach
-                        </select>
-                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4">
-                            <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                        </div>
+                        </x-form.select>
                     </div>
                 </div>
 
@@ -554,15 +542,12 @@
                 <div class="space-y-1">
                     <label class="text-xs font-semibold text-ink font-sans">Kategori Dokumen <span class="text-danger">*</span></label>
                     <div class="relative">
-                        <select name="kategori_dokumen" required x-model="editDoc.kategori_dokumen"
-                            class="w-full appearance-none rounded-lg border border-border bg-surface pl-4 pr-10 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                        <x-form.select name="kategori_dokumen" required x-model="editDoc.kategori_dokumen"
+                           >
                             @foreach ($categoryLabels as $value => $label)
                                 <option value="{{ $value }}">{{ $label }}</option>
                             @endforeach
-                        </select>
-                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4">
-                            <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                        </div>
+                        </x-form.select>
                     </div>
                 </div>
 
