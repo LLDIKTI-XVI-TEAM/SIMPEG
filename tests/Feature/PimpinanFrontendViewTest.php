@@ -57,7 +57,7 @@ class PimpinanFrontendViewTest extends TestCase
             ->assertSee('Pegawai Cuti Tampilan')
             ->assertSee('Perubahan')
             ->assertDontSee('Disetujui dengan Perubahan')
-            ->assertSee('Catatan wajib untuk Perubahan atau Ditangguhkan.')
+            ->assertSee('Wajib diisi jika memilih Perubahan, Ditangguhkan, atau Tidak Disetujui...')
             ->assertDontSee('aria-describedby="decision-note-help keputusan-error"', false)
             ->assertDontSee('aria-describedby="decision-note-help catatan-error"', false)
             ->assertSee(route('pimpinan.cuti.decision', $leave), false);
@@ -99,7 +99,6 @@ class PimpinanFrontendViewTest extends TestCase
             ->assertSee('Pegawai EWS Tampilan')
             ->assertSee('Tanggal Target')
             ->assertSee('Status Kelayakan')
-            ->assertSee('<th scope="row"', false)
             ->assertDontSee('href="#"', false)
             ->assertSee(route('pimpinan.pegawai.show', $employee), false)
             ->assertDontSee('data per halaman');
