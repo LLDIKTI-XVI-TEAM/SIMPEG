@@ -55,7 +55,7 @@
                         <div>
                             <label for="jenis_cuti_id" class="block text-sm font-medium text-ink mb-1">Jenis Cuti <span class="text-danger">*</span></label>
                             <x-form.select id="jenis_cuti_id" name="jenis_cuti_id" required x-model="selectedJenisCuti" @change="validateSaldo"
-                                {{ $formLocked ? 'disabled' : '' }}>
+                                :disabled="$formLocked">
                                 <option value="">Pilih Jenis Cuti</option>
                                 @foreach($jenisCuti as $jenis)
                                     <option value="{{ $jenis->id }}" data-nama="{{ $jenis->nama }}">{{ $jenis->nama }}</option>

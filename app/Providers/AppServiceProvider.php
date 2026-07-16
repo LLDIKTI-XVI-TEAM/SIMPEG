@@ -26,5 +26,12 @@ class AppServiceProvider extends ServiceProvider
             SocialiteWasCalled::class,
             KeycloakExtendSocialite::class.'@handle',
         );
+
+        // Mendaftarkan custom permission agar @can() pada Blade dapat membaca hasPermission()
+        \Illuminate\Support\Facades\Gate::before(function ($user, $ability) {
+            if (method_exists($user, 'hasPermission') && $user->hasPermission($ability)) {
+                return true;
+            }
+        });
     }
 }
