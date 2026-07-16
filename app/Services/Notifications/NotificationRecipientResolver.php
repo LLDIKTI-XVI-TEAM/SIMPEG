@@ -42,7 +42,7 @@ class NotificationRecipientResolver
     }
 
     /**
-     * Daftar event yang dokumen nyatakan memiliki channel email pada scope #37.
+     * Menentukan jenis notifikasi yang memakai email; keputusan cuti perlu perubahan dan tidak disetujui dikirim agar pegawai segera menindaklanjuti statusnya.
      */
     public function emailEnabled(string $type): bool
     {
@@ -51,6 +51,8 @@ class NotificationRecipientResolver
             'cuti.menunggu_persetujuan',
             'cuti.disetujui',
             'cuti.ditunda',
+            'cuti.perlu_perubahan',
+            'cuti.tidak_disetujui',
             'ews.kenaikan_pangkat',
             'ews.kgb',
             'ews.pensiun',

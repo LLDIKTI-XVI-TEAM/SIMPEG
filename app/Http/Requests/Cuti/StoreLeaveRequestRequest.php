@@ -27,6 +27,30 @@ class StoreLeaveRequestRequest extends FormRequest
     }
 
     /**
+     * Memangkas spasi di sekitar kontak selama cuti sebelum validasi.
+     * Snapshot kontak (alamat dan nomor telepon) adalah data PII yang direkam saat pengajuan,
+     * sehingga nilai harus dinormalisasi lebih dulu agar input berisi hanya spasi ditolak sebagai kosong
+     * dan batas panjang dihitung tanpa spasi tepi. Hanya nilai string yang dipangkas; nilai non-string
+     * (mis. array) sengaja dibiarkan agar aturan validasi yang menangkapnya tetap berjalan.
+     */
+    protected function prepareForValidation(): void
+    {
+        $ternormalisasi = [];
+
+        foreach (['alamat_selama_cuti', 'nomor_telepon'] as $field) {
+            $nilai = $this->input($field);
+
+            if (is_string($nilai)) {
+                $ternormalisasi[$field] = trim($nilai);
+            }
+        }
+
+        if ($ternormalisasi !== []) {
+            $this->merge($ternormalisasi);
+        }
+    }
+
+    /**
      * @return array<string, list<string>>
      */
     public function rules(): array
@@ -37,6 +61,12 @@ class StoreLeaveRequestRequest extends FormRequest
             // Tanggal selesai tidak boleh mendahului tanggal mulai agar rentang cuti selalu valid.
             'tanggal_selesai' => ['required', 'date_format:Y-m-d', 'after_or_equal:tanggal_mulai'],
             'alasan' => ['required', 'string', 'max:500'],
+            // Snapshot kontak wajib direkam saat pengajuan agar approver dapat menghubungi pemohon selama cuti;
+            // batas 1000 karakter menjaga alamat tetap ringkas namun cukup lengkap.
+            'alamat_selama_cuti' => ['required', 'string', 'max:1000'],
+            // Nomor telepon dibatasi 20 karakter dan hanya boleh berisi angka, spasi, serta simbol telepon lazim
+            // (kurung, plus, minus, titik) sehingga huruf atau garis miring ditolak.
+            'nomor_telepon' => ['required', 'string', 'max:20', 'regex:/^[0-9()+\-.\s]+$/'],
             // Lampiran opsional; batas 10 MB dan tipe dokumen/gambar yang lazim untuk surat pendukung.
             'lampiran' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png'],
         ];
@@ -49,6 +79,8 @@ class StoreLeaveRequestRequest extends FormRequest
             'tanggal_mulai' => 'tanggal mulai',
             'tanggal_selesai' => 'tanggal selesai',
             'alasan' => 'alasan',
+            'alamat_selama_cuti' => 'alamat selama cuti',
+            'nomor_telepon' => 'nomor telepon',
             'lampiran' => 'lampiran',
         ];
     }

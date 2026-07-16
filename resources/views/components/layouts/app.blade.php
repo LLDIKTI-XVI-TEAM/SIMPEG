@@ -95,11 +95,12 @@
                     'pengaturan',
                     'user-management',
                     'rbac',
+                    'data-nonaktif',
                     'data-backup',
                     'data-master',
                     'laporan',
                     'laporan.pegawai',
-                    'laporan.cuti',
+                    'cuti.laporan',
                     'cuti.rekap',
                     'ews',
                     'ews.config',
@@ -115,7 +116,7 @@
                     'ews.config',
                     'laporan',
                     'laporan.pegawai',
-                    'laporan.cuti',
+            'cuti.laporan',
                     'user-management',
                     'rbac',
                     'data-master',
@@ -138,7 +139,7 @@
                     'group' => 'Kepegawaian',
                     'items' => array_filter([
                         ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users'],
-                        in_array($activeRole, ['kepala_bagian', 'kepala_bagian']) ? ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'] : null,
+                        $activeRole === 'kepala_bagian' ? ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'] : null,
                         ['label' => 'Data Backup', 'route' => 'data-backup', 'icon' => 'user-minus'],
                         ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open'],
                         ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up'],
@@ -147,22 +148,21 @@
                 [
                     'group' => 'Cuti',
                     'items' => array_filter([
-                        in_array($activeRole, ['kepala_bagian', 'kepala_bagian']) ? ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge'] : null,
+                        $activeRole === 'kepala_bagian' ? ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge'] : null,
                         ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
                         ['label' => 'Rekap Cuti', 'route' => 'cuti.rekap', 'icon' => 'document-text'],
-                        ['label' => 'Export Cuti', 'route' => 'laporan.cuti', 'icon' => 'document-arrow-down'],
+                        ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down'],
                     ])
                 ],
                 [
                     'group' => 'EWS & Notifikasi',
                     'items' => array_filter([
-                        in_array($activeRole, ['kepala_bagian', 'kepala_bagian']) ? ['label' => 'EWS Bawahan', 'route' => 'kepala-bagian.ews.index', 'icon' => 'exclamation-triangle'] : null,
+                        $activeRole === 'kepala_bagian' ? ['label' => 'EWS Bawahan', 'route' => 'kepala-bagian.ews.index', 'icon' => 'exclamation-triangle'] : null,
                         ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
                         ['label' => 'EWS Aktif', 'route' => 'ews', 'icon' => 'exclamation-triangle'],
                         ['label' => 'Konfigurasi EWS', 'route' => 'ews.config', 'icon' => 'cog-6-tooth'],
                     ])
                 ],
-
                 [
                     'group' => 'Administrasi Sistem',
                     'items' => [

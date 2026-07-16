@@ -13,12 +13,14 @@ use App\Models\RefJenisPegawai;
 use App\Models\SimpegNotification;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
+use App\Services\Cuti\LeaveBalanceService;
 use App\Services\LeaveApprovalService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 /**
@@ -127,6 +129,8 @@ class SubmitLeaveRequestTest extends TestCase
             'tanggal_mulai' => '2026-07-06',
             'tanggal_selesai' => '2026-07-10',
             'alasan' => 'Keperluan keluarga.',
+            'alamat_selama_cuti' => 'Jl. Sam Ratulangi No. 1, Manado',
+            'nomor_telepon' => '+62 (431) 123-456',
         ], $override);
     }
 
@@ -306,6 +310,21 @@ class SubmitLeaveRequestTest extends TestCase
         $this->assertDatabaseCount('leave_requests', 0);
     }
 
+    public function test_form_pppk_tidak_menampilkan_jenis_cuti_khusus_pns(): void
+    {
+        $aktor = $this->makePemohon('PPPK');
+        $umum = $this->jenisCuti('Cuti Sakit');
+        $khususPns = $this->jenisCuti('Cuti Besar', khususPns: true);
+
+        $response = $this->actingAs($aktor['user'])->get(route('cuti.create'));
+
+        $response->assertOk();
+        $response->assertViewHas('jenisCuti', function ($jenisCuti) use ($umum, $khususPns): bool {
+            return $jenisCuti->contains('id', $umum->id)
+                && ! $jenisCuti->contains('id', $khususPns->id);
+        });
+    }
+
     public function test_pns_boleh_jenis_cuti_khusus_pns(): void
     {
         $aktor = $this->makePemohon('PNS');
@@ -331,6 +350,49 @@ class SubmitLeaveRequestTest extends TestCase
 
         $response->assertUnprocessable();
         $this->assertDatabaseCount('leave_requests', 0);
+    }
+
+    public function test_cuti_form_uses_lampiran_field_name_not_file_lampiran(): void
+    {
+        $aktor = $this->makePemohon();
+
+        $this->actingAs($aktor['user']);
+        $response = $this->get(route('cuti.create'));
+
+        $response->assertOk();
+        $response->assertSee('name="lampiran"', escape: false);
+        $response->assertDontSee('name="file_lampiran"', escape: false);
+    }
+
+    public function test_pegawai_tanpa_linkage_pegawai_tidak_bisa_membuka_form_pengajuan_cuti(): void
+    {
+        $user = User::factory()->pegawai()->create(['employee_id' => null]);
+
+        $this->actingAs($user);
+        $response = $this->get(route('cuti.create'));
+
+        $response->assertForbidden();
+    }
+
+    public function test_cuti_create_form_exposes_ledger_backed_available_balance(): void
+    {
+        $aktor = $this->makePemohon();
+
+        // Saldo awal ditulis lewat service ledger agar angka tersedia yang dilihat pemohon
+        // berasal dari sumber yang sama dengan validasi saldo saat submit (bukan kolom summary lama).
+        app(LeaveBalanceService::class)->setOpeningBalance(
+            $aktor['employee'],
+            (int) now()->year,
+            ['n2' => 0, 'n1' => 0, 'current' => 7],
+            'Setup test saldo',
+            $aktor['user'],
+        );
+
+        $this->actingAs($aktor['user']);
+        $response = $this->get(route('cuti.create'));
+
+        $response->assertOk();
+        $response->assertViewHas('saldoTersedia', 7);
     }
 
     public function test_menolak_lampiran_melebihi_batas(): void
@@ -487,6 +549,46 @@ class SubmitLeaveRequestTest extends TestCase
         $this->assertDatabaseCount('leave_requests', 0);
     }
 
+    public function test_kepala_lembaga_sees_information_state_instead_of_submit_form(): void
+    {
+        // Cuti Kepala Lembaga diproses melalui kementerian, bukan lewat SIMPEG.
+        // Halaman create harus menampilkan panel informasi, bukan form pengajuan.
+        $aktor = $this->makePemohon();
+        $aktor['employee']->forceFill(['is_kepala_lembaga' => true])->save();
+
+        $this->actingAs($aktor['user']);
+        $response = $this->get(route('cuti.create'));
+
+        $response->assertOk();
+        $response->assertViewHas('isKepalaLembaga', true);
+        // Panel informasi harus menyatakan bahwa pengajuan diproses melalui kementerian.
+        $response->assertSee('diproses melalui kementerian', escape: false);
+        // Membuktikan "instead of form": aksi form submit ke cuti.store tidak boleh dirender.
+        $response->assertDontSee('action="'.route('cuti.store').'"', escape: false);
+    }
+
+    public function test_kepala_lembaga_post_submit_is_rejected(): void
+    {
+        // Guard fail-closed di server: meski UI disembunyikan, POST langsung tetap harus ditolak
+        // sebelum perhitungan hari kerja atau penyimpanan apa pun terjadi.
+        $aktor = $this->makePemohon();
+        $aktor['employee']->forceFill(['is_kepala_lembaga' => true])->save();
+        $jenis = $this->jenisCuti('Cuti Tahunan');
+
+        $this->actingAs($aktor['user']);
+        $response = $this->postJson(route(self::ROUTE), $this->payload($jenis, [
+            'alasan' => 'Uji tolak Kepala Lembaga',
+        ]));
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['jenis_cuti_id']);
+        // Tidak boleh ada baris pengajuan tersimpan untuk pegawai/alasan ini.
+        $this->assertDatabaseMissing('leave_requests', [
+            'employee_id' => $aktor['employee']->id,
+            'alasan' => 'Uji tolak Kepala Lembaga',
+        ]);
+    }
+
     public function test_pemohon_bisa_mengirim_ulang_pengajuan_perlu_perubahan_dengan_snapshot_yang_sama(): void
     {
         $aktor = $this->makePemohon();
@@ -503,6 +605,8 @@ class SubmitLeaveRequestTest extends TestCase
             'tanggal_mulai' => '2026-07-13',
             'tanggal_selesai' => '2026-07-15',
             'alasan' => 'Revisi tanggal sesuai arahan approver.',
+            'alamat_selama_cuti' => 'Jl. Sam Ratulangi No. 2, Manado',
+            'nomor_telepon' => '+62 (431) 123-457',
         ]);
 
         $response->assertRedirect(route('cuti.show', $leave));
@@ -518,5 +622,87 @@ class SubmitLeaveRequestTest extends TestCase
             'step_order' => 1,
             'status' => 'active',
         ]);
+    }
+
+    public function test_post_pengajuan_gagal_tertutup_tanpa_chain_approval_dan_tidak_menyimpan_apa_pun(): void
+    {
+        // Pesan resolver dipetakan FormRequest menjadi validation error sebelum persistensi.
+        $jenisPegawai = RefJenisPegawai::firstOrCreate(['nama' => 'PNS']);
+        $employee = Employee::factory()->create([
+            'jenis_pegawai_id' => $jenisPegawai->id,
+            'is_kepala_lembaga' => false,
+        ]);
+        $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+        $jenis = $this->jenisCuti('Cuti Sakit');
+
+        $this->actingAs($user);
+        $this->withoutExceptionHandling();
+        $validationExceptionObserved = false;
+
+        try {
+            $this->post(route(self::ROUTE), $this->payload($jenis, [
+                'alasan' => 'Uji fail-closed tanpa chain',
+            ]));
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                ['Konfigurasi approval cuti pegawai belum tersedia.'],
+                $exception->errors()['jenis_cuti_id'] ?? [],
+            );
+            $validationExceptionObserved = true;
+        }
+
+        $this->assertTrue($validationExceptionObserved, 'POST harus gagal validasi saat chain approval tidak tersedia.');
+        $this->assertDatabaseMissing('leave_requests', [
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $jenis->id,
+            'alasan' => 'Uji fail-closed tanpa chain',
+        ]);
+    }
+
+    public function test_get_form_mengunci_saat_chain_approval_belum_tersedia(): void
+    {
+        // Tanpa chain approval, form GET harus mengunci kontrol dan menampilkan panduan pasti agar pemohon menghubungi admin.
+        $jenisPegawai = RefJenisPegawai::firstOrCreate(['nama' => 'PNS']);
+        $employee = Employee::factory()->create([
+            'jenis_pegawai_id' => $jenisPegawai->id,
+            'is_kepala_lembaga' => false,
+            'kepala_bagian_id' => null,
+        ]);
+        $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+
+        $this->actingAs($user);
+        $response = $this->get(route('cuti.create'));
+
+        $response->assertOk();
+        $response->assertViewHas('chainReady', false);
+        $response->assertSee('Konfigurasi approval cuti belum tersedia.');
+
+        $content = $response->getContent();
+
+        // Regex membatasi disabled pada tag kontrol tepat, bukan elemen lain dalam form.
+        $this->assertMatchesRegularExpression('/<select\\b(?=[^>]*\\bid="jenis_cuti_id")(?=[^>]*\\bname="jenis_cuti_id")[^>]*\\bdisabled\\b[^>]*>/', $content);
+        $this->assertMatchesRegularExpression('/<input\\b(?=[^>]*\\bid="tanggal_mulai")(?=[^>]*\\bname="tanggal_mulai")[^>]*\\bdisabled\\b[^>]*>/', $content);
+        $this->assertMatchesRegularExpression('/<input\\b(?=[^>]*\\bid="tanggal_selesai")(?=[^>]*\\bname="tanggal_selesai")[^>]*\\bdisabled\\b[^>]*>/', $content);
+        $this->assertMatchesRegularExpression('/<textarea\\b(?=[^>]*\\bid="alasan")(?=[^>]*\\bname="alasan")[^>]*\\bdisabled\\b[^>]*>/', $content);
+        $this->assertMatchesRegularExpression('/<textarea\\b(?=[^>]*\\bid="alamat_selama_cuti")(?=[^>]*\\bname="alamat_selama_cuti")[^>]*\\bdisabled\\b[^>]*>/', $content);
+        $this->assertMatchesRegularExpression('/<input\\b(?=[^>]*\\bid="nomor_telepon")(?=[^>]*\\bname="nomor_telepon")[^>]*\\bdisabled\\b[^>]*>/', $content);
+        $this->assertMatchesRegularExpression('/<input\\b(?=[^>]*\\bid="lampiran")(?=[^>]*\\bname="lampiran")[^>]*\\bdisabled\\b[^>]*>/', $content);
+        $this->assertMatchesRegularExpression('/<button\\b(?=[^>]*\\btype="submit")(?=[^>]*:disabled="saldoError \\|\\| true")[^>]*>/', $content);
+    }
+
+    public function test_get_form_menampilkan_label_peran_chain_yang_sebenarnya(): void
+    {
+        // Chain dua langkah aktif harus dirender sebagai label peran nyata berurutan, bukan panduan tetap lama.
+        $aktor = $this->makePemohon();
+
+        $this->actingAs($aktor['user']);
+        $response = $this->get(route('cuti.create'));
+
+        $response->assertOk();
+        $response->assertViewHas('chainReady', true);
+        $response->assertSee('Kepala Bagian');
+        $response->assertSee('PYBMC');
+        // Label tetap lama tidak boleh tersisa setelah panduan menjadi dinamis dari chain.
+        $response->assertDontSee('Verifikator / Kabag');
     }
 }

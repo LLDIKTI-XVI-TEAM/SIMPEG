@@ -4,12 +4,14 @@ use App\Actions\Ews\ListActiveEwsAlertsAction;
 use App\Http\Controllers\Admin\AuditController;
 use App\Http\Controllers\Admin\CutiConfigController;
 use App\Http\Controllers\Admin\CutiController;
+use App\Http\Controllers\Admin\CutiReportController;
 use App\Http\Controllers\Admin\DokumenController;
 use App\Http\Controllers\Admin\EmployeeImportController;
 use App\Http\Controllers\Admin\EwsConfigController;
 use App\Http\Controllers\Admin\EwsController;
 use App\Http\Controllers\Admin\GlobalSearchController;
 use App\Http\Controllers\Admin\HariLiburController;
+use App\Http\Controllers\Admin\KepalaLembagaSupportingDocumentController;
 use App\Http\Controllers\Admin\LaporanController;
 use App\Http\Controllers\Admin\LeaveBalanceController;
 use App\Http\Controllers\Admin\NotificationController;
@@ -37,12 +39,6 @@ use App\Models\Permission;
 use App\Models\Role;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use PhpOffice\PhpSpreadsheet\Cell\DataType;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Style\Alignment;
-use PhpOffice\PhpSpreadsheet\Style\Border;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 Route::get('/', function () {
     return auth()->check()
@@ -228,8 +224,36 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->name('data-backup');
 
     Route::get('/cuti/rekap', [CutiController::class, 'rekap'])
-        ->middleware(['role:super_admin,admin_kepegawaian'])
+        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('cuti.rekap');
+    Route::get('/cuti/laporan', [CutiReportController::class, 'preview'])
+        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+        ->name('cuti.laporan');
+    Route::get('/cuti/laporan/pdf', [CutiReportController::class, 'pdf'])
+        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+        ->name('cuti.laporan.pdf');
+    Route::get('/cuti/laporan/excel', [CutiReportController::class, 'excel'])
+        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+        ->name('cuti.laporan.excel');
+
+    Route::middleware(['role:super_admin,admin_kepegawaian', 'permission:cuti.kepala_lembaga_documents.manage'])
+        ->prefix('cuti/dokumen-kepala-lembaga')
+        ->name('cuti.dokumen-kepala-lembaga.')
+        ->group(function (): void {
+            Route::get('/', [KepalaLembagaSupportingDocumentController::class, 'index'])->name('index');
+            Route::post('/{employee}', [KepalaLembagaSupportingDocumentController::class, 'store'])
+                ->whereUuid('employee')
+                ->name('store');
+            Route::get('/{document}/view', [KepalaLembagaSupportingDocumentController::class, 'view'])
+                ->whereUuid('document')
+                ->name('view');
+            Route::get('/{document}/download', [KepalaLembagaSupportingDocumentController::class, 'download'])
+                ->whereUuid('document')
+                ->name('download');
+            Route::delete('/{document}', [KepalaLembagaSupportingDocumentController::class, 'destroy'])
+                ->whereUuid('document')
+                ->name('destroy');
+        });
 
     Route::get('/konfigurasi', [EwsConfigController::class, 'index'])
         ->middleware(['role:super_admin'])
@@ -285,282 +309,6 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::post('/laporan/export-pegawai/custom', [LaporanController::class, 'exportPegawaiCustom'])
         ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('laporan.pegawai.custom');
-
-    Route::get('/laporan/export-cuti', function () {
-        $riwayatCuti = CutiController::$riwayatCuti;
-        $pegawai = Employee::all()->map(function ($emp) {
-            return [
-                'id' => $emp->id,
-                'nama' => $emp->nama_lengkap,
-                'nip' => $emp->nip,
-                'unit' => $emp->unitKerja?->nama ?? '-',
-                'golongan' => $emp->golongan_terakhir ?? '-',
-                'jenis' => $emp->jenisPegawai?->nama ?? '-',
-                'status' => $emp->status_aktif ?? 'Aktif',
-            ];
-        })->toArray();
-
-        return view('admin.laporan.export-cuti', [
-            'riwayatCuti' => $riwayatCuti,
-            'pegawai' => $pegawai,
-            'title' => 'Laporan - Export Cuti',
-        ]);
-    })->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
-        ->name('laporan.cuti');
-
-    Route::get('/laporan/export-cuti/excel', function (Request $request) {
-        $riwayatCuti = CutiController::$riwayatCuti;
-        $pegawai = Employee::all()->map(function ($emp) {
-            return [
-                'id' => $emp->id,
-                'nama' => $emp->nama_lengkap,
-                'nip' => $emp->nip,
-                'unit' => $emp->unitKerja?->nama ?? '-',
-                'golongan' => $emp->golongan_terakhir ?? '-',
-                'jenis' => $emp->jenisPegawai?->nama ?? '-',
-                'status' => $emp->status_aktif ?? 'Aktif',
-            ];
-        })->toArray();
-
-        // Apply filters
-        $bulan = $request->query('bulan', '');
-        $tahun = $request->query('tahun', '');
-        $unit = $request->query('unit', '');
-        $pegawaiNip = $request->query('pegawai', '');
-        $jenis = $request->query('jenis', '');
-
-        $filteredCuti = array_filter($riwayatCuti, function ($c) use ($bulan, $tahun, $unit, $pegawaiNip, $jenis) {
-            $matchesBulan = true;
-            $matchesTahun = true;
-
-            if (! empty($c['mulai'])) {
-                $parts = explode('-', $c['mulai']); // YYYY-MM-DD
-                $year = $parts[0];
-                $month = (string) (int) $parts[1]; // Convert "06" -> "6"
-
-                if ($bulan !== '') {
-                    $matchesBulan = ($month === $bulan);
-                }
-                if ($tahun !== '') {
-                    $matchesTahun = ($year === $tahun);
-                }
-            }
-
-            $matchesUnit = ($unit === '') || ($c['unit'] === $unit);
-            $matchesPegawai = ($pegawaiNip === '') || ($c['nip'] === $pegawaiNip);
-            $matchesJenis = ($jenis === '') || ($c['jenis'] === $jenis);
-
-            return $matchesBulan && $matchesTahun && $matchesUnit && $matchesPegawai && $matchesJenis;
-        });
-
-        // Buat spreadsheet
-        $spreadsheet = new Spreadsheet;
-
-        // Sheet 1: Detail Cuti Pegawai
-        $sheet1 = $spreadsheet->getActiveSheet();
-        $sheet1->setTitle('Detail Cuti Pegawai');
-
-        // Column headers for Sheet 1
-        $colsSheet1 = [
-            'A' => ['No', 5],
-            'B' => ['NIP', 24],
-            'C' => ['Nama Pegawai', 32],
-            'D' => ['Jenis Cuti', 20],
-            'E' => ['Tanggal Mulai', 16],
-            'F' => ['Tanggal Selesai', 16],
-            'G' => ['Jumlah Hari', 14],
-            'H' => ['Status', 15],
-        ];
-
-        foreach ($colsSheet1 as $col => [$label, $width]) {
-            $sheet1->getColumnDimension($col)->setWidth($width);
-            $sheet1->setCellValue($col.'1', $label);
-        }
-        $sheet1->getRowDimension(1)->setRowHeight(30);
-
-        // Header style for Sheet 1 (Primary Blue #122E92, White Text, Bold, Centered, Borders)
-        $headerStyle = [
-            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 11, 'name' => 'Calibri'],
-            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '122E92']],
-            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => true],
-            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CACFE0']]],
-        ];
-        $sheet1->getStyle('A1:H1')->applyFromArray($headerStyle);
-
-        // Populate Sheet 1 data
-        $index1 = 0;
-        foreach ($filteredCuti as $row) {
-            $r = $index1 + 2;
-
-            $sheet1->setCellValue('A'.$r, $index1 + 1);
-            $sheet1->setCellValueExplicit('B'.$r, $row['nip'], DataType::TYPE_STRING);
-            $sheet1->setCellValue('C'.$r, $row['nama']);
-            $sheet1->setCellValue('D'.$r, $row['jenis']);
-            $sheet1->setCellValue('E'.$r, $row['mulai']);
-            $sheet1->setCellValue('F'.$r, $row['selesai']);
-            $sheet1->setCellValue('G'.$r, $row['hari']);
-            $sheet1->setCellValue('H'.$r, $row['status']);
-
-            $sheet1->getRowDimension($r)->setRowHeight(18);
-
-            // Alternating stripe: putih / biru muda #EEF2FF
-            $bg = ($index1 % 2 === 0) ? 'FFFFFF' : 'EEF2FF';
-            $sheet1->getStyle('A'.$r.':H'.$r)->applyFromArray([
-                'font' => ['size' => 10, 'name' => 'Calibri'],
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $bg]],
-                'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
-                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CACFE0']]],
-            ]);
-            $index1++;
-        }
-
-        // Freeze header row & auto-filter for Sheet 1
-        $sheet1->freezePane('A2');
-        if ($index1 > 0) {
-            $sheet1->setAutoFilter('A1:H'.($index1 + 1));
-        }
-
-        // Sheet 2: Ringkasan Cuti Pegawai
-        $sheet2 = $spreadsheet->createSheet();
-        $sheet2->setTitle('Ringkasan Cuti Pegawai');
-
-        // Column headers for Sheet 2
-        $colsSheet2 = [
-            'A' => ['No', 5],
-            'B' => ['NIP', 24],
-            'C' => ['Nama Pegawai', 32],
-            'D' => ['Total Cuti Tahunan (Hari)', 24],
-            'E' => ['Total Cuti Sakit (Hari)', 22],
-            'F' => ['Total Cuti Melahirkan (Hari)', 26],
-            'G' => ['Sisa Saldo Cuti Tahunan', 24],
-        ];
-
-        foreach ($colsSheet2 as $col => [$label, $width]) {
-            $sheet2->getColumnDimension($col)->setWidth($width);
-            $sheet2->setCellValue($col.'1', $label);
-        }
-        $sheet2->getRowDimension(1)->setRowHeight(30);
-        $sheet2->getStyle('A1:G1')->applyFromArray($headerStyle);
-
-        // Filter employees to match unit & pegawai selected
-        $filteredPegawai = array_filter($pegawai, function ($p) use ($unit, $pegawaiNip) {
-            $matchesUnit = ($unit === '') || ($p['unit'] === $unit);
-            $matchesPegawai = ($pegawaiNip === '') || ($p['nip'] === $pegawaiNip);
-
-            return $matchesUnit && $matchesPegawai;
-        });
-
-        // Determine target year
-        $targetYear = ($tahun !== '') ? $tahun : '2026';
-
-        // Populate Sheet 2 data
-        $index2 = 0;
-        foreach ($filteredPegawai as $p) {
-            $r = $index2 + 2;
-
-            // Calculate total approved leaves
-            $empCuti = array_filter($riwayatCuti, function ($c) use ($p, $targetYear) {
-                if ($c['nip'] !== $p['nip']) {
-                    return false;
-                }
-                if ($c['status'] !== 'disetujui') {
-                    return false;
-                }
-                if (! empty($c['mulai'])) {
-                    $year = explode('-', $c['mulai'])[0];
-
-                    return $year === $targetYear;
-                }
-
-                return false;
-            });
-
-            $totalTahunan = 0;
-            $totalSakit = 0;
-            $totalMelahirkan = 0;
-
-            foreach ($empCuti as $c) {
-                if ($c['jenis'] === 'Cuti Tahunan') {
-                    $totalTahunan += $c['hari'];
-                } elseif ($c['jenis'] === 'Cuti Sakit') {
-                    $totalSakit += $c['hari'];
-                } elseif ($c['jenis'] === 'Cuti Melahirkan') {
-                    $totalMelahirkan += $c['hari'];
-                }
-            }
-
-            $sisaSaldo = 12 - $totalTahunan;
-
-            $sheet2->setCellValue('A'.$r, $index2 + 1);
-            $sheet2->setCellValueExplicit('B'.$r, $p['nip'], DataType::TYPE_STRING);
-            $sheet2->setCellValue('C'.$r, $p['nama']);
-            $sheet2->setCellValue('D'.$r, $totalTahunan);
-            $sheet2->setCellValue('E'.$r, $totalSakit);
-            $sheet2->setCellValue('F'.$r, $totalMelahirkan);
-            $sheet2->setCellValue('G'.$r, $sisaSaldo);
-
-            $sheet2->getRowDimension($r)->setRowHeight(18);
-
-            // Alternating stripe
-            $bg = ($index2 % 2 === 0) ? 'FFFFFF' : 'EEF2FF';
-            $sheet2->getStyle('A'.$r.':G'.$r)->applyFromArray([
-                'font' => ['size' => 10, 'name' => 'Calibri'],
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $bg]],
-                'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
-                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CACFE0']]],
-            ]);
-
-            $index2++;
-        }
-
-        // Freeze header row & auto-filter for Sheet 2
-        $sheet2->freezePane('A2');
-        if ($index2 > 0) {
-            $sheet2->setAutoFilter('A1:G'.($index2 + 1));
-        }
-
-        $spreadsheet->setActiveSheetIndex(0);
-
-        // Determine filename
-        $namaBulan = [
-            '1' => 'Januari',
-            '2' => 'Februari',
-            '3' => 'Maret',
-            '4' => 'April',
-            '5' => 'Mei',
-            '6' => 'Juni',
-            '7' => 'Juli',
-            '8' => 'Agustus',
-            '9' => 'September',
-            '10' => 'Oktober',
-            '11' => 'November',
-            '12' => 'Desember',
-        ];
-        $periodeStr = '';
-        if ($bulan && $tahun) {
-            $periodeStr = ($namaBulan[$bulan] ?? '').'_'.$tahun;
-        } elseif ($bulan) {
-            $periodeStr = $namaBulan[$bulan] ?? '';
-        } elseif ($tahun) {
-            $periodeStr = $tahun;
-        } else {
-            $periodeStr = 'Semua_Periode';
-        }
-        $filename = 'Rekap_Cuti_'.$periodeStr.'_'.now()->format('Ymd').'.xlsx';
-
-        return response()->streamDownload(function () use ($spreadsheet) {
-            $writer = new Xlsx($spreadsheet);
-            $writer->save('php://output');
-        }, $filename, [
-            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
-            'Cache-Control' => 'no-cache, no-store, must-revalidate',
-            'Pragma' => 'no-cache',
-            'Expires' => '0',
-        ]);
-    })->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
-        ->name('laporan.cuti.excel');
-
     Route::get('/pegawai', [PegawaiController::class, 'index'])
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
         ->name('data-pegawai');
@@ -658,6 +406,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::patch('/dashboard/cuti/{leaveRequest}/resubmit', [CutiController::class, 'resubmit'])
         ->middleware('permission:cuti.create')
         ->name('cuti.resubmit')
+        ->whereUuid('leaveRequest');
+    Route::get('/dashboard/cuti/{leaveRequest}/formulir-pdf', [CutiController::class, 'formulirPdf'])
+        ->name('cuti.formulir-pdf')
         ->whereUuid('leaveRequest');
     // Antrean dan tindakan approval cuti digerbang ganda: role allowlist sebagai pagar kasar
     // dan permission level-aksi; kelayakan approver per-tahap (person-based) ditegakkan di service.

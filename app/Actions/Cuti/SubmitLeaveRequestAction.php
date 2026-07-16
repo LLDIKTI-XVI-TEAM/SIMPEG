@@ -12,6 +12,7 @@ use App\Services\WorkdayCalculator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Mengoordinasikan pengajuan cuti oleh pegawai.
@@ -34,6 +35,15 @@ class SubmitLeaveRequestAction
      */
     public function execute(Employee $employee, array $data, Request $request): LeaveRequest
     {
+        // Cuti Kepala Lembaga diproses melalui kementerian, bukan lewat SIMPEG.
+        // Guard ini fail-closed dan wajib berada sebelum perhitungan hari kerja maupun penyimpanan apa pun,
+        // sehingga POST langsung tetap ditolak walau tampilan form sudah disembunyikan di sisi UI.
+        if ($employee->is_kepala_lembaga) {
+            throw ValidationException::withMessages([
+                'jenis_cuti_id' => 'Pengajuan cuti Kepala Lembaga diproses melalui kementerian, bukan melalui SIMPEG.',
+            ]);
+        }
+
         $mulai = Carbon::createFromFormat('Y-m-d', (string) $data['tanggal_mulai'])->startOfDay();
         $selesai = Carbon::createFromFormat('Y-m-d', (string) $data['tanggal_selesai'])->startOfDay();
 
@@ -57,6 +67,8 @@ class SubmitLeaveRequestAction
                 'tanggal_selesai' => $selesai->toDateString(),
                 'jumlah_hari_kerja' => $jumlahHariKerja,
                 'alasan' => $data['alasan'],
+                'alamat_selama_cuti' => $data['alamat_selama_cuti'],
+                'nomor_telepon' => $data['nomor_telepon'],
                 'lampiran_path' => $lampiranPath,
                 // Pengajuan baru selalu masuk engine snapshot dinamis; step aktif pertama disimpan di leave_request_steps.
                 'status' => 'menunggu_approval',
@@ -95,8 +107,14 @@ class SubmitLeaveRequestAction
             return $leaveRequest;
         });
 
+        // Snapshot kontak tetap disimpan pada cuti, tetapi audit hanya mencatat status pengisiannya untuk melindungi PII.
+        $auditValues = $leaveRequest->toArray();
+        unset($auditValues['alamat_selama_cuti'], $auditValues['nomor_telepon']);
+        $auditValues['alamat_selama_cuti_diisi'] = $leaveRequest->alamat_selama_cuti !== null;
+        $auditValues['nomor_telepon_diisi'] = $leaveRequest->nomor_telepon !== null;
+
         // Audit bersifat fire-and-forget sehingga sengaja di luar transaksi agar kegagalan audit tidak membatalkan pengajuan.
-        AuditService::log('CREATE', 'LeaveRequest', $leaveRequest->id, null, $leaveRequest->toArray(), $request);
+        AuditService::log('CREATE', 'LeaveRequest', $leaveRequest->id, null, $auditValues, $request);
 
         return $leaveRequest;
     }
@@ -122,7 +140,8 @@ class SubmitLeaveRequestAction
             'cuti.pengajuan_baru',
             'Pengajuan Cuti Menunggu Persetujuan',
             "{$leaveRequest->employee?->nama_lengkap} mengajukan cuti dan menunggu persetujuan Anda.",
-            ['leave_request_id' => $leaveRequest->id],
+            // Approver diarahkan ke antrean approval; path relatif internal agar link aman dan tidak bergantung host.
+            ['leave_request_id' => $leaveRequest->id, 'url' => route('cuti.approval', [], false)],
         );
     }
 }
