@@ -293,6 +293,73 @@ class EmployeeIndexTest extends TestCase
         $this->assertEmployeeDocumentCompleteness($user, $employee, true);
     }
 
+    public function test_document_status_endpoint_reports_each_history_file_from_storage(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $rank = RefGolongan::where('kode', 'III/a')->firstOrFail();
+        $filePath = 'ranks/sk/'.$employee->id.'.pdf';
+
+        RankHistory::create([
+            'employee_id' => $employee->id,
+            'golongan_id' => $rank->id,
+            'tmt_pangkat' => '2026-01-01',
+            'no_sk' => 'SK-PANGKAT-DETAIL',
+            'tanggal_sk' => '2025-12-20',
+            'file_sk' => $filePath,
+            'is_latest' => true,
+        ]);
+        Storage::disk(Document::STORAGE_DISK)->put($filePath, 'SK pangkat');
+        $archiveFilePath = 'berkas/'.$employee->id.'/ktp.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($archiveFilePath, 'KTP');
+        Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'ktp_kk',
+            'nama_dokumen' => 'KTP',
+            'file_path' => $archiveFilePath,
+        ]);
+        Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Berkas Lainnya',
+            'file_path' => 'berkas/'.$employee->id.'/berkas-hilang.pdf',
+        ]);
+
+        $response = $this->actingAs($user)->getJson("/api/v1/pegawai/{$employee->id}/status-dokumen");
+        $response
+            ->assertOk()
+            ->assertJsonPath('employee.id', $employee->id)
+            ->assertJsonPath('document_status.is_lengkap', true)
+            ->assertJsonPath('document_status.total_riwayat', 1)
+            ->assertJsonPath('document_status.file_tersedia', 1)
+            ->assertJsonPath('document_status.records.0.jenis', 'Pangkat')
+            ->assertJsonPath('document_status.records.0.nomor_sk', 'SK-PANGKAT-DETAIL')
+            ->assertJsonPath('document_status.records.0.file_tersedia', true)
+            ->assertJsonPath('document_status.total_dokumen', 3)
+            ->assertJsonPath('document_status.dokumen_tersedia', 2)
+            ->assertJsonFragment([
+                'kategori' => 'KTP & KK',
+                'nama' => 'KTP',
+                'file_tersedia' => true,
+            ])
+            ->assertJsonFragment([
+                'kategori' => 'Lainnya',
+                'nama' => 'Berkas Lainnya',
+                'status_label' => 'File tidak ditemukan',
+            ]);
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+
+        Storage::disk(Document::STORAGE_DISK)->delete($filePath);
+
+        $this->actingAs($user)
+            ->getJson("/api/v1/pegawai/{$employee->id}/status-dokumen")
+            ->assertOk()
+            ->assertJsonPath('document_status.is_lengkap', false)
+            ->assertJsonPath('document_status.file_tersedia', 0)
+            ->assertJsonPath('document_status.records.0.status_label', 'File tidak ditemukan');
+    }
+
     private function assertEmployeeDocumentCompleteness(User $user, Employee $employee, bool $expected): void
     {
         $this->actingAs($user)
