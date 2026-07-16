@@ -646,12 +646,14 @@
                         </svg>
                         Kembali
                     </a>
+                    @if(auth()->user()->role !== 'pimpinan')
                     <a href="{{ route('pegawai.edit', $p->id) }}" class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm">
                         <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
                         </svg>
                         Edit Pegawai
                     </a>
+                    @endif
                 </div>
             </div>
 
@@ -683,7 +685,11 @@
                             </p>
                         </div>
                         <label class="relative inline-flex items-center cursor-pointer select-none">
+                            @if(auth()->user()->role !== 'pimpinan')
                             <input type="checkbox" x-model="kinerjaBaik" @change="updateKinerjaBaik(kinerjaBaik)" :disabled="isUpdatingKinerja" aria-label="Toggle Kinerja Baik" class="sr-only peer">
+                            @else
+                            <input type=\"checkbox\" x-model=\"kinerjaBaik\" disabled aria-label=\"Toggle Kinerja Baik\" class=\"sr-only peer\">
+                            @endif
                             <div class="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-success"></div>
                         </label>
                     </div>
@@ -699,12 +705,19 @@
                                 </p>
                             </div>
                             <label class="relative inline-flex items-center cursor-pointer select-none">
+                                @if(auth()->user()->role !== 'pimpinan')
                                 <input type="checkbox" x-model="satyalancanaEligible" @change="updateSatyalancanaEligibility()" :disabled="isUpdatingSatyalancana" aria-label="Toggle Kelayakan Satyalancana" class="sr-only peer">
+                                @else
+                                <input type=\"checkbox\" x-model=\"satyalancanaEligible\" disabled aria-label=\"Toggle Kelayakan Satyalancana\" class=\"sr-only peer\">
+                                @endif
                                 <div class="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-success"></div>
                             </label>
                         </div>
                         <div class="space-y-1">
                             <label for="satyalancana-note" class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Catatan Manual</label>
+                            @if(auth()->user()->role === 'pimpinan')
+                            <textarea id=\"satyalancana-note\" x-model=\"satyalancanaNote\" rows=\"2\" readonly class=\"w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder-muted shadow-sm focus:outline-none focus:ring-0 opacity-70\"></textarea>
+                            @else
                             <textarea
                                 id="satyalancana-note"
                                 x-model="satyalancanaNote"
@@ -713,7 +726,9 @@
                                 placeholder="Catatan kelayakan Satyalancana"
                                 class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder-muted shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                             ></textarea>
+                            @endif
                         </div>
+                        @if(auth()->user()->role !== 'pimpinan')
                         <button
                             type="button"
                             @click="updateSatyalancanaEligibility()"
@@ -722,6 +737,7 @@
                         >
                             Simpan Satyalancana
                         </button>
+                        @endif
                     </div>
 
                     {{-- Kepala Bagian --}}
@@ -877,12 +893,14 @@
                         <h3 class="text-sm font-bold text-ink font-sans">Susunan Anggota Keluarga</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Daftar istri/suami dan anak yang tercatat sebagai tanggungan.</p>
                     </div>
-                    <button type="button" @click="openModal('keluarga', 'Tambah Anggota Keluarga')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
+                    @if(auth()->user()->role !== 'pimpinan')
+                            <button type="button" @click="openModal('keluarga', 'Tambah Anggota Keluarga')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
                         <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                         </svg>
                         Tambah Keluarga
                     </button>
+                            @endif
                 </div>
 
                 {{-- Loading skeleton --}}
@@ -903,7 +921,9 @@
                                 <th class="px-4 py-3">TTL</th>
                                 <th class="px-4 py-3">Pekerjaan</th>
                                 <th class="px-4 py-3">Status</th>
-                                <th class="px-4 py-3 text-right">Aksi</th>
+                                @if(auth()->user()->role !== 'pimpinan')
+                                        <th class="px-4 py-3 text-right">Aksi</th>
+                                        @endif
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border text-xs font-sans">
@@ -927,7 +947,8 @@
                                               :class="fam.status === 'Ditanggung' ? 'text-success' : 'text-muted'"
                                               x-text="fam.status"></span>
                                     </td>
-                                    <td class="px-4 py-3 text-right">
+                                    @if(auth()->user()->role !== 'pimpinan')
+                                            <td class="px-4 py-3 text-right">
                                         <button
                                             type="button"
                                             @click="deleteKeluarga(fam.id, index)"
@@ -941,6 +962,7 @@
                                             Hapus
                                         </button>
                                     </td>
+                                            @endif
                                 </tr>
                             </template>
                             <tr x-show="!keluargaLoading && keluargaList.length === 0">
@@ -1058,12 +1080,14 @@
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Hukuman Disiplin</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Catatan sanksi disiplin pegawai yang mempengaruhi promosi kepegawaian.</p>
                     </div>
-                    <button type="button" @click="openModal('disiplin', 'Tambah Hukuman Disiplin')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
+                    @if(auth()->user()->role !== 'pimpinan')
+                            <button type="button" @click="openModal('disiplin', 'Tambah Hukuman Disiplin')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
                         <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                         </svg>
                         Tambah Hukuman
                     </button>
+                            @endif
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-border">
                     <table class="w-full">
@@ -1074,7 +1098,9 @@
                                 <th class="px-4 py-3">Nomor SK</th>
                                 <th class="px-4 py-3">Tanggal SK</th>
                                 <th class="px-4 py-3">Masa Berlaku</th>
-                                <th class="px-4 py-3 text-right">Aksi</th>
+                                @if(auth()->user()->role !== 'pimpinan')
+                                        <th class="px-4 py-3 text-right">Aksi</th>
+                                        @endif
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border text-xs font-sans">
@@ -1090,7 +1116,8 @@
                                     <td class="px-4 py-3" x-text="d.no_sk"></td>
                                     <td class="px-4 py-3" x-text="d.tgl_sk"></td>
                                     <td class="px-4 py-3" x-text="d.masa"></td>
-                                    <td class="px-4 py-3 text-right">
+                                    @if(auth()->user()->role !== 'pimpinan')
+                                            <td class="px-4 py-3 text-right">
                                         <button
                                             type="button"
                                             @click="deleteDisiplin(d.id, index)"
@@ -1104,6 +1131,7 @@
                                             Hapus
                                         </button>
                                     </td>
+                                            @endif
                                 </tr>
                             </template>
                             <tr x-show="disiplinList.length === 0">
@@ -1123,12 +1151,14 @@
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Pendidikan Formal</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Riwayat kualifikasi akademis tertinggi staf.</p>
                     </div>
-                    <button type="button" @click="openModal('pendidikan', 'Tambah Riwayat Pendidikan')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
+                    @if(auth()->user()->role !== 'pimpinan')
+                            <button type="button" @click="openModal('pendidikan', 'Tambah Riwayat Pendidikan')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
                         <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                         </svg>
                         Tambah Pendidikan
                     </button>
+                            @endif
                 </div>
                 {{-- Loading skeleton --}}
                 <div x-show="pendidikanLoading" class="flex items-center justify-center py-10 text-xs text-muted font-sans gap-2">
@@ -1148,7 +1178,9 @@
                                 <th class="px-4 py-3">Program Studi</th>
                                 <th class="px-4 py-3">Tahun Lulus</th>
                                 <th class="px-4 py-3">Nomor Ijazah</th>
-                                <th class="px-4 py-3 text-right">Aksi</th>
+                                @if(auth()->user()->role !== 'pimpinan')
+                                        <th class="px-4 py-3 text-right">Aksi</th>
+                                        @endif
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border text-xs font-sans">
@@ -1159,7 +1191,8 @@
                                     <td class="px-4 py-3" x-text="edu.prodi ?? edu.jurusan ?? '-'"></td>
                                     <td class="px-4 py-3" x-text="edu.lulus ?? edu.tahun_lulus ?? '-'"></td>
                                     <td class="px-4 py-3" x-text="edu.no_ijazah ?? '-'"></td>
-                                    <td class="px-4 py-3 text-right">
+                                    @if(auth()->user()->role !== 'pimpinan')
+                                            <td class="px-4 py-3 text-right">
                                         <div class="inline-flex items-center gap-3">
                                             <button
                                                 type="button"
@@ -1182,6 +1215,7 @@
                                             </button>
                                         </div>
                                     </td>
+                                            @endif
                                 </tr>
                             </template>
                             <tr x-show="!pendidikanLoading && pendidikanList.length === 0">
@@ -1250,7 +1284,9 @@
                                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Nomor Dokumen</th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Tanggal Terbit</th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Ukuran</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Aksi</th>
+                                @if(auth()->user()->role !== 'pimpinan')
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Aksi</th>
+                                        @endif
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border text-xs font-sans text-ink">

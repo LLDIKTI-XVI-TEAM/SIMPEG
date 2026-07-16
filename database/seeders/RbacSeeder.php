@@ -108,6 +108,7 @@ class RbacSeeder extends Seeder
                 'cuti.kepala_lembaga_documents.manage',
             ],
             'pimpinan' => [
+                'employees.read',
                 'notifications.read',
                 'notifications.update',
                 // Pimpinan/PYBMC adalah approver final sekaligus dapat memonitor seluruh pengajuan.

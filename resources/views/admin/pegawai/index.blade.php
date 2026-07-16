@@ -1,4 +1,9 @@
 <x-layouts.app title="Data Pegawai">
+@php
+    $isPimpinan = auth()->user()->role === 'pimpinan';
+    $employeeDetailBase = $isPimpinan ? '/pimpinan/pegawai' : '/pegawai';
+    $dashboardRoute = $isPimpinan ? route('pimpinan.dashboard') : route('dashboard');
+@endphp
 
 <div x-data="{
     // ===== State Modal Riwayat =====
@@ -48,12 +53,12 @@
     },
 
     clearCache() {
-        const toDelete = [];
-        for (let i = 0; i < sessionStorage.length; i++) {
+        for (let i = sessionStorage.length - 1; i >= 0; i--) {
             const key = sessionStorage.key(i);
-            if (key && key.startsWith('pegawai_')) toDelete.push(key);
+            if (key && key.startsWith('pegawai_')) {
+                sessionStorage.removeItem(key);
+            }
         }
-        toDelete.forEach(k => sessionStorage.removeItem(k));
     },
 
     async fetchPage(page) {
@@ -175,7 +180,7 @@
         if (!this.deletePegawaiId) return;
         this.isDeleting = true;
         try {
-            // Soft delete — data masuk backup 30 hari, bisa dipulihkan
+            // Soft delete â€” data masuk backup 30 hari, bisa dipulihkan
             const res = await fetch(`/api/v1/pegawai/${this.deletePegawaiId}`, {
                 method: 'DELETE',
                 headers: {
@@ -260,23 +265,10 @@
     },
 
     init() {
-        if (this.dataChanged) {
-            this.clearCache();
-            this.fetchPage(1);
-            return;
-        }
+        // SELALU gunakan data initialRows dari backend saat load pertama kali.
+        // Hapus cache lama agar tidak nyangkut dengan array kosong.
+        this.clearCache();
         const cKey = this.cacheKey + `_p${this.meta.current_page}`;
-        const cached = sessionStorage.getItem(cKey);
-        if (cached) {
-            try {
-                const data = JSON.parse(cached);
-                this.pegawaiRows = data.rows;
-                this.meta = data.meta;
-                return;
-            } catch (e) {
-                sessionStorage.removeItem(cKey);
-            }
-        }
         if (this.pegawaiRows.length > 0) {
             sessionStorage.setItem(cKey, JSON.stringify({ rows: this.pegawaiRows, meta: this.meta }));
         }
@@ -288,7 +280,7 @@
         <div>
             <h2 class="text-2xl font-semibold text-ink">Data Pegawai</h2>
             <x-ui.breadcrumb :items="[
-                ['label' => 'Dashboard', 'url' => route('dashboard')],
+                ['label' => 'Dashboard', 'url' => $dashboardRoute],
                 ['label' => 'Data Pegawai'],
             ]" />
         </div>
@@ -308,6 +300,7 @@
                 </svg>
                 Export Excel
             </button>
+            @if(auth()->user()->role !== 'pimpinan')
             <div class="relative" x-data="{ open: false }">
                 <button @click="open = !open" @click.outside="open = false" id="add-pegawai-btn"
                     class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
@@ -328,6 +321,7 @@
                     </a>
                 </div>
             </div>
+            @endif
         </div>
     </div>
 
@@ -425,7 +419,7 @@
                     <td class="!px-2.5 py-2.5">
                         <div class="flex items-center gap-3">
                             <x-ui.tooltip dynamicText="'Buka detail ' + p.nama_lengkap" position="right">
-                                <a :href="`/pegawai/${p.id}`"
+                                <a :href="`{{ $employeeDetailBase }}/${p.id}`"
                                    class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-sm font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20">
                                     <img x-show="p.foto_url" :src="p.foto_url" :alt="'Foto ' + p.nama_lengkap"
                                          class="h-full w-full object-cover object-[center_25%]" loading="lazy"
@@ -435,7 +429,7 @@
                             </x-ui.tooltip>
                             <div class="min-w-0">
                                 <x-ui.tooltip dynamicText="'Buka detail ' + p.nama_lengkap" position="right">
-                                    <a :href="`/pegawai/${p.id}`"
+                                    <a :href="`{{ $employeeDetailBase }}/${p.id}`"
                                        class="block truncate text-sm font-semibold text-ink transition hover:text-primary"
                                        x-text="p.nama_lengkap"></a>
                                 </x-ui.tooltip>
@@ -494,7 +488,7 @@
                         <div class="flex items-center justify-start gap-1.5">
                             {{-- Detail --}}
                             <x-ui.tooltip text="Detail" position="top">
-                                <a :href="`/pegawai/${p.id}`"
+                                <a :href="`{{ $employeeDetailBase }}/${p.id}`"
                                    class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm">
                                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
@@ -502,6 +496,7 @@
                                     </svg>
                                 </a>
                             </x-ui.tooltip>
+                            @if(auth()->user()->role !== 'pimpinan')
                             {{-- Edit --}}
                             <x-ui.tooltip text="Edit" position="top">
                                 <a :href="`/pegawai/${p.id}/edit`"
@@ -511,6 +506,7 @@
                                     </svg>
                                 </a>
                             </x-ui.tooltip>
+                            @endif
                             @if(auth()->user()->role === 'super_admin')
                             {{-- Ubah Status --}}
                             <div class="relative" x-data="{ openStatusDropdown: false }" @click.away="openStatusDropdown = false">
@@ -539,7 +535,7 @@
                             </div>
                             @endif
                             @if(auth()->user()->role === 'super_admin')
-                            {{-- Hapus → masuk Backup (Super Admin Only) --}}
+                            {{-- Hapus â†’ masuk Backup (Super Admin Only) --}}
                             <x-ui.tooltip text="Hapus ke Backup" position="top-end">
                                 <button type="button" @click="deletePegawai(p.id, p.nama_lengkap)"
                                         class="flex h-8 w-8 items-center justify-center rounded-lg border border-danger/30 bg-surface text-danger transition hover:bg-danger/10 shadow-sm">
@@ -590,6 +586,7 @@
     {{-- ============================================================ --}}
     {{-- MODAL UBAH STATUS PEGAWAI --}}
     {{-- ============================================================ --}}
+    @if(auth()->user()->role !== 'pimpinan')
     <x-ui.modal
         show="showStatusModal"
         title="Ubah Status Pegawai"
@@ -618,7 +615,7 @@
     </x-ui.modal>
 
     {{-- ============================================================ --}}
-    {{-- MODAL HAPUS PEGAWAI → BACKUP (Super Admin Only) --}}
+    {{-- MODAL HAPUS PEGAWAI â†’ BACKUP (Super Admin Only) --}}
     {{-- ============================================================ --}}
     <x-ui.modal
         show="showDeleteModal"
@@ -988,7 +985,7 @@ function exportSelectedData() {
 document.addEventListener('change', function(e) {
     if (e.target && (e.target.classList.contains('row-check') || e.target.id === 'check-all')) {
         if (e.target.id === 'check-all') {
-            // check-all diklik → set semua row sesuai state-nya (indeterminate → check all)
+            // check-all diklik â†’ set semua row sesuai state-nya (indeterminate â†’ check all)
             const shouldCheck = e.target.indeterminate ? true : e.target.checked;
             e.target.indeterminate = false;
             e.target.checked = shouldCheck;
@@ -1005,6 +1002,9 @@ document.addEventListener('alpine:init', () => {
         updateBulkBar();
     });
 });
+
+    @endif
 </script>
 
 </x-layouts.app>
+
