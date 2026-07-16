@@ -11,9 +11,14 @@ class DokumenApiController extends Controller
 {
     public function index(ListDocumentsRequest $request, ListDocumentsAction $action): JsonResponse
     {
-        return response()->json([
-            'message' => 'Daftar dokumen berhasil diambil.',
-            'documents' => $action->execute($request->validated()),
-        ]);
+        return response()
+            ->json([
+                'message' => 'Daftar dokumen berhasil diambil.',
+                'documents' => $action->execute($request->validated()),
+                'file_status_checked_at' => now()->toIso8601String(),
+            ])
+            // Status file berasal dari filesystem, sehingga respons daftar tidak boleh
+            // disajikan dari cache HTTP ketika pengguna meminta data terbaru.
+            ->header('Cache-Control', 'no-store, private, max-age=0, must-revalidate');
     }
 }

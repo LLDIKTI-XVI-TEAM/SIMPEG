@@ -5,6 +5,7 @@ namespace App\Actions\Documents;
 use App\Models\Appointment;
 use App\Models\DisciplineRecord;
 use App\Models\Document;
+use App\Models\EducationHistory;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\SalaryHistory;
@@ -179,6 +180,6 @@ class DeleteDocumentAction
             || SalaryHistory::query()->where('file_sk', $filePath)->exists()
             || DisciplineRecord::query()->where('file_sk', $filePath)->exists()
             || Appointment::query()->where('file_sk', $filePath)->exists()
-            || \App\Models\EducationHistory::query()->where('file_ijazah', $filePath)->exists();
+            || EducationHistory::query()->where('file_ijazah', $filePath)->exists();
     }
 }

@@ -17,6 +17,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class EmployeeDocumentTest extends TestCase
@@ -117,6 +118,36 @@ class EmployeeDocumentTest extends TestCase
             'nama_dokumen' => 'SK KGB TMT 01-04-2026',
             'nomor_dokumen' => 'SK-KGB-SYNC',
         ]);
+    }
+
+    public function test_document_list_api_rechecks_storage_file_status_on_every_request(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $filePath = 'employees/documents/status-file.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($filePath, 'dokumen tersedia');
+
+        Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Dokumen Status File',
+            'file_path' => $filePath,
+        ]);
+
+        $response = $this->actingAs($user)->getJson('/api/v1/dokumen?refresh=1');
+        $response
+            ->assertOk()
+            ->assertJsonPath('documents.data.0.status_dokumen', 'tersedia')
+            ->assertJsonPath('documents.data.0.status_label', 'File tersedia');
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+
+        Storage::disk(Document::STORAGE_DISK)->delete($filePath);
+
+        $this->actingAs($user)
+            ->getJson('/api/v1/dokumen?refresh=1')
+            ->assertOk()
+            ->assertJsonPath('documents.data.0.status_dokumen', 'file_tidak_ditemukan')
+            ->assertJsonPath('documents.data.0.status_label', 'File tidak ditemukan');
     }
 
     public function test_admin_can_access_document_index_page(): void
@@ -281,7 +312,7 @@ class EmployeeDocumentTest extends TestCase
         try {
             $action->execute($document);
             $this->fail('Dokumen yang digunakan data pengangkatan tidak boleh dihapus.');
-        } catch (\Illuminate\Validation\ValidationException) {
+        } catch (ValidationException) {
             $this->assertDatabaseHas('documents', ['id' => $document->id]);
             Storage::disk(Document::STORAGE_DISK)->assertExists($filePath);
         }
