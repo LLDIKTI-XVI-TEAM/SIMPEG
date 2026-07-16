@@ -13,7 +13,11 @@ use App\Models\LeaveRequestStep;
 use App\Models\RefJenisCuti;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
+use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -282,6 +286,89 @@ class CutiFoundationSchemaTest extends TestCase
                 'event_type' => 'opening_balance_set',
                 'amount' => 12,
                 'dedup_key' => 'saldo-awal-2026',
+            ]),
+            QueryException::class,
+        );
+    }
+
+    public function test_ledger_menerima_seluruh_event_type_resmi(): void
+    {
+        $employee = Employee::factory()->create();
+
+        foreach (LeaveBalanceLedger::eventTypes() as $index => $eventType) {
+            LeaveBalanceLedger::create([
+                'employee_id' => $employee->id,
+                'tahun' => 2026,
+                'event_type' => $eventType,
+                'amount' => 0,
+                'dedup_key' => "event-resmi-{$index}",
+            ]);
+        }
+
+        $this->assertSame(
+            LeaveBalanceLedger::eventTypes(),
+            LeaveBalanceLedger::query()->orderBy('event_type')->pluck('event_type')->all(),
+        );
+    }
+
+    public function test_ledger_menolak_event_type_tidak_dikenal(): void
+    {
+        $employee = Employee::factory()->create();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('event_type ledger cuti tidak diizinkan: event_sembarang');
+
+        LeaveBalanceLedger::create([
+            'employee_id' => $employee->id,
+            'tahun' => 2026,
+            'event_type' => 'event_sembarang',
+            'amount' => 0,
+        ]);
+    }
+
+    #[DataProvider('forbiddenCashConversionEventProvider')]
+    public function test_ledger_menolak_event_konversi_saldo(string $eventType): void
+    {
+        $employee = Employee::factory()->create();
+
+        $this->expectException(InvalidArgumentException::class);
+
+        LeaveBalanceLedger::create([
+            'employee_id' => $employee->id,
+            'tahun' => 2026,
+            'event_type' => $eventType,
+            'amount' => 0,
+        ]);
+    }
+
+    /** @return array<string, array{string}> */
+    public static function forbiddenCashConversionEventProvider(): array
+    {
+        return [
+            'cash conversion' => ['cash_conversion'],
+            'money payout' => ['money_payout'],
+            'leave compensation' => ['leave_compensation'],
+            'saldo diuangkan' => ['saldo_diuangkan'],
+        ];
+    }
+
+    public function test_postgresql_constraint_menolak_event_ledger_di_luar_allowlist(): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('CHECK constraint event ledger diverifikasi khusus pada PostgreSQL.');
+        }
+
+        $employee = Employee::factory()->create();
+
+        $this->assertThrows(
+            fn () => DB::table('leave_balance_ledger')->insert([
+                'id' => (string) Str::uuid(),
+                'employee_id' => $employee->id,
+                'tahun' => 2026,
+                'event_type' => 'cash_conversion',
+                'amount' => 0,
+                'created_at' => now(),
+                'updated_at' => now(),
             ]),
             QueryException::class,
         );
