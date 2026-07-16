@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use InvalidArgumentException;
 
 /**
  * Ledger append-only untuk mutasi saldo cuti tahunan dan koreksi yang diaudit.
@@ -23,6 +24,22 @@ class LeaveBalanceLedger extends Model
 {
     use HasUuid;
 
+    public const EVENT_ANNUAL_ENTITLEMENT_GRANTED = 'annual_entitlement_granted';
+
+    public const EVENT_CARRY_OVER_EXPIRED = 'carry_over_expired';
+
+    public const EVENT_CARRY_OVER_GRANTED = 'carry_over_granted';
+
+    public const EVENT_DUTY_POSTPONEMENT_RECORDED = 'duty_postponement_recorded';
+
+    public const EVENT_LEAVE_DEDUCTED = 'leave_deducted';
+
+    public const EVENT_MANUAL_ADJUSTMENT = 'manual_adjustment';
+
+    public const EVENT_OPENING_BALANCE_SET = 'opening_balance_set';
+
+    public const EVENT_ROLLOVER_APPLIED = 'rollover_applied';
+
     protected $table = 'leave_balance_ledger';
 
     protected $fillable = [
@@ -40,6 +57,36 @@ class LeaveBalanceLedger extends Model
         'created_by',
         'occurred_at',
     ];
+
+    /**
+     * Event resmi menjaga ledger hanya mencatat mutasi saldo berbasis hari, bukan uang atau kompensasi.
+     *
+     * @return list<string>
+     */
+    public static function eventTypes(): array
+    {
+        return [
+            self::EVENT_ANNUAL_ENTITLEMENT_GRANTED,
+            self::EVENT_CARRY_OVER_EXPIRED,
+            self::EVENT_CARRY_OVER_GRANTED,
+            self::EVENT_DUTY_POSTPONEMENT_RECORDED,
+            self::EVENT_LEAVE_DEDUCTED,
+            self::EVENT_MANUAL_ADJUSTMENT,
+            self::EVENT_OPENING_BALANCE_SET,
+            self::EVENT_ROLLOVER_APPLIED,
+        ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $ledger): void {
+            if (! in_array($ledger->event_type, self::eventTypes(), true)) {
+                throw new InvalidArgumentException(
+                    "event_type ledger cuti tidak diizinkan: {$ledger->event_type}"
+                );
+            }
+        });
+    }
 
     protected function casts(): array
     {
