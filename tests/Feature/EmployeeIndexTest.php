@@ -2,14 +2,23 @@
 
 namespace Tests\Feature;
 
+use App\Models\Appointment;
+use App\Models\Document;
 use App\Models\Employee;
 use App\Models\Permission;
+use App\Models\PositionHistory;
+use App\Models\RankHistory;
+use App\Models\RefGolongan;
+use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
+use App\Models\RefUnitKerja;
 use App\Models\Role;
+use App\Models\SalaryHistory;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class EmployeeIndexTest extends TestCase
@@ -174,5 +183,122 @@ class EmployeeIndexTest extends TestCase
         $response = $this->getJson(self::PEGAWAI_ENDPOINT);
 
         $response->assertForbidden();
+    }
+
+    public function test_document_completeness_is_true_when_no_required_history_exists(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create(['profil_status' => 'belum_lengkap']);
+
+        $this->assertEmployeeDocumentCompleteness($user, $employee, true);
+    }
+
+    public function test_document_completeness_requires_file_for_the_existing_rank_history_only(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create(['profil_status' => 'lengkap']);
+        $rank = RefGolongan::where('kode', 'III/a')->firstOrFail();
+        $filePath = 'ranks/sk/'.$employee->id.'.pdf';
+
+        RankHistory::create([
+            'employee_id' => $employee->id,
+            'golongan_id' => $rank->id,
+            'tmt_pangkat' => '2026-01-01',
+            'no_sk' => 'SK-PANGKAT-001',
+            'tanggal_sk' => '2025-12-20',
+            'file_sk' => $filePath,
+            'is_latest' => true,
+        ]);
+
+        Storage::disk(Document::STORAGE_DISK)->put($filePath, 'SK pangkat');
+        $this->assertEmployeeDocumentCompleteness($user, $employee, true);
+
+        Storage::disk(Document::STORAGE_DISK)->delete($filePath);
+        $this->assertEmployeeDocumentCompleteness($user, $employee, false);
+    }
+
+    public function test_document_completeness_requires_storage_files_for_every_existing_history_type(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $rank = RefGolongan::where('kode', 'III/a')->firstOrFail();
+        $positionType = RefJenisJabatan::where('nama', 'Struktural')->firstOrFail();
+        $unit = RefUnitKerja::firstOrFail();
+        $paths = [
+            'rank' => 'ranks/sk/'.$employee->id.'.pdf',
+            'position' => 'positions/sk/'.$employee->id.'.pdf',
+            'salary' => 'salaries/sk/'.$employee->id.'.pdf',
+            'appointment' => 'appointments/sk/'.$employee->id.'.pdf',
+        ];
+
+        $records = [
+            'rank' => RankHistory::create([
+                'employee_id' => $employee->id,
+                'golongan_id' => $rank->id,
+                'tmt_pangkat' => '2026-01-01',
+                'no_sk' => 'SK-PANGKAT-002',
+                'tanggal_sk' => '2025-12-20',
+                'file_sk' => $paths['rank'],
+                'is_latest' => true,
+            ]),
+            'position' => PositionHistory::create([
+                'employee_id' => $employee->id,
+                'nama_jabatan' => 'Analis Kepegawaian',
+                'jenis_jabatan_id' => $positionType->id,
+                'unit_kerja_id' => $unit->id,
+                'tmt_jabatan' => '2026-01-01',
+                'no_sk' => 'SK-JABATAN-001',
+                'tanggal_sk' => '2025-12-20',
+                'file_sk' => $paths['position'],
+                'is_latest' => true,
+            ]),
+            'salary' => SalaryHistory::create([
+                'employee_id' => $employee->id,
+                'tmt_kgb' => '2026-01-01',
+                'gaji_pokok' => 5000000,
+                'no_sk' => 'SK-KGB-001',
+                'tanggal_sk' => '2025-12-20',
+                'file_sk' => $paths['salary'],
+                'is_latest' => true,
+            ]),
+            'appointment' => Appointment::create([
+                'employee_id' => $employee->id,
+                'jenis_pengangkatan' => 'PNS',
+                'tmt_pengangkatan' => '2020-01-01',
+                'no_sk' => 'SK-PENGANGKATAN-001',
+                'tanggal_sk' => '2019-12-20',
+                'file_sk' => $paths['appointment'],
+            ]),
+        ];
+
+        $disk = Storage::disk(Document::STORAGE_DISK);
+        foreach ($paths as $path) {
+            $disk->put($path, 'SK tersedia');
+        }
+        $this->assertEmployeeDocumentCompleteness($user, $employee, true);
+
+        foreach ($paths as $type => $path) {
+            $disk->delete($path);
+            $this->assertEmployeeDocumentCompleteness($user, $employee, false);
+            $disk->put($path, 'SK tersedia');
+
+            $records[$type]->update(['file_sk' => null]);
+            $this->assertEmployeeDocumentCompleteness($user, $employee, false);
+            $records[$type]->update(['file_sk' => $path]);
+        }
+
+        $this->assertEmployeeDocumentCompleteness($user, $employee, true);
+    }
+
+    private function assertEmployeeDocumentCompleteness(User $user, Employee $employee, bool $expected): void
+    {
+        $this->actingAs($user)
+            ->getJson(self::PEGAWAI_ENDPOINT.'?search='.urlencode($employee->nip))
+            ->assertOk()
+            ->assertJsonCount(1, 'employees.data')
+            ->assertJsonPath('employees.data.0.is_lengkap', $expected);
     }
 }
