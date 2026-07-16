@@ -193,6 +193,40 @@ class EmployeeDocumentTest extends TestCase
         ]);
     }
 
+    public function test_edit_document_with_replacement_keeps_old_file_when_another_document_still_references_it(): void
+    {
+        $employee = Employee::factory()->create();
+        $oldFilePath = 'employees/documents/dokumen-dipakai-bersama.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($oldFilePath, 'file lama');
+        $document = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Dokumen Utama',
+            'file_path' => $oldFilePath,
+        ]);
+        Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Dokumen Referensi Bersama',
+            'file_path' => $oldFilePath,
+        ]);
+
+        $updated = app(UpdateDocumentAction::class)->execute(
+            $document,
+            [
+                'kategori_dokumen' => 'lainnya',
+                'nama_dokumen' => 'Dokumen Utama Diperbarui',
+                'nomor_dokumen' => null,
+                'tanggal_terbit' => null,
+                'deskripsi' => null,
+            ],
+            UploadedFile::fake()->create('dokumen-pengganti.pdf', 100, 'application/pdf'),
+        );
+
+        Storage::disk(Document::STORAGE_DISK)->assertExists($oldFilePath);
+        Storage::disk(Document::STORAGE_DISK)->assertExists($updated->file_path);
+    }
+
     public function test_document_list_api_rechecks_storage_file_status_on_every_request(): void
     {
         $user = User::factory()->adminKepegawaian()->create();

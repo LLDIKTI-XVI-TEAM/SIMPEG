@@ -71,7 +71,9 @@ class UpdateDocumentAction
             throw $exception;
         }
 
-        if ($replacementPath !== null && $oldFilePath !== $replacementPath) {
+        if ($replacementPath !== null
+            && $oldFilePath !== $replacementPath
+            && ! $this->fileIsStillReferenced($oldFilePath)) {
             $disk->delete($oldFilePath);
         }
 
@@ -131,5 +133,15 @@ class UpdateDocumentAction
                     $query->orWhere('no_sk', $oldNomorSk);
                 }
             });
+    }
+
+    private function fileIsStillReferenced(string $filePath): bool
+    {
+        return Document::query()->where('file_path', $filePath)->exists()
+            || RankHistory::query()->where('file_sk', $filePath)->exists()
+            || PositionHistory::query()->where('file_sk', $filePath)->exists()
+            || SalaryHistory::query()->where('file_sk', $filePath)->exists()
+            || DisciplineRecord::query()->where('file_sk', $filePath)->exists()
+            || Appointment::query()->where('file_sk', $filePath)->exists();
     }
 }
