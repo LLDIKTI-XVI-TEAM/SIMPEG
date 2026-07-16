@@ -73,13 +73,28 @@
                                         </svg>
                                     </x-ui.button>
 
-                                    {{-- Setuju --}}
-                                    <form action="{{ route('cuti.approve', $r->id) }}" method="POST" class="inline">
-                                        @csrf
-                                        <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-success px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 cursor-pointer">
+                                    {{-- Setuju: konfirmasi ringan agar aksi tidak terpicu tanpa sengaja dan dapat dibatalkan lewat keyboard. --}}
+                                    <div x-data="{ confirming: false, lastTrigger: null,
+                                        open(ev) { this.lastTrigger = ev?.currentTarget ?? null; this.confirming = true; },
+                                        close() { this.confirming = false; this.$nextTick(() => this.lastTrigger?.focus()); } }" class="inline-flex items-center gap-2"
+                                        x-effect="if (confirming) $nextTick(() => $refs.confirmApprove?.focus())">
+                                        <button type="button" x-show="!confirming" @click="open($event)"
+                                            class="inline-flex items-center justify-center rounded-lg bg-success px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 cursor-pointer">
                                             Setuju
                                         </button>
-                                    </form>
+                                        <form action="{{ route('cuti.approve', $r->id) }}" method="POST" class="inline-flex items-center gap-2" x-show="confirming" x-cloak @keydown.escape="close()">
+                                            @csrf
+                                            <span class="text-xs text-muted">Yakin?</span>
+                                            <button type="submit" x-ref="confirmApprove"
+                                                class="inline-flex items-center justify-center rounded-lg bg-success px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 cursor-pointer">
+                                                Ya, setujui
+                                            </button>
+                                            <button type="button" @click="close()"
+                                                class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-ink cursor-pointer">
+                                                Batal
+                                            </button>
+                                        </form>
+                                    </div>
 
                                     {{-- Tunda: butuh alasan, arahkan ke detail tempat form penundaan tersedia --}}
                                     <a href="{{ route('cuti.show', $r->id) }}" class="inline-flex items-center justify-center rounded-lg bg-warning px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 cursor-pointer">
@@ -97,6 +112,18 @@
                         @endforelse
                     </x-ui.table-body>
                 </x-ui.table>
+            </div>
+            <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row">
+                <div>
+                    @if($pending->total() > 0)
+                    <p class="text-sm text-muted">
+                        Menampilkan <span class="font-semibold text-ink">{{ $pending->firstItem() }}</span> hingga <span class="font-semibold text-ink">{{ $pending->lastItem() }}</span> dari <span class="font-semibold text-ink">{{ $pending->total() }}</span> hasil
+                    </p>
+                    @endif
+                </div>
+                <div class="w-full sm:w-auto">
+                    {{ $pending->onEachSide(1)->links('vendor.pagination.simpeg') }}
+                </div>
             </div>
         </x-ui.card>
     </div>

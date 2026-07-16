@@ -82,7 +82,8 @@ class ApproveLeaveAction
                     'cuti.disetujui',
                     'Pengajuan Cuti Disetujui',
                     'Pengajuan cuti Anda telah disetujui sepenuhnya.',
-                    ['leave_request_id' => $leaveRequest->id],
+                    // Pemohon diarahkan ke detail pengajuannya; path relatif internal agar link aman lintas host.
+                    ['leave_request_id' => $leaveRequest->id, 'url' => route('cuti.show', ['id' => $leaveRequest->id], false)],
                 );
             }
 
@@ -112,7 +113,8 @@ class ApproveLeaveAction
             'cuti.menunggu_persetujuan',
             'Pengajuan Cuti Menunggu Persetujuan',
             'Terdapat pengajuan cuti yang menunggu persetujuan Anda.',
-            ['leave_request_id' => $leaveRequest->id],
+            // Approver tahap berikutnya diarahkan ke antrean approval; path relatif internal agar link aman lintas host.
+            ['leave_request_id' => $leaveRequest->id, 'url' => route('cuti.approval', [], false)],
         );
     }
 }

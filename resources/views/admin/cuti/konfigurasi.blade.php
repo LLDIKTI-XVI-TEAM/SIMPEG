@@ -1,306 +1,315 @@
 <x-layouts.app title="Konfigurasi Approval Cuti">
-    {{-- State Alpine: menahan pilihan approver dan alasan agar tombol simpan hanya aktif saat alasan terisi. --}}
+    @php
+        $oldSteps = old('steps');
+        $verifierSteps = is_array($oldSteps)
+            ? collect($oldSteps)
+                ->filter(fn (array $step): bool => ($step['step_type'] ?? null) === 'verifier')
+                ->values()
+                ->map(fn (array $step, int $index): array => [
+                    'role_label' => $step['role_label'] ?? 'Verifikator '.($index + 1),
+                    'approver_employee_id' => $step['approver_employee_id'] ?? '',
+                ])
+                ->all()
+            : $initialVerifierSteps;
+        $pybmcEmployeeId = is_array($oldSteps)
+            ? collect($oldSteps)->firstWhere('step_type', 'pybmc')['approver_employee_id'] ?? ''
+            : $initialPybmcEmployeeId;
+    @endphp
+
     <div class="space-y-6" x-data="{
-        stage2: '{{ old('stage2_approver_id', $stage2Id) }}',
-        stage3: '{{ old('stage3_approver_id', $stage3Id) }}',
-        reason: '{{ old('reason', '') }}',
-        showConfirm: false,
-        expandedAudit: null,
-
-        // Skip-logic ditandai aktif bila approver stage 2 dan stage 3 sama,
-        // sehingga super_admin tahu satu tahap approval akan dilewati otomatis.
-        get skipDuplicate() {
-            return this.stage2 !== '' && this.stage2 === this.stage3;
+        verifiers: @js($verifierSteps),
+        pybmcEmployeeId: @js($pybmcEmployeeId),
+        errors: @js($errors->messages()),
+        maxVerifierSteps: 8,
+        addVerifier() {
+            if (this.verifiers.length >= this.maxVerifierSteps) return;
+            let number = 1;
+            while (this.verifiers.some((verifier) => verifier.role_label === `Verifikator ${number}`)) number++;
+            this.verifiers.push({ role_label: `Verifikator ${number}`, approver_employee_id: '' });
         },
-        openConfirm() {
-            if (this.reason.trim() === '' || this.stage2 === '' || this.stage3 === '') return;
-            $dispatch('open-confirm-cuti-konfig');
+        removeVerifier(index) {
+            this.verifiers.splice(index, 1);
         },
-        submitForm() {
-            this.$refs.configForm.submit();
+        moveVerifier(index, direction) {
+            const nextIndex = index + direction;
+            if (nextIndex < 0 || nextIndex >= this.verifiers.length) return;
+            [this.verifiers[index], this.verifiers[nextIndex]] = [this.verifiers[nextIndex], this.verifiers[index]];
+        },
+        isDuplicate(employeeId, index) {
+            if (! employeeId) return false;
+            return this.verifiers.some((verifier, verifierIndex) => verifierIndex !== index && verifier.approver_employee_id === employeeId)
+                || employeeId === this.pybmcEmployeeId;
+        },
+        errorFor(key) {
+            return this.errors[key]?.[0] ?? '';
         }
-    }" @confirm-cuti-konfig.window="submitForm()">
-
-        {{-- PAGE HEADER --}}
+    }">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink">Konfigurasi Approval Cuti</h2>
-                <nav class="mb-1 flex items-center gap-1.5 text-xs text-muted">
+                <nav class="mb-2 flex items-center gap-1.5 text-xs text-muted" aria-label="Breadcrumb">
                     <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
-                    <span>/</span>
-                    <span class="text-muted">Cuti</span>
-                    <span>/</span>
+                    <span aria-hidden="true">/</span>
+                    <span>Cuti</span>
+                    <span aria-hidden="true">/</span>
                     <span class="font-medium text-ink">Konfigurasi Approval</span>
                 </nav>
+                <h2 class="text-2xl font-semibold text-ink">Konfigurasi Approval Cuti</h2>
             </div>
-            <a href="{{ route('cuti') }}"
-                class="inline-flex items-center gap-2 rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition hover:bg-soft">
+            <a href="{{ route('cuti') }}" class="inline-flex items-center gap-2 rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition hover:bg-soft">
                 Kembali ke Cuti
-                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
                 </svg>
             </a>
         </div>
 
-        @if(session('success'))
+        @if (session('success'))
             <x-ui.alert variant="success">{{ session('success') }}</x-ui.alert>
         @endif
 
-        {{-- FORM KONFIGURASI APPROVER --}}
-        <div class="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
-            <div class="px-5 py-4 border-b border-border bg-soft/30">
-                <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Penentuan Approver Cuti</h3>
-                <p class="mt-0.5 text-xs text-muted">Atasan langsung (stage 1) ditentukan otomatis dari struktur pegawai. Form ini hanya menetapkan approver stage 2 dan stage 3.</p>
+        <section class="overflow-hidden rounded-xl border border-border bg-surface shadow-sm" aria-labelledby="employee-chain-heading">
+            <div class="border-b border-border bg-soft/30 px-5 py-4">
+                <h3 id="employee-chain-heading" class="text-xs font-bold uppercase tracking-wider text-ink">Chain Approval Pegawai</h3>
+                <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-muted">Cari lalu pilih pegawai aktif. Hasil pencarian dibatasi hingga 50 pegawai untuk menjaga halaman tetap ringan.</p>
             </div>
 
-            <form method="POST" action="{{ route('cuti.config.update') }}" x-ref="configForm" class="divide-y divide-border">
-                @csrf
-
-                {{-- Penanda skip-logic: muncul hanya ketika approver kedua tahap dipilih sama. --}}
-                <template x-if="skipDuplicate">
-                    <div class="bg-warning/5 border-b border-warning/15 px-5 py-3 flex items-center gap-2.5">
-                        <svg class="w-4 h-4 shrink-0 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                        </svg>
-                        <span class="text-xs font-medium text-warning">Approver Stage 2 dan Stage 3 sama. Salah satu tahap approval akan dilewati otomatis.</span>
-                    </div>
-                </template>
-
-                {{-- Stage 2 --}}
-                <div class="px-5 py-5 grid grid-cols-1 sm:grid-cols-12 gap-4 items-center hover:bg-soft/10 transition-colors">
-                    <div class="sm:col-span-5">
-                        <label class="text-sm font-semibold text-ink block" for="cfg-stage2">Approver Stage 2 (Verifikator) <span class="text-danger">*</span></label>
-                        <p class="text-xs text-muted mt-0.5 leading-relaxed">Memverifikasi pengajuan setelah disetujui atasan langsung.</p>
-                    </div>
-                    <div class="sm:col-span-7">
-                        <x-form.select id="cfg-stage2" name="stage2_approver_id" x-model="stage2"
-                           >
-                            <option value="">-- Pilih Approver --</option>
-                            @foreach($eligibleUsers as $user)
-                                <option value="{{ $user->id }}">{{ $user->name }} ({{ $user->role }})</option>
-                            @endforeach
-                        </x-form.select>
-                        @error('stage2_approver_id')
-                            <p class="text-xs text-danger mt-1">{{ $message }}</p>
-                        @enderror
-                    </div>
-                </div>
-
-                {{-- Stage 3 --}}
-                <div class="px-5 py-5 grid grid-cols-1 sm:grid-cols-12 gap-4 items-center hover:bg-soft/10 transition-colors">
-                    <div class="sm:col-span-5">
-                        <label class="text-sm font-semibold text-ink block" for="cfg-stage3">Approver Stage 3 (Pimpinan) <span class="text-danger">*</span></label>
-                        <p class="text-xs text-muted mt-0.5 leading-relaxed">Memberi persetujuan final. Setelah tahap ini pengajuan berstatus Disetujui.</p>
-                    </div>
-                    <div class="sm:col-span-7">
-                        <x-form.select id="cfg-stage3" name="stage3_approver_id" x-model="stage3"
-                           >
-                            <option value="">-- Pilih Approver --</option>
-                            @foreach($eligibleUsers as $user)
-                                <option value="{{ $user->id }}">{{ $user->name }} ({{ $user->role }})</option>
-                            @endforeach
-                        </x-form.select>
-                        @error('stage3_approver_id')
-                            <p class="text-xs text-danger mt-1">{{ $message }}</p>
-                        @enderror
-                    </div>
-                </div>
-
-                {{-- Alasan + tombol simpan --}}
-                <div class="px-5 py-5 flex flex-col md:flex-row md:items-start justify-between gap-6 hover:bg-soft/5 transition-colors">
-                    <div class="max-w-md">
-                        <label class="text-sm font-semibold text-ink block" for="cfg-reason">Alasan Perubahan <span class="text-danger">*</span></label>
-                        <p class="text-xs text-muted mt-1 leading-relaxed">Sebutkan alasan perubahan approver untuk dicatat dalam log audit kepegawaian.</p>
-                    </div>
-                    <div class="flex-1 max-w-xl space-y-3">
-                        <x-form.textarea
-                            name="reason"
-                            id="cfg-reason"
-                            rows="3"
-                            value="{{ old('reason') }}"
-                            placeholder="Contoh: Pergantian pejabat verifikator karena mutasi jabatan"
-                            class="resize-y transition-colors"
-                            x-model="reason"
-                        />
-
-                        <button type="button" @click="openConfirm()"
-                            class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 active:opacity-80 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-                            :disabled="reason.trim() === '' || stage2 === '' || stage3 === ''">
-                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                            </svg>
-                            Simpan Konfigurasi
-                        </button>
-                    </div>
-                </div>
+            <form method="GET" action="{{ route('cuti.config') }}" class="grid gap-3 border-b border-border px-5 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                <input type="hidden" name="approver_search" value="{{ $approverSearch }}">
+                <x-form.input name="search" id="employee-search" label="Cari Pegawai" value="{{ $search }}" placeholder="Nama atau NIP" help="Masukkan nama atau NIP untuk memuat pilihan pegawai aktif." />
+                <button type="submit" class="inline-flex items-center justify-center rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Cari Pegawai</button>
             </form>
-        </div>
 
-        {{-- BACKFILL CHAIN DINAMIS --}}
-        <div class="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
-            <div class="px-5 py-4 border-b border-border bg-soft/30">
-                <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Backfill Chain Dinamis</h3>
-                <p class="mt-0.5 text-xs text-muted">Membuat chain approval per pegawai aktif dari Kepala Bagian dan konfigurasi stage 2/3 lama.</p>
+            @if ($search !== null && trim($search) !== '')
+                <form method="GET" action="{{ route('cuti.config') }}" class="grid gap-3 border-b border-border px-5 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                    <input type="hidden" name="search" value="{{ $search }}">
+                    <input type="hidden" name="approver_search" value="{{ $approverSearch }}">
+                    <x-form.select name="employee_id" id="target-employee" label="Pilih Pegawai" :required="true" placeholder="Pilih pegawai dari hasil pencarian">
+                        @foreach ($targetEmployees as $employee)
+                            <option value="{{ $employee->id }}" @selected($selectedEmployee?->id === $employee->id)>{{ $employee->nama_lengkap }} ({{ $employee->nip }})</option>
+                        @endforeach
+                    </x-form.select>
+                    <button type="submit" class="inline-flex items-center justify-center rounded-xl border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30">Pilih Pegawai</button>
+                </form>
+            @endif
+
+            @if ($selectedEmployee)
+                @if ($selectedKepalaBagian)
+                    <form method="GET" action="{{ route('cuti.config') }}" class="grid gap-3 border-b border-border bg-soft/20 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                        <input type="hidden" name="search" value="{{ $search }}">
+                        <input type="hidden" name="employee_id" value="{{ $selectedEmployee->id }}">
+                        <x-form.input name="approver_search" id="approver-search" label="Cari Kandidat Approver" value="{{ $approverSearch }}" placeholder="Nama atau NIP" help="Hasil dibatasi hingga 50 pegawai aktif. Kandidat chain saat ini tetap ditampilkan." />
+                        <button type="submit" class="inline-flex items-center justify-center rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Cari Kandidat</button>
+                    </form>
+                @endif
+                <form method="POST" action="{{ route('cuti.config.employee-chain.store', $selectedEmployee) }}" class="divide-y divide-border">
+                    @csrf
+                    <div class="sticky top-0 z-10 border-b border-border bg-surface/95 px-5 py-3 shadow-[0_4px_12px_rgb(15_23_42/0.08)] backdrop-blur-sm sm:hidden">
+                        <button type="submit" class="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30">Simpan Chain Pegawai</button>
+                    </div>
+                    <div class="grid gap-4 px-5 py-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-wider text-muted">Pegawai</p>
+                            <p class="mt-1 text-sm font-semibold text-ink">{{ $selectedEmployee->nama_lengkap }}</p>
+                            <p class="text-xs text-muted">{{ $selectedEmployee->nip }}@if ($selectedEmployee->jabatan_terakhir), {{ $selectedEmployee->jabatan_terakhir }}@endif</p>
+                        </div>
+                        <div>
+                            <label for="kepala-bagian-display" class="text-xs font-bold uppercase tracking-wider text-muted">Kepala Bagian</label>
+                            <input id="kepala-bagian-display" type="text" readonly value="{{ $selectedKepalaBagian ? $selectedKepalaBagian->nama_lengkap . ' (' . $selectedKepalaBagian->nip . ')' : 'Belum ditetapkan' }}" class="mt-1 w-full rounded-xl border border-border bg-soft px-4 py-2 text-sm text-ink shadow-sm">
+                            <p class="mt-1 text-[11px] text-muted">Ditentukan dari struktur pegawai. Validasi server tetap menjadi sumber kebenaran.</p>
+                        </div>
+                    </div>
+
+                    @if (! $selectedKepalaBagian)
+                        <div class="px-5 pb-5">
+                            <x-ui.alert variant="warning">Pegawai belum memiliki Kepala Bagian aktif. Tetapkan struktur pegawai sebelum menyimpan chain.</x-ui.alert>
+                        </div>
+                    @else
+                        <input type="hidden" name="steps[0][step_type]" value="kepala_bagian">
+                        <input type="hidden" name="steps[0][role_label]" value="Kepala Bagian">
+                        <input type="hidden" name="steps[0][approver_employee_id]" value="{{ $selectedKepalaBagian->id }}">
+
+                        <fieldset class="space-y-4 px-5 py-5">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                                <div>
+                                    <legend class="text-sm font-semibold text-ink">Verifikator</legend>
+                                    <p class="mt-0.5 text-xs leading-relaxed text-muted">Tambahkan nol atau lebih verifikator. Duplikasi approver dicatat dan dilewati otomatis saat approval.</p>
+                                </div>
+                                <button type="button" @click="addVerifier()" :disabled="verifiers.length >= maxVerifierSteps" class="inline-flex items-center justify-center rounded-xl border border-border bg-surface px-3.5 py-1.5 text-xs font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50">Tambah Verifikator</button>
+                            </div>
+
+                            <p id="verifier-limit-help" class="text-[11px] text-muted">Maksimum 8 verifikator, sehingga Kepala Bagian dan PYBMC tetap berada dalam batas 10 langkah.</p>
+                            @error('steps')
+                                <p class="text-[11px] font-semibold text-danger" role="alert">{{ $message }}</p>
+                            @enderror
+
+                            <template x-for="(verifier, index) in verifiers" :key="index">
+                                <div class="grid gap-3 rounded-xl border border-border bg-soft/30 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                                    <div class="grid gap-3 sm:grid-cols-2">
+                                        <input type="hidden" :name="`steps[${index + 1}][step_type]`" value="verifier">
+                                        <div>
+                                            <label class="text-xs font-bold uppercase tracking-wider text-ink" :for="`verifier-label-${index}`" x-text="`Label Verifikator ${index + 1}`"></label>
+                                            <input :id="`verifier-label-${index}`" :name="`steps[${index + 1}][role_label]`" x-model="verifier.role_label" required maxlength="100" :aria-invalid="Boolean(errorFor(`steps.${index + 1}.role_label`))" class="mt-1 w-full rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                            <p x-show="errorFor(`steps.${index + 1}.role_label`)" x-text="errorFor(`steps.${index + 1}.role_label`)" class="mt-1 text-[11px] font-semibold text-danger" role="alert"></p>
+                                        </div>
+                                        <div>
+                                            <label class="text-xs font-bold uppercase tracking-wider text-ink" :for="`verifier-${index}`" x-text="`Pegawai Verifikator ${index + 1}`"></label>
+                                            <select :id="`verifier-${index}`" :name="`steps[${index + 1}][approver_employee_id]`" x-model="verifier.approver_employee_id" required :aria-describedby="`${isDuplicate(verifier.approver_employee_id, index) ? `verifier-duplicate-${index} ` : ''}${errorFor(`steps.${index + 1}.approver_employee_id`) ? `verifier-error-${index}` : ''}`" :aria-invalid="Boolean(errorFor(`steps.${index + 1}.approver_employee_id`))" class="mt-1 w-full rounded-xl border border-border bg-surface py-2 pl-4 pr-10 text-sm text-ink shadow-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                                <option value="">Pilih verifikator</option>
+                                                @foreach ($approverCandidates as $approver)
+                                                    <option value="{{ $approver->id }}">{{ $approver->nama_lengkap }} ({{ $approver->nip }})</option>
+                                                @endforeach
+                                            </select>
+                                            <p :id="`verifier-duplicate-${index}`" x-show="isDuplicate(verifier.approver_employee_id, index)" class="mt-1 text-[11px] text-warning">Approver sama akan dilewati otomatis saat approval.</p>
+                                            <p :id="`verifier-error-${index}`" x-show="errorFor(`steps.${index + 1}.approver_employee_id`)" x-text="errorFor(`steps.${index + 1}.approver_employee_id`)" class="mt-1 text-[11px] font-semibold text-danger" role="alert"></p>
+                                        </div>
+                                    </div>
+                                    <div class="flex flex-wrap gap-2" aria-label="Aksi urutan verifikator">
+                                        <button type="button" @click="moveVerifier(index, -1)" :disabled="index === 0" aria-label="Naikkan urutan verifikator" title="Naikkan urutan verifikator" class="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition-all duration-200 hover:bg-soft hover:text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 sm:h-8 sm:w-8">↑</button>
+                                        <button type="button" @click="moveVerifier(index, 1)" :disabled="index === verifiers.length - 1" aria-label="Turunkan urutan verifikator" title="Turunkan urutan verifikator" class="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition-all duration-200 hover:bg-soft hover:text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 sm:h-8 sm:w-8">↓</button>
+                                        <button type="button" @click="removeVerifier(index)" :aria-label="`Hapus verifikator ${index + 1}`" title="Hapus verifikator" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-danger/20 bg-surface text-danger shadow-sm transition-all duration-200 hover:bg-danger/5 focus:outline-none focus:ring-2 focus:ring-danger/20 sm:h-8 sm:w-8">×</button>
+                                    </div>
+                                </div>
+                            </template>
+                        </fieldset>
+
+                        <div class="grid gap-4 px-5 py-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:items-end">
+                            <div>
+                                <label for="employee-pybmc" class="text-sm font-semibold text-ink">PYBMC Khusus</label>
+                                <p class="mt-0.5 text-xs leading-relaxed text-muted">Opsional. Kosongkan untuk memakai PYBMC global. Jika dipilih, PYBMC khusus menjadi approver final.</p>
+                            </div>
+                            <div>
+                                <input type="hidden" name="steps[_pybmc][step_type]" value="pybmc" x-bind:disabled="! pybmcEmployeeId">
+                                <input type="hidden" name="steps[_pybmc][role_label]" value="PYBMC" x-bind:disabled="! pybmcEmployeeId">
+                                <select id="employee-pybmc" :name="pybmcEmployeeId ? 'steps[_pybmc][approver_employee_id]' : null" x-model="pybmcEmployeeId" aria-describedby="employee-pybmc-help" class="w-full rounded-xl border border-border bg-surface py-2 pl-4 pr-10 text-sm text-ink shadow-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                    <option value="">Gunakan PYBMC global</option>
+                                    @foreach ($approverCandidates as $approver)
+                                        <option value="{{ $approver->id }}">{{ $approver->nama_lengkap }} ({{ $approver->nip }})</option>
+                                    @endforeach
+                                </select>
+                                <p id="employee-pybmc-help" class="mt-1 text-[11px] text-muted">Perubahan chain berlaku untuk pengajuan berikutnya.</p>
+                            </div>
+                        </div>
+
+                        <div class="grid gap-4 px-5 py-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:items-start">
+                            <div>
+                                <label for="employee-chain-reason" class="text-sm font-semibold text-ink">Alasan Perubahan <span class="text-danger">*</span></label>
+                                <p class="mt-1 text-xs leading-relaxed text-muted">Alasan wajib dicatat dalam log audit kepegawaian.</p>
+                            </div>
+                             <div class="space-y-3">
+                                 <x-form.textarea name="reason" id="employee-chain-reason" :required="true" rows="3" placeholder="Contoh: Penyesuaian verifikator setelah mutasi jabatan" />
+                                <button type="submit" class="hidden w-full items-center justify-center rounded-xl border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30 sm:inline-flex">Simpan Chain Pegawai</button>
+                             </div>
+                         </div>
+                     @endif
+                 </form>
+            @elseif ($search !== null && trim($search) !== '')
+                <div class="px-5 py-5 text-sm text-muted">Pilih pegawai dari hasil pencarian untuk melihat Kepala Bagian dan menyusun chain.</div>
+            @else
+                <div class="px-5 py-5 text-sm text-muted">Cari pegawai untuk mulai menyusun chain per pegawai.</div>
+            @endif
+        </section>
+
+        <section class="overflow-hidden rounded-xl border border-border bg-surface shadow-sm" aria-labelledby="backfill-heading">
+            <div class="border-b border-border bg-soft/30 px-5 py-4">
+                <h3 id="backfill-heading" class="text-xs font-bold uppercase tracking-wider text-ink">Backfill Chain Dinamis</h3>
+                <p class="mt-0.5 text-xs text-muted">Membuat chain pegawai aktif dari Kepala Bagian dan konfigurasi lama yang tersedia.</p>
             </div>
-            <div class="grid grid-cols-1 gap-4 px-5 py-5 md:grid-cols-[1fr_auto] md:items-start">
+            <div class="grid gap-4 px-5 py-5 md:grid-cols-[1fr_auto] md:items-start">
                 <div class="space-y-2 text-sm text-muted">
-                    <p><span class="font-semibold text-ink">{{ $chainStats['active'] }}</span> chain aktif sudah tersedia.</p>
-                    <p>Backfill aman dijalankan ulang; pegawai yang sudah memiliki chain aktif akan dilewati.</p>
+                    <p><span class="font-semibold text-ink">{{ $chainStats['active'] }}</span> chain aktif tersedia.</p>
+                    <p>Backfill dapat diulang. Pegawai dengan chain aktif dilewati.</p>
                 </div>
                 <form method="POST" action="{{ route('cuti.config.backfill') }}" class="w-full max-w-md space-y-3">
                     @csrf
-                    <x-form.textarea
-                        name="backfill_reason"
-                        id="backfill-reason"
-                        label="Alasan Backfill"
-                        :required="true"
-                        rows="3"
-                        placeholder="Contoh: Backfill awal dari konfigurasi approval lama"
-                    />
-                    <button type="submit"
-                        class="inline-flex w-full items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition hover:bg-soft">
-                        Jalankan Backfill Chain
-                    </button>
+                    <x-form.textarea name="backfill_reason" id="backfill-reason" label="Alasan Backfill" :required="true" rows="3" placeholder="Contoh: Backfill awal konfigurasi approval" />
+                    <button type="submit" class="inline-flex w-full items-center justify-center rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Jalankan Backfill Chain</button>
                 </form>
             </div>
-        </div>
+        </section>
 
-        {{-- PYBMC GLOBAL --}}
-        <div class="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
-            <div class="px-5 py-4 border-b border-border bg-soft/30">
-                <h3 class="text-xs font-bold text-ink uppercase tracking-wider">PYBMC Global</h3>
-                <p class="mt-0.5 text-xs text-muted">Final approver default untuk chain baru ketika pegawai belum punya PYBMC khusus.</p>
+        <section class="overflow-hidden rounded-xl border border-border bg-surface shadow-sm" aria-labelledby="global-pybmc-heading">
+            <div class="border-b border-border bg-soft/30 px-5 py-4">
+                <h3 id="global-pybmc-heading" class="text-xs font-bold uppercase tracking-wider text-ink">PYBMC Global</h3>
+                <p class="mt-0.5 text-xs text-muted">Override global mengubah PYBMC pada semua chain aktif. Snapshot pengajuan yang sudah disubmit tetap tidak berubah.</p>
             </div>
-            <div class="grid grid-cols-1 gap-4 px-5 py-5 md:grid-cols-[1fr_auto] md:items-start">
+            <div class="grid gap-4 px-5 py-5 md:grid-cols-[1fr_auto] md:items-start">
                 <div class="space-y-2 text-sm text-muted">
                     <p>PYBMC aktif: <span class="font-semibold text-ink">{{ $globalPybmc?->approver?->nama_lengkap ?? 'Belum ditetapkan' }}</span></p>
-                    <p>Perubahan dicatat ke audit dan dipakai oleh chain baru berikutnya.</p>
+                    <p>Perubahan dicatat dalam audit dan diterapkan ke chain aktif.</p>
                 </div>
                 <form method="POST" action="{{ route('cuti.config.pybmc-global') }}" class="w-full max-w-md space-y-3">
                     @csrf
-                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans" for="pybmc-global-approver">Pegawai PYBMC <span class="text-danger">*</span></label>
-                    <x-form.select id="pybmc-global-approver" name="approver_employee_id"
-                       >
-                        <option value="">-- Pilih PYBMC --</option>
-                        @foreach($eligibleUsers as $user)
-                            @if($user->employee_id)
-                                <option value="{{ $user->employee_id }}" @selected(old('approver_employee_id', $globalPybmc?->approver_employee_id) === $user->employee_id)>{{ $user->name }} ({{ $user->role }})</option>
-                            @endif
+                    <x-form.select name="approver_employee_id" id="pybmc-global-approver" label="Pegawai PYBMC" :required="true" :value="$globalPybmc?->approver_employee_id" placeholder="Pilih PYBMC">
+                        @foreach ($approverCandidates as $approver)
+                            <option value="{{ $approver->id }}">{{ $approver->nama_lengkap }} ({{ $approver->nip }})</option>
                         @endforeach
                     </x-form.select>
-                    @error('approver_employee_id')
-                        <p class="text-[11px] text-danger font-semibold font-sans">{{ $message }}</p>
-                    @enderror
-                    <x-form.textarea
-                        name="pybmc_reason"
-                        id="pybmc-global-reason"
-                        label="Alasan PYBMC Global"
-                        :required="true"
-                        rows="3"
-                        placeholder="Contoh: Pergantian pejabat PYBMC"
-                    />
-                    <button type="submit"
-                        class="inline-flex w-full items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition hover:bg-soft">
-                        Simpan PYBMC Global
-                    </button>
+                    <x-form.textarea name="pybmc_reason" id="pybmc-global-reason" label="Alasan PYBMC Global" :required="true" rows="3" placeholder="Contoh: Pergantian pejabat PYBMC" />
+                    <button type="submit" class="inline-flex w-full items-center justify-center rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Simpan PYBMC Global</button>
                 </form>
             </div>
-        </div>
+        </section>
 
-        {{-- LOG PERUBAHAN KONFIGURASI (dari audit log nyata) --}}
-        <div class="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
-            <div class="px-5 py-4 border-b border-border bg-soft/30 flex items-center justify-between">
+        <section class="overflow-hidden rounded-xl border border-border bg-surface shadow-sm" aria-labelledby="audit-heading">
+            <div class="flex items-center justify-between border-b border-border bg-soft/30 px-5 py-4">
                 <div>
-                    <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Log Perubahan Konfigurasi</h3>
-                    <p class="mt-0.5 text-xs text-muted">Riwayat perubahan approver. Klik baris untuk detail.</p>
+                    <h3 id="audit-heading" class="text-xs font-bold uppercase tracking-wider text-ink">Log Perubahan Konfigurasi</h3>
+                    <p class="mt-0.5 text-xs text-muted">Riwayat konfigurasi lama, chain pegawai, dan PYBMC global.</p>
                 </div>
-                <x-ui.badge variant="muted" size="md">{{ $auditRows->count() }} entri</x-ui.badge>
+                <x-ui.badge variant="muted" size="md">{{ count($auditRows) }} entri</x-ui.badge>
             </div>
-
-            <div class="overflow-x-auto">
-                <x-ui.table class="text-left border-collapse text-xs">
+            <div class="hidden overflow-x-auto md:block">
+                <x-ui.table caption="Log perubahan konfigurasi cuti" class="text-left text-xs">
                     <x-ui.table-head>
-                        <x-ui.table-row class="bg-soft border-b border-border">
-                            <x-ui.table-th class="px-5 py-3 w-8"></x-ui.table-th>
+                        <x-ui.table-row class="border-b border-border bg-soft">
                             <x-ui.table-th class="px-5 py-3">Waktu</x-ui.table-th>
+                            <x-ui.table-th class="px-5 py-3">Sumber</x-ui.table-th>
                             <x-ui.table-th class="px-5 py-3">Pengguna</x-ui.table-th>
-                            <x-ui.table-th class="px-5 py-3">Tahap</x-ui.table-th>
-                            <x-ui.table-th align="right" class="px-5 py-3">Approver Lama</x-ui.table-th>
-                            <x-ui.table-th align="center" class="px-3 py-3"></x-ui.table-th>
-                            <x-ui.table-th class="px-5 py-3">Approver Baru</x-ui.table-th>
                             <x-ui.table-th class="px-5 py-3">Catatan</x-ui.table-th>
                         </x-ui.table-row>
                     </x-ui.table-head>
                     <x-ui.table-body>
-                        @forelse($auditRows as $idx => $row)
-                            @php
-                                // Label tahap diturunkan dari kunci konfigurasi yang disimpan di dalam payload audit
-                                // (bukan auditable_id, karena kolom itu bertipe UUID).
-                                $configKey = $row->new_values['key'] ?? $row->auditable_id;
-                                $tahap = $configKey === 'stage2_approver_id' ? 'Stage 2 (Verifikator)' : ($configKey === 'stage3_approver_id' ? 'Stage 3 (Pimpinan)' : $configKey);
-                                $oldName = $row->old_values['approver_name'] ?? 'Tidak ada';
-                                $newName = $row->new_values['approver_name'] ?? 'Tidak ada';
-                                $reasonText = $row->new_values['reason'] ?? '-';
-                            @endphp
-                            <x-ui.table-row @click="expandedAudit = expandedAudit === {{ $idx }} ? null : {{ $idx }}" :interactive="true" class="cursor-pointer">
-                                <x-ui.table-td align="center" padding="wide">
-                                    <svg class="w-3.5 h-3.5 text-muted transition-transform duration-200"
-                                        :class="expandedAudit === {{ $idx }} ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-                                    </svg>
-                                </x-ui.table-td>
-                                <x-ui.table-td padding="wide" class="text-muted whitespace-nowrap">{{ $row->created_at?->format('d M Y, H:i') }}</x-ui.table-td>
-                                <x-ui.table-td padding="wide">
-                                    <span class="font-semibold text-ink block">{{ $row->user_name ?? 'Sistem' }}</span>
-                                    <span class="text-[9px] text-muted block">{{ $row->ip_address }}</span>
-                                </x-ui.table-td>
-                                <x-ui.table-td padding="wide" class="font-medium">{{ $tahap }}</x-ui.table-td>
-                                <x-ui.table-td align="right" padding="wide" class="text-muted">{{ $oldName }}</x-ui.table-td>
-                                <x-ui.table-td align="center" class="px-3 py-3.5 text-muted">&rarr;</x-ui.table-td>
-                                <x-ui.table-td padding="wide" class="font-bold text-success">{{ $newName }}</x-ui.table-td>
-                                <x-ui.table-td title="{{ $reasonText }}" padding="wide" class="text-muted italic max-w-[200px] truncate">{{ $reasonText }}</x-ui.table-td>
-                            </x-ui.table-row>
-
-                            <x-ui.table-row x-show="expandedAudit === {{ $idx }}" x-transition:enter="transition ease-out duration-150"
-                                x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" style="display: none;">
-                                <x-ui.table-td colspan="8" class="bg-soft/30 px-8 py-4 border-t border-border">
-                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs">
-                                        <div class="space-y-1">
-                                            <span class="text-[10px] font-bold uppercase tracking-wider text-muted">IP Address</span>
-                                            <p class="text-sm text-ink">{{ $row->ip_address ?? '-' }}</p>
-                                        </div>
-                                        <div class="space-y-1">
-                                            <span class="text-[10px] font-bold uppercase tracking-wider text-muted">User Agent</span>
-                                            <p class="text-xs text-muted truncate" title="{{ $row->user_agent }}">{{ $row->user_agent ?? '-' }}</p>
-                                        </div>
-                                        <div class="space-y-1 sm:col-span-2 font-sans">
-                                            <span class="text-[10px] font-bold uppercase tracking-wider text-muted">Alasan Perubahan</span>
-                                            <p class="text-sm text-ink leading-relaxed">{{ $reasonText }}</p>
-                                        </div>
-                                    </div>
-                                </x-ui.table-td>
+                        @forelse ($auditRows as $row)
+                            <x-ui.table-row>
+                                <x-ui.table-td padding="wide" class="whitespace-nowrap text-muted">{{ $row['created_at'] }}</x-ui.table-td>
+                                <x-ui.table-td padding="wide" class="font-medium text-ink">{{ $row['source'] }}</x-ui.table-td>
+                                <x-ui.table-td padding="wide" class="text-muted">{{ $row['user_name'] }}</x-ui.table-td>
+                                <x-ui.table-td padding="wide" class="max-w-[320px] truncate text-muted" title="{{ $row['reason'] }}">{{ $row['reason'] }}</x-ui.table-td>
                             </x-ui.table-row>
                         @empty
                             <x-ui.table-row>
-                                <x-ui.table-td colspan="8" align="center" class="px-5 py-8 text-sm text-muted">
-                                    Belum ada perubahan konfigurasi tercatat.
-                                </x-ui.table-td>
+                                <x-ui.table-td colspan="4" align="center" class="px-5 py-8 text-sm text-muted">Belum ada perubahan konfigurasi tercatat.</x-ui.table-td>
                             </x-ui.table-row>
                         @endforelse
                     </x-ui.table-body>
                 </x-ui.table>
             </div>
-        </div>
-
-        {{-- MODAL KONFIRMASI --}}
-
-        <x-ui.confirm-dialog
-            id="cuti-konfig"
-            title="Konfirmasi Perubahan Approver"
-            message="Perubahan ini langsung berlaku untuk pengajuan cuti berikutnya dan dicatat di log audit."
-            confirm-text="Ya, Simpan"
-            variant="warning"
-        />
-
+            <div class="space-y-3 p-5 md:hidden">
+                @forelse ($auditRows as $row)
+                    <article class="rounded-xl border border-border bg-soft/30 p-4">
+                        <dl class="grid gap-3 text-xs">
+                            <div class="grid gap-0.5">
+                                <dt class="font-bold uppercase tracking-wider text-muted">Waktu</dt>
+                                <dd class="text-ink">{{ $row['created_at'] }}</dd>
+                            </div>
+                            <div class="grid gap-0.5">
+                                <dt class="font-bold uppercase tracking-wider text-muted">Sumber</dt>
+                                <dd class="font-medium text-ink">{{ $row['source'] }}</dd>
+                            </div>
+                            <div class="grid gap-0.5">
+                                <dt class="font-bold uppercase tracking-wider text-muted">Pengguna</dt>
+                                <dd class="text-ink">{{ $row['user_name'] }}</dd>
+                            </div>
+                            <div class="grid gap-0.5">
+                                <dt class="font-bold uppercase tracking-wider text-muted">Catatan</dt>
+                                <dd class="break-words text-ink">{{ $row['reason'] }}</dd>
+                            </div>
+                        </dl>
+                    </article>
+                @empty
+                    <p class="py-3 text-center text-sm text-muted">Belum ada perubahan konfigurasi tercatat.</p>
+                @endforelse
+            </div>
+        </section>
     </div>
 </x-layouts.app>

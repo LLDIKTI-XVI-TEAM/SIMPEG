@@ -48,7 +48,8 @@ class RejectLeaveAction
                 'cuti.tidak_disetujui',
                 'Pengajuan Cuti Tidak Disetujui',
                 'Pengajuan cuti Anda tidak disetujui. Silakan periksa catatan keputusan.',
-                ['leave_request_id' => $leaveRequest->id],
+                // Pemohon diarahkan ke detail pengajuannya; path relatif internal agar link aman lintas host.
+                ['leave_request_id' => $leaveRequest->id, 'url' => route('cuti.show', ['id' => $leaveRequest->id], false)],
             );
         }
 

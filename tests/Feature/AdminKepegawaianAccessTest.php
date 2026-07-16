@@ -46,7 +46,7 @@ class AdminKepegawaianAccessTest extends TestCase
             'cuti.rekap',
             'ews',
             'laporan.pegawai',
-            'laporan.cuti',
+            'cuti.laporan',
             'audit-log',
         ] as $allowedRoute) {
             $response->assertSee('href="'.route($allowedRoute).'"', false);
@@ -81,6 +81,23 @@ class AdminKepegawaianAccessTest extends TestCase
             ->assertSee('Pengaturan Sistem');
     }
 
+    public function test_halaman_pengaturan_mengarahkan_konfigurasi_cuti_ke_halaman_chain_pegawai(): void
+    {
+        $superAdmin = User::factory()->superAdmin()->create();
+
+        $response = $this->actingAs($superAdmin)
+            ->withSession(['active_role' => 'super_admin'])
+            ->get(route('pengaturan'));
+
+        $response->assertOk();
+        $response->assertSee('Konfigurasi Approval Cuti');
+        $response->assertSee(route('cuti.config'), false);
+        $response->assertSee('Kepala Bagian, nol atau lebih verifikator, dan PYBMC');
+        $response->assertDontSee('Stage 2');
+        $response->assertDontSee('Stage 3');
+        $response->assertDontSee('Riza Hamzah, S.Sos.');
+    }
+
     public function test_admin_kepegawaian_dapat_membuka_halaman_operasional_sesuai_dokumen(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();
@@ -94,7 +111,7 @@ class AdminKepegawaianAccessTest extends TestCase
             '/cuti/rekap',
             '/ews',
             '/laporan/export-pegawai',
-            '/laporan/export-cuti',
+            '/cuti/laporan',
             '/dashboard/audit',
             '/notifications',
         ] as $uri) {
@@ -116,7 +133,8 @@ class AdminKepegawaianAccessTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Buka Laporan & Export', false);
-        $response->assertSee('/laporan/export-cuti', false);
+        $response->assertSee(route('cuti.laporan'), false);
+        $response->assertDontSee('/laporan/export-cuti', false);
         $response->assertSee('Admin Saldo Cuti', false);
         $response->assertDontSee('activeFilters', false);
         $response->assertDontSee('Preview PDF resmi', false);

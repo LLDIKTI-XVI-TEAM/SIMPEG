@@ -25,7 +25,7 @@
                 ]" />
             </div>
             <div class="flex shrink-0 items-center gap-2">
-                <a href="/laporan/export-cuti"
+                <a href="{{ route('cuti.laporan', array_filter(['periode' => $periode, 'unit' => $unit, 'pegawai' => $pegawaiId, 'jenis' => $jenisId])) }}"
                     class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
                     <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3-3m0 0l-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
@@ -105,7 +105,7 @@
                                         </x-ui.table-td>
                                         <x-ui.table-td padding="sm">
                                             <span
-                                                class="text-xs font-semibold {{ $statusClass[$row['status']] ?? 'text-muted' }}">{{ $row['status'] }}</span>
+                                                class="text-xs font-semibold {{ $statusClass[$row['status']] ?? 'text-muted' }}">{{ $row['status_label'] }}</span>
                                         </x-ui.table-td>
                                         <x-ui.table-td align="right" padding="sm">
                                             <a href="{{ route('cuti.rekap', array_filter(['pegawai' => $row['employee_id'], 'periode' => $row['tahun']])) }}#admin-saldo-cuti"
@@ -170,7 +170,7 @@
                                         <x-ui.table-td align="right" padding="sm" class="text-sm">{{ $row['hari'] }}</x-ui.table-td>
                                         <x-ui.table-td padding="sm">
                                             <span
-                                                class="text-xs font-semibold {{ $statusClass[$row['status']] ?? 'text-muted' }}">{{ $row['status'] }}</span>
+                                                class="text-xs font-semibold {{ $statusClass[$row['status']] ?? 'text-muted' }}">{{ $row['status_label'] }}</span>
                                         </x-ui.table-td>
                                     </x-ui.table-row>
                                 @endforeach

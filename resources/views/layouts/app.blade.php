@@ -100,23 +100,7 @@
                     'data-master',
                     'laporan',
                     'laporan.pegawai',
-                    'laporan.cuti',
-                    'ews.config',
-                ],
-                'kepala_bagian' => [
-                    'data-pegawai',
-                    'pegawai.import',
-                    'hari-libur',
-                    'dokumen',
-                    'audit-log',
-                    'pengaturan',
-                    'user-management',
-                    'rbac',
-                    'data-backup',
-                    'data-master',
-                    'laporan',
-                    'laporan.pegawai',
-                    'laporan.cuti',
+                    'cuti.laporan',
                     'ews.config',
                 ],
                 'pegawai' => [
@@ -129,7 +113,7 @@
                     'ews.config',
                     'laporan',
                     'laporan.pegawai',
-                    'laporan.cuti',
+                    'cuti.laporan',
                     'user-management',
                     'rbac',
                     'data-master',
@@ -165,7 +149,7 @@
                         ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge'],
                         ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
                         ['label' => 'Rekap Cuti', 'route' => 'cuti.rekap', 'icon' => 'document-text'],
-                        ['label' => 'Export Cuti', 'route' => 'laporan.cuti', 'icon' => 'document-arrow-down'],
+                        ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down'],
                     ]
                 ],
                 [
@@ -177,7 +161,6 @@
                         ['label' => 'Konfigurasi EWS', 'route' => 'ews.config', 'icon' => 'cog-6-tooth'],
                     ]
                 ],
-
                 [
                     'group' => 'Administrasi Sistem',
                     'items' => [

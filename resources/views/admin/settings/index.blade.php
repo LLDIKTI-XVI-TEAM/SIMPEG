@@ -13,16 +13,6 @@
         'smtp_port' => 1025
     ];
 
-    $cutiConfig = [
-        'stage1_role' => 'kepala_bagian',
-        'stage2_approver' => 'Riza Hamzah, S.Sos.',
-        'stage2_nip' => '197804122005012002',
-        'stage3_approver' => 'Munawir Sadzali Razak, S.I.P., M.A.',
-        'stage3_nip' => '198305142009121003',
-        'skip_duplicate' => true,
-        'default_jatah' => 12
-    ];
-
     $usersMapping = [
         [
             'id' => 1,
@@ -89,7 +79,6 @@
     <div x-data="{
         activeTab: 'umum',
         instansi: {{ json_encode($instansi) }},
-        cutiConfig: {{ json_encode($cutiConfig) }},
         users: {{ json_encode($usersMapping) }},
         dataMaster: {{ json_encode($dataMaster) }},
         
@@ -120,19 +109,8 @@
             }
             this.showEditModal = false;
         },
-        updateStage2(val) {
-            const parts = val.split('|');
-            this.cutiConfig.stage2_approver = parts[0];
-            this.cutiConfig.stage2_nip = parts[1];
-        },
-        updateStage3(val) {
-            const parts = val.split('|');
-            this.cutiConfig.stage3_approver = parts[0];
-            this.cutiConfig.stage3_nip = parts[1];
-        }
     }" @confirm-sso.window="executeSaveUser()"
-       @confirm-instansi.window="$refs.formUmum.submit()"
-       @confirm-cuti.window="$refs.formCuti.submit()" class="space-y-6">
+       @confirm-instansi.window="$refs.formUmum.submit()" class="space-y-6">
 
 
         <x-admin.page-header title="Pengaturan Sistem" class="border-b border-border pb-4">
@@ -266,134 +244,18 @@
                 </div>
 
                 {{-- TAB: ALUR APPROVAL CUTI --}}
-
-                <div x-show="activeTab === 'cuti'" class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6" style="display: none;">
-                    <form x-ref="formCuti" action="{{ route('settings.update') }}" method="POST" @submit.prevent="$dispatch('open-confirm-cuti')" class="space-y-6">
-
-                        @csrf
-                        <div class="border-b border-border pb-4">
-                            <h2 class="text-lg font-bold text-ink font-sans leading-tight">Alur Persetujuan Cuti</h2>
-                            <p class="text-[11px] text-muted mt-0.5 font-sans leading-normal">Konfigurasi rantai otorisasi bertingkat (3 Stage) untuk pengajuan cuti pegawai.</p>
-                        </div>
-
-                        {{-- Disclaimer Info --}}
-                        <div class="rounded-lg border border-warning/20 bg-warning/5 p-4 flex gap-3 text-xs text-warning leading-relaxed shadow-sm">
-                            <svg class="w-5 h-5 shrink-0 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                            </svg>
-                            <div>
-                                <span class="font-bold">⚠️ INFORMASI ALUR:</span> Setiap perubahan alur persetujuan cuti <strong>hanya berlaku bagi pengajuan cuti baru</strong> yang didaftarkan setelah konfigurasi ini disimpan. Pengajuan cuti yang sedang berjalan (pending approval) tetap menggunakan alur lama.
-                            </div>
-                        </div>
-
-                        <div class="space-y-6">
-                            {{-- Stage 1 --}}
-                            <div class="flex gap-4 items-start p-4 rounded-lg bg-soft/40 border border-border">
-                                <span class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0 font-sans mt-0.5">1</span>
-                                <div class="space-y-1 flex-1">
-                                    <p class="text-xs font-bold text-ink font-sans">Stage 1: Verifikasi Kepala Bagian</p>
-                                    <p class="text-[10px] text-muted font-sans leading-normal">Otomatis dicarikan berdasarkan NIP Atasan yang terdaftar di masing-masing profil pegawai.</p>
-                                </div>
-                            </div>
-
-                            {{-- Stage 2 --}}
-                            <div class="flex gap-4 items-start p-4 rounded-lg bg-soft/40 border border-border">
-                                <span class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0 font-sans mt-0.5">2</span>
-                                <div class="space-y-3 flex-1">
-                                    <div>
-                                        <p class="text-xs font-bold text-ink font-sans">Stage 2: Verifikator Kepegawaian (Kabag)</p>
-                                        <p class="text-[10px] text-muted font-sans leading-normal">Verifikasi administratif berkas cuti oleh tim kepegawaian default.</p>
-                                    </div>
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div class="space-y-1 col-span-1 md:col-span-2">
-                                            <label class="text-[10px] font-semibold text-ink font-sans">Pilih Approver Default (Dropdown)</label>
-                                            <x-form.select @change="updateStage2($event.target.value)">
-                                                <option value="Riza Hamzah, S.Sos.|197804122005012002" :selected="cutiConfig.stage2_nip === '197804122005012002'">Riza Hamzah, S.Sos. (NIP: 197804122005012002)</option>
-                                                <option value="Ahmad Fauzi|198503122010011001" :selected="cutiConfig.stage2_nip === '198503122010011001'">Ahmad Fauzi (NIP: 198503122010011001)</option>
-                                                <option value="Nadia Kusuma|199508222020012002" :selected="cutiConfig.stage2_nip === '199508222020012002'">Nadia Kusuma (NIP: 199508222020012002)</option>
-                                            </x-form.select>
-                                        </div>
-                                        <div class="space-y-1">
-                                            <label class="text-[10px] font-semibold text-ink font-sans">Nama Approver Terpilih</label>
-                                            <input type="text" x-model="cutiConfig.stage2_approver" disabled class="h-[44px] w-full rounded-lg border border-border bg-soft px-4 py-2.5 text-xs text-muted shadow-sm focus:outline-none font-sans">
-                                        </div>
-                                        <div class="space-y-1">
-                                            <label class="text-[10px] font-semibold text-ink font-sans">NIP Approver Terpilih</label>
-                                            <input type="text" x-model="cutiConfig.stage2_nip" disabled class="h-[44px] w-full rounded-lg border border-border bg-soft px-4 py-2.5 text-xs text-muted shadow-sm focus:outline-none font-sans">
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {{-- Stage 3 --}}
-                            <div class="flex gap-4 items-start p-4 rounded-lg bg-soft/40 border border-border">
-                                <span class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0 font-sans mt-0.5">3</span>
-                                <div class="space-y-3 flex-1">
-                                    <div>
-                                        <p class="text-xs font-bold text-ink font-sans">Stage 3: Persetujuan Akhir (Pimpinan)</p>
-                                        <p class="text-[10px] text-muted font-sans leading-normal">Otorisasi tertinggi oleh Kepala LLDIKTI XVI untuk keputusan disetujui / ditangguhkan.</p>
-                                    </div>
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div class="space-y-1 col-span-1 md:col-span-2">
-                                            <label class="text-[10px] font-semibold text-ink font-sans">Pilih Approver Default (Dropdown)</label>
-                                            <x-form.select @change="updateStage3($event.target.value)">
-                                                <option value="Munawir Sadzali Razak, S.I.P., M.A.|198305142009121003" :selected="cutiConfig.stage3_nip === '198305142009121003'">Munawir Sadzali Razak, S.I.P., M.A. (NIP: 198305142009121003)</option>
-                                                <option value="Siraajuddin Laluv, OE., M.|197212311984011062" :selected="cutiConfig.stage3_nip === '197212311984011062'">Siraajuddin Laluv, OE., M. (NIP: 197212311984011062)</option>
-                                                <option value="Yucna Dara, S.P., M.M.|198401202009922002" :selected="cutiConfig.stage3_nip === '198401202009922002'">Yucna Dara, S.P., M.M. (NIP: 198401202009922002)</option>
-                                            </x-form.select>
-                                        </div>
-                                        <div class="space-y-1">
-                                            <label class="text-[10px] font-semibold text-ink font-sans">Nama Approver Terpilih</label>
-                                            <input type="text" x-model="cutiConfig.stage3_approver" disabled class="h-[44px] w-full rounded-lg border border-border bg-soft px-4 py-2.5 text-xs text-muted shadow-sm focus:outline-none font-sans">
-                                        </div>
-                                        <div class="space-y-1">
-                                            <label class="text-[10px] font-semibold text-ink font-sans">NIP Approver Terpilih</label>
-                                            <input type="text" x-model="cutiConfig.stage3_nip" disabled class="h-[44px] w-full rounded-lg border border-border bg-soft px-4 py-2.5 text-xs text-muted shadow-sm focus:outline-none font-sans">
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {{-- Rules Toggles --}}
-                            <div class="pt-4 border-t border-border space-y-4">
-                                <h3 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Kebijakan Otorisasi</h3>
-                                
-                                <div class="flex items-start justify-between p-3 rounded bg-soft/40 text-xs">
-                                    <div class="space-y-0.5">
-                                        <p class="font-semibold text-ink font-sans">Skip Approver Duplikat</p>
-                                        <p class="text-muted text-[10px] font-sans leading-normal">Jika atasan langsung pengaju cuti kebetulan menjabat sebagai verifikator kepegawaian, lewati stage duplikat.</p>
-                                    </div>
-                                    <div class="flex items-center h-5">
-                                        <x-form.checkbox x-model="cutiConfig.skip_duplicate" class="border-primary/20 focus:ring-primary/30" />
-                                    </div>
-                                </div>
-
-                                <div class="flex items-center justify-between p-3 rounded bg-soft/40 text-xs">
-                                    <div class="space-y-0.5">
-                                        <p class="font-semibold text-ink font-sans">Jatah Cuti Tahunan Pegawai (Default)</p>
-                                        <p class="text-muted text-[10px] font-sans leading-normal">Kuota cuti tahun berjalan yang akan dialokasikan kepada pegawai baru.</p>
-                                    </div>
-                                    <div class="w-24">
-                                        <input type="number" x-model="cutiConfig.default_jatah" class="h-[44px] w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink text-center shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                    </div>
-                                </div>
-                            </div>
-
-                        </div>
-
-                        <div class="border-t border-border pt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                            <p class="text-[10px] text-muted italic font-sans flex items-center gap-1.5">
-                                <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296 3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043 3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12Z" />
-                                </svg>
-                                🔒 Perubahan ini akan dicatat ke dalam Audit Log sistem secara real-time.
-                            </p>
-                            <x-ui.button type="submit" variant="primary" size="lg">
-                                Simpan Kebijakan Cuti
-                            </x-ui.button>
-                        </div>
-                    </form>
-                </div>
+                <section x-show="activeTab === 'cuti'" class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-5" style="display: none;" aria-labelledby="settings-cuti-heading">
+                    <div class="border-b border-border pb-4">
+                        <h2 id="settings-cuti-heading" class="text-lg font-bold text-ink font-sans leading-tight">Konfigurasi Approval Cuti</h2>
+                        <p class="mt-0.5 text-[11px] leading-normal text-muted font-sans">Konfigurasi chain dikelola per pegawai pada halaman khusus.</p>
+                    </div>
+                    <div class="rounded-lg border border-info/20 bg-info/5 p-4 text-xs leading-relaxed text-info">
+                        Setiap chain memakai Kepala Bagian, nol atau lebih verifikator, dan PYBMC. Perubahan berlaku untuk pengajuan berikutnya; snapshot pengajuan yang sudah disubmit tetap tidak berubah.
+                    </div>
+                    <a href="{{ route('cuti.config') }}" class="inline-flex items-center justify-center rounded-xl border border-primary bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30">
+                        Buka Konfigurasi Approval Cuti
+                    </a>
+                </section>
 
                 {{-- TAB: PEMETAAN SSO & RBAC --}}
                 <x-ui.card padding="lg" x-show="activeTab === 'rbac'"   style="display: none;" class="space-y-6">
@@ -523,13 +385,13 @@
 
                         <div class="space-y-1">
                             <label class="text-xs font-semibold text-ink font-sans">Role Internal</label>
-                            <x-form.select x-model="selectedUser.role">
+                            <select x-model="selectedUser.role" class="h-[44px] w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 <option value="Super Admin">Super Admin</option>
                                 <option value="Admin Kepegawaian">Admin Kepegawaian</option>
                                 <option value="Pimpinan">Pimpinan</option>
                                 <option value="Kepala Bagian">Kepala Bagian</option>
                                 <option value="Pegawai">Pegawai</option>
-                            </x-form.select>
+                            </select>
                         </div>
                     </div>
 
@@ -560,14 +422,6 @@
             title="Simpan Pengaturan Instansi"
             message="Apakah Anda yakin ingin menyimpan perubahan konfigurasi instansi & server SMTP ini?"
             confirm-text="Simpan Perubahan"
-            variant="warning"
-        />
-
-        <x-ui.confirm-dialog
-            id="cuti"
-            title="Perbarui Alur Cuti"
-            message="Apakah Anda yakin ingin memperbarui kebijakan alur persetujuan cuti? Perubahan ini hanya akan berdampak pada pengajuan cuti baru."
-            confirm-text="Perbarui"
             variant="warning"
         />
 
