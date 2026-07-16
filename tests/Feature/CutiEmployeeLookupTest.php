@@ -86,7 +86,7 @@ class CutiEmployeeLookupTest extends TestCase
 
         Employee::factory()->create([
             'nama_lengkap' => 'Target Lookup Nonaktif',
-            'status_aktif' => 'Nonaktif',
+            'status_aktif' => 'Non-Aktif',
         ]);
 
         $response = $this->actingAs($actor)
