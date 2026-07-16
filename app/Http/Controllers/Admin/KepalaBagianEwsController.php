@@ -1,8 +1,9 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Admin;
 
 use App\Actions\Ews\ListKepalaBagianEwsAlertsAction;
+use App\Http\Controllers\Controller;
 use App\Http\Requests\Ews\KepalaBagianEwsFilterRequest;
 
 class KepalaBagianEwsController extends Controller

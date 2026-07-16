@@ -1,8 +1,9 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Admin;
 
 use App\Actions\Dashboards\BuildPimpinanDashboardAction;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 
 class PimpinanDashboardController extends Controller
