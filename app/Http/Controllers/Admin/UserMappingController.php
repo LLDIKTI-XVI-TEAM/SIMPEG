@@ -3,22 +3,21 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\UpdateUserMappingRequest;
 use App\Models\Employee;
 use App\Models\User;
-use Illuminate\Http\Request;
+use App\Services\AuditService;
 use Illuminate\Support\Str;
 
 class UserMappingController extends Controller
 {
     public function index()
     {
-
         $pegawai = Employee::orderBy('nama_lengkap')->get();
         $users = User::all()->keyBy('email');
 
         $mappedPegawai = $pegawai->map(function ($p) use ($users) {
             $email = $p->email ?? '';
-            $emailDinas = $p->email ?? ''; // No email_dinas in Employee
 
             // Find match in users table by email
             $user = null;
@@ -45,15 +44,8 @@ class UserMappingController extends Controller
         ]);
     }
 
-    public function update(Request $request)
+    public function update(UpdateUserMappingRequest $request)
     {
-
-        $request->validate([
-            'email' => 'required|email',
-            'keycloak_id' => 'nullable|string',
-            'role' => 'required|string|in:super_admin,admin_kepegawaian,pimpinan,kepala_bagian,pegawai',
-        ]);
-
         $email = $request->input('email');
         $keycloakId = trim($request->input('keycloak_id', ''));
         $role = $request->input('role');
@@ -63,19 +55,30 @@ class UserMappingController extends Controller
             $existing = User::where('keycloak_id', $keycloakId)
                 ->where('email', '!=', $email)
                 ->first();
+
             if ($existing) {
                 return back()->with('error', 'Keycloak ID tersebut sudah digunakan oleh pegawai lain!');
             }
         }
 
+        // Cari employee berdasarkan email untuk menyimpan relasi employee_id
+        $employee = Employee::where(function ($q) use ($email): void {
+            $q->whereRaw('lower(email) = ?', [strtolower($email)])
+                ->orWhereRaw('lower(email_pribadi) = ?', [strtolower($email)]);
+        })->first();
+
         $user = User::firstOrNew(['email' => $email]);
 
-        $oldKeycloakId = $user->keycloak_id;
-        $oldRole = $user->role ?? 'pegawai';
+        $oldValues = [
+            'keycloak_id' => $user->keycloak_id,
+            'role' => $user->role ?? 'pegawai',
+            'employee_id' => $user->employee_id,
+        ];
 
         $user->fill([
             'keycloak_id' => $keycloakId ?: null,
             'role' => $role,
+            'employee_id' => $employee?->id,
         ]);
 
         if (! $user->exists) {
@@ -85,31 +88,18 @@ class UserMappingController extends Controller
 
         $user->save();
 
-        // Write Audit Log
-        $dynamicLogs = session('dynamic_audit_logs', []);
-        $newId = count($dynamicLogs) + 1;
-
-        $dynamicLogs[] = [
-            'id' => $newId,
-            'timestamp' => now()->format('Y-m-d H:i:s'),
-            'operator' => auth()->user()->name ?? 'super_admin',
-            'event' => 'UPDATE_MAPPING',
-            'kategori' => 'user_management',
-            'modul' => 'UserMapping',
-            'record_id' => (string) $user->id,
-            'ip_address' => request()->ip(),
-            'user_agent' => request()->userAgent(),
-            'old_values' => [
-                'keycloak_id' => $oldKeycloakId,
-                'role' => $oldRole,
-            ],
-            'new_values' => [
+        AuditService::log(
+            'UPDATE',
+            'User',
+            $user->id,
+            $oldValues,
+            [
                 'keycloak_id' => $keycloakId ?: null,
                 'role' => $role,
+                'employee_id' => $employee?->id,
             ],
-        ];
-
-        session(['dynamic_audit_logs' => $dynamicLogs]);
+            $request,
+        );
 
         return back()->with('success', 'Akses User berhasil diperbarui!');
     }
