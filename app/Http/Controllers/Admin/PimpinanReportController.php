@@ -1,11 +1,12 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Admin;
 
 use App\Actions\Reports\ExportCustomEmployeeReportAction;
 use App\Actions\Reports\ExportLeaveReportAction;
 use App\Actions\Reports\ExportRankHistoryPdfAction;
 use App\Actions\Reports\ExportRankHistoryReportAction;
+use App\Http\Controllers\Controller;
 use App\Http\Requests\Reports\ExportCustomEmployeeReportRequest;
 use App\Http\Requests\Reports\LeaveReportFilterRequest;
 use App\Http\Requests\Reports\RankHistoryReportFilterRequest;

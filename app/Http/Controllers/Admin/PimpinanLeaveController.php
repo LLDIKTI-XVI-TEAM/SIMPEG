@@ -1,8 +1,9 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Admin;
 
 use App\Actions\Cuti\ListPimpinanLeavesAction;
+use App\Http\Controllers\Controller;
 use App\Http\Requests\Cuti\PimpinanLeaveFilterRequest;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;

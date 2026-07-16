@@ -1,8 +1,9 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Admin;
 
 use App\Actions\Employees\ListEmployeesAction;
+use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
@@ -90,7 +91,7 @@ class PimpinanEmployeeController extends Controller
                 ->with([
                     'supervisor:id,nama_lengkap,jabatan_terakhir',
                     'supervisor.positionHistories' => fn ($positions) => $positions
-                        ->select(['id', 'employee_id', 'unit_kerja_id', 'nama_jabatan', 'is_latest'])
+                        ->select(['id', 'positions.employee_id', 'positions.unit_kerja_id', 'nama_jabatan', 'is_latest'])
                         ->where('is_latest', true)
                         ->with('unitKerja:id,nama'),
                 ]),

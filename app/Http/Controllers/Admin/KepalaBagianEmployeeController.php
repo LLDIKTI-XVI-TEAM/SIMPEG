@@ -1,9 +1,10 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Admin;
 
 use App\Actions\Employees\ListKepalaBagianEmployeesAction;
 use App\Actions\Employees\ShowKepalaBagianEmployeeAction;
+use App\Http\Controllers\Controller;
 use App\Http\Requests\Employee\KepalaBagianEmployeeFilterRequest;
 use App\Models\Employee;
 use App\Models\RefJenisPegawai;
