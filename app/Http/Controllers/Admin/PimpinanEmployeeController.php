@@ -91,7 +91,7 @@ class PimpinanEmployeeController extends Controller
                 ->with([
                     'supervisor:id,nama_lengkap,jabatan_terakhir',
                     'supervisor.positionHistories' => fn ($positions) => $positions
-                        ->select(['id', 'positions.employee_id', 'positions.unit_kerja_id', 'nama_jabatan', 'is_latest'])
+                        ->select(['id', 'employee_id', 'unit_kerja_id', 'nama_jabatan', 'is_latest'])
                         ->where('is_latest', true)
                         ->with('unitKerja:id,nama'),
                 ]),
