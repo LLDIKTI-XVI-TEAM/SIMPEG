@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Actions\Documents\DeleteDocumentAction;
+use App\Actions\Documents\UpdateDocumentAction;
 use App\Models\Appointment;
 use App\Models\Document;
 use App\Models\Employee;
@@ -120,6 +121,78 @@ class EmployeeDocumentTest extends TestCase
         ]);
     }
 
+    public function test_edit_document_without_replacement_preserves_existing_file(): void
+    {
+        $employee = Employee::factory()->create();
+        $filePath = 'employees/documents/dokumen-lama.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($filePath, 'file lama');
+        $document = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Dokumen Lama',
+            'nomor_dokumen' => 'DOC-LAMA',
+            'file_path' => $filePath,
+            'keterangan' => 'Keterangan lama',
+        ]);
+
+        $updated = app(UpdateDocumentAction::class)->execute($document, [
+            'kategori_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Dokumen Diperbarui',
+            'nomor_dokumen' => 'DOC-BARU',
+            'tanggal_terbit' => '2026-07-16',
+            'deskripsi' => 'Keterangan baru',
+        ]);
+
+        $this->assertSame($filePath, $updated->file_path);
+        Storage::disk(Document::STORAGE_DISK)->assertExists($filePath);
+        $this->assertDatabaseHas('documents', [
+            'id' => $document->id,
+            'nama_dokumen' => 'Dokumen Diperbarui',
+            'nomor_dokumen' => 'DOC-BARU',
+            'keterangan' => 'Keterangan baru',
+            'file_path' => $filePath,
+        ]);
+    }
+
+    public function test_edit_document_with_replacement_deletes_old_file_after_database_update(): void
+    {
+        $employee = Employee::factory()->create();
+        $oldFilePath = 'employees/documents/dokumen-lama.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($oldFilePath, 'file lama');
+        $document = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Dokumen Lama',
+            'nomor_dokumen' => 'DOC-LAMA',
+            'file_path' => $oldFilePath,
+        ]);
+
+        $updated = app(UpdateDocumentAction::class)->execute(
+            $document,
+            [
+                'kategori_dokumen' => 'ijazah',
+                'nama_dokumen' => 'Dokumen Baru',
+                'nomor_dokumen' => 'DOC-BARU',
+                'tanggal_terbit' => '2026-07-16',
+                'deskripsi' => 'File pengganti',
+            ],
+            UploadedFile::fake()->create('dokumen-baru.pdf', 100, 'application/pdf'),
+        );
+
+        $this->assertNotSame($oldFilePath, $updated->file_path);
+        $this->assertStringStartsWith($employee->id.'/ijazah/', $updated->file_path);
+        Storage::disk(Document::STORAGE_DISK)->assertMissing($oldFilePath);
+        Storage::disk(Document::STORAGE_DISK)->assertExists($updated->file_path);
+        $this->assertDatabaseHas('documents', [
+            'id' => $document->id,
+            'jenis_dokumen' => 'ijazah',
+            'nama_dokumen' => 'Dokumen Baru',
+            'nomor_dokumen' => 'DOC-BARU',
+            'keterangan' => 'File pengganti',
+            'file_path' => $updated->file_path,
+        ]);
+    }
+
     public function test_document_list_api_rechecks_storage_file_status_on_every_request(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -199,7 +272,7 @@ class EmployeeDocumentTest extends TestCase
         ]);
 
         $document = Document::where('employee_id', $employee->id)->where('jenis_dokumen', 'ijazah')->firstOrFail();
-        $this->assertMatchesRegularExpression('/^'.preg_quote($employee->id, '/').'\/ijazah\/'.preg_quote($employee->id, '/').'_ijazah_\d{14}\.pdf$/', $document->file_path);
+        $this->assertMatchesRegularExpression('/^'.preg_quote($employee->id, '/').'\/ijazah\/'.preg_quote($employee->id, '/').'_ijazah_[0-9a-f-]{36}\.pdf$/', $document->file_path);
         Storage::disk(Document::STORAGE_DISK)->assertExists($document->file_path);
     }
 
@@ -246,6 +319,29 @@ class EmployeeDocumentTest extends TestCase
             'employee_id' => $employee->id,
             'nama_dokumen' => 'Script Berbahaya',
         ]);
+        $this->assertSame([], Storage::disk(Document::STORAGE_DISK)->allFiles());
+    }
+
+    public function test_admin_cannot_upload_document_larger_than_size_limit_without_creating_file(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+
+        $this->actingAs($user);
+        $response = $this->from('/dashboard/dokumen')->post('/dashboard/dokumen/upload', [
+            'nama_dokumen' => 'Dokumen Terlalu Besar',
+            'kategori_dokumen' => 'lainnya',
+            'pegawai_id' => $employee->id,
+            'berkas' => UploadedFile::fake()->create('terlalu-besar.pdf', 10241, 'application/pdf'),
+        ]);
+
+        $response->assertRedirect('/dashboard/dokumen');
+        $response->assertSessionHasErrors('berkas');
+        $this->assertDatabaseMissing('documents', [
+            'employee_id' => $employee->id,
+            'nama_dokumen' => 'Dokumen Terlalu Besar',
+        ]);
+        $this->assertSame([], Storage::disk(Document::STORAGE_DISK)->allFiles());
     }
 
     public function test_admin_can_download_document(): void
