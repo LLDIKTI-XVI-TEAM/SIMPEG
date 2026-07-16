@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Documents\DeleteDocumentAction;
+use App\Models\Appointment;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Models\RefGolongan;
@@ -250,5 +252,78 @@ class EmployeeDocumentTest extends TestCase
         $this->get('/dashboard/dokumen/not-a-uuid')->assertNotFound();
         $this->get('/dashboard/dokumen/not-a-uuid/download')->assertNotFound();
         $this->get('/dashboard/dokumen/legacy')->assertRedirect(route('dokumen'));
+    }
+
+    public function test_document_used_by_appointment_is_detected_by_file_path_and_cannot_be_deleted(): void
+    {
+        $employee = Employee::factory()->create();
+        $filePath = 'appointments/sk/pengangkatan-terhubung.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($filePath, 'SK pengangkatan');
+
+        $document = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'sk_pengangkatan',
+            'nama_dokumen' => 'SK Pengangkatan',
+            'file_path' => $filePath,
+        ]);
+        Appointment::create([
+            'employee_id' => $employee->id,
+            'jenis_pengangkatan' => 'PNS',
+            'file_sk' => $filePath,
+        ]);
+
+        $action = app(DeleteDocumentAction::class);
+        $impact = $action->checkImpact($document);
+
+        $this->assertTrue($impact['has_blocked']);
+        $this->assertArrayHasKey('Pengangkatan', $impact['blocked_impacts']);
+
+        try {
+            $action->execute($document);
+            $this->fail('Dokumen yang digunakan data pengangkatan tidak boleh dihapus.');
+        } catch (\Illuminate\Validation\ValidationException) {
+            $this->assertDatabaseHas('documents', ['id' => $document->id]);
+            Storage::disk(Document::STORAGE_DISK)->assertExists($filePath);
+        }
+    }
+
+    public function test_legacy_sk_mutasi_is_blocked_when_it_still_supports_employee_status(): void
+    {
+        $employee = Employee::factory()->create(['status_aktif' => 'Mutasi']);
+        $filePath = 'berkas/'.$employee->id.'/sk-mutasi-lama.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($filePath, 'SK mutasi');
+
+        $document = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'SK Mutasi',
+            'file_path' => $filePath,
+        ]);
+
+        $impact = app(DeleteDocumentAction::class)->checkImpact($document);
+
+        $this->assertTrue($impact['has_blocked']);
+        $this->assertArrayHasKey('Status Pegawai', $impact['blocked_impacts']);
+    }
+
+    public function test_unrelated_additional_document_can_be_deleted(): void
+    {
+        $employee = Employee::factory()->create();
+        $filePath = 'berkas/'.$employee->id.'/ktp.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($filePath, 'KTP');
+
+        $document = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'ktp_kk',
+            'nama_dokumen' => 'KTP',
+            'file_path' => $filePath,
+        ]);
+
+        $action = app(DeleteDocumentAction::class);
+        $this->assertFalse($action->checkImpact($document)['has_blocked']);
+        $action->execute($document);
+
+        $this->assertDatabaseMissing('documents', ['id' => $document->id]);
+        Storage::disk(Document::STORAGE_DISK)->assertMissing($filePath);
     }
 }

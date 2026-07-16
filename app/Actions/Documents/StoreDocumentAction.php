@@ -6,6 +6,7 @@ use App\Models\Appointment;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Models\RefJenisPegawai;
+use App\Models\RefStatusPegawai;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 
@@ -46,8 +47,31 @@ class StoreDocumentAction
                 $this->syncHistory($employee, $document, $category, $payload);
             }
 
+            $this->syncEmployeeStatus($employee, $category);
+
             return $document;
         });
+    }
+
+    private function syncEmployeeStatus(Employee $employee, string $category): void
+    {
+        $statusName = match ($category) {
+            'sk_mutasi' => 'Mutasi',
+            'sk_pensiun' => 'Pensiun',
+            default => null,
+        };
+
+        if ($statusName === null) {
+            return;
+        }
+
+        $status = RefStatusPegawai::query()->where('nama', $statusName)->first();
+        if ($status) {
+            $employee->update([
+                'status_pegawai_id' => $status->id,
+                'status_aktif' => $status->nama,
+            ]);
+        }
     }
 
     private function syncHistory(Employee $employee, Document $document, string $category, array $payload): void
