@@ -6,6 +6,7 @@ use App\Models\RefHariLibur;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -26,9 +27,20 @@ class CalculateWorkdaysTest extends TestCase
         $this->seed(RbacSeeder::class);
     }
 
-    public function test_pegawai_dapat_menghitung_hari_kerja(): void
+    public static function rolePemohonProvider(): array
     {
-        $user = User::factory()->pegawai()->create();
+        return [
+            'admin kepegawaian' => ['admin_kepegawaian'],
+            'pimpinan' => ['pimpinan'],
+            'kepala bagian' => ['kepala_bagian'],
+            'pegawai' => ['pegawai'],
+        ];
+    }
+
+    #[DataProvider('rolePemohonProvider')]
+    public function test_role_self_service_dapat_menghitung_hari_kerja(string $role): void
+    {
+        $user = User::factory()->state(['role' => $role])->create();
 
         $this->actingAs($user);
         $response = $this->getJson(self::ENDPOINT.'?start=2026-01-05&end=2026-01-09');
@@ -67,30 +79,9 @@ class CalculateWorkdaysTest extends TestCase
         $response->assertJsonCount(1, 'data.warnings');
     }
 
-    public function test_super_admin_dapat_mengakses(): void
+    public function test_super_admin_tidak_dapat_mengakses(): void
     {
         $user = User::factory()->superAdmin()->create();
-
-        $this->actingAs($user);
-        $response = $this->getJson(self::ENDPOINT.'?start=2026-01-05&end=2026-01-09');
-
-        $response->assertOk();
-    }
-
-    public function test_admin_kepegawaian_tidak_dapat_mengakses(): void
-    {
-        // Admin kepegawaian tidak memegang cuti.create sehingga ditolak gate permission.
-        $user = User::factory()->adminKepegawaian()->create();
-
-        $this->actingAs($user);
-        $response = $this->getJson(self::ENDPOINT.'?start=2026-01-05&end=2026-01-09');
-
-        $response->assertForbidden();
-    }
-
-    public function test_kepala_bagian_tidak_dapat_mengakses(): void
-    {
-        $user = User::factory()->kepalaBagian()->create();
 
         $this->actingAs($user);
         $response = $this->getJson(self::ENDPOINT.'?start=2026-01-05&end=2026-01-09');

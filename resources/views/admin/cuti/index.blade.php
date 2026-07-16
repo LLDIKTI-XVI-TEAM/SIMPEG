@@ -24,33 +24,33 @@
         {{-- PAGE HEADER --}}
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink font-sans">Monitoring Cuti Pegawai</h2>
+                <h2 class="text-2xl font-semibold text-ink font-sans">{{ $isPegawai ? 'Riwayat Pengajuan Cuti Saya' : 'Monitoring Cuti Pegawai' }}</h2>
                 <x-ui.breadcrumb :items="[
                     ['label' => 'Dashboard', 'url' => route('dashboard')],
                     ['label' => 'Cuti']
                 ]" />
             </div>
             <div class="flex shrink-0 items-center gap-3">
-                @can('cuti.create')
+                @if(auth()->user()->hasPermission('cuti.create') && ! auth()->user()->employee?->is_kepala_lembaga)
                 <a href="{{ route('cuti.create') }}" class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
                     <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                     </svg>
                     Ajukan Cuti Baru
                 </a>
-                @endcan
+                @endif
             </div>
         </div>
 
         {{-- METRICS SUMMARY CARD (GLOBAL MONITORING) --}}
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
             {{-- Total Cuti Active --}}
-            <x-ui.stat-card label="Total Staf Cuti" value="{{ $totalPengajuan }}" variant="primary" size="lg" accent>
+            <x-ui.stat-card label="{{ $isPegawai ? 'Total Pengajuan' : 'Total Staf Cuti' }}" value="{{ $totalPengajuan }}" variant="primary" size="lg" accent>
                 <x-slot:icon>
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
                 </x-slot:icon>
                 <x-slot:meta>
-                    <span>Seluruh riwayat pengajuan</span>
+                    <span>{{ $isPegawai ? 'Seluruh pengajuan Anda' : 'Seluruh riwayat pengajuan' }}</span>
                 </x-slot:meta>
             </x-ui.stat-card>
 
@@ -89,11 +89,11 @@
         <form method="GET" action="{{ route('cuti') }}">
             <input type="hidden" name="per_page" value="{{ request('per_page', 10) }}">
         <x-ui.filter-bar
-            searchId="search-cuti"
-            searchName="search"
+            searchId="{{ $isPegawai ? null : 'search-cuti' }}"
+            searchName="{{ $isPegawai ? null : 'search' }}"
             searchValue="{{ $search }}"
-            searchPlaceholder="Cari nama atau NIP"
-            class="sm:grid-cols-2 lg:grid-cols-5"
+            searchPlaceholder="{{ $isPegawai ? null : 'Cari nama atau NIP...' }}"
+            class="sm:grid-cols-2 {{ $isPegawai ? 'lg:grid-cols-4' : 'lg:grid-cols-5' }}"
         >
             {{-- Filter Status --}}
             <div class="relative">
@@ -118,6 +118,7 @@
                 </x-form.select>
             </div>
 
+            @unless($isPegawai)
             {{-- Filter Unit Kerja --}}
             <div class="relative">
                 <x-form.select id="filter-unit" name="unit">
@@ -127,6 +128,7 @@
                     @endforeach
                 </x-form.select>
             </div>
+            @endunless
 
             {{-- Filter Periode Bulan --}}
             <div class="relative">
@@ -154,8 +156,10 @@
                 <x-ui.table id="cuti-table">
                     <x-ui.table-head class="border-b border-border">
                         <x-ui.table-row>
-                            <x-ui.table-th class="select-none">Pegawai</x-ui.table-th>
-                            <x-ui.table-th class="select-none">Unit Kerja</x-ui.table-th>
+                            @unless($isPegawai)
+                                <x-ui.table-th class="select-none">Pegawai</x-ui.table-th>
+                                <x-ui.table-th class="select-none">Unit Kerja</x-ui.table-th>
+                            @endunless
                             <x-ui.table-th class="select-none">Detail Cuti</x-ui.table-th>
                             <x-ui.table-th class="select-none">Tanggal & Durasi</x-ui.table-th>
                             <x-ui.table-th class="select-none">Langkah Aktif</x-ui.table-th>
@@ -166,6 +170,7 @@
                     <x-ui.table-body>
                         @forelse($riwayatCuti as $r)
                         <x-ui.table-row data-nama="{{ $r['nama'] }}" data-nip="{{ $r['nip'] }}" data-unit="{{ $r['unit'] }}" data-jenis="{{ $r['jenis'] }}" data-status="{{ $r['status'] }}" data-periode="{{ $r['periode'] }}" :interactive="true">
+                            @unless($isPegawai)
                             <x-ui.table-td>
 
                                 <div class="flex items-center gap-3">
@@ -181,6 +186,7 @@
                             <x-ui.table-td>
                                 <span class="text-sm text-ink font-sans">{{ $r['unit'] }}</span>
                             </x-ui.table-td>
+                            @endunless
                             <x-ui.table-td>
                                 <p class="text-sm font-semibold text-ink font-sans">{{ $r['jenis'] }}</p>
                                 <p class="text-xs text-muted font-sans mt-0.5 max-w-xs truncate" title="{{ $r['alasan'] }}">{{ $r['alasan'] }}</p>
@@ -221,8 +227,8 @@
                         </x-ui.table-row>
                         @empty
                         <x-ui.table-row>
-                            <x-ui.table-td colspan="7" align="center" class="px-6 py-8 text-muted">
-                                Belum ada pengajuan cuti yang sesuai dengan filter.
+                            <x-ui.table-td colspan="{{ $isPegawai ? 5 : 7 }}" align="center" class="px-6 py-8 text-muted">
+                                {{ $isPegawai ? 'Belum ada pengajuan cuti Anda yang sesuai dengan filter.' : 'Belum ada pengajuan cuti yang sesuai dengan filter.' }}
                             </x-ui.table-td>
                         </x-ui.table-row>
                         @endforelse

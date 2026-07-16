@@ -1,26 +1,31 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Admin;
 
 use App\Actions\Cuti\ApproveLeaveAction;
 use App\Actions\Cuti\PostponeLeaveAction;
 use App\Actions\Cuti\RejectLeaveAction;
 use App\Actions\Cuti\RequestChangesLeaveAction;
-use App\Http\Requests\Cuti\PimpinanLeaveDecisionRequest;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Cuti\KepalaBagianLeaveDecisionRequest;
 use App\Models\LeaveRequest;
+use App\Services\Employees\KepalaBagianScopeService;
 
-class PimpinanLeaveDecisionController extends Controller
+class KepalaBagianLeaveDecisionController extends Controller
 {
     public function store(
-        PimpinanLeaveDecisionRequest $request,
+        KepalaBagianLeaveDecisionRequest $request,
         LeaveRequest $leave,
+        KepalaBagianScopeService $scope,
         ApproveLeaveAction $approve,
         RequestChangesLeaveAction $requestChanges,
         PostponeLeaveAction $postpone,
         RejectLeaveAction $reject,
     ) {
-        $actor = $request->user()?->employee;
-        abort_if($actor === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat memutuskan cuti.');
+        $user = $request->user();
+        $actor = $user?->employee;
+        abort_if($actor === null, 403, 'Akun Kepala Bagian belum tertaut ke data pegawai.');
+        abort_unless($scope->hasDirectReport($user, $leave->employee_id), 403);
 
         $payload = $request->validated();
         match ($payload['keputusan']) {
@@ -29,6 +34,7 @@ class PimpinanLeaveDecisionController extends Controller
             'DITANGGUHKAN' => $postpone->execute($leave, $actor, $payload['catatan'], $request),
             'TIDAK_DISETUJUI' => $reject->execute($leave, $actor, $payload['catatan'], $request),
         };
+
         $message = match ($payload['keputusan']) {
             'DISETUJUI' => 'Pengajuan cuti berhasil disetujui.',
             'PERUBAHAN' => 'Pengajuan cuti dikembalikan untuk perbaikan.',
@@ -36,7 +42,6 @@ class PimpinanLeaveDecisionController extends Controller
             'TIDAK_DISETUJUI' => 'Pengajuan cuti tidak disetujui dan pemohon telah diberi tahu.',
         };
 
-        return redirect()->route('pimpinan.cuti.show', $leave)
-            ->with('success', $message);
+        return redirect()->route('kepala-bagian.cuti.show', $leave)->with('success', $message);
     }
 }

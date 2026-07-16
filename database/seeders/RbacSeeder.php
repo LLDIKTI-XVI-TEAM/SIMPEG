@@ -12,10 +12,10 @@ class RbacSeeder extends Seeder
     {
         // Daftar role aplikasi sesuai permission matrix SIMPEG.
         $roles = [
-            'super_admin' => 'Super Admin — akses penuh termasuk konfigurasi sistem dan soft delete/restore',
-            'admin_kepegawaian' => 'Admin Kepegawaian — CRUD data pegawai, import, riwayat, cuti, EWS, laporan',
-            'pimpinan' => 'Pimpinan (Kepala Lembaga) — dashboard, read-only data, final approval cuti',
-            'kepala_bagian' => 'Kepala Bagian — approval stage 1 cuti, read-only data bawahan',
+            'super_admin' => 'Super Admin — akses administrasi penuh selain pengajuan cuti pribadi',
+            'admin_kepegawaian' => 'Admin Kepegawaian — kelola data pegawai, pantau cuti, dan ajukan cuti sendiri',
+            'pimpinan' => 'Pimpinan — dashboard, pemantauan, final approval, dan pengajuan cuti sendiri',
+            'kepala_bagian' => 'Kepala Bagian — approval cuti bawahan dan pengajuan cuti sendiri',
             'pegawai' => 'Pegawai — read-only data sendiri, ajukan cuti, lihat notifikasi',
         ];
 
@@ -63,14 +63,14 @@ class RbacSeeder extends Seeder
         ];
 
         foreach ($roles as $name => $description) {
-            Role::firstOrCreate(['name' => $name], [
+            Role::updateOrCreate(['name' => $name], [
                 'guard_name' => 'web',
                 'description' => $description,
             ]);
         }
 
         foreach ($permissions as $name => $attributes) {
-            Permission::firstOrCreate(['name' => $name], $attributes);
+            Permission::updateOrCreate(['name' => $name], $attributes);
         }
 
         // Mapping permission per role dibuat eksplisit agar perubahan hak akses mudah ditelusuri saat review.
@@ -79,7 +79,7 @@ class RbacSeeder extends Seeder
         // bersifat person-based via approval_configs; pemetaan role penampungnya menunggu konfirmasi dan ditegakkan
         // di approval engine. cuti.configure dibatasi khusus super_admin.
         $this->syncRolePermissions([
-            'super_admin' => array_keys($permissions),
+            'super_admin' => array_values(array_diff(array_keys($permissions), ['cuti.create'])),
             'admin_kepegawaian' => [
                 'employees.read',
                 'employees.create',
@@ -101,7 +101,8 @@ class RbacSeeder extends Seeder
                 'audit_logs.read',
                 'notifications.read',
                 'notifications.update',
-                // Admin kepegawaian memonitor seluruh pengajuan cuti namun tidak boleh menyetujui.
+                // Admin kepegawaian dapat mengajukan cuti sendiri dan memonitor seluruh pengajuan tanpa menyetujui.
+                'cuti.create',
                 'cuti.read_all',
                 'cuti.balance.read',
                 'cuti.balance.adjust',
@@ -111,7 +112,8 @@ class RbacSeeder extends Seeder
                 'employees.read',
                 'notifications.read',
                 'notifications.update',
-                // Pimpinan/PYBMC adalah approver final sekaligus dapat memonitor seluruh pengajuan.
+                // Role pimpinan dapat mengajukan cuti sendiri bila bukan pegawai bertanda Kepala Lembaga.
+                'cuti.create',
                 'cuti.approve',
                 'cuti.approve_stage3',
                 'cuti.read_all',
@@ -119,7 +121,8 @@ class RbacSeeder extends Seeder
             'kepala_bagian' => [
                 'notifications.read',
                 'notifications.update',
-                // Kepala bagian memegang approval stage 1 atas pengajuan bawahannya.
+                // Kepala bagian dapat mengajukan cuti sendiri sekaligus memegang approval stage 1 bawahan.
+                'cuti.create',
                 'cuti.approve',
                 'cuti.approve_stage1',
             ],
@@ -127,7 +130,7 @@ class RbacSeeder extends Seeder
                 'employees.read_self',
                 'notifications.read',
                 'notifications.update',
-                // Pegawai sebagai pemohon hanya boleh membuat pengajuan cuti.
+                // Pegawai dapat membuat pengajuan cuti miliknya sendiri.
                 'cuti.create',
                 // Pegawai dapat melihat, menambah, dan mengedit data keluarga miliknya sendiri.
                 // Otorisasi "hanya milik sendiri" dijaga di layer controller dan FormRequest.

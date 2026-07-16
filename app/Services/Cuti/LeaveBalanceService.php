@@ -229,7 +229,7 @@ class LeaveBalanceService
                 'employee_id' => $employeeModel->id,
                 'leave_balance_id' => $balance->id,
                 'tahun' => $tahun,
-                'event_type' => 'opening_balance_set',
+                'event_type' => LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET,
                 'amount' => $newTotal,
                 'source_year' => $tahun,
                 'reason' => $reason,
@@ -309,7 +309,7 @@ class LeaveBalanceService
                 'employee_id' => $employeeModel->id,
                 'leave_balance_id' => $balance->id,
                 'tahun' => $tahun,
-                'event_type' => 'manual_adjustment',
+                'event_type' => LeaveBalanceLedger::EVENT_MANUAL_ADJUSTMENT,
                 'amount' => $applied,
                 'source_year' => $sourceYear,
                 'reason' => $reason,
@@ -362,7 +362,7 @@ class LeaveBalanceService
                 'leave_request_id' => $leaveRequest?->id,
                 'leave_balance_id' => $balance?->id,
                 'tahun' => $sourceYear,
-                'event_type' => 'duty_postponement_recorded',
+                'event_type' => LeaveBalanceLedger::EVENT_DUTY_POSTPONEMENT_RECORDED,
                 'amount' => 0,
                 'source_year' => $sourceYear,
                 'reason' => $reason,
@@ -385,7 +385,7 @@ class LeaveBalanceService
         $employeeModel = $this->resolveEmployee($employee);
         $alreadyDeducted = LeaveBalanceLedger::query()
             ->where('employee_id', $employeeModel->id)
-            ->where('event_type', 'leave_deducted')
+            ->where('event_type', LeaveBalanceLedger::EVENT_LEAVE_DEDUCTED)
             ->where('tahun', $year)
             ->exists();
 
@@ -569,7 +569,7 @@ class LeaveBalanceService
     {
         return LeaveBalanceLedger::query()
             ->where('leave_request_id', $leaveRequest->id)
-            ->where('event_type', 'leave_deducted')
+            ->where('event_type', LeaveBalanceLedger::EVENT_LEAVE_DEDUCTED)
             ->exists();
     }
 
@@ -578,7 +578,7 @@ class LeaveBalanceService
         return LeaveBalanceLedger::query()
             ->where('employee_id', $employeeId)
             ->where('tahun', $tahun)
-            ->where('event_type', 'leave_deducted')
+            ->where('event_type', LeaveBalanceLedger::EVENT_LEAVE_DEDUCTED)
             ->exists();
     }
 
@@ -614,7 +614,7 @@ class LeaveBalanceService
     {
         return LeaveBalanceLedger::query()
             ->where('employee_id', $employeeId)
-            ->where('event_type', 'duty_postponement_recorded')
+            ->where('event_type', LeaveBalanceLedger::EVENT_DUTY_POSTPONEMENT_RECORDED)
             ->where('source_year', $sourceYear)
             ->get(['metadata'])
             ->sum(fn (LeaveBalanceLedger $ledger): int => (int) ($ledger->metadata['postponed_days'] ?? 0));
@@ -625,7 +625,7 @@ class LeaveBalanceService
         return LeaveBalanceLedger::query()
             ->where('employee_id', $employeeId)
             ->where('tahun', $sourceYear)
-            ->where('event_type', 'carry_over_granted')
+            ->where('event_type', LeaveBalanceLedger::EVENT_CARRY_OVER_GRANTED)
             ->get(['metadata'])
             ->sum(fn (LeaveBalanceLedger $ledger): int => (int) ($ledger->metadata['duty_postponed_carried'] ?? 0));
     }
@@ -688,7 +688,7 @@ class LeaveBalanceService
                     'employee_id' => $employee->id,
                     'leave_balance_id' => $balance->id,
                     'tahun' => $tahun,
-                    'event_type' => 'annual_entitlement_granted',
+                    'event_type' => LeaveBalanceLedger::EVENT_ANNUAL_ENTITLEMENT_GRANTED,
                     'amount' => $this->calculator->annualEntitlement(),
                     'source_year' => $tahun,
                     'reason' => 'Jatah cuti tahunan pertama dibuat saat saldo pertama kali dibutuhkan.',
@@ -726,7 +726,7 @@ class LeaveBalanceService
                 'leave_request_id' => $leaveRequest->id,
                 'leave_balance_id' => $balance->id,
                 'tahun' => $tahun,
-                'event_type' => 'leave_deducted',
+                'event_type' => LeaveBalanceLedger::EVENT_LEAVE_DEDUCTED,
                 'amount' => -$amount,
                 'source_year' => $sourceYears[$bucket],
                 'reason' => 'Pemotongan saldo cuti tahunan pada persetujuan final.',
@@ -754,7 +754,7 @@ class LeaveBalanceService
                 'employee_id' => $sourceBalance->employee_id,
                 'leave_balance_id' => $targetBalance->id,
                 'tahun' => $targetYear,
-                'event_type' => 'rollover_applied',
+                'event_type' => LeaveBalanceLedger::EVENT_ROLLOVER_APPLIED,
                 'amount' => 0,
                 'source_year' => $sourceYear,
                 'reason' => 'Rollover saldo cuti tahunan ke tahun berikutnya.',
@@ -772,7 +772,7 @@ class LeaveBalanceService
                 'employee_id' => $sourceBalance->employee_id,
                 'leave_balance_id' => $targetBalance->id,
                 'tahun' => $targetYear,
-                'event_type' => 'annual_entitlement_granted',
+                'event_type' => LeaveBalanceLedger::EVENT_ANNUAL_ENTITLEMENT_GRANTED,
                 'amount' => $this->calculator->annualEntitlement(),
                 'source_year' => $targetYear,
                 'reason' => 'Jatah cuti tahunan tahun target dibuat saat rollover.',
@@ -790,7 +790,7 @@ class LeaveBalanceService
                     'employee_id' => $sourceBalance->employee_id,
                     'leave_balance_id' => $targetBalance->id,
                     'tahun' => $targetYear,
-                    'event_type' => 'carry_over_granted',
+                    'event_type' => LeaveBalanceLedger::EVENT_CARRY_OVER_GRANTED,
                     'amount' => $carryOver,
                     'source_year' => $sourceYear,
                     'reason' => 'Sisa cuti yang memenuhi syarat dibawa ke tahun berikutnya.',
@@ -811,7 +811,7 @@ class LeaveBalanceService
                     'employee_id' => $sourceBalance->employee_id,
                     'leave_balance_id' => $targetBalance->id,
                     'tahun' => $targetYear,
-                    'event_type' => 'carry_over_expired',
+                    'event_type' => LeaveBalanceLedger::EVENT_CARRY_OVER_EXPIRED,
                     'amount' => 0,
                     'source_year' => $sourceYear,
                     'reason' => 'Sisa cuti melewati batas carry-over dan hangus saat rollover.',

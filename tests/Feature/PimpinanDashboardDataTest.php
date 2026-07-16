@@ -88,6 +88,8 @@ class PimpinanDashboardDataTest extends TestCase
             ->assertSee(route('pimpinan.cuti.show', $leave), false)
             ->assertSee(route('pimpinan.ews.index', ['event' => 'Kenaikan Pangkat']), false)
             ->assertSee(route('pimpinan.cuti.index', ['status' => 'menunggu']), false)
+            ->assertSee('Pengajuan Cuti')
+            ->assertSee('href="'.route('cuti').'"', false)
             ->assertDontSee('globalSearch()', false)
             ->assertDontSee('Ahmad Fauzi')
             ->assertDontSee('Nadia Kusuma')

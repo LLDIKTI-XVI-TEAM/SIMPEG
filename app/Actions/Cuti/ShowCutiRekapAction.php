@@ -72,7 +72,11 @@ class ShowCutiRekapAction
             ->paginate(10, ['*'], 'page_ledger')
             ->withQueryString();
         $rolloverRows = (clone $ledgerBase)
-            ->whereIn('event_type', ['rollover_applied', 'carry_over_granted', 'carry_over_expired'])
+            ->whereIn('event_type', [
+                LeaveBalanceLedger::EVENT_ROLLOVER_APPLIED,
+                LeaveBalanceLedger::EVENT_CARRY_OVER_GRANTED,
+                LeaveBalanceLedger::EVENT_CARRY_OVER_EXPIRED,
+            ])
             ->orderByDesc('occurred_at')
             ->limit(5)
             ->get();

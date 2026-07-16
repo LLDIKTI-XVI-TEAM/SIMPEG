@@ -44,6 +44,17 @@ class SubmitLeaveRequestAction
             ]);
         }
 
+        $steps = $this->approvalChains->resolveEffectiveSteps($employee)
+            // Pemohon tidak boleh menjadi approver pengajuannya sendiri; step konflik dihilangkan dari snapshot.
+            ->reject(fn ($step) => $step->approver_employee_id === $employee->id)
+            ->values();
+
+        if ($steps->isEmpty()) {
+            throw ValidationException::withMessages([
+                'jenis_cuti_id' => 'Pengajuan cuti tidak dapat diproses karena tidak ada approver lain yang valid.',
+            ]);
+        }
+
         $mulai = Carbon::createFromFormat('Y-m-d', (string) $data['tanggal_mulai'])->startOfDay();
         $selesai = Carbon::createFromFormat('Y-m-d', (string) $data['tanggal_selesai'])->startOfDay();
 
@@ -55,57 +66,63 @@ class SubmitLeaveRequestAction
             $lampiranPath = $this->files->storeLampiran($request->file('lampiran'));
         }
 
-        $steps = $this->approvalChains->resolveEffectiveSteps($employee);
-
         // Penyimpanan pengajuan dan notifikasi atasan dibungkus transaksi agar tidak ada pengajuan tersimpan
         // tanpa notifikasi pasangannya bila salah satu langkah gagal.
-        $leaveRequest = DB::transaction(function () use ($employee, $data, $mulai, $selesai, $jumlahHariKerja, $lampiranPath, $steps) {
-            $leaveRequest = LeaveRequest::create([
-                'employee_id' => $employee->id,
-                'jenis_cuti_id' => $data['jenis_cuti_id'],
-                'tanggal_mulai' => $mulai->toDateString(),
-                'tanggal_selesai' => $selesai->toDateString(),
-                'jumlah_hari_kerja' => $jumlahHariKerja,
-                'alasan' => $data['alasan'],
-                'alamat_selama_cuti' => $data['alamat_selama_cuti'],
-                'nomor_telepon' => $data['nomor_telepon'],
-                'lampiran_path' => $lampiranPath,
-                // Pengajuan baru selalu masuk engine snapshot dinamis; step aktif pertama disimpan di leave_request_steps.
-                'status' => 'menunggu_approval',
-            ]);
+        try {
+            $leaveRequest = DB::transaction(function () use ($employee, $data, $mulai, $selesai, $jumlahHariKerja, $lampiranPath, $steps) {
+                $leaveRequest = LeaveRequest::create([
+                    'employee_id' => $employee->id,
+                    'jenis_cuti_id' => $data['jenis_cuti_id'],
+                    'tanggal_mulai' => $mulai->toDateString(),
+                    'tanggal_selesai' => $selesai->toDateString(),
+                    'jumlah_hari_kerja' => $jumlahHariKerja,
+                    'alasan' => $data['alasan'],
+                    'alamat_selama_cuti' => $data['alamat_selama_cuti'],
+                    'nomor_telepon' => $data['nomor_telepon'],
+                    'lampiran_path' => $lampiranPath,
+                    // Pengajuan baru selalu masuk engine snapshot dinamis; step aktif pertama disimpan di leave_request_steps.
+                    'status' => 'menunggu_approval',
+                ]);
 
-            $latestOrderByApprover = $steps
-                ->groupBy('approver_employee_id')
-                ->map(fn ($approverSteps) => $approverSteps->max('step_order'));
-            $firstActiveAssigned = false;
+                $latestOrderByApprover = $steps
+                    ->groupBy('approver_employee_id')
+                    ->map(fn ($approverSteps) => $approverSteps->max('step_order'));
+                $firstActiveAssigned = false;
 
-            foreach ($steps as $step) {
-                $isEarlierDuplicate = $latestOrderByApprover[$step->approver_employee_id] !== $step->step_order;
-                $status = 'pending';
+                foreach ($steps as $index => $step) {
+                    $stepOrder = $index + 1;
+                    $isEarlierDuplicate = $latestOrderByApprover[$step->approver_employee_id] !== $step->step_order;
+                    $status = 'pending';
 
-                if ($isEarlierDuplicate) {
-                    $status = 'skipped';
-                } elseif (! $firstActiveAssigned) {
-                    $status = 'active';
-                    $firstActiveAssigned = true;
+                    if ($isEarlierDuplicate) {
+                        $status = 'skipped';
+                    } elseif (! $firstActiveAssigned) {
+                        $status = 'active';
+                        $firstActiveAssigned = true;
+                    }
+
+                    $leaveRequest->steps()->create([
+                        'step_order' => $stepOrder,
+                        'step_type' => $step->step_type,
+                        'role_label' => $step->role_label,
+                        'approver_employee_id' => $step->approver_employee_id,
+                        'status' => $status,
+                        'is_final' => $index === $steps->count() - 1,
+                        'skipped_reason' => $isEarlierDuplicate ? 'duplicate_approver' : null,
+                        'decision_note' => $isEarlierDuplicate ? 'Dilewati otomatis karena approver muncul lagi pada step otoritas lebih akhir.' : null,
+                    ]);
                 }
 
-                $leaveRequest->steps()->create([
-                    'step_order' => $step->step_order,
-                    'step_type' => $step->step_type,
-                    'role_label' => $step->role_label,
-                    'approver_employee_id' => $step->approver_employee_id,
-                    'status' => $status,
-                    'is_final' => $step->is_final,
-                    'skipped_reason' => $isEarlierDuplicate ? 'duplicate_approver' : null,
-                    'decision_note' => $isEarlierDuplicate ? 'Dilewati otomatis karena approver muncul lagi pada step otoritas lebih akhir.' : null,
-                ]);
-            }
+                $this->notifyActiveApprover($leaveRequest);
 
-            $this->notifyActiveApprover($leaveRequest);
+                return $leaveRequest;
+            });
+        } catch (\Throwable $exception) {
+            // File berada di luar transaksi DB; hapus lampiran baru bila persistensi berikutnya gagal.
+            $this->files->deletePublicFile($lampiranPath);
 
-            return $leaveRequest;
-        });
+            throw $exception;
+        }
 
         // Snapshot kontak tetap disimpan pada cuti, tetapi audit hanya mencatat status pengisiannya untuk melindungi PII.
         $auditValues = $leaveRequest->toArray();

@@ -1,8 +1,9 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Admin;
 
 use App\Actions\Cuti\ListKepalaBagianLeavesAction;
+use App\Http\Controllers\Controller;
 use App\Http\Requests\Cuti\KepalaBagianLeaveFilterRequest;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;

@@ -6,10 +6,13 @@ use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
+use App\Models\Permission;
 use App\Models\RefJenisCuti;
+use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -58,16 +61,58 @@ class CutiRbacTest extends TestCase
         }
     }
 
-    public function test_super_admin_memiliki_seluruh_permission_cuti(): void
+    public function test_reseed_memperbarui_metadata_role_dan_permission_yang_sudah_ada(): void
+    {
+        Role::query()->where('name', 'kepala_bagian')->update([
+            'description' => 'Deskripsi role lama.',
+        ]);
+        Permission::query()->where('name', 'cuti.create')->update([
+            'module' => 'legacy',
+            'description' => 'Deskripsi permission lama.',
+        ]);
+
+        $this->seed(RbacSeeder::class);
+
+        $this->assertDatabaseHas('roles', [
+            'name' => 'kepala_bagian',
+            'description' => 'Kepala Bagian — approval cuti bawahan dan pengajuan cuti sendiri',
+        ]);
+        $this->assertDatabaseHas('permissions', [
+            'name' => 'cuti.create',
+            'module' => 'cuti',
+            'description' => 'Mengajukan permohonan cuti',
+        ]);
+    }
+
+    public function test_super_admin_memiliki_permission_cuti_selain_hak_mengajukan_sendiri(): void
     {
         $user = User::factory()->superAdmin()->create();
 
         foreach (self::CUTI_PERMISSIONS as $permission) {
-            $this->assertTrue(
+            $this->assertSame(
+                $permission !== 'cuti.create',
                 $user->hasPermission($permission),
-                "super_admin seharusnya memiliki {$permission}",
+                "mapping cuti super_admin tidak sesuai untuk {$permission}",
             );
         }
+    }
+
+    public static function rolePemohonProvider(): array
+    {
+        return [
+            'admin kepegawaian' => ['admin_kepegawaian'],
+            'pimpinan' => ['pimpinan'],
+            'kepala bagian' => ['kepala_bagian'],
+            'pegawai' => ['pegawai'],
+        ];
+    }
+
+    #[DataProvider('rolePemohonProvider')]
+    public function test_role_self_service_memiliki_permission_cuti_create(string $role): void
+    {
+        $user = User::factory()->state(['role' => $role])->create();
+
+        $this->assertTrue($user->hasPermission('cuti.create'), "role {$role} harus memiliki cuti.create");
     }
 
     public function test_pegawai_bisa_ajukan_cuti_tetapi_tidak_bisa_approve_atau_konfigurasi(): void
