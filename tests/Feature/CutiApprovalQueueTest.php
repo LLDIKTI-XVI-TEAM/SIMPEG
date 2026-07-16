@@ -2,13 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Cuti\SubmitLeaveRequestAction;
 use App\Models\Employee;
+use App\Models\LeaveApprovalChain;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -124,6 +127,56 @@ class CutiApprovalQueueTest extends TestCase
             ->assertSee('$refs.confirmApprove?.focus()', false)
             ->assertSee('lastTrigger: null', false)
             ->assertSee('this.lastTrigger?.focus()', false);
+    }
+
+    public function test_pengajuan_sendiri_tidak_masuk_antrean_approval_pemohon(): void
+    {
+        $pemohon = Employee::factory()->create();
+        $approver = Employee::factory()->create();
+        $user = User::factory()->pegawai()->create(['employee_id' => $pemohon->id]);
+        $jenis = RefJenisCuti::create([
+            'nama' => 'Cuti Sakit Mandiri',
+            'code' => 'sakit_mandiri',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+        $chain = LeaveApprovalChain::create([
+            'employee_id' => $pemohon->id,
+            'name' => 'Chain konflik kepentingan',
+            'effective_from' => '2026-01-01',
+        ]);
+        $chain->steps()->createMany([
+            [
+                'step_order' => 1,
+                'step_type' => 'kepala_bagian',
+                'role_label' => 'Pemohon',
+                'approver_employee_id' => $pemohon->id,
+                'is_final' => false,
+            ],
+            [
+                'step_order' => 2,
+                'step_type' => 'pybmc',
+                'role_label' => 'PYBMC',
+                'approver_employee_id' => $approver->id,
+                'is_final' => true,
+            ],
+        ]);
+        $request = Request::create('/dashboard/cuti', 'POST');
+        $request->setUserResolver(fn () => $user);
+
+        app(SubmitLeaveRequestAction::class)->execute($pemohon, [
+            'jenis_cuti_id' => $jenis->id,
+            'tanggal_mulai' => '2026-08-10',
+            'tanggal_selesai' => '2026-08-12',
+            'alasan' => 'Uji antrean sendiri.',
+            'alamat_selama_cuti' => 'Jl. Uji',
+            'nomor_telepon' => '+62 123',
+        ], $request);
+
+        $response = $this->actingAs($user)->get(route('cuti.approval'));
+
+        $response->assertOk();
+        $this->assertSame(0, $response->viewData('pending')->total());
     }
 
     private function makeWaitingRequest(RefJenisCuti $jenis, Employee $approver, string $alasan, ?Carbon $createdAt = null): string

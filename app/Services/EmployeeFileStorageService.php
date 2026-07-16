@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Document;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -39,8 +40,20 @@ class EmployeeFileStorageService
 
     public function deletePublicFile(?string $path): void
     {
-        if ($path !== null && $path !== '') {
-            Storage::disk('public')->delete($path);
+        if ($path === null || $path === '') {
+            return;
+        }
+
+        try {
+            if (! Storage::disk('public')->delete($path)) {
+                Log::warning('Gagal menghapus file publik pegawai.', ['path' => $path]);
+            }
+        } catch (\Throwable $exception) {
+            // Kegagalan kompensasi storage tidak boleh menutupi exception transaksi yang menjadi akar masalah.
+            Log::warning('Gagal menghapus file publik pegawai.', [
+                'path' => $path,
+                'error' => $exception->getMessage(),
+            ]);
         }
     }
 

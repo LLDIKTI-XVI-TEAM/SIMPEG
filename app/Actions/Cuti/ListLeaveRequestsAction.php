@@ -24,15 +24,17 @@ class ListLeaveRequestsAction
      *   optJenisCutis: Collection<int|string, mixed>,
      *   optUnits: Collection<int|string, mixed>,
      *   optPeriodes: Collection<int, non-falsy-string>,
-     *   search: string, status: string, jenis: string, unit: string, periode: string
+     *   search: string, status: string, jenis: string, unit: string, periode: string,
+     *   isPegawai: bool
      * }
      */
     public function execute(User $user, Request $request): array
     {
-        $search = trim((string) $request->query('search', ''));
+        $isPegawai = $user->role === 'pegawai';
+        $search = $isPegawai ? '' : trim((string) $request->query('search', ''));
         $status = (string) $request->query('status', '');
         $jenis = (string) $request->query('jenis', '');
-        $unit = (string) $request->query('unit', '');
+        $unit = $isPegawai ? '' : (string) $request->query('unit', '');
         $periode = (string) $request->query('periode', '');
         $perPage = min(max((int) $request->query('per_page', 10), 10), 50);
 
@@ -40,8 +42,8 @@ class ListLeaveRequestsAction
             ->with(['employee', 'jenisCuti', 'steps'])
             ->latest();
 
-        // Pemantau (mis. admin kepegawaian/pimpinan) boleh melihat semua; selain itu dibatasi milik sendiri.
-        if (! $user->hasPermission('cuti.read_all')) {
+        // Role pegawai selalu dibatasi ke data sendiri meski mapping permission salah konfigurasi.
+        if ($isPegawai || ! $user->hasPermission('cuti.read_all')) {
             $query->where('employee_id', $user->employee_id);
         }
 
@@ -90,11 +92,13 @@ class ListLeaveRequestsAction
             'jumlahDisetujui' => (clone $baseQuery)->where('status', 'disetujui')->count(),
             'jumlahDitangguhkan' => (clone $baseQuery)->where('status', 'ditangguhkan')->count(),
             'optJenisCutis' => RefJenisCuti::orderBy('nama')->pluck('nama'),
-            'optUnits' => Employee::query()
-                ->whereNotNull('jabatan_terakhir')
-                ->distinct()
-                ->orderBy('jabatan_terakhir')
-                ->pluck('jabatan_terakhir'),
+            'optUnits' => $isPegawai
+                ? collect()
+                : Employee::query()
+                    ->whereNotNull('jabatan_terakhir')
+                    ->distinct()
+                    ->orderBy('jabatan_terakhir')
+                    ->pluck('jabatan_terakhir'),
             // Portable periode options (verified current producer): 12 bulan terakhir, tanpa SQL PostgreSQL-only.
             'optPeriodes' => collect(range(0, 11))->map(fn (int $offset): string => now()->subMonths($offset)->format('Y-m')),
             'search' => $search,
@@ -102,6 +106,7 @@ class ListLeaveRequestsAction
             'jenis' => $jenis,
             'unit' => $unit,
             'periode' => $periode,
+            'isPegawai' => $isPegawai,
         ];
     }
 
