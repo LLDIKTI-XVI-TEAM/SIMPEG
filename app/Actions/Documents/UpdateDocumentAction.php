@@ -80,9 +80,6 @@ class UpdateDocumentAction
         return $updatedDocument;
     }
 
-    /**
-     * @param  array<string, mixed>  $payload
-     */
     private function storeReplacementFile(Document $document, string $category, UploadedFile $file): string
     {
         $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension());
