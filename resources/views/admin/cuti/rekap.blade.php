@@ -35,6 +35,25 @@
             </div>
         </div>
 
+        <section class="rounded-xl border border-border bg-surface px-5 py-4 shadow-sm" aria-label="Filter rekap cuti">
+            <x-cuti.employee-combobox
+                id="rekap-pegawai"
+                :action="route('cuti.rekap')"
+                name="pegawai"
+                query-name="search"
+                :selected-id="$pegawaiId"
+                :selected-label="$selectedEmployee ? $selectedEmployee->nama_lengkap . ' (' . $selectedEmployee->nip . ')' : null"
+                :preserved="['periode' => $periode, 'unit' => $unit, 'jenis' => $jenisId]"
+                :clear-url="route('cuti.rekap', array_filter(['periode' => $periode, 'unit' => $unit, 'jenis' => $jenisId]))"
+                :fallback-options="$selectedEmployee ? collect([$selectedEmployee]) : collect()"
+                fallback-name="pegawai"
+                fallback-label="ID Pegawai"
+                fallback-placeholder="Masukkan UUID pegawai"
+                label="Filter Pegawai"
+                help="Ketik minimal 2 karakter untuk memantau saldo dan penggunaan cuti pegawai."
+                submit-label="Terapkan Filter"
+            />
+        </section>
 
         <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
             @foreach($summary as $card)

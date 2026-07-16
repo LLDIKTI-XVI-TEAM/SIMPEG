@@ -67,30 +67,29 @@
             <x-ui.alert variant="success">{{ session('success') }}</x-ui.alert>
         @endif
 
-        <section class="overflow-hidden rounded-xl border border-border bg-surface shadow-sm" aria-labelledby="employee-chain-heading">
+        <section class="rounded-xl border border-border bg-surface shadow-sm" aria-labelledby="employee-chain-heading">
             <div class="border-b border-border bg-soft/30 px-5 py-4">
                 <h3 id="employee-chain-heading" class="text-xs font-bold uppercase tracking-wider text-ink">Chain Approval Pegawai</h3>
-                <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-muted">Cari lalu pilih pegawai aktif. Hasil pencarian dibatasi hingga 50 pegawai untuk menjaga halaman tetap ringan.</p>
+                <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-muted">Cari lalu pilih pegawai aktif. Autocomplete menampilkan maksimal 15 hasil agar interaksi tetap ringan.</p>
             </div>
 
-            <form method="GET" action="{{ route('cuti.config') }}" class="grid gap-3 border-b border-border px-5 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                <input type="hidden" name="approver_search" value="{{ $approverSearch }}">
-                <x-form.input name="search" id="employee-search" label="Cari Pegawai" value="{{ $search }}" placeholder="Nama atau NIP" help="Masukkan nama atau NIP untuk memuat pilihan pegawai aktif." />
-                <button type="submit" class="inline-flex items-center justify-center rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Cari Pegawai</button>
-            </form>
-
-            @if ($search !== null && trim($search) !== '')
-                <form method="GET" action="{{ route('cuti.config') }}" class="grid gap-3 border-b border-border px-5 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                    <input type="hidden" name="search" value="{{ $search }}">
-                    <input type="hidden" name="approver_search" value="{{ $approverSearch }}">
-                    <x-form.select name="employee_id" id="target-employee" label="Pilih Pegawai" :required="true" placeholder="Pilih pegawai dari hasil pencarian">
-                        @foreach ($targetEmployees as $employee)
-                            <option value="{{ $employee->id }}" @selected($selectedEmployee?->id === $employee->id)>{{ $employee->nama_lengkap }} ({{ $employee->nip }})</option>
-                        @endforeach
-                    </x-form.select>
-                    <button type="submit" class="inline-flex items-center justify-center rounded-xl border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30">Pilih Pegawai</button>
-                </form>
-            @endif
+            <x-cuti.employee-combobox
+                id="employee-search"
+                :action="route('cuti.config')"
+                name="employee_id"
+                query-name="search"
+                :query-value="$search"
+                :selected-id="$selectedEmployee?->id"
+                :selected-label="$selectedEmployee ? $selectedEmployee->nama_lengkap . ' (' . $selectedEmployee->nip . ')' : null"
+                :preserved="['approver_search' => $approverSearch]"
+                :clear-url="route('cuti.config', array_filter(['approver_search' => $approverSearch]))"
+                :fallback-options="$targetEmployees"
+                label="Cari Pegawai"
+                placeholder="Nama atau NIP"
+                help="Ketik minimal 2 karakter. Hasil dibatasi oleh server agar halaman tetap ringan."
+                submit-label="Cari Pegawai"
+                class="border-b border-border px-5 py-4"
+            />
 
             @if ($selectedEmployee)
                 @if ($selectedKepalaBagian)

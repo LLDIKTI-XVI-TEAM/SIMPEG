@@ -110,7 +110,10 @@ class CutiRekapExportTest extends TestCase
     {
         $pimpinan = User::factory()->create(['role' => 'pimpinan']);
 
-        $this->actingAs($pimpinan)->get(route('cuti.rekap'))->assertOk();
+        $this->actingAs($pimpinan)->get(route('cuti.rekap'))
+            ->assertOk()
+            ->assertSee('id="rekap-pegawai"', false)
+            ->assertSee('role="combobox"', false);
         $this->actingAs($pimpinan)->get(route('cuti.config'))->assertForbidden();
     }
 
