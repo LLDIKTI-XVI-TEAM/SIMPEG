@@ -14,13 +14,20 @@ use App\Models\SimpegNotification;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
 use App\Services\Cuti\LeaveBalanceService;
+use App\Services\EmployeeFileStorageService;
 use App\Services\LeaveApprovalService;
+use App\Services\NotificationService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Mockery\Expectation;
+use Mockery\MockInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -48,7 +55,7 @@ class SubmitLeaveRequestTest extends TestCase
      *
      * @return array{user: User, employee: Employee, supervisor: Employee, pybmc: Employee}
      */
-    private function makePemohon(string $jenisPegawai = 'PNS'): array
+    private function makePemohon(string $jenisPegawai = 'PNS', string $role = 'pegawai'): array
     {
         $jenis = RefJenisPegawai::firstOrCreate(['nama' => $jenisPegawai]);
 
@@ -72,7 +79,7 @@ class SubmitLeaveRequestTest extends TestCase
             'tanggal_berakhir' => null,
         ]);
 
-        $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+        $user = User::factory()->state(['role' => $role])->create(['employee_id' => $employee->id]);
 
         $this->createApprovalChain($employee, $supervisor, $pybmc);
 
@@ -132,6 +139,57 @@ class SubmitLeaveRequestTest extends TestCase
             'alamat_selama_cuti' => 'Jl. Sam Ratulangi No. 1, Manado',
             'nomor_telepon' => '+62 (431) 123-456',
         ], $override);
+    }
+
+    public static function rolePemohonProvider(): array
+    {
+        return [
+            'admin kepegawaian' => ['admin_kepegawaian'],
+            'pimpinan' => ['pimpinan'],
+            'kepala bagian' => ['kepala_bagian'],
+            'pegawai' => ['pegawai'],
+        ];
+    }
+
+    #[DataProvider('rolePemohonProvider')]
+    public function test_role_self_service_mengajukan_cuti_hanya_untuk_pegawai_tertambat(string $role): void
+    {
+        $aktor = $this->makePemohon(role: $role);
+        $pegawaiLain = Employee::factory()->create();
+        $jenis = $this->jenisCuti('Cuti Sakit '.$role);
+
+        $response = $this->actingAs($aktor['user'])->post(route(self::ROUTE), $this->payload($jenis, [
+            'employee_id' => $pegawaiLain->id,
+        ]));
+
+        $response->assertRedirect(route('cuti'));
+        $this->assertDatabaseHas('leave_requests', [
+            'employee_id' => $aktor['employee']->id,
+            'jenis_cuti_id' => $jenis->id,
+        ]);
+        $this->assertDatabaseMissing('leave_requests', ['employee_id' => $pegawaiLain->id]);
+    }
+
+    #[DataProvider('rolePemohonProvider')]
+    public function test_role_self_service_tanpa_link_pegawai_gagal_tertutup(string $role): void
+    {
+        $jenis = $this->jenisCuti('Cuti Tanpa Link '.$role);
+        $user = User::factory()->state(['role' => $role])->create(['employee_id' => null]);
+
+        $this->actingAs($user)->get(route('cuti.create'))->assertForbidden();
+        $this->actingAs($user)->postJson(route(self::ROUTE), $this->payload($jenis))->assertUnprocessable();
+        $this->assertDatabaseCount('leave_requests', 0);
+    }
+
+    public function test_super_admin_tidak_bisa_membuka_form_atau_mengajukan_cuti(): void
+    {
+        $employee = Employee::factory()->create();
+        $user = User::factory()->superAdmin()->create(['employee_id' => $employee->id]);
+        $jenis = $this->jenisCuti('Cuti Super Admin');
+
+        $this->actingAs($user)->get(route('cuti.create'))->assertForbidden();
+        $this->actingAs($user)->post(route(self::ROUTE), $this->payload($jenis))->assertForbidden();
+        $this->assertDatabaseCount('leave_requests', 0);
     }
 
     public function test_pegawai_berhasil_mengajukan_cuti(): void
@@ -429,17 +487,46 @@ class SubmitLeaveRequestTest extends TestCase
         Storage::disk('public')->assertExists($leave->lampiran_path);
     }
 
-    public function test_admin_kepegawaian_tidak_bisa_mengajukan_cuti(): void
+    public function test_submit_gagal_setelah_upload_membersihkan_lampiran_baru(): void
     {
-        $jenis = $this->jenisCuti('Cuti Tahunan');
-        $user = User::factory()->adminKepegawaian()->create();
+        Storage::fake('public');
+        $aktor = $this->makePemohon();
+        $jenis = $this->jenisCuti('Cuti Sakit Gagal Notifikasi');
+        $this->mock(NotificationService::class, function (MockInterface $mock): void {
+            /** @var Expectation $expectation */
+            $expectation = $mock->shouldReceive('createForEmployee');
+            $expectation->once()
+                ->andThrow(new \RuntimeException('Simulasi kegagalan notifikasi.'));
+        });
 
-        // Admin kepegawaian tidak memegang cuti.create sehingga ditolak gerbang permission.
-        $this->actingAs($user);
-        $response = $this->post(route(self::ROUTE), $this->payload($jenis));
+        $this->actingAs($aktor['user']);
+        $this->withoutExceptionHandling();
 
-        $response->assertForbidden();
+        try {
+            $this->post(route(self::ROUTE), $this->payload($jenis, [
+                'lampiran' => UploadedFile::fake()->create('orphan.pdf', 100, 'application/pdf'),
+            ]));
+            $this->fail('Submit harus meneruskan kegagalan transaksi.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Simulasi kegagalan notifikasi.', $exception->getMessage());
+        }
+
         $this->assertDatabaseCount('leave_requests', 0);
+        $this->assertSame([], Storage::disk('public')->allFiles('cuti'));
+    }
+
+    public function test_kegagalan_hapus_file_publik_dicatat_tanpa_melempar(): void
+    {
+        Log::shouldReceive('warning')->once()
+            ->withArgs(fn (string $message, array $context = []): bool => str_contains($message, 'Gagal menghapus file publik')
+                && ($context['path'] ?? null) === 'cuti/lama.pdf');
+        $disk = \Mockery::mock(Filesystem::class);
+        /** @var Expectation $deleteExpectation */
+        $deleteExpectation = $disk->shouldReceive('delete');
+        $deleteExpectation->with('cuti/lama.pdf')->andReturnFalse();
+        Storage::shouldReceive('disk')->with('public')->andReturn($disk);
+
+        app(EmployeeFileStorageService::class)->deletePublicFile('cuti/lama.pdf');
     }
 
     public function test_tamu_diarahkan_ke_login(): void
@@ -589,6 +676,104 @@ class SubmitLeaveRequestTest extends TestCase
         ]);
     }
 
+    #[DataProvider('rolePemohonProvider')]
+    public function test_semua_role_self_service_yang_berstatus_kepala_lembaga_ditolak(string $role): void
+    {
+        $aktor = $this->makePemohon(role: $role);
+        $aktor['employee']->forceFill(['is_kepala_lembaga' => true])->save();
+        $jenis = $this->jenisCuti('Cuti Kepala Lembaga '.$role);
+
+        $this->actingAs($aktor['user'])->get(route('cuti.create'))
+            ->assertOk()
+            ->assertViewHas('isKepalaLembaga', true)
+            ->assertDontSee('action="'.route('cuti.store').'"', false);
+        $this->actingAs($aktor['user'])->postJson(route(self::ROUTE), $this->payload($jenis))
+            ->assertUnprocessable();
+        $this->assertDatabaseCount('leave_requests', 0);
+    }
+
+    public function test_snapshot_menghapus_pemohon_dan_menormalkan_urutan_approver_tersisa(): void
+    {
+        $aktor = $this->makePemohon();
+        $chain = LeaveApprovalChain::query()->where('employee_id', $aktor['employee']->id)->firstOrFail();
+        $chain->steps()->delete();
+        $chain->steps()->createMany([
+            [
+                'step_order' => 1,
+                'step_type' => 'kepala_bagian',
+                'role_label' => 'Pemohon sebagai Kepala Bagian',
+                'approver_employee_id' => $aktor['employee']->id,
+                'is_final' => false,
+            ],
+            [
+                'step_order' => 2,
+                'step_type' => 'verifikator',
+                'role_label' => 'Verifikator',
+                'approver_employee_id' => $aktor['supervisor']->id,
+                'is_final' => false,
+            ],
+            [
+                'step_order' => 3,
+                'step_type' => 'pybmc',
+                'role_label' => 'PYBMC',
+                'approver_employee_id' => $aktor['pybmc']->id,
+                'is_final' => true,
+            ],
+        ]);
+        $jenis = $this->jenisCuti('Cuti Konflik Kepentingan');
+
+        $this->actingAs($aktor['user'])->post(route(self::ROUTE), $this->payload($jenis))->assertRedirect(route('cuti'));
+
+        $leave = LeaveRequest::query()->firstOrFail();
+        $this->assertSame([1, 2], $leave->steps()->orderBy('step_order')->pluck('step_order')->all());
+        $this->assertSame(
+            [$aktor['supervisor']->id, $aktor['pybmc']->id],
+            $leave->steps()->orderBy('step_order')->pluck('approver_employee_id')->all(),
+        );
+        $this->assertDatabaseHas('leave_request_steps', [
+            'leave_request_id' => $leave->id,
+            'step_order' => 1,
+            'approver_employee_id' => $aktor['supervisor']->id,
+            'status' => 'active',
+        ]);
+    }
+
+    public function test_submission_tanpa_approver_non_pemohon_tidak_menyimpan_efek_samping(): void
+    {
+        Storage::fake('public');
+        $aktor = $this->makePemohon();
+        $chain = LeaveApprovalChain::query()->where('employee_id', $aktor['employee']->id)->firstOrFail();
+        $chain->steps()->delete();
+        $chain->steps()->createMany([
+            [
+                'step_order' => 1,
+                'step_type' => 'kepala_bagian',
+                'role_label' => 'Kepala Bagian',
+                'approver_employee_id' => $aktor['employee']->id,
+                'is_final' => false,
+            ],
+            [
+                'step_order' => 2,
+                'step_type' => 'pybmc',
+                'role_label' => 'PYBMC',
+                'approver_employee_id' => $aktor['employee']->id,
+                'is_final' => true,
+            ],
+        ]);
+        $jenis = $this->jenisCuti('Cuti Tanpa Approver Valid');
+
+        $response = $this->actingAs($aktor['user'])->postJson(route(self::ROUTE), $this->payload($jenis, [
+            'lampiran' => UploadedFile::fake()->create('surat.pdf', 200, 'application/pdf'),
+        ]));
+
+        $response->assertUnprocessable()->assertJsonValidationErrors(['jenis_cuti_id']);
+        $this->assertDatabaseCount('leave_requests', 0);
+        $this->assertDatabaseCount('leave_request_steps', 0);
+        $this->assertSame(0, SimpegNotification::count());
+        $this->assertDatabaseCount('audit_logs', 0);
+        $this->assertSame([], Storage::disk('public')->allFiles());
+    }
+
     public function test_pemohon_bisa_mengirim_ulang_pengajuan_perlu_perubahan_dengan_snapshot_yang_sama(): void
     {
         $aktor = $this->makePemohon();
@@ -622,6 +807,115 @@ class SubmitLeaveRequestTest extends TestCase
             'step_order' => 1,
             'status' => 'active',
         ]);
+    }
+
+    public function test_resubmit_gagal_setelah_upload_mempertahankan_lampiran_lama_dan_membersihkan_yang_baru(): void
+    {
+        Storage::fake('public');
+        $aktor = $this->makePemohon();
+        $jenis = $this->jenisCuti('Cuti Sakit Resubmit Gagal');
+        $this->actingAs($aktor['user'])->post(route(self::ROUTE), $this->payload($jenis, [
+            'lampiran' => UploadedFile::fake()->create('lama.pdf', 100, 'application/pdf'),
+        ]));
+        $leave = LeaveRequest::firstOrFail();
+        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], 'Perlu revisi.');
+        $oldPath = $leave->fresh()->lampiran_path;
+        $oldValues = $leave->fresh()->only(['tanggal_mulai', 'tanggal_selesai', 'alasan', 'status', 'lampiran_path']);
+        LeaveRequest::saving(function (LeaveRequest $saving): void {
+            if ($saving->isDirty('lampiran_path')) {
+                throw new \RuntimeException('Simulasi kegagalan penyimpanan resubmit.');
+            }
+        });
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->patch(route('cuti.resubmit', $leave), [
+                'tanggal_mulai' => '2026-07-13',
+                'tanggal_selesai' => '2026-07-15',
+                'alasan' => 'Revisi gagal disimpan.',
+                'alamat_selama_cuti' => 'Jl. Revisi',
+                'nomor_telepon' => '+62 123',
+                'lampiran' => UploadedFile::fake()->create('baru.pdf', 100, 'application/pdf'),
+            ]);
+            $this->fail('Resubmit harus meneruskan kegagalan transaksi.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Simulasi kegagalan penyimpanan resubmit.', $exception->getMessage());
+        }
+
+        $this->assertEquals($oldValues, $leave->fresh()->only(array_keys($oldValues)));
+        Storage::disk('public')->assertExists($oldPath);
+        $this->assertSame([$oldPath], Storage::disk('public')->allFiles('cuti'));
+    }
+
+    public function test_resubmit_berhasil_mengganti_lampiran_lalu_menghapus_file_lama(): void
+    {
+        Storage::fake('public');
+        $aktor = $this->makePemohon();
+        $jenis = $this->jenisCuti('Cuti Sakit Ganti Lampiran');
+        $this->actingAs($aktor['user'])->post(route(self::ROUTE), $this->payload($jenis, [
+            'lampiran' => UploadedFile::fake()->create('lama.pdf', 100, 'application/pdf'),
+        ]));
+        $leave = LeaveRequest::firstOrFail();
+        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], 'Ganti lampiran.');
+        $oldPath = $leave->fresh()->lampiran_path;
+
+        $response = $this->patch(route('cuti.resubmit', $leave), [
+            'tanggal_mulai' => '2026-07-13',
+            'tanggal_selesai' => '2026-07-15',
+            'alasan' => 'Lampiran sudah diganti.',
+            'alamat_selama_cuti' => 'Jl. Revisi',
+            'nomor_telepon' => '+62 123',
+            'lampiran' => UploadedFile::fake()->create('baru.pdf', 100, 'application/pdf'),
+        ]);
+
+        $response->assertRedirect(route('cuti.show', $leave));
+        $newPath = $leave->fresh()->lampiran_path;
+        $this->assertNotSame($oldPath, $newPath);
+        Storage::disk('public')->assertExists($newPath);
+        Storage::disk('public')->assertMissing($oldPath);
+    }
+
+    public function test_resubmit_ditolak_jika_pemohon_sekarang_kepala_lembaga_tanpa_mutasi(): void
+    {
+        Storage::fake('public');
+        $aktor = $this->makePemohon();
+        $jenis = $this->jenisCuti('Cuti Sakit Resubmit Kepala Lembaga');
+        $this->actingAs($aktor['user'])->post(route(self::ROUTE), $this->payload($jenis));
+        $leave = LeaveRequest::with('steps')->firstOrFail();
+        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], 'Perlu revisi.');
+        $aktor['employee']->forceFill(['is_kepala_lembaga' => true])->save();
+        $before = $leave->fresh();
+        $beforeValues = [
+            'tanggal_mulai' => $before->tanggal_mulai->toDateString(),
+            'tanggal_selesai' => $before->tanggal_selesai->toDateString(),
+            'alasan' => $before->alasan,
+            'status' => $before->status,
+            'lampiran_path' => $before->lampiran_path,
+        ];
+        $stepsBefore = $leave->steps()->orderBy('step_order')->get()->map->only(['id', 'status', 'step_order'])->all();
+        $auditCount = AuditLog::count();
+
+        $response = $this->patchJson(route('cuti.resubmit', $leave), [
+            'tanggal_mulai' => '2026-07-13',
+            'tanggal_selesai' => '2026-07-15',
+            'alasan' => 'Revisi yang harus ditolak.',
+            'alamat_selama_cuti' => 'Jl. Ditolak',
+            'nomor_telepon' => '+62 123',
+            'lampiran' => UploadedFile::fake()->create('revisi.pdf', 100, 'application/pdf'),
+        ]);
+
+        $response->assertUnprocessable()->assertJsonValidationErrors(['jenis_cuti_id']);
+        $after = $leave->fresh();
+        $this->assertSame($beforeValues, [
+            'tanggal_mulai' => $after->tanggal_mulai->toDateString(),
+            'tanggal_selesai' => $after->tanggal_selesai->toDateString(),
+            'alasan' => $after->alasan,
+            'status' => $after->status,
+            'lampiran_path' => $after->lampiran_path,
+        ]);
+        $this->assertSame($stepsBefore, $leave->steps()->orderBy('step_order')->get()->map->only(['id', 'status', 'step_order'])->all());
+        $this->assertSame($auditCount, AuditLog::count());
+        $this->assertSame([], Storage::disk('public')->allFiles());
     }
 
     public function test_post_pengajuan_gagal_tertutup_tanpa_chain_approval_dan_tidak_menyimpan_apa_pun(): void

@@ -47,6 +47,19 @@ class KepalaBagianFrontendTest extends TestCase
         $this->assertNotNull($otherEmployee->id);
     }
 
+    public function test_navigation_menampilkan_cuti_bawahan_dan_pengajuan_cuti_sendiri(): void
+    {
+        [$user] = $this->kepalaBagian();
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.dashboard'))
+            ->assertOk()
+            ->assertSee('Cuti Bawahan')
+            ->assertSee('href="'.route('kepala-bagian.cuti.index').'"', false)
+            ->assertSee('Pengajuan Cuti')
+            ->assertSee('href="'.route('cuti').'"', false);
+    }
+
     public function test_employee_pages_are_limited_to_direct_reports(): void
     {
         [$user, $kepalaBagian] = $this->kepalaBagian();
