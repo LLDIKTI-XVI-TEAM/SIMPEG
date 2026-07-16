@@ -63,7 +63,7 @@ class EmployeeFamilyController extends Controller
         $action->execute($employee, $family, request());
 
         return response()->json([
-            'message' => 'Data keluarga berhasil dinonaktifkan.',
+            'message' => 'Data keluarga berhasil dihapus.',
         ]);
     }
 }
