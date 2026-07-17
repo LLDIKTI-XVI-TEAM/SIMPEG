@@ -21,6 +21,29 @@
         pybmcEmployeeId: @js($pybmcEmployeeId),
         errors: @js($errors->messages()),
         maxVerifierSteps: 8,
+        backfillHelpOpen: false,
+        openBackfillHelp() {
+            this.backfillHelpOpen = true;
+            this.$nextTick(() => this.$refs.backfillHelpClose.focus());
+        },
+        closeBackfillHelp() {
+            if (! this.backfillHelpOpen) return;
+            this.backfillHelpOpen = false;
+            this.$nextTick(() => this.$refs.backfillHelpTrigger.focus());
+        },
+        trapBackfillHelpFocus(event) {
+            const focusable = [...this.$refs.backfillHelpDialog.querySelectorAll('button, [href], input, select, textarea, [tabindex]')]
+                .filter((element) => ! element.disabled && element.tabIndex >= 0 && element.offsetParent !== null);
+            const first = focusable[0];
+            const last = focusable.at(-1);
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (! event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        },
         addVerifier() {
             if (this.verifiers.length >= this.maxVerifierSteps) return;
             let number = 1;
@@ -209,9 +232,21 @@
         </section>
 
         <section class="overflow-hidden rounded-xl border border-border bg-surface shadow-sm" aria-labelledby="backfill-heading">
-            <div class="border-b border-border bg-soft/30 px-5 py-4">
-                <h3 id="backfill-heading" class="text-xs font-bold uppercase tracking-wider text-ink">Backfill Chain Dinamis</h3>
-                <p class="mt-0.5 text-xs text-muted">Membuat chain pegawai aktif dari Kepala Bagian dan konfigurasi lama yang tersedia.</p>
+            <div class="flex items-start justify-between gap-3 border-b border-border bg-soft/30 px-5 py-4">
+                <div>
+                    <h3 id="backfill-heading" class="text-xs font-bold uppercase tracking-wider text-ink">Backfill Chain Dinamis</h3>
+                    <p class="mt-0.5 text-xs text-muted">Membuat chain pegawai aktif dari Kepala Bagian dan konfigurasi lama yang tersedia.</p>
+                </div>
+                <button
+                    type="button"
+                    x-ref="backfillHelpTrigger"
+                    @click="openBackfillHelp()"
+                    class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-surface text-sm font-bold text-primary shadow-sm transition-colors hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    aria-label="Pelajari Backfill Chain Dinamis"
+                    aria-haspopup="dialog"
+                    :aria-expanded="backfillHelpOpen"
+                    aria-controls="backfill-help-dialog"
+                >?</button>
             </div>
             <div class="grid gap-4 px-5 py-5 md:grid-cols-[1fr_auto] md:items-start">
                 <div class="space-y-2 text-sm text-muted">
@@ -310,5 +345,47 @@
                 @endforelse
             </div>
         </section>
+
+        <x-ui.modal
+            id="backfill-help-dialog"
+            x-ref="backfillHelpDialog"
+            @keydown.tab="trapBackfillHelpFocus($event)"
+            show="backfillHelpOpen"
+            title="Apa itu Backfill Chain Dinamis?"
+            title-id="backfill-help-title"
+            description-id="backfill-help-description"
+            close-action="closeBackfillHelp()"
+            max-width="lg"
+        >
+            <div id="backfill-help-description" class="space-y-5 text-sm leading-relaxed text-muted">
+                <p>Backfill membuat alur persetujuan cuti secara otomatis untuk pegawai aktif yang belum mempunyai chain.</p>
+
+                <div class="rounded-xl border border-primary/15 bg-soft px-4 py-3 text-center font-semibold text-primary">
+                    Kepala Bagian <span aria-hidden="true">→</span> Verifikator (jika tersedia) <span aria-hidden="true">→</span> PYBMC
+                </div>
+
+                <ul class="list-disc space-y-2 pl-5">
+                    <li>Chain dibuat dari Kepala Bagian pegawai, Verifikator lama, dan PYBMC lama yang tersedia.</li>
+                    <li>Pegawai yang sudah mempunyai chain aktif dilewati dan tidak diubah.</li>
+                    <li>Pegawai tanpa Kepala Bagian atau approver final belum dapat dibuatkan chain.</li>
+                    <li>Backfill dapat dijalankan kembali setelah data pegawai diperbaiki.</li>
+                    <li>Alasan Backfill disimpan pada setiap chain yang berhasil dibuat dan catatan auditnya.</li>
+                </ul>
+
+                <p class="rounded-xl bg-warning/10 px-4 py-3 text-ink">
+                    Gunakan Backfill untuk membuat konfigurasi awal secara massal. Untuk mengubah chain pegawai tertentu, gunakan konfigurasi khusus pegawai.
+                </p>
+
+                <div class="flex justify-end">
+                    <button
+                        id="backfill-help-close"
+                        x-ref="backfillHelpClose"
+                        type="button"
+                        @click="closeBackfillHelp()"
+                        class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2"
+                    >Mengerti</button>
+                </div>
+            </div>
+        </x-ui.modal>
     </div>
 </x-layouts.app>

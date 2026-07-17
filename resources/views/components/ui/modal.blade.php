@@ -2,6 +2,7 @@
     'show' => null,
     'title' => null,
     'titleId' => null,
+    'descriptionId' => null,
     'maxWidth' => 'md',
     'closeAction' => null,
     'panelClass' => '',
@@ -34,6 +35,7 @@
     role="dialog"
     aria-modal="true"
     @if ($title) aria-labelledby="{{ $modalTitleId }}" @endif
+    @if ($descriptionId) aria-describedby="{{ $descriptionId }}" @endif
 >
     <div class="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         <div
