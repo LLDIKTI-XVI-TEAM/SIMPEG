@@ -27,7 +27,7 @@
         <x-ui.card>
             <div class="mb-4">
                 <h3 class="text-lg font-semibold text-ink">Export Nominatif Custom</h3>
-                <p id="employee-report-help" class="mt-1 text-sm text-muted">Pilih kolom dan filter. Laporan custom tersedia dalam Excel (.xlsx) saja.</p>
+                <p id="employee-report-help" class="mt-1 text-sm text-muted">Pilih kolom dan filter. Laporan custom tersedia dalam Excel saja.</p>
             </div>
 
             <form action="{{ route('pimpinan.laporan.pegawai') }}" method="GET" class="space-y-6" aria-describedby="employee-report-help">
@@ -109,9 +109,15 @@
                     </div>
                 </fieldset>
 
-                <div class="flex flex-col gap-3 sm:flex-row sm:justify-end">
-                    <x-ui.button type="submit" variant="secondary" size="md">Terapkan Filter</x-ui.button>
-                    <x-ui.button type="submit" variant="primary" size="md" formaction="{{ route('pimpinan.laporan.pegawai.custom') }}" formtarget="_blank">Unduh Excel</x-ui.button>
+                <div class="flex items-center justify-end gap-3 pt-6 border-t border-border mt-6">
+                    <x-ui.button type="submit" variant="secondary" size="md">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" /></svg>
+                        Terapkan Filter
+                    </x-ui.button>
+                    <x-ui.button type="submit" variant="secondary" size="md" formaction="{{ route('pimpinan.laporan.pegawai.custom') }}" formtarget="_blank">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                        Unduh Excel
+                    </x-ui.button>
                 </div>
             </form>
         </x-ui.card>

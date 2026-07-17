@@ -194,7 +194,7 @@
                     [
                         'group' => 'Cuti',
                         'items' => [
-                            ['label' => 'Monitoring Cuti', 'route' => 'pimpinan.cuti.index', 'icon' => 'calendar'],
+                            ['label' => 'Persetujuan Cuti', 'route' => 'pimpinan.cuti.index', 'icon' => 'check-badge'],
                             ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
                         ]
                     ],
@@ -233,7 +233,7 @@
                     [
                         'group' => 'Cuti',
                         'items' => [
-                            ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'calendar'],
+                            ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge'],
                             ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
                         ],
                     ],

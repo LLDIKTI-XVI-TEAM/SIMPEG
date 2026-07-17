@@ -31,13 +31,19 @@
                 ]" />
             </div>
             <div class="flex shrink-0 items-center gap-3">
-                @if(auth()->user()->hasPermission('cuti.create') && ! auth()->user()->employee?->is_kepala_lembaga)
-                <a href="{{ route('cuti.create') }}" class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
-                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                <x-ui.button href="{{ route('cuti') }}" variant="secondary" size="md">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                    </svg>
+                    Refresh
+                </x-ui.button>
+                @if(auth()->user()->role !== 'super_admin' && auth()->user()->hasPermission('cuti.create') && ! auth()->user()->employee?->is_kepala_lembaga)
+                <x-ui.button href="{{ route('cuti.create') }}" variant="primary" size="md">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                     </svg>
                     Ajukan Cuti Baru
-                </a>
+                </x-ui.button>
                 @endif
             </div>
         </div>
@@ -93,11 +99,11 @@
             searchName="{{ $isPegawai ? null : 'search' }}"
             searchValue="{{ $search }}"
             searchPlaceholder="{{ $isPegawai ? null : 'Cari nama atau NIP...' }}"
-            class="sm:grid-cols-2 {{ $isPegawai ? 'lg:grid-cols-4' : 'lg:grid-cols-5' }}"
+            gridClass="sm:grid-cols-2 {{ $isPegawai ? 'lg:grid-cols-3' : 'lg:grid-cols-5' }}"
         >
             {{-- Filter Status --}}
             <div class="relative">
-                <x-form.select id="filter-status" name="status">
+                <x-form.select id="filter-status" name="status" onchange="this.form.submit()">
                     <option value="">Semua Status</option>
                     <option value="menunggu" @selected($status === 'menunggu' || $status === 'pending')>Menunggu Keputusan</option>
                     <option value="disetujui" @selected($status === 'disetujui')>Disetujui</option>
@@ -110,7 +116,7 @@
 
             {{-- Filter Jenis Cuti --}}
             <div class="relative">
-                <x-form.select id="filter-jenis" name="jenis">
+                <x-form.select id="filter-jenis" name="jenis" onchange="this.form.submit()">
                     <option value="">Semua Jenis Cuti</option>
                     @foreach($optJenisCutis as $namaJenis)
                         <option value="{{ $namaJenis }}" @selected($jenis === $namaJenis)>{{ $namaJenis }}</option>
@@ -121,7 +127,7 @@
             @unless($isPegawai)
             {{-- Filter Unit Kerja --}}
             <div class="relative">
-                <x-form.select id="filter-unit" name="unit">
+                <x-form.select id="filter-unit" name="unit" onchange="this.form.submit()">
                     <option value="">Semua Unit Kerja</option>
                     @foreach($optUnits as $namaUnit)
                         <option value="{{ $namaUnit }}" @selected($unit === $namaUnit)>{{ $namaUnit }}</option>
@@ -132,17 +138,12 @@
 
             {{-- Filter Periode Bulan --}}
             <div class="relative">
-                <x-form.select id="filter-periode" name="periode">
+                <x-form.select id="filter-periode" name="periode" onchange="this.form.submit()">
                     <option value="">Semua Periode</option>
                     @foreach($optPeriodes as $periodeOption)
                         <option value="{{ $periodeOption }}" @selected($periode === $periodeOption)>{{ \Carbon\Carbon::createFromFormat('Y-m', $periodeOption)->translatedFormat('F Y') }}</option>
                     @endforeach
                 </x-form.select>
-            </div>
-
-            <div class="flex gap-2">
-                <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Terapkan</button>
-                <a href="{{ route('cuti') }}" class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink shadow-sm transition hover:bg-soft">Reset</a>
             </div>
         </x-ui.filter-bar>
         </form>

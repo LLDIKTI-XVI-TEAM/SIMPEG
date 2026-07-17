@@ -145,7 +145,6 @@
                     <option value="10" :selected="{{ $perPage }} == 10">10</option>
                     <option value="25" :selected="{{ $perPage }} == 25">25</option>
                     <option value="50" :selected="{{ $perPage }} == 50">50</option>
-                    <option value="100" :selected="{{ $perPage }} == 100">100</option>
                 </select>
                 <span class="hidden sm:inline">data</span>
 

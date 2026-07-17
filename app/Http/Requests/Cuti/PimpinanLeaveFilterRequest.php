@@ -17,10 +17,9 @@ class PimpinanLeaveFilterRequest extends FormRequest
         return [
             'search' => ['nullable', 'string', 'max:100'],
             'unit_kerja_id' => ['nullable', 'uuid'],
-            'tahun' => ['nullable', 'integer', 'min:2000', 'max:2100'],
-            'bulan' => ['nullable', 'integer', 'between:1,12'],
+            'periode' => ['nullable', 'string', 'regex:/^\d{4}-\d{2}$/'],
             'jenis_cuti_id' => ['nullable', 'uuid'],
-            'status' => ['nullable', Rule::in(['menunggu', 'disetujui', 'perubahan', 'ditangguhkan', 'tidak_disetujui'])],
+            'status' => ['nullable', Rule::in(['menunggu_saya', 'menunggu', 'disetujui', 'perubahan', 'ditangguhkan', 'tidak_disetujui'])],
         ];
     }
 }

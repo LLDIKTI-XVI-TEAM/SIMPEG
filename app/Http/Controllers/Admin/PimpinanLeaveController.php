@@ -16,13 +16,14 @@ class PimpinanLeaveController extends Controller
     public function index(PimpinanLeaveFilterRequest $request, ListPimpinanLeavesAction $leaves)
     {
         $filters = $request->validated();
+        $data = $leaves->execute($request->user(), $filters);
 
-        return view('pimpinan.cuti.index', [
-            'leaves' => $leaves->execute($filters),
+        return view('pimpinan.cuti.index', array_merge($data, [
             'filters' => $filters,
+            'optPeriodes' => collect(range(0, 11))->map(fn (int $offset): string => now()->subMonths($offset)->format('Y-m')),
             'jenisCutiOptions' => RefJenisCuti::query()->orderBy('nama')->get(['id', 'nama']),
             'unitKerjaOptions' => RefUnitKerja::query()->orderBy('nama')->get(['id', 'nama']),
-        ]);
+        ]));
     }
 
     public function show(Request $request, LeaveRequest $leave)
