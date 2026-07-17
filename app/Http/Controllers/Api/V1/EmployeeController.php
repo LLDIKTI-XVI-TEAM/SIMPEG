@@ -130,8 +130,6 @@ class EmployeeController extends Controller
         ]);
     }
 
-
-
     public function updateStatus(Employee $employee, Request $request, UpdateEmployeeStatusAction $action): JsonResponse
     {
         $request->validate([
@@ -236,5 +234,4 @@ class EmployeeController extends Controller
             'deleted_at_human' => $deletedAt?->format('d/m/Y H:i') ?? '-',
         ];
     }
-
 }

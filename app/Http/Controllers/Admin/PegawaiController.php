@@ -9,7 +9,6 @@ use App\Actions\Employees\ExportEmployeeAction;
 use App\Actions\Employees\ListEmployeesAction;
 use App\Actions\Employees\ListInactiveEmployeesAction;
 use App\Actions\Employees\PrepareEmployeeEditFormDataAction;
-
 use App\Actions\Employees\RestoreEmployeeAction;
 use App\Actions\Employees\StoreEmployeeHistoryAction;
 use App\Actions\Employees\UpdateEmployeeAction;
@@ -304,7 +303,6 @@ class PegawaiController extends Controller
     }
 
     public function store(StoreEmployeeRequest $request, CreateEmployeeAction $action)
-
     {
         try {
             $employee = $action->execute($request->validated(), $request);
