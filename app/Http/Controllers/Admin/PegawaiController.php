@@ -9,7 +9,7 @@ use App\Actions\Employees\ExportEmployeeAction;
 use App\Actions\Employees\ListEmployeesAction;
 use App\Actions\Employees\ListInactiveEmployeesAction;
 use App\Actions\Employees\PrepareEmployeeEditFormDataAction;
-use App\Actions\Employees\PurgeDeletedEmployeesAction;
+
 use App\Actions\Employees\RestoreEmployeeAction;
 use App\Actions\Employees\StoreEmployeeHistoryAction;
 use App\Actions\Employees\UpdateEmployeeAction;
@@ -237,87 +237,6 @@ class PegawaiController extends Controller
         ));
     }
 
-    /**
-     * Halaman Data Backup — pegawai dalam masa retensi trash (soft deleted).
-     * Data akan dihapus permanen setelah 30 hari. Hanya super_admin.
-     * Caching dilakukan client-side via sessionStorage di Alpine.js.
-     */
-    public function backup(Request $request)
-    {
-        $perPage = (int) $request->query('per_page', 10);
-        $perPage = in_array($perPage, [10, 25, 50, 100], true) ? $perPage : 10;
-        $search = trim((string) $request->query('search', ''));
-        $retentionDays = PurgeDeletedEmployeesAction::RETENTION_DAYS;
-        $dataChanged = session()->pull('backup_data_changed', false);
-
-        // SSR initial load — sama persis seperti pola halaman data-pegawai
-        $query = Employee::onlyTrashed()
-            ->with([
-                'jenisPegawai:id,nama',
-                'positionHistories' => fn ($q) => $q
-                    ->with(['jabatan:id,nama', 'unitKerja:id,nama'])
-                    ->where('is_latest', true)
-                    ->limit(1),
-            ])
-            ->orderByDesc('deleted_at');
-
-        if ($search !== '') {
-            $keyword = '%'.mb_strtolower($search).'%';
-            $query->where(function ($q) use ($keyword): void {
-                $q->whereRaw('LOWER(nama_lengkap) LIKE ?', [$keyword])
-                    ->orWhereRaw('LOWER(nip) LIKE ?', [$keyword]);
-            });
-        }
-
-        $paginator = $query->paginate($perPage)->withQueryString();
-
-        $initialRows = $paginator->map(function (Employee $employee) use ($retentionDays): array {
-            $latestPosition = $employee->positionHistories->first();
-            $deletedAt = $employee->deleted_at;
-            $purgeAt = $deletedAt?->copy()->addDays($retentionDays);
-            $sisaHari = $purgeAt ? (int) now()->diffInDays($purgeAt, false) : 0;
-
-            return [
-                'id' => $employee->id,
-                'nama_lengkap' => $employee->nama_lengkap,
-                'nip' => $employee->nip,
-                'foto_url' => $employee->foto_url,
-                'jabatan' => $latestPosition?->jabatan?->nama ?? $employee->jabatan_terakhir ?? '-',
-                'unit_kerja' => $latestPosition?->unitKerja?->nama ?? '-',
-                'golongan_terakhir' => $employee->golongan_terakhir ?? '-',
-                'jenis_pegawai' => $employee->jenisPegawai?->nama ?? '-',
-                'deleted_at_human' => $deletedAt?->format('d/m/Y H:i') ?? '-',
-                'purge_at_human' => $purgeAt?->format('d/m/Y') ?? '-',
-                'sisa_hari' => $sisaHari,
-                'is_expired' => $sisaHari <= 0,
-                'is_urgent' => $sisaHari > 0 && $sisaHari <= 3,
-                'is_warning' => $sisaHari > 3 && $sisaHari <= 7,
-            ];
-        })->values()->all();
-
-        $initialMeta = [
-            'total' => $paginator->total(),
-            'current_page' => $paginator->currentPage(),
-            'last_page' => $paginator->lastPage(),
-            'from' => $paginator->firstItem() ?? 0,
-            'to' => $paginator->lastItem() ?? 0,
-            'per_page' => $paginator->perPage(),
-        ];
-
-        $expiredCount = Employee::onlyTrashed()
-            ->where('deleted_at', '<=', now()->subDays($retentionDays))
-            ->count();
-
-        return view('admin.pegawai.backup', compact(
-            'perPage',
-            'search',
-            'retentionDays',
-            'expiredCount',
-            'initialRows',
-            'initialMeta',
-            'dataChanged',
-        ));
-    }
 
     public function store(StoreEmployeeRequest $request, CreateEmployeeAction $action)
     {
@@ -505,9 +424,8 @@ class PegawaiController extends Controller
 
         $action->execute($employee, $request);
 
-        return redirect()->route('data-backup')
-            ->with('success', 'Data pegawai '.$nama.' berhasil dipulihkan ke daftar pegawai aktif.')
-            ->with('backup_data_changed', true);
+        return redirect()->route('data-nonaktif')
+            ->with('success', 'Data pegawai '.$nama.' berhasil dipulihkan ke daftar pegawai aktif.');
     }
 
     public function bulkRestore(Request $request)
@@ -518,7 +436,7 @@ class PegawaiController extends Controller
         ));
 
         if (empty($ids)) {
-            return redirect()->route('data-backup')
+            return redirect()->route('data-nonaktif')
                 ->with('error', 'Tidak ada pegawai yang dipilih.');
         }
 
@@ -528,8 +446,8 @@ class PegawaiController extends Controller
             ->get(['id', 'nama_lengkap', 'nip']);
 
         if ($employees->isEmpty()) {
-            return redirect()->route('data-backup')
-                ->with('error', 'Data pegawai tidak ditemukan di backup.');
+            return redirect()->route('data-nonaktif')
+                ->with('error', 'Data pegawai tidak ditemukan di daftar nonaktif.');
         }
 
         $validIds = $employees->pluck('id')->all();
@@ -561,9 +479,8 @@ class PegawaiController extends Controller
             AuditLog::insert($auditRows);
         });
 
-        return redirect()->route('data-backup')
-            ->with('success', $count.' pegawai berhasil dipulihkan ke daftar pegawai aktif.')
-            ->with('backup_data_changed', true);
+        return redirect()->route('data-nonaktif')
+            ->with('success', $count.' pegawai berhasil dipulihkan ke daftar pegawai aktif.');
     }
 
     public function storeRiwayat($id, Request $request, StoreEmployeeHistoryAction $action)

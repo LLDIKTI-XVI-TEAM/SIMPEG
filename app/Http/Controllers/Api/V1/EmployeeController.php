@@ -5,10 +5,8 @@ namespace App\Http\Controllers\Api\V1;
 use App\Actions\Employees\AssignSupervisorAction;
 use App\Actions\Employees\CreateEmployeeAction;
 use App\Actions\Employees\DeactivateEmployeeAction;
-use App\Actions\Employees\DeleteEmployeeAction;
 use App\Actions\Employees\ListEmployeesAction;
 use App\Actions\Employees\ListInactiveEmployeesAction;
-use App\Actions\Employees\PurgeDeletedEmployeesAction;
 use App\Actions\Employees\RestoreEmployeeAction;
 use App\Actions\Employees\ShowEmployeeAction;
 use App\Actions\Employees\ShowEmployeeDocumentStatusAction;
@@ -92,43 +90,7 @@ class EmployeeController extends Controller
         ]);
     }
 
-    public function backup(Request $request): JsonResponse
-    {
-        $perPage = min(max((int) ($request->query('per_page', 10)), 1), 100);
-        $search = trim((string) ($request->query('search', '')));
-        $retentionDays = PurgeDeletedEmployeesAction::RETENTION_DAYS;
 
-        $paginator = Employee::onlyTrashed()
-            ->with([
-                'jenisPegawai:id,nama',
-                'positionHistories' => fn ($q) => $q
-                    ->with(['jabatan:id,nama', 'unitKerja:id,nama'])
-                    ->where('is_latest', true)
-                    ->limit(1),
-            ])
-            ->when($search !== '', function ($q) use ($search): void {
-                $keyword = '%'.mb_strtolower($search).'%';
-                $q->where(function ($q) use ($keyword): void {
-                    $q->whereRaw('LOWER(nama_lengkap) LIKE ?', [$keyword])
-                        ->orWhereRaw('LOWER(nip) LIKE ?', [$keyword]);
-                });
-            })
-            ->orderByDesc('deleted_at')
-            ->paginate($perPage)
-            ->withQueryString()
-            ->through(fn (Employee $employee) => $this->backupPayload($employee, $retentionDays));
-
-        $expiredCount = Employee::onlyTrashed()
-            ->where('deleted_at', '<=', now()->subDays($retentionDays))
-            ->count();
-
-        return response()->json([
-            'message' => 'Data backup pegawai berhasil diambil.',
-            'employees' => $paginator,
-            'expired_count' => $expiredCount,
-            'retention_days' => $retentionDays,
-        ]);
-    }
 
     public function destroy(Employee $employee, Request $request, DeactivateEmployeeAction $action): JsonResponse
     {
@@ -139,14 +101,7 @@ class EmployeeController extends Controller
         ]);
     }
 
-    public function forceDestroy(Employee $employee, Request $request, DeleteEmployeeAction $action): JsonResponse
-    {
-        $action->execute($employee, $request);
 
-        return response()->json([
-            'message' => 'Data pegawai berhasil dihapus secara permanen.',
-        ]);
-    }
 
     public function updateStatus(Employee $employee, Request $request, UpdateEmployeeStatusAction $action): JsonResponse
     {
@@ -230,33 +185,5 @@ class EmployeeController extends Controller
         ];
     }
 
-    /**
-     * Payload untuk tabel backup — digunakan Alpine.js di halaman data-backup.
-     *
-     * @return array<string, mixed>
-     */
-    private function backupPayload(Employee $employee, int $retentionDays): array
-    {
-        $latestPosition = $employee->positionHistories->first();
-        $deletedAt = $employee->deleted_at;
-        $purgeAt = $deletedAt?->copy()->addDays($retentionDays);
-        $sisaHari = $purgeAt ? (int) now()->diffInDays($purgeAt, false) : 0;
-
-        return [
-            'id' => $employee->id,
-            'nama_lengkap' => $employee->nama_lengkap,
-            'nip' => $employee->nip,
-            'foto_url' => $employee->foto_url,
-            'jabatan' => $latestPosition?->jabatan?->nama ?? $employee->jabatan_terakhir ?? '-',
-            'unit_kerja' => $latestPosition?->unitKerja?->nama ?? '-',
-            'golongan_terakhir' => $employee->golongan_terakhir ?? '-',
-            'jenis_pegawai' => $employee->jenisPegawai?->nama ?? '-',
-            'deleted_at_human' => $deletedAt?->format('d/m/Y H:i') ?? '-',
-            'purge_at_human' => $purgeAt?->format('d/m/Y') ?? '-',
-            'sisa_hari' => $sisaHari,
-            'is_expired' => $sisaHari <= 0,
-            'is_urgent' => $sisaHari > 0 && $sisaHari <= 3,
-            'is_warning' => $sisaHari > 3 && $sisaHari <= 7,
-        ];
-    }
 }
+
