@@ -175,8 +175,8 @@
                 @endif
             </form>
 
-            <div class="w-full sm:w-auto">
-                    {{ $leaves->appends(request()->query())->links('vendor.pagination.simpeg') }}
+            <div class="w-full sm:w-auto flex justify-end">
+                {{ $leaves->appends(request()->query())->links('vendor.pagination.simpeg') }}
             </div>
         </div>
     </x-ui.card>

@@ -146,7 +146,7 @@
                     @endif
                 </form>
 
-                <div class="w-full sm:w-auto">
+                <div class="w-full sm:w-auto flex justify-end">
                     {{ $leaves->appends(request()->query())->links('vendor.pagination.simpeg') }}
                 </div>
             </div>
