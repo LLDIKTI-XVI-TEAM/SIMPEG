@@ -4,6 +4,7 @@ use App\Actions\Ews\ListActiveEwsAlertsAction;
 use App\Http\Controllers\Admin\AuditController;
 use App\Http\Controllers\Admin\CutiConfigController;
 use App\Http\Controllers\Admin\CutiController;
+use App\Http\Controllers\Admin\CutiEmployeeLookupController;
 use App\Http\Controllers\Admin\CutiReportController;
 use App\Http\Controllers\Admin\DokumenController;
 use App\Http\Controllers\Admin\EmployeeImportController;
@@ -226,6 +227,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/cuti/rekap', [CutiController::class, 'rekap'])
         ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('cuti.rekap');
+    Route::get('/cuti/pegawai/cari', CutiEmployeeLookupController::class)
+        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan', 'throttle:60,1'])
+        ->name('cuti.employee-lookup');
     Route::get('/cuti/laporan', [CutiReportController::class, 'preview'])
         ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('cuti.laporan');

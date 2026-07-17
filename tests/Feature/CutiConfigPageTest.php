@@ -57,6 +57,13 @@ class CutiConfigPageTest extends TestCase
 
         $response->assertOk()
             ->assertSee('Chain Approval Pegawai')
+            ->assertSee('class="rounded-xl border border-border bg-surface shadow-sm"', false)
+            ->assertSee('role="combobox"', false)
+            ->assertSee('x-show="false"', false)
+            ->assertSee("document.getElementById('employee-search')?.form?.requestSubmit()", false)
+            ->assertSee('@keydown.enter.prevent="selectActive($event)"', false)
+            ->assertSee(':name="selectedId ? null :', false)
+            ->assertSee('x-show="selectedId"', false)
             ->assertSee($pegawai->nama_lengkap)
             ->assertSee($kepalaBagian->nama_lengkap)
             ->assertSee('Kepala Bagian')
@@ -87,6 +94,11 @@ class CutiConfigPageTest extends TestCase
             ->assertDontSee('Approver Stage 3', false)
             ->assertDontSee('stage2_approver_id', false)
             ->assertDontSee('stage3_approver_id', false);
+
+        $component = file_get_contents(resource_path('views/components/cuti/employee-combobox.blade.php'));
+        $this->assertIsString($component);
+        $this->assertStringContainsString('name="{{ $queryName }}"', $component);
+        $this->assertStringContainsString(':name="selectedId ? null : @js($queryName)"', $component);
     }
 
     public function test_pencarian_pegawai_dibatasi_lima_puluh_hasil(): void
