@@ -90,7 +90,36 @@ class EmployeeController extends Controller
         ]);
     }
 
+    public function backup(Request $request): JsonResponse
+    {
+        $perPage = min(max((int) ($request->query('per_page', 10)), 1), 100);
+        $search = trim((string) ($request->query('search', '')));
 
+        $paginator = Employee::onlyTrashed()
+            ->with([
+                'jenisPegawai:id,nama',
+                'positionHistories' => fn ($q) => $q
+                    ->with(['jabatan:id,nama', 'unitKerja:id,nama'])
+                    ->where('is_latest', true)
+                    ->limit(1),
+            ])
+            ->when($search !== '', function ($q) use ($search): void {
+                $keyword = '%'.mb_strtolower($search).'%';
+                $q->where(function ($q) use ($keyword): void {
+                    $q->whereRaw('LOWER(nama_lengkap) LIKE ?', [$keyword])
+                        ->orWhereRaw('LOWER(nip) LIKE ?', [$keyword]);
+                });
+            })
+            ->orderByDesc('deleted_at')
+            ->paginate($perPage)
+            ->withQueryString()
+            ->through(fn (Employee $employee) => $this->backupPayload($employee));
+
+        return response()->json([
+            'message' => 'Data pegawai nonaktif berhasil diambil.',
+            'employees' => $paginator,
+        ]);
+    }
 
     public function destroy(Employee $employee, Request $request, DeactivateEmployeeAction $action): JsonResponse
     {
@@ -185,5 +214,27 @@ class EmployeeController extends Controller
         ];
     }
 
-}
+    /**
+     * Payload ringkas untuk backup — data pegawai nonaktif tanpa informasi sensitif.
+     *
+     * @return array<string, mixed>
+     */
+    private function backupPayload(Employee $employee): array
+    {
+        $latestPosition = $employee->positionHistories->first();
+        $deletedAt = $employee->deleted_at;
 
+        return [
+            'id' => $employee->id,
+            'nama_lengkap' => $employee->nama_lengkap,
+            'nip' => $employee->nip,
+            'foto_url' => $employee->foto_url,
+            'jabatan' => $latestPosition?->jabatan?->nama ?? $employee->jabatan_terakhir ?? '-',
+            'unit_kerja' => $latestPosition?->unitKerja?->nama ?? '-',
+            'golongan_terakhir' => $employee->golongan_terakhir ?? '-',
+            'jenis_pegawai' => $employee->jenisPegawai?->nama ?? '-',
+            'deleted_at_human' => $deletedAt?->format('d/m/Y H:i') ?? '-',
+        ];
+    }
+
+}

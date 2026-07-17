@@ -76,12 +76,14 @@
                     'data-master',
                     'hari-libur',
                     'ews.config',
+                    'data-backup',
                 ],
                 'pimpinan' => [
                     'audit-log',
                     'pengaturan',
                     'user-management',
                     'rbac',
+                    'data-backup',
                     'ews.config',
                 ],
                 'kepala_bagian' => [
@@ -94,6 +96,7 @@
                     'user-management',
                     'rbac',
                     'data-nonaktif',
+                    'data-backup',
                     'data-master',
                     'laporan',
                     'laporan.pegawai',
@@ -106,6 +109,7 @@
                 'pegawai' => [
                     'data-pegawai',
                     'pegawai.import',
+                    'data-backup',
                     'dokumen',
                     'cuti.rekap',
                     'ews',
@@ -136,6 +140,7 @@
                     'items' => array_filter([
                         ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users'],
                         $activeRole === 'kepala_bagian' ? ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'] : null,
+                        ['label' => 'Data Backup', 'route' => 'data-backup', 'icon' => 'user-minus'],
                         ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open'],
                         ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up'],
                     ])

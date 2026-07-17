@@ -83,6 +83,7 @@
                     'pengaturan',
                     'user-management',
                     'rbac',
+                    'data-backup',
                     'ews.config',
                     'kepala-bagian.bawahan.index',
                 ],
@@ -95,6 +96,7 @@
                     'pengaturan',
                     'user-management',
                     'rbac',
+                    'data-backup',
                     'data-master',
                     'laporan',
                     'laporan.pegawai',
@@ -104,6 +106,7 @@
                 'pegawai' => [
                     'data-pegawai',
                     'pegawai.import',
+                    'data-backup',
                     'dokumen',
                     'cuti.rekap',
                     'ews',
@@ -135,6 +138,7 @@
                     'items' => [
                         ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users'],
                         ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'],
+                        ['label' => 'Data Backup', 'route' => 'data-backup', 'icon' => 'user-minus'],
                         ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open'],
                         ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up'],
                     ]

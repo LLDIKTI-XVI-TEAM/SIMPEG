@@ -37,6 +37,10 @@ Route::middleware($employeeGroupMiddleware)
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
             ->name('inactive');
 
+        Route::get('/backup', [EmployeeController::class, 'backup'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.restore', 'role:super_admin'])
+            ->name('backup');
+
         Route::delete('/{employee}', [EmployeeController::class, 'destroy'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.deactivate', 'role:super_admin'])
             ->whereUuid('employee')

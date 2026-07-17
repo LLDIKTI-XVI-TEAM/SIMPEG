@@ -237,8 +237,74 @@ class PegawaiController extends Controller
         ));
     }
 
+    /**
+     * Halaman Data Backup — semua pegawai yang dinonaktifkan (soft deleted).
+     * Data tidak akan dihapus permanen secara otomatis. Hanya super_admin.
+     */
+    public function backup(Request $request)
+    {
+        $perPage = (int) $request->query('per_page', 10);
+        $perPage = in_array($perPage, [10, 25, 50, 100], true) ? $perPage : 10;
+        $search = trim((string) $request->query('search', ''));
+        $dataChanged = session()->pull('backup_data_changed', false);
+
+        $query = Employee::onlyTrashed()
+            ->with([
+                'jenisPegawai:id,nama',
+                'positionHistories' => fn ($q) => $q
+                    ->with(['jabatan:id,nama', 'unitKerja:id,nama'])
+                    ->where('is_latest', true)
+                    ->limit(1),
+            ])
+            ->orderByDesc('deleted_at');
+
+        if ($search !== '') {
+            $keyword = '%'.mb_strtolower($search).'%';
+            $query->where(function ($q) use ($keyword): void {
+                $q->whereRaw('LOWER(nama_lengkap) LIKE ?', [$keyword])
+                    ->orWhereRaw('LOWER(nip) LIKE ?', [$keyword]);
+            });
+        }
+
+        $paginator = $query->paginate($perPage)->withQueryString();
+
+        $initialRows = $paginator->map(function (Employee $employee): array {
+            $latestPosition = $employee->positionHistories->first();
+            $deletedAt = $employee->deleted_at;
+
+            return [
+                'id' => $employee->id,
+                'nama_lengkap' => $employee->nama_lengkap,
+                'nip' => $employee->nip,
+                'foto_url' => $employee->foto_url,
+                'jabatan' => $latestPosition?->jabatan?->nama ?? $employee->jabatan_terakhir ?? '-',
+                'unit_kerja' => $latestPosition?->unitKerja?->nama ?? '-',
+                'golongan_terakhir' => $employee->golongan_terakhir ?? '-',
+                'jenis_pegawai' => $employee->jenisPegawai?->nama ?? '-',
+                'deleted_at_human' => $deletedAt?->format('d/m/Y H:i') ?? '-',
+            ];
+        })->values()->all();
+
+        $initialMeta = [
+            'total' => $paginator->total(),
+            'current_page' => $paginator->currentPage(),
+            'last_page' => $paginator->lastPage(),
+            'from' => $paginator->firstItem() ?? 0,
+            'to' => $paginator->lastItem() ?? 0,
+            'per_page' => $paginator->perPage(),
+        ];
+
+        return view('admin.pegawai.backup', compact(
+            'perPage',
+            'search',
+            'initialRows',
+            'initialMeta',
+            'dataChanged',
+        ));
+    }
 
     public function store(StoreEmployeeRequest $request, CreateEmployeeAction $action)
+
     {
         try {
             $employee = $action->execute($request->validated(), $request);
