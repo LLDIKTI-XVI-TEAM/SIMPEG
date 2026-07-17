@@ -445,7 +445,7 @@ class EmployeeUpdateTest extends TestCase
         $response->assertRedirect(route('data-pegawai'));
         $this->assertDatabaseHas('documents', [
             'employee_id' => $employee->id,
-            'jenis_dokumen' => 'lainnya',
+            'jenis_dokumen' => 'sk_mutasi',
             'nama_dokumen' => 'SK Mutasi',
         ]);
         $this->assertDatabaseHas('employees', [
@@ -472,6 +472,11 @@ class EmployeeUpdateTest extends TestCase
             ->post("/pegawai/{$employee->id}", $payload, ['X-CSRF-TOKEN' => 'test-token']);
 
         $response->assertRedirect(route('data-pegawai'));
+        $this->assertDatabaseHas('documents', [
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'sk_pensiun',
+            'nama_dokumen' => 'SK Pensiun',
+        ]);
         $this->assertDatabaseHas('employees', [
             'id' => $employee->id,
             'status_pegawai_id' => $statusPensiun->id,

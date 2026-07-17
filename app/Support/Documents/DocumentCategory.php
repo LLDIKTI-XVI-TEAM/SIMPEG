@@ -10,6 +10,8 @@ class DocumentCategory
         'sk_jabatan' => 'SK Kenaikan Jabatan',
         'sk_kgb' => 'SK KGB',
         'sk_hukuman_disiplin' => 'SK Hukuman Disiplin',
+        'sk_mutasi' => 'SK Mutasi',
+        'sk_pensiun' => 'SK Pensiun',
         'ijazah' => 'Ijazah',
         'ktp_kk' => 'KTP & KK',
         'lainnya' => 'Lainnya',

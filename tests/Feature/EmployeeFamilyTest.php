@@ -111,7 +111,7 @@ class EmployeeFamilyTest extends TestCase
         $this->assertArrayNotHasKey('nik', $audit->new_values);
     }
 
-    public function test_admin_can_soft_delete_family_and_write_audit_log(): void
+    public function test_admin_can_permanently_delete_family_and_write_audit_log(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create();
@@ -121,10 +121,10 @@ class EmployeeFamilyTest extends TestCase
         $response = $this->deleteJsonWithCsrf($this->endpoint($employee)."/{$family->id}");
 
         $response->assertOk();
-        $response->assertJsonPath('message', 'Data keluarga berhasil dinonaktifkan.');
-        $this->assertSoftDeleted('employee_families', ['id' => $family->id]);
+        $response->assertJsonPath('message', 'Data keluarga berhasil dihapus.');
+        $this->assertDatabaseMissing('employee_families', ['id' => $family->id]);
         $this->assertDatabaseHas('audit_logs', [
-            'event' => 'SOFT_DELETE',
+            'event' => 'DELETE',
             'auditable_type' => 'EmployeeFamily',
             'auditable_id' => $family->id,
         ]);

@@ -6,8 +6,12 @@ use App\Models\Appointment;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Models\RefJenisPegawai;
+use App\Models\RefStatusPegawai;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Throwable;
 
 class StoreDocumentAction
 {
@@ -27,27 +31,58 @@ class StoreDocumentAction
         $employee = Employee::findOrFail($payload['pegawai_id']);
         $category = $payload['kategori_dokumen'];
         $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension());
-        $filename = $employee->id.'_'.$category.'_'.now()->format('YmdHis').'.'.$extension;
+        $filename = $employee->id.'_'.$category.'_'.Str::uuid().'.'.$extension;
         $filePath = $file->storeAs($employee->id.'/'.$category, $filename, Document::STORAGE_DISK);
 
-        return DB::transaction(function () use ($employee, $category, $payload, $filePath): Document {
-            $document = Document::create([
-                'employee_id' => $employee->id,
-                'jenis_dokumen' => $category,
-                'nama_dokumen' => $payload['nama_dokumen'],
-                'nomor_dokumen' => $payload['nomor_dokumen'] ?? null,
-                'tanggal_dokumen' => $payload['tanggal_terbit'] ?? null,
-                'file_path' => $filePath,
-                'keterangan' => $payload['deskripsi'] ?? null,
+        try {
+            return DB::transaction(function () use ($employee, $category, $payload, $filePath): Document {
+                $document = Document::create([
+                    'employee_id' => $employee->id,
+                    'jenis_dokumen' => $category,
+                    'nama_dokumen' => $payload['nama_dokumen'],
+                    'nomor_dokumen' => $payload['nomor_dokumen'] ?? null,
+                    'tanggal_dokumen' => $payload['tanggal_terbit'] ?? null,
+                    'file_path' => $filePath,
+                    'keterangan' => $payload['deskripsi'] ?? null,
+                ]);
+
+                // Auto-sync ke tabel history yang relevan
+                if (isset(self::HISTORY_CATEGORIES[$category])) {
+                    $this->syncHistory($employee, $document, $category, $payload);
+                }
+
+                $this->syncEmployeeStatus($employee, $category);
+
+                return $document;
+            });
+        } catch (Throwable $exception) {
+            // Jika transaksi database/sinkronisasi gagal, file baru tidak boleh
+            // tertinggal tanpa record dokumen yang menunjuk kepadanya.
+            Storage::disk(Document::STORAGE_DISK)->delete($filePath);
+
+            throw $exception;
+        }
+    }
+
+    private function syncEmployeeStatus(Employee $employee, string $category): void
+    {
+        $statusName = match ($category) {
+            'sk_mutasi' => 'Mutasi',
+            'sk_pensiun' => 'Pensiun',
+            default => null,
+        };
+
+        if ($statusName === null) {
+            return;
+        }
+
+        $status = RefStatusPegawai::query()->where('nama', $statusName)->first();
+        if ($status) {
+            $employee->update([
+                'status_pegawai_id' => $status->id,
+                'status_aktif' => $status->nama,
             ]);
-
-            // Auto-sync ke tabel history yang relevan
-            if (isset(self::HISTORY_CATEGORIES[$category])) {
-                $this->syncHistory($employee, $document, $category, $payload);
-            }
-
-            return $document;
-        });
+        }
     }
 
     private function syncHistory(Employee $employee, Document $document, string $category, array $payload): void

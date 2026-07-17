@@ -26,6 +26,8 @@ class ListDocumentsRequest extends FormRequest
             'kategori' => ['nullable', 'string', 'max:100'],
             'unit_kerja' => ['nullable', 'string', 'max:150'],
             'status' => ['nullable', 'in:tersedia,file_tidak_ditemukan'],
+            // Dikirim tombol Refresh untuk menandai pemeriksaan filesystem terbaru.
+            'refresh' => ['nullable', 'boolean'],
             'per_page' => ['nullable', 'integer', 'in:5,10,25,50'],
             'page' => ['nullable', 'integer', 'min:1'],
         ];

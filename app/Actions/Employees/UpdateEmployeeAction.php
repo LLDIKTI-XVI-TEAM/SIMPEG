@@ -303,8 +303,14 @@ class UpdateEmployeeAction
                     ? trim((string) ($validated['berkas_lainnya_jenis_manual'] ?? ''))
                     : $jenis;
 
-                // KTP & KK dipetakan ke kategori arsip ktp_kk; sisanya masuk kategori lainnya.
-                $kategori = in_array($jenis, ['KTP', 'KK'], true) ? 'ktp_kk' : 'lainnya';
+                // Hanya KTP/KK dan dokumen tambahan yang masuk kategori umum.
+                // SK Mutasi/Pensiun memiliki kategori khusus karena menjadi dasar status pegawai.
+                $kategori = match ($jenis) {
+                    'KTP', 'KK' => 'ktp_kk',
+                    'SK Mutasi' => 'sk_mutasi',
+                    'SK Pensiun' => 'sk_pensiun',
+                    default => 'lainnya',
+                };
 
                 $filePath = $this->files->storeBerkasLainnya($request->file('file_berkas_lainnya'), $employee->id);
 
