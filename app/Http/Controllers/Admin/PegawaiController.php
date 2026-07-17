@@ -488,7 +488,7 @@ class PegawaiController extends Controller
 
         $action->execute($employee, $request);
 
-        return redirect()->route('data-nonaktif')
+        return redirect()->route('data-backup')
             ->with('success', 'Data pegawai '.$nama.' berhasil dipulihkan ke daftar pegawai aktif.');
     }
 
@@ -500,7 +500,7 @@ class PegawaiController extends Controller
         ));
 
         if (empty($ids)) {
-            return redirect()->route('data-nonaktif')
+            return redirect()->route('data-backup')
                 ->with('error', 'Tidak ada pegawai yang dipilih.');
         }
 
@@ -510,7 +510,7 @@ class PegawaiController extends Controller
             ->get(['id', 'nama_lengkap', 'nip']);
 
         if ($employees->isEmpty()) {
-            return redirect()->route('data-nonaktif')
+            return redirect()->route('data-backup')
                 ->with('error', 'Data pegawai tidak ditemukan di daftar nonaktif.');
         }
 
@@ -543,7 +543,7 @@ class PegawaiController extends Controller
             AuditLog::insert($auditRows);
         });
 
-        return redirect()->route('data-nonaktif')
+        return redirect()->route('data-backup')
             ->with('success', $count.' pegawai berhasil dipulihkan ke daftar pegawai aktif.');
     }
 
