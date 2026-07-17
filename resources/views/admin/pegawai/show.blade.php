@@ -676,8 +676,9 @@
                 {{-- Toggle Flag Kinerja & Kepala Bagian --}}
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-soft/40 rounded-lg p-4 border border-border">
                     {{-- Status Kinerja --}}
-                    <div class="flex items-center justify-between p-2">
-                        <div>
+                    <div class="p-2">
+                        <div class="flex items-start sm:items-center justify-between gap-4">
+                            <div>
                             <span class="text-xs font-bold text-ink font-sans block">Toggle Flag "Kinerja Baik"</span>
                             <p class="text-xs text-muted">Flag manual pengganti SKP sementara untuk menentukan eligibility kenaikan pangkat di EWS.</p>
                             <p x-show="isUpdatingKinerja" class="mt-1 text-[10px] text-primary font-sans" style="display: none;">
@@ -688,10 +689,11 @@
                             @if(auth()->user()->role !== 'pimpinan')
                             <input type="checkbox" x-model="kinerjaBaik" @change="updateKinerjaBaik(kinerjaBaik)" :disabled="isUpdatingKinerja" aria-label="Toggle Kinerja Baik" class="sr-only peer">
                             @else
-                            <input type=\"checkbox\" x-model=\"kinerjaBaik\" disabled aria-label=\"Toggle Kinerja Baik\" class=\"sr-only peer\">
+                            <input type="checkbox" x-model="kinerjaBaik" disabled aria-label="Toggle Kinerja Baik" class="sr-only peer">
                             @endif
                             <div class="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-success"></div>
                         </label>
+                        </div>
                     </div>
 
                     {{-- Satyalancana --}}
@@ -708,7 +710,7 @@
                                 @if(auth()->user()->role !== 'pimpinan')
                                 <input type="checkbox" x-model="satyalancanaEligible" @change="updateSatyalancanaEligibility()" :disabled="isUpdatingSatyalancana" aria-label="Toggle Kelayakan Satyalancana" class="sr-only peer">
                                 @else
-                                <input type=\"checkbox\" x-model=\"satyalancanaEligible\" disabled aria-label=\"Toggle Kelayakan Satyalancana\" class=\"sr-only peer\">
+                                <input type="checkbox" x-model="satyalancanaEligible" disabled aria-label="Toggle Kelayakan Satyalancana" class="sr-only peer">
                                 @endif
                                 <div class="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-success"></div>
                             </label>
@@ -716,7 +718,7 @@
                         <div class="space-y-1">
                             <label for="satyalancana-note" class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Catatan Manual</label>
                             @if(auth()->user()->role === 'pimpinan')
-                            <textarea id=\"satyalancana-note\" x-model=\"satyalancanaNote\" rows=\"2\" readonly class=\"w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder-muted shadow-sm focus:outline-none focus:ring-0 opacity-70\"></textarea>
+                            <textarea id="satyalancana-note" x-model="satyalancanaNote" rows="2" readonly class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder-muted shadow-sm focus:outline-none focus:ring-0 opacity-70 resize-none"></textarea>
                             @else
                             <textarea
                                 id="satyalancana-note"
@@ -724,7 +726,7 @@
                                 rows="2"
                                 maxlength="1000"
                                 placeholder="Catatan kelayakan Satyalancana"
-                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder-muted shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder-muted shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
                             ></textarea>
                             @endif
                         </div>

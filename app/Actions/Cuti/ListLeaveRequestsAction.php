@@ -30,7 +30,9 @@ class ListLeaveRequestsAction
      */
     public function execute(User $user, Request $request): array
     {
-        $isPegawai = $user->role === 'pegawai';
+        // Pimpinan dan Kepala Bagian menggunakan rute ini khusus untuk self-service pengajuan mandiri,
+        // karena mereka telah memiliki rute monitoring terpisah.
+        $isPegawai = in_array($user->role, ['pegawai', 'pimpinan', 'kepala_bagian'], true);
         $search = $isPegawai ? '' : trim((string) $request->query('search', ''));
         $status = (string) $request->query('status', '');
         $jenis = (string) $request->query('jenis', '');
