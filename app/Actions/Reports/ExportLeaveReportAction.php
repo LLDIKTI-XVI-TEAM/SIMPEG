@@ -78,7 +78,7 @@ class ExportLeaveReportAction
         ]);
     }
 
-    private function rows(array $filters): Collection
+    public function rows(array $filters): Collection
     {
         $query = LeaveRequest::query()
             ->with(['employee', 'jenisCuti'])

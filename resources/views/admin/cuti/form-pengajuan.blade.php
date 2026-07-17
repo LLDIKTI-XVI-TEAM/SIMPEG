@@ -118,7 +118,7 @@
                         <div>
                             <label for="alasan" class="block text-sm font-medium text-ink mb-1">Alasan Cuti <span class="text-danger">*</span></label>
                             <textarea id="alasan" name="alasan" rows="3" required
-                                class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                                class="w-full resize-none rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                                 placeholder="Jelaskan alasan cuti Anda secara singkat..."
                                 {{ $formLocked ? 'disabled' : '' }}></textarea>
                             @error('alasan')
@@ -130,7 +130,7 @@
                             <label for="alamat_selama_cuti" class="block text-sm font-medium text-ink mb-1">Alamat Selama Cuti <span class="text-danger">*</span></label>
                             <textarea id="alamat_selama_cuti" name="alamat_selama_cuti" rows="2" maxlength="1000" required autocomplete="street-address" aria-describedby="{{ $errors->has('alamat_selama_cuti') ? 'alamat_selama_cuti-help alamat_selama_cuti-error' : 'alamat_selama_cuti-help' }}"
                                 @if ($errors->has('alamat_selama_cuti')) aria-invalid="true" @endif
-                                class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                                class="w-full resize-none rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                                 {{ $formLocked ? 'disabled' : '' }}>{{ old('alamat_selama_cuti') }}</textarea>
                             <p id="alamat_selama_cuti-help" class="mt-1 text-xs text-muted">Digunakan pada formulir Cuti resmi dan untuk menghubungi Anda selama cuti.</p>
                             @error('alamat_selama_cuti')
@@ -165,14 +165,15 @@
                     </div>
 
                     <div class="bg-soft border-t border-border px-6 py-4 flex items-center justify-end gap-3">
-                        <a href="{{ route('cuti') }}" class="px-5 py-2.5 text-sm font-medium text-muted hover:text-ink transition-colors">Batal</a>
-                        <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-primary/90 focus:ring-2 focus:ring-primary/20 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                            :disabled="saldoError || {{ $formLocked ? 'true' : 'false' }}">
-                            <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <x-ui.button href="{{ route('cuti') }}" variant="muted" size="md">
+                            Batal
+                        </x-ui.button>
+                        <x-ui.button type="submit" variant="primary" size="md" x-bind:disabled="saldoError || {{ $formLocked ? 'true' : 'false' }}">
+                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
                             </svg>
                             Kirim Pengajuan
-                        </button>
+                        </x-ui.button>
                     </div>
                 </form>
                 @else

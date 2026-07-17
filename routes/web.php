@@ -580,9 +580,6 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
 
             Route::get('/ews', [PimpinanEwsController::class, 'index'])->name('ews.index');
 
-            Route::get('/laporan', [PimpinanReportController::class, 'index'])->name('laporan.index');
-            Route::get('/laporan/pegawai', [PimpinanReportController::class, 'employees'])->name('laporan.pegawai');
-            Route::get('/laporan/pegawai/custom', [PimpinanReportController::class, 'customEmployees'])->name('laporan.pegawai.custom');
             Route::get('/laporan/cuti', [PimpinanReportController::class, 'leaves'])->name('laporan.cuti');
             Route::get('/laporan/cuti/excel', [PimpinanReportController::class, 'exportLeaves'])->name('laporan.cuti.excel');
             Route::get('/laporan/kepangkatan', [PimpinanReportController::class, 'rankHistories'])->name('laporan.kepangkatan');
