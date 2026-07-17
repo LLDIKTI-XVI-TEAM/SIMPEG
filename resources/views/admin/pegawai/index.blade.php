@@ -30,6 +30,13 @@
     deletePegawaiName: '',
     isDeleting: false,
 
+    // ===== State Modal Rincian Dokumen =====
+    showDocumentStatusModal: false,
+    documentStatusEmployee: null,
+    documentStatus: { is_lengkap: true, total_riwayat: 0, file_tersedia: 0, records: [], total_dokumen: 0, dokumen_tersedia: 0, documents: [] },
+    isLoadingDocumentStatus: false,
+    documentStatusError: '',
+
     // ===== State Tabel Pegawai =====
     pegawaiRows: @js($initialRows),
     meta: @js($initialMeta),
@@ -174,6 +181,31 @@
         this.deletePegawaiId = id;
         this.deletePegawaiName = name || '';
         this.showDeleteModal = true;
+    },
+
+    async openDocumentStatus(employee) {
+        this.documentStatusEmployee = { id: employee.id, nama_lengkap: employee.nama_lengkap, nip: employee.nip };
+        this.documentStatus = { is_lengkap: employee.is_lengkap, total_riwayat: 0, file_tersedia: 0, records: [], total_dokumen: 0, dokumen_tersedia: 0, documents: [] };
+        this.documentStatusError = '';
+        this.showDocumentStatusModal = true;
+        this.isLoadingDocumentStatus = true;
+
+        try {
+            const response = await fetch(`/api/v1/pegawai/${employee.id}/status-dokumen`, {
+                cache: 'no-store',
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || `HTTP ${response.status}`);
+
+            this.documentStatusEmployee = data.employee;
+            this.documentStatus = data.document_status;
+        } catch (error) {
+            console.error('Gagal memuat rincian dokumen pegawai:', error);
+            this.documentStatusError = error.message || 'Rincian dokumen tidak dapat dimuat.';
+        } finally {
+            this.isLoadingDocumentStatus = false;
+        }
     },
 
     async confirmDeletePegawai() {
@@ -476,11 +508,16 @@
 
                     {{-- Dokumen --}}
                     <td class="!px-2.5 py-2.5">
-                        <span class="inline-flex items-center gap-1.5 font-medium text-xs rounded-md px-2.5 py-1 whitespace-nowrap"
-                            :class="p.is_lengkap ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'">
+                        <button type="button" @click="openDocumentStatus(p)"
+                            class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                            :class="p.is_lengkap ? 'bg-success/10 text-success hover:bg-success/15' : 'bg-warning/10 text-warning hover:bg-warning/15'"
+                            title="Klik untuk melihat rincian status dokumen">
                             <span class="h-1.5 w-1.5 rounded-full" :class="p.is_lengkap ? 'bg-success' : 'bg-warning'"></span>
                             <span x-text="p.is_lengkap ? 'Lengkap' : 'Belum Lengkap'"></span>
-                        </span>
+                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7" />
+                            </svg>
+                        </button>
                     </td>
 
                     {{-- Aksi --}}
@@ -582,6 +619,87 @@
             Batal Pilih
         </button>
     </div>
+
+    {{-- ============================================================ --}}
+    {{-- MODAL RINCIAN STATUS DOKUMEN --}}
+    {{-- ============================================================ --}}
+    <x-ui.modal
+        show="showDocumentStatusModal"
+        title="Rincian Dokumen Pegawai"
+        closeAction="showDocumentStatusModal = false"
+        maxWidth="2xl"
+        bodyClass="p-5"
+    >
+        <div class="space-y-4">
+            <div class="flex items-start justify-between gap-3 rounded-lg border border-border bg-soft/40 p-3">
+                <div class="min-w-0">
+                    <p class="truncate text-sm font-bold text-ink" x-text="documentStatusEmployee?.nama_lengkap ?? 'Pegawai'"></p>
+                    <p class="text-xs text-muted" x-text="'NIP. ' + (documentStatusEmployee?.nip ?? '-')"></p>
+                </div>
+                <span class="inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold"
+                    :class="documentStatus.is_lengkap ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'">
+                    <span class="h-1.5 w-1.5 rounded-full" :class="documentStatus.is_lengkap ? 'bg-success' : 'bg-warning'"></span>
+                    <span x-text="documentStatus.is_lengkap ? 'Lengkap' : 'Belum Lengkap'"></span>
+                </span>
+            </div>
+
+            <template x-if="isLoadingDocumentStatus">
+                <div class="flex items-center justify-center gap-2 py-10 text-sm text-muted">
+                    <svg class="h-5 w-5 animate-spin text-primary" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v8z"></path></svg>
+                    Memeriksa file SK di storage...
+                </div>
+            </template>
+
+            <template x-if="!isLoadingDocumentStatus && documentStatusError">
+                <div class="rounded-lg border border-danger/20 bg-danger/10 p-3 text-sm text-danger" x-text="documentStatusError"></div>
+            </template>
+
+            <template x-if="!isLoadingDocumentStatus && !documentStatusError && documentStatus.total_riwayat === 0 && documentStatus.total_dokumen === 0">
+                <div class="rounded-lg border border-border bg-soft/40 p-5 text-center">
+                    <p class="text-sm font-semibold text-ink">Belum ada dokumen pegawai</p>
+                    <p class="mt-1 text-xs text-muted">Arsip dokumen dan riwayat yang memiliki file akan tampil di sini.</p>
+                </div>
+            </template>
+
+            <template x-if="!isLoadingDocumentStatus && !documentStatusError && documentStatus.total_dokumen > 0">
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <p class="text-sm font-bold text-ink">Daftar Dokumen</p>
+                            <p class="text-xs text-muted" x-text="`${documentStatus.dokumen_tersedia} dari ${documentStatus.total_dokumen} file tersedia di storage.`"></p>
+                        </div>
+                    </div>
+                    <div class="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
+                        <template x-for="(document, index) in documentStatus.documents" :key="document.id ?? `${document.kategori}-${document.file_path ?? index}`">
+                            <div class="rounded-lg border p-3" :class="document.file_tersedia ? 'border-border bg-surface' : 'border-warning/30 bg-warning/5'">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <span class="text-[10px] font-bold uppercase tracking-wide text-muted" x-text="document.kategori"></span>
+                                        <p class="truncate text-sm font-semibold text-ink" x-text="document.nama"></p>
+                                        <p class="mt-0.5 truncate text-xs text-muted" x-text="document.keterangan"></p>
+                                    </div>
+                                    <span class="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold"
+                                        :class="document.file_tersedia ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'">
+                                        <span class="h-1.5 w-1.5 rounded-full" :class="document.file_tersedia ? 'bg-success' : 'bg-warning'"></span>
+                                        <span x-text="document.status_label"></span>
+                                    </span>
+                                </div>
+                                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+                                    <span x-text="'No. Dokumen: ' + document.nomor"></span>
+                                    <span x-text="'Tanggal: ' + document.tanggal"></span>
+                                    <a x-show="document.file_tersedia" :href="document.file_url" target="_blank" rel="noopener"
+                                        class="inline-flex items-center gap-1 font-semibold text-primary hover:underline">
+                                        Buka file
+                                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H19.5m0 0v6m0-6L10.5 15m-3 3h-3a1.5 1.5 0 0 1-1.5-1.5v-12A1.5 1.5 0 0 1 4.5 3h12A1.5 1.5 0 0 1 18 4.5v3" /></svg>
+                                    </a>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </x-ui.modal>
 
     {{-- ============================================================ --}}
     {{-- MODAL UBAH STATUS PEGAWAI --}}

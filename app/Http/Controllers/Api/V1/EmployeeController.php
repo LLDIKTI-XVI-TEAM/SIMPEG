@@ -11,6 +11,7 @@ use App\Actions\Employees\ListInactiveEmployeesAction;
 use App\Actions\Employees\PurgeDeletedEmployeesAction;
 use App\Actions\Employees\RestoreEmployeeAction;
 use App\Actions\Employees\ShowEmployeeAction;
+use App\Actions\Employees\ShowEmployeeDocumentStatusAction;
 use App\Actions\Employees\ShowMyProfileAction;
 use App\Actions\Employees\UpdateEmployeeAction;
 use App\Actions\Employees\UpdateEmployeeStatusAction;
@@ -67,6 +68,20 @@ class EmployeeController extends Controller
             'message' => 'Detail pegawai berhasil diambil.',
             'employee' => $action->execute($employee),
         ]);
+    }
+
+    public function documentStatus(Employee $employee, ShowEmployeeDocumentStatusAction $action): JsonResponse
+    {
+        return response()->json([
+            'message' => 'Status dokumen pegawai berhasil diambil.',
+            'employee' => [
+                'id' => $employee->id,
+                'nama_lengkap' => $employee->nama_lengkap,
+                'nip' => $employee->nip,
+            ],
+            'document_status' => $action->execute($employee),
+            'file_status_checked_at' => now()->toIso8601String(),
+        ])->header('Cache-Control', 'no-store, private, max-age=0, must-revalidate');
     }
 
     public function inactive(Request $request, ListInactiveEmployeesAction $action): JsonResponse

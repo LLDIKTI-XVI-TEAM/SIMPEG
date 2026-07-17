@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Documents\DeleteDocumentAction;
+use App\Actions\Documents\UpdateDocumentAction;
+use App\Models\Appointment;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Models\RefGolongan;
@@ -15,6 +18,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class EmployeeDocumentTest extends TestCase
@@ -117,6 +121,142 @@ class EmployeeDocumentTest extends TestCase
         ]);
     }
 
+    public function test_edit_document_without_replacement_preserves_existing_file(): void
+    {
+        $employee = Employee::factory()->create();
+        $filePath = 'employees/documents/dokumen-lama.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($filePath, 'file lama');
+        $document = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Dokumen Lama',
+            'nomor_dokumen' => 'DOC-LAMA',
+            'file_path' => $filePath,
+            'keterangan' => 'Keterangan lama',
+        ]);
+
+        $updated = app(UpdateDocumentAction::class)->execute($document, [
+            'kategori_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Dokumen Diperbarui',
+            'nomor_dokumen' => 'DOC-BARU',
+            'tanggal_terbit' => '2026-07-16',
+            'deskripsi' => 'Keterangan baru',
+        ]);
+
+        $this->assertSame($filePath, $updated->file_path);
+        Storage::disk(Document::STORAGE_DISK)->assertExists($filePath);
+        $this->assertDatabaseHas('documents', [
+            'id' => $document->id,
+            'nama_dokumen' => 'Dokumen Diperbarui',
+            'nomor_dokumen' => 'DOC-BARU',
+            'keterangan' => 'Keterangan baru',
+            'file_path' => $filePath,
+        ]);
+    }
+
+    public function test_edit_document_with_replacement_deletes_old_file_after_database_update(): void
+    {
+        $employee = Employee::factory()->create();
+        $oldFilePath = 'employees/documents/dokumen-lama.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($oldFilePath, 'file lama');
+        $document = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Dokumen Lama',
+            'nomor_dokumen' => 'DOC-LAMA',
+            'file_path' => $oldFilePath,
+        ]);
+
+        $updated = app(UpdateDocumentAction::class)->execute(
+            $document,
+            [
+                'kategori_dokumen' => 'ijazah',
+                'nama_dokumen' => 'Dokumen Baru',
+                'nomor_dokumen' => 'DOC-BARU',
+                'tanggal_terbit' => '2026-07-16',
+                'deskripsi' => 'File pengganti',
+            ],
+            UploadedFile::fake()->create('dokumen-baru.pdf', 100, 'application/pdf'),
+        );
+
+        $this->assertNotSame($oldFilePath, $updated->file_path);
+        $this->assertStringStartsWith($employee->id.'/ijazah/', $updated->file_path);
+        Storage::disk(Document::STORAGE_DISK)->assertMissing($oldFilePath);
+        Storage::disk(Document::STORAGE_DISK)->assertExists($updated->file_path);
+        $this->assertDatabaseHas('documents', [
+            'id' => $document->id,
+            'jenis_dokumen' => 'ijazah',
+            'nama_dokumen' => 'Dokumen Baru',
+            'nomor_dokumen' => 'DOC-BARU',
+            'keterangan' => 'File pengganti',
+            'file_path' => $updated->file_path,
+        ]);
+    }
+
+    public function test_edit_document_with_replacement_keeps_old_file_when_another_document_still_references_it(): void
+    {
+        $employee = Employee::factory()->create();
+        $oldFilePath = 'employees/documents/dokumen-dipakai-bersama.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($oldFilePath, 'file lama');
+        $document = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Dokumen Utama',
+            'file_path' => $oldFilePath,
+        ]);
+        Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Dokumen Referensi Bersama',
+            'file_path' => $oldFilePath,
+        ]);
+
+        $updated = app(UpdateDocumentAction::class)->execute(
+            $document,
+            [
+                'kategori_dokumen' => 'lainnya',
+                'nama_dokumen' => 'Dokumen Utama Diperbarui',
+                'nomor_dokumen' => null,
+                'tanggal_terbit' => null,
+                'deskripsi' => null,
+            ],
+            UploadedFile::fake()->create('dokumen-pengganti.pdf', 100, 'application/pdf'),
+        );
+
+        Storage::disk(Document::STORAGE_DISK)->assertExists($oldFilePath);
+        Storage::disk(Document::STORAGE_DISK)->assertExists($updated->file_path);
+    }
+
+    public function test_document_list_api_rechecks_storage_file_status_on_every_request(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $filePath = 'employees/documents/status-file.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($filePath, 'dokumen tersedia');
+
+        Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Dokumen Status File',
+            'file_path' => $filePath,
+        ]);
+
+        $response = $this->actingAs($user)->getJson('/api/v1/dokumen?refresh=1');
+        $response
+            ->assertOk()
+            ->assertJsonPath('documents.data.0.status_dokumen', 'tersedia')
+            ->assertJsonPath('documents.data.0.status_label', 'File tersedia');
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+
+        Storage::disk(Document::STORAGE_DISK)->delete($filePath);
+
+        $this->actingAs($user)
+            ->getJson('/api/v1/dokumen?refresh=1')
+            ->assertOk()
+            ->assertJsonPath('documents.data.0.status_dokumen', 'file_tidak_ditemukan')
+            ->assertJsonPath('documents.data.0.status_label', 'File tidak ditemukan');
+    }
+
     public function test_admin_can_access_document_index_page(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -166,7 +306,7 @@ class EmployeeDocumentTest extends TestCase
         ]);
 
         $document = Document::where('employee_id', $employee->id)->where('jenis_dokumen', 'ijazah')->firstOrFail();
-        $this->assertMatchesRegularExpression('/^'.preg_quote($employee->id, '/').'\/ijazah\/'.preg_quote($employee->id, '/').'_ijazah_\d{14}\.pdf$/', $document->file_path);
+        $this->assertMatchesRegularExpression('/^'.preg_quote($employee->id, '/').'\/ijazah\/'.preg_quote($employee->id, '/').'_ijazah_[0-9a-f-]{36}\.pdf$/', $document->file_path);
         Storage::disk(Document::STORAGE_DISK)->assertExists($document->file_path);
     }
 
@@ -213,6 +353,29 @@ class EmployeeDocumentTest extends TestCase
             'employee_id' => $employee->id,
             'nama_dokumen' => 'Script Berbahaya',
         ]);
+        $this->assertSame([], Storage::disk(Document::STORAGE_DISK)->allFiles());
+    }
+
+    public function test_admin_cannot_upload_document_larger_than_size_limit_without_creating_file(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+
+        $this->actingAs($user);
+        $response = $this->from('/dashboard/dokumen')->post('/dashboard/dokumen/upload', [
+            'nama_dokumen' => 'Dokumen Terlalu Besar',
+            'kategori_dokumen' => 'lainnya',
+            'pegawai_id' => $employee->id,
+            'berkas' => UploadedFile::fake()->create('terlalu-besar.pdf', 10241, 'application/pdf'),
+        ]);
+
+        $response->assertRedirect('/dashboard/dokumen');
+        $response->assertSessionHasErrors('berkas');
+        $this->assertDatabaseMissing('documents', [
+            'employee_id' => $employee->id,
+            'nama_dokumen' => 'Dokumen Terlalu Besar',
+        ]);
+        $this->assertSame([], Storage::disk(Document::STORAGE_DISK)->allFiles());
     }
 
     public function test_admin_can_download_document(): void
@@ -250,5 +413,78 @@ class EmployeeDocumentTest extends TestCase
         $this->get('/dashboard/dokumen/not-a-uuid')->assertNotFound();
         $this->get('/dashboard/dokumen/not-a-uuid/download')->assertNotFound();
         $this->get('/dashboard/dokumen/legacy')->assertRedirect(route('dokumen'));
+    }
+
+    public function test_document_used_by_appointment_is_detected_by_file_path_and_cannot_be_deleted(): void
+    {
+        $employee = Employee::factory()->create();
+        $filePath = 'appointments/sk/pengangkatan-terhubung.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($filePath, 'SK pengangkatan');
+
+        $document = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'sk_pengangkatan',
+            'nama_dokumen' => 'SK Pengangkatan',
+            'file_path' => $filePath,
+        ]);
+        Appointment::create([
+            'employee_id' => $employee->id,
+            'jenis_pengangkatan' => 'PNS',
+            'file_sk' => $filePath,
+        ]);
+
+        $action = app(DeleteDocumentAction::class);
+        $impact = $action->checkImpact($document);
+
+        $this->assertTrue($impact['has_blocked']);
+        $this->assertArrayHasKey('Pengangkatan', $impact['blocked_impacts']);
+
+        try {
+            $action->execute($document);
+            $this->fail('Dokumen yang digunakan data pengangkatan tidak boleh dihapus.');
+        } catch (ValidationException) {
+            $this->assertDatabaseHas('documents', ['id' => $document->id]);
+            Storage::disk(Document::STORAGE_DISK)->assertExists($filePath);
+        }
+    }
+
+    public function test_legacy_sk_mutasi_is_blocked_when_it_still_supports_employee_status(): void
+    {
+        $employee = Employee::factory()->create(['status_aktif' => 'Mutasi']);
+        $filePath = 'berkas/'.$employee->id.'/sk-mutasi-lama.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($filePath, 'SK mutasi');
+
+        $document = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'SK Mutasi',
+            'file_path' => $filePath,
+        ]);
+
+        $impact = app(DeleteDocumentAction::class)->checkImpact($document);
+
+        $this->assertTrue($impact['has_blocked']);
+        $this->assertArrayHasKey('Status Pegawai', $impact['blocked_impacts']);
+    }
+
+    public function test_unrelated_additional_document_can_be_deleted(): void
+    {
+        $employee = Employee::factory()->create();
+        $filePath = 'berkas/'.$employee->id.'/ktp.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($filePath, 'KTP');
+
+        $document = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'ktp_kk',
+            'nama_dokumen' => 'KTP',
+            'file_path' => $filePath,
+        ]);
+
+        $action = app(DeleteDocumentAction::class);
+        $this->assertFalse($action->checkImpact($document)['has_blocked']);
+        $action->execute($document);
+
+        $this->assertDatabaseMissing('documents', ['id' => $document->id]);
+        Storage::disk(Document::STORAGE_DISK)->assertMissing($filePath);
     }
 }

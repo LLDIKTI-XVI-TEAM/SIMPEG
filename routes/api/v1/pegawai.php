@@ -95,6 +95,10 @@ Route::middleware($employeeGroupMiddleware)
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
             ->whereUuid('employee')
             ->name('arsip-dokumen.index');
+        Route::get('/{employee}/status-dokumen', [EmployeeController::class, 'documentStatus'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
+            ->whereUuid('employee')
+            ->name('status-dokumen');
         Route::get('/{employee}/riwayat-kepangkatan', [RankHistoryController::class, 'index'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employee_histories.read'])
             ->whereUuid('employee')

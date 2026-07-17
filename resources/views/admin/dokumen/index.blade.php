@@ -8,6 +8,7 @@
             status: '',
         },
         showUploadModal: {{ (old('form_type') === 'upload' && $errors->any()) ? 'true' : 'false' }},
+        isUploading: false,
         showEditModal: {{ (old('form_type') === 'edit' && $errors->any()) ? 'true' : 'false' }},
         editDoc: {
             id: '{{ old("id") }}',
@@ -50,11 +51,11 @@
             toDelete.forEach(k => sessionStorage.removeItem(k));
         },
 
-        async fetchPage(page) {
+        async fetchPage(page, forceRefresh = false) {
             const cKey = this.cacheKey + `_p${page}`;
             const cached = sessionStorage.getItem(cKey);
 
-            if (cached) {
+            if (!forceRefresh && cached) {
                 try {
                     const data = JSON.parse(cached);
                     this.documentsRows = data.rows;
@@ -73,7 +74,12 @@
                     per_page: this.perPage,
                     ...Object.fromEntries(Object.entries(this.filters).filter(([, v]) => v !== '')),
                 });
+                if (forceRefresh) {
+                    params.set('refresh', '1');
+                }
+
                 const res = await fetch(`/api/v1/dokumen?${params}`, {
+                    cache: forceRefresh ? 'no-store' : 'default',
                     headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 });
 
@@ -162,9 +168,9 @@
                 ]" />
             </div>
             <div class="flex shrink-0 items-center gap-3">
-                <button type="button" @click="clearCache(); fetchPage(meta.current_page);"
+                <button type="button" @click="clearCache(); fetchPage(meta.current_page, true);"
                     class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm cursor-pointer font-sans"
-                    title="Refresh Data">
+                    title="Refresh data dan periksa ulang status file di storage">
                     <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
                     </svg>
@@ -373,11 +379,11 @@
         <x-ui.modal
             show="showUploadModal"
             title="Unggah Dokumen Kepegawaian"
-            closeAction="showUploadModal = false"
+            closeAction="if (!isUploading) showUploadModal = false"
             maxWidth="lg"
             bodyClass="p-5 space-y-3"
         >
-            <form action="{{ route('dokumen.store') }}" method="POST" enctype="multipart/form-data" class="space-y-3">
+            <form action="{{ route('dokumen.store') }}" method="POST" enctype="multipart/form-data" class="space-y-3" @submit="if (isUploading) { $event.preventDefault(); return; } isUploading = true">
                 @csrf
                 <input type="hidden" name="form_type" value="upload">
 
@@ -500,19 +506,27 @@
 
                 {{-- Tombol Aksi --}}
                 <div class="flex justify-end gap-3 pt-3 border-t border-border">
-                    <button type="button" @click="showUploadModal = false"
-                        class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-soft cursor-pointer focus:outline-none font-sans">
+                    <button type="button" @click="showUploadModal = false" :disabled="isUploading"
+                        class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-soft cursor-pointer focus:outline-none font-sans disabled:cursor-not-allowed disabled:opacity-60">
                         <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
                         </svg>
                         Batal
                     </button>
-                    <button type="submit"
-                        class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90 cursor-pointer focus:outline-none font-sans">
-                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-                        </svg>
-                        Mulai Unggah
+                    <button type="submit" :disabled="isUploading"
+                        class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90 cursor-pointer focus:outline-none font-sans disabled:cursor-not-allowed disabled:opacity-60">
+                        <template x-if="isUploading">
+                            <svg class="w-4 h-4 mr-1.5 shrink-0 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z"></path>
+                            </svg>
+                        </template>
+                        <template x-if="!isUploading">
+                            <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                            </svg>
+                        </template>
+                        <span x-text="isUploading ? 'Mengunggah...' : 'Mulai Unggah'"></span>
                     </button>
                 </div>
             </form>

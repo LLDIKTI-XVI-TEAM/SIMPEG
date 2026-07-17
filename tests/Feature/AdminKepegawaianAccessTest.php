@@ -34,6 +34,7 @@ class AdminKepegawaianAccessTest extends TestCase
             'data-master',
             'hari-libur',
             'ews.config',
+            'cuti.config',
             'pengaturan',
             'data-nonaktif',
         ] as $forbiddenRoute) {
@@ -81,21 +82,27 @@ class AdminKepegawaianAccessTest extends TestCase
             ->assertSee('Pengaturan Sistem');
     }
 
-    public function test_halaman_pengaturan_mengarahkan_konfigurasi_cuti_ke_halaman_chain_pegawai(): void
+    public function test_super_admin_melihat_konfigurasi_approval_cuti_di_sidebar_dan_bukan_pengaturan(): void
     {
         $superAdmin = User::factory()->superAdmin()->create();
 
-        $response = $this->actingAs($superAdmin)
+        $dashboardResponse = $this->actingAs($superAdmin)
             ->withSession(['active_role' => 'super_admin'])
-            ->get(route('pengaturan'));
+            ->get(route('dashboard'));
 
-        $response->assertOk();
-        $response->assertSee('Konfigurasi Approval Cuti');
-        $response->assertSee(route('cuti.config'), false);
-        $response->assertSee('Kepala Bagian, nol atau lebih verifikator, dan PYBMC');
-        $response->assertDontSee('Stage 2');
-        $response->assertDontSee('Stage 3');
-        $response->assertDontSee('Riza Hamzah, S.Sos.');
+        $dashboardResponse->assertOk();
+        $dashboardResponse->assertSee('href="'.route('cuti.config').'"', false);
+        $dashboardResponse->assertSee('Konfigurasi Approval Cuti');
+
+        $settingsResponse = $this->get(route('pengaturan'));
+
+        $settingsResponse->assertOk();
+        $settingsContent = strstr($settingsResponse->getContent(), '<main');
+
+        $this->assertIsString($settingsContent);
+        $this->assertStringNotContainsString('href="'.route('cuti.config').'"', $settingsContent);
+        $this->assertStringNotContainsString('Konfigurasi Approval Cuti', $settingsContent);
+        $this->assertStringNotContainsString('Alur Approval Cuti', $settingsContent);
     }
 
     public function test_admin_kepegawaian_dapat_membuka_halaman_operasional_sesuai_dokumen(): void

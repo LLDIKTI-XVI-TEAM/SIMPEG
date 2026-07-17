@@ -146,10 +146,6 @@
                             <span>Umum & Instansi</span>
                         </x-ui.tab>
 
-                        <x-ui.tab variant="sidebar" active="activeTab === 'cuti'" click="activeTab = 'cuti'">
-                            <span>Alur Approval Cuti</span>
-                        </x-ui.tab>
-
                         <x-ui.tab variant="sidebar" active="activeTab === 'rbac'" click="activeTab = 'rbac'">
                             <span>Pemetaan SSO & RBAC</span>
                         </x-ui.tab>
@@ -242,20 +238,6 @@
                         </div>
                     </form>
                 </div>
-
-                {{-- TAB: ALUR APPROVAL CUTI --}}
-                <section x-show="activeTab === 'cuti'" class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-5" style="display: none;" aria-labelledby="settings-cuti-heading">
-                    <div class="border-b border-border pb-4">
-                        <h2 id="settings-cuti-heading" class="text-lg font-bold text-ink font-sans leading-tight">Konfigurasi Approval Cuti</h2>
-                        <p class="mt-0.5 text-[11px] leading-normal text-muted font-sans">Konfigurasi chain dikelola per pegawai pada halaman khusus.</p>
-                    </div>
-                    <div class="rounded-lg border border-info/20 bg-info/5 p-4 text-xs leading-relaxed text-info">
-                        Setiap chain memakai Kepala Bagian, nol atau lebih verifikator, dan PYBMC. Perubahan berlaku untuk pengajuan berikutnya; snapshot pengajuan yang sudah disubmit tetap tidak berubah.
-                    </div>
-                    <a href="{{ route('cuti.config') }}" class="inline-flex items-center justify-center rounded-xl border border-primary bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30">
-                        Buka Konfigurasi Approval Cuti
-                    </a>
-                </section>
 
                 {{-- TAB: PEMETAAN SSO & RBAC --}}
                 <x-ui.card padding="lg" x-show="activeTab === 'rbac'"   style="display: none;" class="space-y-6">

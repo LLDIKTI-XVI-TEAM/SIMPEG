@@ -13,7 +13,7 @@ class DeleteEmployeeFamilyAction
     public function __construct(private readonly EmployeeFamilyPayload $payload) {}
 
     /**
-     * Menonaktifkan data keluarga dengan soft delete dan mencatat audit tanpa NIK.
+     * Menghapus data keluarga secara permanen dan mencatat audit tanpa NIK.
      */
     public function execute(Employee $employee, EmployeeFamily $family, Request $request): void
     {
@@ -22,10 +22,10 @@ class DeleteEmployeeFamilyAction
         $oldValues = $this->payload->audit($family);
         $familyId = $family->id;
 
-        $family->delete();
+        $family->forceDelete();
 
         AuditService::log(
-            'SOFT_DELETE',
+            'DELETE',
             'EmployeeFamily',
             $familyId,
             $oldValues,

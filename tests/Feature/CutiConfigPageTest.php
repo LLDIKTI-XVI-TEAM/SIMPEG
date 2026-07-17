@@ -57,6 +57,13 @@ class CutiConfigPageTest extends TestCase
 
         $response->assertOk()
             ->assertSee('Chain Approval Pegawai')
+            ->assertSee('class="rounded-xl border border-border bg-surface shadow-sm"', false)
+            ->assertSee('role="combobox"', false)
+            ->assertSee('x-show="false"', false)
+            ->assertSee("document.getElementById('employee-search')?.form?.requestSubmit()", false)
+            ->assertSee('@keydown.enter.prevent="selectActive($event)"', false)
+            ->assertSee(':name="selectedId ? null :', false)
+            ->assertSee('x-show="selectedId"', false)
             ->assertSee($pegawai->nama_lengkap)
             ->assertSee($kepalaBagian->nama_lengkap)
             ->assertSee('Kepala Bagian')
@@ -77,6 +84,20 @@ class CutiConfigPageTest extends TestCase
             ->assertSee(':name="pybmcEmployeeId ? \'steps[_pybmc][approver_employee_id]\' : null" x-model="pybmcEmployeeId"', false)
             ->assertSee('PYBMC Global')
             ->assertSee('Override global mengubah PYBMC pada semua chain aktif', false)
+            ->assertSee('Pelajari Backfill Chain Dinamis')
+            ->assertSee('aria-haspopup="dialog"', false)
+            ->assertSee('id="backfill-help-dialog"', false)
+            ->assertSee('role="dialog"', false)
+            ->assertSee('aria-modal="true"', false)
+            ->assertSee('aria-labelledby="backfill-help-title"', false)
+            ->assertSee('aria-describedby="backfill-help-description"', false)
+            ->assertSee('Apa itu Backfill Chain Dinamis?')
+            ->assertSee('Kepala Bagian')
+            ->assertSee('Verifikator')
+            ->assertSee('PYBMC')
+            ->assertSee('Alasan Backfill disimpan pada setiap chain yang berhasil dibuat dan catatan auditnya.')
+            ->assertSee('@keydown.tab="trapBackfillHelpFocus($event)"', false)
+            ->assertSee('closeBackfillHelp()', false)
             ->assertSee('hidden overflow-x-auto md:block', false)
             ->assertSee('space-y-3 p-5 md:hidden', false)
             ->assertSee('break-words text-ink', false)
@@ -87,6 +108,11 @@ class CutiConfigPageTest extends TestCase
             ->assertDontSee('Approver Stage 3', false)
             ->assertDontSee('stage2_approver_id', false)
             ->assertDontSee('stage3_approver_id', false);
+
+        $component = file_get_contents(resource_path('views/components/cuti/employee-combobox.blade.php'));
+        $this->assertIsString($component);
+        $this->assertStringContainsString('name="{{ $queryName }}"', $component);
+        $this->assertStringContainsString(':name="selectedId ? null : @js($queryName)"', $component);
     }
 
     public function test_pencarian_pegawai_dibatasi_lima_puluh_hasil(): void
