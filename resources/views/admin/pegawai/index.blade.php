@@ -740,25 +740,24 @@
     {{-- ============================================================ --}}
     <x-ui.modal
         show="showDeleteModal"
-        title="Hapus Pegawai ke Backup"
+        title="Nonaktifkan Pegawai"
         closeAction="showDeleteModal = false"
         maxWidth="sm"
     >
         <div class="space-y-4">
-            {{-- Info backup --}}
+            {{-- Info nonaktif --}}
             <div class="flex items-start gap-3 rounded-lg bg-warning/10 border border-warning/20 p-3">
                 <svg class="w-5 h-5 mt-0.5 shrink-0 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
                 </svg>
                 <div>
                     <p class="text-sm font-semibold text-ink font-sans">
-                        Data akan dipindahkan ke Backup
+                        Data akan dipindahkan ke Daftar Nonaktif
                     </p>
                     <p class="text-xs text-muted font-sans mt-1">
                         Pegawai <strong x-text="deletePegawaiName" class="text-ink"></strong> akan dihapus dari daftar aktif
-                        dan disimpan di <strong>Data Backup</strong> selama <strong>30 hari</strong>.
-                        Dalam masa tersebut data masih bisa dipulihkan.
-                        Setelah 30 hari, data beserta semua riwayat dan file akan <span class="text-danger font-semibold">dihapus permanen otomatis</span>.
+                        dan disimpan di <strong>Daftar Pegawai Nonaktif</strong>.
+                        Data tidak dihapus permanen dan dapat <span class="text-primary font-semibold">dipulihkan kapan saja</span>.
                     </p>
                 </div>
             </div>

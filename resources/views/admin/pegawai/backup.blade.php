@@ -224,22 +224,12 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
         </svg>
         <div class="flex-1 min-w-0">
-            <p class="text-sm font-semibold text-ink font-sans">Trash / Data Backup Pegawai</p>
+            <p class="text-sm font-semibold text-ink font-sans">Data Backup Pegawai</p>
             <p class="text-xs text-muted font-sans mt-0.5">
-                Pegawai yang dihapus disimpan di sini selama <span class="font-semibold text-ink">{{ $retentionDays }} hari</span>.
-                Setelah {{ $retentionDays }} hari, data beserta semua riwayat dan file akan
-                <span class="font-semibold text-danger">dihapus permanen otomatis</span>.
-                Pilih satu atau lebih untuk dipulihkan sekaligus.
+                Pegawai yang dinonaktifkan disimpan di sini dan <span class="font-semibold text-primary">tidak akan dihapus otomatis</span>.
+                Data dapat dipulihkan kapan saja. Pilih satu atau lebih untuk dipulihkan sekaligus.
             </p>
         </div>
-        @if($expiredCount > 0)
-        <div class="shrink-0 flex items-center gap-1.5 rounded-lg bg-danger/10 border border-danger/20 px-3 py-2">
-            <svg class="w-4 h-4 text-danger shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-            </svg>
-            <span class="text-xs font-bold text-danger font-sans whitespace-nowrap">{{ $expiredCount }} akan dihapus</span>
-        </div>
-        @endif
     </div>
 
     {{-- DATA TABLE --}}
@@ -251,8 +241,7 @@
             ['key' => 'nama_lengkap',     'label' => 'Pegawai'],
             ['key' => 'jabatan',          'label' => 'Jabatan & Unit Terakhir'],
             ['key' => 'golongan_terakhir','label' => 'Gol. / Jenis'],
-            ['key' => 'deleted_at_human', 'label' => 'Dihapus Pada'],
-            ['key' => 'sisa_waktu',       'label' => 'Sisa Waktu'],
+            ['key' => 'deleted_at_human', 'label' => 'Dinonaktifkan Pada'],
             ['key' => 'aksi',             'label' => 'Aksi', 'align' => 'right'],
         ]"
         fetchPage="fetchPage(page)"
@@ -263,7 +252,7 @@
         searchPlaceholder="Cari nama atau NIP..."
         emptyTitle="Tidak ada data backup."
         emptyIcon="document"
-        :colspanCount="7"
+        :colspanCount="6"
         checkAllId="backup-check-all"
         checkAllAction="toggleAll($event.target.checked)"
     >
@@ -272,11 +261,7 @@
         {{-- Rows --}}
         <template x-if="!isLoading && rows && rows.length > 0">
             <template x-for="(p, index) in rows" :key="p.id">
-                <tr class="border-b border-border last:border-0 transition-colors hover:bg-soft/40"
-                    :class="{
-                        'bg-danger/5':  p.is_expired,
-                        'bg-warning/5': p.is_urgent && !p.is_expired,
-                    }">
+                <tr class="border-b border-border last:border-0 transition-colors hover:bg-soft/40">
 
                     {{-- Checkbox --}}
                     <td class="px-4 py-3.5">
@@ -287,8 +272,7 @@
                     {{-- Pegawai --}}
                     <td class="px-4 py-3.5">
                         <div class="flex items-center gap-3">
-                            <div class="relative flex h-8 w-8 shrink-0 overflow-hidden items-center justify-center rounded-full border text-sm font-bold"
-                                :class="p.is_expired ? 'border-danger/30 bg-danger/10 text-danger' : 'border-border bg-soft text-muted'">
+                            <div class="relative flex h-8 w-8 shrink-0 overflow-hidden items-center justify-center rounded-full border border-border bg-soft text-sm font-bold text-muted">
                                 <template x-if="p.foto_url">
                                     <img :src="p.foto_url" :alt="'Foto ' + p.nama_lengkap"
                                         class="h-full w-full object-cover object-[center_25%]" loading="lazy"
@@ -320,25 +304,7 @@
                         <p class="text-[10px] text-muted" x-text="p.deleted_at_human.split(' ')[1] ?? ''"></p>
                     </td>
 
-                    {{-- Sisa Waktu --}}
-                    <td class="px-4 py-3.5">
-                        <span class="inline-flex items-center gap-1.5 font-medium font-sans leading-none px-2.5 py-1 text-xs rounded-md"
-                            :class="{
-                                'bg-danger/10 text-danger':   p.is_expired || p.is_urgent,
-                                'bg-warning/10 text-warning': p.is_warning,
-                                'bg-soft text-muted':         !p.is_expired && !p.is_urgent && !p.is_warning,
-                            }">
-                            <span class="h-1.5 w-1.5 rounded-full"
-                                :class="{
-                                    'bg-danger animate-pulse': p.is_expired,
-                                    'bg-danger':   p.is_urgent && !p.is_expired,
-                                    'bg-warning':  p.is_warning,
-                                    'bg-muted':    !p.is_expired && !p.is_urgent && !p.is_warning,
-                                }"></span>
-                            <span x-text="p.is_expired ? 'Akan dihapus' : p.sisa_hari + ' hari lagi'"></span>
-                        </span>
-                        <p class="text-[10px] text-muted font-sans mt-1" x-text="'Hapus: ' + p.purge_at_human"></p>
-                    </td>
+
 
                     {{-- Aksi --}}
                     <td class="px-4 py-3.5 text-right">
@@ -376,14 +342,6 @@
         </template>
 
     </x-ui.data-table>
-
-    {{-- KETERANGAN WARNA --}}
-    <div class="mt-3 flex flex-wrap items-center gap-4 text-xs text-muted font-sans">
-        <span class="font-semibold text-ink">Keterangan:</span>
-        <span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-muted inline-block"></span>Aman (&gt;7 hari)</span>
-        <span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-warning inline-block"></span>Peringatan (3–7 hari)</span>
-        <span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-danger inline-block"></span>Segera dihapus (0–3 hari / expired)</span>
-    </div>
 
     {{-- ============================================================ --}}
     {{-- FLOATING BULK ACTION BAR --}}

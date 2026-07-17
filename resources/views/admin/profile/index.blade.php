@@ -955,7 +955,7 @@
                         </div>
                         <div>
                             <h4 class="font-bold text-ink text-sm">Data Backup</h4>
-                            <p class="text-[11px] text-muted mt-1 leading-relaxed">Riwayat penghapusan data pegawai (soft delete & hard delete) dari sistem.</p>
+                            <p class="text-[11px] text-muted mt-1 leading-relaxed">Daftar pegawai yang dinonaktifkan. Data aman dan dapat dipulihkan kapan saja.</p>
                         </div>
                     </a>
 
