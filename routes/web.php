@@ -1,6 +1,5 @@
 <?php
 
-use App\Actions\Ews\ListActiveEwsAlertsAction;
 use App\Http\Controllers\Admin\AuditController;
 use App\Http\Controllers\Admin\CutiConfigController;
 use App\Http\Controllers\Admin\CutiController;
@@ -35,6 +34,7 @@ use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\UserMappingController;
 use App\Http\Controllers\Auth\KeycloakAuthController;
 use App\Http\Controllers\Cuti\VerifyLeaveProofController;
+use App\Http\Controllers\DashboardController;
 use App\Models\Employee;
 use App\Models\Permission;
 use App\Models\Role;
@@ -107,36 +107,7 @@ if (app()->environment(['local', 'testing'])) {
 }
 
 Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_kepegawaian,pimpinan,kepala_bagian,pegawai'])->group(function (): void {
-    Route::get('/dashboard', function (Request $request, ListActiveEwsAlertsAction $ewsAlerts) {
-        $user = $request->user();
-        $role = $user?->role;
-
-        if ($role === 'pimpinan') {
-            return redirect()->route('pimpinan.dashboard');
-        }
-
-        if ($role === 'kepala_bagian') {
-            return redirect()->route('kepala-bagian.dashboard');
-        }
-
-        $isPegawai = $role === 'pegawai';
-        $employeeId = $isPegawai ? (string) ($user?->employee_id ?? '') : null;
-        $dashboardEwsData = $employeeId !== '' || ! $isPegawai
-            ? $ewsAlerts->execute(null, null, $employeeId)
-            : ['alerts' => []];
-        $dashboardEwsAlerts = $dashboardEwsData['alerts'];
-
-        return view('dashboard', [
-            'dashboardEwsAlerts' => array_slice($dashboardEwsAlerts, 0, 5),
-            'dashboardEwsTotal' => count($dashboardEwsAlerts),
-            'dashboardEwsUrgent' => collect($dashboardEwsAlerts)->where('urgency', 'danger')->count(),
-            'dashboardEwsWarning' => collect($dashboardEwsAlerts)->where('urgency', 'warning')->count(),
-            'dashboardEwsInfo' => collect($dashboardEwsAlerts)->where('urgency', 'success')->count(),
-            'dashboardEwsLink' => $isPegawai
-                ? route('ews.saya')
-                : (in_array($role, ['super_admin', 'admin_kepegawaian'], true) ? route('ews') : '#ews-section'),
-        ]);
-    })->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::get('/admin/search', [GlobalSearchController::class, 'search'])
         ->middleware('role:super_admin,admin_kepegawaian')
