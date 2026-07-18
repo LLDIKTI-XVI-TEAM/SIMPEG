@@ -23,10 +23,11 @@ class GlobalSearchController extends Controller
         $results = [];
 
         $isPimpinan = auth()->user()?->role === 'pimpinan';
+        $op = \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
 
         // 1. Search Employees (Pegawai & NIP)
-        $employees = Employee::where('nama_lengkap', 'ilike', "%{$query}%")
-            ->orWhere('nip', 'ilike', "%{$query}%")
+        $employees = Employee::where('nama_lengkap', $op, "%{$query}%")
+            ->orWhere('nip', $op, "%{$query}%")
             ->limit(5)
             ->get();
 
@@ -45,7 +46,7 @@ class GlobalSearchController extends Controller
         // 2. Search Unit Kerja
         if (! $isPimpinan && class_exists(RefUnitKerja::class)) {
             try {
-                $units = RefUnitKerja::where('nama', 'ilike', "%{$query}%")
+                $units = RefUnitKerja::where('nama', $op, "%{$query}%")
                     ->limit(5)
                     ->get();
                 if ($units->isNotEmpty()) {
@@ -64,8 +65,8 @@ class GlobalSearchController extends Controller
         // 3. Search Dokumen
         if (! $isPimpinan && class_exists(Document::class)) {
             try {
-                $docs = Document::with('employee')->where('nama_dokumen', 'ilike', "%{$query}%")
-                    ->orWhere('nomor_dokumen', 'ilike', "%{$query}%")
+                $docs = Document::with('employee')->where('nama_dokumen', $op, "%{$query}%")
+                    ->orWhere('nomor_dokumen', $op, "%{$query}%")
                     ->limit(5)
                     ->get();
                 if ($docs->isNotEmpty()) {
@@ -86,7 +87,7 @@ class GlobalSearchController extends Controller
         // 4. Search Cuti
         if (class_exists(LeaveRequest::class)) {
             try {
-                $leaves = LeaveRequest::with('employee')->where('alasan', 'ilike', "%{$query}%")
+                $leaves = LeaveRequest::with('employee')->where('alasan', $op, "%{$query}%")
                     ->limit(5)
                     ->get();
                 if ($leaves->isNotEmpty()) {
@@ -108,8 +109,8 @@ class GlobalSearchController extends Controller
 
         // 5. Search Users (kept for completeness)
         if (! $isPimpinan) {
-            $users = User::where('name', 'like', "%{$query}%")
-                ->orWhere('email', 'like', "%{$query}%")
+            $users = User::where('name', $op, "%{$query}%")
+                ->orWhere('email', $op, "%{$query}%")
                 ->limit(5)
                 ->get();
 
