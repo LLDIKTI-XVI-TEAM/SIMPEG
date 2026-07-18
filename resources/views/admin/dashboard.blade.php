@@ -1,10 +1,4 @@
-@php
-    $role = auth()->user()?->role ?? 'pegawai';
-@endphp
 
-@if($role === 'kepala_bagian')
-    @include('kabag.dashboard')
-@else
 <x-layouts.app title="Dashboard" subtitle="Ringkasan eksekutif dan pemantauan aktivitas kepegawaian hari ini.">
     @php
         $dashboardEwsAlerts = $dashboardEwsAlerts ?? [];
@@ -758,4 +752,3 @@
     </x-ui.card>
 
 </x-layouts.app>
-@endif

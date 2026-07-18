@@ -30,9 +30,7 @@ class ListLeaveRequestsAction
      */
     public function execute(User $user, Request $request): array
     {
-        // Pimpinan dan Kepala Bagian menggunakan rute ini khusus untuk self-service pengajuan mandiri,
-        // karena mereka telah memiliki rute monitoring terpisah.
-        $isPegawai = in_array($user->role, ['pegawai', 'pimpinan', 'kepala_bagian'], true);
+        $isPegawai = ! $user->hasPermission('cuti.read_all');
         $search = $isPegawai ? '' : trim((string) $request->query('search', ''));
         $status = (string) $request->query('status', '');
         $jenis = (string) $request->query('jenis', '');
@@ -45,7 +43,7 @@ class ListLeaveRequestsAction
             ->latest();
 
         // Role pegawai selalu dibatasi ke data sendiri meski mapping permission salah konfigurasi.
-        if ($isPegawai || ! $user->hasPermission('cuti.read_all')) {
+        if ($user->role === 'pegawai' || ! $user->hasPermission('cuti.read_all')) {
             $query->where('employee_id', $user->employee_id);
         }
 

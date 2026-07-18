@@ -6,7 +6,10 @@
         unreadCount: 0,
         notifications: [],
         pollingTimer: null,
+        requestInFlight: false,
+        authRedirecting: false,
         endpoint: @js(route('api.v1.notifikasi.index')),
+        loginEndpoint: @js(route('login')),
         markAllEndpoint: @js(route('api.v1.notifikasi.tandai-semua-dibaca')),
         markEndpointTemplate: @js(route('api.v1.notifikasi.tandai-dibaca', ['notificationId' => '__ID__'])),
         csrf: document.querySelector('meta[name=csrf-token]')?.content ?? '',
@@ -14,19 +17,30 @@
             this.load();
             this.pollingTimer = setInterval(() => this.load(), 30000);
         },
-        async load() {
-            if (this.pollingTimer === false) return;
+        stopPolling() {
+            clearInterval(this.pollingTimer);
+            this.pollingTimer = false;
+        },
+        redirectToLogin() {
+            if (this.authRedirecting) return;
 
+            this.authRedirecting = true;
+            this.stopPolling();
+            window.location.assign(this.loginEndpoint);
+        },
+        async load() {
+            if (this.requestInFlight || this.authRedirecting || this.pollingTimer === false) return;
+
+            this.requestInFlight = true;
             this.loading = true;
             try {
                 const response = await fetch(this.endpoint, {
                     headers: { Accept: 'application/json' },
-                    credentials: 'same-origin'
+                    credentials: 'same-origin',
+                    redirect: 'manual'
                 });
-                if (response.status === 401) {
-                    // Session timeout sudah diproses server; hentikan polling agar fetch berikutnya tidak mengikuti redirect SSO.
-                    clearInterval(this.pollingTimer);
-                    this.pollingTimer = false;
+                if (response.type === 'opaqueredirect' || response.status === 401) {
+                    this.redirectToLogin();
                     return;
                 }
                 if (!response.ok) return;
@@ -34,6 +48,7 @@
                 this.notifications = (payload.data ?? []).slice(0, 10);
                 this.unreadCount = payload.meta?.unread_count ?? 0;
             } finally {
+                this.requestInFlight = false;
                 this.loading = false;
             }
         },

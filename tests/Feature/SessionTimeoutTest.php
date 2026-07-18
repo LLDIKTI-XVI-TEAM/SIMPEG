@@ -170,15 +170,31 @@ class SessionTimeoutTest extends TestCase
         ]);
     }
 
-    public function test_notification_bell_stops_polling_after_timeout_response(): void
+    public function test_notification_bell_stops_polling_and_redirects_once_after_authentication_loss(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
 
         $response = $this->actingAs($user)->get(route('dashboard'));
 
         $response->assertOk();
-        $response->assertSee('response.status === 401', false);
-        $response->assertSee('clearInterval(this.pollingTimer)', false);
+        $response->assertSee("redirect: 'manual'", false);
+        $response->assertSee("response.type === 'opaqueredirect' || response.status === 401", false);
+        $response->assertSee('this.stopPolling()', false);
+        $response->assertSee('if (this.authRedirecting) return', false);
+        $response->assertSee('window.location.assign(this.loginEndpoint)', false);
+    }
+
+    public function test_notification_bell_allows_only_one_polling_request_in_flight(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $response = $this->actingAs($user)->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertSee('requestInFlight: false', false);
+        $response->assertSee('if (this.requestInFlight || this.authRedirecting || this.pollingTimer === false) return', false);
+        $response->assertSee('this.requestInFlight = true', false);
+        $response->assertSee('this.requestInFlight = false', false);
     }
 
     public function test_audit_page_recognizes_session_timeout_event(): void

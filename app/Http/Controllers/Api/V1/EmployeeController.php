@@ -5,10 +5,8 @@ namespace App\Http\Controllers\Api\V1;
 use App\Actions\Employees\AssignSupervisorAction;
 use App\Actions\Employees\CreateEmployeeAction;
 use App\Actions\Employees\DeactivateEmployeeAction;
-use App\Actions\Employees\DeleteEmployeeAction;
 use App\Actions\Employees\ListEmployeesAction;
 use App\Actions\Employees\ListInactiveEmployeesAction;
-use App\Actions\Employees\PurgeDeletedEmployeesAction;
 use App\Actions\Employees\RestoreEmployeeAction;
 use App\Actions\Employees\ShowEmployeeAction;
 use App\Actions\Employees\ShowEmployeeDocumentStatusAction;
@@ -96,7 +94,6 @@ class EmployeeController extends Controller
     {
         $perPage = min(max((int) ($request->query('per_page', 10)), 1), 100);
         $search = trim((string) ($request->query('search', '')));
-        $retentionDays = PurgeDeletedEmployeesAction::RETENTION_DAYS;
 
         $paginator = Employee::onlyTrashed()
             ->with([
@@ -116,17 +113,11 @@ class EmployeeController extends Controller
             ->orderByDesc('deleted_at')
             ->paginate($perPage)
             ->withQueryString()
-            ->through(fn (Employee $employee) => $this->backupPayload($employee, $retentionDays));
-
-        $expiredCount = Employee::onlyTrashed()
-            ->where('deleted_at', '<=', now()->subDays($retentionDays))
-            ->count();
+            ->through(fn (Employee $employee) => $this->backupPayload($employee));
 
         return response()->json([
-            'message' => 'Data backup pegawai berhasil diambil.',
+            'message' => 'Data pegawai nonaktif berhasil diambil.',
             'employees' => $paginator,
-            'expired_count' => $expiredCount,
-            'retention_days' => $retentionDays,
         ]);
     }
 
@@ -136,15 +127,6 @@ class EmployeeController extends Controller
 
         return response()->json([
             'message' => 'Data pegawai berhasil dinonaktifkan.',
-        ]);
-    }
-
-    public function forceDestroy(Employee $employee, Request $request, DeleteEmployeeAction $action): JsonResponse
-    {
-        $action->execute($employee, $request);
-
-        return response()->json([
-            'message' => 'Data pegawai berhasil dihapus secara permanen.',
         ]);
     }
 
@@ -231,16 +213,14 @@ class EmployeeController extends Controller
     }
 
     /**
-     * Payload untuk tabel backup — digunakan Alpine.js di halaman data-backup.
+     * Payload ringkas untuk backup — data pegawai nonaktif tanpa informasi sensitif.
      *
      * @return array<string, mixed>
      */
-    private function backupPayload(Employee $employee, int $retentionDays): array
+    private function backupPayload(Employee $employee): array
     {
         $latestPosition = $employee->positionHistories->first();
         $deletedAt = $employee->deleted_at;
-        $purgeAt = $deletedAt?->copy()->addDays($retentionDays);
-        $sisaHari = $purgeAt ? (int) now()->diffInDays($purgeAt, false) : 0;
 
         return [
             'id' => $employee->id,
@@ -252,11 +232,6 @@ class EmployeeController extends Controller
             'golongan_terakhir' => $employee->golongan_terakhir ?? '-',
             'jenis_pegawai' => $employee->jenisPegawai?->nama ?? '-',
             'deleted_at_human' => $deletedAt?->format('d/m/Y H:i') ?? '-',
-            'purge_at_human' => $purgeAt?->format('d/m/Y') ?? '-',
-            'sisa_hari' => $sisaHari,
-            'is_expired' => $sisaHari <= 0,
-            'is_urgent' => $sisaHari > 0 && $sisaHari <= 3,
-            'is_warning' => $sisaHari > 3 && $sisaHari <= 7,
         ];
     }
 }
