@@ -12,6 +12,11 @@ use Illuminate\Pagination\LengthAwarePaginator;
 
 class PimpinanReportController extends Controller
 {
+    public function index()
+    {
+        return view('pimpinan.laporan.index');
+    }
+
     public function leaves(LeaveReportFilterRequest $request, ExportLeaveReportAction $action)
     {
         $filters = $request->validated();

@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Actions\Employees\ListEmployeesAction;
+use App\Actions\Laporan\PimpinanCustomEmployeeExportAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Laporan\CustomEmployeeExportRequest;
+use App\Http\Requests\Laporan\ExportPegawaiRequest;
 use App\Models\Employee;
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
@@ -14,6 +17,7 @@ use App\Models\RefJenjangPendidikan;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PimpinanEmployeeController extends Controller
 {
@@ -137,6 +141,23 @@ class PimpinanEmployeeController extends Controller
 
         $p = $employee;
 
-        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions'));
+        return view('pimpinan.pegawai.show', compact('p'));
+    }
+
+    public function reportPage(ExportPegawaiRequest $request): mixed
+    {
+        $filters         = $request->validated();
+        $selectedColumns = (array) ($filters['columns'] ?? []);
+
+        return view('pimpinan.laporan.pegawai', [
+            'filters'        => $filters,
+            'selectedColumns' => $selectedColumns,
+            'allowedColumns'  => PimpinanCustomEmployeeExportAction::ALLOWED_COLUMNS,
+        ]);
+    }
+
+    public function reportCustom(CustomEmployeeExportRequest $request, PimpinanCustomEmployeeExportAction $action): StreamedResponse
+    {
+        return $action->execute($request->validated());
     }
 }
