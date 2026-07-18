@@ -146,13 +146,13 @@ class PimpinanEmployeeController extends Controller
 
     public function reportPage(ExportPegawaiRequest $request): mixed
     {
-        $filters         = $request->validated();
+        $filters = $request->validated();
         $selectedColumns = (array) ($filters['columns'] ?? []);
 
         return view('pimpinan.laporan.pegawai', [
-            'filters'        => $filters,
+            'filters' => $filters,
             'selectedColumns' => $selectedColumns,
-            'allowedColumns'  => PimpinanCustomEmployeeExportAction::ALLOWED_COLUMNS,
+            'allowedColumns' => PimpinanCustomEmployeeExportAction::ALLOWED_COLUMNS,
         ]);
     }
 
