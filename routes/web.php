@@ -110,7 +110,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::get('/admin/search', [GlobalSearchController::class, 'search'])
-        ->middleware('role:super_admin,admin_kepegawaian')
+        ->middleware('role:super_admin,admin_kepegawaian,pimpinan')
         ->name('global.search');
 
     Route::get('/change-role/{role}', function (Request $request, string $role) {

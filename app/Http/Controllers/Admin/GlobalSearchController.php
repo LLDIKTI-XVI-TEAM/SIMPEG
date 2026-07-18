@@ -22,6 +22,8 @@ class GlobalSearchController extends Controller
 
         $results = [];
 
+        $isPimpinan = auth()->user()?->role === 'pimpinan';
+
         // 1. Search Employees (Pegawai & NIP)
         $employees = Employee::where('nama_lengkap', 'ilike', "%{$query}%")
             ->orWhere('nip', 'ilike', "%{$query}%")
@@ -29,17 +31,19 @@ class GlobalSearchController extends Controller
             ->get();
 
         if ($employees->isNotEmpty()) {
-            $results['Pegawai'] = $employees->map(function ($emp) {
+            $results['Pegawai'] = $employees->map(function ($emp) use ($isPimpinan) {
                 return [
                     'title' => $emp->nama_lengkap,
                     'subtitle' => 'NIP: '.$emp->nip.' — '.($emp->jabatan_terakhir ?? '-'),
-                    'url' => route('data-pegawai', ['search' => $emp->nip]),
+                    'url' => $isPimpinan 
+                        ? route('pimpinan.pegawai.index', ['search' => $emp->nip]) 
+                        : route('data-pegawai', ['search' => $emp->nip]),
                 ];
             });
         }
 
         // 2. Search Unit Kerja
-        if (class_exists(RefUnitKerja::class)) {
+        if (!$isPimpinan && class_exists(RefUnitKerja::class)) {
             try {
                 $units = RefUnitKerja::where('nama', 'ilike', "%{$query}%")
                     ->limit(5)
@@ -58,7 +62,7 @@ class GlobalSearchController extends Controller
         }
 
         // 3. Search Dokumen
-        if (class_exists(Document::class)) {
+        if (!$isPimpinan && class_exists(Document::class)) {
             try {
                 $docs = Document::with('employee')->where('nama_dokumen', 'ilike', "%{$query}%")
                     ->orWhere('nomor_dokumen', 'ilike', "%{$query}%")
@@ -86,13 +90,15 @@ class GlobalSearchController extends Controller
                     ->limit(5)
                     ->get();
                 if ($leaves->isNotEmpty()) {
-                    $results['Cuti'] = $leaves->map(function ($leave) {
+                    $results['Cuti'] = $leaves->map(function ($leave) use ($isPimpinan) {
                         $empName = $leave->employee ? $leave->employee->nama_lengkap : 'Unknown';
 
                         return [
                             'title' => 'Pengajuan Cuti: '.$empName,
                             'subtitle' => 'Alasan: '.mb_strimwidth($leave->alasan, 0, 50, '...').' ('.ucfirst($leave->status).')',
-                            'url' => route('cuti').'?search='.urlencode($empName),
+                            'url' => $isPimpinan 
+                                ? route('pimpinan.cuti.index', ['search' => $empName]) 
+                                : route('cuti').'?search='.urlencode($empName),
                         ];
                     });
                 }
@@ -101,19 +107,21 @@ class GlobalSearchController extends Controller
         }
 
         // 5. Search Users (kept for completeness)
-        $users = User::where('name', 'like', "%{$query}%")
-            ->orWhere('email', 'like', "%{$query}%")
-            ->limit(5)
-            ->get();
+        if (!$isPimpinan) {
+            $users = User::where('name', 'like', "%{$query}%")
+                ->orWhere('email', 'like', "%{$query}%")
+                ->limit(5)
+                ->get();
 
-        if ($users->isNotEmpty()) {
-            $results['Pengguna Sistem'] = $users->map(function ($u) {
-                return [
-                    'title' => $u->name,
-                    'subtitle' => $u->email.' — Role: '.($u->role ?? '-'),
-                    'url' => route('user-management', ['search' => $u->name]),
-                ];
-            });
+            if ($users->isNotEmpty()) {
+                $results['Pengguna Sistem'] = $users->map(function ($u) {
+                    return [
+                        'title' => $u->name,
+                        'subtitle' => $u->email.' — Role: '.($u->role ?? '-'),
+                        'url' => route('user-management', ['search' => $u->name]),
+                    ];
+                });
+            }
         }
 
         return response()->json($results);
