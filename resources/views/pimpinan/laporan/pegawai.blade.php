@@ -22,14 +22,7 @@
                     <div class="flex flex-wrap gap-3">
                         @foreach($allowedColumns as $key => $label)
                             <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-soft/40 px-3 py-2 text-sm transition hover:bg-soft">
-                                <input
-                                    id="column-{{ $key }}"
-                                    name="columns[]"
-                                    value="{{ $key }}"
-                                    type="checkbox"
-                                    class="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                                    {{ in_array($key, $selectedColumns, true) ? 'checked' : '' }}
-                                >
+                                <input id="column-{{ $key }}" name="columns[]" value="{{ $key }}" type="checkbox"{{ in_array($key, $selectedColumns, true) ? ' checked' : '' }} class="h-4 w-4 rounded border-border text-primary focus:ring-primary">
                                 <span class="text-ink">{{ $label }}</span>
                             </label>
                         @endforeach
@@ -39,27 +32,27 @@
                 {{-- Filter --}}
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <div>
-                        <x-form.label for="filter-search">Cari Nama / NIP</x-form.label>
+                        <label class="mb-1 block text-sm font-semibold text-ink" for="filter-search">Cari Nama / NIP</label>
                         <x-form.input id="filter-search" name="search" type="text" placeholder="Nama atau NIP..."
                             :value="$filters['search'] ?? ''" />
                     </div>
                     <div>
-                        <x-form.label for="filter-golongan">Golongan</x-form.label>
+                        <label class="mb-1 block text-sm font-semibold text-ink" for="filter-golongan">Golongan</label>
                         <x-form.input id="filter-golongan" name="golongan" type="text" placeholder="Contoh: IV"
                             :value="$filters['golongan'] ?? ''" />
                     </div>
                     <div>
-                        <x-form.label for="filter-status">Status</x-form.label>
+                        <label class="mb-1 block text-sm font-semibold text-ink" for="filter-status">Status</label>
                         <x-form.input id="filter-status" name="status" type="text" placeholder="Contoh: Aktif"
                             :value="$filters['status'] ?? ''" />
                     </div>
                     <div>
-                        <x-form.label for="filter-pensiun-dari">Pensiun Dari</x-form.label>
+                        <label class="mb-1 block text-sm font-semibold text-ink" for="filter-pensiun-dari">Pensiun Dari</label>
                         <x-form.input id="filter-pensiun-dari" name="pensiun_dari" type="date"
                             :value="$filters['pensiun_dari'] ?? ''" />
                     </div>
                     <div>
-                        <x-form.label for="filter-pensiun-sampai">Pensiun Sampai</x-form.label>
+                        <label class="mb-1 block text-sm font-semibold text-ink" for="filter-pensiun-sampai">Pensiun Sampai</label>
                         <x-form.input id="filter-pensiun-sampai" name="pensiun_sampai" type="date"
                             :value="$filters['pensiun_sampai'] ?? ''" />
                     </div>

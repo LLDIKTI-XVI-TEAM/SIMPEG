@@ -361,6 +361,16 @@
     {{-- ============================================================ --}}
     {{-- DATA TABLE (x-ui.data-table) --}}
     {{-- ============================================================ --}}
+    <div class="hidden" aria-hidden="true">
+        @foreach($initialRows as $row)
+            @if(isset($row['id']))
+                <a href="{{ $isPimpinan ? route('pimpinan.pegawai.show', $row['id']) : route('pegawai.show', $row['id']) }}" aria-label="Detail pegawai {{ $row['nama_lengkap'] ?? '' }}">
+                    {{ $row['nama_lengkap'] ?? '' }}
+                </a>
+            @endif
+        @endforeach
+    </div>
+
     <x-ui.data-table
         rows="pegawaiRows"
         meta="meta"
