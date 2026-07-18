@@ -8,6 +8,7 @@ use App\Actions\Reports\ExportRankHistoryReportAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Reports\LeaveReportFilterRequest;
 use App\Http\Requests\Reports\RankHistoryReportFilterRequest;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class PimpinanReportController extends Controller
 {
@@ -18,7 +19,7 @@ class PimpinanReportController extends Controller
         $page = request('page', 1);
 
         $allRows = $action->rows($filters);
-        $previewData = new \Illuminate\Pagination\LengthAwarePaginator(
+        $previewData = new LengthAwarePaginator(
             $allRows->forPage($page, $perPage)->values(),
             $allRows->count(),
             $perPage,
@@ -45,7 +46,7 @@ class PimpinanReportController extends Controller
         $page = request('page', 1);
 
         $allRows = $action->rows($filters);
-        $previewData = new \Illuminate\Pagination\LengthAwarePaginator(
+        $previewData = new LengthAwarePaginator(
             $allRows->forPage($page, $perPage)->values(),
             $allRows->count(),
             $perPage,

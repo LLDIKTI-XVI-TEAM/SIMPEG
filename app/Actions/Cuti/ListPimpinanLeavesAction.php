@@ -58,10 +58,11 @@ class ListPimpinanLeavesAction
 
         $perPage = (int) request('per_page', 10);
         $paginator = $query->latest()->paginate($perPage)->withQueryString();
-        
+
         // Pimpinan needs activeStep for the table
         $paginator->getCollection()->transform(function (LeaveRequest $r) {
             $r->activeStep = $r->steps->firstWhere('status', 'active');
+
             return $r;
         });
 

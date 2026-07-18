@@ -5,7 +5,12 @@ namespace App\Http\Controllers\Admin;
 use App\Actions\Employees\ListEmployeesAction;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
+use App\Models\RefEselon;
+use App\Models\RefGolongan;
+use App\Models\RefJabatan;
+use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
+use App\Models\RefJenjangPendidikan;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
 use Illuminate\Http\Request;
@@ -55,7 +60,7 @@ class PimpinanEmployeeController extends Controller
             'per_page' => $employees->perPage(),
         ];
 
-        $golonganOptions = \App\Models\Employee::query()
+        $golonganOptions = Employee::query()
             ->whereNotNull('golongan_terakhir')
             ->distinct()
             ->orderBy('golongan_terakhir')
@@ -69,9 +74,9 @@ class PimpinanEmployeeController extends Controller
             $golonganOptions = collect(['II', 'III', 'IV']);
         }
 
-        $unitKerjaOptions = \App\Models\RefUnitKerja::query()->orderBy('nama')->get(['id', 'nama']);
-        $jenisPegawaiOptions = \App\Models\RefJenisPegawai::query()->orderBy('nama')->get(['id', 'nama']);
-        $statusOptions = \App\Models\RefStatusPegawai::query()->orderByDesc('is_default')->orderBy('nama')->get(['id', 'nama']);
+        $unitKerjaOptions = RefUnitKerja::query()->orderBy('nama')->get(['id', 'nama']);
+        $jenisPegawaiOptions = RefJenisPegawai::query()->orderBy('nama')->get(['id', 'nama']);
+        $statusOptions = RefStatusPegawai::query()->orderByDesc('is_default')->orderBy('nama')->get(['id', 'nama']);
 
         return view('admin.pegawai.index', compact(
             'initialRows', 'initialMeta',
@@ -123,15 +128,15 @@ class PimpinanEmployeeController extends Controller
                 ]),
         ]);
 
-        $golonganOptions = \App\Models\RefGolongan::all();
-        $jabatanOptions = \App\Models\RefJabatan::with('jenisJabatan')->orderBy('nama')->get();
-        $jenisJabatanOptions = \App\Models\RefJenisJabatan::all();
-        $unitKerjaOptions = \App\Models\RefUnitKerja::all();
-        $eselonOptions = \App\Models\RefEselon::all();
-        $jenjangOptions = \App\Models\RefJenjangPendidikan::orderBy('urutan')->get();
+        $golonganOptions = RefGolongan::all();
+        $jabatanOptions = RefJabatan::with('jenisJabatan')->orderBy('nama')->get();
+        $jenisJabatanOptions = RefJenisJabatan::all();
+        $unitKerjaOptions = RefUnitKerja::all();
+        $eselonOptions = RefEselon::all();
+        $jenjangOptions = RefJenjangPendidikan::orderBy('urutan')->get();
 
         $p = $employee;
+
         return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions'));
     }
 }
-
