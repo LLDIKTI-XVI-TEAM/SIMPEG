@@ -9,6 +9,7 @@ use App\Models\LeaveRequest;
 use App\Models\RefUnitKerja;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class GlobalSearchController extends Controller
 {
@@ -23,7 +24,7 @@ class GlobalSearchController extends Controller
         $results = [];
 
         $isPimpinan = auth()->user()?->role === 'pimpinan';
-        $op = \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+        $op = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
 
         // 1. Search Employees (Pegawai & NIP)
         $employees = Employee::where('nama_lengkap', $op, "%{$query}%")
