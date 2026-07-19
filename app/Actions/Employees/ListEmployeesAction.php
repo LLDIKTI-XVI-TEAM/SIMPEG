@@ -39,20 +39,22 @@ class ListEmployeesAction
                 // Semua riwayat dibutuhkan untuk memeriksa kelengkapan SK, bukan
                 // hanya riwayat terbaru yang sebelumnya diperlukan oleh tabel.
                 'rankHistories:id,employee_id,file_sk',
-                'positionHistories' => fn ($query) => $query
+                'positionHistories' => fn($query) => $query
                     ->select(['id', 'employee_id', 'file_sk', 'is_latest', 'tmt_jabatan', 'jabatan_id', 'unit_kerja_id'])
                     ->with(['jabatan:id,nama', 'unitKerja:id,nama'])
                     ->orderByDesc('is_latest')
                     ->orderByDesc('tmt_jabatan'),
                 'salaryHistories:id,employee_id,file_sk',
-                'appointments' => fn ($query) => $query
+                'appointments' => fn($query) => $query
                     ->select(['id', 'employee_id', 'file_sk', 'tmt_pengangkatan'])
                     ->orderByDesc('tmt_pengangkatan'),
+                // Berkas lainnya (KTP, KK, mutasi, dll) — hanya ambil field yang dibutuhkan
+                'documents:id,employee_id,file_path',
             ])
             ->when(
                 $validated['search'] ?? null,
-                fn ($query, string $search) => $query->where(function ($query) use ($search): void {
-                    $keyword = '%'.mb_strtolower($search).'%';
+                fn($query, string $search) => $query->where(function ($query) use ($search): void {
+                    $keyword = '%' . mb_strtolower($search) . '%';
 
                     $query->whereRaw('lower(nama_lengkap) like ?', [$keyword])
                         ->orWhereRaw('lower(nip) like ?', [$keyword]);
@@ -60,20 +62,20 @@ class ListEmployeesAction
             )
             ->when(
                 $validated['golongan'] ?? null,
-                fn ($query, string $golongan) => $query->where(function ($q) use ($golongan) {
+                fn($query, string $golongan) => $query->where(function ($q) use ($golongan) {
                     $q->where('golongan_terakhir', $golongan)
-                        ->orWhere('golongan_terakhir', 'LIKE', $golongan.'/%');
+                        ->orWhere('golongan_terakhir', 'LIKE', $golongan . '/%');
                 })
             )
             ->when(
                 $validated['unit_kerja_id'] ?? null,
-                fn ($query, string $unitKerjaId) => $query->whereHas('positionHistories', function ($q) use ($unitKerjaId): void {
+                fn($query, string $unitKerjaId) => $query->whereHas('positionHistories', function ($q) use ($unitKerjaId): void {
                     $q->where('unit_kerja_id', $unitKerjaId)->where('is_latest', true);
                 })
             )
             ->when(
                 $validated['jenis_pegawai_id'] ?? null,
-                fn ($query, string $jenisPegawaiId) => $query->where('jenis_pegawai_id', $jenisPegawaiId)
+                fn($query, string $jenisPegawaiId) => $query->where('jenis_pegawai_id', $jenisPegawaiId)
             )
             ->when(
                 ($validated['status_pegawai_id'] ?? null) ?: null,
@@ -82,12 +84,12 @@ class ListEmployeesAction
                         $query->where('status_pegawai_id', $statusPegawaiId);
                     }
                 },
-                fn ($query) => $query->where('status_aktif', ($validated['status_aktif'] ?? '') ?: 'Aktif')
+                fn($query) => $query->where('status_aktif', ($validated['status_aktif'] ?? '') ?: 'Aktif')
             )
             ->orderBy($sort, $direction)
             ->paginate($perPage)
             ->withQueryString()
-            ->through(fn (Employee $p) => $this->toTableRow($p));
+            ->through(fn(Employee $p) => $this->toTableRow($p));
     }
 
     /**
@@ -112,35 +114,51 @@ class ListEmployeesAction
             'jenis_pegawai' => $p->jenisPegawai?->nama ?? '-',
             'status_nama' => $statusNama,
             'status_key' => strtolower((string) $statusNama),
-            'is_lengkap' => $this->hasCompleteSupportingFiles($p),
+            'is_lengkap' => $this->checkDocumentStatus($p),
             'tmt' => $tmt?->format('d/m/Y'),
         ];
     }
 
     /**
-     * Riwayat yang sudah dibuat wajib memiliki SK yang tersedia di storage.
-     * Riwayat yang belum dibuat tidak memengaruhi kelengkapan dokumen pegawai.
+     * Mengembalikan status kelengkapan dokumen pegawai dalam 4 kondisi:
+     * - 'kosong'       : Tidak ada riwayat SK maupun berkas lainnya di database.
+     * - 'tersedia'     : Tidak ada riwayat SK, tapi ada berkas lainnya (KTP, KK, mutasi, dll)
+     *                    yang filenya tersedia di storage.
+     * - 'tidak_lengkap': Ada riwayat SK di database, namun ada file_sk yang kosong
+     *                    atau file fisiknya tidak ditemukan di storage.
+     * - 'lengkap'      : Semua riwayat SK memiliki file_sk dan file fisiknya tersedia di storage.
      */
-    private function hasCompleteSupportingFiles(Employee $employee): bool
+    private function checkDocumentStatus(Employee $employee): string
     {
         $histories = $employee->rankHistories
             ->concat($employee->positionHistories)
             ->concat($employee->salaryHistories)
             ->concat($employee->appointments);
 
+        // Tidak ada riwayat SK apapun
         if ($histories->isEmpty()) {
-            return true;
+            // Cek apakah ada berkas lain (KTP, KK, mutasi, dll) yang filenya tersedia
+            $disk = Storage::disk(Document::STORAGE_DISK);
+            $adaBerkasLainDenganFile = $employee->documents
+                ->contains(fn($doc): bool => filled($doc->file_path) && $disk->exists($doc->file_path));
+
+            return $adaBerkasLainDenganFile ? 'tersedia' : 'kosong';
         }
 
         $filePaths = $histories->pluck('file_sk');
-        if ($filePaths->contains(fn ($path): bool => blank($path))) {
-            return false;
+
+        // Ada riwayat tapi salah satu file_sk NULL/kosong → tidak lengkap
+        if ($filePaths->contains(fn($path): bool => blank($path))) {
+            return 'tidak_lengkap';
         }
 
         $disk = Storage::disk(Document::STORAGE_DISK);
 
-        return $filePaths
+        // Ada file_sk di DB tapi file fisiknya hilang dari storage → tidak lengkap
+        $semuaAdaDiStorage = $filePaths
             ->unique()
-            ->every(fn (string $path): bool => $disk->exists($path));
+            ->every(fn(string $path): bool => $disk->exists($path));
+
+        return $semuaAdaDiStorage ? 'lengkap' : 'tidak_lengkap';
     }
 }

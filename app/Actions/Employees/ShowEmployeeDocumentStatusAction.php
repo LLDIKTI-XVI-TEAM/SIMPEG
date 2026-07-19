@@ -13,25 +13,25 @@ class ShowEmployeeDocumentStatusAction
     /**
      * Menyusun rincian status SK setiap riwayat pegawai berdasarkan file aktual.
      *
-     * @return array{is_lengkap: bool, total_riwayat: int, file_tersedia: int, records: list<array<string, mixed>>}
+     * @return array{status_kelengkapan: string, is_lengkap: bool, total_riwayat: int, file_tersedia: int, records: list<array<string, mixed>>}
      */
     public function execute(Employee $employee): array
     {
         $employee->load([
-            'rankHistories' => fn ($query) => $query
+            'rankHistories' => fn($query) => $query
                 ->select(['id', 'employee_id', 'golongan_id', 'no_sk', 'tanggal_sk', 'tmt_pangkat', 'file_sk'])
                 ->with('golongan:id,kode,nama')
                 ->orderByDesc('tmt_pangkat'),
-            'positionHistories' => fn ($query) => $query
+            'positionHistories' => fn($query) => $query
                 ->select(['id', 'employee_id', 'nama_jabatan', 'no_sk', 'tanggal_sk', 'tmt_jabatan', 'file_sk'])
                 ->orderByDesc('tmt_jabatan'),
-            'salaryHistories' => fn ($query) => $query
+            'salaryHistories' => fn($query) => $query
                 ->select(['id', 'employee_id', 'gaji_pokok', 'no_sk', 'tanggal_sk', 'tmt_kgb', 'file_sk'])
                 ->orderByDesc('tmt_kgb'),
-            'appointments' => fn ($query) => $query
+            'appointments' => fn($query) => $query
                 ->select(['id', 'employee_id', 'jenis_pengangkatan', 'no_sk', 'tanggal_sk', 'tmt_pengangkatan', 'file_sk'])
                 ->orderByDesc('tmt_pengangkatan'),
-            'documents' => fn ($query) => $query
+            'documents' => fn($query) => $query
                 ->select(['id', 'employee_id', 'jenis_dokumen', 'nama_dokumen', 'nomor_dokumen', 'tanggal_dokumen', 'file_path', 'keterangan'])
                 ->orderByDesc('tanggal_dokumen')
                 ->orderByDesc('created_at'),
@@ -45,7 +45,7 @@ class ShowEmployeeDocumentStatusAction
                 $disk,
                 'Pangkat',
                 $history->golongan?->nama ?? $history->golongan?->kode ?? 'Riwayat Pangkat',
-                'TMT Pangkat: '.$history->tmt_pangkat?->format('d/m/Y'),
+                'TMT Pangkat: ' . $history->tmt_pangkat?->format('d/m/Y'),
                 $history->no_sk,
                 $history->tanggal_sk?->format('d/m/Y'),
                 $history->file_sk,
@@ -57,7 +57,7 @@ class ShowEmployeeDocumentStatusAction
                 $disk,
                 'Jabatan',
                 $history->nama_jabatan,
-                'TMT Jabatan: '.$history->tmt_jabatan?->format('d/m/Y'),
+                'TMT Jabatan: ' . $history->tmt_jabatan?->format('d/m/Y'),
                 $history->no_sk,
                 $history->tanggal_sk?->format('d/m/Y'),
                 $history->file_sk,
@@ -68,8 +68,8 @@ class ShowEmployeeDocumentStatusAction
             $records->push($this->record(
                 $disk,
                 'KGB',
-                'Gaji Pokok: Rp '.number_format((float) $history->gaji_pokok, 0, ',', '.'),
-                'TMT KGB: '.$history->tmt_kgb?->format('d/m/Y'),
+                'Gaji Pokok: Rp ' . number_format((float) $history->gaji_pokok, 0, ',', '.'),
+                'TMT KGB: ' . $history->tmt_kgb?->format('d/m/Y'),
                 $history->no_sk,
                 $history->tanggal_sk?->format('d/m/Y'),
                 $history->file_sk,
@@ -81,7 +81,7 @@ class ShowEmployeeDocumentStatusAction
                 $disk,
                 'Pengangkatan',
                 $history->jenis_pengangkatan,
-                'TMT Pengangkatan: '.$history->tmt_pengangkatan?->format('d/m/Y'),
+                'TMT Pengangkatan: ' . $history->tmt_pengangkatan?->format('d/m/Y'),
                 $history->no_sk,
                 $history->tanggal_sk?->format('d/m/Y'),
                 $history->file_sk,
@@ -89,20 +89,32 @@ class ShowEmployeeDocumentStatusAction
         }
 
         $archiveDocuments = $employee->documents
-            ->map(fn (Document $document): array => $this->documentRecord($disk, $document));
-        $historyDocuments = $records->map(fn (array $record): array => $this->historyDocumentRecord($record));
+            ->map(fn(Document $document): array => $this->documentRecord($disk, $document));
+        $historyDocuments = $records->map(fn(array $record): array => $this->historyDocumentRecord($record));
         $documents = $archiveDocuments
             ->concat($historyDocuments)
             // Arsip Document menjadi sumber utama bila file juga tersambung ke riwayat.
-            ->unique(fn (array $document): string => filled($document['file_path'])
-                ? 'file:'.$document['file_path']
-                : 'record:'.($document['id'] ?? $document['kategori'].'|'.$document['nama'].'|'.$document['nomor']))
+            ->unique(fn(array $document): string => filled($document['file_path'])
+                ? 'file:' . $document['file_path']
+                : 'record:' . ($document['id'] ?? $document['kategori'] . '|' . $document['nama'] . '|' . $document['nomor']))
             ->values();
 
+        $totalRiwayat = $records->count();
+        $fileTersediaCount = $records->where('file_tersedia', true)->count();
+
+        if ($totalRiwayat === 0) {
+            $statusKelengkapan = 'kosong';
+        } elseif ($fileTersediaCount === $totalRiwayat) {
+            $statusKelengkapan = 'lengkap';
+        } else {
+            $statusKelengkapan = 'tidak_lengkap';
+        }
+
         return [
-            'is_lengkap' => $records->every(fn (array $record): bool => $record['file_tersedia']),
-            'total_riwayat' => $records->count(),
-            'file_tersedia' => $records->where('file_tersedia', true)->count(),
+            'status_kelengkapan' => $statusKelengkapan,
+            'is_lengkap' => $statusKelengkapan === 'lengkap', // backward-compat
+            'total_riwayat' => $totalRiwayat,
+            'file_tersedia' => $fileTersediaCount,
             'records' => $records->values()->all(),
             'total_dokumen' => $documents->count(),
             'dokumen_tersedia' => $documents->where('file_tersedia', true)->count(),
@@ -125,7 +137,7 @@ class ShowEmployeeDocumentStatusAction
             'tanggal' => $document->tanggal_dokumen?->format('d/m/Y') ?: '-',
             'keterangan' => $document->keterangan ?: '-',
             'file_path' => $document->file_path,
-            'file_url' => $fileTersedia ? asset('storage/'.$document->file_path) : null,
+            'file_url' => $fileTersedia ? asset('storage/' . $document->file_path) : null,
             'file_tersedia' => $fileTersedia,
             'status_label' => $fileTersedia ? 'File tersedia' : 'File tidak ditemukan',
         ];
@@ -170,12 +182,12 @@ class ShowEmployeeDocumentStatusAction
 
         return [
             'jenis' => $jenis,
-            'judul' => $judul ?: 'Riwayat '.$jenis,
+            'judul' => $judul ?: 'Riwayat ' . $jenis,
             'detail' => $detail,
             'nomor_sk' => $nomorSk ?: '-',
             'tanggal_sk' => $tanggalSk ?: '-',
             'file_path' => $filePath,
-            'file_url' => $fileTersedia ? asset('storage/'.$filePath) : null,
+            'file_url' => $fileTersedia ? asset('storage/' . $filePath) : null,
             'file_tersedia' => $fileTersedia,
             'status_label' => $fileTersedia ? 'File tersedia' : (blank($filePath) ? 'File belum diunggah' : 'File tidak ditemukan'),
         ];

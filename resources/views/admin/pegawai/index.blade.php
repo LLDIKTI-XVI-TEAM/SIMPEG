@@ -1,11 +1,6 @@
 <x-layouts.app title="Data Pegawai">
-@php
-    $isPimpinan = auth()->user()->role === 'pimpinan';
-    $employeeDetailBase = $isPimpinan ? '/pimpinan/pegawai' : '/pegawai';
-    $dashboardRoute = $isPimpinan ? route('pimpinan.dashboard') : route('dashboard');
-@endphp
 
-<div x-data="{
+    <div x-data="{
     // ===== State Modal Riwayat =====
     showRiwayatModal: false,
     riwayatType: '',
@@ -33,7 +28,7 @@
     // ===== State Modal Rincian Dokumen =====
     showDocumentStatusModal: false,
     documentStatusEmployee: null,
-    documentStatus: { is_lengkap: true, total_riwayat: 0, file_tersedia: 0, records: [], total_dokumen: 0, dokumen_tersedia: 0, documents: [] },
+    documentStatus: { status_kelengkapan: 'kosong', is_lengkap: false, total_riwayat: 0, file_tersedia: 0, records: [], total_dokumen: 0, dokumen_tersedia: 0, documents: [] },
     isLoadingDocumentStatus: false,
     documentStatusError: '',
 
@@ -60,12 +55,12 @@
     },
 
     clearCache() {
-        for (let i = sessionStorage.length - 1; i >= 0; i--) {
+        const toDelete = [];
+        for (let i = 0; i < sessionStorage.length; i++) {
             const key = sessionStorage.key(i);
-            if (key && key.startsWith('pegawai_')) {
-                sessionStorage.removeItem(key);
-            }
+            if (key && key.startsWith('pegawai_')) toDelete.push(key);
         }
+        toDelete.forEach(k => sessionStorage.removeItem(k));
     },
 
     async fetchPage(page) {
@@ -185,7 +180,7 @@
 
     async openDocumentStatus(employee) {
         this.documentStatusEmployee = { id: employee.id, nama_lengkap: employee.nama_lengkap, nip: employee.nip };
-        this.documentStatus = { is_lengkap: employee.is_lengkap, total_riwayat: 0, file_tersedia: 0, records: [], total_dokumen: 0, dokumen_tersedia: 0, documents: [] };
+        this.documentStatus = { status_kelengkapan: employee.is_lengkap, is_lengkap: employee.is_lengkap === 'lengkap', total_riwayat: 0, file_tersedia: 0, records: [], total_dokumen: 0, dokumen_tersedia: 0, documents: [] };
         this.documentStatusError = '';
         this.showDocumentStatusModal = true;
         this.isLoadingDocumentStatus = true;
@@ -212,7 +207,7 @@
         if (!this.deletePegawaiId) return;
         this.isDeleting = true;
         try {
-            // Soft delete â€” data masuk backup 30 hari, bisa dipulihkan
+            // Soft delete — data masuk backup 30 hari, bisa dipulihkan
             const res = await fetch(`/api/v1/pegawai/${this.deletePegawaiId}`, {
                 method: 'DELETE',
                 headers: {
@@ -297,534 +292,613 @@
     },
 
     init() {
-        // SELALU gunakan data initialRows dari backend saat load pertama kali.
-        // Hapus cache lama agar tidak nyangkut dengan array kosong.
-        this.clearCache();
+        if (this.dataChanged) {
+            this.clearCache();
+            this.fetchPage(1);
+            return;
+        }
         const cKey = this.cacheKey + `_p${this.meta.current_page}`;
+        const cached = sessionStorage.getItem(cKey);
+        if (cached) {
+            try {
+                const data = JSON.parse(cached);
+                this.pegawaiRows = data.rows;
+                this.meta = data.meta;
+                return;
+            } catch (e) {
+                sessionStorage.removeItem(cKey);
+            }
+        }
         if (this.pegawaiRows.length > 0) {
             sessionStorage.setItem(cKey, JSON.stringify({ rows: this.pegawaiRows, meta: this.meta }));
         }
     },
 }" class="space-y-6">
 
-    {{-- PAGE HEADER --}}
-    <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-            <h2 class="text-2xl font-semibold text-ink">Data Pegawai</h2>
-            <x-ui.breadcrumb :items="[
-                ['label' => 'Dashboard', 'url' => $dashboardRoute],
-                ['label' => 'Data Pegawai'],
-            ]" />
-        </div>
-        <div class="flex shrink-0 items-center gap-3">
-            <button type="button" @click="clearCache(); fetchPage(meta.current_page);"
-                class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm cursor-pointer"
-                title="Refresh Data">
-                <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-                </svg>
-                Refresh
-            </button>
-            <button onclick="exportFilteredData()" id="export-btn"
-                class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm cursor-pointer">
-                <svg class="w-4 h-4 mr-1.5 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-                </svg>
-                Export Excel
-            </button>
-            @if(auth()->user()->role !== 'pimpinan')
-            <div class="relative" x-data="{ open: false }">
-                <button @click="open = !open" @click.outside="open = false" id="add-pegawai-btn"
-                    class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
-                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        {{-- PAGE HEADER --}}
+        <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+                <h2 class="text-2xl font-semibold text-ink">Data Pegawai</h2>
+                <x-ui.breadcrumb :items="[
+        ['label' => 'Dashboard', 'url' => route('dashboard')],
+        ['label' => 'Data Pegawai'],
+    ]" />
+            </div>
+            <div class="flex shrink-0 items-center gap-3">
+                <button type="button" @click="clearCache(); fetchPage(meta.current_page);"
+                    class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm cursor-pointer"
+                    title="Refresh Data">
+                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
                     </svg>
-                    Tambah Pegawai
+                    Refresh
                 </button>
-                <div x-show="open" style="display: none;" x-transition
-                    class="absolute right-0 top-full mt-1.5 w-full rounded-lg border border-border bg-surface p-1 shadow-lg z-20">
-                    <a href="{{ route('pegawai.create') }}" class="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-ink hover:bg-soft transition-colors font-sans">
-                        <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg>
-                        Tambah Manual
-                    </a>
-                    <a href="{{ route('pegawai.import') }}" class="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-ink hover:bg-soft transition-colors font-sans mt-1">
-                        <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
-                        Import Pegawai
-                    </a>
+                <button onclick="exportFilteredData()" id="export-btn"
+                    class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm cursor-pointer">
+                    <svg class="w-4 h-4 mr-1.5 text-primary shrink-0" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                    </svg>
+                    Export Excel
+                </button>
+                <div class="relative" x-data="{ open: false }">
+                    <button @click="open = !open" @click.outside="open = false" id="add-pegawai-btn"
+                        class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                            stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                        Tambah Pegawai
+                    </button>
+                    <div x-show="open" style="display: none;" x-transition
+                        class="absolute right-0 top-full mt-1.5 w-full rounded-lg border border-border bg-surface p-1 shadow-lg z-20">
+                        <a href="{{ route('pegawai.create') }}"
+                            class="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-ink hover:bg-soft transition-colors font-sans">
+                            <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                            </svg>
+                            Tambah Manual
+                        </a>
+                        <a href="{{ route('pegawai.import') }}"
+                            class="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-ink hover:bg-soft transition-colors font-sans mt-1">
+                            <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                            </svg>
+                            Import Pegawai
+                        </a>
+                    </div>
                 </div>
             </div>
-            @endif
         </div>
-    </div>
 
 
-    {{-- ============================================================ --}}
-    {{-- DATA TABLE (x-ui.data-table) --}}
-    {{-- ============================================================ --}}
-    <div class="hidden" aria-hidden="true">
-        @foreach($initialRows as $row)
-            @if(isset($row['id']))
-                <a href="{{ $isPimpinan ? route('pimpinan.pegawai.show', $row['id']) : route('pegawai.show', $row['id']) }}" aria-label="Detail pegawai {{ $row['nama_lengkap'] ?? '' }}">
-                    {{ $row['nama_lengkap'] ?? '' }}
-                </a>
-            @endif
-        @endforeach
-    </div>
+        {{-- ============================================================ --}}
+        {{-- DATA TABLE (x-ui.data-table) --}}
+        {{-- ============================================================ --}}
+        <x-ui.data-table rows="pegawaiRows" meta="meta" :columns="[
+        ['key' => 'check', 'label' => '', 'width' => 'w-10'],
+        ['key' => 'nama_lengkap', 'label' => 'Pegawai', 'sortable' => true],
+        ['key' => 'jabatan', 'label' => 'Jabatan & Unit', 'sortable' => true],
+        ['key' => 'golongan_terakhir', 'label' => 'Gol. / Jenis', 'sortable' => true],
+        ['key' => 'tmt', 'label' => 'TMT'],
+        ['key' => 'status_nama', 'label' => 'Status'],
+        ['key' => 'is_lengkap', 'label' => 'Dokumen'],
+        ['key' => 'aksi', 'label' => 'Aksi'],
+    ]" fetchPage="fetchPage(page)"
+            isLoading="isLoading" perPage="perPage" setPerPage="setPerPage($event.target.value)" sort="sort"
+            direction="direction" setSort="setSort(col)" searchModel="filters.search"
+            searchPlaceholder="Cari nama atau NIP..." emptyTitle="Tidak ada data pegawai yang sesuai."
+            emptyIcon="search" :colspanCount="8" checkAllId="check-all" filterClass="lg:grid-cols-5">
+            {{-- ---- Filter Slots ---- --}}
+            <x-slot:filters>
+                {{-- Filter Golongan --}}
+                <div>
+                    <x-form.select x-model="filters.golongan" @change="applyFilter()" size="md">
+                        <option value="">Semua Golongan</option>
+                        @foreach($golonganOptions as $golongan)
+                            <option value="{{ $golongan }}">Golongan {{ $golongan }}</option>
+                        @endforeach
+                    </x-form.select>
+                </div>
 
-    <x-ui.data-table
-        rows="pegawaiRows"
-        meta="meta"
-        :columns="[
-            ['key' => 'check',           'label' => '', 'width' => 'w-10 !px-2.5'],
-            ['key' => 'nama_lengkap',    'label' => 'Pegawai',       'sortable' => true, 'width' => '!px-2.5'],
-            ['key' => 'jabatan',         'label' => 'Jabatan & Unit','sortable' => true, 'width' => '!px-2.5'],
-            ['key' => 'golongan_terakhir','label' => 'Gol. / Jenis', 'sortable' => true, 'width' => 'whitespace-nowrap !px-2.5'],
-            ['key' => 'tmt',             'label' => 'TMT', 'width' => 'whitespace-nowrap !px-2.5'],
-            ['key' => 'status_nama',     'label' => 'Status', 'width' => 'whitespace-nowrap !px-2.5'],
-            ['key' => 'is_lengkap',      'label' => 'Dokumen', 'width' => 'whitespace-nowrap !px-2.5'],
-            ['key' => 'aksi',            'label' => 'Aksi', 'width' => 'whitespace-nowrap !px-2.5'],
-        ]"
-        fetchPage="fetchPage(page)"
-        isLoading="isLoading"
-        perPage="perPage"
-        setPerPage="setPerPage($event.target.value)"
-        sort="sort"
-        direction="direction"
-        setSort="setSort(col)"
-        searchModel="filters.search"
-        searchPlaceholder="Cari nama atau NIP"
-        emptyTitle="Tidak ada data pegawai yang sesuai."
-        emptyIcon="search"
-        :colspanCount="8"
-        checkAllId="check-all"
-        filterClass="lg:grid-cols-5"
-    >
-        {{-- ---- Filter Slots ---- --}}
-        <x-slot:filters>
-            {{-- Filter Golongan --}}
-            <div>
-                <x-form.select x-model="filters.golongan" @change="applyFilter()" size="md">
-                    <option value="">Semua Golongan</option>
-                    @foreach($golonganOptions as $golongan)
-                        <option value="{{ $golongan }}">Golongan {{ $golongan }}</option>
-                    @endforeach
-                </x-form.select>
-            </div>
+                {{-- Filter Unit Kerja --}}
+                <div>
+                    <x-form.select x-model="filters.unit_kerja_id" @change="applyFilter()" size="md">
+                        <option value="">Semua Unit</option>
+                        @foreach($unitKerjaOptions as $unit)
+                            <option value="{{ $unit->id }}">{{ $unit->nama }}</option>
+                        @endforeach
+                    </x-form.select>
+                </div>
 
-            {{-- Filter Unit Kerja --}}
-            <div>
-                <x-form.select x-model="filters.unit_kerja_id" @change="applyFilter()" size="md">
-                    <option value="">Semua Unit</option>
-                    @foreach($unitKerjaOptions as $unit)
-                        <option value="{{ $unit->id }}">{{ $unit->nama }}</option>
-                    @endforeach
-                </x-form.select>
-            </div>
+                {{-- Filter Jenis Pegawai --}}
+                <div>
+                    <x-form.select x-model="filters.jenis_pegawai_id" @change="applyFilter()" size="md">
+                        <option value="">Semua Jenis</option>
+                        @foreach($jenisPegawaiOptions as $jenis)
+                            <option value="{{ $jenis->id }}">{{ $jenis->nama }}</option>
+                        @endforeach
+                    </x-form.select>
+                </div>
 
-            {{-- Filter Jenis Pegawai --}}
-            <div>
-                <x-form.select x-model="filters.jenis_pegawai_id" @change="applyFilter()" size="md">
-                    <option value="">Semua Jenis</option>
-                    @foreach($jenisPegawaiOptions as $jenis)
-                        <option value="{{ $jenis->id }}">{{ $jenis->nama }}</option>
-                    @endforeach
-                </x-form.select>
-            </div>
+                {{-- Filter Status --}}
+                <div>
+                    <x-form.select x-model="filters.status_pegawai_id" @change="applyFilter()" size="md">
+                        <option value="all">Semua Status</option>
+                        @foreach($statusOptions as $status)
+                            <option value="{{ $status->id }}">{{ $status->nama }}</option>
+                        @endforeach
+                    </x-form.select>
+                </div>
+            </x-slot:filters>
 
-            {{-- Filter Status --}}
-            <div>
-                <x-form.select x-model="filters.status_pegawai_id" @change="applyFilter()" size="md">
-                    <option value="all">Semua Status</option>
-                    @foreach($statusOptions as $status)
-                        <option value="{{ $status->id }}">{{ $status->nama }}</option>
-                    @endforeach
-                </x-form.select>
-            </div>
-        </x-slot:filters>
+            {{-- ---- Custom Header: override kolom sortable dengan tombol sort Alpine ---- --}}
+            {{-- NOTE: komponen x-ui.data-table sudah render header dari $columns,
+            tapi sort pegawai menggunakan setSort() custom bukan mekanisme generik.
+            Header sudah terhubung via prop sort/direction/setSort di komponen. --}}
 
-        {{-- ---- Custom Header: override kolom sortable dengan tombol sort Alpine ---- --}}
-        {{-- NOTE: komponen x-ui.data-table sudah render header dari $columns,
-             tapi sort pegawai menggunakan setSort() custom bukan mekanisme generik.
-             Header sudah terhubung via prop sort/direction/setSort di komponen. --}}
+            {{-- ---- Custom Body Rows ---- --}}
+            <template x-if="!isLoading && pegawaiRows.length > 0">
+                <template x-for="(p, index) in pegawaiRows" :key="p.id">
+                    <x-ui.table-row class="border-b border-border last:border-0" x-bind:data-id="p.id"
+                        x-bind:data-nip="p.nip">
 
-        {{-- ---- Custom Body Rows ---- --}}
-        <template x-if="!isLoading && pegawaiRows.length > 0">
-            <template x-for="(p, index) in pegawaiRows" :key="p.id">
-                <x-ui.table-row class="border-b border-border last:border-0" x-bind:data-id="p.id" x-bind:data-nip="p.nip">
+                        {{-- Checkbox --}}
+                        <td class="px-4 py-3">
+                            <x-form.checkbox size="sm" class="row-check" />
+                        </td>
 
-                    {{-- Checkbox --}}
-                    <td class="!px-2.5 py-2.5">
-                        <x-form.checkbox size="sm" class="row-check" />
-                    </td>
-
-                    {{-- Pegawai --}}
-                    <td class="!px-2.5 py-2.5">
-                        <div class="flex items-center gap-3">
-                            <x-ui.tooltip dynamicText="'Buka detail ' + p.nama_lengkap" position="right">
-                                <a :href="`{{ $employeeDetailBase }}/${p.id}`"
-                                   class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-sm font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20">
-                                    <img x-show="p.foto_url" :src="p.foto_url" :alt="'Foto ' + p.nama_lengkap"
-                                         class="h-full w-full object-cover object-[center_25%]" loading="lazy"
-                                         x-on:error="$el.classList.add('hidden'); $el.nextElementSibling.classList.remove('hidden')">
-                                    <span x-show="!p.foto_url" x-text="p.nama_lengkap.charAt(0).toUpperCase()" aria-hidden="true"></span>
-                                </a>
-                            </x-ui.tooltip>
-                            <div class="min-w-0">
+                        {{-- Pegawai --}}
+                        <td class="px-4 py-3">
+                            <div class="flex items-center gap-3">
                                 <x-ui.tooltip dynamicText="'Buka detail ' + p.nama_lengkap" position="right">
-                                    <a :href="`{{ $employeeDetailBase }}/${p.id}`"
-                                       class="block truncate text-sm font-semibold text-ink transition hover:text-primary"
-                                       x-text="p.nama_lengkap"></a>
+                                    <a :href="`/pegawai/${p.id}`"
+                                        class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-sm font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20">
+                                        <img x-show="p.foto_url" :src="p.foto_url" :alt="'Foto ' + p.nama_lengkap"
+                                            class="h-full w-full object-cover object-[center_25%]" loading="lazy"
+                                            x-on:error="$el.classList.add('hidden'); $el.nextElementSibling.classList.remove('hidden')">
+                                        <span x-show="!p.foto_url" x-text="p.nama_lengkap.charAt(0).toUpperCase()"
+                                            aria-hidden="true"></span>
+                                    </a>
                                 </x-ui.tooltip>
-                                <p class="text-xs text-muted" x-text="'NIP. ' + p.nip"></p>
+                                <div class="min-w-0">
+                                    <x-ui.tooltip dynamicText="'Buka detail ' + p.nama_lengkap" position="right">
+                                        <a :href="`/pegawai/${p.id}`"
+                                            class="block truncate text-sm font-semibold text-ink transition hover:text-primary"
+                                            x-text="p.nama_lengkap"></a>
+                                    </x-ui.tooltip>
+                                    <p class="text-xs text-muted" x-text="'NIP. ' + p.nip"></p>
+                                </div>
                             </div>
-                        </div>
-                    </td>
+                        </td>
 
-                    {{-- Jabatan & Unit --}}
-                    <td class="!px-2.5 py-2.5">
-                        <p class="text-sm font-medium text-ink" x-text="p.jabatan"></p>
-                        <p class="text-xs text-muted" x-text="p.unit_kerja"></p>
-                    </td>
+                        {{-- Jabatan & Unit --}}
+                        <td class="px-4 py-3">
+                            <p class="text-sm font-medium text-ink" x-text="p.jabatan"></p>
+                            <p class="text-xs text-muted" x-text="p.unit_kerja"></p>
+                        </td>
 
-                    {{-- Golongan / Jenis --}}
-                    <td class="!px-2.5 py-2.5">
-                        <span class="text-sm font-medium text-ink" x-text="p.golongan_terakhir + ' / ' + p.jenis_pegawai"></span>
-                    </td>
+                        {{-- Golongan / Jenis --}}
+                        <td class="px-4 py-3">
+                            <span class="text-sm font-medium text-ink"
+                                x-text="p.golongan_terakhir + ' / ' + p.jenis_pegawai"></span>
+                        </td>
 
-                    {{-- TMT --}}
-                    <td class="!px-2.5 py-2.5">
-                        <p class="text-sm text-ink" x-text="p.tmt ?? '-'"></p>
-                    </td>
+                        {{-- TMT --}}
+                        <td class="px-4 py-3">
+                            <p class="text-sm text-ink" x-text="p.tmt ?? '-'"></p>
+                        </td>
 
-                    {{-- Status --}}
-                    <td class="!px-2.5 py-2.5">
-                        <span class="inline-flex items-center gap-1.5 font-medium font-sans leading-none px-2.5 py-1 text-xs rounded-md"
-                            :class="{
+                        {{-- Status --}}
+                        <td class="px-4 py-3">
+                            <span
+                                class="inline-flex items-center gap-1.5 font-medium font-sans leading-none px-2.5 py-1 text-xs rounded-md"
+                                :class="{
                                 'bg-success/10 text-success': p.status_key === 'aktif',
                                 'bg-warning/10 text-warning': p.status_key === 'cuti' || p.status_key === 'mutasi',
                                 'bg-danger/10 text-danger':   p.status_key === 'non-aktif' || p.status_key === 'pensiun',
                                 'bg-muted/10 text-muted':     !['aktif','cuti','mutasi','non-aktif','pensiun'].includes(p.status_key),
                             }">
-                            <span class="h-1.5 w-1.5 rounded-full"
-                                :class="{
+                                <span class="h-1.5 w-1.5 rounded-full" :class="{
                                     'bg-success': p.status_key === 'aktif',
                                     'bg-warning': p.status_key === 'cuti' || p.status_key === 'mutasi',
                                     'bg-danger':  p.status_key === 'non-aktif' || p.status_key === 'pensiun',
                                     'bg-muted':   !['aktif','cuti','mutasi','non-aktif','pensiun'].includes(p.status_key),
                                 }"></span>
-                            <span x-text="p.status_nama"></span>
-                        </span>
-                    </td>
+                                <span x-text="p.status_nama"></span>
+                            </span>
+                        </td>
 
-                    {{-- Dokumen --}}
-                    <td class="!px-2.5 py-2.5">
-                        <button type="button" @click="openDocumentStatus(p)"
-                            class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                            :class="p.is_lengkap ? 'bg-success/10 text-success hover:bg-success/15' : 'bg-warning/10 text-warning hover:bg-warning/15'"
-                            title="Klik untuk melihat rincian status dokumen">
-                            <span class="h-1.5 w-1.5 rounded-full" :class="p.is_lengkap ? 'bg-success' : 'bg-warning'"></span>
-                            <span x-text="p.is_lengkap ? 'Lengkap' : 'Belum Lengkap'"></span>
-                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7" />
-                            </svg>
-                        </button>
-                    </td>
+                        {{-- Dokumen --}}
+                        <td class="px-4 py-3">
+                            <button type="button" @click="openDocumentStatus(p)"
+                                class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                :class="{
+                                'bg-success/10 text-success hover:bg-success/15': p.is_lengkap === 'lengkap',
+                                'bg-warning/10 text-warning hover:bg-warning/15': p.is_lengkap === 'tidak_lengkap',
+                                'bg-primary/10 text-primary hover:bg-primary/15': p.is_lengkap === 'tersedia',
+                                'bg-muted/20 text-muted hover:bg-muted/30':       p.is_lengkap === 'kosong',
+                            }" title="Klik untuk melihat rincian status dokumen">
+                                <span class="h-1.5 w-1.5 rounded-full" :class="{
+                                    'bg-success': p.is_lengkap === 'lengkap',
+                                    'bg-warning': p.is_lengkap === 'tidak_lengkap',
+                                    'bg-primary': p.is_lengkap === 'tersedia',
+                                    'bg-muted':   p.is_lengkap === 'kosong',
+                                }"></span>
+                                <span x-text="
+                                    p.is_lengkap === 'lengkap'       ? 'Lengkap' :
+                                    p.is_lengkap === 'tidak_lengkap' ? 'Tidak Lengkap' :
+                                    p.is_lengkap === 'tersedia'      ? 'Tersedia' :
+                                                                       'Belum Ada'
+                                "></span>
+                                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                    stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7" />
+                                </svg>
+                            </button>
+                        </td>
 
-                    {{-- Aksi --}}
-                    <td class="!px-2.5 py-2.5">
-                        <div class="flex items-center justify-start gap-1.5">
-                            {{-- Detail --}}
-                            <x-ui.tooltip text="Detail" position="top">
-                                <a :href="`{{ $employeeDetailBase }}/${p.id}`"
-                                   :aria-label="`Detail pegawai ${p.nama_lengkap}`"
-                                   class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm">
-                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                    </svg>
-                                </a>
-                            </x-ui.tooltip>
-                            @if(auth()->user()->role !== 'pimpinan')
-                            {{-- Edit --}}
-                            <x-ui.tooltip text="Edit" position="top">
-                                <a :href="`/pegawai/${p.id}/edit`"
-                                   class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm">
-                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
-                                    </svg>
-                                </a>
-                            </x-ui.tooltip>
-                            @endif
-                            @if(auth()->user()->role === 'super_admin')
-                            {{-- Ubah Status --}}
-                            <div class="relative" x-data="{ openStatusDropdown: false }" @click.away="openStatusDropdown = false">
-                                <x-ui.tooltip text="Ubah Status" position="top-end">
-                                    <button type="button" @click="openStatusDropdown = !openStatusDropdown"
-                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-ink transition hover:bg-soft shadow-sm">
-                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                        {{-- Aksi --}}
+                        <td class="px-4 py-3">
+                            <div class="flex items-center justify-start gap-1.5">
+                                {{-- Detail --}}
+                                <x-ui.tooltip text="Detail" position="top">
+                                    <a :href="`/pegawai/${p.id}`"
+                                        class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm">
+                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24" stroke-width="1.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                         </svg>
-                                    </button>
+                                    </a>
                                 </x-ui.tooltip>
-                                <div x-show="openStatusDropdown" style="display: none;" x-transition.opacity.duration.200ms
-                                     :class="index >= Math.max(0, pegawaiRows.length - 2) ? 'bottom-full mb-1' : 'top-full mt-1'"
-                                     class="absolute right-0 z-50 w-36 rounded-lg border border-border bg-surface p-1 shadow-lg">
-                                    <button type="button" @click="promptChangeStatus(p.id, 'Aktif'); openStatusDropdown = false"
-                                            class="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-sm text-success hover:bg-soft transition text-left">
-                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                        Aktif
-                                    </button>
-                                    <button type="button" @click="promptChangeStatus(p.id, 'Non-Aktif'); openStatusDropdown = false"
-                                            class="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-sm text-warning hover:bg-soft transition text-left">
-                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
-                                        Non Aktif
-                                    </button>
-                                </div>
+                                {{-- Edit --}}
+                                <x-ui.tooltip text="Edit" position="top">
+                                    <a :href="`/pegawai/${p.id}/edit`"
+                                        class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm">
+                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24" stroke-width="1.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
+                                        </svg>
+                                    </a>
+                                </x-ui.tooltip>
+                                @if(auth()->user()->role === 'super_admin')
+                                    {{-- Ubah Status --}}
+                                    <div class="relative" x-data="{ openStatusDropdown: false }"
+                                        @click.away="openStatusDropdown = false">
+                                        <x-ui.tooltip text="Ubah Status" position="top-end">
+                                            <button type="button" @click="openStatusDropdown = !openStatusDropdown"
+                                                class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-ink transition hover:bg-soft shadow-sm">
+                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24" stroke-width="1.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                                                </svg>
+                                            </button>
+                                        </x-ui.tooltip>
+                                        <div x-show="openStatusDropdown" style="display: none;"
+                                            x-transition.opacity.duration.200ms
+                                            :class="index >= Math.max(0, pegawaiRows.length - 2) ? 'bottom-full mb-1' : 'top-full mt-1'"
+                                            class="absolute right-0 z-50 w-36 rounded-lg border border-border bg-surface p-1 shadow-lg">
+                                            <button type="button"
+                                                @click="promptChangeStatus(p.id, 'Aktif'); openStatusDropdown = false"
+                                                class="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-sm text-success hover:bg-soft transition text-left">
+                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24" stroke-width="1.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                Aktif
+                                            </button>
+                                            <button type="button"
+                                                @click="promptChangeStatus(p.id, 'Non-Aktif'); openStatusDropdown = false"
+                                                class="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-sm text-warning hover:bg-soft transition text-left">
+                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24" stroke-width="1.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                                </svg>
+                                                Non Aktif
+                                            </button>
+                                        </div>
+                                    </div>
+                                @endif
+                                @if(auth()->user()->role === 'super_admin')
+                                    {{-- Hapus → masuk Backup (Super Admin Only) --}}
+                                    <x-ui.tooltip text="Hapus ke Backup" position="top-end">
+                                        <button type="button" @click="deletePegawai(p.id, p.nama_lengkap)"
+                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-danger/30 bg-surface text-danger transition hover:bg-danger/10 shadow-sm">
+                                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24" stroke-width="1.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                    d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                                            </svg>
+                                        </button>
+                                    </x-ui.tooltip>
+                                @endif
                             </div>
-                            @endif
-                            @if(auth()->user()->role === 'super_admin')
-                            {{-- Hapus â†’ masuk Backup (Super Admin Only) --}}
-                            <x-ui.tooltip text="Hapus ke Backup" position="top-end">
-                                <button type="button" @click="deletePegawai(p.id, p.nama_lengkap)"
-                                        class="flex h-8 w-8 items-center justify-center rounded-lg border border-danger/30 bg-surface text-danger transition hover:bg-danger/10 shadow-sm">
-                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                                    </svg>
-                                </button>
-                            </x-ui.tooltip>
-                            @endif
-                        </div>
-                    </td>
-                </x-ui.table-row>
+                        </td>
+                    </x-ui.table-row>
+                </template>
             </template>
-        </template>
 
-    </x-ui.data-table>
+        </x-ui.data-table>
 
 
-    {{-- ============================================================ --}}
-    {{-- BULK ACTION FLOATING BAR --}}
-    {{-- ============================================================ --}}
-    <div id="bulk-bar" class="fixed bottom-6 left-1/2 z-40 hidden -translate-x-1/2 items-center gap-3 rounded-lg border border-border bg-surface px-6 py-3.5 shadow-lg">
-        <p class="text-sm font-semibold text-ink"><span id="selected-count">0</span> pegawai dipilih</p>
-        <div class="h-4 w-px bg-border"></div>
-        <button onclick="exportSelectedData()" class="inline-flex items-center gap-1.5 text-xs font-semibold text-warning hover:underline transition-colors cursor-pointer">
-            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-            </svg>
-            Export Pilihan
-        </button>
-        <button @click="
+        {{-- ============================================================ --}}
+        {{-- BULK ACTION FLOATING BAR --}}
+        {{-- ============================================================ --}}
+        <div id="bulk-bar"
+            class="fixed bottom-6 left-1/2 z-40 hidden -translate-x-1/2 items-center gap-3 rounded-lg border border-border bg-surface px-6 py-3.5 shadow-lg">
+            <p class="text-sm font-semibold text-ink"><span id="selected-count">0</span> pegawai dipilih</p>
+            <div class="h-4 w-px bg-border"></div>
+            <button onclick="exportSelectedData()"
+                class="inline-flex items-center gap-1.5 text-xs font-semibold text-warning hover:underline transition-colors cursor-pointer">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                </svg>
+                Export Pilihan
+            </button>
+            <button @click="
             const count = document.querySelectorAll('.row-check:checked').length;
             if (count === 0) { window.alert('Tidak ada data pegawai yang dipilih.'); return; }
             document.getElementById('modal-title-bulk-delete').innerText = 'Hapus ' + count + ' Pegawai ke Backup';
             $dispatch('open-confirm-bulk-delete');
         " class="inline-flex items-center gap-1.5 text-xs font-semibold text-danger hover:underline transition-colors cursor-pointer">
-            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-            </svg>
-            Hapus ke Backup
-        </button>
-        <button onclick="document.querySelectorAll(\'.row-check\').forEach(c => c.checked = false); updateBulkBar();"
-            class="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:underline transition-colors cursor-pointer">
-            Batal Pilih
-        </button>
-    </div>
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                </svg>
+                Hapus ke Backup
+            </button>
+            <button
+                onclick="document.querySelectorAll(\'.row-check\').forEach(c => c.checked = false); updateBulkBar();"
+                class="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:underline transition-colors cursor-pointer">
+                Batal Pilih
+            </button>
+        </div>
 
-    {{-- ============================================================ --}}
-    {{-- MODAL RINCIAN STATUS DOKUMEN --}}
-    {{-- ============================================================ --}}
-    <x-ui.modal
-        show="showDocumentStatusModal"
-        title="Rincian Dokumen Pegawai"
-        closeAction="showDocumentStatusModal = false"
-        maxWidth="2xl"
-        bodyClass="p-5"
-    >
-        <div class="space-y-4">
-            <div class="flex items-start justify-between gap-3 rounded-lg border border-border bg-soft/40 p-3">
-                <div class="min-w-0">
-                    <p class="truncate text-sm font-bold text-ink" x-text="documentStatusEmployee?.nama_lengkap ?? 'Pegawai'"></p>
-                    <p class="text-xs text-muted" x-text="'NIP. ' + (documentStatusEmployee?.nip ?? '-')"></p>
+        {{-- ============================================================ --}}
+        {{-- MODAL RINCIAN STATUS DOKUMEN --}}
+        {{-- ============================================================ --}}
+        <x-ui.modal show="showDocumentStatusModal" title="Rincian Dokumen Pegawai"
+            closeAction="showDocumentStatusModal = false" maxWidth="2xl" bodyClass="p-5">
+            <div class="space-y-4">
+                <div class="flex items-start justify-between gap-3 rounded-lg border border-border bg-soft/40 p-3">
+                    <div class="min-w-0">
+                        <p class="truncate text-sm font-bold text-ink"
+                            x-text="documentStatusEmployee?.nama_lengkap ?? 'Pegawai'"></p>
+                        <p class="text-xs text-muted" x-text="'NIP. ' + (documentStatusEmployee?.nip ?? '-')"></p>
+                    </div>
+                    <span class="inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold"
+                        :class="{
+                        'bg-success/10 text-success': documentStatus.status_kelengkapan === 'lengkap',
+                        'bg-warning/10 text-warning': documentStatus.status_kelengkapan === 'tidak_lengkap',
+                        'bg-primary/10 text-primary': documentStatus.status_kelengkapan === 'tersedia',
+                        'bg-muted/20 text-muted':     documentStatus.status_kelengkapan === 'kosong' || !documentStatus.status_kelengkapan,
+                    }">
+                        <span class="h-1.5 w-1.5 rounded-full" :class="{
+                            'bg-success': documentStatus.status_kelengkapan === 'lengkap',
+                            'bg-warning': documentStatus.status_kelengkapan === 'tidak_lengkap',
+                            'bg-primary': documentStatus.status_kelengkapan === 'tersedia',
+                            'bg-muted':   documentStatus.status_kelengkapan === 'kosong' || !documentStatus.status_kelengkapan,
+                        }"></span>
+                        <span x-text="
+                            documentStatus.status_kelengkapan === 'lengkap'       ? 'Lengkap' :
+                            documentStatus.status_kelengkapan === 'tidak_lengkap' ? 'Tidak Lengkap' :
+                            documentStatus.status_kelengkapan === 'tersedia'      ? 'Tersedia' :
+                                                                                    'Belum Ada'
+                        "></span>
+                    </span>
                 </div>
-                <span class="inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold"
-                    :class="documentStatus.is_lengkap ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'">
-                    <span class="h-1.5 w-1.5 rounded-full" :class="documentStatus.is_lengkap ? 'bg-success' : 'bg-warning'"></span>
-                    <span x-text="documentStatus.is_lengkap ? 'Lengkap' : 'Belum Lengkap'"></span>
-                </span>
-            </div>
 
-            <template x-if="isLoadingDocumentStatus">
-                <div class="flex items-center justify-center gap-2 py-10 text-sm text-muted">
-                    <svg class="h-5 w-5 animate-spin text-primary" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v8z"></path></svg>
-                    Memeriksa file SK di storage...
-                </div>
-            </template>
+                <template x-if="isLoadingDocumentStatus">
+                    <div class="flex items-center justify-center gap-2 py-10 text-sm text-muted">
+                        <svg class="h-5 w-5 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                            </circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v8z"></path>
+                        </svg>
+                        Memeriksa file SK di storage...
+                    </div>
+                </template>
 
-            <template x-if="!isLoadingDocumentStatus && documentStatusError">
-                <div class="rounded-lg border border-danger/20 bg-danger/10 p-3 text-sm text-danger" x-text="documentStatusError"></div>
-            </template>
+                <template x-if="!isLoadingDocumentStatus && documentStatusError">
+                    <div class="rounded-lg border border-danger/20 bg-danger/10 p-3 text-sm text-danger"
+                        x-text="documentStatusError"></div>
+                </template>
 
-            <template x-if="!isLoadingDocumentStatus && !documentStatusError && documentStatus.total_riwayat === 0 && documentStatus.total_dokumen === 0">
-                <div class="rounded-lg border border-border bg-soft/40 p-5 text-center">
-                    <p class="text-sm font-semibold text-ink">Belum ada dokumen pegawai</p>
-                    <p class="mt-1 text-xs text-muted">Arsip dokumen dan riwayat yang memiliki file akan tampil di sini.</p>
-                </div>
-            </template>
+                <template
+                    x-if="!isLoadingDocumentStatus && !documentStatusError && documentStatus.total_riwayat === 0 && documentStatus.total_dokumen === 0">
+                    <div class="rounded-lg border border-border bg-soft/40 p-5 text-center">
+                        <p class="text-sm font-semibold text-ink">Belum ada dokumen pegawai</p>
+                        <p class="mt-1 text-xs text-muted">Arsip dokumen dan riwayat yang memiliki file akan tampil di
+                            sini.</p>
+                    </div>
+                </template>
 
-            <template x-if="!isLoadingDocumentStatus && !documentStatusError && documentStatus.total_dokumen > 0">
-                <div class="space-y-3">
-                    <div class="flex items-center justify-between gap-3">
-                        <div>
-                            <p class="text-sm font-bold text-ink">Daftar Dokumen</p>
-                            <p class="text-xs text-muted" x-text="`${documentStatus.dokumen_tersedia} dari ${documentStatus.total_dokumen} file tersedia di storage.`"></p>
+                <template x-if="!isLoadingDocumentStatus && !documentStatusError && documentStatus.total_dokumen > 0">
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between gap-3">
+                            <div>
+                                <p class="text-sm font-bold text-ink">Daftar Dokumen</p>
+                                <p class="text-xs text-muted"
+                                    x-text="`${documentStatus.dokumen_tersedia} dari ${documentStatus.total_dokumen} file tersedia di storage.`">
+                                </p>
+                            </div>
+                        </div>
+                        <div class="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
+                            <template x-for="(document, index) in documentStatus.documents"
+                                :key="document.id ?? `${document.kategori}-${document.file_path ?? index}`">
+                                <div class="rounded-lg border p-3"
+                                    :class="document.file_tersedia ? 'border-border bg-surface' : 'border-warning/30 bg-warning/5'">
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div class="min-w-0">
+                                            <span class="text-[10px] font-bold uppercase tracking-wide text-muted"
+                                                x-text="document.kategori"></span>
+                                            <p class="truncate text-sm font-semibold text-ink" x-text="document.nama">
+                                            </p>
+                                            <p class="mt-0.5 truncate text-xs text-muted" x-text="document.keterangan">
+                                            </p>
+                                        </div>
+                                        <span
+                                            class="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold"
+                                            :class="document.file_tersedia ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'">
+                                            <span class="h-1.5 w-1.5 rounded-full"
+                                                :class="document.file_tersedia ? 'bg-success' : 'bg-warning'"></span>
+                                            <span x-text="document.status_label"></span>
+                                        </span>
+                                    </div>
+                                    <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+                                        <span x-text="'No. Dokumen: ' + document.nomor"></span>
+                                        <span x-text="'Tanggal: ' + document.tanggal"></span>
+                                        <a x-show="document.file_tersedia" :href="document.file_url" target="_blank"
+                                            rel="noopener"
+                                            class="inline-flex items-center gap-1 font-semibold text-primary hover:underline">
+                                            Buka file
+                                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                    d="M13.5 6H19.5m0 0v6m0-6L10.5 15m-3 3h-3a1.5 1.5 0 0 1-1.5-1.5v-12A1.5 1.5 0 0 1 4.5 3h12A1.5 1.5 0 0 1 18 4.5v3" />
+                                            </svg>
+                                        </a>
+                                    </div>
+                                </div>
+                            </template>
                         </div>
                     </div>
-                    <div class="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
-                        <template x-for="(document, index) in documentStatus.documents" :key="document.id ?? `${document.kategori}-${document.file_path ?? index}`">
-                            <div class="rounded-lg border p-3" :class="document.file_tersedia ? 'border-border bg-surface' : 'border-warning/30 bg-warning/5'">
-                                <div class="flex items-start justify-between gap-3">
-                                    <div class="min-w-0">
-                                        <span class="text-[10px] font-bold uppercase tracking-wide text-muted" x-text="document.kategori"></span>
-                                        <p class="truncate text-sm font-semibold text-ink" x-text="document.nama"></p>
-                                        <p class="mt-0.5 truncate text-xs text-muted" x-text="document.keterangan"></p>
-                                    </div>
-                                    <span class="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold"
-                                        :class="document.file_tersedia ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'">
-                                        <span class="h-1.5 w-1.5 rounded-full" :class="document.file_tersedia ? 'bg-success' : 'bg-warning'"></span>
-                                        <span x-text="document.status_label"></span>
-                                    </span>
-                                </div>
-                                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
-                                    <span x-text="'No. Dokumen: ' + document.nomor"></span>
-                                    <span x-text="'Tanggal: ' + document.tanggal"></span>
-                                    <a x-show="document.file_tersedia" :href="document.file_url" target="_blank" rel="noopener"
-                                        class="inline-flex items-center gap-1 font-semibold text-primary hover:underline">
-                                        Buka file
-                                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H19.5m0 0v6m0-6L10.5 15m-3 3h-3a1.5 1.5 0 0 1-1.5-1.5v-12A1.5 1.5 0 0 1 4.5 3h12A1.5 1.5 0 0 1 18 4.5v3" /></svg>
-                                    </a>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
-                </div>
-            </template>
-        </div>
-    </x-ui.modal>
-
-    {{-- ============================================================ --}}
-    {{-- MODAL UBAH STATUS PEGAWAI --}}
-    {{-- ============================================================ --}}
-    @if(auth()->user()->role !== 'pimpinan')
-    <x-ui.modal
-        show="showStatusModal"
-        title="Ubah Status Pegawai"
-        closeAction="showStatusModal = false"
-        maxWidth="sm"
-    >
-        <div class="space-y-4">
-            <p class="text-sm text-ink font-sans">
-                Apakah Anda yakin ingin mengubah status pegawai ini menjadi <strong x-text="statusNewValue" class="text-primary"></strong>?
-            </p>
-            <div class="flex justify-end gap-3 pt-2 border-t border-border">
-                <button type="button" @click="showStatusModal = false" :disabled="isChangingStatus"
-                    class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft cursor-pointer font-sans disabled:opacity-50">
-                    Batal
-                </button>
-                <button type="button" @click="confirmChangeStatus()" :disabled="isChangingStatus"
-                    class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 cursor-pointer font-sans disabled:opacity-50">
-                    <svg x-show="isChangingStatus" class="mr-2 h-4 w-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Simpan
-                </button>
+                </template>
             </div>
-        </div>
-    </x-ui.modal>
+        </x-ui.modal>
 
-    {{-- ============================================================ --}}
-    {{-- MODAL HAPUS PEGAWAI â†’ BACKUP (Super Admin Only) --}}
-    {{-- ============================================================ --}}
-    <x-ui.modal
-        show="showDeleteModal"
-        title="Nonaktifkan Pegawai"
-        closeAction="showDeleteModal = false"
-        maxWidth="sm"
-    >
-        <div class="space-y-4">
-            {{-- Info nonaktif --}}
-            <div class="flex items-start gap-3 rounded-lg bg-warning/10 border border-warning/20 p-3">
-                <svg class="w-5 h-5 mt-0.5 shrink-0 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
-                </svg>
-                <div>
-                    <p class="text-sm font-semibold text-ink font-sans">
-                        Data akan dipindahkan ke Daftar Nonaktif
-                    </p>
-                    <p class="text-xs text-muted font-sans mt-1">
-                        Pegawai <strong x-text="deletePegawaiName" class="text-ink"></strong> akan dihapus dari daftar aktif
-                        dan disimpan di <strong>Daftar Pegawai Nonaktif</strong>.
-                        Data tidak dihapus permanen dan dapat <span class="text-primary font-semibold">dipulihkan kapan saja</span>.
-                    </p>
-                </div>
-            </div>
-            <div class="flex justify-end gap-3 pt-2 border-t border-border">
-                <button type="button" @click="showDeleteModal = false" :disabled="isDeleting"
-                    class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft cursor-pointer font-sans disabled:opacity-50">
-                    Batal
-                </button>
-                <button type="button" @click="confirmDeletePegawai()" :disabled="isDeleting"
-                    class="inline-flex items-center justify-center rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 cursor-pointer font-sans disabled:opacity-50">
-                    <svg x-show="isDeleting" class="mr-2 h-4 w-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <svg x-show="!isDeleting" class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                    </svg>
-                    <span x-text="isDeleting ? 'Memproses...' : 'Ya, Hapus ke Backup'"></span>
-                </button>
-            </div>
-        </div>
-    </x-ui.modal>
-
-    {{-- ============================================================ --}}
-    {{-- MODAL BULK HAPUS KE BACKUP (Super Admin Only) --}}
-    {{-- ============================================================ --}}
-    <div x-data="{ open: false, isBulkDeleting: false }"
-        @open-confirm-bulk-delete.window="open = true">
-        <x-ui.modal
-            show="open"
-            title=""
-            closeAction="open = false"
-            maxWidth="sm"
-        >
+        {{-- ============================================================ --}}
+        {{-- MODAL UBAH STATUS PEGAWAI --}}
+        {{-- ============================================================ --}}
+        <x-ui.modal show="showStatusModal" title="Ubah Status Pegawai" closeAction="showStatusModal = false"
+            maxWidth="sm">
             <div class="space-y-4">
-                <p id="modal-title-bulk-delete" class="text-sm font-bold text-ink font-sans">Hapus Pegawai ke Backup</p>
-                <div class="flex items-start gap-3 rounded-lg bg-warning/10 border border-warning/20 p-3">
-                    <svg class="w-5 h-5 mt-0.5 shrink-0 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
-                    </svg>
-                    <p class="text-xs text-muted font-sans">
-                        Pegawai terpilih akan dipindahkan ke <strong class="text-ink">Data Backup</strong> selama <strong class="text-ink">30 hari</strong>.
-                        Dalam masa tersebut data masih bisa dipulihkan.
-                        Setelah 30 hari, data beserta semua riwayat dan file akan
-                        <span class="text-danger font-semibold">dihapus permanen otomatis</span>.
-                    </p>
-                </div>
-
-                <form id="bulk-destroy-form" method="POST" action="{{ route('pegawai.bulkDestroy') }}">
-                    @csrf
-                </form>
-
+                <p class="text-sm text-ink font-sans">
+                    Apakah Anda yakin ingin mengubah status pegawai ini menjadi <strong x-text="statusNewValue"
+                        class="text-primary"></strong>?
+                </p>
                 <div class="flex justify-end gap-3 pt-2 border-t border-border">
-                    <button type="button" @click="open = false" :disabled="isBulkDeleting"
+                    <button type="button" @click="showStatusModal = false" :disabled="isChangingStatus"
                         class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft cursor-pointer font-sans disabled:opacity-50">
                         Batal
                     </button>
-                    <button type="button" :disabled="isBulkDeleting"
-                        @click="
+                    <button type="button" @click="confirmChangeStatus()" :disabled="isChangingStatus"
+                        class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 cursor-pointer font-sans disabled:opacity-50">
+                        <svg x-show="isChangingStatus" class="mr-2 h-4 w-4 animate-spin text-white"
+                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                            </circle>
+                            <path class="opacity-75" fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                            </path>
+                        </svg>
+                        Simpan
+                    </button>
+                </div>
+            </div>
+        </x-ui.modal>
+
+        {{-- ============================================================ --}}
+        {{-- MODAL HAPUS PEGAWAI → BACKUP (Super Admin Only) --}}
+        {{-- ============================================================ --}}
+        <x-ui.modal show="showDeleteModal" title="Hapus Pegawai ke Backup" closeAction="showDeleteModal = false"
+            maxWidth="sm">
+            <div class="space-y-4">
+                {{-- Info backup --}}
+                <div class="flex items-start gap-3 rounded-lg bg-warning/10 border border-warning/20 p-3">
+                    <svg class="w-5 h-5 mt-0.5 shrink-0 text-warning" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
+                    </svg>
+                    <div>
+                        <p class="text-sm font-semibold text-ink font-sans">
+                            Data akan dipindahkan ke Backup
+                        </p>
+                        <p class="text-xs text-muted font-sans mt-1">
+                            Pegawai <strong x-text="deletePegawaiName" class="text-ink"></strong> akan dihapus dari
+                            daftar aktif
+                            dan disimpan di <strong>Data Backup</strong> selama <strong>30 hari</strong>.
+                            Dalam masa tersebut data masih bisa dipulihkan.
+                            Setelah 30 hari, data beserta semua riwayat dan file akan <span
+                                class="text-danger font-semibold">dihapus permanen otomatis</span>.
+                        </p>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 pt-2 border-t border-border">
+                    <button type="button" @click="showDeleteModal = false" :disabled="isDeleting"
+                        class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft cursor-pointer font-sans disabled:opacity-50">
+                        Batal
+                    </button>
+                    <button type="button" @click="confirmDeletePegawai()" :disabled="isDeleting"
+                        class="inline-flex items-center justify-center rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 cursor-pointer font-sans disabled:opacity-50">
+                        <svg x-show="isDeleting" class="mr-2 h-4 w-4 animate-spin text-white"
+                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                            </circle>
+                            <path class="opacity-75" fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                            </path>
+                        </svg>
+                        <svg x-show="!isDeleting" class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor"
+                            viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                        </svg>
+                        <span x-text="isDeleting ? 'Memproses...' : 'Ya, Hapus ke Backup'"></span>
+                    </button>
+                </div>
+            </div>
+        </x-ui.modal>
+
+        {{-- ============================================================ --}}
+        {{-- MODAL BULK HAPUS KE BACKUP (Super Admin Only) --}}
+        {{-- ============================================================ --}}
+        <div x-data="{ open: false, isBulkDeleting: false }" @open-confirm-bulk-delete.window="open = true">
+            <x-ui.modal show="open" title="" closeAction="open = false" maxWidth="sm">
+                <div class="space-y-4">
+                    <p id="modal-title-bulk-delete" class="text-sm font-bold text-ink font-sans">Hapus Pegawai ke Backup
+                    </p>
+                    <div class="flex items-start gap-3 rounded-lg bg-warning/10 border border-warning/20 p-3">
+                        <svg class="w-5 h-5 mt-0.5 shrink-0 text-warning" fill="none" stroke="currentColor"
+                            viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
+                        </svg>
+                        <p class="text-xs text-muted font-sans">
+                            Pegawai terpilih akan dipindahkan ke <strong class="text-ink">Data Backup</strong> selama
+                            <strong class="text-ink">30 hari</strong>.
+                            Dalam masa tersebut data masih bisa dipulihkan.
+                            Setelah 30 hari, data beserta semua riwayat dan file akan
+                            <span class="text-danger font-semibold">dihapus permanen otomatis</span>.
+                        </p>
+                    </div>
+
+                    <form id="bulk-destroy-form" method="POST" action="{{ route('pegawai.bulkDestroy') }}">
+                        @csrf
+                    </form>
+
+                    <div class="flex justify-end gap-3 pt-2 border-t border-border">
+                        <button type="button" @click="open = false" :disabled="isBulkDeleting"
+                            class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft cursor-pointer font-sans disabled:opacity-50">
+                            Batal
+                        </button>
+                        <button type="button" :disabled="isBulkDeleting" @click="
                             isBulkDeleting = true;
                             const form = document.getElementById('bulk-destroy-form');
                             form.querySelectorAll('input[name=\'ids[]\']').forEach(el => el.remove());
@@ -836,303 +910,322 @@
                             });
                             form.submit();
                         "
-                        class="inline-flex items-center justify-center rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 cursor-pointer font-sans disabled:opacity-50">
-                        <svg x-show="isBulkDeleting" class="mr-2 h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                            class="inline-flex items-center justify-center rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 cursor-pointer font-sans disabled:opacity-50">
+                            <svg x-show="isBulkDeleting" class="mr-2 h-4 w-4 animate-spin text-white" fill="none"
+                                viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                    stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                            </svg>
+                            <svg x-show="!isBulkDeleting" class="w-4 h-4 mr-1.5 shrink-0" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                            </svg>
+                            <span x-text="isBulkDeleting ? 'Memproses...' : 'Ya, Hapus ke Backup'"></span>
+                        </button>
+                    </div>
+                </div>
+            </x-ui.modal>
+        </div>
+
+        {{-- ============================================================ --}}
+        {{-- MODAL TAMBAH RIWAYAT (Pangkat / Jabatan / KGB) --}}
+        {{-- ============================================================ --}}
+        <x-ui.modal show="showRiwayatModal" closeAction="showRiwayatModal = false" maxWidth="lg"
+            bodyClass="p-5 space-y-4">
+            <x-slot:header>
+                <div class="flex items-center justify-between w-full">
+                    <div>
+                        <h3 class="text-sm font-bold text-ink font-sans" x-text="modalTitle"></h3>
+                        <p class="text-xs text-muted font-sans mt-0.5" x-text="'Pegawai: ' + riwayatEmployeeName"></p>
+                    </div>
+                    <button type="button" @click="showRiwayatModal = false"
+                        class="rounded-lg p-1.5 text-muted transition-colors hover:bg-soft hover:text-ink focus:outline-none"
+                        aria-label="Tutup">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                d="M6 18 18 6M6 6l12 12" />
                         </svg>
-                        <svg x-show="!isBulkDeleting" class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                        </svg>
-                        <span x-text="isBulkDeleting ? 'Memproses...' : 'Ya, Hapus ke Backup'"></span>
                     </button>
                 </div>
-            </div>
-        </x-ui.modal>
-    </div>
+            </x-slot:header>
 
-    {{-- ============================================================ --}}
-    {{-- MODAL TAMBAH RIWAYAT (Pangkat / Jabatan / KGB) --}}
-    {{-- ============================================================ --}}
-    <x-ui.modal
-        show="showRiwayatModal"
-        closeAction="showRiwayatModal = false"
-        maxWidth="lg"
-        bodyClass="p-5 space-y-4"
-    >
-        <x-slot:header>
-            <div class="flex items-center justify-between w-full">
-                <div>
-                    <h3 class="text-sm font-bold text-ink font-sans" x-text="modalTitle"></h3>
-                    <p class="text-xs text-muted font-sans mt-0.5" x-text="'Pegawai: ' + riwayatEmployeeName"></p>
+            {{-- Success message --}}
+            <template x-if="successMessage">
+                <div class="rounded-lg bg-success/10 p-3 text-xs text-success font-bold font-sans"
+                    x-text="successMessage"></div>
+            </template>
+
+            {{-- General error --}}
+            <template x-if="errors._general">
+                <div class="rounded-lg bg-danger/10 p-3 text-xs text-danger font-bold font-sans"
+                    x-text="errors._general[0]"></div>
+            </template>
+
+            {{-- ===== FORM KEPANGKATAN ===== --}}
+            <template x-if="riwayatType === 'pangkat'">
+                <div class="space-y-3">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-ink font-sans">Golongan <span
+                                    class="text-danger">*</span></label>
+                            <select x-model="newPangkat.golongan_id"
+                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                <option value="">Pilih Golongan</option>
+                                @foreach($golonganRefOptions ?? [] as $ref)
+                                    <option value="{{ $ref->id }}">{{ $ref->nama }}</option>
+                                @endforeach
+                            </select>
+                            <template x-if="errors.golongan_id">
+                                <p class="text-xs text-danger font-sans" x-text="errors.golongan_id[0]"></p>
+                            </template>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-ink font-sans">No. SK <span
+                                    class="text-danger">*</span></label>
+                            <input type="text" x-model="newPangkat.no_sk" placeholder="SK-..."
+                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <template x-if="errors.no_sk">
+                                <p class="text-xs text-danger font-sans" x-text="errors.no_sk[0]"></p>
+                            </template>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-ink font-sans">Tanggal SK</label>
+                            <input type="date" x-model="newPangkat.tanggal_sk"
+                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-ink font-sans">TMT Pangkat</label>
+                            <input type="date" x-model="newPangkat.tmt_pangkat"
+                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                        </div>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-semibold text-ink font-sans">File SK</label>
+                        <input type="file" x-ref="fileSkInput" accept=".pdf,.jpg,.jpeg,.png"
+                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none font-sans">
+                    </div>
                 </div>
+            </template>
+
+            {{-- ===== FORM JABATAN ===== --}}
+            <template x-if="riwayatType === 'jabatan'">
+                <div class="space-y-3">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-ink font-sans">Jabatan <span
+                                    class="text-danger">*</span></label>
+                            <select x-model="newJabatan.jabatan_id"
+                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                <option value="">Pilih Jabatan</option>
+                                @foreach($jabatanOptions ?? [] as $ref)
+                                    <option value="{{ $ref->id }}">{{ $ref->nama }}</option>
+                                @endforeach
+                            </select>
+                            <template x-if="errors.jabatan_id">
+                                <p class="text-xs text-danger font-sans" x-text="errors.jabatan_id[0]"></p>
+                            </template>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-ink font-sans">Jenis Jabatan</label>
+                            <select x-model="newJabatan.jenis_jabatan_id"
+                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                <option value="">Pilih Jenis</option>
+                                @foreach($jenisJabatanOptions ?? [] as $ref)
+                                    <option value="{{ $ref->id }}">{{ $ref->nama }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-ink font-sans">Unit Kerja</label>
+                            <select x-model="newJabatan.unit_kerja_id"
+                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                <option value="">Pilih Unit</option>
+                                @foreach($unitKerjaOptions ?? [] as $unit)
+                                    <option value="{{ $unit->id }}">{{ $unit->nama }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-ink font-sans">Kelas Jabatan</label>
+                            <input type="text" x-model="newJabatan.kelas_jabatan" placeholder="cth: 9"
+                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-ink font-sans">No. SK</label>
+                            <input type="text" x-model="newJabatan.no_sk" placeholder="SK-..."
+                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-ink font-sans">Tanggal SK</label>
+                            <input type="date" x-model="newJabatan.tanggal_sk"
+                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                        </div>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-semibold text-ink font-sans">TMT Jabatan</label>
+                        <input type="date" x-model="newJabatan.tmt_jabatan"
+                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-semibold text-ink font-sans">File SK</label>
+                        <input type="file" x-ref="fileSkInput" accept=".pdf,.jpg,.jpeg,.png"
+                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none font-sans">
+                    </div>
+                </div>
+            </template>
+
+            {{-- ===== FORM KGB ===== --}}
+            <template x-if="riwayatType === 'kgb'">
+                <div class="space-y-3">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-ink font-sans">Gaji Pokok <span
+                                    class="text-danger">*</span></label>
+                            <input type="number" x-model="newKgb.gaji_pokok" placeholder="0"
+                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <template x-if="errors.gaji_pokok">
+                                <p class="text-xs text-danger font-sans" x-text="errors.gaji_pokok[0]"></p>
+                            </template>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-ink font-sans">No. SK</label>
+                            <input type="text" x-model="newKgb.no_sk" placeholder="SK-..."
+                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-ink font-sans">Tanggal SK</label>
+                            <input type="date" x-model="newKgb.tanggal_sk"
+                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-ink font-sans">TMT KGB</label>
+                            <input type="date" x-model="newKgb.tmt_kgb"
+                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                        </div>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-semibold text-ink font-sans">File SK</label>
+                        <input type="file" x-ref="fileSkInput" accept=".pdf,.jpg,.jpeg,.png"
+                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none font-sans">
+                    </div>
+                </div>
+            </template>
+
+            {{-- Footer tombol --}}
+            <div class="flex justify-end gap-3 pt-3 border-t border-border">
                 <button type="button" @click="showRiwayatModal = false"
-                    class="rounded-lg p-1.5 text-muted transition-colors hover:bg-soft hover:text-ink focus:outline-none" aria-label="Tutup">
-                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18 18 6M6 6l12 12" />
-                    </svg>
+                    class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft cursor-pointer font-sans">
+                    Batal
+                </button>
+                <button type="button" @click="submitRiwayat()" :disabled="isSubmitting"
+                    class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60 cursor-pointer font-sans">
+                    <template x-if="isSubmitting">
+                        <svg class="w-4 h-4 mr-1.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                            </circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                        </svg>
+                    </template>
+                    <span x-text="isSubmitting ? 'Menyimpan...' : 'Simpan Riwayat'"></span>
                 </button>
             </div>
-        </x-slot:header>
+        </x-ui.modal>
 
-        {{-- Success message --}}
-        <template x-if="successMessage">
-            <div class="rounded-lg bg-success/10 p-3 text-xs text-success font-bold font-sans" x-text="successMessage"></div>
-        </template>
+    </div>{{-- end x-data --}}
 
-        {{-- General error --}}
-        <template x-if="errors._general">
-            <div class="rounded-lg bg-danger/10 p-3 text-xs text-danger font-bold font-sans" x-text="errors._general[0]"></div>
-        </template>
+    <script>
+        function updateBulkBar() {
+            const allBoxes = document.querySelectorAll('.row-check');
+            const checked = document.querySelectorAll('.row-check:checked');
+            const bar = document.getElementById('bulk-bar');
+            const count = document.getElementById('selected-count');
+            const checkAll = document.getElementById('check-all');
 
-        {{-- ===== FORM KEPANGKATAN ===== --}}
-        <template x-if="riwayatType === 'pangkat'">
-            <div class="space-y-3">
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="space-y-1">
-                        <label class="text-xs font-semibold text-ink font-sans">Golongan <span class="text-danger">*</span></label>
-                        <select x-model="newPangkat.golongan_id" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                            <option value="">Pilih Golongan</option>
-                            @foreach($golonganRefOptions ?? [] as $ref)
-                                <option value="{{ $ref->id }}">{{ $ref->nama }}</option>
-                            @endforeach
-                        </select>
-                        <template x-if="errors.golongan_id"><p class="text-xs text-danger font-sans" x-text="errors.golongan_id[0]"></p></template>
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-xs font-semibold text-ink font-sans">No. SK <span class="text-danger">*</span></label>
-                        <input type="text" x-model="newPangkat.no_sk" placeholder="SK-..."
-                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                        <template x-if="errors.no_sk"><p class="text-xs text-danger font-sans" x-text="errors.no_sk[0]"></p></template>
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="space-y-1">
-                        <label class="text-xs font-semibold text-ink font-sans">Tanggal SK</label>
-                        <input type="date" x-model="newPangkat.tanggal_sk"
-                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-xs font-semibold text-ink font-sans">TMT Pangkat</label>
-                        <input type="date" x-model="newPangkat.tmt_pangkat"
-                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                    </div>
-                </div>
-                <div class="space-y-1">
-                    <label class="text-xs font-semibold text-ink font-sans">File SK</label>
-                    <input type="file" x-ref="fileSkInput" accept=".pdf,.jpg,.jpeg,.png"
-                        class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none font-sans">
-                </div>
-            </div>
-        </template>
+            // Bulk bar visibility
+            if (checked.length > 0) {
+                bar.classList.remove('hidden');
+                bar.classList.add('flex');
+            } else {
+                bar.classList.add('hidden');
+                bar.classList.remove('flex');
+            }
 
-        {{-- ===== FORM JABATAN ===== --}}
-        <template x-if="riwayatType === 'jabatan'">
-            <div class="space-y-3">
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="space-y-1">
-                        <label class="text-xs font-semibold text-ink font-sans">Jabatan <span class="text-danger">*</span></label>
-                        <select x-model="newJabatan.jabatan_id" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                            <option value="">Pilih Jabatan</option>
-                            @foreach($jabatanOptions ?? [] as $ref)
-                                <option value="{{ $ref->id }}">{{ $ref->nama }}</option>
-                            @endforeach
-                        </select>
-                        <template x-if="errors.jabatan_id"><p class="text-xs text-danger font-sans" x-text="errors.jabatan_id[0]"></p></template>
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-xs font-semibold text-ink font-sans">Jenis Jabatan</label>
-                        <select x-model="newJabatan.jenis_jabatan_id" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                            <option value="">Pilih Jenis</option>
-                            @foreach($jenisJabatanOptions ?? [] as $ref)
-                                <option value="{{ $ref->id }}">{{ $ref->nama }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="space-y-1">
-                        <label class="text-xs font-semibold text-ink font-sans">Unit Kerja</label>
-                        <select x-model="newJabatan.unit_kerja_id" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                            <option value="">Pilih Unit</option>
-                            @foreach($unitKerjaOptions ?? [] as $unit)
-                                <option value="{{ $unit->id }}">{{ $unit->nama }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-xs font-semibold text-ink font-sans">Kelas Jabatan</label>
-                        <input type="text" x-model="newJabatan.kelas_jabatan" placeholder="cth: 9"
-                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="space-y-1">
-                        <label class="text-xs font-semibold text-ink font-sans">No. SK</label>
-                        <input type="text" x-model="newJabatan.no_sk" placeholder="SK-..."
-                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-xs font-semibold text-ink font-sans">Tanggal SK</label>
-                        <input type="date" x-model="newJabatan.tanggal_sk"
-                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                    </div>
-                </div>
-                <div class="space-y-1">
-                    <label class="text-xs font-semibold text-ink font-sans">TMT Jabatan</label>
-                    <input type="date" x-model="newJabatan.tmt_jabatan"
-                        class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                </div>
-                <div class="space-y-1">
-                    <label class="text-xs font-semibold text-ink font-sans">File SK</label>
-                    <input type="file" x-ref="fileSkInput" accept=".pdf,.jpg,.jpeg,.png"
-                        class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none font-sans">
-                </div>
-            </div>
-        </template>
+            if (count) count.innerText = checked.length;
 
-        {{-- ===== FORM KGB ===== --}}
-        <template x-if="riwayatType === 'kgb'">
-            <div class="space-y-3">
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="space-y-1">
-                        <label class="text-xs font-semibold text-ink font-sans">Gaji Pokok <span class="text-danger">*</span></label>
-                        <input type="number" x-model="newKgb.gaji_pokok" placeholder="0"
-                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                        <template x-if="errors.gaji_pokok"><p class="text-xs text-danger font-sans" x-text="errors.gaji_pokok[0]"></p></template>
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-xs font-semibold text-ink font-sans">No. SK</label>
-                        <input type="text" x-model="newKgb.no_sk" placeholder="SK-..."
-                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="space-y-1">
-                        <label class="text-xs font-semibold text-ink font-sans">Tanggal SK</label>
-                        <input type="date" x-model="newKgb.tanggal_sk"
-                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-xs font-semibold text-ink font-sans">TMT KGB</label>
-                        <input type="date" x-model="newKgb.tmt_kgb"
-                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                    </div>
-                </div>
-                <div class="space-y-1">
-                    <label class="text-xs font-semibold text-ink font-sans">File SK</label>
-                    <input type="file" x-ref="fileSkInput" accept=".pdf,.jpg,.jpeg,.png"
-                        class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none font-sans">
-                </div>
-            </div>
-        </template>
-
-        {{-- Footer tombol --}}
-        <div class="flex justify-end gap-3 pt-3 border-t border-border">
-            <button type="button" @click="showRiwayatModal = false"
-                class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft cursor-pointer font-sans">
-                Batal
-            </button>
-            <button type="button" @click="submitRiwayat()" :disabled="isSubmitting"
-                class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60 cursor-pointer font-sans">
-                <template x-if="isSubmitting">
-                    <svg class="w-4 h-4 mr-1.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-                    </svg>
-                </template>
-                <span x-text="isSubmitting ? 'Menyimpan...' : 'Simpan Riwayat'"></span>
-            </button>
-        </div>
-    </x-ui.modal>
-
-</div>{{-- end x-data --}}
-
-<script>
-function updateBulkBar() {
-    const allBoxes = document.querySelectorAll('.row-check');
-    const checked  = document.querySelectorAll('.row-check:checked');
-    const bar      = document.getElementById('bulk-bar');
-    const count    = document.getElementById('selected-count');
-    const checkAll = document.getElementById('check-all');
-
-    // Bulk bar visibility
-    if (checked.length > 0) {
-        bar.classList.remove('hidden');
-        bar.classList.add('flex');
-    } else {
-        bar.classList.add('hidden');
-        bar.classList.remove('flex');
-    }
-
-    if (count) count.innerText = checked.length;
-
-    // Select-all checkbox state: checked / indeterminate / unchecked
-    if (checkAll) {
-        if (checked.length === 0) {
-            checkAll.checked       = false;
-            checkAll.indeterminate = false;
-        } else if (checked.length === allBoxes.length) {
-            checkAll.checked       = true;
-            checkAll.indeterminate = false;
-        } else {
-            checkAll.checked       = false;
-            checkAll.indeterminate = true;
+            // Select-all checkbox state: checked / indeterminate / unchecked
+            if (checkAll) {
+                if (checked.length === 0) {
+                    checkAll.checked = false;
+                    checkAll.indeterminate = false;
+                } else if (checked.length === allBoxes.length) {
+                    checkAll.checked = true;
+                    checkAll.indeterminate = false;
+                } else {
+                    checkAll.checked = false;
+                    checkAll.indeterminate = true;
+                }
+            }
         }
-    }
-}
 
-function exportFilteredData() {
-    const form = document.createElement('form');
-    form.method = 'GET';
-    form.action = '{{ route("pegawai.export") }}';
-    document.body.appendChild(form);
-    form.submit();
-    document.body.removeChild(form);
-}
-
-function exportSelectedData() {
-    const checked = document.querySelectorAll('.row-check:checked');
-    const ids = Array.from(checked).map(c => c.closest('tr')?.dataset.id).filter(Boolean);
-    if (!ids.length) { alert('Tidak ada data yang dipilih.'); return; }
-    const form = document.createElement('form');
-    form.method = 'GET';
-    form.action = '{{ route("pegawai.export") }}';
-    ids.forEach(id => {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'ids[]';
-        input.value = id;
-        form.appendChild(input);
-    });
-    document.body.appendChild(form);
-    form.submit();
-    document.body.removeChild(form);
-}
-
-document.addEventListener('change', function(e) {
-    if (e.target && (e.target.classList.contains('row-check') || e.target.id === 'check-all')) {
-        if (e.target.id === 'check-all') {
-            // check-all diklik â†’ set semua row sesuai state-nya (indeterminate â†’ check all)
-            const shouldCheck = e.target.indeterminate ? true : e.target.checked;
-            e.target.indeterminate = false;
-            e.target.checked = shouldCheck;
-            document.querySelectorAll('.row-check').forEach(c => c.checked = shouldCheck);
+        function exportFilteredData() {
+            const form = document.createElement('form');
+            form.method = 'GET';
+            form.action = '{{ route("pegawai.export") }}';
+            document.body.appendChild(form);
+            form.submit();
+            document.body.removeChild(form);
         }
-        updateBulkBar();
-    }
-});
 
-// Reset check-all & bulk bar setiap kali data rows berubah (pindah halaman / filter)
-document.addEventListener('alpine:init', () => {
-    document.addEventListener('pegawai-rows-changed', () => {
-        document.querySelectorAll('.row-check').forEach(c => c.checked = false);
-        updateBulkBar();
-    });
-});
+        function exportSelectedData() {
+            const checked = document.querySelectorAll('.row-check:checked');
+            const ids = Array.from(checked).map(c => c.closest('tr')?.dataset.id).filter(Boolean);
+            if (!ids.length) { alert('Tidak ada data yang dipilih.'); return; }
+            const form = document.createElement('form');
+            form.method = 'GET';
+            form.action = '{{ route("pegawai.export") }}';
+            ids.forEach(id => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'ids[]';
+                input.value = id;
+                form.appendChild(input);
+            });
+            document.body.appendChild(form);
+            form.submit();
+            document.body.removeChild(form);
+        }
 
-    @endif
-</script>
+        document.addEventListener('change', function (e) {
+            if (e.target && (e.target.classList.contains('row-check') || e.target.id === 'check-all')) {
+                if (e.target.id === 'check-all') {
+                    // check-all diklik → set semua row sesuai state-nya (indeterminate → check all)
+                    const shouldCheck = e.target.indeterminate ? true : e.target.checked;
+                    e.target.indeterminate = false;
+                    e.target.checked = shouldCheck;
+                    document.querySelectorAll('.row-check').forEach(c => c.checked = shouldCheck);
+                }
+                updateBulkBar();
+            }
+        });
+
+        // Reset check-all & bulk bar setiap kali data rows berubah (pindah halaman / filter)
+        document.addEventListener('alpine:init', () => {
+            document.addEventListener('pegawai-rows-changed', () => {
+                document.querySelectorAll('.row-check').forEach(c => c.checked = false);
+                updateBulkBar();
+            });
+        });
+    </script>
 
 </x-layouts.app>
-
