@@ -28,7 +28,7 @@
     // ===== State Modal Rincian Dokumen =====
     showDocumentStatusModal: false,
     documentStatusEmployee: null,
-    documentStatus: { is_lengkap: true, total_riwayat: 0, file_tersedia: 0, records: [], total_dokumen: 0, dokumen_tersedia: 0, documents: [] },
+    documentStatus: { status_kelengkapan: 'kosong', is_lengkap: false, total_riwayat: 0, file_tersedia: 0, records: [], total_dokumen: 0, dokumen_tersedia: 0, documents: [] },
     isLoadingDocumentStatus: false,
     documentStatusError: '',
 
@@ -180,7 +180,7 @@
 
     async openDocumentStatus(employee) {
         this.documentStatusEmployee = { id: employee.id, nama_lengkap: employee.nama_lengkap, nip: employee.nip };
-        this.documentStatus = { is_lengkap: employee.is_lengkap, total_riwayat: 0, file_tersedia: 0, records: [], total_dokumen: 0, dokumen_tersedia: 0, documents: [] };
+        this.documentStatus = { status_kelengkapan: employee.is_lengkap, is_lengkap: employee.is_lengkap === 'lengkap', total_riwayat: 0, file_tersedia: 0, records: [], total_dokumen: 0, dokumen_tersedia: 0, documents: [] };
         this.documentStatusError = '';
         this.showDocumentStatusModal = true;
         this.isLoadingDocumentStatus = true;
@@ -516,10 +516,26 @@
                     <td class="px-4 py-3">
                         <button type="button" @click="openDocumentStatus(p)"
                             class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                            :class="p.is_lengkap ? 'bg-success/10 text-success hover:bg-success/15' : 'bg-warning/10 text-warning hover:bg-warning/15'"
+                            :class="{
+                                'bg-success/10 text-success hover:bg-success/15': p.is_lengkap === 'lengkap',
+                                'bg-warning/10 text-warning hover:bg-warning/15': p.is_lengkap === 'tidak_lengkap',
+                                'bg-primary/10 text-primary hover:bg-primary/15': p.is_lengkap === 'tersedia',
+                                'bg-muted/20 text-muted hover:bg-muted/30':       p.is_lengkap === 'kosong',
+                            }"
                             title="Klik untuk melihat rincian status dokumen">
-                            <span class="h-1.5 w-1.5 rounded-full" :class="p.is_lengkap ? 'bg-success' : 'bg-warning'"></span>
-                            <span x-text="p.is_lengkap ? 'Lengkap' : 'Belum Lengkap'"></span>
+                            <span class="h-1.5 w-1.5 rounded-full"
+                                :class="{
+                                    'bg-success': p.is_lengkap === 'lengkap',
+                                    'bg-warning': p.is_lengkap === 'tidak_lengkap',
+                                    'bg-primary': p.is_lengkap === 'tersedia',
+                                    'bg-muted':   p.is_lengkap === 'kosong',
+                                }"></span>
+                            <span x-text="
+                                p.is_lengkap === 'lengkap'       ? 'Lengkap' :
+                                p.is_lengkap === 'tidak_lengkap' ? 'Tidak Lengkap' :
+                                p.is_lengkap === 'tersedia'      ? 'Tersedia' :
+                                                                   'Belum Ada'
+                            "></span>
                             <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7" />
                             </svg>
@@ -641,9 +657,25 @@
                     <p class="text-xs text-muted" x-text="'NIP. ' + (documentStatusEmployee?.nip ?? '-')"></p>
                 </div>
                 <span class="inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold"
-                    :class="documentStatus.is_lengkap ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'">
-                    <span class="h-1.5 w-1.5 rounded-full" :class="documentStatus.is_lengkap ? 'bg-success' : 'bg-warning'"></span>
-                    <span x-text="documentStatus.is_lengkap ? 'Lengkap' : 'Belum Lengkap'"></span>
+                    :class="{
+                        'bg-success/10 text-success': documentStatus.status_kelengkapan === 'lengkap',
+                        'bg-warning/10 text-warning': documentStatus.status_kelengkapan === 'tidak_lengkap',
+                        'bg-primary/10 text-primary': documentStatus.status_kelengkapan === 'tersedia',
+                        'bg-muted/20 text-muted':     documentStatus.status_kelengkapan === 'kosong' || !documentStatus.status_kelengkapan,
+                    }">
+                    <span class="h-1.5 w-1.5 rounded-full"
+                        :class="{
+                            'bg-success': documentStatus.status_kelengkapan === 'lengkap',
+                            'bg-warning': documentStatus.status_kelengkapan === 'tidak_lengkap',
+                            'bg-primary': documentStatus.status_kelengkapan === 'tersedia',
+                            'bg-muted':   documentStatus.status_kelengkapan === 'kosong' || !documentStatus.status_kelengkapan,
+                        }"></span>
+                    <span x-text="
+                        documentStatus.status_kelengkapan === 'lengkap'       ? 'Lengkap' :
+                        documentStatus.status_kelengkapan === 'tidak_lengkap' ? 'Tidak Lengkap' :
+                        documentStatus.status_kelengkapan === 'tersedia'      ? 'Tersedia' :
+                                                                                'Belum Ada'
+                    "></span>
                 </span>
             </div>
 

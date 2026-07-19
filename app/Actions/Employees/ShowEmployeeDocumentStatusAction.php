@@ -13,7 +13,7 @@ class ShowEmployeeDocumentStatusAction
     /**
      * Menyusun rincian status SK setiap riwayat pegawai berdasarkan file aktual.
      *
-     * @return array{is_lengkap: bool, total_riwayat: int, file_tersedia: int, records: list<array<string, mixed>>}
+     * @return array{status_kelengkapan: string, is_lengkap: bool, total_riwayat: int, file_tersedia: int, records: list<array<string, mixed>>}
      */
     public function execute(Employee $employee): array
     {
@@ -99,10 +99,22 @@ class ShowEmployeeDocumentStatusAction
                 : 'record:'.($document['id'] ?? $document['kategori'].'|'.$document['nama'].'|'.$document['nomor']))
             ->values();
 
+        $totalRiwayat = $records->count();
+        $fileTersediaCount = $records->where('file_tersedia', true)->count();
+
+        if ($totalRiwayat === 0) {
+            $statusKelengkapan = 'kosong';
+        } elseif ($fileTersediaCount === $totalRiwayat) {
+            $statusKelengkapan = 'lengkap';
+        } else {
+            $statusKelengkapan = 'tidak_lengkap';
+        }
+
         return [
-            'is_lengkap' => $records->every(fn (array $record): bool => $record['file_tersedia']),
-            'total_riwayat' => $records->count(),
-            'file_tersedia' => $records->where('file_tersedia', true)->count(),
+            'status_kelengkapan' => $statusKelengkapan,
+            'is_lengkap' => $statusKelengkapan === 'lengkap', // backward-compat
+            'total_riwayat' => $totalRiwayat,
+            'file_tersedia' => $fileTersediaCount,
             'records' => $records->values()->all(),
             'total_dokumen' => $documents->count(),
             'dokumen_tersedia' => $documents->where('file_tersedia', true)->count(),

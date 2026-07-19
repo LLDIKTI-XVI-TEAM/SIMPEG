@@ -191,7 +191,30 @@ class EmployeeIndexTest extends TestCase
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create(['profil_status' => 'belum_lengkap']);
 
-        $this->assertEmployeeDocumentCompleteness($user, $employee, true);
+        $this->assertEmployeeDocumentCompleteness($user, $employee, 'kosong');
+    }
+
+    public function test_document_completeness_is_tersedia_when_only_other_documents_with_files_exist(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+
+        // Tidak ada riwayat SK sama sekali, hanya ada berkas KTP yang filenya ada
+        $ktpPath = 'berkas/'.$employee->id.'/ktp.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($ktpPath, 'KTP content');
+        Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'ktp_kk',
+            'nama_dokumen' => 'KTP',
+            'file_path' => $ktpPath,
+        ]);
+
+        $this->assertEmployeeDocumentCompleteness($user, $employee, 'tersedia');
+
+        // Hapus file dari storage → kembali ke 'kosong' (record ada tapi file hilang)
+        Storage::disk(Document::STORAGE_DISK)->delete($ktpPath);
+        $this->assertEmployeeDocumentCompleteness($user, $employee, 'kosong');
     }
 
     public function test_document_completeness_requires_file_for_the_existing_rank_history_only(): void
@@ -213,10 +236,10 @@ class EmployeeIndexTest extends TestCase
         ]);
 
         Storage::disk(Document::STORAGE_DISK)->put($filePath, 'SK pangkat');
-        $this->assertEmployeeDocumentCompleteness($user, $employee, true);
+        $this->assertEmployeeDocumentCompleteness($user, $employee, 'lengkap');
 
         Storage::disk(Document::STORAGE_DISK)->delete($filePath);
-        $this->assertEmployeeDocumentCompleteness($user, $employee, false);
+        $this->assertEmployeeDocumentCompleteness($user, $employee, 'tidak_lengkap');
     }
 
     public function test_document_completeness_requires_storage_files_for_every_existing_history_type(): void
@@ -278,19 +301,19 @@ class EmployeeIndexTest extends TestCase
         foreach ($paths as $path) {
             $disk->put($path, 'SK tersedia');
         }
-        $this->assertEmployeeDocumentCompleteness($user, $employee, true);
+        $this->assertEmployeeDocumentCompleteness($user, $employee, 'lengkap');
 
         foreach ($paths as $type => $path) {
             $disk->delete($path);
-            $this->assertEmployeeDocumentCompleteness($user, $employee, false);
+            $this->assertEmployeeDocumentCompleteness($user, $employee, 'tidak_lengkap');
             $disk->put($path, 'SK tersedia');
 
             $records[$type]->update(['file_sk' => null]);
-            $this->assertEmployeeDocumentCompleteness($user, $employee, false);
+            $this->assertEmployeeDocumentCompleteness($user, $employee, 'tidak_lengkap');
             $records[$type]->update(['file_sk' => $path]);
         }
 
-        $this->assertEmployeeDocumentCompleteness($user, $employee, true);
+        $this->assertEmployeeDocumentCompleteness($user, $employee, 'lengkap');
     }
 
     public function test_document_status_endpoint_reports_each_history_file_from_storage(): void
@@ -330,6 +353,7 @@ class EmployeeIndexTest extends TestCase
         $response
             ->assertOk()
             ->assertJsonPath('employee.id', $employee->id)
+            ->assertJsonPath('document_status.status_kelengkapan', 'lengkap')
             ->assertJsonPath('document_status.is_lengkap', true)
             ->assertJsonPath('document_status.total_riwayat', 1)
             ->assertJsonPath('document_status.file_tersedia', 1)
@@ -355,12 +379,13 @@ class EmployeeIndexTest extends TestCase
         $this->actingAs($user)
             ->getJson("/api/v1/pegawai/{$employee->id}/status-dokumen")
             ->assertOk()
+            ->assertJsonPath('document_status.status_kelengkapan', 'tidak_lengkap')
             ->assertJsonPath('document_status.is_lengkap', false)
             ->assertJsonPath('document_status.file_tersedia', 0)
             ->assertJsonPath('document_status.records.0.status_label', 'File tidak ditemukan');
     }
 
-    private function assertEmployeeDocumentCompleteness(User $user, Employee $employee, bool $expected): void
+    private function assertEmployeeDocumentCompleteness(User $user, Employee $employee, string $expected): void
     {
         $this->actingAs($user)
             ->getJson(self::PEGAWAI_ENDPOINT.'?search='.urlencode($employee->nip))

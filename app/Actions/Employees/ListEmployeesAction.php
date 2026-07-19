@@ -48,6 +48,8 @@ class ListEmployeesAction
                 'appointments' => fn ($query) => $query
                     ->select(['id', 'employee_id', 'file_sk', 'tmt_pengangkatan'])
                     ->orderByDesc('tmt_pengangkatan'),
+                // Berkas lainnya (KTP, KK, mutasi, dll) — hanya ambil field yang dibutuhkan
+                'documents:id,employee_id,file_path',
             ])
             ->when(
                 $validated['search'] ?? null,
@@ -112,35 +114,51 @@ class ListEmployeesAction
             'jenis_pegawai' => $p->jenisPegawai?->nama ?? '-',
             'status_nama' => $statusNama,
             'status_key' => strtolower((string) $statusNama),
-            'is_lengkap' => $this->hasCompleteSupportingFiles($p),
+            'is_lengkap' => $this->checkDocumentStatus($p),
             'tmt' => $tmt?->format('d/m/Y'),
         ];
     }
 
     /**
-     * Riwayat yang sudah dibuat wajib memiliki SK yang tersedia di storage.
-     * Riwayat yang belum dibuat tidak memengaruhi kelengkapan dokumen pegawai.
+     * Mengembalikan status kelengkapan dokumen pegawai dalam 4 kondisi:
+     * - 'kosong'       : Tidak ada riwayat SK maupun berkas lainnya di database.
+     * - 'tersedia'     : Tidak ada riwayat SK, tapi ada berkas lainnya (KTP, KK, mutasi, dll)
+     *                    yang filenya tersedia di storage.
+     * - 'tidak_lengkap': Ada riwayat SK di database, namun ada file_sk yang kosong
+     *                    atau file fisiknya tidak ditemukan di storage.
+     * - 'lengkap'      : Semua riwayat SK memiliki file_sk dan file fisiknya tersedia di storage.
      */
-    private function hasCompleteSupportingFiles(Employee $employee): bool
+    private function checkDocumentStatus(Employee $employee): string
     {
         $histories = $employee->rankHistories
             ->concat($employee->positionHistories)
             ->concat($employee->salaryHistories)
             ->concat($employee->appointments);
 
+        // Tidak ada riwayat SK apapun
         if ($histories->isEmpty()) {
-            return true;
+            // Cek apakah ada berkas lain (KTP, KK, mutasi, dll) yang filenya tersedia
+            $disk = Storage::disk(Document::STORAGE_DISK);
+            $adaBerkasLainDenganFile = $employee->documents
+                ->contains(fn ($doc): bool => filled($doc->file_path) && $disk->exists($doc->file_path));
+
+            return $adaBerkasLainDenganFile ? 'tersedia' : 'kosong';
         }
 
         $filePaths = $histories->pluck('file_sk');
+
+        // Ada riwayat tapi salah satu file_sk NULL/kosong → tidak lengkap
         if ($filePaths->contains(fn ($path): bool => blank($path))) {
-            return false;
+            return 'tidak_lengkap';
         }
 
         $disk = Storage::disk(Document::STORAGE_DISK);
 
-        return $filePaths
+        // Ada file_sk di DB tapi file fisiknya hilang dari storage → tidak lengkap
+        $semuaAdaDiStorage = $filePaths
             ->unique()
             ->every(fn (string $path): bool => $disk->exists($path));
+
+        return $semuaAdaDiStorage ? 'lengkap' : 'tidak_lengkap';
     }
 }
