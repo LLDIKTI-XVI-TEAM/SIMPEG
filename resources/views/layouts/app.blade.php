@@ -171,6 +171,7 @@
                         ['label' => 'Pengaturan Sistem', 'route' => 'pengaturan', 'icon' => 'cog-6-tooth'],
                         ['label' => 'Audit Log', 'route' => 'audit-log', 'icon' => 'clipboard-document-list'],
                     ]
+                ]
             ];
 
             if ($activeRole === 'pimpinan') {
