@@ -825,12 +825,12 @@
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div class="space-y-1">
                                         <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Hubungan <span class="text-red-500">*</span></label>
-                                        <select x-model="newKeluarga.hubungan" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                        <x-form.select x-model="newKeluarga.hubungan" required>
                                             <option value="Suami">Suami</option>
                                             <option value="Istri">Istri</option>
                                             <option value="Anak">Anak</option>
                                             <option value="Saudara">Saudara</option>
-                                        </select>
+                                        </x-form.select>
                                     </div>
                                     <div class="space-y-1">
                                         <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">NIK <span class="text-muted font-normal normal-case">(opsional)</span></label>
@@ -852,17 +852,17 @@
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div class="space-y-1">
                                         <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Kelamin <span class="text-red-500">*</span></label>
-                                        <select x-model="newKeluarga.jenis_kelamin" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                        <x-form.select x-model="newKeluarga.jenis_kelamin" required>
                                             <option value="L">Laki-laki</option>
                                             <option value="P">Perempuan</option>
-                                        </select>
+                                        </x-form.select>
                                     </div>
                                     <div class="space-y-1">
                                         <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Status Tunjangan <span class="text-red-500">*</span></label>
-                                        <select x-model="newKeluarga.status_tunjangan" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                        <x-form.select x-model="newKeluarga.status_tunjangan" required>
                                             <option value="1">Ditanggung</option>
                                             <option value="0">Tidak Ditanggung</option>
-                                        </select>
+                                        </x-form.select>
                                     </div>
                                 </div>
 

@@ -90,7 +90,7 @@ class PimpinanDashboardDataTest extends TestCase
             ->assertSee(route('pimpinan.cuti.index', ['status' => 'menunggu']), false)
             ->assertSee('Pengajuan Cuti')
             ->assertSee('href="'.route('cuti').'"', false)
-            ->assertDontSee('globalSearch()', false)
+            ->assertSee('globalSearch()', false)
             ->assertDontSee('Ahmad Fauzi')
             ->assertDontSee('Nadia Kusuma')
             ->assertDontSee('Admin HR');

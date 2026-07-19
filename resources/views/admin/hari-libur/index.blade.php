@@ -262,11 +262,11 @@
                 {{-- Tipe Dropdown --}}
                 <div class="flex items-center gap-2">
                     <label class="text-xs text-muted font-sans font-medium whitespace-nowrap">Tipe Libur:</label>
-                    <select x-model="activeTipe" class="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                    <x-form.select x-model="activeTipe">
                         <option value="semua">Semua Tipe</option>
                         <option value="libur_nasional">Libur Nasional</option>
                         <option value="cuti_bersama">Cuti Bersama</option>
-                    </select>
+                    </x-form.select>
                 </div>
             </div>
         </x-ui.card>

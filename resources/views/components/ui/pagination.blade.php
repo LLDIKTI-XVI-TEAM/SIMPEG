@@ -14,7 +14,7 @@
     $pageAction = $actionStr ? $actionStr : "{$currentStr} = page";
 @endphp
 
-<div class="flex items-center gap-1.5" x-show="{{ $total }} > 1" style="display: none;">
+<div class="flex items-center gap-1.5" x-cloak x-show="{{ $total }} > 0">
     {{-- Prev --}}
     <button type="button"
             @click="{{ $prevAction }}"

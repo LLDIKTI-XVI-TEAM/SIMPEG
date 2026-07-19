@@ -16,7 +16,7 @@ $disableEmployeeApiAuth = app()->environment('local')
 
 $employeeGroupMiddleware = $disableEmployeeApiAuth
     ? []
-    : ['web', 'keycloak.auth', 'role:super_admin,admin_kepegawaian'];
+    : ['web', 'keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan'];
 
 // Role middleware menjadi pagar kasar area admin pegawai; permission middleware menjadi pagar aksi per route.
 // Keduanya dipertahankan sebagai defense-in-depth agar akses admin tidak hanya bergantung pada satu lapis kontrol.

@@ -9,6 +9,7 @@ use App\Models\LeaveRequest;
 use App\Models\RefUnitKerja;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class GlobalSearchController extends Controller
 {
@@ -22,26 +23,31 @@ class GlobalSearchController extends Controller
 
         $results = [];
 
+        $isPimpinan = auth()->user()?->role === 'pimpinan';
+        $op = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+
         // 1. Search Employees (Pegawai & NIP)
-        $employees = Employee::where('nama_lengkap', 'ilike', "%{$query}%")
-            ->orWhere('nip', 'ilike', "%{$query}%")
+        $employees = Employee::where('nama_lengkap', $op, "%{$query}%")
+            ->orWhere('nip', $op, "%{$query}%")
             ->limit(5)
             ->get();
 
         if ($employees->isNotEmpty()) {
-            $results['Pegawai'] = $employees->map(function ($emp) {
+            $results['Pegawai'] = $employees->map(function ($emp) use ($isPimpinan) {
                 return [
                     'title' => $emp->nama_lengkap,
                     'subtitle' => 'NIP: '.$emp->nip.' — '.($emp->jabatan_terakhir ?? '-'),
-                    'url' => route('data-pegawai', ['search' => $emp->nip]),
+                    'url' => $isPimpinan
+                        ? route('pimpinan.pegawai.index', ['search' => $emp->nip])
+                        : route('data-pegawai', ['search' => $emp->nip]),
                 ];
             });
         }
 
         // 2. Search Unit Kerja
-        if (class_exists(RefUnitKerja::class)) {
+        if (! $isPimpinan && class_exists(RefUnitKerja::class)) {
             try {
-                $units = RefUnitKerja::where('nama', 'ilike', "%{$query}%")
+                $units = RefUnitKerja::where('nama', $op, "%{$query}%")
                     ->limit(5)
                     ->get();
                 if ($units->isNotEmpty()) {
@@ -58,10 +64,10 @@ class GlobalSearchController extends Controller
         }
 
         // 3. Search Dokumen
-        if (class_exists(Document::class)) {
+        if (! $isPimpinan && class_exists(Document::class)) {
             try {
-                $docs = Document::with('employee')->where('nama_dokumen', 'ilike', "%{$query}%")
-                    ->orWhere('nomor_dokumen', 'ilike', "%{$query}%")
+                $docs = Document::with('employee')->where('nama_dokumen', $op, "%{$query}%")
+                    ->orWhere('nomor_dokumen', $op, "%{$query}%")
                     ->limit(5)
                     ->get();
                 if ($docs->isNotEmpty()) {
@@ -82,17 +88,19 @@ class GlobalSearchController extends Controller
         // 4. Search Cuti
         if (class_exists(LeaveRequest::class)) {
             try {
-                $leaves = LeaveRequest::with('employee')->where('alasan', 'ilike', "%{$query}%")
+                $leaves = LeaveRequest::with('employee')->where('alasan', $op, "%{$query}%")
                     ->limit(5)
                     ->get();
                 if ($leaves->isNotEmpty()) {
-                    $results['Cuti'] = $leaves->map(function ($leave) {
+                    $results['Cuti'] = $leaves->map(function ($leave) use ($isPimpinan) {
                         $empName = $leave->employee ? $leave->employee->nama_lengkap : 'Unknown';
 
                         return [
                             'title' => 'Pengajuan Cuti: '.$empName,
                             'subtitle' => 'Alasan: '.mb_strimwidth($leave->alasan, 0, 50, '...').' ('.ucfirst($leave->status).')',
-                            'url' => route('cuti').'?search='.urlencode($empName),
+                            'url' => $isPimpinan
+                                ? route('pimpinan.cuti.index', ['search' => $empName])
+                                : route('cuti').'?search='.urlencode($empName),
                         ];
                     });
                 }
@@ -101,19 +109,21 @@ class GlobalSearchController extends Controller
         }
 
         // 5. Search Users (kept for completeness)
-        $users = User::where('name', 'like', "%{$query}%")
-            ->orWhere('email', 'like', "%{$query}%")
-            ->limit(5)
-            ->get();
+        if (! $isPimpinan) {
+            $users = User::where('name', $op, "%{$query}%")
+                ->orWhere('email', $op, "%{$query}%")
+                ->limit(5)
+                ->get();
 
-        if ($users->isNotEmpty()) {
-            $results['Pengguna Sistem'] = $users->map(function ($u) {
-                return [
-                    'title' => $u->name,
-                    'subtitle' => $u->email.' — Role: '.($u->role ?? '-'),
-                    'url' => route('user-management', ['search' => $u->name]),
-                ];
-            });
+            if ($users->isNotEmpty()) {
+                $results['Pengguna Sistem'] = $users->map(function ($u) {
+                    return [
+                        'title' => $u->name,
+                        'subtitle' => $u->email.' — Role: '.($u->role ?? '-'),
+                        'url' => route('user-management', ['search' => $u->name]),
+                    ];
+                });
+            }
         }
 
         return response()->json($results);

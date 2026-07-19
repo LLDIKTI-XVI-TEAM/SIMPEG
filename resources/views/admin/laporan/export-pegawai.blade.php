@@ -41,18 +41,17 @@
             <div class="flex shrink-0 items-center gap-3">
                 {{-- Cetak PDF --}}
                 <x-ui.button @click="printReport()" variant="secondary">
-                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.617 0-1.11-.476-1.12-1.09l-.23-2.523M19.5 10.5v.375c0 .621-.504 1.125-1.125 1.125H5.625A1.125 1.125 0 0 1 4.5 11.25v-.375m15 0V9a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 9v1.5m15 0A1.5 1.5 0 0 0 18 9h-3V6a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3H6a1.5 1.5 0 0 0-1.5 1.5" />
                     </svg>
-                    Cetak / PDF
+                    Cetak PDF
                 </x-ui.button>
                 {{-- Export Excel --}}
-                <x-ui.button x-bind:href="exportUrl" variant="primary">
-                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                <x-ui.button as="a" x-bind:href="exportUrl" variant="secondary">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
                     </svg>
-                    Export Excel
-                    <span class="ml-1.5 rounded-full bg-white/20 px-1.5 py-0.5 text-xs font-bold" x-text="exportRows.length + ' data'"></span>
+                    Unduh Excel
                 </x-ui.button>
             </div>
         </div>
@@ -89,7 +88,7 @@
                         {{-- === BAGIAN 1: PILIH KOLOM === --}}
                         <div>
                             <div class="flex items-center justify-between mb-3">
-                                <h3 class="text-xs font-bold uppercase tracking-widest text-muted font-sans">Kolom yang Diekspor</h3>
+                                <h3 class="text-xs uppercase tracking-widest text-muted font-sans font-medium">Kolom yang Diekspor</h3>
                                 <div class="flex gap-2">
                                     <button type="button" @click="selectAllColumns()"
                                         class="text-xs font-semibold text-primary hover:underline font-sans cursor-pointer">Pilih Semua</button>
@@ -122,7 +121,7 @@
                                 <div class="relative">
                                     <label class="block text-xs font-semibold text-muted font-sans mb-1">Cari Nama / NIP</label>
                                     <div class="relative">
-                                        <input type="text" x-model="searchQuery" placeholder="Cari nama atau NIP..."
+                                        <input type="text" x-model="searchQuery" placeholder="Cari nama atau NIP"
                                             class="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans" />
                                         <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -308,19 +307,8 @@
         {{-- ============================================================ --}}
         <x-ui.card padding="none" class="overflow-hidden print:border-none print:shadow-none print:bg-transparent">
             {{-- Header (Screen only) --}}
-            <div class="px-6 py-4 border-b border-border bg-surface print:hidden flex items-center justify-between">
-                <div>
-                    <h3 class="text-sm font-semibold text-ink font-sans">Pratinjau Data Export</h3>
-                    <p class="text-[10px] text-muted font-sans mt-0.5">Menampilkan data sesuai konfigurasi di atas. Hanya kolom yang dipilih yang akan muncul di file Excel.</p>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="text-xs text-muted font-sans">Tampilkan:</span>
-                    <x-form.select x-model.number="perPage" @change="currentPage = 1" class="w-auto py-1.5 pl-3 pr-8 text-xs font-sans">
-                        <option value="10">10 / hal</option>
-                        <option value="25">25 / hal</option>
-                        <option value="50">50 / hal</option>
-                    </x-form.select>
-                </div>
+            <div class="px-6 py-4 border-b border-border bg-surface print:hidden">
+                <h3 class="text-sm font-semibold text-ink font-sans">Pratinjau Data Export</h3>
             </div>
 
             {{-- Table --}}
@@ -369,14 +357,27 @@
             </div>
 
             {{-- Footer: Paginasi (Screen only) --}}
-            <div class="flex flex-col gap-3 border-t border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between bg-surface print:hidden">
-                <p class="text-sm text-muted font-sans">
-                    Menampilkan
-                    <span x-text="exportRows.length === 0 ? 0 : (currentPage - 1) * perPage + 1"></span>–<span x-text="Math.min(currentPage * perPage, exportRows.length)"></span>
-                    dari <span x-text="exportRows.length"></span> data
-                </p>
-                <div class="flex items-center gap-1.5">
-                    <x-ui.pagination current="currentPage" total="totalPages" />
+            <div class="flex flex-col gap-4 border-t border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between bg-surface print:hidden">
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm text-muted font-sans">Tampilkan</span>
+                        <select x-model.number="perPage" @change="currentPage = 1" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center w-auto">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                        </select>
+                        <span class="text-sm text-muted font-sans">data per halaman</span>
+                    </div>
+                </div>
+                <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+                    <p class="text-sm text-muted font-sans">
+                        Menampilkan
+                        <span class="font-medium" x-text="exportRows.length === 0 ? 0 : (currentPage - 1) * perPage + 1"></span>–<span class="font-medium" x-text="Math.min(currentPage * perPage, exportRows.length)"></span>
+                        dari <span class="font-medium" x-text="exportRows.length"></span> data
+                    </p>
+                    <div class="flex items-center gap-1.5">
+                        <x-ui.pagination current="currentPage" total="totalPages" />
+                    </div>
                 </div>
             </div>
         </x-ui.card>

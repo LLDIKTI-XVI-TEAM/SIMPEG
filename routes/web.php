@@ -110,7 +110,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::get('/admin/search', [GlobalSearchController::class, 'search'])
-        ->middleware('role:super_admin,admin_kepegawaian')
+        ->middleware('role:super_admin,admin_kepegawaian,pimpinan')
         ->name('global.search');
 
     Route::get('/change-role/{role}', function (Request $request, string $role) {
@@ -551,14 +551,14 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
 
             Route::get('/ews', [PimpinanEwsController::class, 'index'])->name('ews.index');
 
-            Route::get('/laporan', [PimpinanReportController::class, 'index'])->name('laporan.index');
-            Route::get('/laporan/pegawai', [PimpinanReportController::class, 'employees'])->name('laporan.pegawai');
-            Route::get('/laporan/pegawai/custom', [PimpinanReportController::class, 'customEmployees'])->name('laporan.pegawai.custom');
             Route::get('/laporan/cuti', [PimpinanReportController::class, 'leaves'])->name('laporan.cuti');
             Route::get('/laporan/cuti/excel', [PimpinanReportController::class, 'exportLeaves'])->name('laporan.cuti.excel');
             Route::get('/laporan/kepangkatan', [PimpinanReportController::class, 'rankHistories'])->name('laporan.kepangkatan');
             Route::get('/laporan/kepangkatan/excel', [PimpinanReportController::class, 'exportRankHistoriesExcel'])->name('laporan.kepangkatan.excel');
             Route::get('/laporan/kepangkatan/pdf', [PimpinanReportController::class, 'exportRankHistoriesPdf'])->name('laporan.kepangkatan.pdf');
+            Route::get('/laporan/pegawai', [PimpinanEmployeeController::class, 'reportPage'])->name('laporan.pegawai');
+            Route::get('/laporan/pegawai/custom', [PimpinanEmployeeController::class, 'reportCustom'])->name('laporan.pegawai.custom');
+            Route::get('/laporan', [PimpinanReportController::class, 'index'])->name('laporan.index');
         });
 
     Route::middleware(['role:kepala_bagian'])

@@ -17,7 +17,7 @@ class ListEmployeesRequest extends FormRequest
         $user = $this->user();
 
         return $user !== null
-            && in_array($user->role, ['super_admin', 'admin_kepegawaian'], true);
+            && in_array($user->role, ['super_admin', 'admin_kepegawaian', 'pimpinan'], true);
     }
 
     public function rules(): array

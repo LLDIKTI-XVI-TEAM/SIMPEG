@@ -109,6 +109,7 @@ class RbacSeeder extends Seeder
                 'cuti.kepala_lembaga_documents.manage',
             ],
             'pimpinan' => [
+                'employees.read',
                 'notifications.read',
                 'notifications.update',
                 // Role pimpinan dapat mengajukan cuti sendiri bila bukan pegawai bertanda Kepala Lembaga.

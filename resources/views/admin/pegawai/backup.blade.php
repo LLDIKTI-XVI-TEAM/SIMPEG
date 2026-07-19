@@ -249,7 +249,7 @@
         perPage="perPage"
         setPerPage="perPage = parseInt($event.target.value)"
         searchModel="filters.search"
-        searchPlaceholder="Cari nama atau NIP..."
+        searchPlaceholder="Cari nama atau NIP"
         emptyTitle="Tidak ada data backup."
         emptyIcon="document"
         :colspanCount="6"

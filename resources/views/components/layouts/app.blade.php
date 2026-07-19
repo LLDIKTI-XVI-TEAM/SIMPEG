@@ -194,7 +194,7 @@
                     [
                         'group' => 'Cuti',
                         'items' => [
-                            ['label' => 'Monitoring Cuti', 'route' => 'pimpinan.cuti.index', 'icon' => 'calendar'],
+                            ['label' => 'Persetujuan Cuti', 'route' => 'pimpinan.cuti.index', 'icon' => 'check-badge'],
                             ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
                         ]
                     ],
@@ -208,7 +208,9 @@
                     [
                         'group' => 'Laporan',
                         'items' => [
-                            ['label' => 'Laporan', 'route' => 'pimpinan.laporan.index', 'icon' => 'document-chart-bar'],
+                            ['label' => 'Data Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'clipboard-document-list'],
+                            ['label' => 'Rekapitulasi Cuti', 'route' => 'pimpinan.laporan.cuti', 'icon' => 'calendar-days'],
+                            ['label' => 'Riwayat Kepangkatan', 'route' => 'pimpinan.laporan.kepangkatan', 'icon' => 'document-chart-bar'],
                         ]
                     ]
                 ];
@@ -231,7 +233,7 @@
                     [
                         'group' => 'Cuti',
                         'items' => [
-                            ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'calendar'],
+                            ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge'],
                             ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
                         ],
                     ],
@@ -344,7 +346,7 @@
                             @elseif($menu['icon'] === 'user-minus')
                                 <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M22 10.5h-6m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM4 19.235A10.19 10.19 0 0 1 12.75 15c2.015 0 3.907.585 5.5 1.59m-14.25 2.645A9.903 9.903 0 0 1 12.75 18a9.903 9.903 0 0 1 6.002 2.235" /></svg>
                             @endif
-                            <span>{{ $menu['label'] }}</span>
+                            <span class="truncate">{{ $menu['label'] }}</span>
                         </a>
                     @endforeach
                 </div>
@@ -391,7 +393,7 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
                 </button>
 
-                @if (in_array($activeRole, ['super_admin', 'admin_kepegawaian'], true))
+                @if (in_array($activeRole, ['super_admin', 'admin_kepegawaian', 'pimpinan'], true))
                 {{-- Search Bar --}}
                 <div class="relative w-full hidden sm:block" x-data="globalSearch()">
                     <input

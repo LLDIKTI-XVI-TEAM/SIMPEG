@@ -23,6 +23,7 @@ use Illuminate\Support\Carbon;
  * @property-read Employee|null $employee
  * @property-read RefJenisCuti|null $jenisCuti
  * @property-read LeaveProof|null $proof
+ * @property LeaveRequestStep|null $activeStep
  */
 class LeaveRequest extends Model
 {

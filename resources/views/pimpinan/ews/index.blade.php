@@ -8,7 +8,6 @@
                     ['label' => 'EWS'],
                 ]" />
             </div>
-            <x-ui.button href="{{ route('pimpinan.laporan.index') }}" variant="primary" size="md">Semua Laporan</x-ui.button>
         </div>
 
         <form method="GET" action="{{ route('pimpinan.ews.index') }}" id="filter-form" class="mb-6">
@@ -16,7 +15,7 @@
                 searchId="search" 
                 searchName="search" 
                 :searchValue="request('search')"
-                searchPlaceholder="Cari pegawai..."
+                searchPlaceholder="Cari pegawai"
                 gridClass="grid-cols-1 md:grid-cols-3"
             >
                 <div>
@@ -80,7 +79,7 @@
                     <input type="hidden" name="status" value="{{ request('status') }}">
                     <span class="whitespace-nowrap">Tampilkan</span>
                     <select name="per_page" onchange="this.form.submit()" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
-                        @foreach ([10, 25, 50, 100] as $optPerPage)
+                        @foreach ([10, 25, 50] as $optPerPage)
                             <option value="{{ $optPerPage }}" @selected((int) request('per_page', 10) === $optPerPage)>{{ $optPerPage }}</option>
                         @endforeach
                     </select>

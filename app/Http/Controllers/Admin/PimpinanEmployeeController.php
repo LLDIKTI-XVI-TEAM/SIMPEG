@@ -3,12 +3,21 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Actions\Employees\ListEmployeesAction;
+use App\Actions\Laporan\PimpinanCustomEmployeeExportAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Laporan\CustomEmployeeExportRequest;
+use App\Http\Requests\Laporan\ExportPegawaiRequest;
 use App\Models\Employee;
+use App\Models\RefEselon;
+use App\Models\RefGolongan;
+use App\Models\RefJabatan;
+use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
+use App\Models\RefJenjangPendidikan;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PimpinanEmployeeController extends Controller
 {
@@ -45,16 +54,42 @@ class PimpinanEmployeeController extends Controller
             ->unique()
             ->values();
 
-        return view('pimpinan.pegawai.index', compact(
+        $initialRows = $employees->items();
+        $initialMeta = [
+            'total' => $employees->total(),
+            'current_page' => $employees->currentPage(),
+            'last_page' => $employees->lastPage(),
+            'from' => $employees->firstItem() ?? 0,
+            'to' => $employees->lastItem() ?? 0,
+            'per_page' => $employees->perPage(),
+        ];
+
+        $golonganOptions = Employee::query()
+            ->whereNotNull('golongan_terakhir')
+            ->distinct()
+            ->orderBy('golongan_terakhir')
+            ->pluck('golongan_terakhir')
+            ->map(fn (?string $golongan) => $golongan ? strtok($golongan, '/') : null)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($golonganOptions->isEmpty()) {
+            $golonganOptions = collect(['II', 'III', 'IV']);
+        }
+
+        $unitKerjaOptions = RefUnitKerja::query()->orderBy('nama')->get(['id', 'nama']);
+        $jenisPegawaiOptions = RefJenisPegawai::query()->orderBy('nama')->get(['id', 'nama']);
+        $statusOptions = RefStatusPegawai::query()->orderByDesc('is_default')->orderBy('nama')->get(['id', 'nama']);
+
+        return view('admin.pegawai.index', compact(
+            'initialRows', 'initialMeta',
+            'golonganOptions', 'unitKerjaOptions', 'jenisPegawaiOptions', 'statusOptions',
             'employees',
             'filters',
             'perPage',
             'sort',
             'direction',
-            'unitKerjaOptions',
-            'jenisPegawaiOptions',
-            'statusOptions',
-            'golonganOptions',
         ));
     }
 
@@ -97,6 +132,36 @@ class PimpinanEmployeeController extends Controller
                 ]),
         ]);
 
-        return view('pimpinan.pegawai.show', compact('employee'));
+        $golonganOptions = RefGolongan::all();
+        $jabatanOptions = RefJabatan::with('jenisJabatan')->orderBy('nama')->get();
+        $jenisJabatanOptions = RefJenisJabatan::all();
+        $unitKerjaOptions = RefUnitKerja::all();
+        $eselonOptions = RefEselon::all();
+        $jenjangOptions = RefJenjangPendidikan::orderBy('urutan')->get();
+
+        $p = $employee;
+
+        return view('pimpinan.pegawai.show', compact('p'));
+    }
+
+    public function reportPage(ExportPegawaiRequest $request): mixed
+    {
+        $filters = $request->validated();
+        $selectedColumns = (array) $request->query('columns', []);
+
+        if (empty($selectedColumns)) {
+            $selectedColumns = array_keys(PimpinanCustomEmployeeExportAction::ALLOWED_COLUMNS);
+        }
+
+        return view('pimpinan.laporan.pegawai', [
+            'filters' => $filters,
+            'selectedColumns' => $selectedColumns,
+            'allowedColumns' => PimpinanCustomEmployeeExportAction::ALLOWED_COLUMNS,
+        ]);
+    }
+
+    public function reportCustom(CustomEmployeeExportRequest $request, PimpinanCustomEmployeeExportAction $action): StreamedResponse
+    {
+        return $action->execute($request->validated());
     }
 }
