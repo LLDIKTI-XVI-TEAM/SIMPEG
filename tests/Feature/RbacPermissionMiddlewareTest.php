@@ -51,8 +51,8 @@ class RbacPermissionMiddlewareTest extends TestCase
         // Re-seed tidak boleh menduplikasi permission (firstOrCreate + sync).
         $this->seed(RbacSeeder::class);
 
-        // 22 permission dasar + 16 permission modul cuti setelah proof-generation key disiapkan.
-        $this->assertSame(38, Permission::count());
+        // 21 permission dasar + 16 permission modul cuti setelah hak hapus disiplin dihilangkan.
+        $this->assertSame(37, Permission::count());
         $this->assertTrue(
             Role::where('name', 'super_admin')->firstOrFail()
                 ->permissions()->where('name', 'hari_libur.delete')->exists()
@@ -168,6 +168,11 @@ class RbacPermissionMiddlewareTest extends TestCase
         $this->assertTrue($role->permissions()->where('name', 'discipline_records.create')->exists());
     }
 
+    public function test_discipline_delete_permission_is_not_seeded(): void
+    {
+        $this->assertFalse(Permission::where('name', 'discipline_records.delete')->exists());
+    }
+
     public function test_employee_family_permissions_exist_and_are_assigned_to_admin_kepegawaian(): void
     {
         $role = Role::where('name', 'admin_kepegawaian')->firstOrFail();
@@ -177,6 +182,30 @@ class RbacPermissionMiddlewareTest extends TestCase
 
             $this->assertTrue(Permission::where('name', $permission)->exists());
             $this->assertTrue($role->permissions()->where('name', $permission)->exists());
+        }
+    }
+
+    public function test_pegawai_only_has_read_permissions_for_family_and_employee_histories(): void
+    {
+        $role = Role::where('name', 'pegawai')->firstOrFail();
+
+        $this->assertTrue($role->permissions()->where('name', 'employee_families.read')->exists());
+        $this->assertTrue($role->permissions()->where('name', 'employee_histories.read')->exists());
+
+        foreach ([
+            'employee_families.create',
+            'employee_families.update',
+            'employee_families.delete',
+            'employee_histories.create',
+            'employee_histories.update',
+            'employee_histories.delete',
+        ] as $permission) {
+            if (Permission::where('name', $permission)->exists()) {
+                $this->assertFalse(
+                    $role->permissions()->where('name', $permission)->exists(),
+                    "Role pegawai tidak boleh memiliki permission {$permission}.",
+                );
+            }
         }
     }
 

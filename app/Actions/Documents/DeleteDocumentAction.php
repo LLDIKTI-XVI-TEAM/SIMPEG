@@ -28,7 +28,6 @@ class DeleteDocumentAction
     public function checkImpact(Document $document): array
     {
         $blocked = [];
-        $deletable = [];
 
         $rankHistories = $this->matchingSkRecords(RankHistory::query(), $document, 'file_sk', 'sk_pangkat')
             ->get(['id', 'no_sk', 'tanggal_sk']);
@@ -77,7 +76,8 @@ class DeleteDocumentAction
         $disciplineRecords = $this->matchingSkRecords(DisciplineRecord::query(), $document, 'file_sk', 'sk_hukuman_disiplin')
             ->get(['id', 'no_sk', 'jenis_hukuman']);
         if ($disciplineRecords->isNotEmpty()) {
-            $deletable['Hukuman Disiplin'] = $disciplineRecords->map(fn (DisciplineRecord $record): array => [
+            // Riwayat disiplin bersifat append-only agar jejak keputusan kepegawaian tidak dapat dihapus lewat arsip.
+            $blocked['Hukuman Disiplin'] = $disciplineRecords->map(fn (DisciplineRecord $record): array => [
                 'id' => $record->id,
                 'label' => 'No. SK: '.($record->no_sk ?: '-').' — Jenis: '.$record->jenis_hukuman,
             ])->values()->all();
@@ -85,9 +85,9 @@ class DeleteDocumentAction
 
         return [
             'has_blocked' => $blocked !== [],
-            'has_deletable' => $deletable !== [],
+            'has_deletable' => false,
             'blocked_impacts' => $blocked,
-            'deletable_impacts' => $deletable,
+            'deletable_impacts' => [],
         ];
     }
 
@@ -95,9 +95,9 @@ class DeleteDocumentAction
      * Hapus dokumen hanya saat tidak dipakai oleh riwayat penting.
      * Penegakan dilakukan di server, bukan hanya pada modal pemeriksaan dampak.
      */
-    public function execute(Document $document, bool $forceDeleteDiscipline = false): void
+    public function execute(Document $document): void
     {
-        $filePath = DB::transaction(function () use ($document, $forceDeleteDiscipline): string {
+        $filePath = DB::transaction(function () use ($document): string {
             /** @var Document $lockedDocument */
             $lockedDocument = Document::query()->lockForUpdate()->findOrFail($document->id);
             $impact = $this->checkImpact($lockedDocument);
@@ -106,16 +106,6 @@ class DeleteDocumentAction
                 throw ValidationException::withMessages([
                     'document' => 'Dokumen tidak dapat dihapus karena masih digunakan oleh data kepegawaian.',
                 ]);
-            }
-
-            if ($impact['has_deletable'] && ! $forceDeleteDiscipline) {
-                throw ValidationException::withMessages([
-                    'document' => 'Konfirmasi penghapusan riwayat Hukuman Disiplin diperlukan untuk menghapus dokumen ini.',
-                ]);
-            }
-
-            if ($forceDeleteDiscipline) {
-                $this->matchingSkRecords(DisciplineRecord::query(), $lockedDocument, 'file_sk', 'sk_hukuman_disiplin')->delete();
             }
 
             $filePath = $lockedDocument->file_path;

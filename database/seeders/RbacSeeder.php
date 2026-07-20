@@ -34,7 +34,6 @@ class RbacSeeder extends Seeder
             'employee_histories.delete' => ['module' => 'employee_histories', 'description' => 'Menghapus riwayat pegawai'],
             'discipline_records.read' => ['module' => 'discipline_records', 'description' => 'Melihat riwayat hukuman disiplin'],
             'discipline_records.create' => ['module' => 'discipline_records', 'description' => 'Membuat riwayat hukuman disiplin'],
-            'discipline_records.delete' => ['module' => 'discipline_records', 'description' => 'Menghapus riwayat hukuman disiplin'],
             'employee_families.read' => ['module' => 'employee_families', 'description' => 'Melihat data keluarga pegawai'],
             'employee_families.create' => ['module' => 'employee_families', 'description' => 'Membuat data keluarga pegawai'],
             'employee_families.update' => ['module' => 'employee_families', 'description' => 'Mengubah data keluarga pegawai'],
@@ -93,7 +92,6 @@ class RbacSeeder extends Seeder
                 'employee_histories.delete',
                 'discipline_records.read',
                 'discipline_records.create',
-                'discipline_records.delete',
                 'employee_families.read',
                 'employee_families.create',
                 'employee_families.update',
@@ -132,11 +130,9 @@ class RbacSeeder extends Seeder
                 'notifications.update',
                 // Pegawai dapat membuat pengajuan cuti miliknya sendiri.
                 'cuti.create',
-                // Pegawai dapat melihat, menambah, dan mengedit data keluarga miliknya sendiri.
-                // Otorisasi "hanya milik sendiri" dijaga di layer controller dan FormRequest.
+                // Profil mandiri hanya memberi akses baca; mutasi tetap melalui admin kepegawaian.
                 'employee_families.read',
-                'employee_families.create',
-                'employee_families.update',
+                'employee_histories.read',
             ],
         ]);
     }

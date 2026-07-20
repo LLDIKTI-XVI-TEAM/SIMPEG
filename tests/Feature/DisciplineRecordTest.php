@@ -15,6 +15,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -198,6 +199,36 @@ class DisciplineRecordTest extends TestCase
 
         $this->getJson("/api/v1/pegawai/{$employee->id}/disiplin")->assertForbidden();
         $this->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/disiplin", $this->validPayload())->assertForbidden();
+    }
+
+    public function test_direct_discipline_delete_route_is_absent(): void
+    {
+        $routeName = 'pegawai.disiplin.destroy';
+
+        $this->assertFalse(Route::has('api.v1.'.$routeName));
+    }
+
+    public function test_old_direct_delete_uri_is_unavailable_and_preserves_discipline_record(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $record = DisciplineRecord::create($this->recordPayload($employee));
+
+        $response = $this->actingAs($user)
+            ->withSession(['_token' => 'test-token'])
+            ->deleteJson(
+                "/api/v1/pegawai/{$employee->id}/disiplin/{$record->id}",
+                [],
+                ['X-CSRF-TOKEN' => 'test-token'],
+            );
+
+        $this->assertSame([
+            'status_routing' => true,
+            'record_tetap_ada' => true,
+        ], [
+            'status_routing' => in_array($response->status(), [404, 405], true),
+            'record_tetap_ada' => DisciplineRecord::whereKey($record->id)->exists(),
+        ]);
     }
 
     public function test_validation_rejects_invalid_discipline_payload(): void
