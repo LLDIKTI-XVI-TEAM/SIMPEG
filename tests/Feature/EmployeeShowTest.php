@@ -120,7 +120,7 @@ class EmployeeShowTest extends TestCase
             ->assertJsonPath('employee.appointments.0.jenis_pengangkatan', 'PNS')
             ->assertJsonPath('employee.rank_histories.0.golongan.kode', 'III/a')
             ->assertJsonPath('employee.position_histories.0.jenis_jabatan.nama', 'Struktural')
-            ->assertJsonPath('employee.position_histories.0.unit_kerja.nama', 'Bagian Umum')
+            ->assertJsonPath('employee.position_histories.0.unit_kerja.nama', 'Kepala Bagian Umum')
             ->assertJsonPath('employee.salary_histories.0.gaji_pokok', '5000000.00')
             ->assertJsonPath('employee.discipline_records.0.jenis_hukuman', 'Ringan')
             ->assertJsonPath('employee.education_histories.0.jenjang.nama', 'D4 / S1')
@@ -250,7 +250,7 @@ class EmployeeShowTest extends TestCase
             'nama_jabatan' => 'Analis Kepegawaian',
             'jenis_jabatan_id' => RefJenisJabatan::where('nama', 'Struktural')->firstOrFail()->id,
             'eselon_id' => RefEselon::where('kode', 'IV.a')->firstOrFail()->id,
-            'unit_kerja_id' => RefUnitKerja::where('nama', 'Bagian Umum')->firstOrFail()->id,
+            'unit_kerja_id' => RefUnitKerja::where('nama', 'Kepala Bagian Umum')->firstOrFail()->id,
             'tmt_jabatan' => '2023-01-01',
             'no_sk' => 'SK-JABATAN-001',
             'tanggal_sk' => '2022-12-15',

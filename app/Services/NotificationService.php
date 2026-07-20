@@ -5,28 +5,36 @@ namespace App\Services;
 use App\Jobs\SendSimpegNotificationEmailJob;
 use App\Models\Employee;
 use App\Models\SimpegNotification;
+use App\Services\Notifications\NotificationChannelResolver;
 use App\Services\Notifications\NotificationRecipientResolver;
 use Illuminate\Database\Eloquent\Collection;
 
 class NotificationService
 {
-    public function __construct(private readonly NotificationRecipientResolver $recipients) {}
+    public function __construct(
+        private readonly NotificationRecipientResolver $recipients,
+        private readonly NotificationChannelResolver $channels,
+    ) {}
 
     /**
-     * Membuat notifikasi in-app untuk satu pegawai penerima dan menjadwalkan email bila event memiliki channel email.
+     * Membuat notifikasi in-app untuk satu pegawai penerima dan menjadwalkan email bila channel-nya aktif.
      * Email dikirim lewat queue agar request utama tidak menunggu SMTP.
      *
      * @param  array<string, mixed>|null  $data
      */
-    public function createForEmployee(Employee $employee, string $type, string $title, string $body, ?array $data = null): SimpegNotification
+    public function createForEmployee(Employee $employee, string $type, string $title, string $body, ?array $data = null): ?SimpegNotification
     {
-        $notification = SimpegNotification::create([
-            'user_id' => $employee->id,
-            'type' => $type,
-            'title' => $title,
-            'body' => $body,
-            'data' => $data,
-        ]);
+        $notification = null;
+
+        if ($this->channels->isEnabled('in_app')) {
+            $notification = SimpegNotification::create([
+                'user_id' => $employee->id,
+                'type' => $type,
+                'title' => $title,
+                'body' => $body,
+                'data' => $data,
+            ]);
+        }
 
         $this->dispatchEmails($employee, $type, $title, $body, $data);
 

@@ -9,6 +9,7 @@ use App\Mail\SimpegNotificationMail;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
+use App\Models\RefNotificationChannel;
 use App\Models\SimpegNotification;
 use App\Models\User;
 use App\Services\NotificationService;
@@ -44,6 +45,44 @@ class EmailNotificationTest extends TestCase
             SendSimpegNotificationEmailJob::class,
             fn (SendSimpegNotificationEmailJob $job): bool => $job->employeeId === $employee->id
         );
+    }
+
+    public function test_disabled_email_channel_keeps_in_app_notification_but_does_not_queue_email(): void
+    {
+        Queue::fake();
+        RefNotificationChannel::query()->where('code', 'email')->update(['is_enabled' => false]);
+        $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+
+        app(NotificationService::class)->createForEmployee(
+            employee: $employee,
+            type: 'cuti.pengajuan_baru',
+            title: 'Pengajuan Cuti Menunggu Persetujuan',
+            body: 'Pegawai mengajukan cuti.',
+        );
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $employee->id,
+            'type' => 'cuti.pengajuan_baru',
+        ]);
+        Queue::assertNotPushed(SendSimpegNotificationEmailJob::class);
+    }
+
+    public function test_disabled_in_app_channel_keeps_email_delivery_available(): void
+    {
+        Queue::fake();
+        RefNotificationChannel::query()->where('code', 'in_app')->update(['is_enabled' => false]);
+        $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+
+        $notification = app(NotificationService::class)->createForEmployee(
+            employee: $employee,
+            type: 'cuti.pengajuan_baru',
+            title: 'Pengajuan Cuti Menunggu Persetujuan',
+            body: 'Pegawai mengajukan cuti.',
+        );
+
+        $this->assertNull($notification);
+        $this->assertDatabaseMissing('notifications', ['user_id' => $employee->id]);
+        Queue::assertPushed(SendSimpegNotificationEmailJob::class, 1);
     }
 
     public function test_cuti_revision_request_queues_email_to_primary_recipient(): void
