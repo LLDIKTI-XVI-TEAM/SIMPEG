@@ -41,8 +41,10 @@ class EmployeeReportExportTest extends TestCase
     public function test_preview_and_standard_excel_use_real_active_employee_data_and_same_filter(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();
-        $unitKepegawaian = RefUnitKerja::query()->where('nama', 'Bagian SDM')->firstOrFail();
-        $unitLain = RefUnitKerja::query()->where('nama', 'Bagian Umum')->firstOrFail();
+        $unitKepegawaian = RefUnitKerja::query()
+            ->where('nama', 'Urusan Organisasi Tata Laksana dan SDM')
+            ->firstOrFail();
+        $unitLain = RefUnitKerja::query()->where('nama', 'Urusan Keuangan')->firstOrFail();
 
         $included = $this->createEmployee($unitKepegawaian, [
             'nama_lengkap' => 'Ahmad Export',
@@ -96,7 +98,7 @@ class EmployeeReportExportTest extends TestCase
             $this->assertSame($included->nip, $sheet->getCell('B2')->getValue());
             $this->assertSame('Ahmad Export', $sheet->getCell('C2')->getValue());
             $this->assertSame('Analis Kepegawaian', $sheet->getCell('E2')->getValue());
-            $this->assertSame('Bagian SDM', $sheet->getCell('F2')->getValue());
+            $this->assertSame('Urusan Organisasi Tata Laksana dan SDM', $sheet->getCell('F2')->getValue());
             $this->assertSame('A2', $sheet->getFreezePane());
         } finally {
             $spreadsheet->disconnectWorksheets();
@@ -106,11 +108,16 @@ class EmployeeReportExportTest extends TestCase
     public function test_custom_export_uses_canonical_column_order_and_rejects_sensitive_columns(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();
-        $employee = $this->createEmployee(RefUnitKerja::query()->where('nama', 'Bagian SDM')->firstOrFail(), [
-            'nama_lengkap' => 'Nadia Custom',
-            'nip' => '198503122010011004',
-            'tanggal_pensiun' => '2038-08-17',
-        ]);
+        $employee = $this->createEmployee(
+            RefUnitKerja::query()
+                ->where('nama', 'Urusan Organisasi Tata Laksana dan SDM')
+                ->firstOrFail(),
+            [
+                'nama_lengkap' => 'Nadia Custom',
+                'nip' => '198503122010011004',
+                'tanggal_pensiun' => '2038-08-17',
+            ],
+        );
 
         $response = $this->actingAs($admin)->post(route('laporan.pegawai.custom'), [
             'columns' => ['tanggal_pensiun', 'nama', 'nip'],

@@ -73,7 +73,7 @@ class EmployeeHistoryService
     }
 
     /**
-     * Menambah riwayat jabatan dan menghitung ulang tanggal pensiun dari BUP jenis jabatan.
+     * Menambah riwayat jabatan dan menghitung ulang tanggal pensiun dari BUP jabatan atau jenis jabatannya.
      */
     public function createPositionHistory(Employee $employee, array $data, ?Request $request = null): PositionHistory
     {
@@ -111,12 +111,14 @@ class EmployeeHistoryService
 
             if ($isLatest) {
                 $jenisJabatan = RefJenisJabatan::findOrFail($jenisJabatanId);
+                $bupTahun = $jabatan->default_bup ?? $jenisJabatan->maks_usia_pensiun;
+
                 $employee->update([
                     'jabatan_terakhir' => $jabatan->nama,
                     'kelas_jabatan_terakhir' => $data['kelas_jabatan'] ?? $employee->kelas_jabatan_terakhir,
                     'kelas_jabatan' => $data['kelas_jabatan'] ?? $employee->kelas_jabatan_terakhir,
                     'tanggal_pensiun' => $employee->tanggal_lahir->copy()
-                        ->addYears($jenisJabatan->maks_usia_pensiun)
+                        ->addYears($bupTahun)
                         ->toDateString(),
                 ]);
             }

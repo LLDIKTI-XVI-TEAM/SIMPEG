@@ -164,6 +164,36 @@ podman compose exec app php artisan tinker
 podman compose exec app php artisan test
 ```
 
+### Pengujian Otomatis
+
+Test unit dan feature menggunakan PHPUnit. Konfigurasi lokal default memakai SQLite in-memory, sedangkan CI menjalankan suite yang sama terhadap PostgreSQL 17.
+
+```bash
+# Seluruh test unit dan feature
+composer test
+
+# Seluruh quality gate: Pint, PHPStan, dan test
+composer qa
+```
+
+Laravel Dusk tersedia untuk browser test. Jalankan perintah berikut dari host yang mempunyai Google Chrome/Chromium, dengan aplikasi telah tersedia pada `APP_URL` (default `http://localhost:8000`):
+
+```bash
+# Unduh ChromeDriver yang cocok dengan versi Chrome lokal (cukup saat versi Chrome berubah)
+php artisan dusk:chrome-driver --detect
+
+# Terminal 1: jalankan aplikasi lokal
+php artisan serve
+
+# Terminal 2: jalankan browser test dalam mode headless
+composer test:browser
+
+# Opsional: tampilkan jendela browser ketika mendiagnosis kegagalan
+php artisan dusk --browse
+```
+
+Browser test tidak dipanggil oleh `composer qa` karena memerlukan browser dan ChromeDriver. Jalankan browser test sebelum mengubah alur UI utama atau ketika perubahan memerlukan verifikasi end-to-end.
+
 ### Masuk ke Shell Container
 
 ```bash

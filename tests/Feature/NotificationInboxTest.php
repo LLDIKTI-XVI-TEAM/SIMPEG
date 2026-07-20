@@ -46,6 +46,8 @@ class NotificationInboxTest extends TestCase
             data: ['leave_request_id' => 'LR-001'],
         );
 
+        $this->assertNotNull($notification);
+
         $this->assertDatabaseHas('notifications', [
             'id' => $notification->id,
             'user_id' => $employee->id,

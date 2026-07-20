@@ -12,6 +12,7 @@ use App\Models\RefJenisJabatan;
 use App\Models\RefJenisKelamin;
 use App\Models\RefJenisPegawai;
 use App\Models\RefJenjangPendidikan;
+use App\Models\RefNotificationChannel;
 use App\Models\RefStatusPegawai;
 use App\Models\RefStatusPerkawinan;
 use App\Models\RefUnitKerja;
@@ -53,6 +54,7 @@ class ReferenceSeeder extends Seeder
             ['nama' => 'Struktural', 'maks_usia_pensiun' => 60, 'catatan' => 'Dapat disesuaikan berdasarkan jabatan detail'],
             ['nama' => 'Fungsional Tertentu', 'maks_usia_pensiun' => 58, 'catatan' => 'Mengikuti jenjang atau jabatan detail; beberapa 60 tahun'],
             ['nama' => 'Fungsional Umum / Pelaksana', 'maks_usia_pensiun' => 58, 'catatan' => 'Default umum'],
+            ['nama' => 'Jabatan Akademik / Dosen', 'maks_usia_pensiun' => 65, 'catatan' => 'Disiapkan untuk pengembangan Dosen DPK pada fase berikutnya'],
         ];
 
         foreach ($jenisJabatan as $item) {
@@ -139,14 +141,20 @@ class ReferenceSeeder extends Seeder
         }
 
         $statusPegawai = [
-            ['nama' => 'Aktif', 'keterangan' => 'Pegawai aktif', 'is_default' => true],
-            ['nama' => 'Non-Aktif', 'keterangan' => 'Pegawai nonaktif sementara', 'is_default' => false],
-            ['nama' => 'Pensiun', 'keterangan' => 'Pegawai pensiun', 'is_default' => false],
-            ['nama' => 'Mutasi', 'keterangan' => 'Pegawai mutasi keluar', 'is_default' => false],
+            ['kode' => 'AKTIF', 'nama' => 'Aktif', 'kelompok' => 'Aktif', 'keterangan' => 'Pegawai aktif.', 'is_default' => true],
+            ['kode' => 'NONAKTIF', 'nama' => 'Nonaktif', 'kelompok' => 'Nonaktif', 'keterangan' => 'Pegawai tidak aktif.', 'is_default' => false],
+            ['kode' => 'PENSIUN', 'nama' => 'Pensiun', 'kelompok' => 'Nonaktif', 'keterangan' => 'Pegawai telah pensiun.', 'is_default' => false],
+            ['kode' => 'MUTASI', 'nama' => 'Mutasi', 'kelompok' => 'Nonaktif', 'keterangan' => 'Pegawai mutasi keluar.', 'is_default' => false],
+            ['kode' => 'CLTN', 'nama' => 'Cuti Luar Tanggungan Negara', 'kelompok' => 'Nonaktif', 'keterangan' => 'Pegawai menjalani cuti luar tanggungan negara.', 'is_default' => false],
+            ['kode' => 'PERPANJANGAN_CLTN', 'nama' => 'Perpanjangan CLTN', 'kelompok' => 'Nonaktif', 'keterangan' => 'Cuti luar tanggungan negara diperpanjang.', 'is_default' => false],
+            ['kode' => 'TUGAS_BELAJAR', 'nama' => 'Tugas Belajar', 'kelompok' => 'Aktif/khusus', 'keterangan' => 'Pegawai menjalani tugas belajar.', 'is_default' => false],
+            ['kode' => 'PEMBERHENTIAN_SEMENTARA', 'nama' => 'Pemberhentian Sementara', 'kelompok' => 'Nonaktif', 'keterangan' => 'Pegawai diberhentikan sementara.', 'is_default' => false],
+            ['kode' => 'WAJIB_MILITER', 'nama' => 'Wajib Militer', 'kelompok' => 'Nonaktif/khusus', 'keterangan' => 'Pegawai menjalani wajib militer.', 'is_default' => false],
+            ['kode' => 'HILANG', 'nama' => 'PNS Dinyatakan Hilang', 'kelompok' => 'Nonaktif/khusus', 'keterangan' => 'PNS dinyatakan hilang.', 'is_default' => false],
         ];
 
         foreach ($statusPegawai as $item) {
-            RefStatusPegawai::firstOrCreate(['nama' => $item['nama']], $item);
+            RefStatusPegawai::updateOrCreate(['kode' => $item['kode']], $item);
         }
 
         // ref_hari_libur — subset awal 2026 untuk baseline kalkulasi hari kerja; data mengikuti kalender libur nasional/SKB yang berlaku
@@ -170,19 +178,26 @@ class ReferenceSeeder extends Seeder
             }
         }
 
-        // §16.10 ref_unit_kerja (placeholder — perlu konfirmasi LLDIKTI)
-        $unitKerja = [
-            ['nama' => 'Bagian Umum', 'keterangan' => 'Pusat administrasi dan umum'],
-            ['nama' => 'Bagian Keuangan', 'keterangan' => 'Pengelolaan keuangan dan anggaran'],
-            ['nama' => 'Bagian SDM', 'keterangan' => 'Sumber Daya Manusia dan Kepegawaian'],
-            ['nama' => 'Pimpinan', 'keterangan' => 'Pimpinan LLDIKTI Wilayah XVI'],
-            ['nama' => 'Pokja Akademik dan Riset', 'keterangan' => 'Kelompok Kerja Akademik dan Riset'],
-            ['nama' => 'Pokja Kelembagaan dan Sistem Informasi', 'keterangan' => 'Kelompok Kerja Kelembagaan'],
-            ['nama' => 'Pokja Kemahasiswaan', 'keterangan' => 'Kelompok Kerja Kemahasiswaan'],
-        ];
+        $kepalaLembaga = RefUnitKerja::firstOrCreate(
+            ['nama' => 'Kepala Lembaga'],
+            ['parent_id' => null, 'level' => 0, 'jenis_unit' => 'lembaga', 'is_active' => true, 'keterangan' => 'Root struktur organisasi LLDIKTI.'],
+        );
 
-        foreach ($unitKerja as $item) {
-            RefUnitKerja::firstOrCreate(['nama' => $item['nama']], $item);
+        $kepalaBagianUmum = RefUnitKerja::firstOrCreate(
+            ['nama' => 'Kepala Bagian Umum'],
+            ['parent_id' => $kepalaLembaga->id, 'level' => 1, 'jenis_unit' => 'bagian', 'is_active' => true, 'keterangan' => 'Bagian umum pada struktur awal.'],
+        );
+
+        foreach ([
+            ['nama' => 'Ketua Tim Kerja Substansi', 'parent_id' => $kepalaLembaga->id, 'level' => 1, 'jenis_unit' => 'tim_kerja'],
+            ['nama' => 'Urusan Organisasi Tata Laksana dan SDM', 'parent_id' => $kepalaBagianUmum->id, 'level' => 2, 'jenis_unit' => 'urusan'],
+            ['nama' => 'Urusan Keuangan', 'parent_id' => $kepalaBagianUmum->id, 'level' => 2, 'jenis_unit' => 'urusan'],
+            ['nama' => 'Urusan Humas / Layanan Pendukung', 'parent_id' => $kepalaBagianUmum->id, 'level' => 2, 'jenis_unit' => 'urusan'],
+        ] as $item) {
+            RefUnitKerja::firstOrCreate(
+                ['nama' => $item['nama']],
+                [...$item, 'is_active' => true],
+            );
         }
 
         $jabatan = [
@@ -200,6 +215,7 @@ class ReferenceSeeder extends Seeder
                 ['nama' => $item['nama']],
                 [
                     'jenis_jabatan_id' => $jenisJabatanByNama[$item['jenis']] ?? null,
+                    'is_active' => true,
                     'keterangan' => 'Referensi awal jabatan SIMPEG.',
                 ],
             );
@@ -217,6 +233,14 @@ class ReferenceSeeder extends Seeder
 
         foreach ($bup as $item) {
             RefBup::firstOrCreate(['jenis_jabatan' => $item['jenis_jabatan']], $item);
+        }
+
+        foreach ([
+            ['code' => 'in_app', 'name' => 'Notifikasi dalam aplikasi', 'is_enabled' => true, 'config' => null],
+            ['code' => 'email', 'name' => 'Email', 'is_enabled' => true, 'config' => null],
+            ['code' => 'whatsapp_business', 'name' => 'WhatsApp Business', 'is_enabled' => false, 'config' => null],
+        ] as $channel) {
+            RefNotificationChannel::firstOrCreate(['code' => $channel['code']], $channel);
         }
     }
 }

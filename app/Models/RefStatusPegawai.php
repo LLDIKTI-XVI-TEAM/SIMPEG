@@ -11,7 +11,7 @@ class RefStatusPegawai extends Model
 
     protected $table = 'ref_status_pegawai';
 
-    protected $fillable = ['nama', 'keterangan', 'is_default'];
+    protected $fillable = ['kode', 'nama', 'kelompok', 'keterangan', 'is_default'];
 
     protected function casts(): array
     {

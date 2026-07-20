@@ -19,6 +19,7 @@
     "require-dev": {
         "fakerphp/faker": "^1.23",
         "larastan/larastan": "^3.0",
+        "laravel/dusk": "8.6",
         "laravel/pail": "^1.2.2",
         "laravel/pint": "^1.24",
         "laravel/sail": "^1.41",
@@ -55,6 +56,7 @@
             "@php artisan config:clear --ansi",
             "@php -d memory_limit=-1 artisan test"
         ],
+        "test:browser": "@php artisan dusk",
         "format": "@php vendor/bin/pint",
         "format:check": "@php vendor/bin/pint --test",
         "analyse": "@php vendor/bin/phpstan analyse --memory-limit=1G",

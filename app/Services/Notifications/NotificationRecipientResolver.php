@@ -8,6 +8,8 @@ use Illuminate\Support\Collection;
 
 class NotificationRecipientResolver
 {
+    public function __construct(private readonly NotificationChannelResolver $channels) {}
+
     /**
      * Mengembalikan penerima tambahan untuk EWS lintas role; cuti tetap memakai penerima in-app utama.
      *
@@ -46,7 +48,7 @@ class NotificationRecipientResolver
      */
     public function emailEnabled(string $type): bool
     {
-        return in_array($type, [
+        return $this->channels->isEnabled('email') && in_array($type, [
             'cuti.pengajuan_baru',
             'cuti.menunggu_persetujuan',
             'cuti.disetujui',
