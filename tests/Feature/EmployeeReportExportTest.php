@@ -108,13 +108,16 @@ class EmployeeReportExportTest extends TestCase
     public function test_custom_export_uses_canonical_column_order_and_rejects_sensitive_columns(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();
-        $employee = $this->createEmployee(RefUnitKerja::query()
-            ->where('nama', 'Urusan Organisasi Tata Laksana dan SDM')
-            ->firstOrFail(), [
-            'nama_lengkap' => 'Nadia Custom',
-            'nip' => '198503122010011004',
-            'tanggal_pensiun' => '2038-08-17',
-        ]);
+        $employee = $this->createEmployee(
+            RefUnitKerja::query()
+                ->where('nama', 'Urusan Organisasi Tata Laksana dan SDM')
+                ->firstOrFail(),
+            [
+                'nama_lengkap' => 'Nadia Custom',
+                'nip' => '198503122010011004',
+                'tanggal_pensiun' => '2038-08-17',
+            ],
+        );
 
         $response = $this->actingAs($admin)->post(route('laporan.pegawai.custom'), [
             'columns' => ['tanggal_pensiun', 'nama', 'nip'],
