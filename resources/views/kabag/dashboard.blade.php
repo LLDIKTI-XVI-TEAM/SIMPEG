@@ -20,19 +20,17 @@
                 <path d="M 200 -50 Q 50 200 200 450" fill="none" stroke="currentColor" stroke-width="40"/>
                 <path d="M 280 -50 Q 130 200 280 450" fill="none" stroke="currentColor" stroke-width="20"/>
             </svg>
-            <!-- Small floating ring -->
-            <div class="absolute bottom-1/4 right-[40%] w-3 h-3 border-[2px] border-white/20 rounded-full"></div>
         </div>
 
         <!-- Content Left -->
         <div class="relative z-10 w-full lg:w-[70%] flex flex-col justify-center">
-            <p class="text-[10px] font-bold uppercase tracking-widest text-white/70 mb-0.5">Dashboard Kepala Bagian</p>
+            <p class="text-[10px] font-bold uppercase tracking-widest text-white/70 mb-0.5">Selamat datang kembali</p>
             <h2 class="text-xl sm:text-2xl font-extrabold text-white leading-tight">
                 {{ $namaKepalaBagian }}
             </h2>
             
             <p class="mt-1 text-[12px] text-white/80 font-sans max-w-lg">
-                Data bawahan langsung dan antrean cuti diperbarui saat halaman dibuka.
+                Semangat menjalankan tugas hari ini. Tetap produktif dan berikan pelayanan terbaik.
             </p>
 
             <div class="mt-3 flex flex-wrap items-center gap-2.5">
@@ -162,13 +160,12 @@
             <div>
                 <div class="px-6 py-5 border-b border-border/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface">
                     <div>
-                        <h3 class="text-sm font-bold text-ink font-sans">Pengajuan Cuti Bawahan</h3>
+                        <h3 class="text-sm font-bold text-ink font-sans">Cuti Bawahan</h3>
                         <p class="text-xs text-muted">Menunggu keputusan Anda</p>
                     </div>
                     <div class="flex items-center gap-3">
-                        <a href="{{ route('kepala-bagian.cuti.index') }}" class="text-xs font-semibold text-primary hover:underline font-sans flex items-center gap-1">
+                        <a href="{{ route('kepala-bagian.cuti.index') }}" class="text-xs font-semibold text-primary hover:underline font-sans">
                             Lihat Antrean
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>
                         </a>
                     </div>
                 </div>
@@ -223,9 +220,8 @@
                         <h3 class="text-sm font-bold text-ink font-sans">EWS Bawahan Aktif</h3>
                         <p class="text-xs text-muted">Peringatan aktif dengan target terdekat</p>
                     </div>
-                    <a href="{{ route('kepala-bagian.ews.index') }}" class="text-xs font-semibold text-primary hover:underline font-sans flex items-center gap-1">
+                    <a href="{{ route('kepala-bagian.ews.index') }}" class="text-xs font-semibold text-primary hover:underline font-sans">
                         Lihat Semua
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>
                     </a>
                 </div>
                 <div class="overflow-x-auto">
@@ -287,9 +283,8 @@
                     <h3 class="text-sm font-bold text-ink font-sans">Daftar Bawahan</h3>
                     <p class="text-xs text-muted">Menampilkan lima bawahan aktif pertama berdasarkan nama</p>
                 </div>
-                <a href="{{ route('kepala-bagian.bawahan.index') }}" class="text-xs font-semibold text-primary hover:underline font-sans flex items-center gap-1">
+                <a href="{{ route('kepala-bagian.bawahan.index') }}" class="text-xs font-semibold text-primary hover:underline font-sans">
                     Buka Daftar Bawahan
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>
                 </a>
             </div>
             <div class="overflow-x-auto">
@@ -325,8 +320,10 @@
                                 {{ $employee->jabatan_terakhir ?: '-' }}
                             </x-ui.table-td>
                             <x-ui.table-td class="px-6 py-3.5">
-                                @if($employee->sedang_cuti)
-                                    <x-ui.badge variant="info" size="sm" dot>Cuti</x-ui.badge>
+                                @if($employee->sedang_dinas_luar ?? false)
+                                    <x-ui.badge variant="info" size="sm" dot>Dinas Luar</x-ui.badge>
+                                @elseif($employee->sedang_cuti)
+                                    <x-ui.badge variant="warning" size="sm" dot>Cuti</x-ui.badge>
                                 @else
                                     <x-ui.badge variant="success" size="sm" dot>Aktif</x-ui.badge>
                                 @endif

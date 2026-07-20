@@ -239,24 +239,21 @@
 
             {{-- TABLE FOOTER --}}
             {{-- Footer: Pagination & Meta --}}
-            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border px-6 py-4 bg-soft/20">
-                <div class="flex items-center gap-3 text-sm text-muted">
-                    <span class="whitespace-nowrap">Tampilkan</span>
-                    <select onchange="updatePerPage(this.value)" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
-                        <option value="10" {{ request('per_page', 10) == 10 ? 'selected' : '' }}>10</option>
-                        <option value="25" {{ request('per_page') == 25 ? 'selected' : '' }}>25</option>
-                        <option value="50" {{ request('per_page') == 50 ? 'selected' : '' }}>50</option>
-                        <option value="100" {{ request('per_page') == 100 ? 'selected' : '' }}>100</option>
-                    </select>
-                    <span class="hidden sm:inline">data</span>
-
-                    {{-- Meta Info --}}
-                    @if($riwayatCuti->total() > 0)
-                    <div class="hidden md:block ml-2 border-l border-border pl-4">
-                        Menampilkan <span class="font-medium text-ink">{{ $riwayatCuti->firstItem() }}</span>
-                        - <span class="font-medium text-ink">{{ $riwayatCuti->lastItem() }}</span>
-                        dari <span class="font-medium text-ink">{{ $riwayatCuti->total() }}</span>
+            <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row">
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm text-muted">Tampilkan</span>
+                        <select onchange="updatePerPage(this.value)" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
+                            <option value="10" {{ request('per_page', 10) == 10 ? 'selected' : '' }}>10</option>
+                            <option value="25" {{ request('per_page') == 25 ? 'selected' : '' }}>25</option>
+                            <option value="50" {{ request('per_page') == 50 ? 'selected' : '' }}>50</option>
+                        </select>
+                        <span class="text-sm text-muted">data per halaman</span>
                     </div>
+                    @if($riwayatCuti->total() > 0)
+                    <p class="text-sm text-muted hidden sm:block">
+                        Menampilkan <span class="font-semibold text-ink">{{ $riwayatCuti->firstItem() }}</span> hingga <span class="font-semibold text-ink">{{ $riwayatCuti->lastItem() }}</span> dari <span class="font-semibold text-ink">{{ $riwayatCuti->total() }}</span> hasil
+                    </p>
                     @endif
                 </div>
 
