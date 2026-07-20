@@ -39,13 +39,13 @@ class ListEmployeesAction
                 // Semua riwayat dibutuhkan untuk memeriksa kelengkapan SK, bukan
                 // hanya riwayat terbaru yang sebelumnya diperlukan oleh tabel.
                 'rankHistories:id,employee_id,file_sk',
-                'positionHistories' => fn($query) => $query
+                'positionHistories' => fn ($query) => $query
                     ->select(['id', 'employee_id', 'file_sk', 'is_latest', 'tmt_jabatan', 'jabatan_id', 'unit_kerja_id'])
                     ->with(['jabatan:id,nama', 'unitKerja:id,nama'])
                     ->orderByDesc('is_latest')
                     ->orderByDesc('tmt_jabatan'),
                 'salaryHistories:id,employee_id,file_sk',
-                'appointments' => fn($query) => $query
+                'appointments' => fn ($query) => $query
                     ->select(['id', 'employee_id', 'file_sk', 'tmt_pengangkatan'])
                     ->orderByDesc('tmt_pengangkatan'),
                 // Berkas lainnya (KTP, KK, mutasi, dll) — hanya ambil field yang dibutuhkan
@@ -53,8 +53,8 @@ class ListEmployeesAction
             ])
             ->when(
                 $validated['search'] ?? null,
-                fn($query, string $search) => $query->where(function ($query) use ($search): void {
-                    $keyword = '%' . mb_strtolower($search) . '%';
+                fn ($query, string $search) => $query->where(function ($query) use ($search): void {
+                    $keyword = '%'.mb_strtolower($search).'%';
 
                     $query->whereRaw('lower(nama_lengkap) like ?', [$keyword])
                         ->orWhereRaw('lower(nip) like ?', [$keyword]);
@@ -62,20 +62,20 @@ class ListEmployeesAction
             )
             ->when(
                 $validated['golongan'] ?? null,
-                fn($query, string $golongan) => $query->where(function ($q) use ($golongan) {
+                fn ($query, string $golongan) => $query->where(function ($q) use ($golongan) {
                     $q->where('golongan_terakhir', $golongan)
-                        ->orWhere('golongan_terakhir', 'LIKE', $golongan . '/%');
+                        ->orWhere('golongan_terakhir', 'LIKE', $golongan.'/%');
                 })
             )
             ->when(
                 $validated['unit_kerja_id'] ?? null,
-                fn($query, string $unitKerjaId) => $query->whereHas('positionHistories', function ($q) use ($unitKerjaId): void {
+                fn ($query, string $unitKerjaId) => $query->whereHas('positionHistories', function ($q) use ($unitKerjaId): void {
                     $q->where('unit_kerja_id', $unitKerjaId)->where('is_latest', true);
                 })
             )
             ->when(
                 $validated['jenis_pegawai_id'] ?? null,
-                fn($query, string $jenisPegawaiId) => $query->where('jenis_pegawai_id', $jenisPegawaiId)
+                fn ($query, string $jenisPegawaiId) => $query->where('jenis_pegawai_id', $jenisPegawaiId)
             )
             ->when(
                 ($validated['status_pegawai_id'] ?? null) ?: null,
@@ -84,12 +84,12 @@ class ListEmployeesAction
                         $query->where('status_pegawai_id', $statusPegawaiId);
                     }
                 },
-                fn($query) => $query->where('status_aktif', ($validated['status_aktif'] ?? '') ?: 'Aktif')
+                fn ($query) => $query->where('status_aktif', ($validated['status_aktif'] ?? '') ?: 'Aktif')
             )
             ->orderBy($sort, $direction)
             ->paginate($perPage)
             ->withQueryString()
-            ->through(fn(Employee $p) => $this->toTableRow($p));
+            ->through(fn (Employee $p) => $this->toTableRow($p));
     }
 
     /**
@@ -140,7 +140,7 @@ class ListEmployeesAction
             // Cek apakah ada berkas lain (KTP, KK, mutasi, dll) yang filenya tersedia
             $disk = Storage::disk(Document::STORAGE_DISK);
             $adaBerkasLainDenganFile = $employee->documents
-                ->contains(fn($doc): bool => filled($doc->file_path) && $disk->exists($doc->file_path));
+                ->contains(fn ($doc): bool => filled($doc->file_path) && $disk->exists($doc->file_path));
 
             return $adaBerkasLainDenganFile ? 'tersedia' : 'kosong';
         }
@@ -148,7 +148,7 @@ class ListEmployeesAction
         $filePaths = $histories->pluck('file_sk');
 
         // Ada riwayat tapi salah satu file_sk NULL/kosong → tidak lengkap
-        if ($filePaths->contains(fn($path): bool => blank($path))) {
+        if ($filePaths->contains(fn ($path): bool => blank($path))) {
             return 'tidak_lengkap';
         }
 
@@ -157,7 +157,7 @@ class ListEmployeesAction
         // Ada file_sk di DB tapi file fisiknya hilang dari storage → tidak lengkap
         $semuaAdaDiStorage = $filePaths
             ->unique()
-            ->every(fn(string $path): bool => $disk->exists($path));
+            ->every(fn (string $path): bool => $disk->exists($path));
 
         return $semuaAdaDiStorage ? 'lengkap' : 'tidak_lengkap';
     }

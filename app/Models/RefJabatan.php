@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $nama
  * @property string|null $jenis_jabatan_id
  * @property string|null $eselon_id
+ * @property int|null $default_bup
+ * @property bool $is_active
  * @property string|null $keterangan
  * @property-read RefJenisJabatan|null $jenisJabatan
  * @property-read RefEselon|null $eselon
@@ -25,8 +27,18 @@ class RefJabatan extends Model
         'nama',
         'jenis_jabatan_id',
         'eselon_id',
+        'default_bup',
+        'is_active',
         'keterangan',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'default_bup' => 'integer',
+            'is_active' => 'boolean',
+        ];
+    }
 
     public function jenisJabatan(): BelongsTo
     {

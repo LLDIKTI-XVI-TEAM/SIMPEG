@@ -22,11 +22,8 @@
         showDeleteModal: false,
         deleteDocId: '',
         deleteDocName: '',
-        deleteImpacts: {}, // Keep for backward compatibility or change completely
         deleteBlockedImpacts: {},
-        deleteDeletableImpacts: {},
         deleteHasBlocked: false,
-        deleteHasDeletable: false,
         deleteLoading: false,
         deleteStep: 'confirm', // 'confirm' | 'impact'
         documentsRows: [],
@@ -631,7 +628,7 @@
         <x-ui.modal
             show="showDeleteModal"
             title="Hapus Dokumen"
-            closeAction="showDeleteModal = false; deleteStep = 'confirm'; deleteBlockedImpacts = {}; deleteDeletableImpacts = {}; deleteHasBlocked = false; deleteHasDeletable = false;"
+            closeAction="showDeleteModal = false; deleteStep = 'confirm'; deleteBlockedImpacts = {}; deleteHasBlocked = false;"
             maxWidth="md"
         >
             <div class="space-y-4">
@@ -663,9 +660,7 @@
                                     .then(data => {
                                         deleteLoading = false;
                                         deleteHasBlocked = data.has_blocked;
-                                        deleteHasDeletable = data.has_deletable;
                                         deleteBlockedImpacts = data.blocked_impacts || {};
-                                        deleteDeletableImpacts = data.deletable_impacts || {};
                                         deleteStep = 'impact';
                                     })
                                     .catch(() => { deleteLoading = false; alert('Terjadi kesalahan saat memeriksa dampak.'); });
@@ -682,7 +677,7 @@
                     <div class="space-y-4">
 
                         {{-- Tidak ada dampak (aman dihapus) --}}
-                        <template x-if="!deleteHasBlocked && !deleteHasDeletable">
+                        <template x-if="!deleteHasBlocked">
                             <div class="space-y-3">
                                 <div class="flex items-start gap-2.5 rounded-lg bg-success/10 border border-success/20 p-3">
                                     <svg class="w-4 h-4 mt-0.5 shrink-0 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -691,7 +686,7 @@
                             </div>
                         </template>
 
-                        {{-- DIBLOKIR: Terhubung dengan riwayat penting (Jabatan, Pangkat, KGB) --}}
+                        {{-- DIBLOKIR: Terhubung dengan riwayat penting, termasuk hukuman disiplin append-only. --}}
                         <template x-if="deleteHasBlocked">
                             <div class="space-y-3">
                                 <div class="flex items-start gap-2.5 rounded-lg bg-danger/10 border border-danger/20 p-3">
@@ -718,33 +713,6 @@
                             </div>
                         </template>
 
-                        {{-- BISA DIHAPUS, tapi ada riwayat yang ikut terhapus (Hukuman Disiplin) --}}
-                        <template x-if="!deleteHasBlocked && deleteHasDeletable">
-                            <div class="space-y-3">
-                                <div class="flex items-start gap-2.5 rounded-lg bg-warning/10 border border-warning/20 p-3">
-                                    <svg class="w-4 h-4 mt-0.5 shrink-0 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2.25m0 2.25h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                                    <div>
-                                        <p class="text-xs font-bold text-warning-dark font-sans">Perhatian! Dokumen ini terhubung dengan riwayat Hukuman Disiplin.</p>
-                                        <p class="text-xs text-ink font-sans mt-1">Jika Anda menghapus dokumen ini, riwayat berikut juga akan ikut dihapus secara permanen:</p>
-                                    </div>
-                                </div>
-                                
-                                <template x-for="[category, records] in Object.entries(deleteDeletableImpacts)" :key="category">
-                                    <div class="rounded-lg border border-border bg-soft/40 p-3">
-                                        <p class="text-xs font-bold text-ink font-sans mb-1.5" x-text="category"></p>
-                                        <ul class="space-y-1">
-                                            <template x-for="rec in records" :key="rec.id">
-                                                <li class="flex items-center gap-1.5 text-xs text-muted font-sans">
-                                                    <span class="w-1.5 h-1.5 rounded-full bg-warning shrink-0"></span>
-                                                    <span x-text="rec.label"></span>
-                                                </li>
-                                            </template>
-                                        </ul>
-                                    </div>
-                                </template>
-                            </div>
-                        </template>
-
                         <div class="flex justify-end gap-3 pt-2 border-t border-border">
                             <button type="button" @click="deleteStep = 'confirm'"
                                 class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-soft cursor-pointer focus:outline-none font-sans">
@@ -756,10 +724,9 @@
                                 <form method="POST" :action="`/dashboard/dokumen/${deleteDocId}`">
                                     @csrf
                                     @method('DELETE')
-                                    <input type="hidden" name="force_delete_related" :value="deleteHasDeletable ? '1' : '0'">
                                     <button type="submit"
                                         class="inline-flex items-center justify-center rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90 cursor-pointer focus:outline-none font-sans">
-                                        <span x-text="deleteHasDeletable ? 'Ya, Hapus Dokumen & Riwayat Disiplin' : 'Ya, Hapus Dokumen'"></span>
+                                        Ya, Hapus Dokumen
                                     </button>
                                 </form>
                             </template>

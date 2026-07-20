@@ -1,4 +1,9 @@
 <x-layouts.app title="Data Pegawai">
+    @php
+        $employeeShowUrlPrefix = $employeeShowUrlPrefix ?? route('data-pegawai');
+        $serverRenderedDetailLinks = $serverRenderedDetailLinks ?? [];
+        $isReadOnly = $isReadOnly ?? false;
+    @endphp
 
     <div x-data="{
     // ===== State Modal Riwayat =====
@@ -40,6 +45,7 @@
     dataChanged: @js(session('employee_data_changed', false)),
     sort: '{{ $sort }}',
     direction: '{{ $direction }}',
+    employeeShowUrlPrefix: @js($employeeShowUrlPrefix),
     filters: {
         search:            '{{ $filters['search'] }}',
         golongan:          '{{ $filters['golongan'] }}',
@@ -48,6 +54,10 @@
         status_pegawai_id: '{{ $filters['status_pegawai_id'] ?: 'all' }}',
     },
     searchTimer: null,
+
+    detailUrl(employee) {
+        return `${this.employeeShowUrlPrefix}/${employee.id}`;
+    },
 
     get cacheKey() {
         const f = this.filters;
@@ -315,6 +325,22 @@
     },
 }" class="space-y-6">
 
+        @if ($isReadOnly && $serverRenderedDetailLinks !== [])
+            <noscript>
+                <nav aria-label="Daftar detail pegawai">
+                    <ul>
+                        @foreach ($serverRenderedDetailLinks as $detailLink)
+                            <li>
+                                <a href="{{ $detailLink['url'] }}" aria-label="Detail pegawai {{ $detailLink['name'] }}">
+                                    {{ $detailLink['name'] }}
+                                </a>
+                            </li>
+                        @endforeach
+                    </ul>
+                </nav>
+            </noscript>
+        @endif
+
         {{-- PAGE HEADER --}}
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -459,7 +485,11 @@
                         <td class="px-4 py-3">
                             <div class="flex items-center gap-3">
                                 <x-ui.tooltip dynamicText="'Buka detail ' + p.nama_lengkap" position="right">
-                                    <a :href="`/pegawai/${p.id}`"
+                                    @if ($isReadOnly)
+                                        <a :href="detailUrl(p)"
+                                    @else
+                                        <a :href="`/pegawai/${p.id}`"
+                                    @endif
                                         class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-sm font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20">
                                         <img x-show="p.foto_url" :src="p.foto_url" :alt="'Foto ' + p.nama_lengkap"
                                             class="h-full w-full object-cover object-[center_25%]" loading="lazy"
@@ -470,7 +500,11 @@
                                 </x-ui.tooltip>
                                 <div class="min-w-0">
                                     <x-ui.tooltip dynamicText="'Buka detail ' + p.nama_lengkap" position="right">
-                                        <a :href="`/pegawai/${p.id}`"
+                                        @if ($isReadOnly)
+                                            <a :href="detailUrl(p)"
+                                        @else
+                                            <a :href="`/pegawai/${p.id}`"
+                                        @endif
                                             class="block truncate text-sm font-semibold text-ink transition hover:text-primary"
                                             x-text="p.nama_lengkap"></a>
                                     </x-ui.tooltip>
@@ -550,7 +584,11 @@
                             <div class="flex items-center justify-start gap-1.5">
                                 {{-- Detail --}}
                                 <x-ui.tooltip text="Detail" position="top">
-                                    <a :href="`/pegawai/${p.id}`"
+                                    @if ($isReadOnly)
+                                        <a :href="detailUrl(p)" :aria-label="'Detail pegawai ' + p.nama_lengkap"
+                                    @else
+                                        <a :href="`/pegawai/${p.id}`"
+                                    @endif
                                         class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
                                             viewBox="0 0 24 24" stroke-width="1.5">

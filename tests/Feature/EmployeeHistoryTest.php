@@ -359,7 +359,7 @@ class EmployeeHistoryTest extends TestCase
         );
         $jabatanBaru = RefJabatan::firstOrCreate(
             ['nama' => 'Kepala Bagian Umum'],
-            ['jenis_jabatan_id' => $jenisJabatan->id]
+            ['jenis_jabatan_id' => $jenisJabatan->id, 'default_bup' => 62]
         );
 
         $oldHistory = PositionHistory::create([
@@ -403,7 +403,7 @@ class EmployeeHistoryTest extends TestCase
             'jabatan_terakhir' => 'Kepala Bagian Umum',
             'kelas_jabatan_terakhir' => '9',
         ]);
-        $this->assertSame('2040-06-15', $employee->fresh()->tanggal_pensiun->format('Y-m-d'));
+        $this->assertSame('2042-06-15', $employee->fresh()->tanggal_pensiun->format('Y-m-d'));
         $this->assertDatabaseHas('audit_logs', [
             'event' => 'CREATE',
             'auditable_type' => 'PositionHistory',
