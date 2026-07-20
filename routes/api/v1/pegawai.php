@@ -86,10 +86,6 @@ Route::middleware($employeeGroupMiddleware)
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:discipline_records.create'])
             ->whereUuid('employee')
             ->name('disiplin.store');
-        Route::delete('/{employee}/disiplin/{discipline}', [DisciplineRecordController::class, 'destroy'])
-            ->middleware($disableEmployeeApiAuth ? [] : ['permission:discipline_records.delete'])
-            ->whereUuid(['employee', 'discipline'])
-            ->name('disiplin.destroy');
         Route::get('/{employee}/arsip-dokumen', [EmployeeDocumentController::class, 'index'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
             ->whereUuid('employee')

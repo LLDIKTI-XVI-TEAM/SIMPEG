@@ -2,11 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Models\EducationHistory;
 use App\Models\Employee;
+use App\Models\EmployeeFamily;
 use App\Models\EwsAlert;
 use App\Models\LeaveBalance;
+use App\Models\RefJenjangPendidikan;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -19,6 +23,7 @@ class ProfileTest extends TestCase
     {
         parent::setUp();
 
+        $this->seed(ReferenceSeeder::class);
         $this->seed(RbacSeeder::class);
     }
 
@@ -92,6 +97,42 @@ class ProfileTest extends TestCase
         $response->assertOk();
         $response->assertSee('15-05-2042', false);
         $response->assertDontSee('01-01-2028', false);
+    }
+
+    public function test_profile_renders_family_and_education_as_read_only_data(): void
+    {
+        $employee = Employee::factory()->create();
+        $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+        $jenjang = RefJenjangPendidikan::where('nama', 'D4 / S1')->firstOrFail();
+
+        EmployeeFamily::create([
+            'employee_id' => $employee->id,
+            'nama_anggota' => 'Keluarga Profil Saya',
+            'hubungan' => 'Istri',
+            'tanggal_lahir' => '1990-05-10',
+            'jenis_kelamin' => 'P',
+            'status_tunjangan' => true,
+        ]);
+        EducationHistory::create([
+            'employee_id' => $employee->id,
+            'jenjang_id' => $jenjang->id,
+            'nama_institusi' => 'Universitas Profil Saya',
+            'jurusan' => 'Administrasi Publik',
+            'tahun_lulus' => 2010,
+            'no_ijazah' => 'IJZ-PROFIL-001',
+        ]);
+
+        $response = $this->actingAs($user)->get('/dashboard/profil');
+
+        $response->assertOk();
+        $response->assertSee('Susunan Anggota Keluarga', false);
+        $response->assertSee('Keluarga Profil Saya', false);
+        $response->assertSee('Riwayat Pendidikan Formal', false);
+        $response->assertSee('Universitas Profil Saya', false);
+        $response->assertDontSee('@click="openModal()"', false);
+        $response->assertDontSee('@submit.prevent="submitForm()"', false);
+        $response->assertDontSee("fetch('/api/v1/profil-saya/keluarga'", false);
+        $response->assertDontSee('x-model="newKeluarga.', false);
     }
 
     public function test_profile_password_update_rejects_wrong_current_password(): void

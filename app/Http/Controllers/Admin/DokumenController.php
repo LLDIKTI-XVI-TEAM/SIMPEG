@@ -12,7 +12,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Documents\StoreDocumentRequest;
 use App\Http\Requests\Documents\UpdateDocumentRequest;
 use App\Models\Document;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class DokumenController extends Controller
@@ -71,15 +70,14 @@ class DokumenController extends Controller
     }
 
     /**
-     * Hapus dokumen dan (opsional) semua riwayat terkait.
+     * Hapus dokumen yang tidak digunakan oleh data riwayat pegawai.
      * Hanya Super Admin.
      */
-    public function destroy(string $id, Request $request, DeleteDocumentAction $action)
+    public function destroy(string $id, DeleteDocumentAction $action)
     {
         $document = Document::findOrFail($id);
-        $forceDeleteRelated = (bool) $request->input('force_delete_related', false);
 
-        $action->execute($document, $forceDeleteRelated);
+        $action->execute($document);
 
         return redirect()->route('dokumen')
             ->with('success', 'Dokumen berhasil dihapus.')

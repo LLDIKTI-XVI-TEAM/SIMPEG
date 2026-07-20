@@ -16,9 +16,7 @@ Route::middleware(['web', 'keycloak.auth'])
     ->name('profil-saya.saldo-cuti');
 
 // ============================================================
-// Self-service data keluarga — hanya role pegawai.
-// employee_id tidak dikirim di request body, selalu di-resolve
-// dari sesi login. Otorisasi berlapis: role → FormRequest → controller.
+// Data keluarga profil bersifat read-only dan employee selalu di-resolve dari sesi login.
 // ============================================================
 Route::middleware(['web', 'keycloak.auth', 'role:pegawai'])
     ->prefix('profil-saya/keluarga')
@@ -27,26 +25,10 @@ Route::middleware(['web', 'keycloak.auth', 'role:pegawai'])
         Route::get('/', [MyFamilyController::class, 'index'])
             ->middleware('permission:employee_families.read')
             ->name('index');
-
-        Route::post('/', [MyFamilyController::class, 'store'])
-            ->middleware('permission:employee_families.create')
-            ->name('store');
-
-        Route::put('/{family}', [MyFamilyController::class, 'update'])
-            ->whereUuid('family')
-            ->middleware('permission:employee_families.update')
-            ->name('update');
-
-        Route::delete('/{family}', [MyFamilyController::class, 'destroy'])
-            ->whereUuid('family')
-            ->middleware('permission:employee_families.delete')
-            ->name('destroy');
     });
 
 // ============================================================
-// Self-service riwayat pendidikan — hanya role pegawai.
-// employee_id selalu di-resolve dari sesi login.
-// Otorisasi berlapis: role → FormRequest → controller → action.
+// Riwayat pendidikan profil bersifat read-only dan employee selalu di-resolve dari sesi login.
 // ============================================================
 Route::middleware(['web', 'keycloak.auth', 'role:pegawai'])
     ->prefix('profil-saya/pendidikan')
@@ -55,18 +37,4 @@ Route::middleware(['web', 'keycloak.auth', 'role:pegawai'])
         Route::get('/', [MyEducationHistoryController::class, 'index'])
             ->middleware('permission:employee_histories.read')
             ->name('index');
-
-        Route::post('/', [MyEducationHistoryController::class, 'store'])
-            ->middleware('permission:employee_histories.create')
-            ->name('store');
-
-        Route::put('/{education}', [MyEducationHistoryController::class, 'update'])
-            ->whereUuid('education')
-            ->middleware('permission:employee_histories.create')
-            ->name('update');
-
-        Route::delete('/{education}', [MyEducationHistoryController::class, 'destroy'])
-            ->whereUuid('education')
-            ->middleware('permission:employee_histories.create')
-            ->name('destroy');
     });

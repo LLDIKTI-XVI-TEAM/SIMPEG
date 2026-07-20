@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Actions\Documents\DeleteDocumentAction;
 use App\Actions\Documents\UpdateDocumentAction;
 use App\Models\Appointment;
+use App\Models\DisciplineRecord;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Models\RefGolongan;
@@ -446,6 +447,59 @@ class EmployeeDocumentTest extends TestCase
             $this->assertDatabaseHas('documents', ['id' => $document->id]);
             Storage::disk(Document::STORAGE_DISK)->assertExists($filePath);
         }
+    }
+
+    public function test_document_linked_to_discipline_is_blocked_without_force_bypass(): void
+    {
+        $employee = Employee::factory()->create();
+        $filePath = 'discipline/sk/hukuman-disiplin-terhubung.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($filePath, 'SK hukuman disiplin');
+        $document = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'sk_hukuman_disiplin',
+            'nama_dokumen' => 'SK Hukuman Disiplin',
+            'nomor_dokumen' => 'SK-DIS-FORCE',
+            'file_path' => $filePath,
+        ]);
+        $discipline = DisciplineRecord::create([
+            'employee_id' => $employee->id,
+            'jenis_hukuman' => 'Ringan',
+            'deskripsi' => 'Teguran tertulis.',
+            'tanggal_mulai' => '2026-07-01',
+            'tanggal_berakhir' => '2026-07-31',
+            'no_sk' => 'SK-DIS-FORCE',
+            'tanggal_sk' => '2026-06-30',
+            'file_sk' => $filePath,
+            'is_active' => true,
+        ]);
+
+        $action = app(DeleteDocumentAction::class);
+        $impact = $action->checkImpact($document);
+        $deleteBlocked = false;
+
+        try {
+            $action->execute($document);
+        } catch (ValidationException) {
+            $deleteBlocked = true;
+        }
+
+        $this->assertSame([
+            'parameter_execute' => 1,
+            'impact_diblokir' => true,
+            'kategori_dampak_ada' => true,
+            'delete_ditolak' => true,
+            'dokumen_tetap_ada' => true,
+            'riwayat_tetap_ada' => true,
+            'file_tetap_ada' => true,
+        ], [
+            'parameter_execute' => (new \ReflectionMethod($action, 'execute'))->getNumberOfParameters(),
+            'impact_diblokir' => $impact['has_blocked'],
+            'kategori_dampak_ada' => array_key_exists('Hukuman Disiplin', $impact['blocked_impacts']),
+            'delete_ditolak' => $deleteBlocked,
+            'dokumen_tetap_ada' => Document::whereKey($document->id)->exists(),
+            'riwayat_tetap_ada' => DisciplineRecord::whereKey($discipline->id)->exists(),
+            'file_tetap_ada' => Storage::disk(Document::STORAGE_DISK)->exists($filePath),
+        ]);
     }
 
     public function test_legacy_sk_mutasi_is_blocked_when_it_still_supports_employee_status(): void
