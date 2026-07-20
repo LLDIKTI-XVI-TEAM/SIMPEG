@@ -63,6 +63,14 @@ class PimpinanEmployeeController extends Controller
             'to' => $employees->lastItem() ?? 0,
             'per_page' => $employees->perPage(),
         ];
+        $employeeShowUrlPrefix = route('pimpinan.pegawai.index');
+        $serverRenderedDetailLinks = collect($initialRows)
+            ->map(fn (array $employee): array => [
+                'name' => $employee['nama_lengkap'],
+                'url' => route('pimpinan.pegawai.show', $employee['id']),
+            ])
+            ->all();
+        $isReadOnly = true;
 
         $golonganOptions = Employee::query()
             ->whereNotNull('golongan_terakhir')
@@ -90,6 +98,9 @@ class PimpinanEmployeeController extends Controller
             'perPage',
             'sort',
             'direction',
+            'employeeShowUrlPrefix',
+            'serverRenderedDetailLinks',
+            'isReadOnly',
         ));
     }
 
