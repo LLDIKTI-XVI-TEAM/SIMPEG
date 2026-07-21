@@ -22,29 +22,22 @@ class NotificationRecipientResolver
             return collect();
         }
 
-        if ($this->isNonEligiblePromotion($type, $data)) {
-            return collect();
-        }
-
         return $this->adminRecipients();
     }
 
     /**
-     * Menahan email pegawai pada EWS kenaikan pangkat yang eksplisit tidak eligible.
+     * Menentukan apakah penerima utama (pegawai) perlu mendapat email untuk event ini.
      *
      * @param  array<string, mixed>|null  $data
      */
     public function shouldEmailPrimaryRecipient(string $type, ?array $data = null): bool
     {
-        if ($this->isNonEligiblePromotion($type, $data)) {
-            return false;
-        }
-
         return $this->emailEnabled($type);
     }
 
     /**
      * Menentukan jenis notifikasi yang memakai email; keputusan cuti perlu perubahan dan tidak disetujui dikirim agar pegawai segera menindaklanjuti statusnya.
+     * Email hanya terkirim jika channel aktif dan credential SMTP sudah dikonfigurasi di RefNotificationChannel.
      */
     public function emailEnabled(string $type): bool
     {
@@ -59,6 +52,7 @@ class NotificationRecipientResolver
             'ews.kgb',
             'ews.pensiun',
             'ews.kontrak_pppk',
+            'ews.satyalancana',
         ], true);
     }
 
@@ -75,14 +69,5 @@ class NotificationRecipientResolver
             ->unique('id')
             ->values();
     }
-
-    /**
-     * Fail-closed sampai keputusan bisnis #34 menetapkan apakah admin perlu email untuk pegawai tidak eligible.
-     *
-     * @param  array<string, mixed>|null  $data
-     */
-    private function isNonEligiblePromotion(string $type, ?array $data): bool
-    {
-        return $type === 'ews.kenaikan_pangkat' && ($data['is_eligible'] ?? true) === false;
-    }
 }
+

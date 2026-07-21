@@ -84,9 +84,10 @@ class EwsSchedulerTest extends TestCase
         ]);
     }
 
-    public function test_promotion_eligibility_blocks_notification_when_performance_is_poor(): void
+    public function test_promotion_eligibility_stores_false_and_still_notifies_when_performance_is_poor(): void
     {
         // Kenaikan Pangkat H-90, poor performance (is_kinerja_baik = false)
+        // Notifikasi TETAP terkirim; is_eligible=false disimpan untuk kebutuhan dashboard/filtering.
         $employee = Employee::factory()->create([
             'tanggal_kenaikan_pangkat_berikutnya' => now()->addDays(90)->toDateString(),
             'is_kinerja_baik' => false,
@@ -94,43 +95,44 @@ class EwsSchedulerTest extends TestCase
 
         app(EwsEngineService::class)->run();
 
-        // Alert is created but NO notified_at or notification record is sent to employee
         $this->assertSame(1, EwsAlert::count());
         $alert = EwsAlert::first();
-        $this->assertNull($alert->notified_at);
-        $this->assertDatabaseMissing('notifications', [
+        $this->assertFalse($alert->is_eligible);      // is_eligible tersimpan false
+        $this->assertNotNull($alert->notified_at);    // notifikasi tetap terkirim
+        $this->assertDatabaseHas('notifications', [
             'user_id' => $employee->id,
-            'type' => 'ews.kenaikan_pangkat',
+            'type'    => 'ews.kenaikan_pangkat',
         ]);
     }
 
-    public function test_promotion_eligibility_blocks_notification_when_disciplinary_record_is_active(): void
+    public function test_promotion_eligibility_stores_false_and_still_notifies_when_disciplinary_record_is_active(): void
     {
         // Kenaikan Pangkat H-90, kinerja baik, but active disciplinary record
+        // Notifikasi TETAP terkirim; is_eligible=false disimpan untuk keperluan admin.
         $employee = Employee::factory()->create([
             'tanggal_kenaikan_pangkat_berikutnya' => now()->addDays(90)->toDateString(),
             'is_kinerja_baik' => true,
         ]);
 
         DisciplineRecord::create([
-            'employee_id' => $employee->id,
-            'jenis_hukuman' => 'Sedang',
-            'deskripsi' => 'Melanggar disiplin jam kerja',
-            'tanggal_mulai' => now()->subDay()->toDateString(),
-            'no_sk' => 'SK-DISC-001',
-            'tanggal_sk' => now()->subDay()->toDateString(),
-            'is_active' => true,
+            'employee_id'    => $employee->id,
+            'jenis_hukuman'  => 'Sedang',
+            'deskripsi'      => 'Melanggar disiplin jam kerja',
+            'tanggal_mulai'  => now()->subDay()->toDateString(),
+            'no_sk'          => 'SK-DISC-001',
+            'tanggal_sk'     => now()->subDay()->toDateString(),
+            'is_active'      => true,
         ]);
 
         app(EwsEngineService::class)->run();
 
-        // Alert is created but no notification is sent
         $this->assertSame(1, EwsAlert::count());
         $alert = EwsAlert::first();
-        $this->assertNull($alert->notified_at);
-        $this->assertDatabaseMissing('notifications', [
+        $this->assertFalse($alert->is_eligible);   // is_eligible tersimpan false
+        $this->assertNotNull($alert->notified_at); // notifikasi tetap terkirim
+        $this->assertDatabaseHas('notifications', [
             'user_id' => $employee->id,
-            'type' => 'ews.kenaikan_pangkat',
+            'type'    => 'ews.kenaikan_pangkat',
         ]);
     }
 
@@ -265,30 +267,153 @@ class EwsSchedulerTest extends TestCase
         $this->assertSame(1, SimpegNotification::where('type', 'ews.satyalancana')->count());
     }
 
-    public function test_satyalancana_manual_flag_blocks_notification(): void
+    public function test_satyalancana_manual_flag_stores_false_and_still_notifies(): void
     {
+        // is_satyalancana_eligible=false: notifikasi TETAP terkirim, is_eligible=false disimpan.
         $employee = Employee::factory()->create([
             'is_satyalancana_eligible' => false,
-            'satyalancana_note' => 'Belum memenuhi syarat administrasi.',
+            'satyalancana_note'        => 'Belum memenuhi syarat administrasi.',
         ]);
         $tmt = now()->subYears(10)->addDays(90)->toDateString();
 
         Appointment::create([
-            'employee_id' => $employee->id,
+            'employee_id'        => $employee->id,
             'jenis_pengangkatan' => 'PNS',
-            'tmt_pengangkatan' => $tmt,
-            'no_sk' => 'SK-SATYA-FLAG',
-            'tanggal_sk' => $tmt,
+            'tmt_pengangkatan'   => $tmt,
+            'no_sk'              => 'SK-SATYA-FLAG',
+            'tanggal_sk'         => $tmt,
         ]);
 
         app(EwsEngineService::class)->run();
 
         $this->assertSame(1, EwsAlert::where('type', 'SATYALANCANA')->count());
         $alert = EwsAlert::where('type', 'SATYALANCANA')->firstOrFail();
-        $this->assertNull($alert->notified_at);
-        $this->assertDatabaseMissing('notifications', [
+        $this->assertFalse($alert->is_eligible);   // is_eligible tersimpan false
+        $this->assertNotNull($alert->notified_at); // notifikasi tetap terkirim
+        $this->assertDatabaseHas('notifications', [
             'user_id' => $employee->id,
-            'type' => 'ews.satyalancana',
+            'type'    => 'ews.satyalancana',
+        ]);
+    }
+
+    public function test_alert_stores_is_eligible_true_for_eligible_promotion(): void
+    {
+        $employee = Employee::factory()->create([
+            'tanggal_kenaikan_pangkat_berikutnya' => now()->addDays(90)->toDateString(),
+            'is_kinerja_baik'                     => true,
+        ]);
+
+        app(EwsEngineService::class)->run();
+
+        $alert = EwsAlert::where('type', 'KENAIKAN_PANGKAT')->firstOrFail();
+        $this->assertTrue($alert->is_eligible);
+        $this->assertNotNull($alert->notified_at);
+    }
+
+    public function test_alert_stores_is_eligible_null_for_kgb(): void
+    {
+        // KGB tidak memiliki eligibility check — is_eligible harus null
+        Employee::factory()->create([
+            'tanggal_kgb_berikutnya' => now()->addDays(60)->toDateString(),
+        ]);
+
+        app(EwsEngineService::class)->run();
+
+        $alert = EwsAlert::where('type', 'KGB')->firstOrFail();
+        $this->assertNull($alert->is_eligible);
+        $this->assertNotNull($alert->notified_at);
+    }
+
+    public function test_satyalancana_alert_stores_years_milestone(): void
+    {
+        // Satyalancana 10 tahun — satyalancana_years harus tersimpan 10
+        $employee = Employee::factory()->create([
+            'is_satyalancana_eligible' => true,
+        ]);
+        $tmt = now()->subYears(10)->addDays(90)->toDateString();
+
+        Appointment::create([
+            'employee_id'        => $employee->id,
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan'   => $tmt,
+            'no_sk'              => 'SK-SATYA-YEARS',
+            'tanggal_sk'         => $tmt,
+        ]);
+
+        app(EwsEngineService::class)->run();
+
+        $alert = EwsAlert::where('type', 'SATYALANCANA')->firstOrFail();
+        $this->assertSame(10, $alert->satyalancana_years);
+    }
+
+    public function test_satyalancana_email_fan_out_to_admin_when_eligible(): void
+    {
+        // Fan-out admin untuk EWS terjadi lewat email (via queue),
+        // bukan lewat in-app notification. Verifikasi bahwa:
+        // (1) pegawai mendapat in-app notification
+        // (2) ews.satyalancana aktif di email whitelist (via resolver)
+        $adminEmployee = Employee::factory()->create();
+        User::factory()->create([
+            'role'        => 'admin_kepegawaian',
+            'employee_id' => $adminEmployee->id,
+        ]);
+
+        $employee = Employee::factory()->create([
+            'is_satyalancana_eligible' => true,
+        ]);
+        $tmt = now()->subYears(10)->addDays(90)->toDateString();
+
+        Appointment::create([
+            'employee_id'        => $employee->id,
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan'   => $tmt,
+            'no_sk'              => 'SK-SATYA-FANOUT',
+            'tanggal_sk'         => $tmt,
+        ]);
+
+        app(EwsEngineService::class)->run();
+
+        // Pegawai dapat notif in-app
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $employee->id,
+            'type'    => 'ews.satyalancana',
+        ]);
+
+        // Admin TIDAK mendapat in-app (fan-out admin hanya lewat email queue)
+        // Verifikasi bahwa ews.satyalancana ada di whitelist email resolver
+        $resolver = app(\App\Services\Notifications\NotificationRecipientResolver::class);
+        $this->assertTrue($resolver->emailEnabled('ews.satyalancana'));
+    }
+
+    public function test_satyalancana_notifies_even_when_not_eligible(): void
+    {
+        // is_satyalancana_eligible=false: pegawai dan admin tetap dapat notif in-app.
+        // Email terkirim jika credential SMTP sudah dikonfigurasi di RefNotificationChannel.
+        $adminEmployee = Employee::factory()->create();
+        User::factory()->create([
+            'role'        => 'admin_kepegawaian',
+            'employee_id' => $adminEmployee->id,
+        ]);
+
+        $employee = Employee::factory()->create([
+            'is_satyalancana_eligible' => false,
+        ]);
+        $tmt = now()->subYears(10)->addDays(90)->toDateString();
+
+        Appointment::create([
+            'employee_id'        => $employee->id,
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan'   => $tmt,
+            'no_sk'              => 'SK-SATYA-NO-FANOUT',
+            'tanggal_sk'         => $tmt,
+        ]);
+
+        app(EwsEngineService::class)->run();
+
+        // Pegawai tetap dapat notif in-app meski not eligible
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $employee->id,
+            'type'    => 'ews.satyalancana',
         ]);
     }
 
