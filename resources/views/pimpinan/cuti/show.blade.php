@@ -239,14 +239,15 @@
                             @php
                                 $stepStatus = match ($step->status) {
                                     'approved' => ['label' => 'Disetujui', 'variant' => 'success'],
-                                    'rejected' => ['label' => 'Tidak Disetujui', 'variant' => 'danger'],
+                                    // Status legacy tetap dapat dibaca, tetapi penulisan baru memakai tidak_disetujui.
+                                    'tidak_disetujui', 'rejected' => ['label' => 'Tidak Disetujui', 'variant' => 'danger'],
                                     'active' => ['label' => 'Menunggu Keputusan', 'variant' => 'warning'],
                                     'skipped' => ['label' => 'Dilewati', 'variant' => 'muted'],
                                     default => ['label' => ucfirst($step->status), 'variant' => 'info'],
                                 };
                             @endphp
                             <x-ui.timeline-item
-                                variant="{{ $step->status == 'active' ? 'warning' : ($step->status == 'approved' ? 'success' : ($step->status == 'rejected' ? 'danger' : 'muted')) }}"
+                                variant="{{ $stepStatus['variant'] }}"
                                 title="Tahap {{ $step->step_order }} · {{ $step->role_label }}"
                                 description="{{ $step->approver?->nama_lengkap ?? 'Approver tidak tersedia' }}"
                                 pulse="{{ $step->status == 'active' }}">
@@ -280,7 +281,8 @@
                                     'APPROVE' => ['label' => 'Disetujui', 'variant' => 'success'],
                                     'REQUEST_CHANGES' => ['label' => 'Perubahan', 'variant' => 'info'],
                                     'POSTPONE' => ['label' => 'Ditangguhkan', 'variant' => 'warning'],
-                                    'REJECT' => ['label' => 'Tidak Disetujui', 'variant' => 'danger'],
+                                    // REJECT hanya kompatibilitas baca untuk keputusan historis.
+                                    'NOT_APPROVED', 'REJECT' => ['label' => 'Tidak Disetujui', 'variant' => 'danger'],
                                     default => ['label' => 'Dilewati', 'variant' => 'muted'],
                                 };
                             @endphp

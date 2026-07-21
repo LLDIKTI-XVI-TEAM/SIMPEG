@@ -10,8 +10,8 @@ use App\Services\LeaveApprovalService;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 
-/** Menolak pengajuan cuti secara terminal tanpa pemotongan saldo. */
-class RejectLeaveAction
+/** Menutup pengajuan sebagai Tidak Disetujui tanpa memutasi saldo cuti. */
+class DeclineLeaveAction
 {
     use BuildsLeaveDecisionAuditPayload;
 
@@ -28,8 +28,8 @@ class RejectLeaveAction
             ->where('approver_employee_id', $actor->id)
             ->first();
 
-        $leaveRequest = $this->approvals->reject($leaveRequest, $actor, $komentar);
-        $auditPayload = $this->decisionAuditPayload($statusSebelum, $leaveRequest, $stepSebelum, $actor, 'REJECT', $komentar);
+        $leaveRequest = $this->approvals->decline($leaveRequest, $actor, $komentar);
+        $auditPayload = $this->decisionAuditPayload($statusSebelum, $leaveRequest, $stepSebelum, $actor, 'NOT_APPROVED', $komentar);
 
         AuditService::log(
             'UPDATE',

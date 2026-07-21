@@ -136,7 +136,7 @@
                             <x-ui.table-th class="select-none">Pegawai</x-ui.table-th>
                             <x-ui.table-th class="select-none">Detail Cuti</x-ui.table-th>
                             <x-ui.table-th class="select-none">Pelaksanaan</x-ui.table-th>
-                            <x-ui.table-th class="select-none">Langkah Aktif</x-ui.table-th>
+                            <x-ui.table-th class="select-none">Tahap Aktif</x-ui.table-th>
                             <x-ui.table-th class="select-none">Status Akhir</x-ui.table-th>
                             <x-ui.table-th align="right" class="select-none">Aksi</x-ui.table-th>
                         </x-ui.table-row>
@@ -165,14 +165,10 @@
                                 </x-ui.table-td>
                                 <x-ui.table-td>
                                     <div class="text-[11px] font-medium text-ink font-sans">
-                                        @if($leave->status === 'menunggu_approval' && $leave->activeStep)
-                                            @if($leave->activeStep->approver_employee_id === auth()->user()?->employee_id)
-                                                <span class="text-primary font-bold">Menunggu Anda</span>
-                                            @else
-                                                <span>Menunggu <strong>{{ $leave->activeStep->approver?->nama_lengkap ?? '-' }}</strong></span>
-                                            @endif
-                                        @elseif($leave->activeStep)
-                                            <span>Langkah aktif: <strong>{{ $leave->activeStep->approver?->nama_lengkap ?? '-' }}</strong></span>
+                                        @if($leave->status === 'menunggu_approval' && $leave->current_step_label)
+                                            <span>Menunggu <strong>{{ $leave->current_step_label }}</strong></span>
+                                        @elseif($leave->current_step_label)
+                                            <span>Langkah aktif: <strong>{{ $leave->current_step_label }}</strong></span>
                                         @else
                                             <span class="text-muted">-</span>
                                         @endif

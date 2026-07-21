@@ -402,11 +402,11 @@ class PhaseSevenBrowserQaSeeder extends Seeder
         }
 
         if ($status === 'tidak_disetujui') {
-            $firstStep = [...$firstStep, 'status' => 'rejected', 'acted_at' => '2026-10-01 09:00:00'];
+            $firstStep = [...$firstStep, 'status' => 'tidak_disetujui', 'acted_at' => '2026-10-01 09:00:00'];
             $finalStep = [
                 ...$finalStep,
                 'status' => 'skipped',
-                'skipped_reason' => 'request_rejected',
+                'skipped_reason' => 'request_not_approved',
                 'decision_note' => 'Dilewati karena pengajuan sudah tidak disetujui.',
                 'acted_at' => '2026-10-01 09:00:00',
             ];

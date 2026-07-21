@@ -153,6 +153,38 @@ class KepalaBagianFrontendTest extends TestCase
         ]);
     }
 
+    public function test_detail_cuti_bawahan_menampilkan_status_tidak_disetujui_baru_dan_legacy(): void
+    {
+        [$user, $kepalaBagian] = $this->kepalaBagian();
+        $directReport = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $leave = $this->leaveWithActiveStep($directReport, $kepalaBagian);
+        $leave->forceFill(['status' => 'tidak_disetujui'])->save();
+        $leave->steps()->delete();
+
+        foreach (['tidak_disetujui', 'rejected'] as $index => $status) {
+            LeaveRequestStep::create([
+                'leave_request_id' => $leave->id,
+                'step_order' => $index + 1,
+                'step_type' => 'kepala_bagian',
+                'role_label' => $index === 0 ? 'Kepala Bagian Baru' : 'Kepala Bagian Legacy',
+                'approver_employee_id' => $kepalaBagian->id,
+                'status' => $status,
+                'is_final' => $index === 1,
+                'acted_at' => now(),
+            ]);
+        }
+
+        $response = $this->actingAs($user)->get(route('kepala-bagian.cuti.show', $leave));
+
+        $response
+            ->assertOk()
+            ->assertSeeInOrder(['Kepala Bagian Baru', 'Tidak Disetujui'])
+            ->assertSeeInOrder(['Kepala Bagian Legacy', 'Tidak Disetujui'])
+            ->assertDontSee('Ditolak')
+            ->assertDontSee('Rejected');
+        $this->assertGreaterThanOrEqual(2, substr_count($response->getContent(), 'border-danger'));
+    }
+
     public function test_ews_page_only_exposes_alerts_for_direct_reports(): void
     {
         [$user, $kepalaBagian] = $this->kepalaBagian();
