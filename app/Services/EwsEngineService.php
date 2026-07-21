@@ -315,7 +315,6 @@ class EwsEngineService
             $timeLabel = ($days / 30).' bulan';
         }
 
-<<<<<<< Updated upstream
         $notificationType = 'ews.'.strtolower(str_replace('_', '_', $type));
 
         // Sertakan keterangan tidak eligible agar penerima mengetahui statusnya.
@@ -343,42 +342,6 @@ class EwsEngineService
         );
 
         $alert->update(['notified_at' => now()]);
-=======
-        // Send notification regardless of eligibility, but add warning note if not eligible
-        $timeLabel = $days.' hari';
-        if ($days >= 365 && $days % 365 === 0) {
-            $timeLabel = ($days / 365).' tahun';
-        } elseif ($days >= 30 && $days % 30 === 0) {
-            $timeLabel = ($days / 30).' bulan';
-        }
->>>>>>> Stashed changes
-
-        $typeLabel = strtolower($type);
-        $notificationType = 'ews.'.$typeLabel;
-
-        $body = sprintf(
-            'Pemberitahuan EWS: Jadwal %s Anda jatuh pada %s (sisa sekitar %s). Harap lengkapi berkas.',
-            $titleLabel,
-            Carbon::parse($targetDate)->format('d-m-Y'),
-            $timeLabel
-        );
-
-        if (! $isEligible) {
-            $body .= "\n\nPerhatian: Saat ini Anda belum memenuhi syarat eligibilitas.";
-        }
-
-        $this->notificationService->createForEmployee(
-            $employee,
-            $notificationType,
-            'Peringatan EWS: '.$titleLabel,
-            $body,
-            ['ews_alert_id' => $alert->id]
-        );
-
-        $alert->update([
-            'is_eligible' => $isEligible,
-            'notified_at' => now(),
-        ]);
 
         return true;
     }
