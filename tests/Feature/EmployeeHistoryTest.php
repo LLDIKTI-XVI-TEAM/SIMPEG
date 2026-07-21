@@ -169,6 +169,58 @@ class EmployeeHistoryTest extends TestCase
         $this->assertLessThan($clearLatestIndex, $employeeReloadIndex);
     }
 
+    public function test_service_recomputes_latest_rank_from_all_dated_histories(): void
+    {
+        $employee = Employee::factory()->create();
+        $oldGolongan = RefGolongan::where('kode', 'III/a')->firstOrFail();
+        $latestGolongan = RefGolongan::where('kode', 'III/b')->firstOrFail();
+
+        $incorrectlyFlagged = RankHistory::create([
+            'employee_id' => $employee->id,
+            'golongan_id' => $oldGolongan->id,
+            'tmt_pangkat' => '2022-01-01',
+            'is_latest' => true,
+        ]);
+        $actualLatest = RankHistory::create([
+            'employee_id' => $employee->id,
+            'golongan_id' => $latestGolongan->id,
+            'tmt_pangkat' => '2026-01-01',
+            'is_latest' => false,
+        ]);
+
+        $inserted = app(EmployeeHistoryService::class)->createRankHistory($employee, [
+            'golongan_id' => $oldGolongan->id,
+            'tmt_pangkat' => '2024-01-01',
+        ]);
+
+        $this->assertFalse($incorrectlyFlagged->fresh()->is_latest);
+        $this->assertTrue($actualLatest->fresh()->is_latest);
+        $this->assertFalse($inserted->fresh()->is_latest);
+        $this->assertSame(1, $employee->rankHistories()->where('is_latest', true)->count());
+        $this->assertSame('2030-01-01', $employee->fresh()->tanggal_kenaikan_pangkat_berikutnya->format('Y-m-d'));
+    }
+
+    public function test_service_never_marks_new_null_rank_tmt_as_latest(): void
+    {
+        $employee = Employee::factory()->create();
+        $golongan = RefGolongan::where('kode', 'III/b')->firstOrFail();
+        $datedHistory = RankHistory::create([
+            'employee_id' => $employee->id,
+            'golongan_id' => $golongan->id,
+            'tmt_pangkat' => '2026-02-01',
+            'is_latest' => false,
+        ]);
+
+        $inserted = app(EmployeeHistoryService::class)->createRankHistory($employee, [
+            'golongan_id' => $golongan->id,
+            'tmt_pangkat' => null,
+        ]);
+
+        $this->assertTrue($datedHistory->fresh()->is_latest);
+        $this->assertFalse($inserted->fresh()->is_latest);
+        $this->assertSame('2030-02-01', $employee->fresh()->tanggal_kenaikan_pangkat_berikutnya->format('Y-m-d'));
+    }
+
     public function test_admin_can_list_rank_histories_ordered_with_golongan_data(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -350,7 +402,10 @@ class EmployeeHistoryTest extends TestCase
     public function test_admin_can_create_position_history_append_only_and_update_pension_date(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
-        $employee = Employee::factory()->create(['tanggal_lahir' => '1980-06-15']);
+        $employee = Employee::factory()->create([
+            'tanggal_lahir' => '1980-06-15',
+            'tanggal_pensiun' => null,
+        ]);
         $jenisJabatan = RefJenisJabatan::where('nama', 'Struktural')->firstOrFail();
         $unitKerja = RefUnitKerja::firstOrFail();
         $jabatanLama = RefJabatan::firstOrCreate(
@@ -463,6 +518,28 @@ class EmployeeHistoryTest extends TestCase
         $this->assertSame('2040-06-15', $employee->tanggal_pensiun->format('Y-m-d'));
     }
 
+    public function test_position_history_preserves_existing_official_pension_date(): void
+    {
+        $employee = Employee::factory()->create([
+            'tanggal_lahir' => '1980-06-15',
+            'tanggal_pensiun' => '2038-12-31',
+        ]);
+        $jenisJabatan = RefJenisJabatan::where('nama', 'Struktural')->firstOrFail();
+        $jabatan = RefJabatan::create([
+            'nama' => 'Jabatan BUP Baru',
+            'jenis_jabatan_id' => $jenisJabatan->id,
+            'default_bup' => 65,
+        ]);
+
+        app(EmployeeHistoryService::class)->createPositionHistory($employee, [
+            'jabatan_id' => $jabatan->id,
+            'jenis_jabatan_id' => $jenisJabatan->id,
+            'tmt_jabatan' => '2026-03-01',
+        ]);
+
+        $this->assertSame('2038-12-31', $employee->fresh()->tanggal_pensiun->format('Y-m-d'));
+    }
+
     public function test_admin_can_create_kgb_history_append_only_and_update_next_kgb_date(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -535,6 +612,18 @@ class EmployeeHistoryTest extends TestCase
             'is_latest' => false,
         ]);
         $this->assertSame('2028-04-01', $employee->fresh()->tanggal_kgb_berikutnya->format('Y-m-d'));
+    }
+
+    public function test_kgb_history_uses_non_overflow_calculator_for_leap_day(): void
+    {
+        $employee = Employee::factory()->create();
+
+        app(EmployeeHistoryService::class)->createKgbHistory($employee, [
+            'tmt_kgb' => '2024-02-29',
+            'gaji_pokok' => 4500000,
+        ]);
+
+        $this->assertSame('2026-02-28', $employee->fresh()->tanggal_kgb_berikutnya->format('Y-m-d'));
     }
 
     public function test_old_english_employee_history_urls_no_longer_resolve(): void

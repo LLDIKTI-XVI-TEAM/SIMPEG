@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\RankHistory;
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
 use App\Models\RefJabatan;
@@ -11,12 +12,16 @@ use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
 use App\Models\User;
+use App\Services\Employees\TmtCalculatorService;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class EmployeeUpdateTest extends TestCase
@@ -128,7 +133,9 @@ class EmployeeUpdateTest extends TestCase
         $this->assertIsString($photoPath);
         $this->assertStringStartsWith('employees/photos/', $photoPath);
         $this->assertStringEndsWith('.png', $photoPath);
-        Storage::disk('public')->assertExists($photoPath);
+        /** @var FilesystemAdapter $disk */
+        $disk = Storage::disk('public');
+        $disk->assertExists($photoPath);
         $this->assertDatabaseHas('employees', [
             'id' => $employee->id,
             'foto' => $photoPath,
@@ -266,6 +273,19 @@ class EmployeeUpdateTest extends TestCase
             ['jenis_jabatan_id' => $jenisJabatan->id]
         );
 
+        $realCalculator = new TmtCalculatorService;
+        $this->mock(TmtCalculatorService::class, function (MockInterface $mock) use ($realCalculator): void {
+            $mock->expects('syncForEmployee')
+                ->withArgs(function (Employee $employee): bool {
+                    $this->assertSame(1, $employee->rankHistories()->count());
+                    $this->assertSame(1, $employee->positionHistories()->count());
+                    $this->assertSame(1, $employee->salaryHistories()->count());
+
+                    return true;
+                })
+                ->andReturnUsing(fn (Employee $employee) => $realCalculator->syncForEmployee($employee));
+        });
+
         $payload = $this->validPayload($employee, [
             // Pangkat
             'pangkat_golongan_id' => $golongan->id,
@@ -344,6 +364,141 @@ class EmployeeUpdateTest extends TestCase
             'tmt_pengangkatan' => '2026-04-01 00:00:00',
             'no_sk' => 'SK-PENGANGKATAN-WEB-001',
         ]);
+
+        $employee->refresh();
+        $this->assertSame('2030-01-02', $employee->tanggal_kenaikan_pangkat_berikutnya?->format('Y-m-d'));
+        $this->assertSame('2028-03-02', $employee->tanggal_kgb_berikutnya?->format('Y-m-d'));
+    }
+
+    public function test_unrelated_employee_update_does_not_sync_or_change_derived_snapshots(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Nama Sebelum',
+            'tanggal_kenaikan_pangkat_berikutnya' => '2031-05-10',
+            'tanggal_kgb_berikutnya' => '2029-07-15',
+        ]);
+
+        $this->mock(TmtCalculatorService::class, function (MockInterface $mock): void {
+            $mock->shouldNotReceive('syncForEmployee');
+        });
+
+        $this->actingAs($user);
+        $response = $this->putJsonWithCsrf($this->endpoint($employee), $this->validPayload($employee, [
+            'nama_lengkap' => 'Nama Sesudah',
+        ]));
+
+        $response->assertOk();
+        $employee->refresh();
+        $this->assertSame('Nama Sesudah', $employee->nama_lengkap);
+        $this->assertSame('2031-05-10', $employee->tanggal_kenaikan_pangkat_berikutnya?->format('Y-m-d'));
+        $this->assertSame('2029-07-15', $employee->tanggal_kgb_berikutnya?->format('Y-m-d'));
+    }
+
+    public function test_source_update_rebuilds_latest_flags_deterministically_and_ignores_backdated_and_null_tmt(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create([
+            'tanggal_kenaikan_pangkat_berikutnya' => '2040-01-01',
+        ]);
+        $golongan = RefGolongan::firstOrFail();
+        $createdAt = '2026-06-01 08:00:00';
+
+        $olderCreatedAt = new RankHistory([
+            'employee_id' => $employee->id,
+            'golongan_id' => $golongan->id,
+            'tmt_pangkat' => '2026-05-20',
+            'is_latest' => true,
+        ]);
+        $olderCreatedAt->forceFill([
+            'id' => 'ffffffff-ffff-4fff-bfff-ffffffffffff',
+            'created_at' => '2026-05-31 08:00:00',
+            'updated_at' => '2026-05-31 08:00:00',
+        ])->save();
+
+        $lowerId = new RankHistory([
+            'employee_id' => $employee->id,
+            'golongan_id' => $golongan->id,
+            'tmt_pangkat' => '2026-05-20',
+            'is_latest' => true,
+        ]);
+        $lowerId->forceFill([
+            'id' => '00000000-0000-4000-8000-000000000001',
+            'created_at' => $createdAt,
+            'updated_at' => $createdAt,
+        ])->save();
+
+        $higherId = new RankHistory([
+            'employee_id' => $employee->id,
+            'golongan_id' => $golongan->id,
+            'tmt_pangkat' => '2026-05-20',
+            'is_latest' => false,
+        ]);
+        $higherId->forceFill([
+            'id' => '00000000-0000-4000-8000-000000000002',
+            'created_at' => $createdAt,
+            'updated_at' => $createdAt,
+        ])->save();
+
+        RankHistory::create([
+            'employee_id' => $employee->id,
+            'golongan_id' => $golongan->id,
+            'tmt_pangkat' => null,
+            'is_latest' => true,
+        ]);
+
+        $this->actingAs($user);
+        $response = $this->withSession(['_token' => 'test-token'])->post("/pegawai/{$employee->id}", $this->validPayload($employee, [
+            'pangkat_history_id' => 'new',
+            'pangkat_golongan_id' => $golongan->id,
+            'pangkat_no_sk' => 'SK-BACKDATE-001',
+            'pangkat_tanggal_sk' => '2020-01-02',
+            'pangkat_tmt_pangkat' => '2020-01-01',
+        ]), ['X-CSRF-TOKEN' => 'test-token']);
+
+        $response->assertRedirect(route('data-pegawai'));
+        $this->assertTrue($higherId->fresh()->is_latest);
+        $this->assertFalse($lowerId->fresh()->is_latest);
+        $this->assertFalse($olderCreatedAt->fresh()->is_latest);
+        $this->assertSame(1, $employee->rankHistories()->where('is_latest', true)->count());
+        $this->assertSame('2030-05-20', $employee->fresh()->tanggal_kenaikan_pangkat_berikutnya?->format('Y-m-d'));
+    }
+
+    public function test_update_locks_employee_before_rebuilding_latest_history(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $golongan = RefGolongan::firstOrFail();
+        $queries = collect();
+
+        DB::listen(function ($query) use ($queries): void {
+            $queries->push(strtolower($query->sql));
+        });
+
+        $this->actingAs($user);
+        $response = $this->withSession(['_token' => 'test-token'])->post("/pegawai/{$employee->id}", $this->validPayload($employee, [
+            'pangkat_history_id' => 'new',
+            'pangkat_golongan_id' => $golongan->id,
+            'pangkat_no_sk' => 'SK-RANK-LOCK',
+            'pangkat_tanggal_sk' => '2026-02-10',
+            'pangkat_tmt_pangkat' => '2026-02-01',
+        ]), ['X-CSRF-TOKEN' => 'test-token']);
+
+        $response->assertRedirect(route('data-pegawai'));
+
+        $clearLatestIndex = $queries->search(fn (string $query): bool => str_contains($query, 'update "rank_histories"')
+            && str_contains($query, '"is_latest"'));
+        $employeeSelectsBeforeRebuild = $queries->take($clearLatestIndex)->filter(fn (string $query): bool => str_contains($query, 'from "employees"')
+            && str_contains($query, 'where "employees"."id"'));
+        $employeeLockIndex = $employeeSelectsBeforeRebuild->keys()->last();
+
+        $this->assertIsInt($clearLatestIndex);
+        $this->assertGreaterThanOrEqual(3, $employeeSelectsBeforeRebuild->count());
+        $this->assertIsInt($employeeLockIndex);
+        $this->assertLessThan($clearLatestIndex, $employeeLockIndex);
+        if (DB::getDriverName() !== 'sqlite') {
+            $this->assertStringContainsString('for update', $queries->get($employeeLockIndex));
+        }
     }
 
     public function test_berkas_lainnya_preset_ktp_is_saved_as_document_on_employee_update(): void
@@ -377,7 +532,9 @@ class EmployeeUpdateTest extends TestCase
 
         $document = $employee->documents()->firstOrFail();
         $this->assertStringStartsWith("berkas/{$employee->id}/", $document->file_path);
-        Storage::disk('public')->assertExists($document->file_path);
+        /** @var FilesystemAdapter $disk */
+        $disk = Storage::disk('public');
+        $disk->assertExists($document->file_path);
     }
 
     public function test_berkas_lainnya_manual_jenis_is_saved_as_lainnya_category(): void
