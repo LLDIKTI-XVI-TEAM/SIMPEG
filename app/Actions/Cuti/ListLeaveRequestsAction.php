@@ -39,7 +39,14 @@ class ListLeaveRequestsAction
         $perPage = min(max((int) $request->query('per_page', 10), 10), 50);
 
         $query = LeaveRequest::query()
-            ->with(['employee', 'jenisCuti', 'steps'])
+            ->with([
+                'employee',
+                'jenisCuti',
+                'steps' => fn ($steps) => $steps
+                    ->select(['id', 'leave_request_id', 'role_label', 'status', 'step_order'])
+                    ->where('status', 'active')
+                    ->orderBy('step_order'),
+            ])
             ->latest();
 
         // Role pegawai selalu dibatasi ke data sendiri meski mapping permission salah konfigurasi.
@@ -132,8 +139,8 @@ class ListLeaveRequestsAction
             'alasan' => $r->alasan,
             // Status runtime MENTAH (menunggu_approval|disetujui|ditangguhkan|perlu_perubahan|tidak_disetujui).
             'status' => $r->status,
-            // role_label langkah aktif untuk menampilkan "Menunggu {label}" pada baris yang menunggu.
-            'current_step' => $activeStep?->role_label,
+            // Label berasal dari snapshot agar perubahan konfigurasi tidak mengubah riwayat pengajuan.
+            'current_step_label' => $activeStep?->role_label,
             'periode' => optional($r->tanggal_mulai)->format('Y-m'),
         ];
     }

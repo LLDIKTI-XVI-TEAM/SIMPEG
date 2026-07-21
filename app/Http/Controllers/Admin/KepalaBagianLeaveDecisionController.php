@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Actions\Cuti\ApproveLeaveAction;
+use App\Actions\Cuti\DeclineLeaveAction;
 use App\Actions\Cuti\PostponeLeaveAction;
-use App\Actions\Cuti\RejectLeaveAction;
 use App\Actions\Cuti\RequestChangesLeaveAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Cuti\KepalaBagianLeaveDecisionRequest;
@@ -20,7 +20,7 @@ class KepalaBagianLeaveDecisionController extends Controller
         ApproveLeaveAction $approve,
         RequestChangesLeaveAction $requestChanges,
         PostponeLeaveAction $postpone,
-        RejectLeaveAction $reject,
+        DeclineLeaveAction $decline,
     ) {
         $user = $request->user();
         $actor = $user?->employee;
@@ -32,7 +32,7 @@ class KepalaBagianLeaveDecisionController extends Controller
             'DISETUJUI' => $approve->execute($leave, $actor, $payload['catatan'] ?? null, $request),
             'PERUBAHAN' => $requestChanges->execute($leave, $actor, $payload['catatan'], $request),
             'DITANGGUHKAN' => $postpone->execute($leave, $actor, $payload['catatan'], $request),
-            'TIDAK_DISETUJUI' => $reject->execute($leave, $actor, $payload['catatan'], $request),
+            'TIDAK_DISETUJUI' => $decline->execute($leave, $actor, $payload['catatan'], $request),
         };
 
         $message = match ($payload['keputusan']) {

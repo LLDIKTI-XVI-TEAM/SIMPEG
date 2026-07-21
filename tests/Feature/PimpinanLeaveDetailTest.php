@@ -82,18 +82,52 @@ class PimpinanLeaveDetailTest extends TestCase
             'komentar' => 'Menunggu konfirmasi jadwal.',
             'acted_at' => '2026-07-02 11:45:00',
         ]);
+        LeaveApproval::create([
+            'leave_request_id' => $leave->id,
+            'approver_id' => $approver->id,
+            'stage' => 1,
+            'action' => 'NOT_APPROVED',
+            'komentar' => 'Dokumen baru tidak memenuhi persyaratan.',
+            'acted_at' => '2026-07-03 09:15:00',
+        ]);
+        $response = $this->actingAs($this->pimpinan())
+            ->get(route('pimpinan.cuti.show', $leave));
 
-        $this->actingAs($this->pimpinan())
-            ->get(route('pimpinan.cuti.show', $leave))
+        $response
             ->assertOk()
             ->assertSee('Riwayat Tindakan Resmi')
             ->assertSee('Perubahan')
             ->assertSee('Ditangguhkan')
+            ->assertDontSee('Ditolak')
             ->assertSee('Lengkapi surat pendukung.')
             ->assertSee('Menunggu konfirmasi jadwal.')
+            ->assertSee('Dokumen baru tidak memenuhi persyaratan.')
             ->assertSee('01 Jul 2026 10:30')
             ->assertSee('02 Jul 2026 11:45')
             ->assertSee('Pejabat Cuti');
+
+        $response->assertSee('Tidak Disetujui');
+    }
+
+    public function test_detail_menampilkan_action_legacy_reject_sebagai_tidak_disetujui(): void
+    {
+        $approver = Employee::factory()->create(['nama_lengkap' => 'Pejabat Legacy']);
+        $leave = $this->leave(Employee::factory()->create(), $this->leaveType(), '2026-07-06', 'tidak_disetujui');
+        LeaveApproval::create([
+            'leave_request_id' => $leave->id,
+            'approver_id' => $approver->id,
+            'stage' => 1,
+            'action' => 'REJECT',
+            'komentar' => 'Catatan keputusan dari data lama.',
+            'acted_at' => '2026-07-04 08:00:00',
+        ]);
+
+        $this->actingAs($this->pimpinan())
+            ->get(route('pimpinan.cuti.show', $leave))
+            ->assertOk()
+            ->assertSee('Tidak Disetujui')
+            ->assertSee('Catatan keputusan dari data lama.')
+            ->assertDontSee('Ditolak');
     }
 
     public function test_detail_only_exposes_attachment_through_an_authorized_route_when_file_exists(): void

@@ -119,7 +119,9 @@ class CutiDetailTimelineTest extends TestCase
             ->assertOk()
             ->assertSee('role="dialog"', false)
             ->assertSee('@keydown.escape.window="close()"', false)
-            ->assertSee("@click=\"open('postpone', \$event)\"", false);
+            ->assertSee("@click=\"open('postpone', \$event)\"", false)
+            ->assertSee("@click=\"open('decline', \$event)\"", false)
+            ->assertDontSee("@click=\"open('reject', \$event)\"", false);
     }
 
     public function test_active_approver_actions_wrap_on_small_screens(): void
@@ -155,5 +157,47 @@ class CutiDetailTimelineTest extends TestCase
             ->get(route('cuti.show', $leaveRequest->id))
             ->assertOk()
             ->assertSee('flex-wrap justify-end gap-3', false);
+    }
+
+    public function test_detail_timeline_menampilkan_status_baru_dan_legacy_sebagai_tidak_disetujui(): void
+    {
+        $viewer = User::factory()->superAdmin()->create();
+        $jenis = RefJenisCuti::create([
+            'nama' => 'Cuti Sakit',
+            'code' => 'cuti-sakit-timeline-decline',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+        $leaveRequest = LeaveRequest::create([
+            'employee_id' => Employee::factory()->create()->id,
+            'jenis_cuti_id' => $jenis->id,
+            'tanggal_mulai' => '2026-08-10',
+            'tanggal_selesai' => '2026-08-10',
+            'jumlah_hari_kerja' => 1,
+            'alasan' => 'Uji label keputusan tidak disetujui.',
+            'status' => 'tidak_disetujui',
+        ]);
+        $approver = Employee::factory()->create();
+
+        foreach (['tidak_disetujui', 'rejected'] as $index => $status) {
+            $leaveRequest->steps()->create([
+                'step_order' => $index + 1,
+                'step_type' => 'verifikator',
+                'role_label' => $index === 0 ? 'Verifikator Baru' : 'Verifikator Legacy',
+                'approver_employee_id' => $approver->id,
+                'status' => $status,
+                'is_final' => $index === 1,
+                'decision_note' => 'Dokumen pendukung tidak sesuai.',
+                'acted_at' => now(),
+            ]);
+        }
+
+        $response = $this->actingAs($viewer)->get(route('cuti.show', $leaveRequest->id));
+
+        $response
+            ->assertOk()
+            ->assertSee('Tidak Disetujui oleh Verifikator Baru')
+            ->assertSee('Tidak Disetujui oleh Verifikator Legacy')
+            ->assertDontSee('Ditolak');
     }
 }

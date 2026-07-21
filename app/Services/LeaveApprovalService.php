@@ -142,9 +142,10 @@ class LeaveApprovalService
     }
 
     /**
-     * Menolak pengajuan secara terminal. Step aktif ditutup agar pengajuan tidak kembali muncul di antrean.
+     * Menutup pengajuan sebagai Tidak Disetujui tanpa memotong saldo.
+     * Step aktif dan seluruh step lanjutan ditutup agar pengajuan tidak kembali muncul di antrean.
      */
-    public function reject(LeaveRequest $leaveRequest, Employee $actor, string $komentar): LeaveRequest
+    public function decline(LeaveRequest $leaveRequest, Employee $actor, string $komentar): LeaveRequest
     {
         $this->assertApprovalActionable($leaveRequest);
         $this->assertActorIsApprover($leaveRequest, $actor, $this->pendingStageOrFail($leaveRequest));
@@ -156,17 +157,17 @@ class LeaveApprovalService
             $this->assertActorMatchesStep($activeStep, $actor);
 
             $activeStep->forceFill([
-                'status' => 'rejected',
+                'status' => self::STATUS_TIDAK_DISETUJUI,
                 'decision_note' => $komentar,
                 'acted_at' => Carbon::now(),
             ])->save();
 
-            $this->recordApproval($locked, $actor, $activeStep->step_order, 'REJECT', $komentar);
+            $this->recordApproval($locked, $actor, $activeStep->step_order, 'NOT_APPROVED', $komentar);
             $locked->steps()
                 ->where('status', 'pending')
                 ->update([
                     'status' => 'skipped',
-                    'skipped_reason' => 'request_rejected',
+                    'skipped_reason' => 'request_not_approved',
                     'decision_note' => 'Dilewati karena pengajuan sudah tidak disetujui.',
                     'acted_at' => Carbon::now(),
                 ]);

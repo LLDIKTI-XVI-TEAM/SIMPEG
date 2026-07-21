@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Actions\Cuti\ApproveLeaveAction;
+use App\Actions\Cuti\DeclineLeaveAction;
 use App\Actions\Cuti\PostponeLeaveAction;
-use App\Actions\Cuti\RejectLeaveAction;
 use App\Actions\Cuti\RequestChangesLeaveAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Cuti\PimpinanLeaveDecisionRequest;
@@ -18,7 +18,7 @@ class PimpinanLeaveDecisionController extends Controller
         ApproveLeaveAction $approve,
         RequestChangesLeaveAction $requestChanges,
         PostponeLeaveAction $postpone,
-        RejectLeaveAction $reject,
+        DeclineLeaveAction $decline,
     ) {
         $actor = $request->user()?->employee;
         abort_if($actor === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat memutuskan cuti.');
@@ -28,7 +28,7 @@ class PimpinanLeaveDecisionController extends Controller
             'DISETUJUI' => $approve->execute($leave, $actor, $payload['catatan'] ?? null, $request),
             'PERUBAHAN' => $requestChanges->execute($leave, $actor, $payload['catatan'], $request),
             'DITANGGUHKAN' => $postpone->execute($leave, $actor, $payload['catatan'], $request),
-            'TIDAK_DISETUJUI' => $reject->execute($leave, $actor, $payload['catatan'], $request),
+            'TIDAK_DISETUJUI' => $decline->execute($leave, $actor, $payload['catatan'], $request),
         };
         $message = match ($payload['keputusan']) {
             'DISETUJUI' => 'Pengajuan cuti berhasil disetujui.',
