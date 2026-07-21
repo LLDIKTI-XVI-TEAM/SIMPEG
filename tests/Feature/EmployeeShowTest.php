@@ -89,6 +89,35 @@ class EmployeeShowTest extends TestCase
             ->assertDontSee('01-01-2028', false);
     }
 
+    public function test_employee_detail_page_uses_persisted_promotion_and_kgb_snapshots(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = $this->employeeWithReferences([
+            'tanggal_kenaikan_pangkat_berikutnya' => '2035-06-15',
+            'tanggal_kgb_berikutnya' => null,
+        ]);
+
+        RankHistory::create([
+            'employee_id' => $employee->id,
+            'golongan_id' => RefGolongan::where('kode', 'III/a')->firstOrFail()->id,
+            'tmt_pangkat' => '2020-04-01',
+            'is_latest' => true,
+        ]);
+        SalaryHistory::create([
+            'employee_id' => $employee->id,
+            'tmt_kgb' => '2020-01-01',
+            'gaji_pokok' => 5000000,
+            'is_latest' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSee('15-06-2035', false)
+            ->assertDontSee('01-04-2024', false)
+            ->assertDontSee('01-01-2022', false);
+    }
+
     public function test_employee_detail_response_includes_kepala_lembaga_marker(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
