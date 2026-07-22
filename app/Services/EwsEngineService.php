@@ -86,22 +86,21 @@ class EwsEngineService
                             $targetDate = Carbon::parse($employee->tanggal_kenaikan_pangkat_berikutnya);
                             $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
 
-                            foreach ($pangkatDays as $days) {
-                                if ($diffDays === $days) {
-                                    $hasActiveDiscipline = $employee->disciplineRecords->contains('is_active', true);
-                                    $isEligible = ($employee->is_kinerja_baik === true) && ! $hasActiveDiscipline;
+                            $days = $this->dueStage($pangkatDays, $diffDays);
+                            if ($days !== null) {
+                                $hasActiveDiscipline = $employee->disciplineRecords->contains('is_active', true);
+                                $isEligible = ($employee->is_kinerja_baik === true) && ! $hasActiveDiscipline;
 
-                                    $created = $this->createAlertIfNotExist(
-                                        $employee,
-                                        'KENAIKAN_PANGKAT',
-                                        $targetDate->toDateString(),
-                                        $days,
-                                        'Kenaikan Pangkat',
-                                        $isEligible,
-                                    );
-                                    if ($created) {
-                                        $alertsCreated++;
-                                    }
+                                $created = $this->createAlertIfNotExist(
+                                    $employee,
+                                    'KENAIKAN_PANGKAT',
+                                    $targetDate->toDateString(),
+                                    $days,
+                                    'Kenaikan Pangkat',
+                                    $isEligible,
+                                );
+                                if ($created) {
+                                    $alertsCreated++;
                                 }
                             }
                         }
@@ -111,18 +110,17 @@ class EwsEngineService
                             $targetDate = Carbon::parse($employee->tanggal_kgb_berikutnya);
                             $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
 
-                            foreach ($kgbDays as $days) {
-                                if ($diffDays === $days) {
-                                    $created = $this->createAlertIfNotExist(
-                                        $employee,
-                                        'KGB',
-                                        $targetDate->toDateString(),
-                                        $days,
-                                        'KGB',
-                                    );
-                                    if ($created) {
-                                        $alertsCreated++;
-                                    }
+                            $days = $this->dueStage($kgbDays, $diffDays);
+                            if ($days !== null) {
+                                $created = $this->createAlertIfNotExist(
+                                    $employee,
+                                    'KGB',
+                                    $targetDate->toDateString(),
+                                    $days,
+                                    'KGB',
+                                );
+                                if ($created) {
+                                    $alertsCreated++;
                                 }
                             }
                         }
@@ -132,18 +130,17 @@ class EwsEngineService
                             $targetDate = Carbon::parse($employee->tanggal_pensiun);
                             $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
 
-                            foreach ($pensiunDays as $days) {
-                                if ($diffDays === $days) {
-                                    $created = $this->createAlertIfNotExist(
-                                        $employee,
-                                        'PENSIUN',
-                                        $targetDate->toDateString(),
-                                        $days,
-                                        'Pensiun',
-                                    );
-                                    if ($created) {
-                                        $alertsCreated++;
-                                    }
+                            $days = $this->dueStage($pensiunDays, $diffDays);
+                            if ($days !== null) {
+                                $created = $this->createAlertIfNotExist(
+                                    $employee,
+                                    'PENSIUN',
+                                    $targetDate->toDateString(),
+                                    $days,
+                                    'Pensiun',
+                                );
+                                if ($created) {
+                                    $alertsCreated++;
                                 }
                             }
                         }
@@ -171,18 +168,17 @@ class EwsEngineService
                             if ($targetDate) {
                                 $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
 
-                                foreach ($pppkDays as $days) {
-                                    if ($diffDays === $days) {
-                                        $created = $this->createAlertIfNotExist(
-                                            $employee,
-                                            'KONTRAK_PPPK',
-                                            $targetDate->toDateString(),
-                                            $days,
-                                            'Kontrak PPPK',
-                                        );
-                                        if ($created) {
-                                            $alertsCreated++;
-                                        }
+                                $days = $this->dueStage($pppkDays, $diffDays);
+                                if ($days !== null) {
+                                    $created = $this->createAlertIfNotExist(
+                                        $employee,
+                                        'KONTRAK_PPPK',
+                                        $targetDate->toDateString(),
+                                        $days,
+                                        'Kontrak PPPK',
+                                    );
+                                    if ($created) {
+                                        $alertsCreated++;
                                     }
                                 }
                             }
@@ -195,27 +191,26 @@ class EwsEngineService
                             ->first();
 
                         if ($firstAppointment) {
-                            $firstTmt  = Carbon::parse($firstAppointment->tmt_pengangkatan)->startOfDay();
+                            $firstTmt = Carbon::parse($firstAppointment->tmt_pengangkatan)->startOfDay();
                             $isEligible = $employee->is_satyalancana_eligible === true;
 
                             foreach ([10, 20, 30] as $years) {
                                 $targetDate = $firstTmt->copy()->addYears($years);
-                                $diffDays   = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
+                                $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
 
-                                foreach ($satyalancanaDays as $days) {
-                                    if ($diffDays === $days) {
-                                        $created = $this->createAlertIfNotExist(
-                                            $employee,
-                                            'SATYALANCANA',
-                                            $targetDate->toDateString(),
-                                            $days,
-                                            'Satyalancana '.$years.' Tahun',
-                                            $isEligible,
-                                            $years,
-                                        );
-                                        if ($created) {
-                                            $alertsCreated++;
-                                        }
+                                $days = $this->dueStage($satyalancanaDays, $diffDays);
+                                if ($days !== null) {
+                                    $created = $this->createAlertIfNotExist(
+                                        $employee,
+                                        'SATYALANCANA',
+                                        $targetDate->toDateString(),
+                                        $days,
+                                        'Satyalancana '.$years.' Tahun',
+                                        $isEligible,
+                                        $years,
+                                    );
+                                    if ($created) {
+                                        $alertsCreated++;
                                     }
                                 }
                             }
@@ -225,9 +220,9 @@ class EwsEngineService
 
             // Mark scheduler run as successful
             $run->update([
-                'status'            => 'berhasil',
-                'finished_at'       => now(),
-                'alerts_created'    => $alertsCreated,
+                'status' => 'berhasil',
+                'finished_at' => now(),
+                'alerts_created' => $alertsCreated,
                 'employees_checked' => $employeesChecked,
             ]);
 
@@ -237,8 +232,8 @@ class EwsEngineService
             ]);
 
             $run->update([
-                'status'        => 'gagal',
-                'finished_at'   => now(),
+                'status' => 'gagal',
+                'finished_at' => now(),
                 'error_message' => $e->getMessage()."\n".$e->getTraceAsString(),
             ]);
 
@@ -264,10 +259,31 @@ class EwsEngineService
     }
 
     /**
-     * Buat EwsAlert dan kirim notifikasi jika eligible.
+     * Mengambil tahap paling mendesak yang telah mulai berlaku.
+     * Tahap terakhir tetap berlaku setelah tanggal target lewat agar reminder tidak
+     * berhenti sebelum pegawai membaca notifikasinya.
+     *
+     * @param  list<int>  $stages
+     */
+    private function dueStage(array $stages, int $diffDays): ?int
+    {
+        $stages = array_values(array_unique(array_filter($stages, fn (int $days): bool => $days >= 0)));
+        sort($stages);
+
+        foreach ($stages as $stage) {
+            if ($diffDays <= $stage) {
+                return $stage;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Membuat satu alert EWS dan menyegarkan satu notifikasi in-app selama belum dibaca.
      *
      * @param  bool|null  $isEligible  null = tidak ada eligibility check untuk tipe ini
-     * @param  int|null   $satyalancanayears  milestone dalam tahun; diisi hanya untuk SATYALANCANA
+     * @param  int|null  $satyalancanaYears  milestone dalam tahun; diisi hanya untuk SATYALANCANA
      */
     protected function createAlertIfNotExist(
         Employee $employee,
@@ -276,38 +292,42 @@ class EwsEngineService
         int $days,
         string $titleLabel,
         ?bool $isEligible = null,
-        ?int $satyalancanayears = null,
+        ?int $satyalancanaYears = null,
     ): bool {
-        // Cek duplikasi di query level sebelum menyentuh DB constraint
-        $exists = EwsAlert::where('employee_id', $employee->id)
+        $identity = [
+            'employee_id' => $employee->id,
+            'type' => $type,
+            'target_date' => $targetDate,
+            'interval_days' => $days,
+        ];
+
+        $findAlert = fn () => EwsAlert::query()
+            ->where('employee_id', $employee->id)
             ->where('type', $type)
-            ->where('target_date', $targetDate)
-            ->where('interval_days', $days)
-            ->exists();
+            ->whereDate('target_date', $targetDate)
+            ->where('interval_days', $days);
+        $alert = $findAlert()->first();
+        $wasCreated = false;
 
-        if ($exists) {
-            return false;
+        if ($alert === null) {
+            try {
+                $alert = EwsAlert::create([
+                    ...$identity,
+                    'is_processed' => false,
+                    'is_eligible' => $isEligible,
+                    'satyalancana_years' => $satyalancanaYears,
+                    'followup_status' => EwsAlert::FOLLOWUP_STATUS_ACTIVE,
+                ]);
+                $wasCreated = true;
+            } catch (QueryException $exception) {
+                $alert = $findAlert()->first();
+
+                if ($alert === null) {
+                    throw $exception;
+                }
+            }
         }
 
-        // Try-catch untuk menangani race condition pada concurrent run
-        try {
-            $alert = EwsAlert::create([
-                'employee_id'        => $employee->id,
-                'type'               => $type,
-                'target_date'        => $targetDate,
-                'interval_days'      => $days,
-                'is_processed'       => false,
-                'is_eligible'        => $isEligible,
-                'satyalancana_years' => $satyalancanayears,
-                'followup_status'    => EwsAlert::FOLLOWUP_STATUS_ACTIVE,
-            ]);
-        } catch (QueryException $e) {
-            // Sudah dibuat oleh run bersamaan
-            return false;
-        }
-
-        // Kirim notifikasi ke pegawai dan admin (in-app selalu, email jika channel aktif dan credential terkonfigurasi).
-        // is_eligible tetap disimpan di DB untuk keperluan dashboard dan filtering, bukan sebagai gate notifikasi.
         $timeLabel = $days.' hari';
         if ($days >= 365 && $days % 365 === 0) {
             $timeLabel = ($days / 365).' tahun';
@@ -315,36 +335,33 @@ class EwsEngineService
             $timeLabel = ($days / 30).' bulan';
         }
 
-        $notificationType = 'ews.'.strtolower(str_replace('_', '_', $type));
-
-        // Sertakan keterangan tidak eligible agar penerima mengetahui statusnya.
         $eligibilityNote = ($isEligible === false)
             ? ' Perhatian: pegawai saat ini belum memenuhi syarat eligibilitas.'
             : '';
-
         $body = sprintf(
-            'Pemberitahuan EWS: Jadwal %s Anda jatuh pada %s (sisa sekitar %s). Harap lengkapi berkas.%s',
+            'Pemberitahuan EWS: Jadwal %s Anda jatuh pada %s (tahap pengingat H-%s). Harap lengkapi berkas.%s',
             $titleLabel,
             Carbon::parse($targetDate)->format('d-m-Y'),
             $timeLabel,
-            $eligibilityNote
+            $eligibilityNote,
         );
 
-        $this->notificationService->createForEmployee(
+        $notification = $this->notificationService->upsertEwsReminder(
             $employee,
-            $notificationType,
+            $alert,
+            'ews.'.strtolower($type),
             'Peringatan EWS: '.$titleLabel,
             $body,
             [
                 'ews_alert_id' => $alert->id,
-                'is_eligible'  => $isEligible,
-            ]
+                'is_eligible' => $isEligible,
+            ],
         );
 
-        $alert->update(['notified_at' => now()]);
+        if ($notification !== null && ! $notification->is_read) {
+            $alert->forceFill(['notified_at' => now()])->save();
+        }
 
-        return true;
+        return $wasCreated;
     }
 }
-
-

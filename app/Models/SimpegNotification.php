@@ -13,6 +13,7 @@ use Illuminate\Support\Carbon;
  * @property string $type
  * @property string $title
  * @property string $body
+ * @property string|null $ews_alert_id
  * @property array<string, mixed>|null $data
  * @property bool $is_read
  * @property Carbon|null $read_at
@@ -26,6 +27,7 @@ class SimpegNotification extends Model
 
     protected $fillable = [
         'user_id',
+        'ews_alert_id',
         'type',
         'title',
         'body',

@@ -4,10 +4,12 @@ namespace App\Services;
 
 use App\Jobs\SendSimpegNotificationEmailJob;
 use App\Models\Employee;
+use App\Models\EwsAlert;
 use App\Models\SimpegNotification;
 use App\Services\Notifications\NotificationChannelResolver;
 use App\Services\Notifications\NotificationRecipientResolver;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\QueryException;
 
 class NotificationService
 {
@@ -39,6 +41,86 @@ class NotificationService
         $this->dispatchEmails($employee, $type, $title, $body, $data);
 
         return $notification;
+    }
+
+    /**
+     * Membuat atau menyegarkan satu notifikasi in-app untuk alert EWS yang sama.
+     * Pengiriman email hanya dilakukan ketika notifikasi pertama kali dibuat.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function upsertEwsReminder(
+        Employee $employee,
+        EwsAlert $alert,
+        string $type,
+        string $title,
+        string $body,
+        array $data,
+    ): ?SimpegNotification {
+        if ($alert->notification_acknowledged_at !== null || ! $this->channels->isEnabled('in_app')) {
+            return null;
+        }
+
+        $attributes = [
+            'ews_alert_id' => $alert->id,
+            'type' => $type,
+            'title' => $title,
+            'body' => $body,
+            'data' => $data,
+        ];
+
+        $notification = SimpegNotification::query()
+            ->where('user_id', $employee->id)
+            ->where(function ($query) use ($alert): void {
+                $query->where('ews_alert_id', $alert->id)
+                    ->orWhere('data->ews_alert_id', $alert->id);
+            })
+            ->first();
+
+        if ($notification !== null) {
+            if ($notification->is_read) {
+                $alert->forceFill(['notification_acknowledged_at' => $notification->read_at ?? now()])->save();
+
+                return $notification;
+            }
+
+            $notification->fill($attributes)->save();
+
+            return $notification->refresh();
+        }
+
+        try {
+            $notification = SimpegNotification::create([
+                'user_id' => $employee->id,
+                'ews_alert_id' => $alert->id,
+                ...$attributes,
+            ]);
+        } catch (QueryException) {
+            return SimpegNotification::query()
+                ->where('user_id', $employee->id)
+                ->where('ews_alert_id', $alert->id)
+                ->first();
+        }
+
+        $this->dispatchEmails($employee, $type, $title, $body, $data);
+
+        return $notification;
+    }
+
+    /**
+     * Menandai pengakuan pegawai terhadap alert EWS sehingga reminder tidak dikirim ulang.
+     */
+    private function acknowledgeEwsReminder(SimpegNotification $notification): void
+    {
+        $alertId = $notification->ews_alert_id ?? $notification->data['ews_alert_id'] ?? null;
+        if (! is_string($alertId) || $alertId === '') {
+            return;
+        }
+
+        EwsAlert::query()
+            ->whereKey($alertId)
+            ->whereNull('notification_acknowledged_at')
+            ->update(['notification_acknowledged_at' => now()]);
     }
 
     /**
@@ -80,7 +162,8 @@ class NotificationService
 
         return SimpegNotification::query()
             ->where('user_id', $employeeId)
-            // UUID bersifat acak; urutan kedua hanya untuk stabilitas saat created_at sama, bukan kronologi mutlak.
+            // Notifikasi belum dibaca tetap berada di atas, termasuk EWS yang sudah melewati targetnya.
+            ->orderBy('is_read')
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->limit($limit)
@@ -119,6 +202,7 @@ class NotificationService
                 'is_read' => true,
                 'read_at' => now(),
             ])->save();
+            $this->acknowledgeEwsReminder($notification);
         }
 
         return $notification->refresh();
@@ -130,13 +214,25 @@ class NotificationService
             return 0;
         }
 
-        return SimpegNotification::query()
+        $notifications = SimpegNotification::query()
             ->where('user_id', $employeeId)
             ->unread()
+            ->get();
+
+        $now = now();
+        $updated = SimpegNotification::query()
+            ->whereKey($notifications->modelKeys())
             ->update([
                 'is_read' => true,
-                'read_at' => now(),
-                'updated_at' => now(),
+                'read_at' => $now,
+                'updated_at' => $now,
             ]);
+
+        EwsAlert::query()
+            ->whereIn('id', $notifications->pluck('ews_alert_id')->filter())
+            ->whereNull('notification_acknowledged_at')
+            ->update(['notification_acknowledged_at' => $now]);
+
+        return $updated;
     }
 }

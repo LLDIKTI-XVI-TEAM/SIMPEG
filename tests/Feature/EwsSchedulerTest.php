@@ -11,6 +11,7 @@ use App\Models\RefJenisPegawai;
 use App\Models\SimpegNotification;
 use App\Models\User;
 use App\Services\EwsEngineService;
+use App\Services\Notifications\NotificationRecipientResolver;
 use App\Services\NotificationService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
@@ -101,7 +102,7 @@ class EwsSchedulerTest extends TestCase
         $this->assertNotNull($alert->notified_at);    // notifikasi tetap terkirim
         $this->assertDatabaseHas('notifications', [
             'user_id' => $employee->id,
-            'type'    => 'ews.kenaikan_pangkat',
+            'type' => 'ews.kenaikan_pangkat',
         ]);
     }
 
@@ -115,13 +116,13 @@ class EwsSchedulerTest extends TestCase
         ]);
 
         DisciplineRecord::create([
-            'employee_id'    => $employee->id,
-            'jenis_hukuman'  => 'Sedang',
-            'deskripsi'      => 'Melanggar disiplin jam kerja',
-            'tanggal_mulai'  => now()->subDay()->toDateString(),
-            'no_sk'          => 'SK-DISC-001',
-            'tanggal_sk'     => now()->subDay()->toDateString(),
-            'is_active'      => true,
+            'employee_id' => $employee->id,
+            'jenis_hukuman' => 'Sedang',
+            'deskripsi' => 'Melanggar disiplin jam kerja',
+            'tanggal_mulai' => now()->subDay()->toDateString(),
+            'no_sk' => 'SK-DISC-001',
+            'tanggal_sk' => now()->subDay()->toDateString(),
+            'is_active' => true,
         ]);
 
         app(EwsEngineService::class)->run();
@@ -132,7 +133,7 @@ class EwsSchedulerTest extends TestCase
         $this->assertNotNull($alert->notified_at); // notifikasi tetap terkirim
         $this->assertDatabaseHas('notifications', [
             'user_id' => $employee->id,
-            'type'    => 'ews.kenaikan_pangkat',
+            'type' => 'ews.kenaikan_pangkat',
         ]);
     }
 
@@ -272,16 +273,16 @@ class EwsSchedulerTest extends TestCase
         // is_satyalancana_eligible=false: notifikasi TETAP terkirim, is_eligible=false disimpan.
         $employee = Employee::factory()->create([
             'is_satyalancana_eligible' => false,
-            'satyalancana_note'        => 'Belum memenuhi syarat administrasi.',
+            'satyalancana_note' => 'Belum memenuhi syarat administrasi.',
         ]);
         $tmt = now()->subYears(10)->addDays(90)->toDateString();
 
         Appointment::create([
-            'employee_id'        => $employee->id,
+            'employee_id' => $employee->id,
             'jenis_pengangkatan' => 'PNS',
-            'tmt_pengangkatan'   => $tmt,
-            'no_sk'              => 'SK-SATYA-FLAG',
-            'tanggal_sk'         => $tmt,
+            'tmt_pengangkatan' => $tmt,
+            'no_sk' => 'SK-SATYA-FLAG',
+            'tanggal_sk' => $tmt,
         ]);
 
         app(EwsEngineService::class)->run();
@@ -292,7 +293,7 @@ class EwsSchedulerTest extends TestCase
         $this->assertNotNull($alert->notified_at); // notifikasi tetap terkirim
         $this->assertDatabaseHas('notifications', [
             'user_id' => $employee->id,
-            'type'    => 'ews.satyalancana',
+            'type' => 'ews.satyalancana',
         ]);
     }
 
@@ -300,7 +301,7 @@ class EwsSchedulerTest extends TestCase
     {
         $employee = Employee::factory()->create([
             'tanggal_kenaikan_pangkat_berikutnya' => now()->addDays(90)->toDateString(),
-            'is_kinerja_baik'                     => true,
+            'is_kinerja_baik' => true,
         ]);
 
         app(EwsEngineService::class)->run();
@@ -333,11 +334,11 @@ class EwsSchedulerTest extends TestCase
         $tmt = now()->subYears(10)->addDays(90)->toDateString();
 
         Appointment::create([
-            'employee_id'        => $employee->id,
+            'employee_id' => $employee->id,
             'jenis_pengangkatan' => 'PNS',
-            'tmt_pengangkatan'   => $tmt,
-            'no_sk'              => 'SK-SATYA-YEARS',
-            'tanggal_sk'         => $tmt,
+            'tmt_pengangkatan' => $tmt,
+            'no_sk' => 'SK-SATYA-YEARS',
+            'tanggal_sk' => $tmt,
         ]);
 
         app(EwsEngineService::class)->run();
@@ -354,7 +355,7 @@ class EwsSchedulerTest extends TestCase
         // (2) ews.satyalancana aktif di email whitelist (via resolver)
         $adminEmployee = Employee::factory()->create();
         User::factory()->create([
-            'role'        => 'admin_kepegawaian',
+            'role' => 'admin_kepegawaian',
             'employee_id' => $adminEmployee->id,
         ]);
 
@@ -364,11 +365,11 @@ class EwsSchedulerTest extends TestCase
         $tmt = now()->subYears(10)->addDays(90)->toDateString();
 
         Appointment::create([
-            'employee_id'        => $employee->id,
+            'employee_id' => $employee->id,
             'jenis_pengangkatan' => 'PNS',
-            'tmt_pengangkatan'   => $tmt,
-            'no_sk'              => 'SK-SATYA-FANOUT',
-            'tanggal_sk'         => $tmt,
+            'tmt_pengangkatan' => $tmt,
+            'no_sk' => 'SK-SATYA-FANOUT',
+            'tanggal_sk' => $tmt,
         ]);
 
         app(EwsEngineService::class)->run();
@@ -376,12 +377,12 @@ class EwsSchedulerTest extends TestCase
         // Pegawai dapat notif in-app
         $this->assertDatabaseHas('notifications', [
             'user_id' => $employee->id,
-            'type'    => 'ews.satyalancana',
+            'type' => 'ews.satyalancana',
         ]);
 
         // Admin TIDAK mendapat in-app (fan-out admin hanya lewat email queue)
         // Verifikasi bahwa ews.satyalancana ada di whitelist email resolver
-        $resolver = app(\App\Services\Notifications\NotificationRecipientResolver::class);
+        $resolver = app(NotificationRecipientResolver::class);
         $this->assertTrue($resolver->emailEnabled('ews.satyalancana'));
     }
 
@@ -391,7 +392,7 @@ class EwsSchedulerTest extends TestCase
         // Email terkirim jika credential SMTP sudah dikonfigurasi di RefNotificationChannel.
         $adminEmployee = Employee::factory()->create();
         User::factory()->create([
-            'role'        => 'admin_kepegawaian',
+            'role' => 'admin_kepegawaian',
             'employee_id' => $adminEmployee->id,
         ]);
 
@@ -401,11 +402,11 @@ class EwsSchedulerTest extends TestCase
         $tmt = now()->subYears(10)->addDays(90)->toDateString();
 
         Appointment::create([
-            'employee_id'        => $employee->id,
+            'employee_id' => $employee->id,
             'jenis_pengangkatan' => 'PNS',
-            'tmt_pengangkatan'   => $tmt,
-            'no_sk'              => 'SK-SATYA-NO-FANOUT',
-            'tanggal_sk'         => $tmt,
+            'tmt_pengangkatan' => $tmt,
+            'no_sk' => 'SK-SATYA-NO-FANOUT',
+            'tanggal_sk' => $tmt,
         ]);
 
         app(EwsEngineService::class)->run();
@@ -413,7 +414,7 @@ class EwsSchedulerTest extends TestCase
         // Pegawai tetap dapat notif in-app meski not eligible
         $this->assertDatabaseHas('notifications', [
             'user_id' => $employee->id,
-            'type'    => 'ews.satyalancana',
+            'type' => 'ews.satyalancana',
         ]);
     }
 
@@ -430,6 +431,46 @@ class EwsSchedulerTest extends TestCase
         // Run second time
         app(EwsEngineService::class)->run();
         $this->assertSame(1, EwsAlert::count()); // Still 1 due to duplicate prevention
+    }
+
+    public function test_scheduler_refreshes_one_unread_ews_reminder_after_target_date_without_duplication(): void
+    {
+        $employee = Employee::factory()->create([
+            'tanggal_kgb_berikutnya' => now()->subDay()->toDateString(),
+        ]);
+
+        app(EwsEngineService::class)->run();
+        $alert = EwsAlert::where('employee_id', $employee->id)->where('type', 'KGB')->firstOrFail();
+        $notification = SimpegNotification::where('ews_alert_id', $alert->id)->firstOrFail();
+        $firstNotifiedAt = $alert->notified_at;
+
+        $this->travel(5)->minutes();
+        app(EwsEngineService::class)->run();
+
+        $this->assertSame(1, EwsAlert::where('employee_id', $employee->id)->where('type', 'KGB')->count());
+        $this->assertSame(1, SimpegNotification::where('ews_alert_id', $alert->id)->count());
+        $this->assertSame($notification->id, SimpegNotification::where('ews_alert_id', $alert->id)->firstOrFail()->id);
+        $this->assertTrue($alert->refresh()->notified_at->greaterThan($firstNotifiedAt));
+    }
+
+    public function test_scheduler_stops_refreshing_ews_reminder_after_employee_reads_it(): void
+    {
+        $employee = Employee::factory()->create([
+            'tanggal_kgb_berikutnya' => now()->subDay()->toDateString(),
+        ]);
+
+        app(EwsEngineService::class)->run();
+        $alert = EwsAlert::where('employee_id', $employee->id)->where('type', 'KGB')->firstOrFail();
+        $notification = SimpegNotification::where('ews_alert_id', $alert->id)->firstOrFail();
+        $notification->update(['is_read' => true, 'read_at' => now()]);
+        $firstNotifiedAt = $alert->notified_at;
+
+        $this->travel(5)->minutes();
+        app(EwsEngineService::class)->run();
+
+        $this->assertSame(1, SimpegNotification::where('ews_alert_id', $alert->id)->count());
+        $this->assertSame($firstNotifiedAt->toDateTimeString(), $alert->refresh()->notified_at->toDateTimeString());
+        $this->assertNotNull($alert->notification_acknowledged_at);
     }
 
     public function test_scheduler_records_failure_and_notifies_super_admin(): void
@@ -458,9 +499,9 @@ class EwsSchedulerTest extends TestCase
         $notificationMock = $this->mock(NotificationService::class);
 
         /** @var Expectation $kgbNotificationExpectation */
-        $kgbNotificationExpectation = $notificationMock->shouldReceive('createForEmployee');
+        $kgbNotificationExpectation = $notificationMock->shouldReceive('upsertEwsReminder');
         $kgbNotificationExpectation
-            ->with(\Mockery::any(), 'ews.kgb', \Mockery::any(), \Mockery::any(), \Mockery::any())
+            ->with(\Mockery::any(), \Mockery::any(), 'ews.kgb', \Mockery::any(), \Mockery::any(), \Mockery::any())
             ->once()
             ->andThrow(new \RuntimeException('Service failure simulation'));
 
