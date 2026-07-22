@@ -18,7 +18,7 @@ class NotificationRecipientResolver
      */
     public function additionalRecipients(Employee $primaryRecipient, string $type, ?array $data = null): Collection
     {
-        if (! str_starts_with($type, 'ews.')) {
+        if (! str_starts_with($type, 'ews.') || $type === 'ews.scheduler_failed') {
             return collect();
         }
 
@@ -43,30 +43,18 @@ class NotificationRecipientResolver
         return $this->emailEnabled($type);
     }
 
-    /**
-     * Menentukan jenis notifikasi yang memakai email; keputusan cuti perlu perubahan dan tidak disetujui dikirim agar pegawai segera menindaklanjuti statusnya.
-     */
+    /** Menyerahkan keputusan email sepenuhnya ke kebijakan event-channel dua lapis. */
     public function emailEnabled(string $type): bool
     {
-        return $this->channels->isEnabled('email') && in_array($type, [
-            'cuti.pengajuan_baru',
-            'cuti.menunggu_persetujuan',
-            'cuti.disetujui',
-            'cuti.ditunda',
-            'cuti.perlu_perubahan',
-            'cuti.tidak_disetujui',
-            'ews.kenaikan_pangkat',
-            'ews.kgb',
-            'ews.pensiun',
-            'ews.kontrak_pppk',
-        ], true);
+        return $this->channels->isEnabledForEvent($type, 'email');
     }
 
     /** @return Collection<int, Employee> */
     private function adminRecipients(): Collection
     {
         return User::query()
-            ->whereIn('role', ['super_admin', 'admin_kepegawaian'])
+            // EWS rutin hanya perlu ditindaklanjuti Admin Kepegawaian; Super Admin khusus kegagalan scheduler.
+            ->where('role', 'admin_kepegawaian')
             ->whereNotNull('employee_id')
             ->with('employee')
             ->get()

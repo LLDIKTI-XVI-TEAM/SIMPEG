@@ -8,11 +8,13 @@ use App\Jobs\SendSimpegNotificationEmailJob;
 use App\Mail\SimpegNotificationMail;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
+use App\Models\NotificationEventChannel;
 use App\Models\RefJenisCuti;
 use App\Models\RefNotificationChannel;
 use App\Models\SimpegNotification;
 use App\Models\User;
 use App\Services\NotificationService;
+use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobFailed;
@@ -27,9 +29,255 @@ class EmailNotificationTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_email_diantrekan_saat_channel_global_dan_kebijakan_event_aktif(): void
+    {
+        Queue::fake();
+        $this->setEventChannelPolicy('cuti.pengajuan_baru', 'email', true);
+        $this->setEventChannelPolicy('cuti.pengajuan_baru', 'in_app', true);
+        $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+
+        app(NotificationService::class)->createForEmployee(
+            employee: $employee,
+            type: 'cuti.pengajuan_baru',
+            title: 'Pengajuan Cuti Menunggu Persetujuan',
+            body: 'Pegawai mengajukan cuti.',
+        );
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $employee->id,
+            'type' => 'cuti.pengajuan_baru',
+        ]);
+        Queue::assertPushed(SendSimpegNotificationEmailJob::class, 1);
+    }
+
+    public function test_kebijakan_email_yang_tidak_ada_memblokir_email_tetapi_in_app_tetap_tersimpan(): void
+    {
+        Queue::fake();
+        $this->setEventChannelPolicy('cuti.pengajuan_baru', 'in_app', true);
+        $this->deleteEventChannelPolicy('cuti.pengajuan_baru', 'email');
+        $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+
+        app(NotificationService::class)->createForEmployee(
+            employee: $employee,
+            type: 'cuti.pengajuan_baru',
+            title: 'Pengajuan Cuti Menunggu Persetujuan',
+            body: 'Pegawai mengajukan cuti.',
+        );
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $employee->id,
+            'type' => 'cuti.pengajuan_baru',
+        ]);
+        Queue::assertNotPushed(SendSimpegNotificationEmailJob::class);
+    }
+
+    public function test_kebijakan_email_nonaktif_memblokir_email_tetapi_in_app_tetap_tersimpan(): void
+    {
+        Queue::fake();
+        $this->setEventChannelPolicy('cuti.pengajuan_baru', 'email', false);
+        $this->setEventChannelPolicy('cuti.pengajuan_baru', 'in_app', true);
+        $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+
+        app(NotificationService::class)->createForEmployee(
+            employee: $employee,
+            type: 'cuti.pengajuan_baru',
+            title: 'Pengajuan Cuti Menunggu Persetujuan',
+            body: 'Pegawai mengajukan cuti.',
+        );
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $employee->id,
+            'type' => 'cuti.pengajuan_baru',
+        ]);
+        Queue::assertNotPushed(SendSimpegNotificationEmailJob::class);
+    }
+
+    public function test_channel_global_email_nonaktif_memblokir_email_walau_kebijakan_event_aktif(): void
+    {
+        Queue::fake();
+        $this->setEventChannelPolicy('cuti.pengajuan_baru', 'email', true);
+        $this->setEventChannelPolicy('cuti.pengajuan_baru', 'in_app', true);
+        RefNotificationChannel::query()->where('code', 'email')->update(['is_enabled' => false]);
+        $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+
+        app(NotificationService::class)->createForEmployee(
+            employee: $employee,
+            type: 'cuti.pengajuan_baru',
+            title: 'Pengajuan Cuti Menunggu Persetujuan',
+            body: 'Pegawai mengajukan cuti.',
+        );
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $employee->id,
+            'type' => 'cuti.pengajuan_baru',
+        ]);
+        Queue::assertNotPushed(SendSimpegNotificationEmailJob::class);
+    }
+
+    public function test_kebijakan_in_app_yang_tidak_ada_memblokir_persist_tetapi_email_tetap_diantrekan(): void
+    {
+        Queue::fake();
+        $this->setEventChannelPolicy('cuti.pengajuan_baru', 'email', true);
+        $this->deleteEventChannelPolicy('cuti.pengajuan_baru', 'in_app');
+        $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+
+        $notification = app(NotificationService::class)->createForEmployee(
+            employee: $employee,
+            type: 'cuti.pengajuan_baru',
+            title: 'Pengajuan Cuti Menunggu Persetujuan',
+            body: 'Pegawai mengajukan cuti.',
+        );
+
+        $this->assertNull($notification);
+        $this->assertDatabaseMissing('notifications', ['user_id' => $employee->id]);
+        Queue::assertPushed(SendSimpegNotificationEmailJob::class, 1);
+    }
+
+    public function test_kebijakan_in_app_nonaktif_memblokir_persist_tetapi_email_tetap_diantrekan(): void
+    {
+        Queue::fake();
+        $this->setEventChannelPolicy('cuti.pengajuan_baru', 'email', true);
+        $this->setEventChannelPolicy('cuti.pengajuan_baru', 'in_app', false);
+        $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+
+        $notification = app(NotificationService::class)->createForEmployee(
+            employee: $employee,
+            type: 'cuti.pengajuan_baru',
+            title: 'Pengajuan Cuti Menunggu Persetujuan',
+            body: 'Pegawai mengajukan cuti.',
+        );
+
+        $this->assertNull($notification);
+        $this->assertDatabaseMissing('notifications', ['user_id' => $employee->id]);
+        Queue::assertPushed(SendSimpegNotificationEmailJob::class, 1);
+    }
+
+    public function test_channel_global_in_app_nonaktif_memblokir_persist_walau_kebijakan_event_aktif(): void
+    {
+        Queue::fake();
+        $this->setEventChannelPolicy('cuti.pengajuan_baru', 'email', true);
+        $this->setEventChannelPolicy('cuti.pengajuan_baru', 'in_app', true);
+        RefNotificationChannel::query()->where('code', 'in_app')->update(['is_enabled' => false]);
+        $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+
+        $notification = app(NotificationService::class)->createForEmployee(
+            employee: $employee,
+            type: 'cuti.pengajuan_baru',
+            title: 'Pengajuan Cuti Menunggu Persetujuan',
+            body: 'Pegawai mengajukan cuti.',
+        );
+
+        $this->assertNull($notification);
+        $this->assertDatabaseMissing('notifications', ['user_id' => $employee->id]);
+        Queue::assertPushed(SendSimpegNotificationEmailJob::class, 1);
+    }
+
+    public function test_ews_normal_mengirim_in_app_dan_email_hanya_ke_pegawai_dan_admin_kepegawaian(): void
+    {
+        Queue::fake();
+        $this->enableEventChannels('ews.kgb');
+        $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+        $adminEmployee = Employee::factory()->create(['email' => 'admin@example.test']);
+        $superEmployee = Employee::factory()->create(['email' => 'super@example.test']);
+        User::factory()->adminKepegawaian()->create(['employee_id' => $adminEmployee->id]);
+        User::factory()->superAdmin()->create(['employee_id' => $superEmployee->id]);
+
+        app(NotificationService::class)->createForEmployee(
+            employee: $employee,
+            type: 'ews.kgb',
+            title: 'Peringatan EWS: KGB',
+            body: 'Jadwal KGB mendekat.',
+            data: ['ews_alert_id' => 'alert-1'],
+        );
+
+        $this->assertDatabaseHas('notifications', ['user_id' => $employee->id, 'type' => 'ews.kgb']);
+        $this->assertDatabaseHas('notifications', ['user_id' => $adminEmployee->id, 'type' => 'ews.kgb']);
+        $this->assertDatabaseMissing('notifications', ['user_id' => $superEmployee->id, 'type' => 'ews.kgb']);
+        Queue::assertPushed(SendSimpegNotificationEmailJob::class, 2);
+        Queue::assertPushed(SendSimpegNotificationEmailJob::class, fn (SendSimpegNotificationEmailJob $job): bool => $job->employeeId === $employee->id);
+        Queue::assertPushed(SendSimpegNotificationEmailJob::class, fn (SendSimpegNotificationEmailJob $job): bool => $job->employeeId === $adminEmployee->id);
+        Queue::assertNotPushed(SendSimpegNotificationEmailJob::class, fn (SendSimpegNotificationEmailJob $job): bool => $job->employeeId === $superEmployee->id);
+    }
+
+    public function test_ews_satyalancana_mengirim_in_app_dan_email_hanya_ke_pegawai_dan_admin_kepegawaian(): void
+    {
+        Queue::fake();
+        $this->enableEventChannels('ews.satyalancana');
+        $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+        $adminEmployee = Employee::factory()->create(['email' => 'admin@example.test']);
+        $superEmployee = Employee::factory()->create(['email' => 'super@example.test']);
+        User::factory()->adminKepegawaian()->create(['employee_id' => $adminEmployee->id]);
+        User::factory()->superAdmin()->create(['employee_id' => $superEmployee->id]);
+
+        app(NotificationService::class)->createForEmployee(
+            employee: $employee,
+            type: 'ews.satyalancana',
+            title: 'Peringatan EWS: Satyalancana',
+            body: 'Milestone Satyalancana mendekat.',
+            data: ['ews_alert_id' => 'alert-satya-1'],
+        );
+
+        $this->assertDatabaseHas('notifications', ['user_id' => $employee->id, 'type' => 'ews.satyalancana']);
+        $this->assertDatabaseHas('notifications', ['user_id' => $adminEmployee->id, 'type' => 'ews.satyalancana']);
+        $this->assertDatabaseMissing('notifications', ['user_id' => $superEmployee->id, 'type' => 'ews.satyalancana']);
+        Queue::assertPushed(SendSimpegNotificationEmailJob::class, 2);
+        Queue::assertPushed(SendSimpegNotificationEmailJob::class, fn (SendSimpegNotificationEmailJob $job): bool => $job->employeeId === $employee->id);
+        Queue::assertPushed(SendSimpegNotificationEmailJob::class, fn (SendSimpegNotificationEmailJob $job): bool => $job->employeeId === $adminEmployee->id);
+        Queue::assertNotPushed(SendSimpegNotificationEmailJob::class, fn (SendSimpegNotificationEmailJob $job): bool => $job->employeeId === $superEmployee->id);
+    }
+
+    public function test_scheduler_failure_mengirim_in_app_hanya_ke_super_admin_yang_diberikan_sebagai_penerima_utama(): void
+    {
+        Queue::fake();
+        $this->seed(ReferenceSeeder::class);
+        $superEmployee = Employee::factory()->create(['email' => 'super@example.test']);
+        User::factory()->superAdmin()->create(['employee_id' => $superEmployee->id]);
+
+        $notification = app(NotificationService::class)->createForEmployee(
+            employee: $superEmployee,
+            type: 'ews.scheduler_failed',
+            title: 'Gagal Eksekusi Scheduler EWS',
+            body: 'Scheduler EWS harian gagal berjalan.',
+        );
+
+        $this->assertNotNull($notification);
+        $this->assertDatabaseCount('notifications', 1);
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $superEmployee->id,
+            'type' => 'ews.scheduler_failed',
+        ]);
+        Queue::assertNotPushed(SendSimpegNotificationEmailJob::class);
+    }
+
+    public function test_cuti_tetap_hanya_mengirim_in_app_dan_email_ke_penerima_utama(): void
+    {
+        Queue::fake();
+        $this->enableEventChannels('cuti.pengajuan_baru');
+        $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+        $adminEmployee = Employee::factory()->create(['email' => 'admin@example.test']);
+        $superEmployee = Employee::factory()->create(['email' => 'super@example.test']);
+        User::factory()->adminKepegawaian()->create(['employee_id' => $adminEmployee->id]);
+        User::factory()->superAdmin()->create(['employee_id' => $superEmployee->id]);
+
+        app(NotificationService::class)->createForEmployee(
+            employee: $employee,
+            type: 'cuti.pengajuan_baru',
+            title: 'Pengajuan Cuti Menunggu Persetujuan',
+            body: 'Pegawai mengajukan cuti.',
+        );
+
+        $this->assertDatabaseCount('notifications', 1);
+        $this->assertDatabaseHas('notifications', ['user_id' => $employee->id, 'type' => 'cuti.pengajuan_baru']);
+        $this->assertDatabaseMissing('notifications', ['user_id' => $adminEmployee->id, 'type' => 'cuti.pengajuan_baru']);
+        $this->assertDatabaseMissing('notifications', ['user_id' => $superEmployee->id, 'type' => 'cuti.pengajuan_baru']);
+        Queue::assertPushed(SendSimpegNotificationEmailJob::class, 1);
+        Queue::assertPushed(SendSimpegNotificationEmailJob::class, fn (SendSimpegNotificationEmailJob $job): bool => $job->employeeId === $employee->id);
+    }
+
     public function test_cuti_submission_queues_email_to_primary_recipient(): void
     {
         Queue::fake();
+        $this->enableEventChannels('cuti.pengajuan_baru');
         $employee = Employee::factory()->create(['email' => 'atasan@example.test']);
 
         app(NotificationService::class)->createForEmployee(
@@ -50,6 +298,7 @@ class EmailNotificationTest extends TestCase
     public function test_disabled_email_channel_keeps_in_app_notification_but_does_not_queue_email(): void
     {
         Queue::fake();
+        $this->enableEventChannels('cuti.pengajuan_baru');
         RefNotificationChannel::query()->where('code', 'email')->update(['is_enabled' => false]);
         $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
 
@@ -70,6 +319,7 @@ class EmailNotificationTest extends TestCase
     public function test_disabled_in_app_channel_keeps_email_delivery_available(): void
     {
         Queue::fake();
+        $this->enableEventChannels('cuti.pengajuan_baru');
         RefNotificationChannel::query()->where('code', 'in_app')->update(['is_enabled' => false]);
         $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
 
@@ -88,6 +338,7 @@ class EmailNotificationTest extends TestCase
     public function test_cuti_revision_request_queues_email_to_primary_recipient(): void
     {
         Queue::fake();
+        $this->enableEventChannels('cuti.perlu_perubahan');
         $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
 
         app(NotificationService::class)->createForEmployee(
@@ -108,6 +359,7 @@ class EmailNotificationTest extends TestCase
     public function test_cuti_decline_queues_email_to_primary_recipient(): void
     {
         Queue::fake();
+        $this->enableEventChannels('cuti.tidak_disetujui');
         $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
 
         app(NotificationService::class)->createForEmployee(
@@ -125,9 +377,10 @@ class EmailNotificationTest extends TestCase
         );
     }
 
-    public function test_ews_email_goes_to_employee_admin_kepegawaian_and_super_admin(): void
+    public function test_ews_email_goes_to_employee_and_admin_kepegawaian_but_not_super_admin(): void
     {
         Queue::fake();
+        $this->enableEventChannels('ews.kgb');
         $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
         $adminEmployee = Employee::factory()->create(['email' => 'admin@example.test']);
         $superEmployee = Employee::factory()->create(['email' => 'super@example.test']);
@@ -144,20 +397,19 @@ class EmailNotificationTest extends TestCase
             data: ['ews_alert_id' => 'alert-1'],
         );
 
-        Queue::assertPushed(SendSimpegNotificationEmailJob::class, 3);
+        Queue::assertPushed(SendSimpegNotificationEmailJob::class, 2);
         Queue::assertPushed(SendSimpegNotificationEmailJob::class, fn (SendSimpegNotificationEmailJob $job): bool => $job->employeeId === $employee->id);
         Queue::assertPushed(SendSimpegNotificationEmailJob::class, fn (SendSimpegNotificationEmailJob $job): bool => $job->employeeId === $adminEmployee->id);
-        Queue::assertPushed(SendSimpegNotificationEmailJob::class, fn (SendSimpegNotificationEmailJob $job): bool => $job->employeeId === $superEmployee->id);
+        Queue::assertNotPushed(SendSimpegNotificationEmailJob::class, fn (SendSimpegNotificationEmailJob $job): bool => $job->employeeId === $superEmployee->id);
         Queue::assertNotPushed(SendSimpegNotificationEmailJob::class, fn (SendSimpegNotificationEmailJob $job): bool => $job->employeeId === $pimpinanEmployee->id);
     }
 
     public function test_ews_email_recipients_are_deduplicated(): void
     {
         Queue::fake();
+        $this->enableEventChannels('ews.kgb');
         $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
-        $superEmployee = Employee::factory()->create(['email' => 'super@example.test']);
         User::factory()->adminKepegawaian()->create(['employee_id' => $employee->id]);
-        User::factory()->superAdmin()->create(['employee_id' => $superEmployee->id]);
 
         app(NotificationService::class)->createForEmployee(
             employee: $employee,
@@ -167,14 +419,14 @@ class EmailNotificationTest extends TestCase
             data: ['ews_alert_id' => 'alert-1'],
         );
 
-        Queue::assertPushed(SendSimpegNotificationEmailJob::class, 2);
+        Queue::assertPushed(SendSimpegNotificationEmailJob::class, 1);
         Queue::assertPushed(SendSimpegNotificationEmailJob::class, fn (SendSimpegNotificationEmailJob $job): bool => $job->employeeId === $employee->id);
-        Queue::assertPushed(SendSimpegNotificationEmailJob::class, fn (SendSimpegNotificationEmailJob $job): bool => $job->employeeId === $superEmployee->id);
     }
 
     public function test_non_eligible_promotion_does_not_queue_email_until_admin_policy_is_decided(): void
     {
         Queue::fake();
+        $this->enableEventChannels('ews.kenaikan_pangkat');
         $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
         $adminEmployee = Employee::factory()->create(['email' => 'admin@example.test']);
         $superEmployee = Employee::factory()->create(['email' => 'super@example.test']);
@@ -254,6 +506,7 @@ class EmailNotificationTest extends TestCase
     public function test_persetujuan_final_dan_notifikasi_in_app_tetap_committed_sebelum_email_diproses(): void
     {
         Queue::fake();
+        $this->enableEventChannels('cuti.disetujui');
         $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
         $pybmc = Employee::factory()->create();
         $leave = $this->makeLeaveRequestWithSteps($employee, [$pybmc]);
@@ -294,6 +547,7 @@ class EmailNotificationTest extends TestCase
     public function test_cuti_decline_notification_carries_internal_detail_url(): void
     {
         Queue::fake();
+        $this->enableEventChannels('cuti.tidak_disetujui');
         $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
         $approver = Employee::factory()->create();
         $leave = $this->makeLeaveRequestWithSteps($employee, [$approver]);
@@ -313,6 +567,7 @@ class EmailNotificationTest extends TestCase
     public function test_intermediate_approval_notifies_next_approver_with_internal_approval_url(): void
     {
         Queue::fake();
+        $this->enableEventChannels('cuti.menunggu_persetujuan');
         $employee = Employee::factory()->create();
         $kepalaBagian = Employee::factory()->create(['email' => 'kabag@example.test']);
         $pybmc = Employee::factory()->create(['email' => 'pybmc@example.test']);
@@ -391,5 +646,42 @@ class EmailNotificationTest extends TestCase
         }
 
         return $leave;
+    }
+
+    /**
+     * Menetapkan satu pasangan event-channel agar test mengunci kebijakan delivery dua lapis berbasis DB.
+     */
+    private function setEventChannelPolicy(string $eventKey, string $channelCode, bool $isEnabled): void
+    {
+        $channel = RefNotificationChannel::query()->where('code', $channelCode)->firstOrFail();
+
+        NotificationEventChannel::query()->updateOrCreate([
+            'event_key' => $eventKey,
+            'notification_channel_id' => $channel->id,
+        ], [
+            'is_enabled' => $isEnabled,
+        ]);
+    }
+
+    /**
+     * Menghapus pasangan tertentu agar test dapat membuktikan perilaku fail-closed saat kebijakan hilang.
+     */
+    private function deleteEventChannelPolicy(string $eventKey, string $channelCode): void
+    {
+        $channelId = RefNotificationChannel::query()->where('code', $channelCode)->value('id');
+
+        NotificationEventChannel::query()
+            ->where('event_key', $eventKey)
+            ->where('notification_channel_id', $channelId)
+            ->delete();
+    }
+
+    /**
+     * Mengaktifkan dua channel efektif yang diwajibkan untuk event cuti dan EWS yang didukung.
+     */
+    private function enableEventChannels(string $eventKey): void
+    {
+        $this->setEventChannelPolicy($eventKey, 'in_app', true);
+        $this->setEventChannelPolicy($eventKey, 'email', true);
     }
 }
