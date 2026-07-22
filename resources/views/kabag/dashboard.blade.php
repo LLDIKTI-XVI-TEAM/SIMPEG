@@ -156,7 +156,7 @@
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
         
         {{-- WIDGET: Pengajuan Cuti Pending --}}
-        <x-ui.card padding="none" class="overflow-hidden flex flex-col justify-between">
+        <x-ui.card padding="none" class="overflow-hidden flex flex-col justify-between" x-data="{ confirmOpen: false, selectedLeaveId: '', selectedEmployeeName: '' }">
             <div>
                 <div class="px-6 py-5 border-b border-border/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface">
                     <div>
@@ -174,7 +174,8 @@
                         <x-ui.table-head>
                             <x-ui.table-row>
                                 <x-ui.table-th padding="lg">Pegawai</x-ui.table-th>
-                                <x-ui.table-th align="right" padding="lg">Keterangan</x-ui.table-th>
+                                <x-ui.table-th padding="lg">Keterangan</x-ui.table-th>
+                                <x-ui.table-th align="right" padding="lg">Aksi</x-ui.table-th>
                             </x-ui.table-row>
                         </x-ui.table-head>
                         <x-ui.table-body>
@@ -195,13 +196,32 @@
                                         </div>
                                     </div>
                                 </x-ui.table-td>
-                                <x-ui.table-td align="right" class="px-6 py-3.5">
+                                <x-ui.table-td class="px-6 py-3.5">
                                     <p class="text-xs text-muted font-sans leading-none">{{ $leave->jenisCuti?->nama ?? '-' }} · {{ $leave->jumlah_hari_kerja }} hari kerja · {{ $leave->tanggal_mulai?->translatedFormat('d M') ?? '-' }}–{{ $leave->tanggal_selesai?->translatedFormat('d M Y') ?? '-' }}</p>
+                                </x-ui.table-td>
+                                <x-ui.table-td align="right" class="px-6 py-3.5">
+                                    <div class="flex items-center justify-end gap-1.5">
+                                        <x-ui.tooltip text="Setujui Pengajuan" position="top-end">
+                                            <button type="button" @click="selectedLeaveId = '{{ $leave->id }}'; selectedEmployeeName = '{{ addslashes($leave->employee?->nama_lengkap ?? '') }}'; confirmOpen = true" class="flex h-7 w-7 items-center justify-center rounded-md bg-success/10 text-success transition hover:bg-success/20 border border-success/20 focus:outline-none focus:ring-2 focus:ring-success/30" aria-label="Setujui pengajuan cuti {{ $leave->employee?->nama_lengkap }}">
+                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                                                </svg>
+                                            </button>
+                                        </x-ui.tooltip>
+                                        <x-ui.tooltip text="Tinjau Detail & Opsi Lain" position="top-end">
+                                            <a href="{{ route('kepala-bagian.cuti.show', $leave) }}" class="flex h-7 w-7 items-center justify-center rounded-md border border-border bg-surface text-primary transition hover:bg-soft shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Tinjau detail cuti">
+                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"></path>
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                                </svg>
+                                            </a>
+                                        </x-ui.tooltip>
+                                    </div>
                                 </x-ui.table-td>
                             </x-ui.table-row>
                             @empty
                             <x-ui.table-row>
-                                <x-ui.table-td colspan="2" class="px-6 py-8 text-center text-sm text-muted">
+                                <x-ui.table-td colspan="3" class="px-6 py-8 text-center text-sm text-muted">
                                     Tidak ada pengajuan cuti yang menunggu tindakan Anda.
                                 </x-ui.table-td>
                             </x-ui.table-row>
@@ -210,6 +230,18 @@
                     </x-ui.table>
                 </div>
             </div>
+
+            <x-ui.modal show="confirmOpen" close-action="confirmOpen = false" title="Konfirmasi Persetujuan Cuti">
+                <p class="text-sm text-ink">Setujui pengajuan cuti untuk <span class="font-bold text-ink" x-text="selectedEmployeeName"></span>? Pengajuan akan diteruskan ke approver berikutnya.</p>
+                <div class="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                    <x-ui.button type="button" @click="confirmOpen = false" variant="secondary">Batal</x-ui.button>
+                    <form method="POST" :action="'/kepala-bagian/cuti/' + selectedLeaveId + '/keputusan'">
+                        @csrf
+                        <input type="hidden" name="keputusan" value="DISETUJUI">
+                        <x-ui.button type="submit" variant="success">Ya, Setujui</x-ui.button>
+                    </form>
+                </div>
+            </x-ui.modal>
         </x-ui.card>
 
         {{-- WIDGET: EWS Bawahan --}}

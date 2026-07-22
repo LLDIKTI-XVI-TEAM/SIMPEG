@@ -12,10 +12,9 @@
     </div>
 
     <x-ui.alert variant="info" title="Informasi Cuti" class="mb-6">
-        Daftar ini memuat seluruh riwayat dan pengajuan cuti dari bawahan langsung Anda.
+        Daftar ini memuat pengajuan cuti dari bawahan langsung Anda. Gunakan filter di bawah untuk menyaring data.
     </x-ui.alert>
 
-    <!-- FILTER & PENCARIAN -->
     <!-- FILTER & PENCARIAN -->
     <form method="GET" action="{{ route('kepala-bagian.cuti.index') }}" id="filter-form" class="mb-6">
         <input type="hidden" name="per_page" value="{{ request('per_page', 10) }}">
@@ -24,7 +23,7 @@
             <!-- Filter Status -->
             <div>
                 <x-form.select size="md" name="status" id="status" onchange="this.form.submit()">
-                    <option value="">Semua Status</option>
+                    <option value="all" @selected(($filters['status'] ?? '') === 'all' || is_null($filters['status'] ?? null))>Semua Status</option>
                     <option value="menunggu_approval" @selected(($filters['status'] ?? '') === 'menunggu_approval')>Menunggu Keputusan</option>
                     <option value="disetujui" @selected(($filters['status'] ?? '') === 'disetujui')>Disetujui</option>
                     <option value="perlu_perubahan" @selected(($filters['status'] ?? '') === 'perlu_perubahan')>Perubahan</option>

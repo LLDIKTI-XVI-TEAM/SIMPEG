@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Cuti;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class KepalaBagianLeaveFilterRequest extends FormRequest
 {
@@ -18,7 +19,8 @@ class KepalaBagianLeaveFilterRequest extends FormRequest
             'tahun' => ['nullable', 'integer', 'min:2000', 'max:2100'],
             'bulan' => ['nullable', 'integer', 'between:1,12'],
             'jenis_cuti_id' => ['nullable', 'uuid', 'exists:ref_jenis_cuti,id'],
-            'status' => ['nullable', 'string', 'in:menunggu_approval,disetujui,ditolak,dibatalkan,ditangguhkan'],
+            'status' => ['nullable', 'string', Rule::in(['menunggu_approval', 'disetujui', 'perlu_perubahan', 'ditangguhkan', 'tidak_disetujui', 'all'])],
+            'per_page' => ['nullable', 'integer', Rule::in([10, 25, 50])],
         ];
     }
 }

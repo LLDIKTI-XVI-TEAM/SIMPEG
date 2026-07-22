@@ -565,6 +565,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->prefix('kepala-bagian')
         ->name('kepala-bagian.')
         ->group(function (): void {
+            Route::get('/', fn () => redirect()->route('kepala-bagian.dashboard'));
             Route::get('/dashboard', [KepalaBagianDashboardController::class, 'index'])->name('dashboard');
 
             Route::get('/bawahan', [KepalaBagianEmployeeController::class, 'index'])->name('bawahan.index');

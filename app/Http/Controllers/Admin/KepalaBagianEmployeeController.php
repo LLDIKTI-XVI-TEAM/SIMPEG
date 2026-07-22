@@ -9,19 +9,32 @@ use App\Http\Requests\Employee\KepalaBagianEmployeeFilterRequest;
 use App\Models\Employee;
 use App\Models\RefJenisPegawai;
 use App\Models\RefUnitKerja;
+use App\Models\PositionHistory;
+use App\Services\Employees\KepalaBagianScopeService;
 use Illuminate\Http\Request;
 
 class KepalaBagianEmployeeController extends Controller
 {
-    public function index(KepalaBagianEmployeeFilterRequest $request, ListKepalaBagianEmployeesAction $action)
+    public function index(KepalaBagianEmployeeFilterRequest $request, ListKepalaBagianEmployeesAction $action, KepalaBagianScopeService $scope)
     {
         abort_if($request->user()?->employee_id === null, 403, 'Akun Kepala Bagian belum tertaut ke data pegawai.');
+
+        $reportIds = $scope->directReportIds($request->user());
+        $unitKerjaIds = PositionHistory::query()
+            ->where('is_latest', true)
+            ->whereIn('employee_id', $reportIds)
+            ->whereNotNull('unit_kerja_id')
+            ->pluck('unit_kerja_id');
+        $jenisPegawaiIds = Employee::query()
+            ->whereIn('id', $reportIds)
+            ->whereNotNull('jenis_pegawai_id')
+            ->pluck('jenis_pegawai_id');
 
         return view('kabag.bawahan.index', [
             'employees' => $action->execute($request->user(), $request->validated()),
             'filters' => $request->validated(),
-            'unitKerjas' => RefUnitKerja::orderBy('nama')->get(),
-            'jenisPegawais' => RefJenisPegawai::orderBy('nama')->get(),
+            'unitKerjas' => RefUnitKerja::whereIn('id', $unitKerjaIds)->orderBy('nama')->get(),
+            'jenisPegawais' => RefJenisPegawai::whereIn('id', $jenisPegawaiIds)->orderBy('nama')->get(),
         ]);
     }
 
