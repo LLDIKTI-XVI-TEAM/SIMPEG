@@ -27,10 +27,10 @@ class DashboardController extends Controller
         }
 
         $isPegawai = $role === 'pegawai';
-        $employeeId = $isPegawai ? (string) ($user?->employee_id ?? '') : null;
+        $employeeId = $isPegawai ? $user?->employee_id : null;
 
-        $dashboardEwsData = $employeeId !== '' || ! $isPegawai
-            ? $ewsAlerts->execute(null, null, $employeeId)
+        $dashboardEwsData = $employeeId || ! $isPegawai
+            ? $ewsAlerts->execute(null, null, $employeeId ? (string) $employeeId : null)
             : ['alerts' => []];
 
         $dashboardEwsAlerts = $dashboardEwsData['alerts'];
