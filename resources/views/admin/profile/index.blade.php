@@ -16,8 +16,8 @@
             </div>
 
             {{-- Card Akun --}}
-            <div class="rounded-lg border border-border bg-surface shadow-sm">
-                <div class="border-b border-border px-6 py-4">
+            <x-ui.card padding="none" class="overflow-hidden">
+                <div class="border-b border-border px-6 py-4 bg-surface">
                     <h3 class="font-semibold text-ink">Informasi Akun</h3>
                     <p class="text-sm text-muted mt-0.5">Informasi dasar akun pengguna Anda.</p>
                 </div>
@@ -41,12 +41,12 @@
                         </div>
                     </div>
                 </div>
-            </div>
+            </x-ui.card>
 
 
             {{-- Card Ganti Password --}}
-            <div class="rounded-lg border border-border bg-surface shadow-sm">
-                <div class="border-b border-border px-6 py-4">
+            <x-ui.card padding="none" class="overflow-hidden">
+                <div class="border-b border-border px-6 py-4 bg-surface">
                     <h3 class="font-semibold text-ink">Ubah Kata Sandi</h3>
                     <p class="text-sm text-muted mt-0.5">Perbarui kata sandi akun Anda untuk menjaga keamanan.</p>
                 </div>
@@ -75,7 +75,7 @@
                         </div>
                     </form>
                 </div>
-            </div>
+            </x-ui.card>
         </div>
     @else
         <div x-data="{
@@ -169,18 +169,18 @@
                 </div>
 
                 {{-- TAB NAVIGATION --}}
-                <div class="border-b border-border flex gap-4 md:gap-6 overflow-x-auto pb-1 select-none">
-                    <button @click="activeTab = 'profile'" :class="activeTab === 'profile' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Profil</button>
-                    <button @click="activeTab = 'cuti'" :class="activeTab === 'cuti' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Cuti</button>
-                    <button @click="activeTab = 'keluarga'" :class="activeTab === 'keluarga' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Keluarga</button>
-                    <button @click="activeTab = 'kepangkatan'" :class="activeTab === 'kepangkatan' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Kepangkatan</button>
-                    <button @click="activeTab = 'jabatan'" :class="activeTab === 'jabatan' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Jabatan</button>
-                    <button @click="activeTab = 'kgb'" :class="activeTab === 'kgb' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">KGB</button>
-                    <button @click="activeTab = 'disiplin'" :class="activeTab === 'disiplin' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Hukuman Disiplin</button>
-                    <button @click="activeTab = 'pendidikan'" :class="activeTab === 'pendidikan' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Pendidikan</button>
-                    <button @click="activeTab = 'pengangkatan'" :class="activeTab === 'pengangkatan' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Pengangkatan</button>
-                    <button @click="activeTab = 'docs'" :class="activeTab === 'docs' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Dokumen SK</button>
-                </div>
+                <x-ui.tabs>
+                    <x-ui.tab click="activeTab = 'profile'" active="activeTab === 'profile'">Profil</x-ui.tab>
+                    <x-ui.tab click="activeTab = 'cuti'" active="activeTab === 'cuti'">Cuti</x-ui.tab>
+                    <x-ui.tab click="activeTab = 'keluarga'" active="activeTab === 'keluarga'">Keluarga</x-ui.tab>
+                    <x-ui.tab click="activeTab = 'kepangkatan'" active="activeTab === 'kepangkatan'">Kepangkatan</x-ui.tab>
+                    <x-ui.tab click="activeTab = 'jabatan'" active="activeTab === 'jabatan'">Jabatan</x-ui.tab>
+                    <x-ui.tab click="activeTab = 'kgb'" active="activeTab === 'kgb'">KGB</x-ui.tab>
+                    <x-ui.tab click="activeTab = 'disiplin'" active="activeTab === 'disiplin'">Hukuman Disiplin</x-ui.tab>
+                    <x-ui.tab click="activeTab = 'pendidikan'" active="activeTab === 'pendidikan'">Pendidikan</x-ui.tab>
+                    <x-ui.tab click="activeTab = 'pengangkatan'" active="activeTab === 'pengangkatan'">Pengangkatan</x-ui.tab>
+                    <x-ui.tab click="activeTab = 'docs'" active="activeTab === 'docs'">Dokumen SK</x-ui.tab>
+                </x-ui.tabs>
 
                 {{-- TAB 1: PROFIL LENGKAP --}}
                 <div x-show="activeTab === 'profile'" class="space-y-6" x-transition>
@@ -333,11 +333,7 @@
                         <div class="rounded-lg border border-border bg-surface p-4 shadow-sm text-center">
                             <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans block">Sisa Saldo</span>
                             <span class="text-3xl font-bold text-primary block mt-2">
-                                @if($saldoCuti === null)
-                                    <span class="text-sm font-semibold text-muted">Belum tersedia</span>
-                                @else
-                                    {{ $saldoCuti }} <span class="text-sm font-normal text-muted">Hari</span>
-                                @endif
+                                {{ $saldoCuti?->sisa ?? ($saldoCuti?->jatah_awal ?? 12) }} <span class="text-sm font-normal text-muted">Hari</span>
                             </span>
                         </div>
                     </div>
@@ -351,49 +347,49 @@
                             <p class="text-xs text-muted font-sans mt-0.5">Daftar istri/suami dan anak yang tercatat sebagai tanggungan.</p>
                         </div>
                     </div>
-                    <div class="overflow-x-auto rounded-lg border border-border">
-                        <table class="w-full">
-                            <thead class="bg-soft border-b border-border">
-                                <tr class="text-left text-xs font-semibold text-muted uppercase tracking-wide font-sans">
-                                    <th class="px-4 py-3">Nama Lengkap & NIK</th>
-                                    <th class="px-4 py-3">Hubungan</th>
-                                    <th class="px-4 py-3">TTL</th>
-                                    <th class="px-4 py-3">Pekerjaan</th>
-                                    <th class="px-4 py-3">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-border text-xs font-sans">
+                    <div class="overflow-x-auto">
+                        <x-ui.table>
+                            <x-ui.table-head>
+                                <x-ui.table-row>
+                                    <x-ui.table-th>Nama Lengkap & NIK</x-ui.table-th>
+                                    <x-ui.table-th>Hubungan</x-ui.table-th>
+                                    <x-ui.table-th>TTL</x-ui.table-th>
+                                    <x-ui.table-th>Pekerjaan</x-ui.table-th>
+                                    <x-ui.table-th>Status</x-ui.table-th>
+                                </x-ui.table-row>
+                            </x-ui.table-head>
+                            <x-ui.table-body>
                                 <template x-if="keluargaList.length === 0">
-                                    <tr>
-                                        <td colspan="5" class="px-0 py-0">
+                                    <x-ui.table-row>
+                                        <x-ui.table-td colspan="5" class="px-0 py-0">
                                             <x-ui.empty-state icon="document" title="Tidak ada data anggota keluarga." />
-                                        </td>
-                                    </tr>
+                                        </x-ui.table-td>
+                                    </x-ui.table-row>
                                 </template>
                                 <template x-for="(fam, index) in keluargaList" :key="index">
-                                    <tr class="transition-colors hover:bg-soft/30 text-ink">
-                                        <td class="px-4 py-3">
+                                    <x-ui.table-row>
+                                        <x-ui.table-td>
                                             <p class="font-bold font-sans" x-text="fam.nama_anggota"></p>
                                             <p class="text-[10px] text-muted" x-text="fam.nik ? 'NIK. ' + fam.nik : 'NIK. -'"></p>
-                                        </td>
-                                        <td class="px-4 py-3">
+                                        </x-ui.table-td>
+                                        <x-ui.table-td>
                                             <p class="font-sans" x-text="fam.hubungan"></p>
                                             <p class="text-[10px] text-muted font-sans" x-text="fam.jenis_kelamin"></p>
-                                        </td>
-                                        <td class="px-4 py-3">
+                                        </x-ui.table-td>
+                                        <x-ui.table-td>
                                             <p class="font-sans" x-text="fam.tempat_lahir || '-'"></p>
                                             <p class="text-[10px] text-muted" x-text="fam.tanggal_lahir"></p>
-                                        </td>
-                                        <td class="px-4 py-3 font-sans" x-text="fam.pekerjaan || '-'"></td>
-                                        <td class="px-4 py-3">
+                                        </x-ui.table-td>
+                                        <x-ui.table-td class="font-sans" x-text="fam.pekerjaan || '-'"></x-ui.table-td>
+                                        <x-ui.table-td>
                                             <span class="inline-flex items-center gap-1 text-[10px] font-bold"
                                                   :class="fam.status === 'Ditanggung' ? 'text-success' : 'text-muted'"
                                                   x-text="fam.status"></span>
-                                        </td>
-                                    </tr>
+                                        </x-ui.table-td>
+                                    </x-ui.table-row>
                                 </template>
-                            </tbody>
-                        </table>
+                            </x-ui.table-body>
+                        </x-ui.table>
                     </div>
                 </div>
 
@@ -403,33 +399,33 @@
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Kepangkatan & Golongan</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Catatan kenaikan pangkat reguler maupun pilihan selama masa dinas.</p>
                     </div>
-                    <div class="overflow-x-auto rounded-lg border border-border">
-                        <table class="w-full">
-                            <thead class="bg-soft border-b border-border">
-                                <tr class="text-left text-xs font-semibold text-muted uppercase tracking-wide font-sans">
-                                    <th class="px-4 py-3">Golongan</th>
-                                    <th class="px-4 py-3">Nomor SK Pangkat</th>
-                                    <th class="px-4 py-3">Tanggal SK</th>
-                                    <th class="px-4 py-3">TMT Pangkat</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-border text-xs font-sans">
+                    <div class="overflow-x-auto">
+                        <x-ui.table>
+                            <x-ui.table-head>
+                                <x-ui.table-row>
+                                    <x-ui.table-th>Golongan</x-ui.table-th>
+                                    <x-ui.table-th>Nomor SK Pangkat</x-ui.table-th>
+                                    <x-ui.table-th>Tanggal SK</x-ui.table-th>
+                                    <x-ui.table-th>TMT Pangkat</x-ui.table-th>
+                                </x-ui.table-row>
+                            </x-ui.table-head>
+                            <x-ui.table-body>
                                 @forelse($p->rankHistories as $r)
-                                    <tr class="transition-colors hover:bg-soft/30 text-ink">
-                                        <td class="px-4 py-3 font-bold">{{ $r->golongan->nama ?? '-' }}</td>
-                                        <td class="px-4 py-3">{{ $r->no_sk }}</td>
-                                        <td class="px-4 py-3">{{ $r->tanggal_sk }}</td>
-                                        <td class="px-4 py-3">{{ $r->tmt_pangkat }}</td>
-                                    </tr>
+                                    <x-ui.table-row>
+                                        <x-ui.table-td class="font-bold">{{ $r->golongan->nama ?? '-' }}</x-ui.table-td>
+                                        <x-ui.table-td>{{ $r->no_sk }}</x-ui.table-td>
+                                        <x-ui.table-td>{{ $r->tanggal_sk }}</x-ui.table-td>
+                                        <x-ui.table-td>{{ $r->tmt_pangkat }}</x-ui.table-td>
+                                    </x-ui.table-row>
                                 @empty
-                                    <tr>
-                                        <td colspan="4" class="px-0 py-0">
+                                    <x-ui.table-row>
+                                        <x-ui.table-td colspan="4" class="px-0 py-0">
                                             <x-ui.empty-state icon="document" title="Tidak ada data riwayat kepangkatan." />
-                                        </td>
-                                    </tr>
+                                        </x-ui.table-td>
+                                    </x-ui.table-row>
                                 @endforelse
-                            </tbody>
-                        </table>
+                            </x-ui.table-body>
+                        </x-ui.table>
                     </div>
                 </div>
 
@@ -439,35 +435,35 @@
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Jabatan & Struktural</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Catatan penugasan jabatan fungsional maupun struktural.</p>
                     </div>
-                    <div class="overflow-x-auto rounded-lg border border-border">
-                        <table class="w-full">
-                            <thead class="bg-soft border-b border-border">
-                                <tr class="text-left text-xs font-semibold text-muted uppercase tracking-wide font-sans">
-                                    <th class="px-4 py-3">Nama Jabatan</th>
-                                    <th class="px-4 py-3">Unit Kerja</th>
-                                    <th class="px-4 py-3">Nomor SK Jabatan</th>
-                                    <th class="px-4 py-3">Tanggal SK</th>
-                                    <th class="px-4 py-3">TMT Jabatan</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-border text-xs font-sans">
+                    <div class="overflow-x-auto">
+                        <x-ui.table>
+                            <x-ui.table-head>
+                                <x-ui.table-row>
+                                    <x-ui.table-th>Nama Jabatan</x-ui.table-th>
+                                    <x-ui.table-th>Unit Kerja</x-ui.table-th>
+                                    <x-ui.table-th>Nomor SK Jabatan</x-ui.table-th>
+                                    <x-ui.table-th>Tanggal SK</x-ui.table-th>
+                                    <x-ui.table-th>TMT Jabatan</x-ui.table-th>
+                                </x-ui.table-row>
+                            </x-ui.table-head>
+                            <x-ui.table-body>
                                 @forelse($p->positionHistories as $j)
-                                    <tr class="transition-colors hover:bg-soft/30 text-ink">
-                                        <td class="px-4 py-3 font-bold">{{ $j->nama_jabatan }}</td>
-                                        <td class="px-4 py-3">{{ $j->unitKerja->nama ?? '-' }}</td>
-                                        <td class="px-4 py-3">{{ $j->no_sk }}</td>
-                                        <td class="px-4 py-3">{{ $j->tanggal_sk }}</td>
-                                        <td class="px-4 py-3">{{ $j->tmt_jabatan }}</td>
-                                    </tr>
+                                    <x-ui.table-row>
+                                        <x-ui.table-td class="font-bold">{{ $j->nama_jabatan }}</x-ui.table-td>
+                                        <x-ui.table-td>{{ $j->unitKerja->nama ?? '-' }}</x-ui.table-td>
+                                        <x-ui.table-td>{{ $j->no_sk }}</x-ui.table-td>
+                                        <x-ui.table-td>{{ $j->tanggal_sk }}</x-ui.table-td>
+                                        <x-ui.table-td>{{ $j->tmt_jabatan }}</x-ui.table-td>
+                                    </x-ui.table-row>
                                 @empty
-                                    <tr>
-                                        <td colspan="5" class="px-0 py-0">
+                                    <x-ui.table-row>
+                                        <x-ui.table-td colspan="5" class="px-0 py-0">
                                             <x-ui.empty-state icon="document" title="Tidak ada data riwayat jabatan." />
-                                        </td>
-                                    </tr>
+                                        </x-ui.table-td>
+                                    </x-ui.table-row>
                                 @endforelse
-                            </tbody>
-                        </table>
+                            </x-ui.table-body>
+                        </x-ui.table>
                     </div>
                 </div>
 
@@ -477,33 +473,33 @@
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Kenaikan Gaji Berkala (KGB)</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Catatan penyesuaian gaji berkala setiap 2 tahun sekali.</p>
                     </div>
-                    <div class="overflow-x-auto rounded-lg border border-border">
-                        <table class="w-full">
-                            <thead class="bg-soft border-b border-border">
-                                <tr class="text-left text-xs font-semibold text-muted uppercase tracking-wide font-sans">
-                                    <th class="px-4 py-3">Gaji Pokok Baru</th>
-                                    <th class="px-4 py-3">Nomor Surat KGB</th>
-                                    <th class="px-4 py-3">Tanggal Surat</th>
-                                    <th class="px-4 py-3">TMT KGB</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-border text-xs font-sans">
+                    <div class="overflow-x-auto">
+                        <x-ui.table>
+                            <x-ui.table-head>
+                                <x-ui.table-row>
+                                    <x-ui.table-th>Gaji Pokok Baru</x-ui.table-th>
+                                    <x-ui.table-th>Nomor Surat KGB</x-ui.table-th>
+                                    <x-ui.table-th>Tanggal Surat</x-ui.table-th>
+                                    <x-ui.table-th>TMT KGB</x-ui.table-th>
+                                </x-ui.table-row>
+                            </x-ui.table-head>
+                            <x-ui.table-body>
                                 @forelse($p->salaryHistories as $k)
-                                    <tr class="transition-colors hover:bg-soft/30 text-ink">
-                                        <td class="px-4 py-3 font-bold">Rp {{ number_format($k->gaji_pokok, 0, ',', '.') }}</td>
-                                        <td class="px-4 py-3">{{ $k->no_sk }}</td>
-                                        <td class="px-4 py-3">{{ $k->tanggal_sk }}</td>
-                                        <td class="px-4 py-3">{{ $k->tmt_kgb }}</td>
-                                    </tr>
+                                    <x-ui.table-row>
+                                        <x-ui.table-td class="font-bold">Rp {{ number_format($k->gaji_pokok, 0, ',', '.') }}</x-ui.table-td>
+                                        <x-ui.table-td>{{ $k->no_sk }}</x-ui.table-td>
+                                        <x-ui.table-td>{{ $k->tanggal_sk }}</x-ui.table-td>
+                                        <x-ui.table-td>{{ $k->tmt_kgb }}</x-ui.table-td>
+                                    </x-ui.table-row>
                                 @empty
-                                    <tr>
-                                        <td colspan="4" class="px-0 py-0">
+                                    <x-ui.table-row>
+                                        <x-ui.table-td colspan="4" class="px-0 py-0">
                                             <x-ui.empty-state icon="document" title="Tidak ada data riwayat KGB." />
-                                        </td>
-                                    </tr>
+                                        </x-ui.table-td>
+                                    </x-ui.table-row>
                                 @endforelse
-                            </tbody>
-                        </table>
+                            </x-ui.table-body>
+                        </x-ui.table>
                     </div>
                 </div>
 
@@ -513,40 +509,40 @@
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Hukuman Disiplin</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Catatan sanksi disiplin pegawai yang mempengaruhi promosi kepegawaian.</p>
                     </div>
-                    <div class="overflow-x-auto rounded-lg border border-border">
-                        <table class="w-full">
-                            <thead class="bg-soft border-b border-border">
-                                <tr class="text-left text-xs font-semibold text-muted uppercase tracking-wide font-sans">
-                                    <th class="px-4 py-3">Jenis Hukuman</th>
-                                    <th class="px-4 py-3">Alasan / Pelanggaran</th>
-                                    <th class="px-4 py-3">Nomor SK</th>
-                                    <th class="px-4 py-3">Tanggal SK</th>
-                                    <th class="px-4 py-3">Masa Berlaku</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-border text-xs font-sans">
+                    <div class="overflow-x-auto">
+                        <x-ui.table>
+                            <x-ui.table-head>
+                                <x-ui.table-row>
+                                    <x-ui.table-th>Jenis Hukuman</x-ui.table-th>
+                                    <x-ui.table-th>Alasan / Pelanggaran</x-ui.table-th>
+                                    <x-ui.table-th>Nomor SK</x-ui.table-th>
+                                    <x-ui.table-th>Tanggal SK</x-ui.table-th>
+                                    <x-ui.table-th>Masa Berlaku</x-ui.table-th>
+                                </x-ui.table-row>
+                            </x-ui.table-head>
+                            <x-ui.table-body>
                                 @forelse($p->disciplineRecords as $d)
-                                    <tr class="transition-colors hover:bg-soft/30 text-ink">
-                                        <td class="px-4 py-3">
+                                    <x-ui.table-row>
+                                        <x-ui.table-td>
                                             <span class="font-bold text-danger">{{ $d->jenis_hukuman }}</span>
                                             @if($d->is_active)
                                                 <span class="ml-1 inline-flex items-center rounded-full bg-danger/10 px-1.5 py-0.5 text-[8px] font-bold text-danger uppercase">Aktif</span>
                                             @endif
-                                        </td>
-                                        <td class="px-4 py-3">{{ $d->deskripsi }}</td>
-                                        <td class="px-4 py-3">{{ $d->no_sk }}</td>
-                                        <td class="px-4 py-3">{{ $d->tanggal_sk ? \Carbon\Carbon::parse($d->tanggal_sk)->format('d-m-Y') : '-' }}</td>
-                                        <td class="px-4 py-3">{{ $d->tanggal_mulai ? \Carbon\Carbon::parse($d->tanggal_mulai)->format('d-m-Y') : '-' }} s/d {{ $d->tanggal_berakhir ? \Carbon\Carbon::parse($d->tanggal_berakhir)->format('d-m-Y') : 'Sekarang' }}</td>
-                                    </tr>
+                                        </x-ui.table-td>
+                                        <x-ui.table-td>{{ $d->deskripsi }}</x-ui.table-td>
+                                        <x-ui.table-td>{{ $d->no_sk }}</x-ui.table-td>
+                                        <x-ui.table-td>{{ $d->tanggal_sk ? \Carbon\Carbon::parse($d->tanggal_sk)->format('d-m-Y') : '-' }}</x-ui.table-td>
+                                        <x-ui.table-td>{{ $d->tanggal_mulai ? \Carbon\Carbon::parse($d->tanggal_mulai)->format('d-m-Y') : '-' }} s/d {{ $d->tanggal_berakhir ? \Carbon\Carbon::parse($d->tanggal_berakhir)->format('d-m-Y') : 'Sekarang' }}</x-ui.table-td>
+                                    </x-ui.table-row>
                                 @empty
-                                    <tr>
-                                        <td colspan="5" class="px-0 py-0">
-                                            <x-ui.empty-state icon="document" title="Anda tidak memiliki riwayat hukuman disiplin. Bersih (Clean Record). ✅" />
-                                        </td>
-                                    </tr>
+                                    <x-ui.table-row>
+                                        <x-ui.table-td colspan="5" class="px-0 py-0">
+                                            <x-ui.empty-state icon="document" title="Anda tidak memiliki riwayat hukuman disiplin. Bersih (Clean Record)." />
+                                        </x-ui.table-td>
+                                    </x-ui.table-row>
                                 @endforelse
-                            </tbody>
-                        </table>
+                            </x-ui.table-body>
+                        </x-ui.table>
                     </div>
                 </div>
 
@@ -556,35 +552,35 @@
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Pendidikan Formal</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Riwayat kualifikasi akademis tertinggi.</p>
                     </div>
-                    <div class="overflow-x-auto rounded-lg border border-border">
-                        <table class="w-full">
-                            <thead class="bg-soft border-b border-border">
-                                <tr class="text-left text-xs font-semibold text-muted uppercase tracking-wide font-sans">
-                                    <th class="px-4 py-3">Tingkat</th>
-                                    <th class="px-4 py-3">Nama Institusi</th>
-                                    <th class="px-4 py-3">Program Studi</th>
-                                    <th class="px-4 py-3">Tahun Lulus</th>
-                                    <th class="px-4 py-3">Nomor Ijazah</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-border text-xs font-sans">
+                    <div class="overflow-x-auto">
+                        <x-ui.table>
+                            <x-ui.table-head>
+                                <x-ui.table-row>
+                                    <x-ui.table-th>Tingkat</x-ui.table-th>
+                                    <x-ui.table-th>Nama Institusi</x-ui.table-th>
+                                    <x-ui.table-th>Program Studi</x-ui.table-th>
+                                    <x-ui.table-th>Tahun Lulus</x-ui.table-th>
+                                    <x-ui.table-th>Nomor Ijazah</x-ui.table-th>
+                                </x-ui.table-row>
+                            </x-ui.table-head>
+                            <x-ui.table-body>
                                 @forelse($p->educationHistories as $e)
-                                    <tr class="transition-colors hover:bg-soft/30 text-ink">
-                                        <td class="px-4 py-3 font-bold">{{ $e->jenjang->nama ?? '-' }}</td>
-                                        <td class="px-4 py-3">{{ $e->nama_institusi }}</td>
-                                        <td class="px-4 py-3">{{ $e->jurusan }}</td>
-                                        <td class="px-4 py-3">{{ $e->tahun_lulus }}</td>
-                                        <td class="px-4 py-3">{{ $e->no_ijazah }}</td>
-                                    </tr>
+                                    <x-ui.table-row>
+                                        <x-ui.table-td class="font-bold">{{ $e->jenjang->nama ?? '-' }}</x-ui.table-td>
+                                        <x-ui.table-td>{{ $e->nama_institusi }}</x-ui.table-td>
+                                        <x-ui.table-td>{{ $e->jurusan }}</x-ui.table-td>
+                                        <x-ui.table-td>{{ $e->tahun_lulus }}</x-ui.table-td>
+                                        <x-ui.table-td>{{ $e->no_ijazah }}</x-ui.table-td>
+                                    </x-ui.table-row>
                                 @empty
-                                    <tr>
-                                        <td colspan="5" class="px-0 py-0">
+                                    <x-ui.table-row>
+                                        <x-ui.table-td colspan="5" class="px-0 py-0">
                                             <x-ui.empty-state icon="document" title="Tidak ada data riwayat pendidikan." />
-                                        </td>
-                                    </tr>
+                                        </x-ui.table-td>
+                                    </x-ui.table-row>
                                 @endforelse
-                            </tbody>
-                        </table>
+                            </x-ui.table-body>
+                        </x-ui.table>
                     </div>
                 </div>
 
@@ -635,21 +631,21 @@
                         <p class="text-xs text-muted font-sans mt-0.5">Daftar berkas pendukung mutasi pangkat, jabatan, KGB, dan dokumen kepegawaian lain.</p>
                     </div>
 
-                    <div class="overflow-x-auto rounded-lg border border-border">
-                        <table class="w-full">
-                            <thead class="bg-soft border-b border-border">
-                                <tr>
-                                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Nama Dokumen</th>
-                                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Kategori</th>
-                                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Nomor Dokumen</th>
-                                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Tanggal Terbit</th>
-                                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Ukuran</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-border text-xs font-sans text-ink">
+                    <div class="overflow-x-auto">
+                        <x-ui.table>
+                            <x-ui.table-head>
+                                <x-ui.table-row>
+                                    <x-ui.table-th>Nama Dokumen</x-ui.table-th>
+                                    <x-ui.table-th>Kategori</x-ui.table-th>
+                                    <x-ui.table-th>Nomor Dokumen</x-ui.table-th>
+                                    <x-ui.table-th>Tanggal Terbit</x-ui.table-th>
+                                    <x-ui.table-th>Ukuran</x-ui.table-th>
+                                </x-ui.table-row>
+                            </x-ui.table-head>
+                            <x-ui.table-body>
                                 @forelse($riwayatDokumen as $doc)
-                                <tr class="transition-colors hover:bg-soft/30">
-                                    <td class="px-4 py-3 max-w-xs">
+                                <x-ui.table-row>
+                                    <x-ui.table-td class="max-w-xs">
                                         <div class="flex items-start gap-2.5">
                                             <div class="flex h-8 w-6 shrink-0 flex-col items-center justify-between rounded border border-border bg-soft p-0.5 shadow-sm relative">
                                                 <div class="w-full bg-primary/10 text-primary text-[5px] font-bold text-center py-0.5 uppercase tracking-wide">
@@ -661,21 +657,21 @@
                                                 <p class="text-xs text-muted truncate">{{ $doc['keterangan'] }}</p>
                                             </div>
                                         </div>
-                                    </td>
-                                    <td class="px-4 py-3 text-muted font-sans">{{ $doc['kategori_label'] }}</td>
-                                    <td class="px-4 py-3 text-muted">{{ $doc['nomor'] }}</td>
-                                    <td class="px-4 py-3 text-muted">{{ $doc['tanggal'] }}</td>
-                                    <td class="px-4 py-3 text-muted">{{ $doc['file_size'] }}</td>
-                                </tr>
+                                    </x-ui.table-td>
+                                    <x-ui.table-td class="text-muted font-sans">{{ $doc['kategori_label'] }}</x-ui.table-td>
+                                    <x-ui.table-td class="text-muted">{{ $doc['nomor'] }}</x-ui.table-td>
+                                    <x-ui.table-td class="text-muted">{{ $doc['tanggal'] }}</x-ui.table-td>
+                                    <x-ui.table-td class="text-muted">{{ $doc['file_size'] }}</x-ui.table-td>
+                                </x-ui.table-row>
                                 @empty
-                                <tr>
-                                    <td colspan="5" class="px-4 py-6 text-center text-muted font-sans">
+                                <x-ui.table-row>
+                                    <x-ui.table-td colspan="5" align="center" class="text-muted font-sans">
                                         Belum ada dokumen atau SK kepegawaian yang diunggah.
-                                    </td>
-                                </tr>
+                                    </x-ui.table-td>
+                                </x-ui.table-row>
                                 @endforelse
-                            </tbody>
-                        </table>
+                            </x-ui.table-body>
+                        </x-ui.table>
                     </div>
                 </div>
 

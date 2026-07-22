@@ -6,6 +6,7 @@ use App\Actions\Ews\ListActiveEwsAlertsAction;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
+use App\Models\SimpegNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -60,7 +61,7 @@ class DashboardController extends Controller
                 ->take(5)
                 ->get();
 
-            $notifikasi = \App\Models\SimpegNotification::where('user_id', $user->id)
+            $notifikasi = SimpegNotification::where('user_id', $user->id)
                 ->latest()
                 ->take(5)
                 ->get();
