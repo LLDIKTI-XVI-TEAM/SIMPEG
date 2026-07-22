@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Employee;
 use App\Models\RefAgama;
+use App\Models\RefGolongan;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPerkawinan;
 use App\Models\User;
@@ -49,6 +50,11 @@ class EmployeeCreateIntegrationTest extends TestCase
             'jenis_pegawai_id' => $jenisPegawaiId,
             'golongan_terakhir' => 'III/a',
             'pangkat_terakhir' => 'Penata Muda',
+            'pangkat_golongan_id' => RefGolongan::where('kode', 'III/a')->firstOrFail()->id,
+            'pangkat_no_sk' => 'SK-PANGKAT-UJI-001',
+            'pangkat_tanggal_sk' => '2022-07-01',
+            'pangkat_tmt_pangkat' => '2022-07-22',
+            'file_sk_pangkat' => UploadedFile::fake()->create('sk-pangkat.pdf', 500, 'application/pdf'),
             'jabatan_terakhir' => 'Analis Sistem Informasi',
             'kelas_jabatan' => '7',
             'pengangkatan_tmt_pengangkatan' => '2024-01-01',
@@ -77,6 +83,14 @@ class EmployeeCreateIntegrationTest extends TestCase
         ]);
 
         $employee = Employee::where('nip', '199001012024011001')->first();
+
+        $this->assertDatabaseHas('rank_histories', [
+            'employee_id' => $employee->id,
+            'no_sk' => 'SK-PANGKAT-UJI-001',
+            'tmt_pangkat' => '2022-07-22 00:00:00',
+            'is_latest' => true,
+        ]);
+        $this->assertSame('2026-07-22', $employee->fresh()->tanggal_kenaikan_pangkat_berikutnya?->format('Y-m-d'));
 
         $this->assertDatabaseHas('appointments', [
             'employee_id' => $employee->id,

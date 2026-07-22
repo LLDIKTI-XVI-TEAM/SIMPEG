@@ -10,12 +10,16 @@ use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Services\AuditService;
 use App\Services\EmployeeFileStorageService;
+use App\Services\EmployeeHistoryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class UpdateEmployeeAction
 {
-    public function __construct(private readonly EmployeeFileStorageService $files) {}
+    public function __construct(
+        private readonly EmployeeFileStorageService $files,
+        private readonly EmployeeHistoryService $histories,
+    ) {}
 
     /**
      * Memperbarui pegawai, termasuk dokumen pengangkatan, riwayat pangkat, jabatan, dan KGB.
@@ -85,29 +89,15 @@ class UpdateEmployeeAction
                     $history = $employee->rankHistories()->find($pangkatId);
                     if ($history) {
                         $history->update($pangkatData);
-                        if ($history->is_latest) {
-                            $golongan = RefGolongan::find($validated['pangkat_golongan_id']);
-                            if ($golongan) {
-                                $employee->update([
-                                    'golongan_terakhir' => $golongan->kode,
-                                    'pangkat_terakhir' => $golongan->nama,
-                                ]);
-                            }
-                        }
                     }
                 } else {
-                    $employee->rankHistories()->update(['is_latest' => false]);
-                    $pangkatData['is_latest'] = true;
-                    $employee->rankHistories()->create($pangkatData);
-
-                    $golongan = RefGolongan::find($validated['pangkat_golongan_id']);
-                    if ($golongan) {
-                        $employee->update([
-                            'golongan_terakhir' => $golongan->kode,
-                            'pangkat_terakhir' => $golongan->nama,
-                        ]);
-                    }
+                    $employee->rankHistories()->create([
+                        ...$pangkatData,
+                        'is_latest' => false,
+                    ]);
                 }
+
+                $this->histories->reconcileRankSnapshot($employee);
             }
 
             // 2. Jabatan (PositionHistory)

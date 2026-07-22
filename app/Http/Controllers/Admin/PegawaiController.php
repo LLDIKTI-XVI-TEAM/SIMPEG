@@ -310,8 +310,10 @@ class PegawaiController extends Controller
             return redirect()->route('data-pegawai')
                 ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil ditambahkan.')
                 ->with('employee_data_changed', true);
-        } catch (\Exception $e) {
-            return back()->withInput()->with('error', 'Gagal menambahkan pegawai: '.$e->getMessage());
+        } catch (\Throwable $e) {
+            return back()
+                ->withInput($request->except(array_keys($request->allFiles())))
+                ->with('error', 'Gagal menambahkan pegawai: '.$e->getMessage());
         }
     }
 
@@ -367,8 +369,10 @@ class PegawaiController extends Controller
             }
 
             return $redirect;
-        } catch (\Exception $e) {
-            return back()->withInput()->with('error', 'Gagal memperbarui pegawai: '.$e->getMessage());
+        } catch (\Throwable $e) {
+            return back()
+                ->withInput($request->except(array_keys($request->allFiles())))
+                ->with('error', 'Gagal memperbarui pegawai: '.$e->getMessage());
         }
     }
 

@@ -10,13 +10,17 @@ use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Services\AuditService;
 use App\Services\EmployeeFileStorageService;
+use App\Services\EmployeeHistoryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class CreateEmployeeAction
 {
-    public function __construct(private readonly EmployeeFileStorageService $files) {}
+    public function __construct(
+        private readonly EmployeeFileStorageService $files,
+        private readonly EmployeeHistoryService $histories,
+    ) {}
 
     /**
      * Membuat pegawai baru, termasuk penyimpanan foto, dokumen SK,
@@ -68,14 +72,7 @@ class CreateEmployeeAction
                     }
 
                     $employee->rankHistories()->create($pangkatData);
-
-                    $golongan = RefGolongan::find($data['pangkat_golongan_id']);
-                    if ($golongan) {
-                        $employee->update([
-                            'golongan_terakhir' => $golongan->kode,
-                            'pangkat_terakhir' => $golongan->nama,
-                        ]);
-                    }
+                    $this->histories->reconcileRankSnapshot($employee);
                 }
 
                 // 2. Jabatan (PositionHistory)

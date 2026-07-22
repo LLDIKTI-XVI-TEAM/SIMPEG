@@ -22,7 +22,7 @@ class EmployeeHistoryService
     public function __construct(private readonly EmployeeFileStorageService $files) {}
 
     /**
-     * Menambah riwayat pangkat secara append-only dan menjaga hanya satu data terbaru.
+     * Menambah riwayat pangkat secara append-only dan menjaga snapshot pangkat pegawai.
      */
     public function createRankHistory(Employee $employee, array $data, ?Request $request = null): RankHistory
     {
@@ -32,28 +32,12 @@ class EmployeeHistoryService
             $golongan = RefGolongan::findOrFail($data['golongan_id']);
             // Kunci baris pegawai agar dua penulisan paralel tidak sama-sama menyisakan riwayat terbaru.
             $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
-            $currentLatest = $employee->rankHistories()->where('is_latest', true)->first();
-            // Riwayat terbaru ditentukan dari TMT, bukan urutan input, agar backfill SK lama tidak merusak snapshot.
-            $isLatest = $currentLatest === null
-                || Carbon::parse($data['tmt_pangkat'])->greaterThanOrEqualTo($currentLatest->tmt_pangkat);
-
-            if ($isLatest) {
-                $employee->rankHistories()->update(['is_latest' => false]);
-            }
-
             $history = $employee->rankHistories()->create([
                 ...Arr::only($data, ['golongan_id', 'tmt_pangkat', 'no_sk', 'tanggal_sk', 'file_sk']),
-                'is_latest' => $isLatest,
+                'is_latest' => false,
             ]);
 
-            if ($isLatest) {
-                $employee->update([
-                    'golongan_terakhir' => $golongan->kode,
-                    'pangkat_terakhir' => $golongan->nama,
-                    // Aturan domain EWS: jadwal kenaikan pangkat reguler dihitung 4 tahun dari TMT pangkat terbaru.
-                    'tanggal_kenaikan_pangkat_berikutnya' => Carbon::parse($data['tmt_pangkat'])->addYears(4)->toDateString(),
-                ]);
-            }
+            $this->reconcileRankSnapshot($employee);
 
             if ($history->file_sk) {
                 $employee->documents()->create([
@@ -70,6 +54,41 @@ class EmployeeHistoryService
 
             return $history->refresh();
         });
+    }
+
+    /**
+     * Menetapkan riwayat pangkat dengan TMT paling baru sebagai snapshot pegawai dan target EWS.
+     *
+     * Riwayat dengan TMT kosong tidak mengubah snapshot yang sudah ada.
+     */
+    public function reconcileRankSnapshot(Employee $employee): ?RankHistory
+    {
+        $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
+        $latest = $employee->rankHistories()
+            ->with('golongan')
+            ->whereNotNull('tmt_pangkat')
+            ->orderByDesc('tmt_pangkat')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($latest === null) {
+            return null;
+        }
+
+        $employee->rankHistories()->update(['is_latest' => false]);
+        // Pembaruan massal di atas tidak memperbarui atribut model yang sudah dimuat.
+        // Gunakan query eksplisit agar kandidat terbaru selalu diaktifkan kembali.
+        $employee->rankHistories()->whereKey($latest->id)->update(['is_latest' => true]);
+
+        $employee->update([
+            'golongan_terakhir' => $latest->golongan->kode,
+            'pangkat_terakhir' => $latest->golongan->nama,
+            // Aturan domain EWS: jadwal kenaikan pangkat reguler dihitung 4 tahun dari TMT pangkat terbaru.
+            'tanggal_kenaikan_pangkat_berikutnya' => $latest->tmt_pangkat->copy()->addYears(4)->toDateString(),
+        ]);
+
+        return $latest->refresh();
     }
 
     /**

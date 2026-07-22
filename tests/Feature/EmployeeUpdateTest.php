@@ -314,6 +314,9 @@ class EmployeeUpdateTest extends TestCase
             'is_latest' => 1,
         ]);
 
+        $employee->refresh();
+        $this->assertSame('2030-01-02', $employee->tanggal_kenaikan_pangkat_berikutnya?->format('Y-m-d'));
+
         // Assert PositionHistory was created
         $this->assertDatabaseHas('position_histories', [
             'employee_id' => $employee->id,
@@ -344,6 +347,67 @@ class EmployeeUpdateTest extends TestCase
             'tmt_pengangkatan' => '2026-04-01 00:00:00',
             'no_sk' => 'SK-PENGANGKATAN-WEB-001',
         ]);
+    }
+
+    public function test_web_rank_history_sets_next_promotion_date_from_tmt(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $golongan = RefGolongan::where('kode', 'III/a')->firstOrFail();
+
+        $this->actingAs($user);
+        $response = $this->withSession(['_token' => 'test-token'])
+            ->post("/pegawai/{$employee->id}", $this->validPayload($employee, [
+                'pangkat_history_id' => 'new',
+                'pangkat_golongan_id' => $golongan->id,
+                'pangkat_no_sk' => 'SK-PANGKAT-EWS-001',
+                'pangkat_tanggal_sk' => '2022-07-01',
+                'pangkat_tmt_pangkat' => '2022-07-22',
+            ]), ['X-CSRF-TOKEN' => 'test-token']);
+
+        $response->assertRedirect(route('data-pegawai'));
+        $this->assertDatabaseHas('rank_histories', [
+            'employee_id' => $employee->id,
+            'no_sk' => 'SK-PANGKAT-EWS-001',
+            'is_latest' => true,
+        ]);
+        $this->assertSame('2026-07-22', $employee->fresh()->tanggal_kenaikan_pangkat_berikutnya?->format('Y-m-d'));
+    }
+
+    public function test_web_backdated_rank_history_keeps_latest_snapshot_and_ews_target(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $oldGolongan = RefGolongan::where('kode', 'III/a')->firstOrFail();
+        $latestGolongan = RefGolongan::where('kode', 'III/b')->firstOrFail();
+        $latest = $employee->rankHistories()->create([
+            'golongan_id' => $latestGolongan->id,
+            'no_sk' => 'SK-PANGKAT-LATEST',
+            'tanggal_sk' => '2022-07-01',
+            'tmt_pangkat' => '2022-07-22',
+            'is_latest' => true,
+        ]);
+
+        $this->actingAs($user);
+        $response = $this->withSession(['_token' => 'test-token'])
+            ->post("/pegawai/{$employee->id}", $this->validPayload($employee, [
+                'pangkat_history_id' => 'new',
+                'pangkat_golongan_id' => $oldGolongan->id,
+                'pangkat_no_sk' => 'SK-PANGKAT-LAMA',
+                'pangkat_tanggal_sk' => '2020-07-01',
+                'pangkat_tmt_pangkat' => '2020-07-22',
+            ]), ['X-CSRF-TOKEN' => 'test-token']);
+
+        $response->assertRedirect(route('data-pegawai'));
+        $this->assertTrue($latest->fresh()->is_latest);
+        $this->assertDatabaseHas('rank_histories', [
+            'employee_id' => $employee->id,
+            'no_sk' => 'SK-PANGKAT-LAMA',
+            'is_latest' => false,
+        ]);
+        $employee->refresh();
+        $this->assertSame('III/b', $employee->golongan_terakhir);
+        $this->assertSame('2026-07-22', $employee->tanggal_kenaikan_pangkat_berikutnya?->format('Y-m-d'));
     }
 
     public function test_berkas_lainnya_preset_ktp_is_saved_as_document_on_employee_update(): void
