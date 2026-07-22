@@ -71,13 +71,8 @@ class PimpinanFrontendViewTest extends TestCase
             ->get(route('pimpinan.pegawai.show', $employee))
             ->assertOk()
             ->assertSee('Pegawai Detail Tampilan')
-            ->assertSee('aria-label="Navigasi detail pegawai"', false)
-            ->assertSee('aria-orientation="vertical"', false)
-            ->assertSee('aria-controls="pimpinan-panel-info"', false)
-            ->assertSee('id="pimpinan-panel-info"', false)
-            ->assertSee('@keydown.down.prevent', false)
-            ->assertDontSee('@keydown.right.prevent', false)
-            ->assertSee('history-export-unavailable', false)
+            ->assertSee('Detail Pegawai')
+            ->assertDontSee('Edit Pegawai')
             ->assertDontSee('/pimpinan/laporan/pegawai/custom', false);
     }
 

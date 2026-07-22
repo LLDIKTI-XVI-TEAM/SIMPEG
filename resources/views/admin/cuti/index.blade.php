@@ -98,7 +98,7 @@
             searchId="{{ $isPegawai ? null : 'search-cuti' }}"
             searchName="{{ $isPegawai ? null : 'search' }}"
             searchValue="{{ $search }}"
-            searchPlaceholder="{{ $isPegawai ? null : 'Cari nama atau NIP...' }}"
+            searchPlaceholder="{{ $isPegawai ? null : 'Cari nama atau NIP' }}"
             gridClass="sm:grid-cols-2 {{ $isPegawai ? 'lg:grid-cols-3' : 'lg:grid-cols-5' }}"
         >
             {{-- Filter Status --}}

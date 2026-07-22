@@ -105,7 +105,7 @@
                             </x-ui.table-row>
                         @empty
                             <x-ui.table-row>
-                                <x-ui.table-td colspan="5" class="px-4 py-8 text-center text-muted">Tidak ada riwayat kepangkatan yang sesuai dengan filter.</x-ui.table-td>
+                                <x-ui.table-td colspan="5" align="center" class="px-4 py-8 text-muted">Tidak ada riwayat kepangkatan yang sesuai dengan filter.</x-ui.table-td>
                             </x-ui.table-row>
                         @endforelse
                     </x-ui.table-body>

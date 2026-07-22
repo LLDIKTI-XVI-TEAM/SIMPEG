@@ -208,7 +208,7 @@
                     [
                         'group' => 'Laporan',
                         'items' => [
-                            ['label' => 'Data Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'clipboard-document-list'],
+                            ['label' => 'Data Pegawai', 'route' => 'pimpinan.laporan.pegawai', 'icon' => 'clipboard-document-list'],
                             ['label' => 'Rekapitulasi Cuti', 'route' => 'pimpinan.laporan.cuti', 'icon' => 'calendar-days'],
                             ['label' => 'Riwayat Kepangkatan', 'route' => 'pimpinan.laporan.kepangkatan', 'icon' => 'document-chart-bar'],
                         ]

@@ -23,8 +23,8 @@
             <!-- Filter Status -->
             <div>
                 <x-form.select size="md" name="status" id="status" onchange="this.form.submit()">
-                    <option value="all" @selected(($filters['status'] ?? '') === 'all' || is_null($filters['status'] ?? null))>Semua Status</option>
                     <option value="menunggu_approval" @selected(($filters['status'] ?? '') === 'menunggu_approval')>Menunggu Keputusan</option>
+                    <option value="all" @selected(($filters['status'] ?? '') === 'all' || (request()->has('status') && is_null($filters['status'] ?? null)))>Semua Status</option>
                     <option value="disetujui" @selected(($filters['status'] ?? '') === 'disetujui')>Disetujui</option>
                     <option value="perlu_perubahan" @selected(($filters['status'] ?? '') === 'perlu_perubahan')>Perubahan</option>
                     <option value="ditangguhkan" @selected(($filters['status'] ?? '') === 'ditangguhkan')>Ditangguhkan</option>
@@ -164,7 +164,11 @@
                     @empty
                     <x-ui.table-row>
                         <x-ui.table-td colspan="6" align="center" class="px-6 py-8 text-muted text-sm">
-                            Belum ada pengajuan cuti bawahan yang sesuai dengan filter.
+                            @if(($filters['status'] ?? '') === 'menunggu_approval')
+                                Tidak ada pengajuan Cuti yang menunggu tindakan Anda.
+                            @else
+                                Belum ada pengajuan cuti bawahan yang sesuai dengan filter.
+                            @endif
                         </x-ui.table-td>
                     </x-ui.table-row>
                     @endforelse

@@ -149,13 +149,14 @@ class PimpinanEmployeeController extends Controller
         $unitKerjaOptions = RefUnitKerja::all();
         $eselonOptions = RefEselon::all();
         $jenjangOptions = RefJenjangPendidikan::orderBy('urutan')->get();
-
         $p = $employee;
 
-        return view('pimpinan.pegawai.show', compact('p'));
+        return view('admin.pegawai.show', compact(
+            'p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions'
+        ));
     }
 
-    public function reportPage(ExportPegawaiRequest $request): mixed
+    public function reportPage(ExportPegawaiRequest $request, \App\Services\Laporan\EmployeeExportDataService $exportData): mixed
     {
         $filters = $request->validated();
         $selectedColumns = (array) $request->query('columns', []);
@@ -164,10 +165,32 @@ class PimpinanEmployeeController extends Controller
             $selectedColumns = array_keys(PimpinanCustomEmployeeExportAction::ALLOWED_COLUMNS);
         }
 
+        $unitKerjaOptions = RefUnitKerja::query()->orderBy('nama')->get(['id', 'nama']);
+        $jenisPegawaiOptions = RefJenisPegawai::query()->orderBy('nama')->get(['id', 'nama']);
+        $jabatanOptions = RefJabatan::query()->orderBy('nama')->get(['id', 'nama']);
+
+        $perPage = (int) $request->query('per_page', 10);
+        $perPage = in_array($perPage, [10, 25, 50], true) ? $perPage : 10;
+        $page = max(1, (int) $request->query('page', 1));
+
+        $allRows = $exportData->rows($filters);
+        $previewData = new \Illuminate\Pagination\LengthAwarePaginator(
+            $allRows->forPage($page, $perPage)->values(),
+            $allRows->count(),
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
         return view('pimpinan.laporan.pegawai', [
             'filters' => $filters,
             'selectedColumns' => $selectedColumns,
             'allowedColumns' => PimpinanCustomEmployeeExportAction::ALLOWED_COLUMNS,
+            'unitKerjaOptions' => $unitKerjaOptions,
+            'jenisPegawaiOptions' => $jenisPegawaiOptions,
+            'jabatanOptions' => $jabatanOptions,
+            'pegawai' => $allRows->toArray(),
+            'previewData' => $previewData,
         ]);
     }
 

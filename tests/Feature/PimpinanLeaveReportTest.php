@@ -22,8 +22,7 @@ class PimpinanLeaveReportTest extends TestCase
 
         $this->actingAs(User::factory()->pimpinan()->create())
             ->get(route('pimpinan.laporan.index'))
-            ->assertOk()
-            ->assertSee('<title>Laporan &amp; Statistik — SIMPEG</title>', false);
+            ->assertRedirect(route('pimpinan.laporan.pegawai'));
     }
 
     public function test_pimpinan_preview_and_excel_export_use_filtered_leave_requests(): void

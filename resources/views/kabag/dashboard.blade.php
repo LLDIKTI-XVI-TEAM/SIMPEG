@@ -156,7 +156,24 @@
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
         
         {{-- WIDGET: Pengajuan Cuti Pending --}}
-        <x-ui.card padding="none" class="overflow-hidden flex flex-col justify-between" x-data="{ confirmOpen: false, selectedLeaveId: '', selectedEmployeeName: '' }">
+        <x-ui.card padding="none" class="overflow-hidden flex flex-col justify-between" x-data="{
+            confirmOpen: false,
+            selectedLeaveId: '',
+            selectedEmployeeName: '',
+            decisionType: 'DISETUJUI',
+            note: '',
+            isSubmitting: false,
+            urlTemplate: '{{ route('kepala-bagian.cuti.decision', ['leave' => '__LEAVE_ID__']) }}',
+            actionUrl() { return this.urlTemplate.replace('__LEAVE_ID__', this.selectedLeaveId); },
+            openDecision(leaveId, empName, type) {
+                this.selectedLeaveId = leaveId;
+                this.selectedEmployeeName = empName;
+                this.decisionType = type;
+                this.note = '';
+                this.isSubmitting = false;
+                this.confirmOpen = true;
+            }
+        }">
             <div>
                 <div class="px-6 py-5 border-b border-border/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface">
                     <div>
@@ -200,17 +217,47 @@
                                     <p class="text-xs text-muted font-sans leading-none">{{ $leave->jenisCuti?->nama ?? '-' }} · {{ $leave->jumlah_hari_kerja }} hari kerja · {{ $leave->tanggal_mulai?->translatedFormat('d M') ?? '-' }}–{{ $leave->tanggal_selesai?->translatedFormat('d M Y') ?? '-' }}</p>
                                 </x-ui.table-td>
                                 <x-ui.table-td align="right" class="px-6 py-3.5">
-                                    <div class="flex items-center justify-end gap-1.5">
-                                        <x-ui.tooltip text="Setujui Pengajuan" position="top-end">
-                                            <button type="button" @click="selectedLeaveId = '{{ $leave->id }}'; selectedEmployeeName = '{{ addslashes($leave->employee?->nama_lengkap ?? '') }}'; confirmOpen = true" class="flex h-7 w-7 items-center justify-center rounded-md bg-success/10 text-success transition hover:bg-success/20 border border-success/20 focus:outline-none focus:ring-2 focus:ring-success/30" aria-label="Setujui pengajuan cuti {{ $leave->employee?->nama_lengkap }}">
-                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                    <div class="flex items-center justify-end gap-1">
+                                        {{-- 1. SETUJUI --}}
+                                        <x-ui.tooltip text="Setujui" position="top">
+                                            <button type="button" @click="openDecision('{{ $leave->id }}', '{{ addslashes($leave->employee?->nama_lengkap ?? '') }}', 'DISETUJUI')" class="flex h-7 w-7 items-center justify-center rounded-md bg-success/10 text-success transition hover:bg-success/20 border border-success/20 focus:outline-none focus:ring-2 focus:ring-success/30" aria-label="Setujui pengajuan cuti {{ $leave->employee?->nama_lengkap }}">
+                                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                                                 </svg>
                                             </button>
                                         </x-ui.tooltip>
-                                        <x-ui.tooltip text="Tinjau Detail & Opsi Lain" position="top-end">
+
+                                        {{-- 2. PERUBAHAN --}}
+                                        <x-ui.tooltip text="Minta Perubahan" position="top">
+                                            <button type="button" @click="openDecision('{{ $leave->id }}', '{{ addslashes($leave->employee?->nama_lengkap ?? '') }}', 'PERLU_PERUBAHAN')" class="flex h-7 w-7 items-center justify-center rounded-md bg-info/10 text-info transition hover:bg-info/20 border border-info/20 focus:outline-none focus:ring-2 focus:ring-info/30" aria-label="Minta perubahan pengajuan cuti {{ $leave->employee?->nama_lengkap }}">
+                                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
+                                                </svg>
+                                            </button>
+                                        </x-ui.tooltip>
+
+                                        {{-- 3. DITANGGUHKAN --}}
+                                        <x-ui.tooltip text="Tangguhkan" position="top">
+                                            <button type="button" @click="openDecision('{{ $leave->id }}', '{{ addslashes($leave->employee?->nama_lengkap ?? '') }}', 'DITANGGUHKAN')" class="flex h-7 w-7 items-center justify-center rounded-md bg-warning/10 text-warning transition hover:bg-warning/20 border border-warning/20 focus:outline-none focus:ring-2 focus:ring-warning/30" aria-label="Tangguhkan pengajuan cuti {{ $leave->employee?->nama_lengkap }}">
+                                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                                </svg>
+                                            </button>
+                                        </x-ui.tooltip>
+
+                                        {{-- 4. TIDAK DISETUJUI --}}
+                                        <x-ui.tooltip text="Tidak Disetujui" position="top">
+                                            <button type="button" @click="openDecision('{{ $leave->id }}', '{{ addslashes($leave->employee?->nama_lengkap ?? '') }}', 'TIDAK_DISETUJUI')" class="flex h-7 w-7 items-center justify-center rounded-md bg-danger/10 text-danger transition hover:bg-danger/20 border border-danger/20 focus:outline-none focus:ring-2 focus:ring-danger/30" aria-label="Tidak setujui pengajuan cuti {{ $leave->employee?->nama_lengkap }}">
+                                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        </x-ui.tooltip>
+
+                                        {{-- 5. DETAIL --}}
+                                        <x-ui.tooltip text="Tinjau Detail" position="top-end">
                                             <a href="{{ route('kepala-bagian.cuti.show', $leave) }}" class="flex h-7 w-7 items-center justify-center rounded-md border border-border bg-surface text-primary transition hover:bg-soft shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Tinjau detail cuti">
-                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"></path>
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                                                 </svg>
@@ -231,16 +278,49 @@
                 </div>
             </div>
 
-            <x-ui.modal show="confirmOpen" close-action="confirmOpen = false" title="Konfirmasi Persetujuan Cuti">
-                <p class="text-sm text-ink">Setujui pengajuan cuti untuk <span class="font-bold text-ink" x-text="selectedEmployeeName"></span>? Pengajuan akan diteruskan ke approver berikutnya.</p>
-                <div class="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                    <x-ui.button type="button" @click="confirmOpen = false" variant="secondary">Batal</x-ui.button>
-                    <form method="POST" :action="'/kepala-bagian/cuti/' + selectedLeaveId + '/keputusan'">
-                        @csrf
-                        <input type="hidden" name="keputusan" value="DISETUJUI">
-                        <x-ui.button type="submit" variant="success">Ya, Setujui</x-ui.button>
-                    </form>
-                </div>
+            {{-- MODAL KEPUTUSAN --}}
+            <x-ui.modal show="confirmOpen" close-action="if (!isSubmitting) confirmOpen = false" @keydown.escape.window="if (!isSubmitting) confirmOpen = false">
+                <x-slot:title>
+                    <span x-text="decisionType === 'DISETUJUI' ? 'Konfirmasi Persetujuan Cuti' : (decisionType === 'PERLU_PERUBAHAN' ? 'Keputusan: Perlu Perubahan' : (decisionType === 'DITANGGUHKAN' ? 'Keputusan: Ditangguhkan' : 'Keputusan: Tidak Disetujui'))"></span>
+                </x-slot:title>
+
+                <form method="POST" :action="actionUrl()" @submit="isSubmitting = true">
+                    @csrf
+                    <input type="hidden" name="keputusan" :value="decisionType">
+
+                    <div class="space-y-4">
+                        <p class="text-sm text-ink">
+                            Pengajuan cuti untuk <span class="font-bold text-ink" x-text="selectedEmployeeName"></span>.
+                            <template x-if="decisionType === 'DISETUJUI'">
+                                <span>Apakah Anda yakin ingin menyetujui pengajuan ini? Pengajuan akan diteruskan ke proses selanjutnya.</span>
+                            </template>
+                        </p>
+
+                        {{-- TEXTAREA CATATAN/ALASAN (WAJIB UNTUK NON-DISETUJUI) --}}
+                        <template x-if="decisionType !== 'DISETUJUI'">
+                            <div class="space-y-1.5">
+                                <label for="dashboard-catatan" class="block text-xs font-semibold text-ink font-sans">
+                                    Catatan / Alasan Keputusan <span class="text-danger">*</span>
+                                </label>
+                                <textarea id="dashboard-catatan" name="catatan" x-model="note" required minlength="5" rows="3" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans" placeholder="Masukkan catatan keputusan minimal 5 karakter..."></textarea>
+                                <p class="text-[11px] text-muted font-sans" x-show="note.trim().length < 5">Catatan wajib diisi minimal 5 karakter.</p>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                        <x-ui.button type="button" @click="confirmOpen = false" variant="secondary" ::disabled="isSubmitting">Batal</x-ui.button>
+                        <x-ui.button type="submit"
+                            ::variant="decisionType === 'DISETUJUI' ? 'success' : (decisionType === 'TIDAK_DISETUJUI' ? 'danger' : 'primary')"
+                            ::disabled="isSubmitting || (decisionType !== 'DISETUJUI' && note.trim().length < 5)">
+                            <span x-show="!isSubmitting" x-text="decisionType === 'DISETUJUI' ? 'Ya, Setujui' : 'Kirim Keputusan'"></span>
+                            <span x-show="isSubmitting" class="flex items-center gap-2">
+                                <svg class="w-4 h-4 animate-spin text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                Mengirim...
+                            </span>
+                        </x-ui.button>
+                    </div>
+                </form>
             </x-ui.modal>
         </x-ui.card>
 

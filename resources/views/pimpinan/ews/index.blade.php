@@ -59,10 +59,10 @@
                             @endphp
                             <x-ui.table-row class="hover:bg-soft transition-colors border-b border-border/50 group">
                                 <x-ui.table-td class="px-5 py-3"><a href="{{ route('pimpinan.pegawai.show', $alert['pegawai_id']) }}" class="font-semibold text-ink transition hover:text-primary focus:outline-none rounded">{{ $alert['nama'] }}</a><span class="mt-1 block font-sans text-[10px] text-muted">NIP. {{ $alert['nip'] }}</span></x-ui.table-td>
-                                <x-ui.table-td class="px-4 py-3.5 text-sm text-ink">{{ $alert['jenis_event'] }}<p class="mt-1 text-xs text-muted">{{ $alert['threshold_label'] }}</span></x-ui.table-td>
+                                <x-ui.table-td class="px-4 py-3.5 text-sm text-ink">{{ $alert['jenis_event'] }}<p class="mt-1 text-xs text-muted">{{ $alert['threshold_label'] }}</p></x-ui.table-td>
                                 <x-ui.table-td class="px-4 py-3.5 text-sm text-ink">{{ \Carbon\Carbon::parse($alert['tanggal_target'])->translatedFormat('d M Y') }}</x-ui.table-td>
                                 <x-ui.table-td class="px-4 py-3.5"><x-ui.badge :variant="$alert['urgency']" size="sm" dot>{{ $remaining }}</x-ui.badge></x-ui.table-td>
-                                <x-ui.table-td class="px-4 py-3.5"><x-ui.badge :variant="$eligibility['variant']" size="sm" dot>{{ $eligibility['label'] }}</x-ui.badge><p class="mt-1 text-xs text-muted">{{ $alert['eligibility_reason'] }}</span></x-ui.table-td>
+                                <x-ui.table-td class="px-4 py-3.5"><x-ui.badge :variant="$eligibility['variant']" size="sm" dot>{{ $eligibility['label'] }}</x-ui.badge><p class="mt-1 text-xs text-muted">{{ $alert['eligibility_reason'] }}</p></x-ui.table-td>
                                 <x-ui.table-td class="px-4 py-3.5"><x-ui.badge variant="info" size="sm" dot>{{ $alert['followup_status_label'] }}</x-ui.badge>@if ($alert['handled_note'])<p class="mt-1 text-xs text-muted">{{ $alert['handled_note'] }}</p>@endif</x-ui.table-td>
                             </x-ui.table-row>
                         @empty

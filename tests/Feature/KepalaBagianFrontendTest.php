@@ -116,6 +116,43 @@ class KepalaBagianFrontendTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_leave_index_defaults_to_menunggu_approval_status(): void
+    {
+        [$user, $kepalaBagian] = $this->kepalaBagian();
+        $pendingReport = Employee::factory()->create([
+            'nama_lengkap' => 'Pemohon Menunggu',
+            'kepala_bagian_id' => $kepalaBagian->id,
+        ]);
+        $approvedReport = Employee::factory()->create([
+            'nama_lengkap' => 'Pemohon Disetujui',
+            'kepala_bagian_id' => $kepalaBagian->id,
+        ]);
+        
+        $pendingLeave = $this->leaveWithActiveStep($pendingReport, $kepalaBagian);
+        
+        $approvedLeave = LeaveRequest::create([
+            'employee_id' => $approvedReport->id,
+            'jenis_cuti_id' => $pendingLeave->jenis_cuti_id,
+            'tanggal_mulai' => '2026-06-01',
+            'tanggal_selesai' => '2026-06-02',
+            'jumlah_hari_kerja' => 2,
+            'alasan' => 'Sudah disetujui sebelumnya.',
+            'status' => 'disetujui',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.cuti.index'))
+            ->assertOk()
+            ->assertSee('Pemohon Menunggu')
+            ->assertDontSee('Pemohon Disetujui');
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.cuti.index', ['status' => 'all']))
+            ->assertOk()
+            ->assertSee('Pemohon Menunggu')
+            ->assertSee('Pemohon Disetujui');
+    }
+
     public function test_kepala_bagian_decision_uses_leave_workflow_and_requires_note_when_needed(): void
     {
         [$user, $kepalaBagian] = $this->kepalaBagian();

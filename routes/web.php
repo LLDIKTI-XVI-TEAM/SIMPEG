@@ -525,6 +525,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->prefix('pimpinan')
         ->name('pimpinan.')
         ->group(function () {
+            Route::get('/', fn () => redirect()->route('pimpinan.dashboard'));
             Route::get('/dashboard', [PimpinanDashboardController::class, 'index'])->name('dashboard');
 
             Route::get('/pegawai', [PimpinanEmployeeController::class, 'index'])->name('pegawai.index');

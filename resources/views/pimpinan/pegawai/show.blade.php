@@ -117,6 +117,61 @@
                             </svg>
                             Supervisor
                         </button>
+
+                        <button
+                            type="button"
+                            role="tab"
+                            @click="setTab('pangkat')"
+                            :class="activeTab === 'pangkat' ? 'bg-primary/10 text-primary font-semibold' : 'text-muted hover:bg-soft hover:text-ink'"
+                            class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition text-left"
+                        >
+                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18 9 11.25l4.306 4.307a11.95 11.95 0 0 1 5.814-5.519l2.74-1.22m0 0-5.94-2.28m5.94 2.28-2.28 5.94" /></svg>
+                            Riwayat Kepangkatan
+                        </button>
+
+                        <button
+                            type="button"
+                            role="tab"
+                            @click="setTab('jabatan')"
+                            :class="activeTab === 'jabatan' ? 'bg-primary/10 text-primary font-semibold' : 'text-muted hover:bg-soft hover:text-ink'"
+                            class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition text-left"
+                        >
+                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25" /></svg>
+                            Riwayat Jabatan
+                        </button>
+
+                        <button
+                            type="button"
+                            role="tab"
+                            @click="setTab('kgb')"
+                            :class="activeTab === 'kgb' ? 'bg-primary/10 text-primary font-semibold' : 'text-muted hover:bg-soft hover:text-ink'"
+                            class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition text-left"
+                        >
+                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33" /></svg>
+                            Riwayat KGB
+                        </button>
+
+                        <button
+                            type="button"
+                            role="tab"
+                            @click="setTab('disiplin')"
+                            :class="activeTab === 'disiplin' ? 'bg-primary/10 text-primary font-semibold' : 'text-muted hover:bg-soft hover:text-ink'"
+                            class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition text-left"
+                        >
+                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg>
+                            Hukuman Disiplin
+                        </button>
+
+                        <button
+                            type="button"
+                            role="tab"
+                            @click="setTab('pendidikan')"
+                            :class="activeTab === 'pendidikan' ? 'bg-primary/10 text-primary font-semibold' : 'text-muted hover:bg-soft hover:text-ink'"
+                            class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition text-left"
+                        >
+                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.436 60.436 0 0 0-.491 6.347A48.627 48.627 0 0 1 12 20.904a48.627 48.627 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.57 50.57 0 0 0-2.658-.813A59.905 59.905 0 0 1 12 3.493a59.902 59.902 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342" /></svg>
+                            Pendidikan
+                        </button>
                     </nav>
 
                     {{-- Export history tidak tersedia untuk pimpinan --}}
@@ -258,9 +313,155 @@
                             </div>
                         @endif
                     </x-ui.card>
+                {{-- Panel: Kepangkatan --}}
+                <div x-show="activeTab === 'pangkat'" x-cloak>
+                    <x-ui.card>
+                        <h2 class="mb-4 text-base font-semibold text-ink">Riwayat Kepangkatan</h2>
+                        @if(($p->rankHistories ?? collect())->isEmpty())
+                            <p class="text-sm text-muted">Belum ada riwayat kepangkatan.</p>
+                        @else
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-sm text-ink font-sans">
+                                    <thead class="bg-soft/40 text-xs text-muted uppercase">
+                                        <tr>
+                                            <th class="px-4 py-3">Golongan</th>
+                                            <th class="px-4 py-3">No. SK</th>
+                                            <th class="px-4 py-3">Tanggal SK</th>
+                                            <th class="px-4 py-3">TMT</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-border">
+                                        @foreach($p->rankHistories as $r)
+                                            <tr>
+                                                <td class="px-4 py-3 font-semibold">{{ $r->golongan->nama ?? '-' }}</td>
+                                                <td class="px-4 py-3">{{ $r->no_sk ?? '-' }}</td>
+                                                <td class="px-4 py-3">{{ $r->tanggal_sk ? \Carbon\Carbon::parse($r->tanggal_sk)->translatedFormat('d M Y') : '-' }}</td>
+                                                <td class="px-4 py-3">{{ $r->tmt_pangkat ? \Carbon\Carbon::parse($r->tmt_pangkat)->translatedFormat('d M Y') : '-' }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
+                    </x-ui.card>
                 </div>
 
-            </div>
+                {{-- Panel: Jabatan --}}
+                <div x-show="activeTab === 'jabatan'" x-cloak>
+                    <x-ui.card>
+                        <h2 class="mb-4 text-base font-semibold text-ink">Riwayat Jabatan</h2>
+                        @if(($p->positionHistories ?? collect())->isEmpty())
+                            <p class="text-sm text-muted">Belum ada riwayat jabatan.</p>
+                        @else
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-sm text-ink font-sans">
+                                    <thead class="bg-soft/40 text-xs text-muted uppercase">
+                                        <tr>
+                                            <th class="px-4 py-3">Jabatan</th>
+                                            <th class="px-4 py-3">Unit Kerja</th>
+                                            <th class="px-4 py-3">No. SK</th>
+                                            <th class="px-4 py-3">TMT</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-border">
+                                        @foreach($p->positionHistories as $j)
+                                            <tr>
+                                                <td class="px-4 py-3 font-semibold">{{ $j->jabatan?->nama ?? $j->nama_jabatan ?? '-' }}</td>
+                                                <td class="px-4 py-3">{{ $j->unitKerja?->nama ?? '-' }}</td>
+                                                <td class="px-4 py-3">{{ $j->no_sk ?? '-' }}</td>
+                                                <td class="px-4 py-3">{{ $j->tmt_jabatan ? \Carbon\Carbon::parse($j->tmt_jabatan)->translatedFormat('d M Y') : '-' }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
+                    </x-ui.card>
+                </div>
+
+                {{-- Panel: KGB --}}
+                <div x-show="activeTab === 'kgb'" x-cloak>
+                    <x-ui.card>
+                        <h2 class="mb-4 text-base font-semibold text-ink">Riwayat KGB</h2>
+                        @if(($p->salaryHistories ?? collect())->isEmpty())
+                            <p class="text-sm text-muted">Belum ada riwayat KGB.</p>
+                        @else
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-sm text-ink font-sans">
+                                    <thead class="bg-soft/40 text-xs text-muted uppercase">
+                                        <tr>
+                                            <th class="px-4 py-3">Gaji Pokok</th>
+                                            <th class="px-4 py-3">No. SK</th>
+                                            <th class="px-4 py-3">TMT KGB</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-border">
+                                        @foreach($p->salaryHistories as $s)
+                                            <tr>
+                                                <td class="px-4 py-3 font-semibold">Rp {{ number_format($s->gaji_pokok, 0, ',', '.') }}</td>
+                                                <td class="px-4 py-3">{{ $s->no_sk ?? '-' }}</td>
+                                                <td class="px-4 py-3">{{ $s->tmt_kgb ? \Carbon\Carbon::parse($s->tmt_kgb)->translatedFormat('d M Y') : '-' }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
+                    </x-ui.card>
+                </div>
+
+                {{-- Panel: Hukuman Disiplin --}}
+                <div x-show="activeTab === 'disiplin'" x-cloak>
+                    <x-ui.card>
+                        <h2 class="mb-4 text-base font-semibold text-ink">Hukuman Disiplin</h2>
+                        @if(($p->disciplineRecords ?? collect())->isEmpty())
+                            <p class="text-sm text-muted">Tidak ada riwayat hukuman disiplin.</p>
+                        @else
+                            <div class="divide-y divide-border">
+                                @foreach($p->disciplineRecords as $d)
+                                    <div class="py-3">
+                                        <p class="text-sm font-semibold text-ink">{{ $d->jenis_hukuman }}</p>
+                                        <p class="text-xs text-muted">{{ $d->deskripsi }}</p>
+                                        <p class="mt-1 text-xs text-muted">No. SK: {{ $d->no_sk }} · Masa: {{ $d->tanggal_mulai ? \Carbon\Carbon::parse($d->tanggal_mulai)->format('d-m-Y') : '-' }} s/d {{ $d->tanggal_berakhir ? \Carbon\Carbon::parse($d->tanggal_berakhir)->format('d-m-Y') : 'Sekarang' }}</p>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+                    </x-ui.card>
+                </div>
+
+                {{-- Panel: Pendidikan --}}
+                <div x-show="activeTab === 'pendidikan'" x-cloak>
+                    <x-ui.card>
+                        <h2 class="mb-4 text-base font-semibold text-ink">Riwayat Pendidikan</h2>
+                        @if(($p->educationHistories ?? collect())->isEmpty())
+                            <p class="text-sm text-muted">Belum ada riwayat pendidikan.</p>
+                        @else
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-sm text-ink font-sans">
+                                    <thead class="bg-soft/40 text-xs text-muted uppercase">
+                                        <tr>
+                                            <th class="px-4 py-3">Jenjang</th>
+                                            <th class="px-4 py-3">Institusi</th>
+                                            <th class="px-4 py-3">Jurusan</th>
+                                            <th class="px-4 py-3">Tahun Lulus</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-border">
+                                        @foreach($p->educationHistories as $edu)
+                                            <tr>
+                                                <td class="px-4 py-3 font-semibold">{{ $edu->jenjang?->urutan ?? $edu->tingkat ?? '-' }}</td>
+                                                <td class="px-4 py-3">{{ $edu->nama_institusi ?? '-' }}</td>
+                                                <td class="px-4 py-3">{{ $edu->jurusan ?? '-' }}</td>
+                                                <td class="px-4 py-3">{{ $edu->tahun_lulus ?? '-' }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
+                    </x-ui.card>
+                </div>
         </div>
     </div>
 </x-layouts.app>
