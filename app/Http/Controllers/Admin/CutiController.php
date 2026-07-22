@@ -3,12 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Actions\Cuti\ApproveLeaveAction;
+use App\Actions\Cuti\DeclineLeaveAction;
 use App\Actions\Cuti\DownloadOfficialLeavePdfAction;
 use App\Actions\Cuti\ListLeaveRequestsAction;
 use App\Actions\Cuti\ListPendingLeaveApprovalsAction;
 use App\Actions\Cuti\PostponeLeaveAction;
 use App\Actions\Cuti\PrepareLeaveRequestFormAction;
-use App\Actions\Cuti\RejectLeaveAction;
 use App\Actions\Cuti\RequestChangesLeaveAction;
 use App\Actions\Cuti\ResubmitLeaveRequestAction;
 use App\Actions\Cuti\ShowCutiRekapAction;
@@ -184,13 +184,13 @@ class CutiController extends Controller
             ->with('success', 'Pengajuan cuti dikembalikan untuk perbaikan.');
     }
 
-    /** Menolak pengajuan cuti secara terminal pada step aktif. */
-    public function reject(ReviewLeaveDecisionRequest $request, $id, RejectLeaveAction $action)
+    /** Menutup pengajuan sebagai Tidak Disetujui pada step aktif. */
+    public function decline(ReviewLeaveDecisionRequest $request, $id, DeclineLeaveAction $action)
     {
         $leaveRequest = LeaveRequest::findOrFail($id);
         $actor = $request->user()->employee;
 
-        abort_if($actor === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat menolak cuti.');
+        abort_if($actor === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat memutuskan cuti.');
 
         $action->execute($leaveRequest, $actor, $request->validated()['komentar'], $request);
 

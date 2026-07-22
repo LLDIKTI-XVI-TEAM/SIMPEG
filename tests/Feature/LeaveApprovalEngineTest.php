@@ -344,14 +344,31 @@ class LeaveApprovalEngineTest extends TestCase
         ]);
         $cuti = $this->makeRequest($pemohon['employee'], $jenis, [$pemohon['kepala_bagian'], $pemohon['pybmc']], 2);
 
-        $this->service()->reject($cuti, $pemohon['kepala_bagian'], 'Dokumen pendukung tidak sesuai.');
+        $this->service()->decline($cuti, $pemohon['kepala_bagian'], 'Dokumen pendukung tidak sesuai.');
 
         $this->assertSame('tidak_disetujui', $cuti->fresh()->status);
-        $this->assertDatabaseHas('leave_request_steps', ['leave_request_id' => $cuti->id, 'step_order' => 1, 'status' => 'rejected']);
-        $this->assertDatabaseHas('leave_approvals', ['leave_request_id' => $cuti->id, 'stage' => 1, 'action' => 'REJECT']);
+        $this->assertDatabaseHas('leave_request_steps', ['leave_request_id' => $cuti->id, 'step_order' => 1, 'status' => 'tidak_disetujui']);
+        $this->assertDatabaseHas('leave_request_steps', [
+            'leave_request_id' => $cuti->id,
+            'step_order' => 2,
+            'status' => 'skipped',
+            'skipped_reason' => 'request_not_approved',
+        ]);
+        $this->assertDatabaseHas('leave_approvals', ['leave_request_id' => $cuti->id, 'stage' => 1, 'action' => 'NOT_APPROVED']);
+        $this->assertDatabaseCount('leave_balance_ledger', 0);
         $balance = LeaveBalance::where('employee_id', $pemohon['employee']->id)->where('tahun', 2026)->first();
         $this->assertSame(0, $balance->terpakai);
         $this->assertSame(12, $balance->sisa);
+    }
+
+    public function test_tidak_disetujui_hanya_dapat_diputuskan_approver_snapshot_aktif(): void
+    {
+        $pemohon = $this->makePemohon();
+        $jenis = $this->jenisCuti('Cuti Sakit');
+        $cuti = $this->makeRequest($pemohon['employee'], $jenis, [$pemohon['kepala_bagian'], $pemohon['pybmc']], 2);
+
+        $this->expectException(AuthorizationException::class);
+        $this->service()->decline($cuti, $pemohon['pybmc'], 'Dokumen pendukung tidak sesuai.');
     }
 
     public function test_penundaan_lalu_disetujui_kembali_oleh_approver_yang_sama(): void

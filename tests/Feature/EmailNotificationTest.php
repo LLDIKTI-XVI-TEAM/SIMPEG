@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Actions\Cuti\ApproveLeaveAction;
-use App\Actions\Cuti\RejectLeaveAction;
+use App\Actions\Cuti\DeclineLeaveAction;
 use App\Jobs\SendSimpegNotificationEmailJob;
 use App\Mail\SimpegNotificationMail;
 use App\Models\Employee;
@@ -105,7 +105,7 @@ class EmailNotificationTest extends TestCase
         );
     }
 
-    public function test_cuti_rejection_queues_email_to_primary_recipient(): void
+    public function test_cuti_decline_queues_email_to_primary_recipient(): void
     {
         Queue::fake();
         $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
@@ -291,14 +291,14 @@ class EmailNotificationTest extends TestCase
         $this->assertStringNotContainsString('https://example.net/phishing', $html);
     }
 
-    public function test_cuti_rejection_notification_carries_internal_detail_url(): void
+    public function test_cuti_decline_notification_carries_internal_detail_url(): void
     {
         Queue::fake();
         $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
         $approver = Employee::factory()->create();
         $leave = $this->makeLeaveRequestWithSteps($employee, [$approver]);
 
-        app(RejectLeaveAction::class)->execute($leave, $approver, 'Dokumen pendukung tidak sesuai.', Request::create('/'));
+        app(DeclineLeaveAction::class)->execute($leave, $approver, 'Dokumen pendukung tidak sesuai.', Request::create('/'));
 
         $notification = SimpegNotification::query()
             ->where('user_id', $employee->id)

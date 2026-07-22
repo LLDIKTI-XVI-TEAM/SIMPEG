@@ -25,7 +25,7 @@ class CutiListDisplayTest extends TestCase
         $this->seed(RbacSeeder::class);
     }
 
-    public function test_waiting_row_shows_dynamic_current_step_label(): void
+    public function test_list_rows_expose_current_step_label_from_the_active_snapshot(): void
     {
         $user = User::factory()->superAdmin()->create();
         $jenis = RefJenisCuti::create([
@@ -62,15 +62,78 @@ class CutiListDisplayTest extends TestCase
         $riwayatCuti = $response->viewData('riwayatCuti');
         $row = $riwayatCuti->first();
 
-        $this->assertSame('Kepala Bagian', $row['current_step']);
+        $this->assertArrayHasKey('current_step_label', $row);
+        $this->assertSame('Kepala Bagian', $row['current_step_label']);
+        $this->assertArrayNotHasKey('current_step', $row);
         $this->assertArrayNotHasKey('stage_atasan', $row);
         $this->assertArrayNotHasKey('stage_kepala', $row);
-        // The waiting cell renders "Menunggu <strong>Kepala Bagian</strong>"; assert both fragments.
-        $response->assertSee('Menunggu', false);
-        $response->assertSee('Kepala Bagian', false);
-        // The stale two-slot markup must be gone.
-        $response->assertDontSee('stage_atasan', false);
-        $response->assertDontSee('stage_kepala', false);
+    }
+
+    public function test_completed_list_row_exposes_a_null_current_step_label(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $jenis = RefJenisCuti::create([
+            'nama' => 'Cuti Sakit Kontrak Tahap Terminal',
+            'code' => 'sakit-kontrak-tahap-terminal',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+        $leaveRequest = $this->createLeave(
+            Employee::factory()->create(['nama_lengkap' => 'Pegawai Tahap Terminal Admin']),
+            $jenis,
+            'Uji tahap terminal Admin',
+            'disetujui',
+        );
+
+        $response = $this->actingAs($user)->get(route('cuti'));
+        $row = $response->viewData('riwayatCuti')->getCollection()->firstWhere('id', $leaveRequest->id);
+
+        $response->assertOk();
+        $this->assertSame(1, $response->viewData('riwayatCuti')->total());
+        $this->assertArrayHasKey('current_step_label', $row);
+        $this->assertNull($row['current_step_label']);
+        $this->assertArrayNotHasKey('current_step', $row);
+    }
+
+    public function test_list_renders_active_role_label_and_dash_for_a_terminal_row(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $jenis = RefJenisCuti::create([
+            'nama' => 'Cuti Kontrak Tampilan Tahap Admin',
+            'code' => 'cuti-kontrak-tampilan-tahap-admin',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+        $activeLeave = $this->createLeave(
+            Employee::factory()->create(['nama_lengkap' => 'Pegawai Tahap Aktif Admin']),
+            $jenis,
+            'Baris tahap aktif Admin',
+            'menunggu_approval',
+        );
+        $activeLeave->steps()->create([
+            'step_order' => 1,
+            'step_type' => 'verifikator_kontrak_admin',
+            'role_label' => 'Verifikator Kontrak Admin',
+            'approver_employee_id' => Employee::factory()->create()->id,
+            'status' => 'active',
+            'is_final' => false,
+        ]);
+        $this->createLeave(
+            Employee::factory()->create(['nama_lengkap' => 'Pegawai Tanpa Tahap Admin']),
+            $jenis,
+            'Baris tanpa tahap Admin',
+            'disetujui',
+        );
+
+        $response = $this->actingAs($user)->get(route('cuti'));
+
+        $response->assertOk()
+            ->assertSee('Verifikator Kontrak Admin')
+            ->assertSee('Langkah Aktif');
+        $this->assertMatchesRegularExpression(
+            '/data-nama="Pegawai Tanpa Tahap Admin".*?<span class="text-muted">-<\/span>/s',
+            $response->getContent(),
+        );
     }
 
     public function test_empty_list_renders_clear_empty_state(): void

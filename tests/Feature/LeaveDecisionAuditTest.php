@@ -32,13 +32,16 @@ class LeaveDecisionAuditTest extends TestCase
         $this->seed(RbacSeeder::class);
     }
 
-    public function test_reject_menyimpan_audit_dengan_id_dan_status_sebelum_sesudah(): void
+    public function test_decline_menyimpan_audit_dengan_id_dan_status_sebelum_sesudah(): void
     {
-        [$user, $approver, $pemohon, $cuti] = $this->buatPengajuanMenungguApproval('cuti_sakit_reject_audit');
+        [$user, $approver, $pemohon, $cuti] = $this->buatPengajuanMenungguApproval('cuti_sakit_decline_audit');
 
-        $komentar = 'Dokumen pendukung tidak lengkap sehingga pengajuan ditolak.';
+        $komentar = 'Dokumen pendukung tidak lengkap sehingga pengajuan tidak disetujui.';
 
-        $response = $this->actingAs($user)->post(route('cuti.reject', ['id' => $cuti->id]), [
+        $url = route('cuti.decline', ['id' => $cuti->id]);
+        $this->assertSame("/cuti/{$cuti->id}/decline", parse_url($url, PHP_URL_PATH));
+
+        $response = $this->actingAs($user)->post($url, [
             'komentar' => $komentar,
         ]);
 
@@ -68,7 +71,7 @@ class LeaveDecisionAuditTest extends TestCase
             'leave_request_id' => $cuti->id,
             'employee_id' => $pemohon->id,
             'status' => 'tidak_disetujui',
-            'decision' => 'REJECT',
+            'decision' => 'NOT_APPROVED',
             'step_order' => 1,
             'step_label' => 'Verifikator',
             'approver_id' => $approver->id,

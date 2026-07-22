@@ -10,13 +10,17 @@ use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Services\AuditService;
 use App\Services\EmployeeFileStorageService;
+use App\Services\Employees\TmtCalculatorService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class CreateEmployeeAction
 {
-    public function __construct(private readonly EmployeeFileStorageService $files) {}
+    public function __construct(
+        private readonly EmployeeFileStorageService $files,
+        private readonly TmtCalculatorService $tmtCalculator,
+    ) {}
 
     /**
      * Membuat pegawai baru, termasuk penyimpanan foto, dokumen SK,
@@ -37,6 +41,7 @@ class CreateEmployeeAction
                 }
 
                 $employee = Employee::create($data);
+                $sourceHistoryChanged = false;
 
                 // 1. Pangkat (RankHistory)
                 if ($request->filled('pangkat_golongan_id') || $request->filled('pangkat_no_sk') || $request->filled('pangkat_tmt_pangkat') || $request->hasFile('file_sk_pangkat')) {
@@ -45,7 +50,7 @@ class CreateEmployeeAction
                         'no_sk' => $data['pangkat_no_sk'] ?? null,
                         'tanggal_sk' => $data['pangkat_tanggal_sk'] ?? null,
                         'tmt_pangkat' => $data['pangkat_tmt_pangkat'] ?? null,
-                        'is_latest' => true,
+                        'is_latest' => ($data['pangkat_tmt_pangkat'] ?? null) !== null,
                     ];
 
                     if ($request->hasFile('file_sk_pangkat') && $request->file('file_sk_pangkat')->isValid()) {
@@ -68,6 +73,7 @@ class CreateEmployeeAction
                     }
 
                     $employee->rankHistories()->create($pangkatData);
+                    $sourceHistoryChanged = true;
 
                     $golongan = RefGolongan::find($data['pangkat_golongan_id']);
                     if ($golongan) {
@@ -96,7 +102,7 @@ class CreateEmployeeAction
                         'no_sk' => $data['jabatan_no_sk'],
                         'tanggal_sk' => $data['jabatan_tanggal_sk'],
                         'tmt_jabatan' => $data['jabatan_tmt_jabatan'],
-                        'is_latest' => true,
+                        'is_latest' => ($data['jabatan_tmt_jabatan'] ?? null) !== null,
                     ];
 
                     if ($request->hasFile('file_sk_jabatan') && $request->file('file_sk_jabatan')->isValid()) {
@@ -116,6 +122,7 @@ class CreateEmployeeAction
                     }
 
                     $employee->positionHistories()->create($jabatanData);
+                    $sourceHistoryChanged = true;
 
                     $employee->update([
                         'jabatan_terakhir' => $namaJabatan,
@@ -131,7 +138,7 @@ class CreateEmployeeAction
                         'no_sk' => $data['kgb_no_sk'] ?? null,
                         'tanggal_sk' => $data['kgb_tanggal_sk'] ?? null,
                         'tmt_kgb' => $data['kgb_tmt_kgb'] ?? null,
-                        'is_latest' => true,
+                        'is_latest' => ($data['kgb_tmt_kgb'] ?? null) !== null,
                     ];
 
                     if ($request->hasFile('file_sk_kgb') && $request->file('file_sk_kgb')->isValid()) {
@@ -151,6 +158,12 @@ class CreateEmployeeAction
                     }
 
                     $employee->salaryHistories()->create($kgbData);
+                    $sourceHistoryChanged = true;
+                }
+
+                // Sinkronisasi ditunda sampai seluruh riwayat sumber tersimpan agar snapshot tidak membaca keadaan parsial.
+                if ($sourceHistoryChanged) {
+                    $this->tmtCalculator->syncForEmployee($employee);
                 }
 
                 // 4. Pengangkatan (Appointment)

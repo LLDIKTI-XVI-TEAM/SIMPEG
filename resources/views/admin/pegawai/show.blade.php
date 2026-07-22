@@ -4,16 +4,16 @@
         // Mapping riwayat berkas digital pegawai
         $riwayatDokumen = $p->documents ?? [];
 
-        // Kalkulator otomatis jadwal
-        $tmtPangkatTerakhir = $p->latestRank()?->tmt_pangkat ? \Carbon\Carbon::parse($p->latestRank()->tmt_pangkat) : null;
-        $estimasiPangkatNext = $tmtPangkatTerakhir ? $tmtPangkatTerakhir->copy()->addYears(4)->format('d-m-Y') : '-';
+        $estimasiPangkatNext = $p->tanggal_kenaikan_pangkat_berikutnya
+            ? \Carbon\Carbon::parse($p->tanggal_kenaikan_pangkat_berikutnya)->format('d-m-Y')
+            : '-';
         $estimasiKgbNext = $p->tanggal_kgb_berikutnya
             ? \Carbon\Carbon::parse($p->tanggal_kgb_berikutnya)->format('d-m-Y')
-            : ($p->latestSalary()?->tmt_kgb ? \Carbon\Carbon::parse($p->latestSalary()->tmt_kgb)->addYears(2)->format('d-m-Y') : '-');
-        
+            : '-';
+
         $pensiunDate = $p->tanggal_pensiun ? \Carbon\Carbon::parse($p->tanggal_pensiun) : null;
         $estimasiPensiun = $pensiunDate ? $pensiunDate->format('d-m-Y') : '-';
-        
+
         $sisaPensiunStr = '-';
         if ($pensiunDate) {
             $now = \Carbon\Carbon::now();

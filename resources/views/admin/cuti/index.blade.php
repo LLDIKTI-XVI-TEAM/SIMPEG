@@ -199,10 +199,10 @@
                             </x-ui.table-td>
                             <x-ui.table-td>
                                 <div class="text-[11px] font-medium text-ink font-sans">
-                                    @if($r['status'] === 'menunggu_approval' && $r['current_step'])
-                                        <span>Menunggu <strong>{{ $r['current_step'] }}</strong></span>
-                                    @elseif($r['current_step'])
-                                        <span>Langkah aktif: <strong>{{ $r['current_step'] }}</strong></span>
+                                    @if($r['status'] === 'menunggu_approval' && $r['current_step_label'])
+                                        <span>Menunggu <strong>{{ $r['current_step_label'] }}</strong></span>
+                                    @elseif($r['current_step_label'])
+                                        <span>Langkah aktif: <strong>{{ $r['current_step_label'] }}</strong></span>
                                     @else
                                         <span class="text-muted">-</span>
                                     @endif

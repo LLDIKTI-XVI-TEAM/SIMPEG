@@ -9,8 +9,8 @@ use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\RefGolongan;
 use App\Models\RefJabatan;
-use App\Models\RefJenisJabatan;
 use App\Models\SalaryHistory;
+use App\Services\Employees\TmtCalculatorService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
@@ -19,7 +19,10 @@ use Illuminate\Support\Facades\DB;
 
 class EmployeeHistoryService
 {
-    public function __construct(private readonly EmployeeFileStorageService $files) {}
+    public function __construct(
+        private readonly EmployeeFileStorageService $files,
+        private readonly TmtCalculatorService $tmtCalculator,
+    ) {}
 
     /**
      * Menambah riwayat pangkat secara append-only dan menjaga hanya satu data terbaru.
@@ -32,28 +35,32 @@ class EmployeeHistoryService
             $golongan = RefGolongan::findOrFail($data['golongan_id']);
             // Kunci baris pegawai agar dua penulisan paralel tidak sama-sama menyisakan riwayat terbaru.
             $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
-            $currentLatest = $employee->rankHistories()->where('is_latest', true)->first();
-            // Riwayat terbaru ditentukan dari TMT, bukan urutan input, agar backfill SK lama tidak merusak snapshot.
-            $isLatest = $currentLatest === null
-                || Carbon::parse($data['tmt_pangkat'])->greaterThanOrEqualTo($currentLatest->tmt_pangkat);
-
-            if ($isLatest) {
-                $employee->rankHistories()->update(['is_latest' => false]);
-            }
-
             $history = $employee->rankHistories()->create([
                 ...Arr::only($data, ['golongan_id', 'tmt_pangkat', 'no_sk', 'tanggal_sk', 'file_sk']),
-                'is_latest' => $isLatest,
+                'is_latest' => false,
             ]);
 
-            if ($isLatest) {
+            // Pilih ulang dari seluruh riwayat bertanggal agar flag lama yang keliru dan input backfill tidak dipercaya.
+            $latest = $employee->rankHistories()
+                ->whereNotNull('tmt_pangkat')
+                ->orderByDesc('tmt_pangkat')
+                ->orderByDesc('created_at')
+                ->orderByDesc('id')
+                ->first();
+            $employee->rankHistories()->update(['is_latest' => false]);
+            if ($latest !== null) {
+                $employee->rankHistories()->whereKey($latest->id)->update(['is_latest' => true]);
+            }
+
+            if ($latest !== null) {
+                $latestGolongan = RefGolongan::findOrFail($latest->golongan_id);
                 $employee->update([
-                    'golongan_terakhir' => $golongan->kode,
-                    'pangkat_terakhir' => $golongan->nama,
-                    // Aturan domain EWS: jadwal kenaikan pangkat reguler dihitung 4 tahun dari TMT pangkat terbaru.
-                    'tanggal_kenaikan_pangkat_berikutnya' => Carbon::parse($data['tmt_pangkat'])->addYears(4)->toDateString(),
+                    'golongan_terakhir' => $latestGolongan->kode,
+                    'pangkat_terakhir' => $latestGolongan->nama,
                 ]);
             }
+
+            $this->tmtCalculator->syncForEmployee($employee);
 
             if ($history->file_sk) {
                 $employee->documents()->create([
@@ -84,15 +91,6 @@ class EmployeeHistoryService
             $jenisJabatanId = $data['jenis_jabatan_id'] ?? $jabatan->jenis_jabatan_id;
             // Kunci baris pegawai agar dua penulisan paralel tidak sama-sama menyisakan riwayat terbaru.
             $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
-            $currentLatest = $employee->positionHistories()->where('is_latest', true)->first();
-            // Riwayat terbaru ditentukan dari TMT, bukan urutan input, agar backfill SK lama tidak merusak snapshot.
-            $isLatest = $currentLatest === null
-                || Carbon::parse($data['tmt_jabatan'])->greaterThanOrEqualTo($currentLatest->tmt_jabatan);
-
-            if ($isLatest) {
-                $employee->positionHistories()->update(['is_latest' => false]);
-            }
-
             $history = $employee->positionHistories()->create([
                 ...Arr::only($data, [
                     'eselon_id',
@@ -106,22 +104,31 @@ class EmployeeHistoryService
                 'jabatan_id' => $jabatan->id,
                 'nama_jabatan' => $jabatan->nama,
                 'jenis_jabatan_id' => $jenisJabatanId,
-                'is_latest' => $isLatest,
+                'is_latest' => false,
             ]);
 
-            if ($isLatest) {
-                $jenisJabatan = RefJenisJabatan::findOrFail($jenisJabatanId);
-                $bupTahun = $jabatan->default_bup ?? $jenisJabatan->maks_usia_pensiun;
+            // Urutan stabil ini memastikan TMT sama tetap menghasilkan satu sumber snapshot yang deterministik.
+            $latest = $employee->positionHistories()
+                ->whereNotNull('tmt_jabatan')
+                ->orderByDesc('tmt_jabatan')
+                ->orderByDesc('created_at')
+                ->orderByDesc('id')
+                ->first();
+            $employee->positionHistories()->update(['is_latest' => false]);
+            if ($latest !== null) {
+                $employee->positionHistories()->whereKey($latest->id)->update(['is_latest' => true]);
+            }
 
+            if ($latest !== null) {
+                $latestJabatan = RefJabatan::findOrFail($latest->jabatan_id);
                 $employee->update([
-                    'jabatan_terakhir' => $jabatan->nama,
-                    'kelas_jabatan_terakhir' => $data['kelas_jabatan'] ?? $employee->kelas_jabatan_terakhir,
-                    'kelas_jabatan' => $data['kelas_jabatan'] ?? $employee->kelas_jabatan_terakhir,
-                    'tanggal_pensiun' => $employee->tanggal_lahir->copy()
-                        ->addYears($bupTahun)
-                        ->toDateString(),
+                    'jabatan_terakhir' => $latestJabatan->nama,
+                    'kelas_jabatan_terakhir' => $latest->kelas_jabatan ?? $employee->kelas_jabatan_terakhir,
+                    'kelas_jabatan' => $latest->kelas_jabatan ?? $employee->kelas_jabatan_terakhir,
                 ]);
             }
+
+            $this->tmtCalculator->syncForEmployee($employee);
 
             if ($history->file_sk) {
                 $employee->documents()->create([
@@ -150,26 +157,24 @@ class EmployeeHistoryService
         return DB::transaction(function () use ($employee, $data, $request): SalaryHistory {
             // Kunci baris pegawai agar dua penulisan paralel tidak sama-sama menyisakan riwayat terbaru.
             $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
-            $currentLatest = $employee->salaryHistories()->where('is_latest', true)->first();
-            // Riwayat terbaru ditentukan dari TMT, bukan urutan input, agar backfill SK lama tidak merusak snapshot.
-            $isLatest = $currentLatest === null
-                || Carbon::parse($data['tmt_kgb'])->greaterThanOrEqualTo($currentLatest->tmt_kgb);
-
-            if ($isLatest) {
-                $employee->salaryHistories()->update(['is_latest' => false]);
-            }
-
             $history = $employee->salaryHistories()->create([
                 ...Arr::only($data, ['tmt_kgb', 'gaji_pokok', 'no_sk', 'tanggal_sk', 'file_sk']),
-                'is_latest' => $isLatest,
+                'is_latest' => false,
             ]);
 
-            if ($isLatest) {
-                $employee->update([
-                    // Aturan domain EWS: jadwal KGB berikutnya dihitung 2 tahun dari TMT KGB terbaru.
-                    'tanggal_kgb_berikutnya' => Carbon::parse($data['tmt_kgb'])->addYears(2)->toDateString(),
-                ]);
+            // TMT null tidak boleh menjadi terbaru; semua flag dibangun ulang dari sumber bertanggal yang sah.
+            $latest = $employee->salaryHistories()
+                ->whereNotNull('tmt_kgb')
+                ->orderByDesc('tmt_kgb')
+                ->orderByDesc('created_at')
+                ->orderByDesc('id')
+                ->first();
+            $employee->salaryHistories()->update(['is_latest' => false]);
+            if ($latest !== null) {
+                $employee->salaryHistories()->whereKey($latest->id)->update(['is_latest' => true]);
             }
+
+            $this->tmtCalculator->syncForEmployee($employee);
 
             if ($history->file_sk) {
                 $employee->documents()->create([
