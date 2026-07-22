@@ -2,7 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Models\NotificationEventChannel;
+use App\Models\RefNotificationChannel;
 use Database\Seeders\ReferenceSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -99,6 +102,142 @@ class ReferenceSeederTest extends TestCase
             'code' => 'email',
             'is_enabled' => false,
         ]);
+    }
+
+    public function test_notification_event_channels_enforces_composite_unique_contract(): void
+    {
+        $this->seedReferenceData();
+
+        $emailChannelId = RefNotificationChannel::query()->where('code', 'email')->value('id');
+
+        $this->expectException(QueryException::class);
+
+        NotificationEventChannel::query()->create([
+            'event_key' => 'cuti.pengajuan_baru',
+            'notification_channel_id' => $emailChannelId,
+            'is_enabled' => true,
+        ]);
+    }
+
+    public function test_reference_seeder_creates_enabled_policies_for_supported_notification_events(): void
+    {
+        $this->seedReferenceData();
+
+        $expectedEvents = [
+            'cuti.disetujui',
+            'cuti.ditunda',
+            'cuti.menunggu_persetujuan',
+            'cuti.pengajuan_baru',
+            'cuti.perlu_perubahan',
+            'cuti.tidak_disetujui',
+            'ews.kenaikan_pangkat',
+            'ews.kgb',
+            'ews.kontrak_pppk',
+            'ews.pensiun',
+            'ews.satyalancana',
+        ];
+
+        $policies = DB::table('notification_event_channels')
+            ->join('ref_notification_channels', 'ref_notification_channels.id', '=', 'notification_event_channels.notification_channel_id')
+            ->whereIn('notification_event_channels.event_key', $expectedEvents)
+            ->orderBy('notification_event_channels.event_key')
+            ->orderBy('ref_notification_channels.code')
+            ->get([
+                'notification_event_channels.event_key',
+                'notification_event_channels.is_enabled',
+                'ref_notification_channels.code',
+            ]);
+
+        $this->assertCount(22, $policies);
+        $this->assertSame($expectedEvents, $policies->pluck('event_key')->unique()->values()->all());
+        $this->assertSame(['email', 'in_app'], $policies->pluck('code')->unique()->sort()->values()->all());
+        $this->assertTrue($policies->every(fn (object $policy): bool => (bool) $policy->is_enabled));
+
+        foreach ($expectedEvents as $eventKey) {
+            $this->assertSame(['email', 'in_app'], $policies
+                ->where('event_key', $eventKey)
+                ->pluck('code')
+                ->sort()
+                ->values()
+                ->all());
+        }
+    }
+
+    public function test_reference_seeder_creates_separate_in_app_only_policy_for_scheduler_failure(): void
+    {
+        $this->seedReferenceData();
+
+        $policies = DB::table('notification_event_channels')
+            ->join('ref_notification_channels', 'ref_notification_channels.id', '=', 'notification_event_channels.notification_channel_id')
+            ->where('notification_event_channels.event_key', 'ews.scheduler_failed')
+            ->get([
+                'notification_event_channels.is_enabled',
+                'ref_notification_channels.code',
+            ]);
+
+        $this->assertDatabaseCount('notification_event_channels', 23);
+        $this->assertCount(1, $policies);
+        $this->assertSame('in_app', $policies->sole()->code);
+        $this->assertTrue((bool) $policies->sole()->is_enabled);
+
+        DB::table('notification_event_channels')
+            ->where('event_key', 'ews.scheduler_failed')
+            ->update(['is_enabled' => false]);
+
+        $this->seedReferenceData();
+
+        $this->assertDatabaseHas('notification_event_channels', [
+            'event_key' => 'ews.scheduler_failed',
+            'is_enabled' => false,
+        ]);
+    }
+
+    public function test_reference_seeder_preserves_operator_disabled_event_policy_on_rerun(): void
+    {
+        $this->seedReferenceData();
+
+        $emailChannelId = RefNotificationChannel::query()->where('code', 'email')->value('id');
+        DB::table('notification_event_channels')
+            ->where('event_key', 'ews.satyalancana')
+            ->where('notification_channel_id', $emailChannelId)
+            ->update(['is_enabled' => false]);
+
+        $this->seedReferenceData();
+
+        $this->assertDatabaseCount('notification_event_channels', 23);
+        $this->assertDatabaseHas('notification_event_channels', [
+            'event_key' => 'ews.satyalancana',
+            'notification_channel_id' => $emailChannelId,
+            'is_enabled' => false,
+        ]);
+    }
+
+    public function test_notification_event_channel_casts_enabled_state_and_resolves_channel_relation(): void
+    {
+        $this->seedReferenceData();
+
+        $policy = NotificationEventChannel::query()
+            ->where('event_key', 'ews.satyalancana')
+            ->whereHas('channel', fn ($query) => $query->where('code', 'email'))
+            ->firstOrFail();
+
+        $this->assertIsBool($policy->is_enabled);
+        $this->assertTrue($policy->is_enabled);
+        $this->assertInstanceOf(RefNotificationChannel::class, $policy->channel);
+        $this->assertSame('email', $policy->channel->code);
+    }
+
+    public function test_notification_event_channel_foreign_key_restricts_channel_deletion_on_postgresql(): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Perilaku FK restrict kebijakan notifikasi diverifikasi khusus pada PostgreSQL.');
+        }
+
+        $this->seedReferenceData();
+
+        $this->expectException(QueryException::class);
+
+        RefNotificationChannel::query()->where('code', 'email')->delete();
     }
 
     public function test_reference_seeder_marks_reference_position_active_and_keeps_optional_bup_override_available(): void
