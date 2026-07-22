@@ -229,7 +229,7 @@
 
                                         {{-- 2. PERUBAHAN --}}
                                         <x-ui.tooltip text="Minta Perubahan" position="top">
-                                            <button type="button" @click="openDecision('{{ $leave->id }}', '{{ addslashes($leave->employee?->nama_lengkap ?? '') }}', 'PERLU_PERUBAHAN')" class="flex h-7 w-7 items-center justify-center rounded-md bg-info/10 text-info transition hover:bg-info/20 border border-info/20 focus:outline-none focus:ring-2 focus:ring-info/30" aria-label="Minta perubahan pengajuan cuti {{ $leave->employee?->nama_lengkap }}">
+                                            <button type="button" @click="openDecision('{{ $leave->id }}', '{{ addslashes($leave->employee?->nama_lengkap ?? '') }}', 'PERUBAHAN')" class="flex h-7 w-7 items-center justify-center rounded-md bg-info/10 text-info transition hover:bg-info/20 border border-info/20 focus:outline-none focus:ring-2 focus:ring-info/30" aria-label="Minta perubahan pengajuan cuti {{ $leave->employee?->nama_lengkap }}">
                                                 <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                                 </svg>
@@ -281,7 +281,7 @@
             {{-- MODAL KEPUTUSAN --}}
             <x-ui.modal show="confirmOpen" close-action="if (!isSubmitting) confirmOpen = false" @keydown.escape.window="if (!isSubmitting) confirmOpen = false">
                 <x-slot:title>
-                    <span x-text="decisionType === 'DISETUJUI' ? 'Konfirmasi Persetujuan Cuti' : (decisionType === 'PERLU_PERUBAHAN' ? 'Keputusan: Perlu Perubahan' : (decisionType === 'DITANGGUHKAN' ? 'Keputusan: Ditangguhkan' : 'Keputusan: Tidak Disetujui'))"></span>
+                    <span x-text="decisionType === 'DISETUJUI' ? 'Konfirmasi Persetujuan Cuti' : (decisionType === 'PERUBAHAN' ? 'Keputusan: Perubahan' : (decisionType === 'DITANGGUHKAN' ? 'Keputusan: Ditangguhkan' : 'Keputusan: Tidak Disetujui'))"></span>
                 </x-slot:title>
 
                 <form method="POST" :action="actionUrl()" @submit="isSubmitting = true">
@@ -302,8 +302,16 @@
                                 <label for="dashboard-catatan" class="block text-xs font-semibold text-ink font-sans">
                                     Catatan / Alasan Keputusan <span class="text-danger">*</span>
                                 </label>
-                                <textarea id="dashboard-catatan" name="catatan" x-model="note" required minlength="5" rows="3" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans" placeholder="Masukkan catatan keputusan minimal 5 karakter..."></textarea>
-                                <p class="text-[11px] text-muted font-sans" x-show="note.trim().length < 5">Catatan wajib diisi minimal 5 karakter.</p>
+                                <textarea id="dashboard-catatan" name="catatan" x-model="note" required minlength="5" maxlength="500" rows="3"
+                                    :class="{'border-danger focus:border-danger focus:ring-danger/20': decisionType !== 'DISETUJUI' && note.trim().length > 0 && note.trim().length < 5}"
+                                    class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans"
+                                    placeholder="Tulis alasan keputusan..."></textarea>
+                                <div class="flex items-center justify-between text-[11px] font-sans mt-1">
+                                    <span class="text-danger font-medium flex items-center gap-1" x-show="decisionType !== 'DISETUJUI' && note.trim().length > 0 && note.trim().length < 5">
+                                        ⚠ Catatan keputusan minimal berisi 5 karakter.
+                                    </span>
+                                    <span class="text-muted ml-auto" x-text="note.trim().length + '/500'"></span>
+                                </div>
                             </div>
                         </template>
                     </div>
@@ -432,9 +440,7 @@
                                 {{ $employee->jabatan_terakhir ?: '-' }}
                             </x-ui.table-td>
                             <x-ui.table-td class="px-6 py-3.5">
-                                @if($employee->sedang_dinas_luar ?? false)
-                                    <x-ui.badge variant="info" size="sm" dot>Dinas Luar</x-ui.badge>
-                                @elseif($employee->sedang_cuti)
+                                @if($employee->sedang_cuti)
                                     <x-ui.badge variant="warning" size="sm" dot>Cuti</x-ui.badge>
                                 @else
                                     <x-ui.badge variant="success" size="sm" dot>Aktif</x-ui.badge>
