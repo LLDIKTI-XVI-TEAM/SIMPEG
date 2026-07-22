@@ -57,7 +57,7 @@ class NotificationService
         string $body,
         array $data,
     ): ?SimpegNotification {
-        if ($alert->notification_acknowledged_at !== null || ! $this->channels->isEnabled('in_app')) {
+        if (! $this->channels->isEnabled('in_app')) {
             return null;
         }
 
@@ -84,9 +84,22 @@ class NotificationService
                 return $notification;
             }
 
+            // Notifikasi yang benar-benar belum dibaca adalah sumber kebenaran.
+            // Ini memperbaiki data lama yang sudah memiliki acknowledgement, tetapi
+            // notifikasinya masih belum dibaca, agar pengingat tetap diperbarui.
+            if ($alert->notification_acknowledged_at !== null) {
+                $alert->forceFill(['notification_acknowledged_at' => null])->save();
+            }
+
             $notification->fill($attributes)->save();
 
             return $notification->refresh();
+        }
+
+        // Jika tidak ada lagi notifikasi belum dibaca, acknowledgement mencegah
+        // notifikasi baru dibuat ulang setelah pegawai membacanya.
+        if ($alert->notification_acknowledged_at !== null) {
+            return null;
         }
 
         try {

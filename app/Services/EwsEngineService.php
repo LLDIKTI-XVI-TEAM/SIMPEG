@@ -71,19 +71,39 @@ class EwsEngineService
                 $configDays('satyalancana_h30', 30),
             ];
 
+            $pangkatRequiredYears = $this->configYears('pangkat_required_years', 4);
+            $kgbRequiredYears = $this->configYears('kgb_required_years', 2);
+            $pensiunRequiredAgeYears = max(0, $configDays('pensiun_required_age_years', 0));
+            $pppkContractYears = $this->configYears('pppk_contract_years', 5);
+            $satyalancanaYears = [
+                $this->configYears('satyalancana_years_1', 10),
+                $this->configYears('satyalancana_years_2', 20),
+                $this->configYears('satyalancana_years_3', 30),
+            ];
+
             // Scan semua pegawai aktif dalam chunk 100 untuk mencegah OOM pada dataset besar.
-            Employee::with(['appointments', 'jenisPegawai', 'disciplineRecords'])
+            Employee::with(['appointments', 'rankHistories', 'salaryHistories', 'jenisPegawai', 'disciplineRecords'])
                 ->where('status_aktif', 'Aktif')
                 ->chunkById(100, function ($employees) use (
                     $pangkatDays, $kgbDays, $pensiunDays, $pppkDays, $satyalancanaDays,
+                    $pangkatRequiredYears, $kgbRequiredYears, $pensiunRequiredAgeYears,
+                    $pppkContractYears, $satyalancanaYears,
                     &$alertsCreated, &$employeesChecked
                 ): void {
                     foreach ($employees as $employee) {
                         $employeesChecked++;
 
-                        // 1. Kenaikan Pangkat
-                        if ($employee->tanggal_kenaikan_pangkat_berikutnya) {
-                            $targetDate = Carbon::parse($employee->tanggal_kenaikan_pangkat_berikutnya);
+                        // 1. Kenaikan Pangkat: gunakan TMT pangkat terbaru agar perubahan masa berlaku langsung diterapkan.
+                        $latestRank = $employee->rankHistories
+                            ->filter(fn ($history): bool => $history->tmt_pangkat !== null)
+                            ->sortByDesc('tmt_pangkat')
+                            ->first();
+                        $targetDate = $latestRank
+                            ? Carbon::parse($latestRank->tmt_pangkat)->addYears($pangkatRequiredYears)
+                            : ($employee->tanggal_kenaikan_pangkat_berikutnya
+                                ? Carbon::parse($employee->tanggal_kenaikan_pangkat_berikutnya)
+                                : null);
+                        if ($targetDate) {
                             $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
 
                             $days = $this->dueStage($pangkatDays, $diffDays);
@@ -105,9 +125,17 @@ class EwsEngineService
                             }
                         }
 
-                        // 2. KGB — tidak ada eligibility check (selalu eligible)
-                        if ($employee->tanggal_kgb_berikutnya) {
-                            $targetDate = Carbon::parse($employee->tanggal_kgb_berikutnya);
+                        // 2. KGB — gunakan TMT KGB terbaru agar perubahan masa berlaku langsung diterapkan.
+                        $latestKgb = $employee->salaryHistories
+                            ->filter(fn ($history): bool => $history->tmt_kgb !== null)
+                            ->sortByDesc('tmt_kgb')
+                            ->first();
+                        $targetDate = $latestKgb
+                            ? Carbon::parse($latestKgb->tmt_kgb)->addYears($kgbRequiredYears)
+                            : ($employee->tanggal_kgb_berikutnya
+                                ? Carbon::parse($employee->tanggal_kgb_berikutnya)
+                                : null);
+                        if ($targetDate) {
                             $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
 
                             $days = $this->dueStage($kgbDays, $diffDays);
@@ -125,9 +153,11 @@ class EwsEngineService
                             }
                         }
 
-                        // 3. Pensiun — tidak ada eligibility check
-                        if ($employee->tanggal_pensiun) {
-                            $targetDate = Carbon::parse($employee->tanggal_pensiun);
+                        // 3. Pensiun — usia BUP global mengalahkan snapshot per jabatan bila diatur.
+                        $targetDate = $pensiunRequiredAgeYears > 0 && $employee->tanggal_lahir
+                            ? Carbon::parse($employee->tanggal_lahir)->addYears($pensiunRequiredAgeYears)
+                            : ($employee->tanggal_pensiun ? Carbon::parse($employee->tanggal_pensiun) : null);
+                        if ($targetDate) {
                             $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
 
                             $days = $this->dueStage($pensiunDays, $diffDays);
@@ -161,7 +191,7 @@ class EwsEngineService
                                     ->last();
 
                                 if ($pppkApp) {
-                                    $targetDate = Carbon::parse($pppkApp->tmt_pengangkatan)->addYears(5);
+                                    $targetDate = Carbon::parse($pppkApp->tmt_pengangkatan)->addYears($pppkContractYears);
                                 }
                             }
 
@@ -194,7 +224,7 @@ class EwsEngineService
                             $firstTmt = Carbon::parse($firstAppointment->tmt_pengangkatan)->startOfDay();
                             $isEligible = $employee->is_satyalancana_eligible === true;
 
-                            foreach ([10, 20, 30] as $years) {
+                            foreach ($satyalancanaYears as $years) {
                                 $targetDate = $firstTmt->copy()->addYears($years);
                                 $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
 
@@ -256,6 +286,11 @@ class EwsEngineService
 
             throw $e;
         }
+    }
+
+    private function configYears(string $key, int $default): int
+    {
+        return max(1, (int) EwsConfig::getVal($key, (string) $default));
     }
 
     /**
@@ -359,7 +394,21 @@ class EwsEngineService
         );
 
         if ($notification !== null && ! $notification->is_read) {
-            $alert->forceFill(['notified_at' => now()])->save();
+            $updates = ['notified_at' => now()];
+
+            // Alert kedaluwarsa dari lifecycle lama tidak boleh menyembunyikan
+            // reminder yang masih belum dibaca. Status manual tetap dihormati.
+            if ($alert->followup_status === EwsAlert::FOLLOWUP_STATUS_EXPIRED) {
+                $updates += [
+                    'followup_status' => EwsAlert::FOLLOWUP_STATUS_ACTIVE,
+                    'is_processed' => false,
+                    'handled_at' => null,
+                    'handled_by' => null,
+                    'handled_note' => null,
+                ];
+            }
+
+            $alert->forceFill($updates)->save();
         }
 
         return $wasCreated;

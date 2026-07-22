@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\DisciplineRecord;
 use App\Models\Document;
 use App\Models\Employee;
+use App\Models\EwsConfig;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\RefGolongan;
@@ -85,7 +86,9 @@ class EmployeeHistoryService
             'golongan_terakhir' => $latest->golongan->kode,
             'pangkat_terakhir' => $latest->golongan->nama,
             // Aturan domain EWS: jadwal kenaikan pangkat reguler dihitung 4 tahun dari TMT pangkat terbaru.
-            'tanggal_kenaikan_pangkat_berikutnya' => $latest->tmt_pangkat->copy()->addYears(4)->toDateString(),
+            'tanggal_kenaikan_pangkat_berikutnya' => $latest->tmt_pangkat->copy()
+                ->addYears($this->configYears('pangkat_required_years', 4))
+                ->toDateString(),
         ]);
 
         return $latest->refresh();
@@ -185,8 +188,10 @@ class EmployeeHistoryService
 
             if ($isLatest) {
                 $employee->update([
-                    // Aturan domain EWS: jadwal KGB berikutnya dihitung 2 tahun dari TMT KGB terbaru.
-                    'tanggal_kgb_berikutnya' => Carbon::parse($data['tmt_kgb'])->addYears(2)->toDateString(),
+                    // Aturan domain EWS: jadwal KGB berikutnya dihitung dari TMT KGB terbaru dengan masa yang dapat dikonfigurasi.
+                    'tanggal_kgb_berikutnya' => Carbon::parse($data['tmt_kgb'])
+                        ->addYears($this->configYears('kgb_required_years', 2))
+                        ->toDateString(),
                 ]);
             }
 
@@ -272,6 +277,11 @@ class EmployeeHistoryService
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
+    private function configYears(string $key, int $default): int
+    {
+        return max(1, (int) EwsConfig::getVal($key, (string) $default));
+    }
+
     private function storeSkUpload(array $data): array
     {
         if (($data['file_sk'] ?? null) instanceof UploadedFile) {

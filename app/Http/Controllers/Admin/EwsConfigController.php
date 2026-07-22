@@ -15,18 +15,25 @@ class EwsConfigController extends Controller
 {
     private static array $configKeys = [
         'ews_scheduler_time' => 'Scheduler Time',
+        'pangkat_required_years' => 'Pangkat Masa Kenaikan (Tahun)',
         'pangkat_h90' => 'Pangkat Tahap 1 (Hari)',
         'pangkat_h60' => 'Pangkat Tahap 2 (Hari)',
         'pangkat_h30' => 'Pangkat Tahap 3 (Hari)',
+        'kgb_required_years' => 'KGB Masa Kenaikan (Tahun)',
         'kgb_h60' => 'KGB Tahap 1 (Hari)',
         'kgb_h30' => 'KGB Tahap 2 (Hari)',
         'kgb_h14' => 'KGB Tahap 3 (Hari)',
+        'pensiun_required_age_years' => 'Pensiun Usia BUP Global (Tahun)',
         'pensiun_y1' => 'Pensiun Tahap 1 (Hari)',
         'pensiun_m6' => 'Pensiun Tahap 2 (Hari)',
         'pensiun_m3' => 'Pensiun Tahang 3 (Hari)',
+        'pppk_contract_years' => 'PPPK Masa Kontrak (Tahun)',
         'pppk_m6' => 'PPPK Tahap 1 (Hari)',
         'pppk_m3' => 'PPPK Tahap 2 (Hari)',
         'pppk_m1' => 'PPPK Tahap 3 (Hari)',
+        'satyalancana_years_1' => 'Satyalancana Milestone 1 (Tahun)',
+        'satyalancana_years_2' => 'Satyalancana Milestone 2 (Tahun)',
+        'satyalancana_years_3' => 'Satyalancana Milestone 3 (Tahun)',
         'satyalancana_h180' => 'Satyalancana Tahap 1 (Hari)',
         'satyalancana_h90' => 'Satyalancana Tahap 2 (Hari)',
         'satyalancana_h30' => 'Satyalancana Tahap 3 (Hari)',
@@ -43,22 +50,29 @@ class EwsConfigController extends Controller
         $configs = [
             'ews_scheduler_time' => $schedulerTime,
 
+            'pangkat_required_years' => EwsConfig::getVal('pangkat_required_years', '4'),
             'pangkat_h90' => EwsConfig::getVal('pangkat_h90', '90'),
             'pangkat_h60' => EwsConfig::getVal('pangkat_h60', '60'),
             'pangkat_h30' => EwsConfig::getVal('pangkat_h30', '30'),
 
+            'kgb_required_years' => EwsConfig::getVal('kgb_required_years', '2'),
             'kgb_h60' => EwsConfig::getVal('kgb_h60', '60'),
             'kgb_h30' => EwsConfig::getVal('kgb_h30', '30'),
             'kgb_h14' => EwsConfig::getVal('kgb_h14', '14'),
 
+            'pensiun_required_age_years' => EwsConfig::getVal('pensiun_required_age_years', '0'),
             'pensiun_y1' => EwsConfig::getVal('pensiun_y1', '365'),
             'pensiun_m6' => EwsConfig::getVal('pensiun_m6', '180'),
             'pensiun_m3' => EwsConfig::getVal('pensiun_m3', '90'),
 
+            'pppk_contract_years' => EwsConfig::getVal('pppk_contract_years', '5'),
             'pppk_m6' => EwsConfig::getVal('pppk_m6', '180'),
             'pppk_m3' => EwsConfig::getVal('pppk_m3', '90'),
             'pppk_m1' => EwsConfig::getVal('pppk_m1', '30'),
 
+            'satyalancana_years_1' => EwsConfig::getVal('satyalancana_years_1', '10'),
+            'satyalancana_years_2' => EwsConfig::getVal('satyalancana_years_2', '20'),
+            'satyalancana_years_3' => EwsConfig::getVal('satyalancana_years_3', '30'),
             'satyalancana_h180' => EwsConfig::getVal('satyalancana_h180', '180'),
             'satyalancana_h90' => EwsConfig::getVal('satyalancana_h90', '90'),
             'satyalancana_h30' => EwsConfig::getVal('satyalancana_h30', '30'),
@@ -136,22 +150,29 @@ class EwsConfigController extends Controller
         $request->validate([
             'ews_scheduler_time' => 'required|date_format:H:i',
 
+            'pangkat_required_years' => 'required|integer|min:1|max:100',
             'pangkat_h90' => 'required|integer|min:1',
             'pangkat_h60' => 'required|integer|min:1',
             'pangkat_h30' => 'required|integer|min:1',
 
+            'kgb_required_years' => 'required|integer|min:1|max:100',
             'kgb_h60' => 'required|integer|min:1',
             'kgb_h30' => 'required|integer|min:1',
             'kgb_h14' => 'required|integer|min:1',
 
+            'pensiun_required_age_years' => 'required|integer|min:0|max:100',
             'pensiun_y1' => 'required|integer|min:1',
             'pensiun_m6' => 'required|integer|min:1',
             'pensiun_m3' => 'required|integer|min:1',
 
+            'pppk_contract_years' => 'required|integer|min:1|max:100',
             'pppk_m6' => 'required|integer|min:1',
             'pppk_m3' => 'required|integer|min:1',
             'pppk_m1' => 'required|integer|min:1',
 
+            'satyalancana_years_1' => 'required|integer|min:1|max:100',
+            'satyalancana_years_2' => 'required|integer|min:1|max:100',
+            'satyalancana_years_3' => 'required|integer|min:1|max:100',
             'satyalancana_h180' => 'required|integer|min:1',
             'satyalancana_h90' => 'required|integer|min:1',
             'satyalancana_h30' => 'required|integer|min:1',
@@ -167,18 +188,25 @@ class EwsConfigController extends Controller
             'reason.min' => 'Alasan perubahan minimal berisi 5 karakter.',
         ], [
             'ews_scheduler_time' => 'Waktu eksekusi scheduler',
+            'pangkat_required_years' => 'Masa kenaikan pangkat',
             'pangkat_h90' => 'Pangkat Tahap 1',
             'pangkat_h60' => 'Pangkat Tahap 2',
             'pangkat_h30' => 'Pangkat Tahap 3',
+            'kgb_required_years' => 'Masa kenaikan KGB',
             'kgb_h60' => 'KGB Tahap 1',
             'kgb_h30' => 'KGB Tahap 2',
             'kgb_h14' => 'KGB Tahap 3',
+            'pensiun_required_age_years' => 'Usia BUP global',
             'pensiun_y1' => 'Pensiun Tahap 1',
             'pensiun_m6' => 'Pensiun Tahap 2',
             'pensiun_m3' => 'Pensiun Tahap 3',
+            'pppk_contract_years' => 'Masa kontrak PPPK',
             'pppk_m6' => 'PPPK Tahap 1',
             'pppk_m3' => 'PPPK Tahap 2',
             'pppk_m1' => 'PPPK Tahap 3',
+            'satyalancana_years_1' => 'Milestone Satyalancana 1',
+            'satyalancana_years_2' => 'Milestone Satyalancana 2',
+            'satyalancana_years_3' => 'Milestone Satyalancana 3',
             'satyalancana_h180' => 'Satyalancana Tahap 1',
             'satyalancana_h90' => 'Satyalancana Tahap 2',
             'satyalancana_h30' => 'Satyalancana Tahap 3',
@@ -236,6 +264,16 @@ class EwsConfigController extends Controller
         }
         if ($sl90 <= $sl30) {
             $thresholdErrors['satyalancana_h30'][] = 'Satyalancana Tahap 2 harus lebih besar dari Tahap 3.';
+        }
+
+        $slYear1 = (int) $request->input('satyalancana_years_1');
+        $slYear2 = (int) $request->input('satyalancana_years_2');
+        $slYear3 = (int) $request->input('satyalancana_years_3');
+        if ($slYear1 >= $slYear2) {
+            $thresholdErrors['satyalancana_years_2'][] = 'Milestone Satyalancana 1 harus lebih kecil dari Milestone 2.';
+        }
+        if ($slYear2 >= $slYear3) {
+            $thresholdErrors['satyalancana_years_3'][] = 'Milestone Satyalancana 2 harus lebih kecil dari Milestone 3.';
         }
 
         if (! empty($thresholdErrors)) {

@@ -6,7 +6,9 @@ use App\Models\Appointment;
 use App\Models\DisciplineRecord;
 use App\Models\Employee;
 use App\Models\EwsAlert;
+use App\Models\EwsConfig;
 use App\Models\EwsSchedulerRun;
+use App\Models\RefGolongan;
 use App\Models\RefJenisPegawai;
 use App\Models\SimpegNotification;
 use App\Models\User;
@@ -29,6 +31,99 @@ class EwsSchedulerTest extends TestCase
         parent::setUp();
         $this->seed(ReferenceSeeder::class);
         $this->seed(RbacSeeder::class);
+    }
+
+    public function test_scheduler_uses_configured_event_periods_for_all_ews_types(): void
+    {
+        EwsConfig::setVal('pangkat_required_years', '3');
+        EwsConfig::setVal('kgb_required_years', '4');
+        EwsConfig::setVal('pensiun_required_age_years', '55');
+        EwsConfig::setVal('pppk_contract_years', '3');
+        EwsConfig::setVal('satyalancana_years_1', '7');
+        EwsConfig::setVal('satyalancana_years_2', '14');
+        EwsConfig::setVal('satyalancana_years_3', '21');
+        EwsConfig::setVal('pangkat_h90', '1');
+        EwsConfig::setVal('pangkat_h60', '2');
+        EwsConfig::setVal('pangkat_h30', '3');
+        EwsConfig::setVal('kgb_h60', '1');
+        EwsConfig::setVal('kgb_h30', '2');
+        EwsConfig::setVal('kgb_h14', '3');
+        EwsConfig::setVal('pensiun_y1', '1');
+        EwsConfig::setVal('pensiun_m6', '2');
+        EwsConfig::setVal('pensiun_m3', '3');
+        EwsConfig::setVal('pppk_m6', '1');
+        EwsConfig::setVal('pppk_m3', '2');
+        EwsConfig::setVal('pppk_m1', '3');
+        EwsConfig::setVal('satyalancana_h180', '1');
+        EwsConfig::setVal('satyalancana_h90', '2');
+        EwsConfig::setVal('satyalancana_h30', '3');
+
+        $rankGolongan = RefGolongan::where('kode', 'III/a')->firstOrFail();
+        $rankEmployee = Employee::factory()->create(['is_kinerja_baik' => true]);
+        $rankEmployee->rankHistories()->create([
+            'golongan_id' => $rankGolongan->id,
+            'tmt_pangkat' => now()->subYears(3)->addDays(3)->toDateString(),
+            'no_sk' => 'SK-PANGKAT-KONFIG',
+            'tanggal_sk' => now()->subYears(3)->toDateString(),
+            'is_latest' => true,
+        ]);
+
+        $kgbEmployee = Employee::factory()->create();
+        $kgbEmployee->salaryHistories()->create([
+            'tmt_kgb' => now()->subYears(4)->addDays(3)->toDateString(),
+            'gaji_pokok' => 5000000,
+            'no_sk' => 'SK-KGB-KONFIG',
+            'tanggal_sk' => now()->subYears(4)->toDateString(),
+            'is_latest' => true,
+        ]);
+
+        $pensiunEmployee = Employee::factory()->create([
+            'tanggal_lahir' => now()->subYears(55)->addDays(3)->toDateString(),
+            'tanggal_pensiun' => now()->addYears(10)->toDateString(),
+        ]);
+
+        $pppkJenis = RefJenisPegawai::where('nama', 'PPPK')->firstOrFail();
+        $pppkEmployee = Employee::factory()->create([
+            'jenis_pegawai_id' => $pppkJenis->id,
+            'tanggal_akhir_kontrak' => null,
+        ]);
+        Appointment::create([
+            'employee_id' => $pppkEmployee->id,
+            'jenis_pengangkatan' => 'PPPK',
+            'tmt_pengangkatan' => now()->subYears(3)->addDays(3)->toDateString(),
+            'no_sk' => 'SK-PPPK-KONFIG',
+            'tanggal_sk' => now()->subYears(3)->toDateString(),
+        ]);
+
+        $satyalancanaEmployee = Employee::factory()->create(['is_satyalancana_eligible' => true]);
+        Appointment::create([
+            'employee_id' => $satyalancanaEmployee->id,
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => now()->subYears(7)->addDays(3)->toDateString(),
+            'no_sk' => 'SK-SATYA-KONFIG',
+            'tanggal_sk' => now()->subYears(7)->toDateString(),
+        ]);
+
+        app(EwsEngineService::class)->run();
+
+        foreach ([
+            [$rankEmployee->id, 'KENAIKAN_PANGKAT'],
+            [$kgbEmployee->id, 'KGB'],
+            [$pensiunEmployee->id, 'PENSIUN'],
+            [$pppkEmployee->id, 'KONTRAK_PPPK'],
+            [$satyalancanaEmployee->id, 'SATYALANCANA'],
+        ] as [$employeeId, $type]) {
+            $this->assertDatabaseHas('ews_alerts', [
+                'employee_id' => $employeeId,
+                'type' => $type,
+                'interval_days' => 3,
+            ]);
+        }
+        $this->assertDatabaseHas('ews_alerts', [
+            'employee_id' => $satyalancanaEmployee->id,
+            'type' => 'SATYALANCANA',
+            'satyalancana_years' => 7,
+        ]);
     }
 
     public function test_scheduler_creates_runs_log_successfully(): void
@@ -451,6 +546,51 @@ class EwsSchedulerTest extends TestCase
         $this->assertSame(1, SimpegNotification::where('ews_alert_id', $alert->id)->count());
         $this->assertSame($notification->id, SimpegNotification::where('ews_alert_id', $alert->id)->firstOrFail()->id);
         $this->assertTrue($alert->refresh()->notified_at->greaterThan($firstNotifiedAt));
+    }
+
+    public function test_scheduler_revives_expired_alert_with_an_unread_reminder(): void
+    {
+        $employee = Employee::factory()->create([
+            'tanggal_kgb_berikutnya' => now()->subDay()->toDateString(),
+        ]);
+
+        app(EwsEngineService::class)->run();
+        $alert = EwsAlert::where('employee_id', $employee->id)->where('type', 'KGB')->firstOrFail();
+        $notification = SimpegNotification::where('ews_alert_id', $alert->id)->firstOrFail();
+        $firstNotifiedAt = $alert->notified_at;
+        $alert->update([
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_EXPIRED,
+            'is_processed' => true,
+        ]);
+
+        $this->travel(5)->minutes();
+        app(EwsEngineService::class)->run();
+
+        $this->assertSame(1, EwsAlert::where('employee_id', $employee->id)->where('type', 'KGB')->count());
+        $this->assertSame(1, SimpegNotification::where('ews_alert_id', $alert->id)->count());
+        $this->assertSame($notification->id, SimpegNotification::where('ews_alert_id', $alert->id)->firstOrFail()->id);
+        $this->assertSame(EwsAlert::FOLLOWUP_STATUS_ACTIVE, $alert->refresh()->followup_status);
+        $this->assertFalse($alert->is_processed);
+        $this->assertTrue($alert->notified_at->greaterThan($firstNotifiedAt));
+    }
+
+    public function test_scheduler_refreshes_unread_reminder_with_stale_acknowledgement(): void
+    {
+        $employee = Employee::factory()->create([
+            'tanggal_kgb_berikutnya' => now()->subDay()->toDateString(),
+        ]);
+
+        app(EwsEngineService::class)->run();
+        $alert = EwsAlert::where('employee_id', $employee->id)->where('type', 'KGB')->firstOrFail();
+        $firstNotifiedAt = $alert->notified_at;
+        $alert->update(['notification_acknowledged_at' => now()]);
+
+        $this->travel(5)->minutes();
+        app(EwsEngineService::class)->run();
+
+        $this->assertSame(1, SimpegNotification::where('ews_alert_id', $alert->id)->count());
+        $this->assertNull($alert->refresh()->notification_acknowledged_at);
+        $this->assertTrue($alert->notified_at->greaterThan($firstNotifiedAt));
     }
 
     public function test_scheduler_stops_refreshing_ews_reminder_after_employee_reads_it(): void
