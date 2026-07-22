@@ -46,7 +46,7 @@ class DashboardEwsTest extends TestCase
         $this->actingAs($user)
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertSee('Pegawai Dashboard EWS', false)
+            ->assertSee('Daftar Peringatan Dini (EWS)', false)
             ->assertDontSee('Pegawai Dashboard Lain', false)
             ->assertSee(route('ews.saya'), false)
             ->assertDontSee('Budi Santoso', false);
