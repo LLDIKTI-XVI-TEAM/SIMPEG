@@ -24,6 +24,10 @@
                 $sisaPensiunStr = 'Memasuki Usia Pensiun';
             }
         }
+
+        $canAssignSupervisor = auth()->check()
+            && in_array(auth()->user()->role, ['super_admin', 'admin_kepegawaian'], true)
+            && auth()->user()->hasPermission('employees.update');
     @endphp
 
     <div x-data="{
@@ -35,6 +39,19 @@
         satyalancanaNote: @js($p->satyalancana_note ?? ''),
         satyalancanaEndpoint: @js(route('pegawai.satyalancana.update', $p->id)),
         isUpdatingSatyalancana: false,
+        supervisorLookupEndpoint: @js(route('pegawai.supervisor-lookup', $p->id)),
+        supervisorQuery: @js($selectedSupervisorName ?? ''),
+        supervisorSelectedId: @js($selectedSupervisorId ?? ''),
+        supervisorSelectedName: @js($selectedSupervisorName ?? ''),
+        supervisorResults: [],
+        supervisorActiveIndex: -1,
+        supervisorOpen: false,
+        supervisorLoading: false,
+        supervisorError: '',
+        supervisorSelectionError: '',
+        supervisorClearConfirmed: false,
+        supervisorSearchTimer: null,
+        supervisorLookupRequestId: 0,
         showModal: false,
         modalTitle: '',
         modalType: '',
@@ -139,6 +156,125 @@
             } finally {
                 this.isUpdatingSatyalancana = false;
             }
+        },
+        searchSupervisor() {
+            window.clearTimeout(this.supervisorSearchTimer);
+            this.supervisorLookupRequestId++;
+            this.supervisorError = '';
+            this.supervisorSelectionError = '';
+
+            if (this.supervisorQuery !== this.supervisorSelectedName) {
+                this.supervisorSelectedId = '';
+            }
+
+            if (this.supervisorQuery.trim().length < 2) {
+                this.supervisorResults = [];
+                this.supervisorOpen = false;
+                this.supervisorLoading = false;
+
+                return;
+            }
+
+            this.supervisorSearchTimer = window.setTimeout(() => this.fetchSupervisorCandidates(), 250);
+        },
+        async fetchSupervisorCandidates() {
+            const requestId = ++this.supervisorLookupRequestId;
+            this.supervisorLoading = true;
+            this.supervisorOpen = true;
+            this.supervisorActiveIndex = -1;
+
+            try {
+                const response = await fetch(`${this.supervisorLookupEndpoint}?q=${encodeURIComponent(this.supervisorQuery.trim())}`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Lookup Kepala Bagian tidak tersedia.');
+                }
+
+                const result = await response.json();
+                if (requestId !== this.supervisorLookupRequestId) return;
+
+                this.supervisorResults = Array.isArray(result.data) ? result.data : [];
+            } catch (error) {
+                if (requestId !== this.supervisorLookupRequestId) return;
+
+                this.supervisorResults = [];
+                this.supervisorError = 'Pencarian Kepala Bagian gagal. Coba lagi.';
+            } finally {
+                if (requestId === this.supervisorLookupRequestId) {
+                    this.supervisorLoading = false;
+                }
+            }
+        },
+        selectSupervisor(candidate) {
+            this.supervisorLookupRequestId++;
+            this.supervisorSelectionError = '';
+            this.supervisorSelectedId = candidate.id;
+            this.supervisorSelectedName = candidate.nama_lengkap;
+            this.supervisorQuery = candidate.nama_lengkap;
+            this.supervisorResults = [];
+            this.supervisorActiveIndex = -1;
+            this.supervisorOpen = false;
+        },
+        clearSupervisorAndSubmit() {
+            if (!window.confirm('Hapus penugasan Kepala Bagian ini? Perubahan akan disimpan sesuai tanggal efektif.')) {
+                return;
+            }
+
+            const form = document.getElementById('assign-kepala-bagian-form');
+            if (!form) return;
+
+            if (!form.checkValidity()) {
+                form.reportValidity();
+
+                return;
+            }
+
+            window.clearTimeout(this.supervisorSearchTimer);
+            this.supervisorLookupRequestId++;
+            this.supervisorSelectedId = '';
+            this.supervisorSelectedName = '';
+            this.supervisorQuery = '';
+            this.supervisorResults = [];
+            this.supervisorActiveIndex = -1;
+            this.supervisorOpen = false;
+            this.supervisorError = '';
+            this.supervisorLoading = false;
+            this.supervisorClearConfirmed = true;
+            this.$nextTick(() => form.requestSubmit());
+        },
+        validateSupervisorSelection(event) {
+            if (this.supervisorSelectedId || this.supervisorClearConfirmed) {
+                this.supervisorClearConfirmed = false;
+
+                return;
+            }
+
+            event.preventDefault();
+            this.supervisorSelectionError = 'Pilih kandidat Kepala Bagian dari hasil pencarian sebelum menyimpan.';
+            this.$nextTick(() => document.getElementById('kepala_bagian_lookup')?.focus());
+        },
+        moveSupervisorActiveIndex(direction) {
+            if (!this.supervisorOpen && this.supervisorQuery.trim().length >= 2) {
+                this.fetchSupervisorCandidates();
+
+                return;
+            }
+
+            if (this.supervisorResults.length === 0) {
+                return;
+            }
+
+            this.supervisorActiveIndex = (this.supervisorActiveIndex + direction + this.supervisorResults.length) % this.supervisorResults.length;
+        },
+        chooseActiveSupervisor() {
+            if (this.supervisorActiveIndex >= 0) {
+                this.selectSupervisor(this.supervisorResults[this.supervisorActiveIndex]);
+            }
+        },
+        closeSupervisorLookup() {
+            window.setTimeout(() => this.supervisorOpen = false, 150);
         },
         
         openModal(type, title) {
@@ -537,7 +673,7 @@
     }" class="mx-auto max-w-5xl space-y-6">
         
         {{-- BREADCRUMBS & DYNAMIC ALERT --}}
-        <div class="relative mb-2">
+            <div class="relative mb-2">
             <h2 class="mb-1 text-2xl font-extrabold text-ink tracking-tight font-sans">Detail Pegawai</h2>
             <nav class="flex items-center gap-1.5 text-xs text-muted mb-4">
                 <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
@@ -546,6 +682,14 @@
                 <span>/</span>
                 <span class="font-medium text-ink">Detail Pegawai</span>
             </nav>
+
+            @if (session('success'))
+                <x-ui.alert variant="success" class="mb-4">{{ session('success') }}</x-ui.alert>
+            @endif
+
+            @if (session('error'))
+                <x-ui.alert variant="danger" class="mb-4">{{ session('error') }}</x-ui.alert>
+            @endif
 
             {{-- DYNAMIC ALERT (MENGGANTIKAN TOAST) --}}
             <div x-show="toast.show" style="display: none;" class="mb-4" x-transition>
@@ -715,17 +859,106 @@
                     </div>
 
                     {{-- Kepala Bagian --}}
-                    <div class="flex items-center gap-3 md:col-span-2 border-t border-border/80 pt-4">
+                    <div class="space-y-4 md:col-span-2 border-t border-border/80 pt-4">
+                    <div class="flex items-center gap-3">
                         <div class="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold shrink-0">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0 1 12 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 0 1-.673-.38m0 0A2.18 2.18 0 0 1 3 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 0 1 3.413-.387m7.5 0V5.25A2.25 2.25 0 0 0 13.5 3h-3a2.25 2.25 0 0 0-2.25 2.25v.894m7.5 0a48.667 48.667 0 0 0-7.5 0M12 12.75h.008v.008H12v-.008Z" />
                             </svg>
                         </div>
                         <div>
-                            <span class="text-[9px] font-bold text-muted uppercase tracking-wider font-sans block">Kepala Bagian</span>
-                            <p class="text-xs font-bold text-ink font-sans">{{ $p->currentSupervisor()?->supervisor->nama_lengkap ?? '-' }}</p>
-                            <p class="text-xs text-muted">NIP. {{ $p->currentSupervisor()?->supervisor->nip ?? '-' }} ({{ $p->currentSupervisor()?->supervisor->latestPosition()?->nama_jabatan ?? '-' }})</p>
+                            <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans block">Kepala Bagian</span>
+                            <p class="text-xs font-bold text-ink font-sans">{{ $currentSupervisor?->supervisor?->nama_lengkap ?? '-' }}</p>
+                            <p class="text-xs text-muted">NIP. {{ $currentSupervisor?->supervisor?->nip ?? '-' }} ({{ $currentSupervisorPosition?->nama_jabatan ?? '-' }})</p>
                         </div>
+                    </div>
+                    @if ($canAssignSupervisor)
+                        <form id="assign-kepala-bagian-form" action="{{ route('pegawai.assign-atasan', $p->id) }}" method="POST" @submit="validateSupervisorSelection($event)" class="border-t border-border pt-4">
+                            @csrf
+                            <div class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_13rem_auto] md:items-start">
+                                <div class="space-y-1">
+                                    <label for="kepala_bagian_lookup" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
+                                        Ubah Kepala Bagian
+                                    </label>
+                                    <div class="relative">
+                                        <input type="hidden" name="kepala_bagian_id" :value="supervisorSelectedId">
+                                        <input
+                                            id="kepala_bagian_lookup"
+                                            x-model="supervisorQuery"
+                                            @input="searchSupervisor()"
+                                            @focus="supervisorQuery.trim().length >= 2 && (supervisorOpen = true)"
+                                            @blur="closeSupervisorLookup()"
+                                            @keydown.arrow-down.prevent="moveSupervisorActiveIndex(1)"
+                                            @keydown.arrow-up.prevent="moveSupervisorActiveIndex(-1)"
+                                            @keydown.enter.prevent="chooseActiveSupervisor()"
+                                            @keydown.escape.prevent="supervisorOpen = false"
+                                            type="search"
+                                            autocomplete="off"
+                                            role="combobox"
+                                            aria-autocomplete="list"
+                                            :aria-expanded="supervisorOpen.toString()"
+                                            aria-controls="kepala_bagian_lookup_results"
+                                            :aria-activedescendant="supervisorActiveIndex >= 0 ? `kepala_bagian_option_${supervisorActiveIndex}` : null"
+                                            aria-describedby="kepala_bagian_lookup_help kepala_bagian_lookup_selection_error {{ $errors->has('kepala_bagian_id') ? 'kepala_bagian_lookup_error' : '' }}"
+                                            :aria-invalid="{{ $errors->has('kepala_bagian_id') ? 'true' : 'false' }}"
+                                            placeholder="Ketik minimal 2 karakter nama atau NIP"
+                                            class="w-full rounded-xl border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 {{ $errors->has('kepala_bagian_id') ? 'border-danger focus:border-danger focus:ring-danger/20' : 'border-border' }}"
+                                        >
+                                        <div
+                                            id="kepala_bagian_lookup_results"
+                                            x-cloak
+                                            x-show="supervisorOpen"
+                                            role="listbox"
+                                            aria-label="Hasil pencarian Kepala Bagian"
+                                            class="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-border bg-surface p-1 shadow-md"
+                                        >
+                                            <div x-show="supervisorLoading" class="flex items-center gap-2 px-3 py-2 text-xs text-muted">
+                                                <x-ui.loading size="sm" color="primary" />
+                                                Memuat kandidat.
+                                            </div>
+                                            <p x-show="!supervisorLoading && supervisorError" x-text="supervisorError" class="px-3 py-2 text-xs text-danger"></p>
+                                            <p x-show="!supervisorLoading && !supervisorError && supervisorResults.length === 0" class="px-3 py-2 text-xs text-muted">
+                                                Tidak ada kandidat yang cocok.
+                                            </p>
+                                            <template x-for="(candidate, index) in supervisorResults" :key="candidate.id">
+                                                <button
+                                                    type="button"
+                                                    :id="`kepala_bagian_option_${index}`"
+                                                    role="option"
+                                                    :aria-selected="supervisorActiveIndex === index"
+                                                    @mousedown.prevent="selectSupervisor(candidate)"
+                                                    @mouseenter="supervisorActiveIndex = index"
+                                                    :class="supervisorActiveIndex === index ? 'bg-soft text-ink' : 'text-ink'"
+                                                    class="flex w-full flex-col rounded-lg px-3 py-2 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                >
+                                                    <span x-text="candidate.nama_lengkap" class="text-sm font-semibold"></span>
+                                                    <span x-text="`NIP. ${candidate.nip}`" class="text-xs text-muted"></span>
+                                                </button>
+                                            </template>
+                                        </div>
+                                    </div>
+                                    <p id="kepala_bagian_lookup_help" class="text-xs text-muted font-sans">Cari nama atau NIP, minimal 2 karakter. Penugasan lampau dan masa depan berlaku sesuai tanggal efektif.</p>
+                                    <p id="kepala_bagian_lookup_selection_error" x-show="supervisorSelectionError" x-cloak x-text="supervisorSelectionError" class="text-xs font-semibold text-danger font-sans" role="alert"></p>
+                                    @error('kepala_bagian_id')
+                                        <p id="kepala_bagian_lookup_error" class="text-[11px] font-semibold text-danger font-sans">{{ $message }}</p>
+                                    @enderror
+                                    <p x-show="supervisorSelectedName" class="text-xs text-muted">Dipilih: <span x-text="supervisorSelectedName" class="font-semibold text-ink"></span></p>
+                                </div>
+                                <x-form.input
+                                    name="effective_date"
+                                    type="date"
+                                    label="Tanggal Efektif"
+                                    :value="old('effective_date', now()->toDateString())"
+                                    required
+                                    help="Tanggal mulai penugasan."
+                                />
+                                <div class="flex flex-wrap gap-2 md:pt-6">
+                                    <x-ui.button type="submit" size="sm">Simpan</x-ui.button>
+                                    <x-ui.button type="button" variant="danger" size="sm" aria-label="Hapus penugasan Kepala Bagian dan simpan" @click="clearSupervisorAndSubmit()">Hapus Kepala Bagian lalu simpan</x-ui.button>
+                                </div>
+                            </div>
+                        </form>
+                    @endif
                     </div>
                 </div>
 

@@ -14,6 +14,7 @@ use App\Actions\Employees\ShowMyProfileAction;
 use App\Actions\Employees\UpdateEmployeeAction;
 use App\Actions\Employees\UpdateEmployeeStatusAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Employee\AssignSupervisorRequest;
 use App\Http\Requests\Employee\ListEmployeesRequest;
 use App\Http\Requests\Employee\StoreEmployeeRequest;
 use App\Http\Requests\Employee\UpdateEmployeeRequest;
@@ -168,14 +169,15 @@ class EmployeeController extends Controller
         ]);
     }
 
-    public function assignSupervisor(Request $request, Employee $employee, AssignSupervisorAction $action): JsonResponse
+    public function assignSupervisor(AssignSupervisorRequest $request, Employee $employee, AssignSupervisorAction $action): JsonResponse
     {
-        $request->validate([
-            'kepala_bagian_id' => 'nullable|uuid|exists:employees,id',
-            'supervisor_id' => 'nullable|uuid|exists:employees,id',
-        ]);
-
-        $updatedEmployee = $action->execute($employee, $request->input('kepala_bagian_id', $request->input('supervisor_id')), $request);
+        $data = $request->validated();
+        $updatedEmployee = $action->execute(
+            $employee,
+            $data['kepala_bagian_id'] ?? $data['supervisor_id'] ?? null,
+            $data['effective_date'],
+            $request,
+        );
 
         return response()->json([
             'message' => 'Kepala bagian berhasil diperbarui.',
