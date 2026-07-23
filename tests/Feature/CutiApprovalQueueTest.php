@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\LeaveApprovalChain;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
+use App\Models\SupervisorAssignment;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Database\Events\QueryExecuted;
@@ -134,6 +135,13 @@ class CutiApprovalQueueTest extends TestCase
         $pemohon = Employee::factory()->create();
         $approver = Employee::factory()->create();
         $user = User::factory()->pegawai()->create(['employee_id' => $pemohon->id]);
+        // Kepala Bagian efektif kebetulan pemohon sendiri; resolver lolos gerbang lalu langkah pemohon disaring dari antrean.
+        SupervisorAssignment::create([
+            'employee_id' => $pemohon->id,
+            'kepala_bagian_id' => $pemohon->id,
+            'tanggal_mulai' => '2026-01-01',
+            'tanggal_berakhir' => null,
+        ]);
         $jenis = RefJenisCuti::create([
             'nama' => 'Cuti Sakit Mandiri',
             'code' => 'sakit_mandiri',

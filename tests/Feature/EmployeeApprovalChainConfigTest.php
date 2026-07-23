@@ -12,6 +12,7 @@ use App\Models\LeaveApprovalChain;
 use App\Models\LeavePybmcGlobalConfig;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
+use App\Models\SupervisorAssignment;
 use App\Models\User;
 use App\Services\Cuti\ApprovalChainResolver;
 use Database\Seeders\RbacSeeder;
@@ -120,6 +121,47 @@ class EmployeeApprovalChainConfigTest extends TestCase
             ->firstOrFail();
 
         $this->assertTrue($auditUpdate->old_values['is_active']);
+    }
+
+    public function test_assignment_effective_today_synchronizes_only_first_kepala_bagian_step_on_active_chain(): void
+    {
+        $actor = User::factory()->superAdmin()->create();
+        $kepalaBagianLama = Employee::factory()->create();
+        $kepalaBagianBaru = Employee::factory()->create();
+        $verifikator = Employee::factory()->create();
+        $pybmc = Employee::factory()->create();
+        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagianLama->id]);
+        SupervisorAssignment::create([
+            'employee_id' => $pegawai->id,
+            'kepala_bagian_id' => $kepalaBagianLama->id,
+            'tanggal_mulai' => today()->subMonth(),
+            'tanggal_berakhir' => null,
+        ]);
+        $chain = $this->actingAs($actor)->app->make(SaveEmployeeApprovalChainAction::class)->execute($pegawai, [
+            ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $kepalaBagianLama->id, 'is_final' => false],
+            ['step_type' => 'verifier', 'role_label' => 'Verifikator Kepegawaian', 'approver_employee_id' => $verifikator->id, 'is_final' => false],
+            ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $pybmc->id, 'is_final' => true],
+        ], $actor, 'Chain sebelum pergantian Kepala Bagian.');
+
+        $response = $this->actingAs($actor)->withSession(['_token' => 'test-token'])->postJson(
+            "/api/v1/pegawai/{$pegawai->id}/assign-atasan",
+            [
+                'kepala_bagian_id' => $kepalaBagianBaru->id,
+                'effective_date' => today()->toDateString(),
+            ],
+            ['X-CSRF-TOKEN' => 'test-token'],
+        );
+
+        $response->assertOk();
+        $this->assertSame(
+            [$kepalaBagianBaru->id, $verifikator->id, $pybmc->id],
+            $chain->steps()->orderBy('step_order')->pluck('approver_employee_id')->all(),
+        );
+        $this->assertSame(
+            ['kepala_bagian', 'verifier', 'pybmc'],
+            $chain->steps()->orderBy('step_order')->pluck('step_type')->all(),
+        );
+        $this->assertSame(1, LeaveApprovalChain::where('employee_id', $pegawai->id)->where('is_active', true)->count());
     }
 
     public function test_global_pybmc_bisa_disimpan_dengan_audit(): void
@@ -661,6 +703,14 @@ class EmployeeApprovalChainConfigTest extends TestCase
         $approverSama = Employee::factory()->create();
         $verifikator = Employee::factory()->create();
 
+        // Kepala Bagian efektif wajib ada agar resolver melewati gerbang fail-closed dan menguji logika skip duplikat.
+        SupervisorAssignment::create([
+            'employee_id' => $pegawai->id,
+            'kepala_bagian_id' => $approverSama->id,
+            'tanggal_mulai' => today()->subDay(),
+            'tanggal_berakhir' => null,
+        ]);
+
         $this->actingAs($actor)->app->make(SaveEmployeeApprovalChainAction::class)->execute($pegawai, [
             ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $approverSama->id, 'is_final' => false],
             ['step_type' => 'verifier', 'role_label' => 'Verifikator', 'approver_employee_id' => $verifikator->id, 'is_final' => false],
@@ -681,6 +731,14 @@ class EmployeeApprovalChainConfigTest extends TestCase
         $pegawai = Employee::factory()->create();
         $kepalaBagian = Employee::factory()->create();
 
+        // Kepala Bagian efektif wajib ada agar resolusi lolos gerbang fail-closed dan justru gagal karena tidak ada approver final.
+        SupervisorAssignment::create([
+            'employee_id' => $pegawai->id,
+            'kepala_bagian_id' => $kepalaBagian->id,
+            'tanggal_mulai' => today()->subDay(),
+            'tanggal_berakhir' => null,
+        ]);
+
         LeaveApprovalChain::create([
             'employee_id' => $pegawai->id,
             'name' => 'Chain rusak',
@@ -698,6 +756,35 @@ class EmployeeApprovalChainConfigTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Rantai approval cuti wajib memiliki tepat satu approver final.');
+
+        $this->app->make(ApprovalChainResolver::class)->resolveEffectiveSteps($pegawai);
+    }
+
+    public function test_resolver_fail_closed_jika_supervisor_aktif_ada_tetapi_step_kepala_bagian_hilang(): void
+    {
+        $pegawai = Employee::factory()->create();
+        $kepalaBagian = Employee::factory()->create();
+        $pybmc = Employee::factory()->create();
+        SupervisorAssignment::create([
+            'employee_id' => $pegawai->id,
+            'kepala_bagian_id' => $kepalaBagian->id,
+            'tanggal_mulai' => today()->subDay(),
+            'tanggal_berakhir' => null,
+        ]);
+        LeaveApprovalChain::create([
+            'employee_id' => $pegawai->id,
+            'name' => 'Chain tanpa Kepala Bagian',
+            'effective_from' => today(),
+        ])->steps()->create([
+            'step_order' => 1,
+            'step_type' => 'pybmc',
+            'role_label' => 'PYBMC',
+            'approver_employee_id' => $pybmc->id,
+            'is_final' => true,
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Rantai approval cuti wajib memiliki step Kepala Bagian.');
 
         $this->app->make(ApprovalChainResolver::class)->resolveEffectiveSteps($pegawai);
     }

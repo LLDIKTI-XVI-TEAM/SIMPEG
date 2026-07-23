@@ -22,6 +22,7 @@ use Database\Seeders\ReferenceSeeder;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -243,6 +244,223 @@ class SubmitLeaveRequestTest extends TestCase
         $this->assertTrue(
             AuditLog::query()->where('auditable_type', 'LeaveRequest')->where('event', 'CREATE')->exists(),
         );
+    }
+
+    public function test_future_assignment_preserves_existing_snapshot_and_post_effective_submission_uses_new_kepala_bagian(): void
+    {
+        Carbon::setTestNow('2026-07-23 08:00:00');
+
+        try {
+            $aktor = $this->makePemohon();
+            $kepalaBagianBaru = Employee::factory()->create();
+            $admin = User::factory()->superAdmin()->create();
+            $jenis = $this->jenisCuti('Cuti Sakit Efektif');
+
+            $assignmentResponse = $this->actingAs($admin)
+                ->withSession(['_token' => 'test-token'])
+                ->postJson("/api/v1/pegawai/{$aktor['employee']->id}/assign-atasan", [
+                    'kepala_bagian_id' => $kepalaBagianBaru->id,
+                    'effective_date' => '2026-08-01',
+                ], ['X-CSRF-TOKEN' => 'test-token']);
+            $assignmentResponse->assertOk();
+
+            $this->actingAs($aktor['user'])->post(route(self::ROUTE), $this->payload($jenis, [
+                'tanggal_mulai' => '2026-07-27',
+                'tanggal_selesai' => '2026-07-28',
+                'alasan' => 'Pengajuan sebelum tanggal efektif.',
+            ]))->assertRedirect(route('cuti'));
+
+            $pengajuanSebelum = LeaveRequest::query()
+                ->where('alasan', 'Pengajuan sebelum tanggal efektif.')
+                ->firstOrFail();
+            $this->assertDatabaseHas('leave_request_steps', [
+                'leave_request_id' => $pengajuanSebelum->id,
+                'step_order' => 1,
+                'approver_employee_id' => $aktor['supervisor']->id,
+            ]);
+
+            Carbon::setTestNow('2026-08-01 08:00:00');
+            $this->flushSession();
+            $this->actingAs($aktor['user']);
+            $this->post(route(self::ROUTE), $this->payload($jenis, [
+                'tanggal_mulai' => '2026-08-03',
+                'tanggal_selesai' => '2026-08-04',
+                'alasan' => 'Pengajuan setelah tanggal efektif.',
+            ]))->assertRedirect(route('cuti'));
+
+            $pengajuanSesudah = LeaveRequest::query()
+                ->where('alasan', 'Pengajuan setelah tanggal efektif.')
+                ->firstOrFail();
+            $this->assertDatabaseHas('leave_request_steps', [
+                'leave_request_id' => $pengajuanSesudah->id,
+                'step_order' => 1,
+                'approver_employee_id' => $kepalaBagianBaru->id,
+            ]);
+            $this->assertDatabaseHas('leave_request_steps', [
+                'leave_request_id' => $pengajuanSesudah->id,
+                'step_order' => 2,
+                'approver_employee_id' => $aktor['pybmc']->id,
+            ]);
+            $this->assertDatabaseHas('leave_request_steps', [
+                'leave_request_id' => $pengajuanSebelum->id,
+                'step_order' => 1,
+                'approver_employee_id' => $aktor['supervisor']->id,
+            ]);
+            $this->assertDatabaseMissing('leave_request_steps', [
+                'leave_request_id' => $pengajuanSebelum->id,
+                'approver_employee_id' => $kepalaBagianBaru->id,
+            ]);
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_submission_uses_effective_supervisor_when_pointer_is_null_and_stored_chain_is_stale(): void
+    {
+        Carbon::setTestNow('2026-07-23 08:00:00');
+
+        try {
+            $aktor = $this->makePemohon();
+            $kepalaBagianTersimpan = $aktor['supervisor'];
+            $kepalaBagianEfektif = Employee::factory()->create();
+            $aktor['employee']->supervisorAssignments()->delete();
+            $aktor['employee']->update(['kepala_bagian_id' => null]);
+            SupervisorAssignment::create([
+                'employee_id' => $aktor['employee']->id,
+                'kepala_bagian_id' => $kepalaBagianEfektif->id,
+                'tanggal_mulai' => '2026-08-01',
+                'tanggal_berakhir' => null,
+            ]);
+            $jenis = $this->jenisCuti('Cuti Sakit Pointer Kosong');
+
+            Carbon::setTestNow('2026-08-01 08:00:00');
+            $this->flushSession();
+            $this->actingAs($aktor['user'])->post(route(self::ROUTE), $this->payload($jenis, [
+                'tanggal_mulai' => '2026-08-03',
+                'tanggal_selesai' => '2026-08-04',
+                'alasan' => 'Pengajuan dengan pointer Kepala Bagian kosong.',
+            ]))->assertRedirect(route('cuti'));
+
+            $leave = LeaveRequest::query()->where('alasan', 'Pengajuan dengan pointer Kepala Bagian kosong.')->firstOrFail();
+            $this->assertDatabaseHas('leave_request_steps', [
+                'leave_request_id' => $leave->id,
+                'step_order' => 1,
+                'approver_employee_id' => $kepalaBagianEfektif->id,
+            ]);
+            $this->assertSame(
+                $kepalaBagianTersimpan->id,
+                LeaveApprovalChain::query()
+                    ->where('employee_id', $aktor['employee']->id)
+                    ->firstOrFail()
+                    ->steps()
+                    ->where('step_type', 'kepala_bagian')
+                    ->firstOrFail()
+                    ->approver_employee_id,
+            );
+            $this->assertNull($aktor['employee']->fresh()->kepala_bagian_id);
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_submission_fails_closed_when_no_effective_kepala_bagian_and_stored_chain_is_stale(): void
+    {
+        Carbon::setTestNow('2026-08-01 08:00:00');
+
+        try {
+            $aktor = $this->makePemohon();
+            // Pegawai lain memvalidasi scope per-pegawai: pengosongan penugasan pemohon tidak boleh menyentuh mereka.
+            $lain = $this->makePemohon();
+
+            // Kosongkan penugasan efektif pemohon; chain aktif tetap menyimpan approver Kepala Bagian lama.
+            $aktor['employee']->supervisorAssignments()->delete();
+            $aktor['employee']->update(['kepala_bagian_id' => null]);
+
+            $storedKepalaBagianId = LeaveApprovalChain::query()
+                ->where('employee_id', $aktor['employee']->id)
+                ->firstOrFail()
+                ->steps()
+                ->where('step_type', 'kepala_bagian')
+                ->firstOrFail()
+                ->approver_employee_id;
+            // Prasyarat: approver tersimpan adalah pihak lain (bukan pemohon), sehingga jalur konflik kepentingan tidak berlaku.
+            $this->assertSame($aktor['supervisor']->id, $storedKepalaBagianId);
+
+            $jenis = $this->jenisCuti('Cuti Sakit Tanpa Kabag Efektif');
+
+            $this->actingAs($aktor['user']);
+            $response = $this->postJson(route(self::ROUTE), $this->payload($jenis, [
+                'alasan' => 'Uji fail-closed tanpa Kepala Bagian efektif.',
+            ]));
+
+            // Fail-closed: tanpa Kepala Bagian efektif pada hari server, pengajuan baru wajib ditolak sebagai validation error.
+            $response->assertUnprocessable();
+            $response->assertJsonValidationErrors(['jenis_cuti_id']);
+            $this->assertDatabaseMissing('leave_requests', [
+                'employee_id' => $aktor['employee']->id,
+                'alasan' => 'Uji fail-closed tanpa Kepala Bagian efektif.',
+            ]);
+            $this->assertDatabaseCount('leave_request_steps', 0);
+
+            // Chain lama tetap immutable: approver Kepala Bagian tersimpan tidak boleh berubah karena resolusi gagal.
+            $this->assertSame(
+                $storedKepalaBagianId,
+                LeaveApprovalChain::query()
+                    ->where('employee_id', $aktor['employee']->id)
+                    ->firstOrFail()
+                    ->steps()
+                    ->where('step_type', 'kepala_bagian')
+                    ->firstOrFail()
+                    ->approver_employee_id,
+            );
+
+            // Scope per-pegawai: penugasan efektif pegawai lain tidak terpengaruh oleh pengosongan pemohon.
+            $this->assertNotNull($lain['employee']->fresh()->currentSupervisor());
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_submission_fails_closed_when_no_effective_supervisor_even_if_chain_kepala_bagian_is_applicant(): void
+    {
+        $aktor = $this->makePemohon();
+        // Kosongkan penugasan efektif; chain justru menetapkan pemohon sendiri sebagai Kepala Bagian.
+        $aktor['employee']->supervisorAssignments()->delete();
+        $aktor['employee']->update(['kepala_bagian_id' => null]);
+        $chain = LeaveApprovalChain::query()->where('employee_id', $aktor['employee']->id)->firstOrFail();
+        $chain->steps()->delete();
+        $chain->steps()->createMany([
+            [
+                'step_order' => 1,
+                'step_type' => 'kepala_bagian',
+                'role_label' => 'Kepala Bagian',
+                'approver_employee_id' => $aktor['employee']->id,
+                'is_final' => false,
+            ],
+            [
+                'step_order' => 2,
+                'step_type' => 'pybmc',
+                'role_label' => 'PYBMC',
+                'approver_employee_id' => $aktor['pybmc']->id,
+                'is_final' => true,
+            ],
+        ]);
+        $jenis = $this->jenisCuti('Cuti Sakit Pemohon Sebagai Kabag');
+
+        $this->actingAs($aktor['user']);
+        $response = $this->postJson(route(self::ROUTE), $this->payload($jenis, [
+            'alasan' => 'Uji fail-closed pemohon sebagai Kepala Bagian.',
+        ]));
+
+        // Invariant tanpa syarat: tanpa Kepala Bagian efektif, pengajuan ditolak sebelum penyaringan konflik kepentingan
+        // sehingga approver PYBMC yang tersisa tidak boleh menjadi celah lolosnya pengajuan.
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['jenis_cuti_id']);
+        $this->assertDatabaseMissing('leave_requests', [
+            'employee_id' => $aktor['employee']->id,
+            'alasan' => 'Uji fail-closed pemohon sebagai Kepala Bagian.',
+        ]);
+        $this->assertDatabaseCount('leave_request_steps', 0);
     }
 
     public function test_jumlah_hari_kerja_dihitung_di_server(): void
@@ -695,6 +913,14 @@ class SubmitLeaveRequestTest extends TestCase
     public function test_snapshot_menghapus_pemohon_dan_menormalkan_urutan_approver_tersisa(): void
     {
         $aktor = $this->makePemohon();
+        // Kepala Bagian efektif kebetulan pemohon sendiri; resolver menuliskannya ke step lalu langkah pemohon disaring.
+        $aktor['employee']->supervisorAssignments()->delete();
+        SupervisorAssignment::create([
+            'employee_id' => $aktor['employee']->id,
+            'kepala_bagian_id' => $aktor['employee']->id,
+            'tanggal_mulai' => '2026-01-01',
+            'tanggal_berakhir' => null,
+        ]);
         $chain = LeaveApprovalChain::query()->where('employee_id', $aktor['employee']->id)->firstOrFail();
         $chain->steps()->delete();
         $chain->steps()->createMany([
@@ -742,6 +968,7 @@ class SubmitLeaveRequestTest extends TestCase
     {
         Storage::fake('public');
         $aktor = $this->makePemohon();
+        $aktor['employee']->supervisorAssignments()->delete();
         $chain = LeaveApprovalChain::query()->where('employee_id', $aktor['employee']->id)->firstOrFail();
         $chain->steps()->delete();
         $chain->steps()->createMany([

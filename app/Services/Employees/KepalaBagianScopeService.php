@@ -23,13 +23,21 @@ class KepalaBagianScopeService
         }
 
         return Employee::query()->where(function (Builder $query) use ($employeeId): void {
-            $query->where('kepala_bagian_id', $employeeId)
-                ->orWhereHas('supervisorAssignments', function (Builder $assignments) use ($employeeId): void {
-                    $assignments->whereNull('tanggal_berakhir')
-                        ->where(function (Builder $assignment) use ($employeeId): void {
-                            $assignment->where('kepala_bagian_id', $employeeId)
-                                ->orWhere('supervisor_id', $employeeId);
-                        });
+            $query->whereHas('supervisorAssignments', function (Builder $assignments) use ($employeeId): void {
+                $assignments->whereDate('tanggal_mulai', '<=', today()->toDateString())
+                    ->where(function (Builder $active): void {
+                        $active->whereNull('tanggal_berakhir')
+                            ->orWhereDate('tanggal_berakhir', '>=', today()->toDateString());
+                    })
+                    ->where(function (Builder $assignment) use ($employeeId): void {
+                        $assignment->where('kepala_bagian_id', $employeeId)
+                            ->orWhere('supervisor_id', $employeeId);
+                    });
+            })
+                ->orWhere(function (Builder $fallback) use ($employeeId): void {
+                    // Pointer lama hanya menjadi fallback bagi pegawai yang belum memiliki histori penugasan.
+                    $fallback->where('kepala_bagian_id', $employeeId)
+                        ->whereDoesntHave('supervisorAssignments');
                 });
         });
     }
