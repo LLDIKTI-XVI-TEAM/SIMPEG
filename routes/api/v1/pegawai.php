@@ -135,7 +135,7 @@ Route::middleware($employeeGroupMiddleware)
             ->whereUuid(['employee', 'education'])
             ->name('riwayat-pendidikan.destroy');
         Route::post('/{employee}/assign-atasan', [EmployeeController::class, 'assignSupervisor'])
-            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.update', 'role:super_admin'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
             ->whereUuid('employee')
             ->name('assign-atasan');
     });
