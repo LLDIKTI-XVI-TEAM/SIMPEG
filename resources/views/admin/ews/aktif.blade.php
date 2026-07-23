@@ -18,9 +18,9 @@
 
     <div class="space-y-6" x-data="{
         search: '',
-        followup: { open: false, action: '', status: '', label: '', employee: '', note: '' },
-        openFollowup(action, status, label, employee) {
-            this.followup = { open: true, action, status, label, employee, note: '' };
+        followup: { open: false, action: '', status: '', label: '', employee: '', type: '', note: '' },
+        openFollowup(action, status, label, employee, type) {
+            this.followup = { open: true, action, status, label, employee, type, note: '' };
         },
         closeFollowup() {
             this.followup.open = false;
@@ -303,14 +303,14 @@
                                             <div class="flex flex-wrap gap-2">
                                                 <button
                                                     type="button"
-                                                    @click="openFollowup(@js(route('ews.followup.update', $alert['alert_id'])), @js('ditangani'), @js('Ditangani'), @js($alert['nama']))"
+                                                    @click="openFollowup(@js(route('ews.followup.update', $alert['alert_id'])), @js('ditangani'), @js('Ditangani'), @js($alert['nama']), @js($alert['type']))"
                                                     class="inline-flex items-center justify-center rounded-lg bg-success px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-success/20"
                                                 >
                                                     Ditangani
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    @click="openFollowup(@js(route('ews.followup.update', $alert['alert_id'])), @js('tidak_perlu'), @js('Tidak Perlu'), @js($alert['nama']))"
+                                                    @click="openFollowup(@js(route('ews.followup.update', $alert['alert_id'])), @js('tidak_perlu'), @js('Tidak Perlu'), @js($alert['nama']), @js($alert['type']))"
                                                     class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-ink shadow-sm transition-colors hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20"
                                                 >
                                                     Tidak Perlu
@@ -354,7 +354,7 @@
             closeAction="closeFollowup()"
             maxWidth="lg"
         >
-            <form method="POST" :action="followup.action" class="space-y-4">
+            <form method="POST" :action="followup.action" enctype="multipart/form-data" class="space-y-4">
                 @csrf
                 @method('PATCH')
 
@@ -364,6 +364,77 @@
                     <p class="font-semibold text-ink" x-text="followup.label"></p>
                     <p class="mt-1 text-xs text-muted" x-text="followup.employee"></p>
                 </div>
+
+                <template x-if="followup.status === 'ditangani' && followup.type === 'KENAIKAN_PANGKAT'">
+                    <div class="space-y-4 rounded-lg border border-primary/20 bg-primary/5 p-4">
+                        <div>
+                            <h4 class="text-sm font-semibold text-ink">SK Pangkat Baru</h4>
+                            <p class="mt-1 text-xs text-muted">Riwayat pangkat baru akan dibuat dan target EWS dihitung ulang dari TMT Pangkat + konfigurasi masa berlaku.</p>
+                        </div>
+                        <div>
+                            <label for="ews-golongan-id" class="mb-1.5 block text-sm font-medium text-ink">Golongan Baru <span class="text-danger">*</span></label>
+                            <select id="ews-golongan-id" name="golongan_id" required class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                <option value="">Pilih golongan</option>
+                                @foreach($golonganOptions as $golongan)
+                                    <option value="{{ $golongan->id }}">{{ $golongan->kode }} — {{ $golongan->nama }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <label for="ews-tmt-pangkat" class="mb-1.5 block text-sm font-medium text-ink">TMT Pangkat <span class="text-danger">*</span></label>
+                                <input id="ews-tmt-pangkat" type="date" name="tmt_pangkat" required class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            </div>
+                            <div>
+                                <label for="ews-tanggal-sk-pangkat" class="mb-1.5 block text-sm font-medium text-ink">Tanggal SK <span class="text-danger">*</span></label>
+                                <input id="ews-tanggal-sk-pangkat" type="date" name="tanggal_sk" required class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            </div>
+                        </div>
+                        <div>
+                            <label for="ews-no-sk-pangkat" class="mb-1.5 block text-sm font-medium text-ink">Nomor SK <span class="text-danger">*</span></label>
+                            <input id="ews-no-sk-pangkat" type="text" name="no_sk" required maxlength="100" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label for="ews-file-sk-pangkat" class="mb-1.5 block text-sm font-medium text-ink">File SK Baru <span class="text-danger">*</span></label>
+                            <input id="ews-file-sk-pangkat" type="file" name="file_sk" required accept=".pdf,.jpg,.jpeg,.png" class="block w-full text-sm text-muted file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-primary hover:file:bg-primary/20">
+                            <p class="mt-1 text-xs text-muted">PDF/JPG/PNG, maksimal 10 MB.</p>
+                        </div>
+                    </div>
+                </template>
+
+                <template x-if="followup.status === 'ditangani' && followup.type === 'KGB'">
+                    <div class="space-y-4 rounded-lg border border-primary/20 bg-primary/5 p-4">
+                        <div>
+                            <h4 class="text-sm font-semibold text-ink">SK KGB Baru</h4>
+                            <p class="mt-1 text-xs text-muted">Riwayat KGB baru akan dibuat dan target EWS dihitung ulang dari TMT KGB + konfigurasi masa berlaku.</p>
+                        </div>
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <label for="ews-tmt-kgb" class="mb-1.5 block text-sm font-medium text-ink">TMT KGB <span class="text-danger">*</span></label>
+                                <input id="ews-tmt-kgb" type="date" name="tmt_kgb" required class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            </div>
+                            <div>
+                                <label for="ews-gaji-pokok" class="mb-1.5 block text-sm font-medium text-ink">Gaji Pokok <span class="text-danger">*</span></label>
+                                <input id="ews-gaji-pokok" type="number" name="gaji_pokok" required min="0" step="0.01" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            </div>
+                        </div>
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <label for="ews-tanggal-sk-kgb" class="mb-1.5 block text-sm font-medium text-ink">Tanggal SK <span class="text-danger">*</span></label>
+                                <input id="ews-tanggal-sk-kgb" type="date" name="tanggal_sk" required class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            </div>
+                            <div>
+                                <label for="ews-no-sk-kgb" class="mb-1.5 block text-sm font-medium text-ink">Nomor SK <span class="text-danger">*</span></label>
+                                <input id="ews-no-sk-kgb" type="text" name="no_sk" required maxlength="100" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            </div>
+                        </div>
+                        <div>
+                            <label for="ews-file-sk-kgb" class="mb-1.5 block text-sm font-medium text-ink">File SK Baru <span class="text-danger">*</span></label>
+                            <input id="ews-file-sk-kgb" type="file" name="file_sk" required accept=".pdf,.jpg,.jpeg,.png" class="block w-full text-sm text-muted file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-primary hover:file:bg-primary/20">
+                            <p class="mt-1 text-xs text-muted">PDF/JPG/PNG, maksimal 10 MB.</p>
+                        </div>
+                    </div>
+                </template>
 
                 <x-form.textarea
                     name="handled_note"

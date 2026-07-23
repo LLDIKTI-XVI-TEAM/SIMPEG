@@ -134,6 +134,7 @@ class ListActiveEwsAlertsAction
         return [
             'pegawai_id' => $employee->id,
             'alert_id' => $alert->id,
+            'type' => $alert->type,
             'nama' => $employee->nama_lengkap,
             'nip' => $employee->nip,
             'jenis_event' => $this->typeLabels[$alert->type] ?? $alert->type,

@@ -7,6 +7,7 @@ use App\Actions\Ews\UpdateEwsAlertFollowupAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Ews\UpdateEwsAlertFollowupRequest;
 use App\Models\EwsAlert;
+use App\Models\RefGolongan;
 use Illuminate\Http\Request;
 
 class EwsController extends Controller
@@ -26,6 +27,9 @@ class EwsController extends Controller
             'filterStatus' => $filterStatus,
             'typeLabels' => $data['type_labels'],
             'followupStatusLabels' => $data['followup_status_labels'],
+            'golonganOptions' => RefGolongan::query()
+                ->orderBy('kode')
+                ->get(['id', 'kode', 'nama']),
             'title' => 'EWS Aktif',
         ]);
     }
