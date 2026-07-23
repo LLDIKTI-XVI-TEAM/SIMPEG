@@ -51,7 +51,7 @@ class EwsFollowupTest extends TestCase
     public function test_admin_kepegawaian_can_mark_alert_as_ditangani_and_it_disappears_from_active_page(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
-        $alert = $this->activeAlert('Pegawai Followup Ditangani', 'PENSIUN');
+        $alert = $this->activeAlert('Pegawai Followup Ditangani', 'SATYALANCANA');
 
         $this->actingAs($user)
             ->from(route('ews'))
@@ -202,6 +202,110 @@ class EwsFollowupTest extends TestCase
         $this->assertSame('2030-07-22', $employee->fresh()->tanggal_kgb_berikutnya->toDateString());
         $this->assertSame(EwsAlert::FOLLOWUP_STATUS_HANDLED, $alert->refresh()->followup_status);
         $this->assertTrue(SimpegNotification::where('ews_alert_id', $alert->id)->firstOrFail()->is_read);
+    }
+
+    public function test_pension_approval_uploads_sk_sets_employee_to_pensiun_and_stops_reminders(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->superAdmin()->create();
+        $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
+        $alert = $this->activeAlertFor($employee, 'PENSIUN', now()->subDay()->toDateString(), 90);
+        $otherStage = $this->activeAlertFor($employee, 'PENSIUN', now()->subDay()->toDateString(), 180);
+        foreach ([$alert, $otherStage] as $pensionAlert) {
+            SimpegNotification::create([
+                'user_id' => $employee->id,
+                'ews_alert_id' => $pensionAlert->id,
+                'type' => 'ews.pensiun',
+                'title' => 'Peringatan Pensiun',
+                'body' => 'Segera lengkapi berkas.',
+                'data' => ['ews_alert_id' => $pensionAlert->id],
+            ]);
+        }
+
+        $this->actingAs($user)
+            ->from(route('ews'))
+            ->postWithCsrf(route('ews.followup.update', $alert), [
+                'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+                'handled_note' => 'SK pensiun telah diterbitkan.',
+                'no_sk' => 'SK-PENSIUN-EWS-001',
+                'tanggal_sk' => '2026-07-25',
+                'file_sk' => UploadedFile::fake()->create('sk-pensiun.pdf', 128, 'application/pdf'),
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('ews'));
+
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'status_aktif' => 'Pensiun',
+        ]);
+        $this->assertDatabaseHas('documents', [
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'sk_pensiun',
+            'nomor_dokumen' => 'SK-PENSIUN-EWS-001',
+        ]);
+        $this->assertSame(EwsAlert::FOLLOWUP_STATUS_HANDLED, $alert->refresh()->followup_status);
+        $this->assertSame(EwsAlert::FOLLOWUP_STATUS_HANDLED, $otherStage->refresh()->followup_status);
+        $this->assertTrue(SimpegNotification::whereIn('ews_alert_id', [$alert->id, $otherStage->id])->where('is_read', true)->exists());
+        $this->assertDatabaseHas('audit_logs', [
+            'event' => 'UPDATE',
+            'auditable_type' => 'Employee',
+            'auditable_id' => $employee->id,
+        ]);
+    }
+
+    public function test_pension_approval_requires_sk_data(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $alert = $this->activeAlert('Pegawai Pensiun Wajib SK', 'PENSIUN');
+
+        $this->actingAs($user)
+            ->postJsonWithCsrf(route('ews.followup.update', $alert), [
+                'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+                'handled_note' => 'Pensiun akan diproses.',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['no_sk', 'tanggal_sk', 'file_sk']);
+
+        $this->assertSame(EwsAlert::FOLLOWUP_STATUS_ACTIVE, $alert->refresh()->followup_status);
+    }
+
+    public function test_tidak_perlu_keeps_employee_data_and_sends_note_notification(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $employee = Employee::factory()->create([
+            'golongan_terakhir' => 'III/a',
+            'tanggal_kenaikan_pangkat_berikutnya' => '2030-07-22',
+        ]);
+        $alert = $this->activeAlertFor($employee, 'KENAIKAN_PANGKAT', now()->addDays(30)->toDateString(), 30);
+        SimpegNotification::create([
+            'user_id' => $employee->id,
+            'ews_alert_id' => $alert->id,
+            'type' => 'ews.kenaikan_pangkat',
+            'title' => 'Peringatan Pangkat',
+            'body' => 'Segera lengkapi berkas.',
+            'data' => ['ews_alert_id' => $alert->id],
+        ]);
+
+        $this->actingAs($user)
+            ->from(route('ews'))
+            ->postWithCsrf(route('ews.followup.update', $alert), [
+                'followup_status' => EwsAlert::FOLLOWUP_STATUS_NOT_NEEDED,
+                'handled_note' => 'Usulan belum diperlukan karena data masih valid.',
+            ])
+            ->assertRedirect(route('ews'));
+
+        $employee->refresh();
+        $this->assertSame('III/a', $employee->golongan_terakhir);
+        $this->assertSame('2030-07-22', $employee->tanggal_kenaikan_pangkat_berikutnya->toDateString());
+        $this->assertSame(0, $employee->rankHistories()->count());
+        $this->assertSame(EwsAlert::FOLLOWUP_STATUS_NOT_NEEDED, $alert->refresh()->followup_status);
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $employee->id,
+            'type' => 'ews.tidak_perlu',
+            'title' => 'Tindak Lanjut EWS: Tidak Perlu',
+            'body' => 'Usulan belum diperlukan karena data masih valid.',
+            'is_read' => false,
+        ]);
     }
 
     public function test_pangkat_or_kgb_approval_requires_new_history_and_sk_data(): void

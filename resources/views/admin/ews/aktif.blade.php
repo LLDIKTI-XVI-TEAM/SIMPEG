@@ -436,6 +436,30 @@
                     </div>
                 </template>
 
+                <template x-if="followup.status === 'ditangani' && followup.type === 'PENSIUN'">
+                    <div class="space-y-4 rounded-lg border border-danger/20 bg-danger/5 p-4">
+                        <div>
+                            <h4 class="text-sm font-semibold text-ink">SK Pensiun</h4>
+                            <p class="mt-1 text-xs text-muted">Saat disetujui, SK diarsipkan dan status pegawai langsung berubah menjadi Pensiun.</p>
+                        </div>
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <label for="ews-tanggal-sk-pensiun" class="mb-1.5 block text-sm font-medium text-ink">Tanggal SK <span class="text-danger">*</span></label>
+                                <input id="ews-tanggal-sk-pensiun" type="date" name="tanggal_sk" required class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            </div>
+                            <div>
+                                <label for="ews-no-sk-pensiun" class="mb-1.5 block text-sm font-medium text-ink">Nomor SK <span class="text-danger">*</span></label>
+                                <input id="ews-no-sk-pensiun" type="text" name="no_sk" required maxlength="100" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            </div>
+                        </div>
+                        <div>
+                            <label for="ews-file-sk-pensiun" class="mb-1.5 block text-sm font-medium text-ink">File SK Pensiun <span class="text-danger">*</span></label>
+                            <input id="ews-file-sk-pensiun" type="file" name="file_sk" required accept=".pdf,.jpg,.jpeg,.png" class="block w-full text-sm text-muted file:mr-3 file:rounded-md file:border-0 file:bg-danger/10 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-danger hover:file:bg-danger/20">
+                            <p class="mt-1 text-xs text-muted">PDF/JPG/PNG, maksimal 10 MB.</p>
+                        </div>
+                    </div>
+                </template>
+
                 <x-form.textarea
                     name="handled_note"
                     id="ews-followup-note"

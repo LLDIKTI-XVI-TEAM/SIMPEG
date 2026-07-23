@@ -52,14 +52,14 @@ class UpdateEwsAlertFollowupRequest extends FormRequest
             }
 
             if (! $this->hasFile('file_sk') || ! $this->file('file_sk')?->isValid()) {
-                $validator->errors()->add('file_sk', 'File SK baru wajib diunggah saat persetujuan EWS Pangkat atau KGB.');
+                $validator->errors()->add('file_sk', 'File SK baru wajib diunggah saat persetujuan EWS Pangkat, KGB, atau Pensiun.');
             }
         });
     }
 
     private function requiresHistoryCompletion(): bool
     {
-        return $this->isRankApproval() || $this->isKgbApproval();
+        return $this->isRankApproval() || $this->isKgbApproval() || $this->isPensionApproval();
     }
 
     private function isRankApproval(): bool
@@ -70,6 +70,11 @@ class UpdateEwsAlertFollowupRequest extends FormRequest
     private function isKgbApproval(): bool
     {
         return $this->alertType() === 'KGB';
+    }
+
+    private function isPensionApproval(): bool
+    {
+        return $this->alertType() === 'PENSIUN';
     }
 
     private function alertType(): ?string
@@ -90,6 +95,9 @@ class UpdateEwsAlertFollowupRequest extends FormRequest
         return [
             'followup_status' => 'status tindak lanjut',
             'handled_note' => 'catatan tindak lanjut',
+            'no_sk' => 'nomor SK',
+            'tanggal_sk' => 'tanggal SK',
+            'file_sk' => 'file SK',
         ];
     }
 }
