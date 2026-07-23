@@ -153,7 +153,7 @@ class PimpinanEmployeeController extends Controller
         $jenjangOptions = RefJenjangPendidikan::orderBy('urutan')->get();
         $p = $employee;
 
-        return view('admin.pegawai.show', compact(
+        return view('pimpinan.pegawai.show', compact(
             'p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions'
         ));
     }
