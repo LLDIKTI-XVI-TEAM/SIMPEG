@@ -52,7 +52,7 @@ class ProfileTest extends TestCase
         $response->assertSee('7', false);
     }
 
-    public function test_profile_does_not_show_fake_default_leave_balance_when_missing(): void
+    public function test_profile_shows_fallback_default_leave_balance_when_missing(): void
     {
         $employee = Employee::factory()->create();
         $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
@@ -61,8 +61,8 @@ class ProfileTest extends TestCase
         $response = $this->get('/dashboard/profil?tab=cuti');
 
         $response->assertOk();
-        $response->assertSee('Belum tersedia', false);
-        $response->assertDontSee('12 <span class="text-sm font-normal text-muted">Hari</span>', false);
+        $response->assertDontSee('Belum tersedia', false);
+        $response->assertSee('12 <span class="text-sm font-normal text-muted">Hari</span>', false);
     }
 
     public function test_profile_ews_section_uses_real_alerts_not_mock(): void
