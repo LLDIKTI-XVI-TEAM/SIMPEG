@@ -32,7 +32,7 @@ class ShowProfilePageAction
             $leaveBalance = LeaveBalance::query()
                 ->where('employee_id', $employee->id)
                 ->where('tahun', $year)
-                ->value('sisa');
+                ->first();
         }
 
         return [

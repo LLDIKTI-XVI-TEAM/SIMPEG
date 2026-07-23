@@ -3,6 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Ews\ListActiveEwsAlertsAction;
+use App\Models\Employee;
+use App\Models\LeaveBalance;
+use App\Models\LeaveRequest;
+use App\Models\SimpegNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -23,10 +27,10 @@ class DashboardController extends Controller
         }
 
         $isPegawai = $role === 'pegawai';
-        $employeeId = $isPegawai ? (string) ($user?->employee_id ?? '') : null;
+        $employeeId = $isPegawai ? $user?->employee_id : null;
 
-        $dashboardEwsData = $employeeId !== '' || ! $isPegawai
-            ? $ewsAlerts->execute(null, null, $employeeId)
+        $dashboardEwsData = $employeeId || ! $isPegawai
+            ? $ewsAlerts->execute(null, null, $employeeId ? (string) $employeeId : null)
             : ['alerts' => []];
 
         $dashboardEwsAlerts = $dashboardEwsData['alerts'];
@@ -43,6 +47,32 @@ class DashboardController extends Controller
         ];
 
         if ($isPegawai) {
+            $employee = Employee::with(['jenisPegawai', 'statusPegawai'])
+                ->where('id', $employeeId)
+                ->first();
+
+            $saldoCuti = LeaveBalance::where('employee_id', $employeeId)
+                ->where('tahun', date('Y'))
+                ->first();
+
+            $cutiAktif = LeaveRequest::where('employee_id', $employeeId)
+                ->whereIn('status', ['menunggu_approval', 'ditangguhkan', 'perlu_perubahan'])
+                ->latest()
+                ->take(5)
+                ->get();
+
+            $notifikasi = SimpegNotification::where('user_id', $user->id)
+                ->latest()
+                ->take(5)
+                ->get();
+
+            $viewData = array_merge($viewData, [
+                'employee' => $employee,
+                'saldoCuti' => $saldoCuti,
+                'cutiAktif' => $cutiAktif,
+                'notifikasi' => $notifikasi,
+            ]);
+
             return view('pegawai.dashboard', $viewData);
         }
 
