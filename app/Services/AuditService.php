@@ -33,19 +33,16 @@ class AuditService
         ?string $userAgent = null,
     ): void {
         try {
-            $user = Auth::user();
-
-            AuditLog::create([
-                'user_id' => $user?->id,
-                'user_name' => $user?->name,
-                'event' => $event,
-                'auditable_type' => $auditableType,
-                'auditable_id' => $auditableId,
-                'old_values' => $oldValues,
-                'new_values' => $newValues,
-                'ip_address' => $request?->ip() ?? $ipAddress,
-                'user_agent' => $request?->userAgent() ?? $userAgent,
-            ]);
+            AuditLog::create(self::authenticatedPayload(
+                $event,
+                $auditableType,
+                $auditableId,
+                $oldValues,
+                $newValues,
+                $request,
+                $ipAddress,
+                $userAgent,
+            ));
         } catch (\Throwable $e) {
             Log::warning('Audit log gagal ditulis', [
                 'event' => $event,
@@ -53,6 +50,31 @@ class AuditService
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Menulis audit kritis tanpa menelan kegagalan agar transaksi domain dapat di-rollback.
+     */
+    public static function logOrFail(
+        string $event,
+        string $auditableType,
+        ?string $auditableId = null,
+        ?array $oldValues = null,
+        ?array $newValues = null,
+        ?Request $request = null,
+        ?string $ipAddress = null,
+        ?string $userAgent = null,
+    ): void {
+        AuditLog::create(self::authenticatedPayload(
+            $event,
+            $auditableType,
+            $auditableId,
+            $oldValues,
+            $newValues,
+            $request,
+            $ipAddress,
+            $userAgent,
+        ));
     }
 
     /**
@@ -90,5 +112,35 @@ class AuditService
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $oldValues
+     * @param  array<string, mixed>|null  $newValues
+     * @return array<string, mixed>
+     */
+    private static function authenticatedPayload(
+        string $event,
+        string $auditableType,
+        ?string $auditableId,
+        ?array $oldValues,
+        ?array $newValues,
+        ?Request $request,
+        ?string $ipAddress,
+        ?string $userAgent,
+    ): array {
+        $user = Auth::user();
+
+        return [
+            'user_id' => $user?->id,
+            'user_name' => $user?->name,
+            'event' => $event,
+            'auditable_type' => $auditableType,
+            'auditable_id' => $auditableId,
+            'old_values' => $oldValues,
+            'new_values' => $newValues,
+            'ip_address' => $request?->ip() ?? $ipAddress,
+            'user_agent' => $request?->userAgent() ?? $userAgent,
+        ];
     }
 }
