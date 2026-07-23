@@ -269,7 +269,12 @@ class Employee extends Model
     public function currentSupervisor(): ?SupervisorAssignment
     {
         return $this->supervisorAssignments()
-            ->whereNull('tanggal_berakhir')
+            ->whereDate('tanggal_mulai', '<=', today()->toDateString())
+            ->where(function ($query): void {
+                $query->whereNull('tanggal_berakhir')
+                    ->orWhereDate('tanggal_berakhir', '>=', today()->toDateString());
+            })
+            ->orderByDesc('tanggal_mulai')
             ->first();
     }
 
