@@ -122,7 +122,7 @@
         <div class="mb-6 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
 
             {{-- W1: Total Pegawai Aktif --}}
-            <x-ui.stat-card href="{{ route('pimpinan.pegawai.index', ['status_pegawai_id' => 'aktif']) }}" label="Total Pegawai Aktif" value="{{ $totalPegawai }}" variant="primary" size="lg" accent>
+            <x-ui.stat-card href="{{ route('pimpinan.pegawai.index') }}" label="Total Pegawai Aktif" value="{{ $totalPegawai }}" variant="primary" size="lg" accent>
                 <x-slot:icon>
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
                 </x-slot:icon>
@@ -187,7 +187,7 @@
                         <x-ui.table-head>
                             <x-ui.table-row>
                                 <x-ui.table-th padding="lg">Pegawai</x-ui.table-th>
-                                <x-ui.table-th padding="lg">Golongan</x-ui.table-th>
+                                <x-ui.table-th padding="lg">Golongan (Asal → Tujuan)</x-ui.table-th>
                                 <x-ui.table-th padding="lg">TMT</x-ui.table-th>
                                 <x-ui.table-th padding="lg">Nomor SK</x-ui.table-th>
                             </x-ui.table-row>
@@ -206,7 +206,15 @@
                                             </div>
                                         </div>
                                     </x-ui.table-td>
-                                    <x-ui.table-td padding="xl" class="text-muted font-medium text-xs">{{ $row['golongan'] }}</x-ui.table-td>
+                                    <x-ui.table-td padding="xl" class="text-muted font-medium text-xs">
+                                        @if(!empty($row['golongan_awal']) && !empty($row['golongan_tujuan']))
+                                            <span class="text-ink font-semibold">{{ $row['golongan_awal'] }}</span>
+                                            <span class="text-muted mx-1">→</span>
+                                            <span class="text-primary font-bold">{{ $row['golongan_tujuan'] }}</span>
+                                        @else
+                                            <span>{{ $row['golongan'] }}</span>
+                                        @endif
+                                    </x-ui.table-td>
                                     <x-ui.table-td padding="xl" class="font-semibold text-xs">{{ \Carbon\Carbon::parse($row['tmt'])->translatedFormat('d M Y') }}</x-ui.table-td>
                                     <x-ui.table-td padding="xl" class="text-muted text-xs">{{ $row['no_sk'] }}</x-ui.table-td>
                                 </x-ui.table-row>

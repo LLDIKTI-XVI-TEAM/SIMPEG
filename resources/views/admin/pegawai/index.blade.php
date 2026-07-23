@@ -418,20 +418,25 @@
         {{-- ============================================================ --}}
         {{-- DATA TABLE (x-ui.data-table) --}}
         {{-- ============================================================ --}}
-        <x-ui.data-table rows="pegawaiRows" meta="meta" :columns="[
-        ['key' => 'check', 'label' => '', 'width' => 'w-10'],
-        ['key' => 'nama_lengkap', 'label' => 'Pegawai', 'sortable' => true],
-        ['key' => 'jabatan', 'label' => 'Jabatan & Unit', 'sortable' => true],
-        ['key' => 'golongan_terakhir', 'label' => 'Gol. / Jenis', 'sortable' => true],
-        ['key' => 'tmt', 'label' => 'TMT'],
-        ['key' => 'status_nama', 'label' => 'Status'],
-        ['key' => 'is_lengkap', 'label' => 'Dokumen'],
-        ['key' => 'aksi', 'label' => 'Aksi'],
-    ]" fetchPage="fetchPage(page)"
+        @php
+            $tableColumns = [
+                ['key' => 'nama_lengkap', 'label' => 'Pegawai', 'sortable' => true],
+                ['key' => 'jabatan', 'label' => 'Jabatan & Unit', 'sortable' => true],
+                ['key' => 'golongan_terakhir', 'label' => 'Gol. / Jenis', 'sortable' => true],
+                ['key' => 'tmt', 'label' => 'TMT'],
+                ['key' => 'status_nama', 'label' => 'Status'],
+                ['key' => 'is_lengkap', 'label' => 'Dokumen'],
+                ['key' => 'aksi', 'label' => 'Aksi'],
+            ];
+            if (! ($isReadOnly ?? false)) {
+                array_unshift($tableColumns, ['key' => 'check', 'label' => '', 'width' => 'w-10']);
+            }
+        @endphp
+        <x-ui.data-table rows="pegawaiRows" meta="meta" :columns="$tableColumns" fetchPage="fetchPage(page)"
             isLoading="isLoading" perPage="perPage" setPerPage="setPerPage($event.target.value)" sort="sort"
             direction="direction" setSort="setSort(col)" searchModel="filters.search"
             searchPlaceholder="Cari nama atau NIP" emptyTitle="Tidak ada data pegawai yang sesuai."
-            emptyIcon="search" :colspanCount="8" checkAllId="check-all" filterClass="lg:grid-cols-5">
+            emptyIcon="search" :colspanCount="count($tableColumns)" :checkAllId="!($isReadOnly ?? false) ? 'check-all' : null" filterClass="lg:grid-cols-5">
             {{-- ---- Filter Slots ---- --}}
             <x-slot:filters>
                 {{-- Filter Golongan --}}
@@ -487,9 +492,11 @@
                         x-bind:data-nip="p.nip">
 
                         {{-- Checkbox --}}
-                        <td class="px-4 py-3">
-                            <x-form.checkbox size="sm" class="row-check" />
-                        </td>
+                        @if (! ($isReadOnly ?? false))
+                            <td class="px-4 py-3">
+                                <x-form.checkbox size="sm" class="row-check" />
+                            </td>
+                        @endif
 
                         {{-- Pegawai --}}
                         <td class="px-4 py-3">
@@ -685,6 +692,7 @@
         </x-ui.data-table>
 
 
+        @if (! ($isReadOnly ?? false))
         {{-- ============================================================ --}}
         {{-- BULK ACTION FLOATING BAR --}}
         {{-- ============================================================ --}}
@@ -718,6 +726,7 @@
                 Batal Pilih
             </button>
         </div>
+        @endif
 
         {{-- ============================================================ --}}
         {{-- MODAL RINCIAN STATUS DOKUMEN --}}

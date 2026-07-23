@@ -274,15 +274,15 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
             'statusList' => $statusList,
             'title' => 'Laporan - Export Pegawai',
         ]);
-    })->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+    })->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('laporan.pegawai');
 
     Route::get('/laporan/export-pegawai/excel', [LaporanController::class, 'exportPegawaiExcel'])
-        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+        ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('laporan.pegawai.excel');
 
     Route::post('/laporan/export-pegawai/custom', [LaporanController::class, 'exportPegawaiCustom'])
-        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+        ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('laporan.pegawai.custom');
     Route::get('/pegawai', [PegawaiController::class, 'index'])
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])

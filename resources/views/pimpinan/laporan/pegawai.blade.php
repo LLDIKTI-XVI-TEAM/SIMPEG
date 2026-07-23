@@ -172,6 +172,20 @@
                                         @endforeach
                                     </x-form.select>
                                 </div>
+
+                                {{-- Periode Pensiun Dari --}}
+                                <div>
+                                    <label class="block text-xs font-semibold text-muted font-sans mb-1" for="filter-pensiun-dari">Pensiun Dari</label>
+                                    <input id="filter-pensiun-dari" name="pensiun_dari" type="date" value="{{ $filters['pensiun_dari'] ?? '' }}"
+                                        class="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans" />
+                                </div>
+
+                                {{-- Periode Pensiun Sampai --}}
+                                <div>
+                                    <label class="block text-xs font-semibold text-muted font-sans mb-1" for="filter-pensiun-sampai">Pensiun Sampai</label>
+                                    <input id="filter-pensiun-sampai" name="pensiun_sampai" type="date" value="{{ $filters['pensiun_sampai'] ?? '' }}"
+                                        class="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans" />
+                                </div>
                             </div>
                         </div>
 
