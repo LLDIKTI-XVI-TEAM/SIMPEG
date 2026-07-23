@@ -160,6 +160,7 @@
                     'items' => array_filter([
                         $activeRole === 'kepala_bagian' ? ['label' => 'EWS Bawahan', 'route' => 'kepala-bagian.ews.index', 'icon' => 'exclamation-triangle'] : null,
                         ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
+                        $activeRole === 'pegawai' ? ['label' => 'EWS Saya', 'route' => 'ews.saya', 'icon' => 'exclamation-triangle'] : null,
                         ['label' => 'EWS Aktif', 'route' => 'ews', 'icon' => 'exclamation-triangle'],
                         ['label' => 'Konfigurasi EWS', 'route' => 'ews.config', 'icon' => 'cog-6-tooth'],
                     ])
