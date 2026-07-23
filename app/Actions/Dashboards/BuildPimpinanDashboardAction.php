@@ -22,24 +22,83 @@ class BuildPimpinanDashboardAction
         $now = now();
         $pendingLeaves = $this->pendingLeaves($user->employee_id);
         $ews = $this->ewsAlerts->execute(null, null)['alerts'];
+        $trenPegawai = collect(range(11, 0))
+            ->map(function (int $offset) use ($now): array {
+                $targetDate = $now->copy()->subMonths($offset)->endOfMonth();
+
+                return [
+                    'label' => $now->copy()->subMonths($offset)->translatedFormat('M Y'),
+                    'jumlah' => Employee::query()
+                        ->whereDate('created_at', '<=', $targetDate)
+                        ->where(function ($q) use ($targetDate): void {
+                            $q->whereNull('tanggal_pensiun')
+                                ->orWhereDate('tanggal_pensiun', '>', $targetDate);
+                        })
+                        ->count(),
+                ];
+            });
+
+        $chartWidth = 440;
+        $chartHeight = 100;
+        $paddingX = 40;
+        $paddingYBottom = 125;
+        $count = $trenPegawai->count();
+        $points = [];
+        $pathD = '';
+        $maxVal = 10;
+
+        if ($count > 1) {
+            $trenArray = $trenPegawai->toArray();
+            $maxVal = max(array_column($trenArray, 'jumlah'));
+            $maxVal = $maxVal > 0 ? $maxVal * 1.2 : 10;
+            $stepX = $chartWidth / ($count - 1);
+
+            foreach (array_values($trenArray) as $index => $data) {
+                $x = $paddingX + ($index * $stepX);
+                $y = $paddingYBottom - (($data['jumlah'] / $maxVal) * $chartHeight);
+                $points[] = [
+                    'x' => $x,
+                    'y' => $y,
+                    'val' => $data['jumlah'],
+                    'label' => substr((string) $data['label'], 0, 3),
+                ];
+            }
+
+            $pathD = 'M '.$points[0]['x'].' '.$points[0]['y'];
+            for ($i = 0; $i < count($points) - 1; $i++) {
+                $curr = $points[$i];
+                $next = $points[$i + 1];
+                $midX = ($curr['x'] + $next['x']) / 2;
+                $pathD .= " C {$midX} {$curr['y']}, {$midX} {$next['y']}, {$next['x']} {$next['y']}";
+            }
+        }
 
         return [
             'totalPegawai' => $employees->count(),
             'komposisi' => $employees->countBy(fn (Employee $employee): string => $employee->jenisPegawai?->nama ?? 'Tidak Diketahui')->all(),
             'promotionRows' => RankHistory::query()
-                ->with(['employee', 'golongan'])
+                ->with(['employee.rankHistories.golongan', 'golongan'])
                 ->whereYear('tmt_pangkat', $now->year)
                 ->whereMonth('tmt_pangkat', $now->month)
                 ->orderBy('tmt_pangkat')
                 ->limit(5)
                 ->get()
-                ->map(fn (RankHistory $history): array => [
-                    'nama' => $history->employee?->nama_lengkap ?? '-',
-                    'nip' => $history->employee?->nip ?? '-',
-                    'golongan' => $history->golongan?->kode ?? '-',
-                    'tmt' => $history->tmt_pangkat?->toDateString() ?? '-',
-                    'no_sk' => $history->no_sk ?? '-',
-                ]),
+                ->map(function (RankHistory $history): array {
+                    $prevRank = $history->employee?->rankHistories
+                        ?->where('tmt_pangkat', '<', $history->tmt_pangkat)
+                        ->sortByDesc('tmt_pangkat')
+                        ->first();
+
+                    return [
+                        'nama' => $history->employee?->nama_lengkap ?? '-',
+                        'nip' => $history->employee?->nip ?? '-',
+                        'golongan_awal' => $prevRank?->golongan?->kode ?? '-',
+                        'golongan_tujuan' => $history->golongan?->kode ?? '-',
+                        'golongan' => $history->golongan?->kode ?? '-',
+                        'tmt' => $history->tmt_pangkat?->toDateString() ?? '-',
+                        'no_sk' => $history->no_sk ?? '-',
+                    ];
+                }),
             'naikPangkatBulanIni' => RankHistory::query()
                 ->whereYear('tmt_pangkat', $now->year)
                 ->whereMonth('tmt_pangkat', $now->month)
@@ -55,6 +114,7 @@ class BuildPimpinanDashboardAction
                 ->count(),
             'cutiDitunda' => LeaveRequest::query()->where('status', 'ditangguhkan')->count(),
             'pendingLeaves' => $pendingLeaves,
+            'totalEwsAktif' => count($ews),
             'ewsAktif' => array_slice($ews, 0, 5),
             'auditTerbaru' => AuditLog::query()
                 ->latest()
@@ -67,18 +127,14 @@ class BuildPimpinanDashboardAction
                     'waktu' => $audit->created_at?->translatedFormat('d M Y H:i') ?? '-',
                 ]),
             'distribusiGolongan' => $employees
-                ->map(fn (Employee $employee): string => explode('/', (string) $employee->golongan_terakhir)[0] ?: 'Belum Diisi')
+                ->map(fn (Employee $employee): string => (string) $employee->golongan_terakhir ?: 'Belum Diisi')
                 ->countBy()
                 ->sortKeys()
                 ->all(),
-            'trenPegawai' => collect(range(11, 0))
-                ->map(fn (int $offset): array => [
-                    'label' => $now->copy()->subMonths($offset)->translatedFormat('M Y'),
-                    'jumlah' => Employee::query()
-                        ->where('status_aktif', 'Aktif')
-                        ->whereDate('created_at', '<=', $now->copy()->subMonths($offset)->endOfMonth())
-                        ->count(),
-                ]),
+            'trenPegawai' => $trenPegawai,
+            'trendPoints' => $points,
+            'trendPathD' => $pathD,
+            'trendMaxVal' => $maxVal,
         ];
     }
 

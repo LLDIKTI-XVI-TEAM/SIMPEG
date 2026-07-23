@@ -17,9 +17,16 @@ class KepalaBagianLeaveController extends Controller
     {
         abort_if($request->user()?->employee_id === null, 403, 'Akun Kepala Bagian belum tertaut ke data pegawai.');
 
+        $filters = $request->validated();
+        if (! $request->has('status')) {
+            $filters['status'] = 'menunggu_approval';
+        } elseif (($filters['status'] ?? null) === 'all') {
+            $filters['status'] = null;
+        }
+
         return view('kabag.cuti.index', [
-            'leaves' => $action->execute($request->user(), $request->validated()),
-            'filters' => $request->validated(),
+            'leaves' => $action->execute($request->user(), $filters),
+            'filters' => $filters,
             'jenisCutiOptions' => RefJenisCuti::query()->orderBy('nama')->get(['id', 'nama']),
         ]);
     }

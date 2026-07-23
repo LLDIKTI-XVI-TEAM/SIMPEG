@@ -275,15 +275,15 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
             'statusList' => $statusList,
             'title' => 'Laporan - Export Pegawai',
         ]);
-    })->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+    })->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('laporan.pegawai');
 
     Route::get('/laporan/export-pegawai/excel', [LaporanController::class, 'exportPegawaiExcel'])
-        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+        ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('laporan.pegawai.excel');
 
     Route::post('/laporan/export-pegawai/custom', [LaporanController::class, 'exportPegawaiCustom'])
-        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+        ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('laporan.pegawai.custom');
     Route::get('/pegawai', [PegawaiController::class, 'index'])
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
@@ -530,6 +530,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->prefix('pimpinan')
         ->name('pimpinan.')
         ->group(function () {
+            Route::get('/', fn () => redirect()->route('pimpinan.dashboard'));
             Route::get('/dashboard', [PimpinanDashboardController::class, 'index'])->name('dashboard');
 
             Route::get('/pegawai', [PimpinanEmployeeController::class, 'index'])->name('pegawai.index');
@@ -570,6 +571,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->prefix('kepala-bagian')
         ->name('kepala-bagian.')
         ->group(function (): void {
+            Route::get('/', fn () => redirect()->route('kepala-bagian.dashboard'));
             Route::get('/dashboard', [KepalaBagianDashboardController::class, 'index'])->name('dashboard');
 
             Route::get('/bawahan', [KepalaBagianEmployeeController::class, 'index'])->name('bawahan.index');

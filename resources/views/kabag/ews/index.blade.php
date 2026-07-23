@@ -23,97 +23,76 @@
             $countTotal = collect($alerts)->count();
         @endphp
         
-        <x-ui.card class="flex items-center gap-4">
-            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-soft text-ink font-bold text-lg">
-                {{ $countTotal }}
-            </div>
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-wider text-muted font-sans">Total Peringatan</p>
-                <h3 class="text-base font-bold text-ink">{{ $countTotal }} Kasus Aktif</h3>
-            </div>
-        </x-ui.card>
+        <x-ui.stat-card label="Total Peringatan" value="{{ $countTotal }}" variant="primary" size="lg" accent>
+            <x-slot:icon>
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" /></svg>
+            </x-slot:icon>
+            <x-slot:meta>
+                <span>{{ $countTotal }} Kasus Aktif</span>
+            </x-slot:meta>
+        </x-ui.stat-card>
 
-        <x-ui.card class="flex items-center gap-4">
-            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-danger/10 text-danger font-bold text-lg">
-                {{ $countMerah }}
-            </div>
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-wider text-muted font-sans">Sangat Mendesak</p>
-                <h3 class="text-base font-bold text-danger">{{ $countMerah }} (&lt; 30 Hari)</h3>
-            </div>
-        </x-ui.card>
+        <x-ui.stat-card label="Sangat Mendesak" value="{{ $countMerah }}" variant="danger" size="lg" accent>
+            <x-slot:icon>
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2.25m0 1.5h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+            </x-slot:icon>
+            <x-slot:meta>
+                <span>&lt; 30 Hari</span>
+            </x-slot:meta>
+        </x-ui.stat-card>
 
-        <x-ui.card class="flex items-center gap-4">
-            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-warning/10 text-warning font-bold text-lg">
-                {{ $countKuning }}
-            </div>
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-wider text-muted font-sans">Perlu Perhatian</p>
-                <h3 class="text-base font-bold text-warning">{{ $countKuning }} (30-90 Hari)</h3>
-            </div>
-        </x-ui.card>
+        <x-ui.stat-card label="Perlu Perhatian" value="{{ $countKuning }}" variant="warning" size="lg" accent>
+            <x-slot:icon>
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+            </x-slot:icon>
+            <x-slot:meta>
+                <span>30-90 Hari</span>
+            </x-slot:meta>
+        </x-ui.stat-card>
 
-        <x-ui.card class="flex items-center gap-4">
-            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success font-bold text-lg">
-                {{ $countHijau }}
-            </div>
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-wider text-muted font-sans">Pemantauan Rutin</p>
-                <h3 class="text-base font-bold text-success">{{ $countHijau }} (&gt; 90 Hari)</h3>
-            </div>
-        </x-ui.card>
+        <x-ui.stat-card label="Pemantauan Rutin" value="{{ $countHijau }}" variant="success" size="lg" accent>
+            <x-slot:icon>
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+            </x-slot:icon>
+            <x-slot:meta>
+                <span>&gt; 90 Hari</span>
+            </x-slot:meta>
+        </x-ui.stat-card>
     </div>
 
     {{-- FILTER & SEARCH AREA --}}
     <div x-data="{ search: '' }">
+        <form method="GET" action="{{ route('kepala-bagian.ews.index') }}" class="mb-6">
+            <input type="hidden" name="status" value="{{ request('status') }}">
+            <x-ui.filter-bar 
+                searchModel="search"
+                searchPlaceholder="Cari nama atau NIP"
+                gridClass="sm:grid-cols-3 lg:grid-cols-5"
+            >
+                <div class="relative">
+                    <x-form.select name="event" onchange="this.form.submit()">
+                        <option value="">Semua Event</option>
+                        @foreach($type_labels as $label)
+                            <option value="{{ $label }}" @selected(request('event') === $label)>{{ $label }}</option>
+                        @endforeach
+                    </x-form.select>
+                </div>
+            </x-ui.filter-bar>
+        </form>
+
         <x-ui.card padding="none" class="overflow-hidden">
-            <div class="border-b border-border bg-soft/30 px-6 py-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                
-                {{-- Event Filter Links --}}
-                <div class="flex flex-wrap gap-1 bg-soft p-1 rounded-lg">
-                    <a href="{{ route('kepala-bagian.ews.index', ['status' => request('status')]) }}" class="px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all {{ request('event') === null ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink' }}">
-                        Semua
-                    </a>
-                    @foreach($type_labels as $label)
-                        <a href="{{ route('kepala-bagian.ews.index', ['event' => $label, 'status' => request('status')]) }}" class="px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all {{ request('event') === $label ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink' }}">
-                            {{ $label }}
-                        </a>
-                    @endforeach
-                </div>
-
-                <div class="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-                    {{-- Status Select Form --}}
-
-
-                    {{-- Search Box (Frontend Only) --}}
-                    <div class="relative w-full sm:w-64">
-                        <span class="absolute inset-y-0 left-0 flex items-center pl-3">
-                            <svg class="h-4 w-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.603 10.603Z" />
-                            </svg>
-                        </span>
-                        <input 
-                            type="text" 
-                            x-model="search"
-                            placeholder="Cari nama atau NIP..." 
-                            class="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-4 text-sm text-ink placeholder-muted shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                        />
-                    </div>
-                </div>
-            </div>
-
             {{-- TABLE --}}
             <div class="overflow-x-auto">
-                <x-ui.table class="min-w-[1040px] table-fixed">
+                <x-ui.table>
                     <x-ui.table-head>
                         <x-ui.table-row>
-                            <x-ui.table-th align="center" padding="wide" class="w-14">NO</x-ui.table-th>
-                            <x-ui.table-th padding="wide" class="w-[260px]">PEGAWAI</x-ui.table-th>
-                            <x-ui.table-th padding="wide" class="w-[240px]">EVENT & AMBANG</x-ui.table-th>
-                            <x-ui.table-th padding="wide" class="w-[150px]">TARGET</x-ui.table-th>
-                            <x-ui.table-th padding="wide" class="w-[140px]">URGENSI</x-ui.table-th>
-                            <x-ui.table-th padding="wide" class="w-[160px]">STATUS TINDAKAN</x-ui.table-th>
-                            <x-ui.table-th padding="wide">ELIGIBILITY</x-ui.table-th>
+                            <x-ui.table-th align="center" padding="comfortable" class="w-14 text-xs text-muted font-bold uppercase tracking-wider">NO</x-ui.table-th>
+                            <x-ui.table-th padding="comfortable" class="text-xs text-muted font-bold uppercase tracking-wider">PEGAWAI</x-ui.table-th>
+                            <x-ui.table-th padding="comfortable" class="text-xs text-muted font-bold uppercase tracking-wider">EVENT & AMBANG</x-ui.table-th>
+                            <x-ui.table-th padding="comfortable" class="text-xs text-muted font-bold uppercase tracking-wider">TARGET</x-ui.table-th>
+                            <x-ui.table-th padding="comfortable" class="text-xs text-muted font-bold uppercase tracking-wider">URGENSI</x-ui.table-th>
+                            <x-ui.table-th padding="comfortable" class="text-xs text-muted font-bold uppercase tracking-wider">STATUS TINDAKAN</x-ui.table-th>
+                            <x-ui.table-th padding="comfortable" class="text-xs text-muted font-bold uppercase tracking-wider">ELIGIBILITY</x-ui.table-th>
                         </x-ui.table-row>
                     </x-ui.table-head>
                     <x-ui.table-body>
@@ -203,7 +182,7 @@
                                             <span class="inline-flex rounded-full {{ $alert['is_eligible'] ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger' }} px-2.5 py-1 text-xs font-semibold">
                                                 {{ $alert['is_eligible'] ? 'Layak' : 'Tidak Layak' }}
                                             </span>
-                                            <button type="button" class="p-0.5 rounded-full hover:bg-black/5 focus:outline-none transition-colors {{ $alert['is_eligible'] ? 'text-success' : 'text-danger' }}" aria-label="Toggle Detail">
+                                            <button type="button" class="p-0.5 rounded-full hover:bg-black/5 focus:outline-none transition-colors {{ $alert['is_eligible'] ? 'text-success' : 'text-danger' }}" :aria-label="open ? 'Sembunyikan Detail' : 'Tampilkan Detail'">
                                                 <svg class="w-4 h-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
                                                 </svg>
@@ -241,31 +220,13 @@
                 </x-ui.table>
             </div>
             
-            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border px-6 py-4 bg-soft/20" x-data="{ currentPage: 1, totalPages: 1 }">
-                <form class="flex items-center gap-3 text-sm text-muted">
-                    <span class="whitespace-nowrap">Tampilkan</span>
-                    <select class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
-                        <option value="10">10</option>
-                        <option value="25">25</option>
-                        <option value="50">50</option>
-                        <option value="100">100</option>
-                    </select>
-                    <span class="hidden sm:inline">data</span>
-
-                    {{-- Meta Info --}}
-                    @if(count($alerts) > 0)
-                        <div class="hidden md:block ml-2 border-l border-border pl-4">
-                            Menampilkan <span class="font-medium text-ink">1</span>
-                            - <span class="font-medium text-ink">{{ count($alerts) }}</span>
-                            dari <span class="font-medium text-ink">{{ count($alerts) }}</span>
-                        </div>
-                    @endif
-                </form>
-                
-                <div class="w-full sm:w-auto" x-show="totalPages > 1">
-                    <x-ui.pagination />
-                </div>
+            @if(count($alerts) > 0)
+            <div class="border-t border-border bg-surface px-6 py-3">
+                <p class="text-sm text-muted font-sans">
+                    Menampilkan <span class="font-semibold text-ink">{{ count($alerts) }}</span> peringatan EWS aktif untuk bawahan langsung Anda.
+                </p>
             </div>
+            @endif
         </x-ui.card>
     </div>
 </x-layouts.app>

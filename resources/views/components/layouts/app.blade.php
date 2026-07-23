@@ -208,7 +208,7 @@
                     [
                         'group' => 'Laporan',
                         'items' => [
-                            ['label' => 'Data Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'clipboard-document-list'],
+                            ['label' => 'Data Pegawai', 'route' => 'pimpinan.laporan.pegawai', 'icon' => 'clipboard-document-list'],
                             ['label' => 'Rekapitulasi Cuti', 'route' => 'pimpinan.laporan.cuti', 'icon' => 'calendar-days'],
                             ['label' => 'Riwayat Kepangkatan', 'route' => 'pimpinan.laporan.kepangkatan', 'icon' => 'document-chart-bar'],
                         ]
@@ -381,7 +381,18 @@
         <header class="sticky top-0 z-40 flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface/80 backdrop-blur-md px-4 lg:px-6">
 
             {{-- Left: Hamburger (mobile only) + Search --}}
-            <div class="flex items-center gap-4 w-full max-w-sm">
+                @php
+                    $searchWidth = '';
+                    $searchPlaceholder = 'Cari pegawai, NIP, dokumen, cuti, unit kerja.';
+                    if ($activeRole === 'kepala_bagian') {
+                        $searchWidth = 'max-width: 300px;';
+                        $searchPlaceholder = 'Cari bawahan, NIP, atau cuti.';
+                    } elseif ($activeRole === 'pimpinan') {
+                        $searchWidth = 'max-width: 370px;';
+                        $searchPlaceholder = 'Cari pegawai, NIP, cuti, atau laporan.';
+                    }
+                @endphp
+            <div class="flex items-center gap-4 w-full max-w-sm" style="{{ $searchWidth }}">
                 <button
                     @click="sidebarOpen = !sidebarOpen"
                     id="sidebar-toggle"
@@ -393,7 +404,7 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
                 </button>
 
-                @if (in_array($activeRole, ['super_admin', 'admin_kepegawaian', 'pimpinan'], true))
+                @if (in_array($activeRole, ['super_admin', 'admin_kepegawaian', 'pimpinan', 'kepala_bagian'], true))
                 {{-- Search Bar --}}
                 <div class="relative w-full hidden sm:block" x-data="globalSearch()">
                     <input
@@ -404,7 +415,7 @@
                         @focus="if(searchQuery.length > 1) showDropdown = true"
                         @keydown.enter="handleEnter"
                         class="w-full rounded-lg border border-border bg-surface pl-10 pr-10 py-2 text-sm text-ink focus:border-primary focus:bg-surface focus:outline-none focus:ring-1 focus:ring-primary font-sans transition-colors"
-                        placeholder="Cari pegawai, NIP, dokumen, cuti, unit kerja..."
+                        placeholder="{{ $searchPlaceholder }}"
                     >
                     <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
@@ -627,7 +638,12 @@
             },
 
             fetchResults() {
-                fetch('/admin/search?q=' + this.searchQuery)
+                let searchUrl = '/admin/search';
+                @if($activeRole === 'kepala_bagian')
+                    searchUrl = '/kepala-bagian/search';
+                @endif
+                
+                fetch(searchUrl + '?q=' + this.searchQuery)
                     .then(r => r.json())
                     .then(data => {
                         this.searchResults = data;

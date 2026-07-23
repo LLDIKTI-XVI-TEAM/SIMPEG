@@ -122,7 +122,7 @@
         <div class="mb-6 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
 
             {{-- W1: Total Pegawai Aktif --}}
-            <x-ui.stat-card href="#" label="Total Pegawai Aktif" value="{{ $totalPegawai }}" variant="primary" size="lg" accent>
+            <x-ui.stat-card href="{{ route('pimpinan.pegawai.index') }}" label="Total Pegawai Aktif" value="{{ $totalPegawai }}" variant="primary" size="lg" accent>
                 <x-slot:icon>
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
                 </x-slot:icon>
@@ -155,7 +155,7 @@
             </x-ui.stat-card>
 
             {{-- W4: EWS Aktif --}}
-            <x-ui.stat-card href="{{ route('pimpinan.ews.index') }}" label="EWS Aktif" value="{{ count($ewsAktif) }}" variant="danger" size="lg" accent>
+            <x-ui.stat-card href="{{ route('pimpinan.ews.index') }}" label="EWS Aktif" value="{{ $totalEwsAktif ?? count($ewsAktif) }}" variant="danger" size="lg" accent>
                 <x-slot:icon>
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
                 </x-slot:icon>
@@ -187,7 +187,7 @@
                         <x-ui.table-head>
                             <x-ui.table-row>
                                 <x-ui.table-th padding="lg">Pegawai</x-ui.table-th>
-                                <x-ui.table-th padding="lg">Golongan</x-ui.table-th>
+                                <x-ui.table-th padding="lg">Golongan (Asal → Tujuan)</x-ui.table-th>
                                 <x-ui.table-th padding="lg">TMT</x-ui.table-th>
                                 <x-ui.table-th padding="lg">Nomor SK</x-ui.table-th>
                             </x-ui.table-row>
@@ -206,12 +206,20 @@
                                             </div>
                                         </div>
                                     </x-ui.table-td>
-                                    <x-ui.table-td padding="xl" class="text-muted font-medium text-xs">{{ $row['golongan'] }}</x-ui.table-td>
+                                    <x-ui.table-td padding="xl" class="text-muted font-medium text-xs">
+                                        @if(!empty($row['golongan_awal']) && !empty($row['golongan_tujuan']))
+                                            <span class="text-ink font-semibold">{{ $row['golongan_awal'] }}</span>
+                                            <span class="text-muted mx-1">→</span>
+                                            <span class="text-primary font-bold">{{ $row['golongan_tujuan'] }}</span>
+                                        @else
+                                            <span>{{ $row['golongan'] }}</span>
+                                        @endif
+                                    </x-ui.table-td>
                                     <x-ui.table-td padding="xl" class="font-semibold text-xs">{{ \Carbon\Carbon::parse($row['tmt'])->translatedFormat('d M Y') }}</x-ui.table-td>
                                     <x-ui.table-td padding="xl" class="text-muted text-xs">{{ $row['no_sk'] }}</x-ui.table-td>
                                 </x-ui.table-row>
                             @empty
-                                <x-ui.table-row><x-ui.table-td colspan="4" class="px-6 py-8 text-center text-xs text-muted">Tidak ada riwayat kenaikan pangkat pada bulan ini.</x-ui.table-td></x-ui.table-row>
+                                <x-ui.table-row><x-ui.table-td colspan="4" align="center" class="py-8 text-xs text-muted">Tidak ada riwayat kenaikan pangkat pada bulan ini.</x-ui.table-td></x-ui.table-row>
                             @endforelse
                         </x-ui.table-body>
                     </x-ui.table>
@@ -402,7 +410,7 @@
                             </div>
                         </div>
                         @empty
-                        <div class="px-6 py-10 text-center text-sm text-muted">
+                        <div class="px-6 py-10 text-center text-xs text-muted">
                             Tidak ada pengajuan cuti yang menunggu tindakan Anda.
                         </div>
                         @endforelse
@@ -457,45 +465,10 @@
                     
                     @php
                         // Menghitung poin-poin SVG secara dinamis berdasarkan data trend ($trenPegawai).
-                        $chartWidth = 440;
-                        $chartHeight = 100;
-                        $paddingX = 40;
-                        $paddingYTop = 20;
-                        $paddingYBottom = 125;
-                        
-                        $count = count($trenPegawai);
-                        if($count > 1) {
-                            $minVal = 0;
-                            
-                            // Handle if $trenPegawai is a Collection or an array
-                            $trenArray = $trenPegawai instanceof \Illuminate\Support\Collection ? $trenPegawai->toArray() : $trenPegawai;
-                            
-                            $maxVal = max(array_column($trenArray, 'jumlah'));
-                            $maxVal = $maxVal > 0 ? $maxVal * 1.2 : 10; // Tambah headroom 20%
-                            
-                            $stepX = $chartWidth / ($count - 1);
-                            
-                            $points = [];
-                            foreach(array_values($trenArray) as $index => $data) {
-                                $x = $paddingX + ($index * $stepX);
-                                $y = $paddingYBottom - (($data['jumlah'] / $maxVal) * $chartHeight);
-                                $points[] = [
-                                    'x' => $x,
-                                    'y' => $y,
-                                    'val' => $data['jumlah'],
-                                    'label' => substr($data['label'], 0, 3)
-                                ];
-                            }
-
-                            // Generate smooth curve path (B-Spline / Bezier approach)
-                            $pathD = "M " . $points[0]['x'] . " " . $points[0]['y'];
-                            for($i = 0; $i < count($points) - 1; $i++) {
-                                $curr = $points[$i];
-                                $next = $points[$i+1];
-                                $midX = ($curr['x'] + $next['x']) / 2;
-                                $pathD .= " C $midX {$curr['y']}, $midX {$next['y']}, {$next['x']} {$next['y']}";
-                            }
-                        }
+                        $points = $trendPoints ?? [];
+                        $pathD = $trendPathD ?? '';
+                        $maxVal = $trendMaxVal ?? 10;
+                        $count = count($points);
                     @endphp
 
                     {{-- SVG Line Chart --}}

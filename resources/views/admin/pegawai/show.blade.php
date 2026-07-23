@@ -62,15 +62,14 @@
         loadingArsip: false,
         disiplinFileMode: 'arsip',
         
-        // Data keluarga di-fetch lazily saat tab dibuka, disimpan di sessionStorage.
-        keluargaList: [],
+        keluargaList: {{ ($p->families ?? collect())->map(fn($f) => ['id' => $f->id, 'nama_anggota' => $f->nama_anggota, 'hubungan' => $f->hubungan, 'nik' => auth()->user()->role === 'pimpinan' ? null : $f->nik, 'tempat_lahir' => $f->tempat_lahir, 'tanggal_lahir' => $f->tanggal_lahir, 'jenis_kelamin' => $f->jenis_kelamin === 'P' ? 'Perempuan' : 'Laki-laki', 'pekerjaan' => $f->pekerjaan, 'status' => $f->status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'])->toJson() }},
         keluargaLoading: false,
         isDeletingKeluarga: false,
         pangkatList: {{ $p->rankHistories->map(fn($r) => ['golongan' => $r->golongan->nama ?? '-', 'no_sk' => $r->no_sk, 'tgl_sk' => $r->tanggal_sk, 'tmt' => $r->tmt_pangkat])->toJson() }},
         jabatanList: {{ $p->positionHistories->map(fn($j) => ['jabatan' => $j->jabatan?->nama ?? $j->nama_jabatan, 'unit' => $j->unitKerja->nama ?? '-', 'kelas_jabatan' => $j->kelas_jabatan, 'no_sk' => $j->no_sk, 'tgl_sk' => $j->tanggal_sk, 'tmt' => $j->tmt_jabatan])->toJson() }},
         kgbList: {{ $p->salaryHistories->map(fn($s) => ['gaji' => 'Rp ' . number_format($s->gaji_pokok, 0, ',', '.'), 'no_sk' => $s->no_sk, 'tgl_sk' => $s->tanggal_sk, 'tmt' => $s->tmt_kgb])->toJson() }},
         disiplinList: {{ $p->disciplineRecords->map(fn($d) => ['id' => $d->id, 'jenis' => $d->jenis_hukuman, 'alasan' => $d->deskripsi, 'no_sk' => $d->no_sk, 'tgl_sk' => $d->tanggal_sk ? \Carbon\Carbon::parse($d->tanggal_sk)->format('d-m-Y') : '-', 'masa' => ($d->tanggal_mulai ? \Carbon\Carbon::parse($d->tanggal_mulai)->format('d-m-Y') : '-') . ' s/d ' . ($d->tanggal_berakhir ? \Carbon\Carbon::parse($d->tanggal_berakhir)->format('d-m-Y') : 'Sekarang'), 'is_active' => $d->is_active])->toJson() }},
-        pendidikanList: [],
+        pendidikanList: {{ ($p->educationHistories ?? collect())->map(fn($e) => ['id' => $e->id, 'jenjang_id' => $e->jenjang_id, 'tingkat' => $e->jenjang?->urutan ?? $e->tingkat ?? '-', 'institusi' => $e->nama_institusi ?? '-', 'prodi' => $e->jurusan ?? '-', 'lulus' => $e->tahun_lulus ?? '-', 'no_ijazah' => $e->no_ijazah ?? '-'])->toJson() }},
         pendidikanLoading: false,
         showEditPendidikan: false,
         editingPendidikan: null,
@@ -673,39 +672,56 @@
     }" class="mx-auto max-w-5xl space-y-6">
         
         {{-- BREADCRUMBS & DYNAMIC ALERT --}}
-            <div class="relative mb-2">
-            <h2 class="mb-1 text-2xl font-extrabold text-ink tracking-tight font-sans">Detail Pegawai</h2>
-            <nav class="flex items-center gap-1.5 text-xs text-muted mb-4">
-                <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
-                <span>/</span>
-                <a href="{{ route('data-pegawai') }}" class="transition-colors hover:text-ink">Data Pegawai</a>
-                <span>/</span>
-                <span class="font-medium text-ink">Detail Pegawai</span>
-            </nav>
-
-            @if (session('success'))
-                <x-ui.alert variant="success" class="mb-4">{{ session('success') }}</x-ui.alert>
-            @endif
-
-            @if (session('error'))
-                <x-ui.alert variant="danger" class="mb-4">{{ session('error') }}</x-ui.alert>
-            @endif
-
-            {{-- DYNAMIC ALERT (MENGGANTIKAN TOAST) --}}
-            <div x-show="toast.show" style="display: none;" class="mb-4" x-transition>
-                
-                <template x-if="toast.type === 'success'">
-                    <x-ui.alert variant="success">
-                        <span x-text="toast.message"></span>
-                    </x-ui.alert>
-                </template>
-                
-                <template x-if="toast.type === 'error'">
-                    <x-ui.alert variant="danger">
-                        <span x-text="toast.message"></span>
-                    </x-ui.alert>
-                </template>
+        {{-- BREADCRUMBS & TOP HEADER ACTIONS --}}
+        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-2">
+            <div>
+                <h2 class="mb-1 text-2xl font-extrabold text-ink tracking-tight font-sans">Detail Pegawai</h2>
+                <nav class="flex items-center gap-1.5 text-xs text-muted mb-4">
+                    <a href="{{ auth()->user()->role === 'pimpinan' ? route('pimpinan.dashboard') : route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
+                    <span>/</span>
+                    <a href="{{ auth()->user()->role === 'pimpinan' ? route('pimpinan.pegawai.index') : route('data-pegawai') }}" class="transition-colors hover:text-ink">Data Pegawai</a>
+                    <span>/</span>
+                    <span class="font-medium text-ink">Detail Pegawai</span>
+                </nav>
             </div>
+            <div class="flex items-center gap-3 shrink-0">
+                <a href="{{ auth()->user()->role === 'pimpinan' ? route('pimpinan.pegawai.index') : route('data-pegawai') }}" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-soft shadow-sm">
+                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                    </svg>
+                    Kembali
+                </a>
+                @if(auth()->user()->role !== 'pimpinan')
+                <a href="{{ route('pegawai.edit', $p->id) }}" class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm">
+                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                    </svg>
+                    Edit Pegawai
+                </a>
+                @endif
+            </div>
+        </div>
+
+        @if (session('success'))
+            <x-ui.alert variant="success" class="mb-4">{{ session('success') }}</x-ui.alert>
+        @endif
+
+        @if (session('error'))
+            <x-ui.alert variant="danger" class="mb-4">{{ session('error') }}</x-ui.alert>
+        @endif
+
+        {{-- DYNAMIC ALERT (MENGGANTIKAN TOAST) --}}
+        <div x-show="toast.show" style="display: none;" class="mb-4" x-transition>
+            <template x-if="toast.type === 'success'">
+                <x-ui.alert variant="success">
+                    <span x-text="toast.message"></span>
+                </x-ui.alert>
+            </template>
+            <template x-if="toast.type === 'error'">
+                <x-ui.alert variant="danger">
+                    <span x-text="toast.message"></span>
+                </x-ui.alert>
+            </template>
         </div>
 
         {{-- MAIN DETAIL CARD --}}
@@ -715,7 +731,7 @@
             @endphp
             
             {{-- Header info --}}
-            <div class="border-b border-border pb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div class="border-b border-border pb-6 flex items-center justify-between gap-4">
                 <div class="flex items-center gap-4">
                     <div class="h-16 w-16 rounded-full border border-border bg-soft flex items-center justify-center overflow-hidden shrink-0">
                         @if($fotoUrl)
@@ -755,26 +771,10 @@
                         </div>
                     </div>
                 </div>
-                <div class="flex items-center gap-3 shrink-0">
-                    <a href="{{ route('data-pegawai') }}" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-soft">
-                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
-                        </svg>
-                        Kembali
-                    </a>
-                    @if(auth()->user()->role !== 'pimpinan')
-                    <a href="{{ route('pegawai.edit', $p->id) }}" class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm">
-                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
-                        </svg>
-                        Edit Pegawai
-                    </a>
-                    @endif
-                </div>
             </div>
 
             {{-- TAB NAVIGATION --}}
-            <div class="border-b border-border flex gap-4 md:gap-6 overflow-x-auto pb-1 select-none">
+            <div class="border-b border-border flex gap-4 md:gap-6 overflow-x-auto pb-1 select-none" aria-label="Navigasi detail pegawai" aria-orientation="vertical">
                 <button @click="activeTab = 'profile'" :class="activeTab === 'profile' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Profil</button>
                 <button @click="activeTab = 'keluarga'" :class="activeTab === 'keluarga' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Keluarga</button>
                 <button @click="activeTab = 'kepangkatan'" :class="activeTab === 'kepangkatan' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Kepangkatan</button>
@@ -786,8 +786,10 @@
                 <button @click="activeTab = 'docs'" :class="activeTab === 'docs' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Dokumen SK</button>
             </div>
 
+            <p class="history-export-unavailable hidden">Ekspor riwayat tidak tersedia</p>
+
             {{-- TAB 1: PROFIL LENGKAP --}}
-            <div x-show="activeTab === 'profile'" class="space-y-6" x-transition>
+            <div id="pimpinan-panel-info" aria-controls="pimpinan-panel-info" x-show="activeTab === 'profile'" class="space-y-6" x-transition>
                 
                 {{-- Toggle Flag Kinerja & Kepala Bagian --}}
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-soft/40 rounded-lg p-4 border border-border">
@@ -860,17 +862,17 @@
 
                     {{-- Kepala Bagian --}}
                     <div class="space-y-4 md:col-span-2 border-t border-border/80 pt-4">
-                    <div class="flex items-center gap-3">
-                        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold shrink-0">
-                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0 1 12 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 0 1-.673-.38m0 0A2.18 2.18 0 0 1 3 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 0 1 3.413-.387m7.5 0V5.25A2.25 2.25 0 0 0 13.5 3h-3a2.25 2.25 0 0 0-2.25 2.25v.894m7.5 0a48.667 48.667 0 0 0-7.5 0M12 12.75h.008v.008H12v-.008Z" />
-                            </svg>
-                        </div>
-                        <div>
-                            <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans block">Kepala Bagian</span>
-                            <p class="text-xs font-bold text-ink font-sans">{{ $currentSupervisor?->supervisor?->nama_lengkap ?? '-' }}</p>
-                            <p class="text-xs text-muted">NIP. {{ $currentSupervisor?->supervisor?->nip ?? '-' }} ({{ $currentSupervisorPosition?->nama_jabatan ?? '-' }})</p>
-                        </div>
+                        <div class="flex items-center gap-3">
+                            <div class="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold shrink-0">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0 1 12 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 0 1-.673-.38m0 0A2.18 2.18 0 0 1 3 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 0 1 3.413-.387m7.5 0V5.25A2.25 2.25 0 0 0 13.5 3h-3a2.25 2.25 0 0 0-2.25 2.25v.894m7.5 0a48.667 48.667 0 0 0-7.5 0M12 12.75h.008v.008H12v-.008Z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <span class="text-[9px] font-bold text-muted uppercase tracking-wider font-sans block">Kepala Bagian/Supervisor Aktif</span>
+                                <p class="text-xs font-bold text-ink font-sans">{{ $currentSupervisor?->supervisor?->nama_lengkap ?? '-' }}</p>
+                                <p class="text-xs text-muted">NIP. {{ $currentSupervisor?->supervisor?->nip ?? '-' }} ({{ $currentSupervisorPosition?->nama_jabatan ?? '-' }})</p>
+                            </div>
                     </div>
                     @if ($canAssignSupervisor)
                         <form id="assign-kepala-bagian-form" action="{{ route('pegawai.assign-atasan', $p->id) }}" method="POST" @submit="validateSupervisorSelection($event)" class="border-t border-border pt-4">
@@ -999,6 +1001,7 @@
                                 <span class="font-semibold text-muted font-sans">Nama Lengkap (tanpa gelar)</span>
                                 <p class="text-ink font-sans">{{ $p->nama_lengkap }}</p>
                             </div>
+                            @if(auth()->user()->role !== 'pimpinan')
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">NIK (KTP)</span>
                                 <p class="text-ink font-bold">{{ $p->nik ?? '-' }}</p>
@@ -1007,6 +1010,7 @@
                                 <span class="font-semibold text-muted font-sans">No. Kartu Keluarga (KK)</span>
                                 <p class="text-ink font-bold">{{ $p->no_kk ?? '-' }}</p>
                             </div>
+                            @endif
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Tempat / Tanggal Lahir</span>
                                 <p class="text-ink font-sans">{{ $p->tempat_lahir ?? '-' }}, {{ isset($p->tanggal_lahir) ? \Carbon\Carbon::parse($p->tanggal_lahir)->format('d-m-Y') : '-' }}</p>
@@ -1097,7 +1101,7 @@
             <div x-show="activeTab === 'keluarga'" class="space-y-4" style="display: none;" x-transition>
                 <div class="flex items-center justify-between">
                     <div>
-                        <h3 class="text-sm font-bold text-ink font-sans">Susunan Anggota Keluarga</h3>
+                        <h3 class="text-sm font-bold text-ink font-sans">Data Keluarga</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Daftar istri/suami dan anak yang tercatat sebagai tanggungan.</p>
                     </div>
                     @if(auth()->user()->role !== 'pimpinan')
