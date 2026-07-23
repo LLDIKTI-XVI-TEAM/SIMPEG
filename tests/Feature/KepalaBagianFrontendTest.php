@@ -127,9 +127,9 @@ class KepalaBagianFrontendTest extends TestCase
             'nama_lengkap' => 'Pemohon Disetujui',
             'kepala_bagian_id' => $kepalaBagian->id,
         ]);
-        
+
         $pendingLeave = $this->leaveWithActiveStep($pendingReport, $kepalaBagian);
-        
+
         $approvedLeave = LeaveRequest::create([
             'employee_id' => $approvedReport->id,
             'jenis_cuti_id' => $pendingLeave->jenis_cuti_id,

@@ -7,9 +7,9 @@ use App\Actions\Employees\ShowKepalaBagianEmployeeAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Employee\KepalaBagianEmployeeFilterRequest;
 use App\Models\Employee;
+use App\Models\PositionHistory;
 use App\Models\RefJenisPegawai;
 use App\Models\RefUnitKerja;
-use App\Models\PositionHistory;
 use App\Services\Employees\KepalaBagianScopeService;
 use Illuminate\Http\Request;
 

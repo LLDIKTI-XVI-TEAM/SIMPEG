@@ -16,7 +16,9 @@ use App\Models\RefJenisPegawai;
 use App\Models\RefJenjangPendidikan;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
+use App\Services\Laporan\EmployeeExportDataService;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PimpinanEmployeeController extends Controller
@@ -156,7 +158,7 @@ class PimpinanEmployeeController extends Controller
         ));
     }
 
-    public function reportPage(ExportPegawaiRequest $request, \App\Services\Laporan\EmployeeExportDataService $exportData): mixed
+    public function reportPage(ExportPegawaiRequest $request, EmployeeExportDataService $exportData): mixed
     {
         $filters = $request->validated();
         $selectedColumns = (array) $request->query('columns', []);
@@ -174,7 +176,7 @@ class PimpinanEmployeeController extends Controller
         $page = max(1, (int) $request->query('page', 1));
 
         $allRows = $exportData->rows($filters);
-        $previewData = new \Illuminate\Pagination\LengthAwarePaginator(
+        $previewData = new LengthAwarePaginator(
             $allRows->forPage($page, $perPage)->values(),
             $allRows->count(),
             $perPage,
