@@ -239,8 +239,7 @@
                             @php
                                 $stepStatus = match ($step->status) {
                                     'approved' => ['label' => 'Disetujui', 'variant' => 'success'],
-                                    // Status legacy tetap dapat dibaca, tetapi penulisan baru memakai tidak_disetujui.
-                                    'tidak_disetujui', 'rejected' => ['label' => 'Tidak Disetujui', 'variant' => 'danger'],
+                                    'tidak_disetujui' => ['label' => 'Tidak Disetujui', 'variant' => 'danger'],
                                     'active' => ['label' => 'Menunggu Keputusan', 'variant' => 'warning'],
                                     'skipped' => ['label' => 'Dilewati', 'variant' => 'muted'],
                                     default => ['label' => ucfirst($step->status), 'variant' => 'info'],
@@ -281,8 +280,7 @@
                                     'APPROVE' => ['label' => 'Disetujui', 'variant' => 'success'],
                                     'REQUEST_CHANGES' => ['label' => 'Perubahan', 'variant' => 'info'],
                                     'POSTPONE' => ['label' => 'Ditangguhkan', 'variant' => 'warning'],
-                                    // REJECT hanya kompatibilitas baca untuk keputusan historis.
-                                    'NOT_APPROVED', 'REJECT' => ['label' => 'Tidak Disetujui', 'variant' => 'danger'],
+                                    'NOT_APPROVED' => ['label' => 'Tidak Disetujui', 'variant' => 'danger'],
                                     default => ['label' => 'Dilewati', 'variant' => 'muted'],
                                 };
                             @endphp
