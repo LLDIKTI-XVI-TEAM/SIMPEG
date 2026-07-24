@@ -9,6 +9,7 @@ use App\Models\EducationHistory;
 use App\Models\Employee;
 use App\Models\EmployeeFamily;
 use App\Models\EwsAlert;
+use App\Models\EwsConfig;
 use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
 use App\Models\Permission;
@@ -74,8 +75,9 @@ class EmployeeShowTest extends TestCase
             ->assertJsonPath('employee.id', $employee->id);
     }
 
-    public function test_employee_detail_page_uses_tanggal_pensiun_from_employee(): void
+    public function test_employee_detail_page_calculates_retirement_estimate_from_birth_date_and_bup(): void
     {
+        EwsConfig::setVal('pensiun_required_age_years', '60');
         $user = User::factory()->adminKepegawaian()->create();
         $employee = $this->employeeWithReferences([
             'tanggal_lahir' => '1970-01-01',
@@ -85,8 +87,8 @@ class EmployeeShowTest extends TestCase
         $this->actingAs($user)
             ->get(route('pegawai.show', $employee->id))
             ->assertOk()
-            ->assertSee('15-05-2042', false)
-            ->assertDontSee('01-01-2028', false);
+            ->assertSee('01-01-2030', false)
+            ->assertDontSee('15-05-2042', false);
     }
 
     public function test_employee_detail_response_includes_kepala_lembaga_marker(): void

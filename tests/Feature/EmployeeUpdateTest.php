@@ -203,6 +203,25 @@ class EmployeeUpdateTest extends TestCase
         $response->assertJsonValidationErrors('tanggal_lahir');
     }
 
+    public function test_web_edit_omits_and_ignores_manual_retirement_date(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create(['tanggal_pensiun' => '2042-05-15']);
+
+        $this->actingAs($user)
+            ->get(route('pegawai.edit', $employee->id))
+            ->assertOk()
+            ->assertDontSee('name="tanggal_pensiun"', false);
+
+        $response = $this->actingAs($user)->post(
+            route('pegawai.update', $employee->id),
+            $this->validPayload($employee, ['tanggal_pensiun' => '2030-01-01'])
+        );
+
+        $response->assertRedirect(route('data-pegawai'));
+        $this->assertSame('2042-05-15', $employee->fresh()->tanggal_pensiun?->toDateString());
+    }
+
     private function endpoint(Employee $employee): string
     {
         return "/api/v1/pegawai/{$employee->id}";

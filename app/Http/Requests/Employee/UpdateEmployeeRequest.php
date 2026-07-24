@@ -36,6 +36,9 @@ class UpdateEmployeeRequest extends FormRequest
 
         // Aturan tambahan khusus form UI web
         if (! $this->wantsJson() && ! $this->is('api/*')) {
+            // Tanggal pensiun dihitung dari tanggal lahir dan BUP pada halaman detail.
+            unset($rules['tanggal_pensiun']);
+
             // Pangkat (Rank)
             $rules['pangkat_golongan_id'] = ['nullable', 'uuid', 'exists:ref_golongan,id'];
             $rules['pangkat_no_sk'] = ['nullable', 'string', 'max:255'];

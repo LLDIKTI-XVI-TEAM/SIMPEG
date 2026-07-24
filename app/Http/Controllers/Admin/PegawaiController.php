@@ -21,6 +21,7 @@ use App\Http\Requests\Employee\UpdateEmployeeRequest;
 use App\Http\Requests\Employee\UpdateEmployeeSatyalancanaEligibilityRequest;
 use App\Models\AuditLog;
 use App\Models\Employee;
+use App\Models\EwsConfig;
 use App\Models\RefAgama;
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
@@ -341,8 +342,12 @@ class PegawaiController extends Controller
         $unitKerjaOptions = RefUnitKerja::all();
         $eselonOptions = RefEselon::all();
         $jenjangOptions = RefJenjangPendidikan::orderBy('urutan')->get();
+        $bupPensiunYears = max(0, (int) EwsConfig::getVal('pensiun_required_age_years', 0));
+        $estimasiTanggalPensiun = $bupPensiunYears > 0 && $p->tanggal_lahir
+            ? $p->tanggal_lahir->copy()->addYears($bupPensiunYears)
+            : null;
 
-        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions'));
+        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions', 'estimasiTanggalPensiun'));
     }
 
     public function edit($id, PrepareEmployeeEditFormDataAction $action)
