@@ -287,8 +287,7 @@
                             @php
                                 $stepStatus = match ($step->status) {
                                     'approved' => ['label' => 'Disetujui', 'variant' => 'success'],
-                                    // rejected hanya kompatibilitas baca; penulisan baru memakai tidak_disetujui.
-                                    'tidak_disetujui', 'rejected' => ['label' => 'Tidak Disetujui', 'variant' => 'danger'],
+                                    'tidak_disetujui' => ['label' => 'Tidak Disetujui', 'variant' => 'danger'],
                                     'active' => ['label' => 'Menunggu Keputusan', 'variant' => 'warning'],
                                     'skipped' => ['label' => 'Dilewati', 'variant' => 'muted'],
                                     default => ['label' => ucfirst($step->status), 'variant' => 'info'],

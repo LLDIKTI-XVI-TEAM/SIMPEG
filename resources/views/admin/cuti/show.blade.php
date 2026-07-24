@@ -121,15 +121,14 @@
                         @php
                             $stepVariant = match ($step->status) {
                                 'approved' => 'success',
-                                'tidak_disetujui', 'rejected' => 'danger',
+                                'tidak_disetujui' => 'danger',
                                 'active' => $status === 'ditangguhkan' ? 'warning' : 'warning',
                                 'skipped' => 'muted',
                                 default => 'muted',
                             };
                             $stepTitle = match ($step->status) {
                                 'approved' => "Disetujui oleh {$step->role_label}",
-                                // Token lama hanya dibaca untuk histori; seluruh penulisan baru memakai tidak_disetujui.
-                                'tidak_disetujui', 'rejected' => "Tidak Disetujui oleh {$step->role_label}",
+                                'tidak_disetujui' => "Tidak Disetujui oleh {$step->role_label}",
                                 'active' => $status === 'ditangguhkan' ? "Ditangguhkan oleh {$step->role_label}" : "Menunggu {$step->role_label}",
                                 'skipped' => "Dilewati: {$step->role_label}",
                                 default => "Menunggu {$step->role_label}",
@@ -159,15 +158,14 @@
                                 @php
                                     $actionVariant = match ($approval->action) {
                                         'APPROVE' => 'success',
-                                        'NOT_APPROVED', 'REJECT', 'REQUEST_CHANGES' => 'danger',
+                                        'NOT_APPROVED', 'REQUEST_CHANGES' => 'danger',
                                         default => 'warning',
                                     };
                                     $actionLabel = match ($approval->action) {
                                         'APPROVE' => 'Setuju',
                                         'POSTPONE' => 'Tunda',
                                         'REQUEST_CHANGES' => 'Perubahan',
-                                        // REJECT dipertahankan sebagai pembaca histori, bukan kontrak penulisan aktif.
-                                        'NOT_APPROVED', 'REJECT' => 'Tidak Disetujui',
+                                        'NOT_APPROVED' => 'Tidak Disetujui',
                                         'SKIP' => 'Dilewati',
                                         default => $approval->action,
                                     };

@@ -253,8 +253,7 @@ class LeaveProofService
 
         return match ($statusStr) {
             'approved' => [$statusStr, 'Disetujui'],
-            // Reader menerima token lama tanpa mengizinkan penulisan legacy atau bukti di luar pengajuan disetujui.
-            'tidak_disetujui', 'rejected' => [$statusStr, 'Tidak Disetujui'],
+            'tidak_disetujui' => [$statusStr, 'Tidak Disetujui'],
             'pending' => [$statusStr, 'Menunggu'],
             default => [$statusStr, ucfirst($statusStr)],
         };
