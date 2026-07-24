@@ -1,60 +1,103 @@
 <x-layouts.app title="User Management - Kelola Akses User">
 
+    @php
+        $mappingFormHasErrors = old('form') === 'user-mapping' && $errors->any();
+        $mappingFormShouldReopen = old('form') === 'user-mapping' && ($errors->any() || session()->has('error'));
+    @endphp
+
     <div x-data="{
-        searchQuery: '',
-        filterRole: '',
-        filterStatus: '',
-        currentPage: 1,
-        perPage: 5,
-        showEditModal: false,
-        selectedEmployee: { nama: '', email: '', keycloak_id: '', role: '', nip: '' },
-        
-        employees: {{ json_encode($pegawai) }},
+        showEditModal: @js($mappingFormShouldReopen),
+        selectedEmployee: {
+            id: @js(old('employee_id', '')),
+            nama: '',
+            email: '',
+            keycloak_id: @js(old('keycloak_id', '')),
+            role: @js(old('role', '')),
+            nip: ''
+        },
+        employees: @js($pegawai->items()),
+        lastFocusedElement: null,
 
         init() {
-            this.$watch('searchQuery', () => this.currentPage = 1);
-            this.$watch('filterRole', () => this.currentPage = 1);
-            this.$watch('filterStatus', () => this.currentPage = 1);
+            if (this.showEditModal) {
+                this.restoreFailedMappingForm();
+                this.$nextTick(() => this.focusModalField());
+            }
         },
 
-        get filteredEmployees() {
-            return this.employees.filter(e => {
-                // Search match
-                const nameMatch = e.nama.toLowerCase().includes(this.searchQuery.toLowerCase());
-                const nipMatch = e.nip.toLowerCase().includes(this.searchQuery.toLowerCase());
-                const emailMatch = (e.mapped_email || '').toLowerCase().includes(this.searchQuery.toLowerCase());
-                const matchesSearch = nameMatch || nipMatch || emailMatch;
+        restoreFailedMappingForm() {
+            const employee = this.employees.find((candidate) => candidate.id === this.selectedEmployee.id);
 
-                // Role filter match
-                const matchesRole = !this.filterRole || e.role === this.filterRole;
+            if (!employee) {
+                return;
+            }
 
-                // Status filter match
-                const statusStr = e.is_connected ? 'connected' : 'disconnected';
-                const matchesStatus = !this.filterStatus || statusStr === this.filterStatus;
-
-                return matchesSearch && matchesRole && matchesStatus;
-            });
-        },
-
-        get paginatedEmployees() {
-            const start = (this.currentPage - 1) * this.perPage;
-            const end = start + this.perPage;
-            return this.filteredEmployees.slice(start, end);
-        },
-
-        get totalPages() {
-            return Math.ceil(this.filteredEmployees.length / this.perPage) || 1;
-        },
-
-        openEdit(emp) {
             this.selectedEmployee = {
+                id: employee.id,
+                nama: employee.nama,
+                email: employee.mapped_email,
+                keycloak_id: this.selectedEmployee.keycloak_id,
+                role: this.selectedEmployee.role,
+                nip: employee.nip
+            };
+        },
+
+        openEdit(emp, trigger) {
+            this.lastFocusedElement = trigger instanceof HTMLElement ? trigger : document.activeElement;
+            this.selectedEmployee = {
+                id: emp.id,
                 nama: emp.nama,
                 email: emp.mapped_email,
                 keycloak_id: emp.keycloak_id || '',
-                role: emp.role || 'pegawai',
+                role: emp.role || '',
                 nip: emp.nip
             };
             this.showEditModal = true;
+            this.$nextTick(() => this.focusModalField());
+        },
+
+        closeEdit() {
+            this.showEditModal = false;
+            this.$nextTick(() => {
+                if (this.lastFocusedElement instanceof HTMLElement) {
+                    this.lastFocusedElement.focus();
+                }
+            });
+        },
+
+        focusModalField() {
+            if (this.$refs.roleSelect?.getAttribute('aria-invalid') === 'true') {
+                this.$refs.roleSelect.focus();
+
+                return;
+            }
+
+            this.$refs.keycloakIdentifier?.focus();
+        },
+
+        trapFocus(event, container) {
+            const focusableElements = [...container.querySelectorAll(
+                'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]'
+            )].filter((element) => element.offsetParent !== null && element.getAttribute('tabindex') !== '-1');
+
+            if (focusableElements.length === 0) {
+                return;
+            }
+
+            const firstElement = focusableElements[0];
+            const lastElement = focusableElements[focusableElements.length - 1];
+
+            if (event.shiftKey && document.activeElement === firstElement) {
+                event.preventDefault();
+                lastElement.focus();
+
+                return;
+            }
+
+            if (!event.shiftKey && document.activeElement === lastElement) {
+                event.preventDefault();
+                firstElement.focus();
+            }
         }
     }" class="space-y-6">
 
@@ -102,12 +145,15 @@
 
         {{-- FILTER BAR --}}
         <x-ui.card padding="sm" class="flex flex-col gap-4">
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12">
+            <form id="user-mapping-filter-form" action="{{ route('user-management') }}" method="GET" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12">
                 {{-- Search Bar --}}
-                <div class="col-span-1 sm:col-span-2 lg:col-span-6 relative">
+                <div class="col-span-1 sm:col-span-2 lg:col-span-5 relative">
+                    <label for="user-mapping-search" class="sr-only">Cari nama, NIP, atau email pegawai</label>
                     <input
+                        id="user-mapping-search"
                         type="text"
-                        x-model="searchQuery"
+                        name="search"
+                        value="{{ request('search') }}"
                         placeholder="Cari nama, NIP, atau email pegawai..."
                         class="w-full rounded-lg border border-border bg-surface pl-10 pr-4 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans"
                     >
@@ -120,32 +166,44 @@
 
                 {{-- Filter Role --}}
                 <div class="col-span-1 lg:col-span-3 relative">
-                    <x-form.select x-model="filterRole">
+                    <label for="user-mapping-role-filter" class="sr-only">Filter role internal SIMPEG</label>
+                    <select id="user-mapping-role-filter" name="role" onchange="this.form.requestSubmit()" class="h-[44px] w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                         <option value="">Semua Role</option>
-                        <option value="Super Admin">Super Admin</option>
-                        <option value="Admin Kepegawaian">Admin Kepegawaian</option>
-                        <option value="Pimpinan">Pimpinan</option>
-                        <option value="Kepala Bagian">Kepala Bagian</option>
-                        <option value="Pegawai">Pegawai</option>
-                    </x-form.select>
+                        <option value="super_admin" @selected(request('role') === 'super_admin')>Super Admin</option>
+                        <option value="admin_kepegawaian" @selected(request('role') === 'admin_kepegawaian')>Admin Kepegawaian</option>
+                        <option value="pimpinan" @selected(request('role') === 'pimpinan')>Pimpinan</option>
+                        <option value="kepala_bagian" @selected(request('role') === 'kepala_bagian')>Kepala Bagian</option>
+                        <option value="pegawai" @selected(request('role') === 'pegawai')>Pegawai</option>
+                    </select>
                 </div>
 
                 {{-- Filter Status Mapping --}}
                 <div class="col-span-1 lg:col-span-3 relative">
-                    <x-form.select x-model="filterStatus">
-                        <option value="">Semua Status SSO</option>
-                        <option value="connected">Terhubung</option>
-                        <option value="disconnected">Belum Terhubung</option>
-                    </x-form.select>
+                    <label for="user-mapping-status-filter" class="sr-only">Filter status mapping</label>
+                    <select id="user-mapping-status-filter" name="status" onchange="this.form.requestSubmit()" class="h-[44px] w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                        <option value="">Semua Status Mapping</option>
+                        <option value="terhubung" @selected(request('status') === 'terhubung')>Terhubung</option>
+                        <option value="belum_ada_user" @selected(request('status') === 'belum_ada_user')>Belum Ada User Lokal</option>
+                        <option value="identifier_kosong" @selected(request('status') === 'identifier_kosong')>Identifier Keycloak Kosong</option>
+                        <option value="role_kosong" @selected(request('status') === 'role_kosong')>Role Belum Ditetapkan</option>
+                    </select>
                 </div>
-            </div>
+                <div class="col-span-1 flex gap-2 lg:col-span-1">
+                    <button type="submit" class="h-[44px] w-full rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/20">Terapkan</button>
+                </div>
+                @if(request()->hasAny(['search', 'role', 'status', 'per_page']))
+                    <div class="col-span-1 sm:col-span-2 lg:col-span-12">
+                        <a href="{{ route('user-management') }}" class="text-xs font-semibold text-primary hover:underline">Reset filter</a>
+                    </div>
+                @endif
+            </form>
         </x-ui.card>
 
         {{-- TABLE CARD --}}
         <x-ui.card padding="none" class="overflow-hidden">
             <div class="px-6 py-4 border-b border-border bg-surface">
                 <h3 class="text-sm font-semibold text-ink font-sans">Pemetaan Akun SSO & Otorisasi RBAC</h3>
-                <p class="text-xs text-muted">Hubungkan email Keycloak SSO dengan data pegawai internal serta kelola role.</p>
+                <p class="text-xs text-muted">Hubungkan identifier Keycloak SSO dengan data pegawai internal serta kelola role.</p>
             </div>            <div class="overflow-x-auto">
                 <x-ui.table class="border-collapse">
                     <x-ui.table-head class="border-b border-border">
@@ -161,36 +219,41 @@
                         </x-ui.table-row>
                     </x-ui.table-head>
                     <x-ui.table-body>
-                        <template x-for="(emp, index) in paginatedEmployees" :key="emp.nip">
+                        @forelse ($pegawai as $emp)
+                            @php
+                                $roleLabel = match ($emp['role']) {
+                                    null, '' => 'Belum diberi role',
+                                    'super_admin' => 'Super Admin',
+                                    'admin_kepegawaian' => 'Admin Kepegawaian',
+                                    'pimpinan' => 'Pimpinan',
+                                    'kepala_bagian' => 'Kepala Bagian',
+                                    'pegawai' => 'Pegawai',
+                                    default => 'Role tidak dikenal',
+                                };
+                                $roleClass = match ($emp['role']) {
+                                    'super_admin' => 'bg-danger/10 text-danger',
+                                    'admin_kepegawaian' => 'bg-primary/10 text-primary',
+                                    'kepala_bagian' => 'bg-warning/10 text-warning',
+                                    'pegawai' => 'bg-success/10 text-success',
+                                    default => 'bg-soft text-muted',
+                                };
+                                $statusClass = match ($emp['mapping_status']) {
+                                    'terhubung' => 'bg-success/10 text-success',
+                                    'role_kosong' => 'bg-warning/10 text-warning',
+                                    default => 'bg-danger/10 text-danger',
+                                };
+                            @endphp
                             <x-ui.table-row :interactive="true">
-                                <x-ui.table-td x-text="(currentPage - 1) * perPage + index + 1" class="text-muted whitespace-nowrap"></x-ui.table-td>
-                                <x-ui.table-td x-text="emp.nama" class="font-bold whitespace-nowrap"></x-ui.table-td>
-                                <x-ui.table-td x-text="emp.nip" class="text-muted whitespace-nowrap"></x-ui.table-td>
-                                <x-ui.table-td x-text="emp.mapped_email" class="whitespace-nowrap"></x-ui.table-td>
-                                <x-ui.table-td : x-text="emp.keycloak_id || '-'" class="whitespace-nowrap"></x-ui.table-td>
+                                <x-ui.table-td class="text-muted whitespace-nowrap">{{ ($pegawai->firstItem() ?? 0) + $loop->index }}</x-ui.table-td>
+                                <x-ui.table-td class="font-bold whitespace-nowrap">{{ $emp['nama'] }}</x-ui.table-td>
+                                <x-ui.table-td class="text-muted whitespace-nowrap">{{ $emp['nip'] }}</x-ui.table-td>
+                                <x-ui.table-td class="whitespace-nowrap">{{ $emp['mapped_email'] ?: '-' }}</x-ui.table-td>
+                                <x-ui.table-td class="whitespace-nowrap">{{ $emp['keycloak_id'] ?: '-' }}</x-ui.table-td>
                                 <x-ui.table-td class="whitespace-nowrap">
-                                     <x-ui.badge
-                                           variant="none"
-                                           size="xs"
-                                           uppercase
-                                           x-bind:class="{
-                                               'bg-danger/10 text-danger': emp.role === 'super_admin',
-                                               'bg-primary/10 text-primary': emp.role === 'admin_kepegawaian',
-                                               'bg-soft text-muted': emp.role === 'pimpinan',
-                                               'bg-warning/10 text-warning': emp.role === 'kepala_bagian',
-                                               'bg-success/10 text-success': emp.role === 'pegawai'
-                                           }"
-                                           x-text="emp.role"
-                                     ></x-ui.badge>
+                                     <x-ui.badge variant="none" size="xs" uppercase class="{{ $roleClass }}">{{ $roleLabel }}</x-ui.badge>
                                 </x-ui.table-td>
                                 <x-ui.table-td class="whitespace-nowrap">
-                                    <x-ui.badge
-                                          variant="none"
-                                          size="xs"
-                                          dot
-                                          x-bind:class="emp.is_connected ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'">
-                                        <span x-text="emp.is_connected ? 'Terhubung' : 'Belum Terhubung'"></span>
-                                    </x-ui.badge>
+                                     <x-ui.badge variant="none" size="xs" dot class="{{ $statusClass }}">{{ $emp['mapping_status_label'] }}</x-ui.badge>
                                 </x-ui.table-td>
                                 <x-ui.table-td align="right" class="whitespace-nowrap">
                                     <div class="flex items-center justify-end">
@@ -198,7 +261,7 @@
                                             type="button"
                                             variant="secondary"
                                             size="icon"
-                                            @click="openEdit(emp)"
+                                            @click="openEdit(employees.find((employee) => employee.id === '{{ $emp['id'] }}'), $event.currentTarget)"
                                             title="Edit Pemetaan"
                                             aria-label="Edit Pemetaan"
                                         >
@@ -209,13 +272,13 @@
                                     </div>
                                 </x-ui.table-td>
                             </x-ui.table-row>
-                        </template>
-
-                        <x-ui.table-row x-show="filteredEmployees.length === 0">
+                        @empty
+                        <x-ui.table-row>
                             <x-ui.table-td colspan="8" align="center" class="px-6 py-8 text-muted">
                                 Tidak ada pegawai yang cocok dengan filter pencarian Anda.
                             </x-ui.table-td>
                         </x-ui.table-row>
+                        @endforelse
                     </x-ui.table-body>
                 </x-ui.table>
             </div>
@@ -224,76 +287,129 @@
             <div class="flex flex-col gap-3 border-t border-border px-4 py-4 sm:flex-row sm:items-center sm:justify-between bg-surface">
                 <div class="flex items-center gap-3">
                     <p class="text-sm text-muted font-sans">
-                        Menampilkan <span x-text="filteredEmployees.length === 0 ? 0 : (currentPage - 1) * perPage + 1"></span> - <span x-text="Math.min(currentPage * perPage, filteredEmployees.length)"></span> dari <span x-text="filteredEmployees.length"></span> data
+                        Menampilkan {{ $pegawai->firstItem() ?? 0 }} - {{ $pegawai->lastItem() ?? 0 }} dari {{ $pegawai->total() }} data
                     </p>
-                    <div class="relative">
-                        <select x-model.number="perPage" @change="currentPage = 1" class="appearance-none rounded-lg border border-border bg-surface pl-3 pr-8 py-1 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                            <option value="5">5 / halaman</option>
-                            <option value="10">10 / halaman</option>
-                            <option value="25">25 / halaman</option>
+                    <form action="{{ route('user-management') }}" method="GET" class="relative">
+                        <input type="hidden" name="search" value="{{ request('search') }}">
+                        <input type="hidden" name="role" value="{{ request('role') }}">
+                        <input type="hidden" name="status" value="{{ request('status') }}">
+                        <label for="user-mapping-per-page" class="sr-only">Jumlah data per halaman</label>
+                        <select id="user-mapping-per-page" name="per_page" onchange="this.form.submit()" class="appearance-none rounded-lg border border-border bg-surface pl-3 pr-8 py-1 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                            <option value="5" @selected((int) request('per_page', 10) === 5)>5 / halaman</option>
+                            <option value="10" @selected((int) request('per_page', 10) === 10)>10 / halaman</option>
+                            <option value="25" @selected((int) request('per_page', 10) === 25)>25 / halaman</option>
+                            <option value="50" @selected((int) request('per_page', 10) === 50)>50 / halaman</option>
                         </select>
                         <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
                             </svg>
                         </div>
-                    </div>
+                    </form>
                 </div>
 
                 <div class="flex items-center gap-1.5">
-
-                    <x-ui.pagination current="currentPage" total="totalPages" />
-
+                    {{ $pegawai->onEachSide(1)->links('vendor.pagination.simpeg') }}
                 </div>
             </div>
         </x-ui.card>
 
         {{-- EDIT PEMETAAN MODAL --}}
-        <div x-show="showEditModal" class="fixed inset-0 z-50 overflow-hidden" style="display: none;" x-transition>
+        <div
+            x-show="showEditModal"
+            @keydown.escape.window="if (showEditModal) closeEdit()"
+            class="fixed inset-0 z-50 overflow-hidden"
+            style="display: none;"
+            x-transition
+        >
             {{-- Backdrop --}}
-            <div class="absolute inset-0 bg-ink/30 transition-opacity" @click="showEditModal = false"></div>
+            <div class="absolute inset-0 bg-ink/30 transition-opacity" @click="closeEdit()"></div>
             
             <div class="fixed inset-0 flex items-center justify-center p-4">
-                <form action="{{ route('user-management.update') }}" method="POST" class="w-full max-w-md bg-surface border border-border rounded-lg shadow-xl flex flex-col overflow-hidden">
+                <form action="{{ route('user-management.update') }}" method="POST" class="w-full max-w-md bg-surface border border-border rounded-lg shadow-xl flex flex-col overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="user-mapping-modal-title" tabindex="-1" @keydown.tab="trapFocus($event, $el)">
                     @csrf
+                    <input type="hidden" name="form" value="user-mapping">
                     
                     {{-- Header --}}
                     <div class="px-6 py-5 border-b border-border flex items-center justify-between">
                         <div>
-                            <h3 class="text-sm font-bold text-ink font-sans">Edit Otorisasi & SSO</h3>
+                            <h3 id="user-mapping-modal-title" class="text-sm font-bold text-ink font-sans">Edit Otorisasi & SSO</h3>
                             <p class="text-[11px] text-muted font-sans mt-0.5" x-text="selectedEmployee.nama"></p>
                         </div>
-                        <button type="button" @click="showEditModal = false" class="text-xs font-semibold text-muted hover:text-ink font-sans cursor-pointer focus:outline-none">
+                        <button type="button" @click="closeEdit()" class="text-xs font-semibold text-muted hover:text-ink font-sans cursor-pointer focus:outline-none" aria-label="Tutup modal pemetaan user">
                             Tutup
                         </button>
                     </div>
 
                     {{-- Body --}}
                     <div class="p-6 space-y-4">
-                        <input type="hidden" name="email" :value="selectedEmployee.email">
+                        @if($mappingFormHasErrors)
+                            <x-ui.alert variant="danger" title="Periksa kembali data pemetaan">
+                                Perbaiki field yang ditandai sebelum menyimpan kembali.
+                            </x-ui.alert>
+                        @endif
+
+                        @error('mapping')
+                            <x-ui.alert variant="danger" title="Pemetaan dibatalkan">
+                                {{ $message }}
+                            </x-ui.alert>
+                        @enderror
+
+                        <input type="hidden" name="employee_id" :value="selectedEmployee.id">
 
                         <div class="space-y-1">
-                            <label class="text-xs font-semibold text-ink font-sans">Email Pegawai (Read-only)</label>
-                            <input type="text" :value="selectedEmployee.email" disabled class="h-[44px] w-full rounded-lg border border-border bg-soft px-4 py-2.5 text-xs text-muted font-sans select-none focus:outline-none">
+                            <label for="user-mapping-employee" class="text-xs font-semibold text-ink font-sans">Pegawai Terpilih (Read-only)</label>
+                            <input
+                                id="user-mapping-employee"
+                                type="text"
+                                :value="selectedEmployee.email"
+                                disabled
+                                @if ($errors->has('employee_id')) aria-invalid="true" aria-describedby="user-mapping-employee-error" @endif
+                                class="h-[44px] w-full rounded-lg border border-border bg-soft px-4 py-2.5 text-xs text-muted font-sans select-none focus:outline-none"
+                            >
+                            @error('employee_id')
+                                <p id="user-mapping-employee-error" class="text-[11px] text-danger font-semibold font-sans" role="alert">{{ $message }}</p>
+                            @enderror
                         </div>
 
                         <div class="space-y-1">
-                            <label class="text-xs font-semibold text-ink font-sans">Keycloak ID / Email SSO</label>
-                            <input type="text" name="keycloak_id" x-model="selectedEmployee.keycloak_id" placeholder="Masukkan ID / Email SSO Keycloak..." class="h-[44px] w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                            <p class="text-[10px] text-muted font-sans">Kosongkan jika ingin memutuskan (disconnect) akun SSO pegawai.</p>
+                            <label for="user-mapping-keycloak-id" class="text-xs font-semibold text-ink font-sans">Identifier Keycloak</label>
+                            <input
+                                id="user-mapping-keycloak-id"
+                                type="text"
+                                name="keycloak_id"
+                                x-model="selectedEmployee.keycloak_id"
+                                x-ref="keycloakIdentifier"
+                                required
+                                placeholder="Masukkan identifier Keycloak..."
+                                aria-describedby="{{ $errors->has('keycloak_id') ? 'user-mapping-keycloak-id-help user-mapping-keycloak-id-error' : 'user-mapping-keycloak-id-help' }}"
+                                @if ($errors->has('keycloak_id')) aria-invalid="true" @endif
+                                class="h-[44px] w-full rounded-lg border {{ $errors->has('keycloak_id') ? 'border-danger focus:border-danger focus:ring-danger/20' : 'border-border focus:border-primary focus:ring-primary/20' }} bg-surface px-4 py-2.5 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 font-sans"
+                            >
+                            <p id="user-mapping-keycloak-id-help" class="text-[10px] text-muted font-sans">Identifier Keycloak wajib diisi. Disconnect belum tersedia pada halaman ini.</p>
+                            @error('keycloak_id')
+                                <p id="user-mapping-keycloak-id-error" class="text-[11px] text-danger font-semibold font-sans" role="alert">{{ $message }}</p>
+                            @enderror
                             <p class="text-[10px] text-danger font-semibold font-sans mt-1">⚠️ Aturan Unik: Satu Keycloak ID hanya boleh dipetakan ke satu pegawai saja.</p>
                         </div>
  
-                        <div class="space-y-1">
-                            <label class="text-xs font-semibold text-ink font-sans">Role Internal SIMPEG</label>
-                            <x-form.select name="role" x-model="selectedEmployee.role">
-                                <option value="Super Admin">Super Admin</option>
-                                <option value="Admin Kepegawaian">Admin Kepegawaian</option>
-                                <option value="Pimpinan">Pimpinan</option>
-                                <option value="Kepala Bagian">Kepala Bagian</option>
-                                <option value="Pegawai">Pegawai</option>
+                        <div>
+                            <x-form.select
+                                id="user-mapping-role"
+                                name="role"
+                                label="Role Internal SIMPEG"
+                                help="Pilih tingkat otorisasi internal yang akan diberikan kepada user ini."
+                                required
+                                x-model="selectedEmployee.role"
+                                x-ref="roleSelect"
+                            >
+                                <option value="" disabled>Pilih role internal</option>
+                                <option value="super_admin">Super Admin</option>
+                                <option value="admin_kepegawaian">Admin Kepegawaian</option>
+                                <option value="pimpinan">Pimpinan</option>
+                                <option value="kepala_bagian">Kepala Bagian</option>
+                                <option value="pegawai">Pegawai</option>
                             </x-form.select>
-                            <p class="text-[10px] text-muted font-sans">Pilih tingkat otorisasi internal untuk di-assign ke user ini.</p>
                             <p class="text-[10px] text-warning font-semibold font-sans mt-1">⚠️ Catatan: Perubahan role baru akan aktif setelah user melakukan login berikutnya.</p>
                         </div>
 
@@ -310,7 +426,7 @@
 
                     {{-- Footer --}}
                     <div class="px-6 py-4 border-t border-border bg-soft flex justify-end gap-3">
-                        <x-ui.button type="button" variant="secondary" size="xs" @click="showEditModal = false">
+                        <x-ui.button type="button" variant="secondary" size="xs" @click="closeEdit()">
                             Batal
                         </x-ui.button>
                         <x-ui.button type="submit" variant="primary" size="xs">
