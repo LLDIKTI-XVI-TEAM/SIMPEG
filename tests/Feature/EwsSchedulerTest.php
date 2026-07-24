@@ -281,9 +281,9 @@ class EwsSchedulerTest extends TestCase
     {
         $pppkJenis = RefJenisPegawai::where('nama', 'PPPK')->firstOrFail();
 
-        // PPPK Employee with null tanggal_akhir_kontrak, but PPPK appointment 5 years minus 180 days ago
-        // So target date (tmt + 5 years) is exactly H-180
-        $tmt = now()->subYears(5)->addDays(180)->toDateString();
+        // PPPK Employee with null tanggal_akhir_kontrak, but PPPK appointment 4 years minus 180 days ago.
+        // So target date (TMT + default 4 years) is exactly H-180.
+        $tmt = now()->subYears(4)->addDays(180)->toDateString();
         $employee = Employee::factory()->create([
             'jenis_pegawai_id' => $pppkJenis->id,
             'tanggal_akhir_kontrak' => null,
@@ -309,6 +309,28 @@ class EwsSchedulerTest extends TestCase
             'user_id' => $employee->id,
             'type' => 'ews.kontrak_pppk',
         ]);
+    }
+
+    public function test_scheduler_skips_contract_ews_for_pns_and_cpns(): void
+    {
+        foreach (['PNS', 'CPNS'] as $jenis) {
+            $jenisPegawai = RefJenisPegawai::where('nama', $jenis)->firstOrFail();
+            $employee = Employee::factory()->create([
+                'jenis_pegawai_id' => $jenisPegawai->id,
+                'tanggal_akhir_kontrak' => now()->addDays(180)->toDateString(),
+            ]);
+            Appointment::create([
+                'employee_id' => $employee->id,
+                'jenis_pengangkatan' => $jenis,
+                'tmt_pengangkatan' => now()->subYears(4)->addDays(180)->toDateString(),
+                'no_sk' => 'SK-'.$jenis.'-TANPA-EWS',
+                'tanggal_sk' => now()->subYears(4)->toDateString(),
+            ]);
+        }
+
+        app(EwsEngineService::class)->run();
+
+        $this->assertSame(0, EwsAlert::where('type', 'KONTRAK_PPPK')->count());
     }
 
     public function test_scheduler_creates_satyalancana_alerts_for_h180_h90_h30(): void

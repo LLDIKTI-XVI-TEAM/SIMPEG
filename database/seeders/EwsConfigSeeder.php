@@ -23,7 +23,7 @@ class EwsConfigSeeder extends Seeder
             ['key' => 'pensiun_y1', 'value' => '365'],
             ['key' => 'pensiun_m6', 'value' => '180'],
             ['key' => 'pensiun_m3', 'value' => '90'],
-            ['key' => 'pppk_contract_years', 'value' => '5'],
+            ['key' => 'pppk_contract_years', 'value' => '4'],
             ['key' => 'pppk_m6', 'value' => '180'],
             ['key' => 'pppk_m3', 'value' => '90'],
             ['key' => 'pppk_m1', 'value' => '30'],

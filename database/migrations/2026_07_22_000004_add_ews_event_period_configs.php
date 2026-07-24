@@ -12,7 +12,7 @@ return new class extends Migration
             'kgb_required_years' => '2',
             // Nilai 0 mempertahankan BUP per jabatan yang telah dikonfigurasi.
             'pensiun_required_age_years' => '0',
-            'pppk_contract_years' => '5',
+            'pppk_contract_years' => '4',
             'satyalancana_years_1' => '10',
             'satyalancana_years_2' => '20',
             'satyalancana_years_3' => '30',

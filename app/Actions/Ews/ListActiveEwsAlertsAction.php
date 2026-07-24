@@ -56,7 +56,6 @@ class ListActiveEwsAlertsAction
         }
 
         $status = $this->statusFromFilter($filterStatus);
-        $status = $this->statusFromFilter($filterStatus);
         if ($filterStatus === 'semua') {
             // Do not filter by followup_status
         } elseif ($filterStatus === '' || $filterStatus === null) {

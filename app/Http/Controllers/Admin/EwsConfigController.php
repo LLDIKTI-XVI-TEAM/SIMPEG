@@ -65,7 +65,7 @@ class EwsConfigController extends Controller
             'pensiun_m6' => EwsConfig::getVal('pensiun_m6', '180'),
             'pensiun_m3' => EwsConfig::getVal('pensiun_m3', '90'),
 
-            'pppk_contract_years' => EwsConfig::getVal('pppk_contract_years', '5'),
+            'pppk_contract_years' => EwsConfig::getVal('pppk_contract_years', '4'),
             'pppk_m6' => EwsConfig::getVal('pppk_m6', '180'),
             'pppk_m3' => EwsConfig::getVal('pppk_m3', '90'),
             'pppk_m1' => EwsConfig::getVal('pppk_m1', '30'),

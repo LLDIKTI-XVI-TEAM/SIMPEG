@@ -74,7 +74,7 @@ class EwsEngineService
             $pangkatRequiredYears = $this->configYears('pangkat_required_years', 4);
             $kgbRequiredYears = $this->configYears('kgb_required_years', 2);
             $pensiunRequiredAgeYears = max(0, $configDays('pensiun_required_age_years', 0));
-            $pppkContractYears = $this->configYears('pppk_contract_years', 5);
+            $pppkContractYears = $this->configYears('pppk_contract_years', 4);
             $satyalancanaYears = [
                 $this->configYears('satyalancana_years_1', 10),
                 $this->configYears('satyalancana_years_2', 20),
@@ -184,11 +184,11 @@ class EwsEngineService
                             if ($employee->tanggal_akhir_kontrak) {
                                 $targetDate = Carbon::parse($employee->tanggal_akhir_kontrak);
                             } else {
-                                // Fallback: tmt_pengangkatan PPPK + 5 tahun
+                                // Fallback: TMT pengangkatan PPPK terbaru + masa kontrak global.
                                 $pppkApp = $employee->appointments
-                                    ->filter(fn ($a): bool => $a->jenis_pengangkatan === 'PPPK' && $a->tmt_pengangkatan !== null)
-                                    ->sortBy('tmt_pengangkatan')
-                                    ->last();
+                                    ->filter(fn ($a): bool => strtoupper((string) $a->jenis_pengangkatan) === 'PPPK' && $a->tmt_pengangkatan !== null)
+                                    ->sortByDesc('tmt_pengangkatan')
+                                    ->first();
 
                                 if ($pppkApp) {
                                     $targetDate = Carbon::parse($pppkApp->tmt_pengangkatan)->addYears($pppkContractYears);
