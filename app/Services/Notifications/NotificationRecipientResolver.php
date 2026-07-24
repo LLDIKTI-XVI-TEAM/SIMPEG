@@ -32,15 +32,22 @@ class NotificationRecipientResolver
      */
     public function shouldEmailPrimaryRecipient(string $type, ?array $data = null): bool
     {
-        return $this->emailEnabled($type);
+        return $this->emailEnabled($type, $data);
     }
 
     /**
      * Menentukan jenis notifikasi yang memakai email; keputusan cuti perlu perubahan dan tidak disetujui dikirim agar pegawai segera menindaklanjuti statusnya.
      * Email hanya terkirim jika channel aktif dan credential SMTP sudah dikonfigurasi di RefNotificationChannel.
+     * Promosi yang belum eligible menunggu keputusan admin melalui alur follow-up, sehingga tidak mengirim email terlebih dahulu.
+     *
+     * @param  array<string, mixed>|null  $data
      */
-    public function emailEnabled(string $type): bool
+    public function emailEnabled(string $type, ?array $data = null): bool
     {
+        if ($type === 'ews.kenaikan_pangkat' && ($data['is_eligible'] ?? null) === false) {
+            return false;
+        }
+
         return $this->channels->isEnabled('email') && in_array($type, [
             'cuti.pengajuan_baru',
             'cuti.menunggu_persetujuan',

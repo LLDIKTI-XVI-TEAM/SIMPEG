@@ -143,7 +143,7 @@ class NotificationService
      */
     private function dispatchEmails(Employee $primaryRecipient, string $type, string $title, string $body, ?array $data): void
     {
-        if (! $this->recipients->emailEnabled($type)) {
+        if (! $this->recipients->emailEnabled($type, $data)) {
             return;
         }
 
