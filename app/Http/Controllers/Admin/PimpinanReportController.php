@@ -78,4 +78,50 @@ class PimpinanReportController extends Controller
     ) {
         return $pdf->execute($report->rows($request->validated()));
     }
+
+    public function fixedEmployeeReport(\App\Http\Requests\Laporan\ExportPegawaiRequest $request, \App\Services\Laporan\EmployeeExportDataService $exportData)
+    {
+        $filters = $request->validated();
+        $perPage = (int) request('per_page', 10);
+        $perPage = in_array($perPage, [10, 25, 50], true) ? $perPage : 10;
+        $page = max(1, (int) request('page', 1));
+
+        $allRows = $exportData->rows($filters);
+        $previewData = new LengthAwarePaginator(
+            $allRows->forPage($page, $perPage)->values(),
+            $allRows->count(),
+            $perPage,
+            $page,
+            ['path' => request()->url(), 'query' => request()->query()]
+        );
+
+        $unitKerjaOptions = \App\Models\RefUnitKerja::query()->orderBy('nama')->get(['id', 'nama']);
+        $jenisPegawaiOptions = \App\Models\RefJenisPegawai::query()->orderBy('nama')->get(['id', 'nama']);
+        $jabatanOptions = \App\Models\RefJabatan::query()->orderBy('nama')->get(['id', 'nama']);
+
+        return view('pimpinan.laporan.nominatif', [
+            'filters' => $filters,
+            'previewData' => $previewData,
+            'unitKerjaOptions' => $unitKerjaOptions,
+            'jenisPegawaiOptions' => $jenisPegawaiOptions,
+            'jabatanOptions' => $jabatanOptions,
+        ]);
+    }
+
+    public function exportFixedEmployeeReportExcel(\App\Http\Requests\Laporan\ExportPegawaiRequest $request, \App\Actions\Laporan\PimpinanCustomEmployeeExportAction $action)
+    {
+        $validated = $request->validated();
+        // Paksa hanya kolom aman PRD (NIP, Nama, Golongan, Jabatan, Unit Kerja, Jenis Pegawai)
+        $validated['columns'] = ['nip', 'nama', 'golongan', 'jabatan', 'unit', 'jenis'];
+
+        return $action->execute($validated);
+    }
+
+    public function exportFixedEmployeeReportPdf(\App\Http\Requests\Laporan\ExportPegawaiRequest $request, \App\Services\Laporan\EmployeeExportDataService $exportData, \App\Actions\Reports\ExportFixedEmployeePdfAction $pdf)
+    {
+        $filters = $request->validated();
+        $rows = $exportData->rows($filters);
+
+        return $pdf->execute($rows);
+    }
 }

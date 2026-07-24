@@ -183,9 +183,9 @@ class PimpinanLeaveDecisionTest extends TestCase
 
     public function test_leave_index_lists_real_requests_and_links_to_the_request_detail(): void
     {
-        $pimpinan = User::factory()->pimpinan()->create();
-        $pemohon = Employee::factory()->create(['nama_lengkap' => 'Pegawai Antrean Cuti']);
         $approver = Employee::factory()->create(['nama_lengkap' => 'Pejabat Berbeda Dari Label']);
+        $pimpinan = User::factory()->pimpinan()->create(['employee_id' => $approver->id]);
+        $pemohon = Employee::factory()->create(['nama_lengkap' => 'Pegawai Antrean Cuti']);
         $jenisCuti = RefJenisCuti::create([
             'nama' => 'Cuti Sakit Kontrak Daftar Pimpinan',
             'code' => 'cuti_sakit_kontrak_daftar_pimpinan',
@@ -264,7 +264,7 @@ class PimpinanLeaveDecisionTest extends TestCase
             'status' => 'disetujui',
         ]);
 
-        $response = $this->actingAs($pimpinan)->get(route('pimpinan.cuti.index'));
+        $response = $this->actingAs($pimpinan)->get(route('pimpinan.cuti.index', ['status' => 'all']));
 
         $response->assertOk()
             ->assertSee('PYBMC Kontrak Tampilan');
@@ -294,7 +294,7 @@ class PimpinanLeaveDecisionTest extends TestCase
             'status' => 'disetujui',
         ]);
 
-        $response = $this->actingAs($pimpinan)->get(route('pimpinan.cuti.index'));
+        $response = $this->actingAs($pimpinan)->get(route('pimpinan.cuti.index', ['status' => 'all']));
         $row = $response->viewData('leaves')->getCollection()->firstWhere('id', $leave->id);
 
         $response->assertOk();

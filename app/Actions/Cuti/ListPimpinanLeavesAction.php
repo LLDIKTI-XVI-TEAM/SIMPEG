@@ -49,11 +49,14 @@ class ListPimpinanLeavesAction
             $query->where('jenis_cuti_id', $filters['jenis_cuti_id']);
         }
         if (filled($filters['status'] ?? null)) {
-            if ($filters['status'] === 'menunggu_saya' && $user->employee_id) {
-                $query->whereHas('steps', fn ($q) => $q
-                    ->where('status', 'active')
-                    ->where('approver_employee_id', $user->employee_id));
-            } else {
+            if ($filters['status'] === 'menunggu_saya') {
+                $query->where('status', 'menunggu_approval');
+                if ($user->employee_id) {
+                    $query->whereHas('steps', fn ($q) => $q
+                        ->where('status', 'active')
+                        ->where('approver_employee_id', $user->employee_id));
+                }
+            } elseif ($filters['status'] !== 'all') {
                 $statuses = match ($filters['status']) {
                     'menunggu' => ['menunggu_approval'],
                     'perubahan' => ['perlu_perubahan'],

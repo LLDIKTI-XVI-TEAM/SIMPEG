@@ -12,6 +12,15 @@ class PimpinanLeaveFilterRequest extends FormRequest
         return $this->user()?->role === 'pimpinan';
     }
 
+    protected function prepareForValidation(): void
+    {
+        if (! $this->has('status')) {
+            $this->merge([
+                'status' => 'menunggu_saya',
+            ]);
+        }
+    }
+
     public function rules(): array
     {
         return [
@@ -19,7 +28,7 @@ class PimpinanLeaveFilterRequest extends FormRequest
             'unit_kerja_id' => ['nullable', 'uuid'],
             'periode' => ['nullable', 'string', 'regex:/^\d{4}-\d{2}$/'],
             'jenis_cuti_id' => ['nullable', 'uuid'],
-            'status' => ['nullable', Rule::in(['menunggu_saya', 'menunggu', 'disetujui', 'perubahan', 'ditangguhkan', 'tidak_disetujui'])],
+            'status' => ['nullable', Rule::in(['all', 'menunggu_saya', 'menunggu', 'disetujui', 'perubahan', 'ditangguhkan', 'tidak_disetujui'])],
         ];
     }
 }
