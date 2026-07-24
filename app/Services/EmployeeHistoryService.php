@@ -271,17 +271,17 @@ class EmployeeHistoryService
         });
     }
 
+    private function configYears(string $key, int $default): int
+    {
+        return max(1, (int) EwsConfig::getVal($key, (string) $default));
+    }
+
     /**
      * Upload SK disimpan sebelum transaksi data agar model hanya menerima path relatif yang aman.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    private function configYears(string $key, int $default): int
-    {
-        return max(1, (int) EwsConfig::getVal($key, (string) $default));
-    }
-
     private function storeSkUpload(array $data): array
     {
         if (($data['file_sk'] ?? null) instanceof UploadedFile) {
