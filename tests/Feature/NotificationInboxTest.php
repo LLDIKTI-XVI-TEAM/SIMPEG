@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\NotificationEventChannel;
 use App\Models\Permission;
+use App\Models\RefNotificationChannel;
 use App\Models\Role;
 use App\Models\SimpegNotification;
 use App\Models\User;
@@ -37,6 +39,12 @@ class NotificationInboxTest extends TestCase
     public function test_notification_service_creates_unread_notification_for_employee(): void
     {
         $employee = Employee::factory()->create();
+        $channel = RefNotificationChannel::query()->where('code', 'in_app')->firstOrFail();
+        NotificationEventChannel::query()->create([
+            'event_key' => 'cuti.diajukan',
+            'notification_channel_id' => $channel->id,
+            'is_enabled' => true,
+        ]);
 
         $notification = app(NotificationService::class)->createForEmployee(
             employee: $employee,

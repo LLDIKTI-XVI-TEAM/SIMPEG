@@ -18,7 +18,7 @@ class NotificationRecipientResolver
      */
     public function additionalRecipients(Employee $primaryRecipient, string $type, ?array $data = null): Collection
     {
-        if (! str_starts_with($type, 'ews.')) {
+        if (! str_starts_with($type, 'ews.') || $type === 'ews.scheduler_failed') {
             return collect();
         }
 
@@ -36,9 +36,9 @@ class NotificationRecipientResolver
     }
 
     /**
-     * Menentukan jenis notifikasi yang memakai email; keputusan cuti perlu perubahan dan tidak disetujui dikirim agar pegawai segera menindaklanjuti statusnya.
-     * Email hanya terkirim jika channel aktif dan credential SMTP sudah dikonfigurasi di RefNotificationChannel.
+     * Menentukan jenis notifikasi yang memakai email.
      * Promosi yang belum eligible menunggu keputusan admin melalui alur follow-up, sehingga tidak mengirim email terlebih dahulu.
+     * Fail-closed: delivery hanya aktif bila channel global dan pasangan kebijakan event-channel sama-sama aktif.
      *
      * @param  array<string, mixed>|null  $data
      */
@@ -48,26 +48,15 @@ class NotificationRecipientResolver
             return false;
         }
 
-        return $this->channels->isEnabled('email') && in_array($type, [
-            'cuti.pengajuan_baru',
-            'cuti.menunggu_persetujuan',
-            'cuti.disetujui',
-            'cuti.ditunda',
-            'cuti.perlu_perubahan',
-            'cuti.tidak_disetujui',
-            'ews.kenaikan_pangkat',
-            'ews.kgb',
-            'ews.pensiun',
-            'ews.kontrak_pppk',
-            'ews.satyalancana',
-        ], true);
+        return $this->channels->isEnabledForEvent($type, 'email');
     }
 
     /** @return Collection<int, Employee> */
     private function adminRecipients(): Collection
     {
         return User::query()
-            ->whereIn('role', ['super_admin', 'admin_kepegawaian'])
+            // EWS rutin hanya perlu ditindaklanjuti Admin Kepegawaian; Super Admin khusus kegagalan scheduler.
+            ->where('role', 'admin_kepegawaian')
             ->whereNotNull('employee_id')
             ->with('employee')
             ->get()

@@ -40,6 +40,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $satyalancana_note
  * @property bool $is_kepala_lembaga
  * @property-read RefJenisPegawai|null $jenisPegawai
+ * @property-read User|null $user
  * @property-read Employee|null $kepalaBagian
  * @property-read Collection<int, PositionHistory> $positionHistories
  * @property-read Collection<int, DisciplineRecord> $disciplineRecords
@@ -141,6 +142,12 @@ class Employee extends Model
     public function jenisPegawai(): BelongsTo
     {
         return $this->belongsTo(RefJenisPegawai::class, 'jenis_pegawai_id');
+    }
+
+    /** @return HasOne<User, $this> */
+    public function user(): HasOne
+    {
+        return $this->hasOne(User::class);
     }
 
     /** @return BelongsTo<RefStatusPegawai, $this> */
@@ -269,7 +276,12 @@ class Employee extends Model
     public function currentSupervisor(): ?SupervisorAssignment
     {
         return $this->supervisorAssignments()
-            ->whereNull('tanggal_berakhir')
+            ->whereDate('tanggal_mulai', '<=', today()->toDateString())
+            ->where(function ($query): void {
+                $query->whereNull('tanggal_berakhir')
+                    ->orWhereDate('tanggal_berakhir', '>=', today()->toDateString());
+            })
+            ->orderByDesc('tanggal_mulai')
             ->first();
     }
 

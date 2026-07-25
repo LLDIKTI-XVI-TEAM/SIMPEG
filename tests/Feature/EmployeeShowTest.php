@@ -91,6 +91,97 @@ class EmployeeShowTest extends TestCase
             ->assertDontSee('15-05-2042', false);
     }
 
+    public function test_employee_detail_page_uses_persisted_promotion_and_kgb_snapshots(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = $this->employeeWithReferences([
+            'tanggal_kenaikan_pangkat_berikutnya' => '2035-06-15',
+            'tanggal_kgb_berikutnya' => null,
+        ]);
+
+        RankHistory::create([
+            'employee_id' => $employee->id,
+            'golongan_id' => RefGolongan::where('kode', 'III/a')->firstOrFail()->id,
+            'tmt_pangkat' => '2020-04-01',
+            'is_latest' => true,
+        ]);
+        SalaryHistory::create([
+            'employee_id' => $employee->id,
+            'tmt_kgb' => '2020-01-01',
+            'gaji_pokok' => 5000000,
+            'is_latest' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSee('15-06-2035', false)
+            ->assertDontSee('01-04-2024', false)
+            ->assertDontSee('01-01-2022', false);
+    }
+
+    public function test_detail_page_menampilkan_kontrol_kepala_bagian_hanya_bila_role_dan_permission_memenuhi_syarat(): void
+    {
+        $employee = $this->employeeWithReferences();
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSee('Ubah Kepala Bagian', false)
+            ->assertSee(route('pegawai.assign-atasan', $employee->id), false);
+
+        $role = Role::where('name', 'admin_kepegawaian')->firstOrFail();
+        $permissionId = Permission::where('name', 'employees.update')->firstOrFail()->id;
+        $role->permissions()->detach($permissionId);
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertDontSee('Ubah Kepala Bagian', false);
+    }
+
+    public function test_detail_page_menyediakan_form_penghapusan_kepala_bagian_yang_eksplisit(): void
+    {
+        $employee = $this->employeeWithReferences();
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSee('id="assign-kepala-bagian-form"', false)
+            ->assertSee('Hapus Kepala Bagian lalu simpan', false)
+            ->assertSee('requestSubmit()', false);
+    }
+
+    public function test_detail_page_mencegah_submit_nama_kepala_bagian_tanpa_kandidat_terpilih(): void
+    {
+        $employee = $this->employeeWithReferences();
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSee('@submit="validateSupervisorSelection($event)"', false)
+            ->assertSee('Pilih kandidat Kepala Bagian dari hasil pencarian sebelum menyimpan.', false)
+            ->assertSee('role="alert"', false)
+            ->assertSee('supervisorClearConfirmed', false)
+            ->assertSee('text-xs text-muted font-sans', false);
+    }
+
+    public function test_detail_page_memulihkan_label_kepala_bagian_dari_id_tervalidasi_bukan_input_browser(): void
+    {
+        $employee = $this->employeeWithReferences();
+        $candidate = $this->employeeWithReferences(['nama_lengkap' => 'Kandidat Tersimpan']);
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->withSession(['_old_input' => [
+                'kepala_bagian_id' => $candidate->id,
+                'kepala_bagian_label' => '<script>window.xss = true</script>',
+            ]])
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSee('Kandidat Tersimpan', false)
+            ->assertDontSee('window.xss = true', false);
+    }
+
     public function test_employee_detail_response_includes_kepala_lembaga_marker(): void
     {
         $user = User::factory()->adminKepegawaian()->create();

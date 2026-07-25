@@ -14,7 +14,7 @@ class PimpinanReportController extends Controller
 {
     public function index()
     {
-        return view('pimpinan.laporan.index');
+        return redirect()->route('pimpinan.laporan.pegawai');
     }
 
     public function leaves(LeaveReportFilterRequest $request, ExportLeaveReportAction $action)

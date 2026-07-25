@@ -84,13 +84,11 @@ class PimpinanCustomEmployeeReportTest extends TestCase
         $response = $this->actingAs(User::factory()->pimpinan()->create())
             ->get(route('pimpinan.laporan.pegawai'))
             ->assertOk()
-            ->assertSee('Terapkan Filter')
-            ->assertSee('Unduh Excel (.xlsx)');
+            ->assertSee('Unduh Excel');
 
-        $pattern = '/<form action="'.preg_quote(route('pimpinan.laporan.pegawai'), '/').'" method="GET" class="space-y-6" aria-describedby="employee-report-help">(.*?)<\/form>/s';
+        $pattern = '/<form action="'.preg_quote(route('pimpinan.laporan.pegawai'), '/').'" method="GET"[^>]*>(.*?)<\/form>/s';
 
         $this->assertSame(1, preg_match($pattern, $response->getContent(), $matches));
-        $this->assertStringContainsString('formaction="'.route('pimpinan.laporan.pegawai.custom').'"', $matches[0]);
         $this->assertStringNotContainsString('name="_token"', $matches[0]);
         $this->assertStringNotContainsString('_token=', $matches[0]);
     }

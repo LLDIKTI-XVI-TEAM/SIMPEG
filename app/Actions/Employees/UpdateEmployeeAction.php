@@ -12,7 +12,7 @@ use App\Models\RefStatusPegawai;
 use App\Models\SimpegNotification;
 use App\Services\AuditService;
 use App\Services\EmployeeFileStorageService;
-use App\Services\EmployeeHistoryService;
+use App\Services\Employees\TmtCalculatorService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -20,7 +20,7 @@ class UpdateEmployeeAction
 {
     public function __construct(
         private readonly EmployeeFileStorageService $files,
-        private readonly EmployeeHistoryService $histories,
+        private readonly TmtCalculatorService $tmtCalculator,
     ) {}
 
     /**
@@ -31,10 +31,14 @@ class UpdateEmployeeAction
     public function execute(Employee $employee, array $validated, Request $request): Employee
     {
         return DB::transaction(function () use ($employee, $validated, $request) {
+            $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
             $oldValues = $employee->toArray();
             $validated = $this->normalizeEmployeeContract($validated);
             $pppkContractChanged = array_key_exists('tanggal_akhir_kontrak', $validated)
                 && ($oldValues['tanggal_akhir_kontrak'] ?? null) !== $validated['tanggal_akhir_kontrak'];
+            $rankHistoryChanged = false;
+            $positionHistoryChanged = false;
+            $salaryHistoryChanged = false;
 
             if ($request->hasFile('foto') && $request->file('foto')->isValid()) {
                 $validated['foto'] = $this->files->storePhoto($request->file('foto'));
@@ -93,15 +97,13 @@ class UpdateEmployeeAction
                     $history = $employee->rankHistories()->find($pangkatId);
                     if ($history) {
                         $history->update($pangkatData);
+                        $rankHistoryChanged = $history->wasChanged();
                     }
                 } else {
-                    $employee->rankHistories()->create([
-                        ...$pangkatData,
-                        'is_latest' => false,
-                    ]);
+                    $pangkatData['is_latest'] = false;
+                    $employee->rankHistories()->create($pangkatData);
+                    $rankHistoryChanged = true;
                 }
-
-                $this->histories->reconcileRankSnapshot($employee);
             }
 
             // 2. Jabatan (PositionHistory)
@@ -160,24 +162,12 @@ class UpdateEmployeeAction
                     $history = $employee->positionHistories()->find($jabatanId);
                     if ($history) {
                         $history->update($jabatanData);
-                        if ($history->is_latest) {
-                            $employee->update([
-                                'jabatan_terakhir' => $namaJabatan,
-                                'kelas_jabatan_terakhir' => $jabatanData['kelas_jabatan'],
-                                'kelas_jabatan' => $jabatanData['kelas_jabatan'],
-                            ]);
-                        }
+                        $positionHistoryChanged = $history->wasChanged();
                     }
                 } else {
-                    $employee->positionHistories()->update(['is_latest' => false]);
-                    $jabatanData['is_latest'] = true;
+                    $jabatanData['is_latest'] = false;
                     $employee->positionHistories()->create($jabatanData);
-
-                    $employee->update([
-                        'jabatan_terakhir' => $namaJabatan,
-                        'kelas_jabatan_terakhir' => $jabatanData['kelas_jabatan'],
-                        'kelas_jabatan' => $jabatanData['kelas_jabatan'],
-                    ]);
+                    $positionHistoryChanged = true;
                 }
             }
 
@@ -226,12 +216,27 @@ class UpdateEmployeeAction
                     $history = $employee->salaryHistories()->find($kgbId);
                     if ($history) {
                         $history->update($kgbData);
+                        $salaryHistoryChanged = $history->wasChanged();
                     }
                 } else {
-                    $employee->salaryHistories()->update(['is_latest' => false]);
-                    $kgbData['is_latest'] = true;
+                    $kgbData['is_latest'] = false;
                     $employee->salaryHistories()->create($kgbData);
+                    $salaryHistoryChanged = true;
                 }
+            }
+
+            // Bangun ulang flag dari seluruh TMT sah setelah semua penulisan agar backfill/null tidak merusak snapshot terbaru.
+            if ($rankHistoryChanged) {
+                $this->rebuildLatestRank($employee);
+            }
+            if ($positionHistoryChanged) {
+                $this->rebuildLatestPosition($employee);
+            }
+            if ($salaryHistoryChanged) {
+                $this->rebuildLatestSalary($employee);
+            }
+            if ($rankHistoryChanged || $positionHistoryChanged || $salaryHistoryChanged) {
+                $this->tmtCalculator->syncForEmployee($employee);
             }
 
             // 4. Pengangkatan (Appointment)
@@ -398,5 +403,66 @@ class UpdateEmployeeAction
         }
 
         return $data;
+    }
+
+    private function rebuildLatestRank(Employee $employee): void
+    {
+        $latest = $employee->rankHistories()
+            ->whereNotNull('tmt_pangkat')
+            ->orderByDesc('tmt_pangkat')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->first();
+
+        $employee->rankHistories()->update(['is_latest' => false]);
+        if ($latest === null) {
+            return;
+        }
+
+        $employee->rankHistories()->whereKey($latest->id)->update(['is_latest' => true]);
+        $golongan = RefGolongan::find($latest->golongan_id);
+        if ($golongan !== null) {
+            $employee->update([
+                'golongan_terakhir' => $golongan->kode,
+                'pangkat_terakhir' => $golongan->nama,
+            ]);
+        }
+    }
+
+    private function rebuildLatestPosition(Employee $employee): void
+    {
+        $latest = $employee->positionHistories()
+            ->whereNotNull('tmt_jabatan')
+            ->orderByDesc('tmt_jabatan')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->first();
+
+        $employee->positionHistories()->update(['is_latest' => false]);
+        if ($latest === null) {
+            return;
+        }
+
+        $employee->positionHistories()->whereKey($latest->id)->update(['is_latest' => true]);
+        $employee->update([
+            'jabatan_terakhir' => $latest->nama_jabatan,
+            'kelas_jabatan_terakhir' => $latest->kelas_jabatan ?? $employee->kelas_jabatan_terakhir,
+            'kelas_jabatan' => $latest->kelas_jabatan ?? $employee->kelas_jabatan_terakhir,
+        ]);
+    }
+
+    private function rebuildLatestSalary(Employee $employee): void
+    {
+        $latest = $employee->salaryHistories()
+            ->whereNotNull('tmt_kgb')
+            ->orderByDesc('tmt_kgb')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->first();
+
+        $employee->salaryHistories()->update(['is_latest' => false]);
+        if ($latest !== null) {
+            $employee->salaryHistories()->whereKey($latest->id)->update(['is_latest' => true]);
+        }
     }
 }

@@ -16,7 +16,9 @@ use App\Models\RefJenisPegawai;
 use App\Models\RefJenjangPendidikan;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
+use App\Services\Laporan\EmployeeExportDataService;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PimpinanEmployeeController extends Controller
@@ -133,7 +135,14 @@ class PimpinanEmployeeController extends Controller
                 ->orderBy('nama_anggota'),
             'supervisorAssignments' => fn ($query) => $query
                 ->select(['id', 'employee_id', 'supervisor_id', 'kepala_bagian_id', 'tanggal_mulai', 'tanggal_berakhir'])
-                ->whereNull('tanggal_berakhir')
+                // Hanya assignment yang efektif terhadap hari ini: sudah dimulai dan belum berakhir.
+                // Future assignment (tanggal_mulai > hari ini) tidak boleh dianggap current;
+                // tanggal_berakhir = hari ini bersifat inklusif.
+                ->whereDate('tanggal_mulai', '<=', today())
+                ->where(function ($q) {
+                    $q->whereNull('tanggal_berakhir')
+                        ->orWhereDate('tanggal_berakhir', '>=', today());
+                })
                 ->with([
                     'supervisor:id,nama_lengkap,jabatan_terakhir',
                     'supervisor.positionHistories' => fn ($positions) => $positions
@@ -149,13 +158,14 @@ class PimpinanEmployeeController extends Controller
         $unitKerjaOptions = RefUnitKerja::all();
         $eselonOptions = RefEselon::all();
         $jenjangOptions = RefJenjangPendidikan::orderBy('urutan')->get();
-
         $p = $employee;
 
-        return view('pimpinan.pegawai.show', compact('p'));
+        return view('pimpinan.pegawai.show', compact(
+            'p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions'
+        ));
     }
 
-    public function reportPage(ExportPegawaiRequest $request): mixed
+    public function reportPage(ExportPegawaiRequest $request, EmployeeExportDataService $exportData): mixed
     {
         $filters = $request->validated();
         $selectedColumns = (array) $request->query('columns', []);
@@ -164,10 +174,32 @@ class PimpinanEmployeeController extends Controller
             $selectedColumns = array_keys(PimpinanCustomEmployeeExportAction::ALLOWED_COLUMNS);
         }
 
+        $unitKerjaOptions = RefUnitKerja::query()->orderBy('nama')->get(['id', 'nama']);
+        $jenisPegawaiOptions = RefJenisPegawai::query()->orderBy('nama')->get(['id', 'nama']);
+        $jabatanOptions = RefJabatan::query()->orderBy('nama')->get(['id', 'nama']);
+
+        $perPage = (int) $request->query('per_page', 10);
+        $perPage = in_array($perPage, [10, 25, 50], true) ? $perPage : 10;
+        $page = max(1, (int) $request->query('page', 1));
+
+        $allRows = $exportData->rows($filters);
+        $previewData = new LengthAwarePaginator(
+            $allRows->forPage($page, $perPage)->values(),
+            $allRows->count(),
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
         return view('pimpinan.laporan.pegawai', [
             'filters' => $filters,
             'selectedColumns' => $selectedColumns,
             'allowedColumns' => PimpinanCustomEmployeeExportAction::ALLOWED_COLUMNS,
+            'unitKerjaOptions' => $unitKerjaOptions,
+            'jenisPegawaiOptions' => $jenisPegawaiOptions,
+            'jabatanOptions' => $jabatanOptions,
+            'pegawai' => $allRows->toArray(),
+            'previewData' => $previewData,
         ]);
     }
 

@@ -10,6 +10,7 @@ use App\Services\Notifications\NotificationChannelResolver;
 use App\Services\Notifications\NotificationRecipientResolver;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Collection as SupportCollection;
 
 class NotificationService
 {
@@ -27,18 +28,31 @@ class NotificationService
     public function createForEmployee(Employee $employee, string $type, string $title, string $body, ?array $data = null): ?SimpegNotification
     {
         $notification = null;
+        $additionalRecipients = $this->recipients->additionalRecipients($employee, $type, $data);
 
-        if ($this->channels->isEnabled('in_app')) {
-            $notification = SimpegNotification::create([
-                'user_id' => $employee->id,
-                'type' => $type,
-                'title' => $title,
-                'body' => $body,
-                'data' => $data,
-            ]);
+        if ($this->channels->isEnabledForEvent($type, 'in_app')) {
+            // EWS rutin perlu terlihat oleh pegawai dan Admin Kepegawaian tanpa menggandakan pegawai yang juga berperan admin.
+            $inAppRecipients = collect([$employee])
+                ->merge($additionalRecipients)
+                ->unique('id')
+                ->values();
+
+            foreach ($inAppRecipients as $recipient) {
+                $created = SimpegNotification::create([
+                    'user_id' => $recipient->id,
+                    'type' => $type,
+                    'title' => $title,
+                    'body' => $body,
+                    'data' => $data,
+                ]);
+
+                if ($recipient->id === $employee->id) {
+                    $notification = $created;
+                }
+            }
         }
 
-        $this->dispatchEmails($employee, $type, $title, $body, $data);
+        $this->dispatchEmails($employee, $additionalRecipients, $type, $title, $body, $data);
 
         return $notification;
     }
@@ -115,7 +129,7 @@ class NotificationService
                 ->first();
         }
 
-        $this->dispatchEmails($employee, $type, $title, $body, $data);
+        $this->dispatchEmails($employee, collect(), $type, $title, $body, $data);
 
         return $notification;
     }
@@ -139,10 +153,17 @@ class NotificationService
     /**
      * Menjadwalkan email untuk event yang aktif channel email tanpa mengubah kontrak in-app notification.
      *
+     * @param  SupportCollection<int, Employee>  $additionalRecipients
      * @param  array<string, mixed>|null  $data
      */
-    private function dispatchEmails(Employee $primaryRecipient, string $type, string $title, string $body, ?array $data): void
-    {
+    private function dispatchEmails(
+        Employee $primaryRecipient,
+        SupportCollection $additionalRecipients,
+        string $type,
+        string $title,
+        string $body,
+        ?array $data,
+    ): void {
         if (! $this->recipients->emailEnabled($type, $data)) {
             return;
         }
@@ -154,7 +175,7 @@ class NotificationService
         }
 
         $emailRecipients = $emailRecipients
-            ->merge($this->recipients->additionalRecipients($primaryRecipient, $type, $data))
+            ->merge($additionalRecipients)
             ->filter(fn (Employee $employee): bool => $employee->email !== null && $employee->email !== '')
             ->unique('id')
             ->values();

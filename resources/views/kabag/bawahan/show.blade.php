@@ -41,9 +41,15 @@
                     <p class="text-sm sm:text-base font-medium text-white/80 font-sans mt-2">NIP. {{ $employee->nip }} &middot; {{ $employee->jabatan_terakhir ?: '-' }}</p>
                 </div>
                 <div class="sm:ml-auto mt-2 sm:mt-0 bg-white rounded-full p-1 shadow-sm shrink-0 flex items-center justify-center w-max h-max">
-                    <x-ui.badge variant="success" size="md" pill dot="true">
-                        {{ $employee->statusPegawai?->nama ?? $employee->status_aktif ?? 'Status tidak tersedia' }}
-                    </x-ui.badge>
+                    @if($employee->sedang_dinas_luar ?? ($employee->status_aktif === 'dinas_luar'))
+                        <x-ui.badge variant="info" size="md" pill dot="true">Dinas Luar</x-ui.badge>
+                    @elseif($employee->sedang_cuti ?? false)
+                        <x-ui.badge variant="warning" size="md" pill dot="true">Cuti</x-ui.badge>
+                    @else
+                        <x-ui.badge variant="success" size="md" pill dot="true">
+                            {{ $employee->statusPegawai?->nama ?? $employee->status_aktif ?? 'Aktif' }}
+                        </x-ui.badge>
+                    @endif
                 </div>
             </div>
         </div>

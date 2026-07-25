@@ -121,14 +121,14 @@
                         @php
                             $stepVariant = match ($step->status) {
                                 'approved' => 'success',
-                                'rejected' => 'danger',
+                                'tidak_disetujui' => 'danger',
                                 'active' => $status === 'ditangguhkan' ? 'warning' : 'warning',
                                 'skipped' => 'muted',
                                 default => 'muted',
                             };
                             $stepTitle = match ($step->status) {
                                 'approved' => "Disetujui oleh {$step->role_label}",
-                                'rejected' => "Tidak disetujui oleh {$step->role_label}",
+                                'tidak_disetujui' => "Tidak Disetujui oleh {$step->role_label}",
                                 'active' => $status === 'ditangguhkan' ? "Ditangguhkan oleh {$step->role_label}" : "Menunggu {$step->role_label}",
                                 'skipped' => "Dilewati: {$step->role_label}",
                                 default => "Menunggu {$step->role_label}",
@@ -158,14 +158,14 @@
                                 @php
                                     $actionVariant = match ($approval->action) {
                                         'APPROVE' => 'success',
-                                        'REJECT', 'REQUEST_CHANGES' => 'danger',
+                                        'NOT_APPROVED', 'REQUEST_CHANGES' => 'danger',
                                         default => 'warning',
                                     };
                                     $actionLabel = match ($approval->action) {
                                         'APPROVE' => 'Setuju',
                                         'POSTPONE' => 'Tunda',
                                         'REQUEST_CHANGES' => 'Perubahan',
-                                        'REJECT' => 'Tidak Disetujui',
+                                        'NOT_APPROVED' => 'Tidak Disetujui',
                                         'SKIP' => 'Dilewati',
                                         default => $approval->action,
                                     };
@@ -257,7 +257,7 @@
                     @foreach ([
                         'postpone' => ['route' => 'cuti.postpone', 'label' => 'Alasan Penundaan', 'title' => 'Tunda Pengajuan', 'variant' => 'warning'],
                         'requestChanges' => ['route' => 'cuti.request-changes', 'label' => 'Catatan Perubahan', 'title' => 'Minta Perubahan', 'variant' => 'danger'],
-                        'reject' => ['route' => 'cuti.reject', 'label' => 'Alasan Penolakan', 'title' => 'Tidak Setujui', 'variant' => 'danger'],
+                        'decline' => ['route' => 'cuti.decline', 'label' => 'Alasan Tidak Disetujui', 'title' => 'Tidak Disetujui', 'variant' => 'danger'],
                     ] as $formKey => $form)
                     <div x-show="decisionForm === '{{ $formKey }}'" x-cloak
                         role="dialog" aria-modal="true" aria-labelledby="decision-title-{{ $formKey }}"
@@ -304,7 +304,7 @@
                         <button type="button" class="{{ $buttonStyles['danger'] }}" @click="open('requestChanges', $event)">
                             Perlu Perubahan
                         </button>
-                        <button type="button" class="{{ $buttonStyles['danger'] }}" @click="open('reject', $event)">
+                        <button type="button" class="{{ $buttonStyles['danger'] }}" @click="open('decline', $event)">
                             Tidak Setujui
                         </button>
                         <form action="{{ route('cuti.approve', $cuti->id) }}" method="POST" class="inline">

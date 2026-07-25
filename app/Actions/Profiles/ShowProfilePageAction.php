@@ -32,7 +32,7 @@ class ShowProfilePageAction
             $leaveBalance = LeaveBalance::query()
                 ->where('employee_id', $employee->id)
                 ->where('tahun', $year)
-                ->value('sisa');
+                ->first();
         }
 
         return [
@@ -59,25 +59,18 @@ class ShowProfilePageAction
         ];
     }
 
+    // Estimasi pangkat dan KGB memakai snapshot kalkulator tersimpan, bukan rumus ulang dari riwayat.
     private function estimateNextRankDate($employee): string
     {
-        $latestRankDate = $employee?->latestRank()?->tmt_pangkat;
-
-        return $latestRankDate
-            ? Carbon::parse($latestRankDate)->addYears(4)->format('d-m-Y')
+        return $employee?->tanggal_kenaikan_pangkat_berikutnya
+            ? Carbon::parse($employee->tanggal_kenaikan_pangkat_berikutnya)->format('d-m-Y')
             : '-';
     }
 
     private function estimateNextKgbDate($employee): string
     {
-        if ($employee?->tanggal_kgb_berikutnya) {
-            return Carbon::parse($employee->tanggal_kgb_berikutnya)->format('d-m-Y');
-        }
-
-        $latestSalaryDate = $employee?->latestSalary()?->tmt_kgb;
-
-        return $latestSalaryDate
-            ? Carbon::parse($latestSalaryDate)->addYears(2)->format('d-m-Y')
+        return $employee?->tanggal_kgb_berikutnya
+            ? Carbon::parse($employee->tanggal_kgb_berikutnya)->format('d-m-Y')
             : '-';
     }
 

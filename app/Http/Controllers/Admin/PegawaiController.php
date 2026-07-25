@@ -15,6 +15,7 @@ use App\Actions\Employees\UpdateEmployeeAction;
 use App\Actions\Employees\UpdateEmployeePerformanceFlagAction;
 use App\Actions\Employees\UpdateEmployeeSatyalancanaEligibilityAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Employee\AssignSupervisorRequest;
 use App\Http\Requests\Employee\StoreEmployeeRequest;
 use App\Http\Requests\Employee\UpdateEmployeePerformanceFlagRequest;
 use App\Http\Requests\Employee\UpdateEmployeeRequest;
@@ -37,6 +38,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PegawaiController extends Controller
@@ -318,6 +320,9 @@ class PegawaiController extends Controller
         }
     }
 
+    /**
+     * Menyiapkan detail pegawai dan Kepala Bagian aktif sekali agar Blade tidak menambah query saat render.
+     */
     public function show($id)
     {
         $p = Employee::with([
@@ -333,7 +338,7 @@ class PegawaiController extends Controller
             'statusKawin',
             'jenisPegawai',
             'statusPegawai',
-            'supervisorAssignments.supervisor',
+            'supervisorAssignments.supervisor.positionHistories' => fn ($query) => $query->where('is_latest', true),
         ])->findOrFail($id);
 
         $golonganOptions = RefGolongan::all();
@@ -347,7 +352,23 @@ class PegawaiController extends Controller
             ? $p->tanggal_lahir->copy()->addYears($bupPensiunYears)
             : null;
 
-        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions', 'estimasiTanggalPensiun'));
+        $currentSupervisor = $p->supervisorAssignments
+            ->filter(fn ($assignment): bool => $assignment->tanggal_mulai->lte(today())
+                && ($assignment->tanggal_berakhir === null || $assignment->tanggal_berakhir->gte(today())))
+            ->sortByDesc('tanggal_mulai')
+            ->first();
+        $currentSupervisorPosition = $currentSupervisor?->supervisor?->positionHistories
+            ->where('is_latest', true)
+            ->sortByDesc('tmt_jabatan')
+            ->first();
+        $oldSupervisorId = old('kepala_bagian_id');
+        $selectedSupervisor = is_string($oldSupervisorId) && Str::isUuid($oldSupervisorId)
+            ? Employee::query()->select(['id', 'nama_lengkap', 'nip'])->find($oldSupervisorId)
+            : null;
+        $selectedSupervisorId = $selectedSupervisor?->id ?? $currentSupervisor?->supervisor?->id;
+        $selectedSupervisorName = $selectedSupervisor?->nama_lengkap ?? $currentSupervisor?->supervisor?->nama_lengkap;
+
+        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions', 'estimasiTanggalPensiun', 'currentSupervisor', 'currentSupervisorPosition', 'selectedSupervisorId', 'selectedSupervisorName'));
     }
 
     public function edit($id, PrepareEmployeeEditFormDataAction $action)
@@ -577,23 +598,32 @@ class PegawaiController extends Controller
         return $action->execute($request);
     }
 
-    public function assignAtasan(Request $request, $id, AssignSupervisorAction $action)
+    /**
+     * Menyimpan perubahan Kepala Bagian dan mempertahankan pilihan form bila aturan histori menolak perubahan.
+     */
+    public function assignAtasan(AssignSupervisorRequest $request, $id, AssignSupervisorAction $action)
     {
-        $request->validate([
-            'kepala_bagian_id' => 'nullable|uuid|exists:employees,id',
-            'supervisor_id' => 'nullable|uuid|exists:employees,id',
-        ]);
-
         $employee = Employee::findOrFail($id);
+        $data = $request->validated();
 
         try {
-            $action->execute($employee, $request->input('kepala_bagian_id', $request->input('supervisor_id')), $request);
+            $action->execute(
+                $employee,
+                $data['kepala_bagian_id'] ?? $data['supervisor_id'] ?? null,
+                $data['effective_date'],
+                $request,
+            );
 
             return redirect()->route('pegawai.show', $id)
                 ->with('success', 'Kepala bagian untuk '.$employee->nama_lengkap.' berhasil diperbarui.')
                 ->with('employee_data_changed', true);
+        } catch (ValidationException $e) {
+            return redirect()->route('pegawai.show', $id)
+                ->withInput()
+                ->withErrors($e->errors());
         } catch (\Exception $e) {
             return redirect()->route('pegawai.show', $id)
+                ->withInput()
                 ->with('error', 'Gagal memperbarui kepala bagian: '.$e->getMessage());
         }
     }

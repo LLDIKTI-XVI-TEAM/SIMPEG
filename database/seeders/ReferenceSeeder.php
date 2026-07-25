@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\NotificationEventChannel;
 use App\Models\RefAgama;
 use App\Models\RefBup;
 use App\Models\RefEselon;
@@ -241,6 +242,48 @@ class ReferenceSeeder extends Seeder
             ['code' => 'whatsapp_business', 'name' => 'WhatsApp Business', 'is_enabled' => false, 'config' => null],
         ] as $channel) {
             RefNotificationChannel::firstOrCreate(['code' => $channel['code']], $channel);
+        }
+
+        $supportedNotificationEvents = [
+            'cuti.pengajuan_baru',
+            'cuti.menunggu_persetujuan',
+            'cuti.disetujui',
+            'cuti.ditunda',
+            'cuti.perlu_perubahan',
+            'cuti.tidak_disetujui',
+            'ews.kenaikan_pangkat',
+            'ews.kgb',
+            'ews.pensiun',
+            'ews.kontrak_pppk',
+            'ews.satyalancana',
+        ];
+        $notificationChannels = RefNotificationChannel::query()
+            ->whereIn('code', ['in_app', 'email'])
+            ->get();
+
+        // Default pasangan aktif hanya dibuat sekali agar pilihan operator tetap terjaga saat seeder dijalankan ulang.
+        foreach ($supportedNotificationEvents as $eventKey) {
+            foreach ($notificationChannels as $channel) {
+                NotificationEventChannel::firstOrCreate(
+                    [
+                        'event_key' => $eventKey,
+                        'notification_channel_id' => $channel->id,
+                    ],
+                    ['is_enabled' => true],
+                );
+            }
+        }
+
+        // Kegagalan scheduler adalah alert operasional terpisah; in-app mempertahankan perilaku lama tanpa mengada-adakan email.
+        $inAppChannel = $notificationChannels->firstWhere('code', 'in_app');
+        if ($inAppChannel !== null) {
+            NotificationEventChannel::firstOrCreate(
+                [
+                    'event_key' => 'ews.scheduler_failed',
+                    'notification_channel_id' => $inAppChannel->id,
+                ],
+                ['is_enabled' => true],
+            );
         }
     }
 }

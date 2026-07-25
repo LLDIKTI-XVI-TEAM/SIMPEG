@@ -287,13 +287,14 @@
                             @php
                                 $stepStatus = match ($step->status) {
                                     'approved' => ['label' => 'Disetujui', 'variant' => 'success'],
+                                    'tidak_disetujui' => ['label' => 'Tidak Disetujui', 'variant' => 'danger'],
                                     'active' => ['label' => 'Menunggu Keputusan', 'variant' => 'warning'],
                                     'skipped' => ['label' => 'Dilewati', 'variant' => 'muted'],
                                     default => ['label' => ucfirst($step->status), 'variant' => 'info'],
                                 };
                             @endphp
                             <x-ui.timeline-item
-                                variant="{{ $step->status == 'active' ? 'warning' : ($step->status == 'approved' ? 'success' : 'muted') }}"
+                                variant="{{ $stepStatus['variant'] }}"
                                 title="Tahap {{ $step->step_order }} · {{ $step->role_label }}"
                                 description="{{ $step->approver?->nama_lengkap ?? 'Approver tidak tersedia' }}"
                                 pulse="{{ $step->status == 'active' }}">

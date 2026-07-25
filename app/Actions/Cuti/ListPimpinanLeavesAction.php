@@ -16,7 +16,14 @@ class ListPimpinanLeavesAction
      */
     public function execute(User $user, array $filters): array
     {
-        $query = LeaveRequest::query()->with(['employee', 'jenisCuti', 'steps']);
+        $query = LeaveRequest::query()->with([
+            'employee',
+            'jenisCuti',
+            'steps' => fn ($steps) => $steps
+                ->select(['id', 'leave_request_id', 'role_label', 'status', 'step_order'])
+                ->where('status', 'active')
+                ->orderBy('step_order'),
+        ]);
 
         // Base query untuk counter statistik
         $baseQuery = clone $query;
@@ -59,9 +66,9 @@ class ListPimpinanLeavesAction
         $perPage = (int) request('per_page', 10);
         $paginator = $query->latest()->paginate($perPage)->withQueryString();
 
-        // Pimpinan needs activeStep for the table
-        $paginator->getCollection()->transform(function (LeaveRequest $r) {
-            $r->activeStep = $r->steps->firstWhere('status', 'active');
+        $paginator->getCollection()->transform(function (LeaveRequest $r): LeaveRequest {
+            // Label memakai snapshot pengajuan, bukan nama approver atau konfigurasi terkini.
+            $r->setAttribute('current_step_label', $r->steps->first()?->role_label);
 
             return $r;
         });

@@ -82,18 +82,31 @@ class PimpinanLeaveDetailTest extends TestCase
             'komentar' => 'Menunggu konfirmasi jadwal.',
             'acted_at' => '2026-07-02 11:45:00',
         ]);
+        LeaveApproval::create([
+            'leave_request_id' => $leave->id,
+            'approver_id' => $approver->id,
+            'stage' => 1,
+            'action' => 'NOT_APPROVED',
+            'komentar' => 'Dokumen baru tidak memenuhi persyaratan.',
+            'acted_at' => '2026-07-03 09:15:00',
+        ]);
+        $response = $this->actingAs($this->pimpinan())
+            ->get(route('pimpinan.cuti.show', $leave));
 
-        $this->actingAs($this->pimpinan())
-            ->get(route('pimpinan.cuti.show', $leave))
+        $response
             ->assertOk()
             ->assertSee('Riwayat Tindakan Resmi')
             ->assertSee('Perubahan')
             ->assertSee('Ditangguhkan')
+            ->assertDontSee('Ditolak')
             ->assertSee('Lengkapi surat pendukung.')
             ->assertSee('Menunggu konfirmasi jadwal.')
+            ->assertSee('Dokumen baru tidak memenuhi persyaratan.')
             ->assertSee('01 Jul 2026 10:30')
             ->assertSee('02 Jul 2026 11:45')
             ->assertSee('Pejabat Cuti');
+
+        $response->assertSee('Tidak Disetujui');
     }
 
     public function test_detail_only_exposes_attachment_through_an_authorized_route_when_file_exists(): void

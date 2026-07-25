@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\CutiEmployeeLookupController;
 use App\Http\Controllers\Admin\CutiReportController;
 use App\Http\Controllers\Admin\DokumenController;
 use App\Http\Controllers\Admin\EmployeeImportController;
+use App\Http\Controllers\Admin\EmployeeSupervisorLookupController;
 use App\Http\Controllers\Admin\EwsConfigController;
 use App\Http\Controllers\Admin\EwsController;
 use App\Http\Controllers\Admin\GlobalSearchController;
@@ -274,15 +275,15 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
             'statusList' => $statusList,
             'title' => 'Laporan - Export Pegawai',
         ]);
-    })->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+    })->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('laporan.pegawai');
 
     Route::get('/laporan/export-pegawai/excel', [LaporanController::class, 'exportPegawaiExcel'])
-        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+        ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('laporan.pegawai.excel');
 
     Route::post('/laporan/export-pegawai/custom', [LaporanController::class, 'exportPegawaiCustom'])
-        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+        ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('laporan.pegawai.custom');
     Route::get('/pegawai', [PegawaiController::class, 'index'])
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
@@ -301,6 +302,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
         ->name('pegawai.edit');
+    Route::get('/pegawai/{id}/cari-kepala-bagian', EmployeeSupervisorLookupController::class)
+        ->whereUuid('id')
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update', 'throttle:60,1'])
+        ->name('pegawai.supervisor-lookup');
     Route::post('/pegawai/{id}', [PegawaiController::class, 'update'])
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
@@ -333,7 +338,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->name('pegawai.riwayat.store');
     Route::post('/pegawai/{id}/assign-atasan', [PegawaiController::class, 'assignAtasan'])
         ->whereUuid('id')
-        ->middleware(['role:super_admin', 'permission:employees.update'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
         ->name('pegawai.assign-atasan');
 
     Route::get('/dashboard/cuti/saldo', [LeaveBalanceController::class, 'showMyBalanceWeb'])
@@ -402,9 +407,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin,pimpinan,kepala_bagian,admin_kepegawaian,pegawai'])
         ->name('cuti.request-changes')
         ->whereUuid('id');
-    Route::post('/cuti/{id}/reject', [CutiController::class, 'reject'])
+    Route::post('/cuti/{id}/decline', [CutiController::class, 'decline'])
         ->middleware(['role:super_admin,pimpinan,kepala_bagian,admin_kepegawaian,pegawai'])
-        ->name('cuti.reject')
+        ->name('cuti.decline')
         ->whereUuid('id');
     Route::get('/dashboard/cuti/{id}', [CutiController::class, 'show'])
         ->name('cuti.show')
@@ -525,6 +530,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->prefix('pimpinan')
         ->name('pimpinan.')
         ->group(function () {
+            Route::get('/', fn () => redirect()->route('pimpinan.dashboard'));
             Route::get('/dashboard', [PimpinanDashboardController::class, 'index'])->name('dashboard');
 
             Route::get('/pegawai', [PimpinanEmployeeController::class, 'index'])->name('pegawai.index');
@@ -565,6 +571,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->prefix('kepala-bagian')
         ->name('kepala-bagian.')
         ->group(function (): void {
+            Route::get('/', fn () => redirect()->route('kepala-bagian.dashboard'));
             Route::get('/dashboard', [KepalaBagianDashboardController::class, 'index'])->name('dashboard');
 
             Route::get('/bawahan', [KepalaBagianEmployeeController::class, 'index'])->name('bawahan.index');

@@ -16,8 +16,8 @@ class KepalaBagianEmployeeFilterRequest extends FormRequest
     {
         return [
             'search' => ['nullable', 'string', 'max:100'],
-            'status' => ['nullable', Rule::in(['aktif', 'cuti'])],
-            'per_page' => ['nullable', 'integer', Rule::in([10, 25, 50, 100])],
+            'status' => ['nullable', Rule::in(['aktif', 'cuti', 'dinas_luar'])],
+            'per_page' => ['nullable', 'integer', Rule::in([10, 25, 50])],
             'golongan' => ['nullable', 'string', Rule::in(['I', 'II', 'III', 'IV'])],
             'unit_kerja_id' => ['nullable', 'exists:ref_unit_kerja,id'],
             'jenis_pegawai_id' => ['nullable', 'exists:ref_jenis_pegawai,id'],

@@ -253,7 +253,7 @@ class LeaveProofService
 
         return match ($statusStr) {
             'approved' => [$statusStr, 'Disetujui'],
-            'rejected' => [$statusStr, 'Ditolak'],
+            'tidak_disetujui' => [$statusStr, 'Tidak Disetujui'],
             'pending' => [$statusStr, 'Menunggu'],
             default => [$statusStr, ucfirst($statusStr)],
         };

@@ -12,6 +12,7 @@ use App\Models\SupervisorAssignment;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class PimpinanEmployeeDetailTest extends TestCase
@@ -128,5 +129,68 @@ class PimpinanEmployeeDetailTest extends TestCase
             ->assertDontSee('Tambah Keluarga')
             ->assertDontSee('Edit Keluarga')
             ->assertDontSee('Hapus Keluarga');
+    }
+
+    public function test_detail_pimpinan_hanya_menampilkan_assignment_efektif_current(): void
+    {
+        Carbon::setTestNow('2026-07-23 08:00:00');
+
+        try {
+            $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Assignment Efektif']);
+            $currentSupervisor = Employee::factory()->create(['nama_lengkap' => 'Supervisor Aktif Saat Ini']);
+            $futureSupervisor = Employee::factory()->create(['nama_lengkap' => 'Supervisor Mendatang']);
+
+            // Current: sudah dimulai dan belum berakhir -> wajib tampil.
+            SupervisorAssignment::create([
+                'employee_id' => $employee->id,
+                'supervisor_id' => $currentSupervisor->id,
+                'kepala_bagian_id' => $currentSupervisor->id,
+                'tanggal_mulai' => today()->subDays(5)->toDateString(),
+                'tanggal_berakhir' => null,
+            ]);
+
+            // Future open-ended: belum dimulai -> tidak boleh dianggap current.
+            SupervisorAssignment::create([
+                'employee_id' => $employee->id,
+                'supervisor_id' => $futureSupervisor->id,
+                'kepala_bagian_id' => $futureSupervisor->id,
+                'tanggal_mulai' => today()->addDays(10)->toDateString(),
+                'tanggal_berakhir' => null,
+            ]);
+
+            $this->actingAs(User::factory()->pimpinan()->create())
+                ->get(route('pimpinan.pegawai.show', $employee))
+                ->assertOk()
+                ->assertSee('Supervisor Aktif Saat Ini')
+                ->assertDontSee('Supervisor Mendatang');
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_detail_pimpinan_memasukkan_assignment_yang_berakhir_hari_ini(): void
+    {
+        Carbon::setTestNow('2026-07-23 08:00:00');
+
+        try {
+            $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Assignment Berakhir Hari Ini']);
+            $supervisor = Employee::factory()->create(['nama_lengkap' => 'Supervisor Berakhir Hari Ini']);
+
+            // tanggal_berakhir = hari ini bersifat inklusif -> masih tampil.
+            SupervisorAssignment::create([
+                'employee_id' => $employee->id,
+                'supervisor_id' => $supervisor->id,
+                'kepala_bagian_id' => $supervisor->id,
+                'tanggal_mulai' => today()->subDays(3)->toDateString(),
+                'tanggal_berakhir' => today()->toDateString(),
+            ]);
+
+            $this->actingAs(User::factory()->pimpinan()->create())
+                ->get(route('pimpinan.pegawai.show', $employee))
+                ->assertOk()
+                ->assertSee('Supervisor Berakhir Hari Ini');
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 }

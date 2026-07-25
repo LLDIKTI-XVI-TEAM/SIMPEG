@@ -3,8 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\PositionHistory;
+use App\Models\RankHistory;
 use App\Models\RefJenisPegawai;
+use App\Models\SalaryHistory;
 use App\Models\User;
+use App\Services\Employees\TmtCalculatorService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -225,6 +229,51 @@ class EmployeeImportTest extends TestCase
             ->assertSeeText('III/b')
             ->assertSeeText('Penata Muda Tingkat I')
             ->assertSeeText('8');
+    }
+
+    public function test_import_wizard_persists_data_utama_snapshots_without_histories_or_tmt_calculation(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile([$this->validRows()[0]]),
+        ]);
+
+        $upload->assertOk();
+        $batchId = $upload->json('batch_id');
+
+        $validation = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", []);
+        $validation->assertOk();
+        $validation->assertJsonPath('valid_count', 1);
+        $validation->assertJsonPath('error_count', 0);
+
+        $this->mock(TmtCalculatorService::class)
+            ->shouldNotReceive('syncForEmployee');
+
+        $execute = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", []);
+        $execute->assertOk();
+        $execute->assertJsonPath('status', 'queued');
+
+        $status = $this->getJson("/api/pegawai/import/{$batchId}/status");
+        $status->assertOk();
+        $status->assertJsonPath('status', 'completed');
+        $status->assertJsonPath('result.inserted', 1);
+        $status->assertJsonPath('result.failed', 0);
+
+        $employee = Employee::where('nip', '198001012006041001')->firstOrFail();
+
+        $this->assertSame('III/a', $employee->golongan_terakhir);
+        $this->assertSame('Penata Muda', $employee->pangkat_terakhir);
+        $this->assertSame('Analis Kepegawaian', $employee->jabatan_terakhir);
+        $this->assertSame('7', $employee->kelas_jabatan_terakhir);
+        $this->assertSame('S1', $employee->pendidikan_terakhir);
+        $this->assertSame('Manajemen', $employee->prodi_pendidikan_terakhir);
+        $this->assertSame('2038-01-01', $employee->tanggal_pensiun?->format('Y-m-d'));
+        $this->assertSame(0, RankHistory::where('employee_id', $employee->id)->count());
+        $this->assertSame(0, PositionHistory::where('employee_id', $employee->id)->count());
+        $this->assertSame(0, SalaryHistory::where('employee_id', $employee->id)->count());
     }
 
     public function test_import_wizard_realigns_old_template_rows_without_nik_and_no_kk_values(): void

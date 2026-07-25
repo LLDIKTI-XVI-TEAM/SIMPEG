@@ -7,7 +7,10 @@ use App\Models\Employee;
 use App\Models\EmployeeFamily;
 use App\Models\EwsAlert;
 use App\Models\LeaveBalance;
+use App\Models\RankHistory;
+use App\Models\RefGolongan;
 use App\Models\RefJenjangPendidikan;
+use App\Models\SalaryHistory;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
@@ -49,7 +52,7 @@ class ProfileTest extends TestCase
         $response->assertSee('7', false);
     }
 
-    public function test_profile_does_not_show_fake_default_leave_balance_when_missing(): void
+    public function test_profile_shows_fallback_default_leave_balance_when_missing(): void
     {
         $employee = Employee::factory()->create();
         $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
@@ -58,8 +61,8 @@ class ProfileTest extends TestCase
         $response = $this->get('/dashboard/profil?tab=cuti');
 
         $response->assertOk();
-        $response->assertSee('Belum tersedia', false);
-        $response->assertDontSee('12 <span class="text-sm font-normal text-muted">Hari</span>', false);
+        $response->assertDontSee('Belum tersedia', false);
+        $response->assertSee('12 <span class="text-sm font-normal text-muted">Hari</span>', false);
     }
 
     public function test_profile_ews_section_uses_real_alerts_not_mock(): void
@@ -97,6 +100,40 @@ class ProfileTest extends TestCase
         $response->assertOk();
         $response->assertSee('15-05-2042', false);
         $response->assertDontSee('01-01-2028', false);
+    }
+
+    public function test_profile_uses_persisted_tmt_and_kgb_snapshots_instead_of_history_fallbacks(): void
+    {
+        $employee = Employee::factory()->create([
+            'tanggal_kenaikan_pangkat_berikutnya' => '2031-06-15',
+            'tanggal_kgb_berikutnya' => null,
+        ]);
+        $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+        $golongan = RefGolongan::where('kode', 'III/a')->firstOrFail();
+
+        RankHistory::create([
+            'employee_id' => $employee->id,
+            'golongan_id' => $golongan->id,
+            'tmt_pangkat' => '2026-01-01',
+            'no_sk' => 'SK-RANK-PROFILE',
+            'tanggal_sk' => '2026-01-10',
+            'is_latest' => true,
+        ]);
+        SalaryHistory::create([
+            'employee_id' => $employee->id,
+            'tmt_kgb' => '2026-03-01',
+            'gaji_pokok' => 4500000,
+            'no_sk' => 'SK-KGB-PROFILE',
+            'tanggal_sk' => '2026-03-10',
+            'is_latest' => true,
+        ]);
+
+        $response = $this->actingAs($user)->get('/dashboard/profil');
+
+        $response->assertOk();
+        $response->assertSee('15-06-2031', false);
+        $response->assertDontSee('01-01-2030', false);
+        $response->assertDontSee('01-03-2028', false);
     }
 
     public function test_profile_renders_family_and_education_as_read_only_data(): void

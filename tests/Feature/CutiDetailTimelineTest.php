@@ -119,7 +119,9 @@ class CutiDetailTimelineTest extends TestCase
             ->assertOk()
             ->assertSee('role="dialog"', false)
             ->assertSee('@keydown.escape.window="close()"', false)
-            ->assertSee("@click=\"open('postpone', \$event)\"", false);
+            ->assertSee("@click=\"open('postpone', \$event)\"", false)
+            ->assertSee("@click=\"open('decline', \$event)\"", false)
+            ->assertDontSee("@click=\"open('reject', \$event)\"", false);
     }
 
     public function test_active_approver_actions_wrap_on_small_screens(): void
@@ -155,5 +157,75 @@ class CutiDetailTimelineTest extends TestCase
             ->get(route('cuti.show', $leaveRequest->id))
             ->assertOk()
             ->assertSee('flex-wrap justify-end gap-3', false);
+    }
+
+    public function test_detail_timeline_menampilkan_status_tidak_disetujui(): void
+    {
+        $viewer = User::factory()->superAdmin()->create();
+        $jenis = RefJenisCuti::create([
+            'nama' => 'Cuti Sakit',
+            'code' => 'cuti-sakit-timeline-decline',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+        $leaveRequest = LeaveRequest::create([
+            'employee_id' => Employee::factory()->create()->id,
+            'jenis_cuti_id' => $jenis->id,
+            'tanggal_mulai' => '2026-08-10',
+            'tanggal_selesai' => '2026-08-10',
+            'jumlah_hari_kerja' => 1,
+            'alasan' => 'Uji label keputusan tidak disetujui.',
+            'status' => 'tidak_disetujui',
+        ]);
+        $approver = Employee::factory()->create();
+
+        $leaveRequest->steps()->create([
+            'step_order' => 1,
+            'step_type' => 'verifikator',
+            'role_label' => 'Verifikator Baru',
+            'approver_employee_id' => $approver->id,
+            'status' => 'tidak_disetujui',
+            'is_final' => true,
+            'decision_note' => 'Dokumen pendukung tidak sesuai.',
+            'acted_at' => now(),
+        ]);
+
+        $response = $this->actingAs($viewer)->get(route('cuti.show', $leaveRequest->id));
+
+        $response
+            ->assertOk()
+            ->assertSee('Tidak Disetujui oleh Verifikator Baru')
+            ->assertDontSee('Verifikator Legacy')
+            ->assertDontSee('Ditolak');
+    }
+
+    public function test_file_domain_cuti_tidak_memuat_token_keputusan_legacy(): void
+    {
+        // Literal berkutip mencegah false positive dari method, identifier, dan prosa.
+        $files = [
+            'app/Services/Cuti/LeaveProofService.php',
+            'resources/views/admin/cuti/show.blade.php',
+            'resources/views/pimpinan/cuti/show.blade.php',
+            'resources/views/kabag/cuti/show.blade.php',
+        ];
+        $forbiddenTokens = [
+            "'rejected'" => 'status legacy single-quoted',
+            '"rejected"' => 'status legacy double-quoted',
+            "'REJECT'" => 'action legacy single-quoted',
+            '"REJECT"' => 'action legacy double-quoted',
+        ];
+
+        foreach ($files as $relativePath) {
+            $contents = file_get_contents(base_path($relativePath));
+            $this->assertNotFalse($contents, "Gagal membaca file domain cuti: {$relativePath}");
+
+            foreach ($forbiddenTokens as $token => $description) {
+                $this->assertStringNotContainsString(
+                    $token,
+                    $contents,
+                    "File {$relativePath} masih memuat {$description}: {$token}.",
+                );
+            }
+        }
     }
 }

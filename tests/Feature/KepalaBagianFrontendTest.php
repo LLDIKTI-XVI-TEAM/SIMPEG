@@ -116,6 +116,43 @@ class KepalaBagianFrontendTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_leave_index_defaults_to_menunggu_approval_status(): void
+    {
+        [$user, $kepalaBagian] = $this->kepalaBagian();
+        $pendingReport = Employee::factory()->create([
+            'nama_lengkap' => 'Pemohon Menunggu',
+            'kepala_bagian_id' => $kepalaBagian->id,
+        ]);
+        $approvedReport = Employee::factory()->create([
+            'nama_lengkap' => 'Pemohon Disetujui',
+            'kepala_bagian_id' => $kepalaBagian->id,
+        ]);
+
+        $pendingLeave = $this->leaveWithActiveStep($pendingReport, $kepalaBagian);
+
+        $approvedLeave = LeaveRequest::create([
+            'employee_id' => $approvedReport->id,
+            'jenis_cuti_id' => $pendingLeave->jenis_cuti_id,
+            'tanggal_mulai' => '2026-06-01',
+            'tanggal_selesai' => '2026-06-02',
+            'jumlah_hari_kerja' => 2,
+            'alasan' => 'Sudah disetujui sebelumnya.',
+            'status' => 'disetujui',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.cuti.index'))
+            ->assertOk()
+            ->assertSee('Pemohon Menunggu')
+            ->assertDontSee('Pemohon Disetujui');
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.cuti.index', ['status' => 'all']))
+            ->assertOk()
+            ->assertSee('Pemohon Menunggu')
+            ->assertSee('Pemohon Disetujui');
+    }
+
     public function test_kepala_bagian_decision_uses_leave_workflow_and_requires_note_when_needed(): void
     {
         [$user, $kepalaBagian] = $this->kepalaBagian();
@@ -151,6 +188,36 @@ class KepalaBagianFrontendTest extends TestCase
             'auditable_type' => 'LeaveRequest',
             'auditable_id' => $leave->id,
         ]);
+    }
+
+    public function test_detail_cuti_bawahan_menampilkan_status_tidak_disetujui(): void
+    {
+        [$user, $kepalaBagian] = $this->kepalaBagian();
+        $directReport = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $leave = $this->leaveWithActiveStep($directReport, $kepalaBagian);
+        $leave->forceFill(['status' => 'tidak_disetujui'])->save();
+        $leave->steps()->delete();
+
+        LeaveRequestStep::create([
+            'leave_request_id' => $leave->id,
+            'step_order' => 1,
+            'step_type' => 'kepala_bagian',
+            'role_label' => 'Kepala Bagian Baru',
+            'approver_employee_id' => $kepalaBagian->id,
+            'status' => 'tidak_disetujui',
+            'is_final' => true,
+            'acted_at' => now(),
+        ]);
+
+        $response = $this->actingAs($user)->get(route('kepala-bagian.cuti.show', $leave));
+
+        $response
+            ->assertOk()
+            ->assertSeeInOrder(['Kepala Bagian Baru', 'Tidak Disetujui'])
+            ->assertDontSee('Kepala Bagian Legacy')
+            ->assertDontSee('Ditolak')
+            ->assertDontSee('Rejected');
+        $this->assertGreaterThanOrEqual(1, substr_count($response->getContent(), 'border-danger'));
     }
 
     public function test_ews_page_only_exposes_alerts_for_direct_reports(): void
