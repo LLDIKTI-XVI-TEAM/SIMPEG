@@ -6,7 +6,10 @@ use App\Http\Controllers\Admin\CutiController;
 use App\Http\Controllers\Admin\CutiEmployeeLookupController;
 use App\Http\Controllers\Admin\CutiReportController;
 use App\Http\Controllers\Admin\DataMasterEselonController;
+use App\Http\Controllers\Admin\DataMasterGolonganController;
+use App\Http\Controllers\Admin\DataMasterJenisJabatanController;
 use App\Http\Controllers\Admin\DataMasterJenjangPendidikanController;
+use App\Http\Controllers\Admin\DataMasterStatusPegawaiController;
 use App\Http\Controllers\Admin\DokumenController;
 use App\Http\Controllers\Admin\EmployeeImportController;
 use App\Http\Controllers\Admin\EmployeeSupervisorLookupController;
@@ -213,6 +216,30 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
             ->whereUuid('jenjang')->name('jenjang-pendidikan.toggle');
         Route::post('/jenjang-pendidikan/{jenjang}/destroy', [DataMasterJenjangPendidikanController::class, 'destroy'])
             ->whereUuid('jenjang')->name('jenjang-pendidikan.destroy');
+
+        Route::post('/golongan', [DataMasterGolonganController::class, 'store'])->name('golongan.store');
+        Route::post('/golongan/{golongan}/update', [DataMasterGolonganController::class, 'update'])
+            ->whereUuid('golongan')->name('golongan.update');
+        Route::post('/golongan/{golongan}/toggle-aktif', [DataMasterGolonganController::class, 'toggle'])
+            ->whereUuid('golongan')->name('golongan.toggle');
+        Route::post('/golongan/{golongan}/destroy', [DataMasterGolonganController::class, 'destroy'])
+            ->whereUuid('golongan')->name('golongan.destroy');
+
+        Route::post('/jenis-jabatan', [DataMasterJenisJabatanController::class, 'store'])->name('jenis-jabatan.store');
+        Route::post('/jenis-jabatan/{jenisJabatan}/update', [DataMasterJenisJabatanController::class, 'update'])
+            ->whereUuid('jenisJabatan')->name('jenis-jabatan.update');
+        Route::post('/jenis-jabatan/{jenisJabatan}/toggle-aktif', [DataMasterJenisJabatanController::class, 'toggle'])
+            ->whereUuid('jenisJabatan')->name('jenis-jabatan.toggle');
+        Route::post('/jenis-jabatan/{jenisJabatan}/destroy', [DataMasterJenisJabatanController::class, 'destroy'])
+            ->whereUuid('jenisJabatan')->name('jenis-jabatan.destroy');
+
+        Route::post('/status-pegawai', [DataMasterStatusPegawaiController::class, 'store'])->name('status-pegawai.store');
+        Route::post('/status-pegawai/{statusPegawai}/update', [DataMasterStatusPegawaiController::class, 'update'])
+            ->whereUuid('statusPegawai')->name('status-pegawai.update');
+        Route::post('/status-pegawai/{statusPegawai}/toggle-aktif', [DataMasterStatusPegawaiController::class, 'toggle'])
+            ->whereUuid('statusPegawai')->name('status-pegawai.toggle');
+        Route::post('/status-pegawai/{statusPegawai}/destroy', [DataMasterStatusPegawaiController::class, 'destroy'])
+            ->whereUuid('statusPegawai')->name('status-pegawai.destroy');
     });
 
     Route::get('/pegawai/nonaktif-list', [PegawaiController::class, 'inactive'])

@@ -7,6 +7,7 @@ use App\Services\Referensi\ReferenceTableCatalog;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Validation\ValidationException;
 
 class ToggleReferenceItemActiveAction
 {
@@ -18,6 +19,19 @@ class ToggleReferenceItemActiveAction
     public function execute(Model $item, Request $request): Model
     {
         $oldValue = (bool) $item->getAttribute('is_active');
+
+        // Penonaktifan baris data sistem ditolak karena logika aplikasi
+        // (EWS, status default pegawai baru) bergantung padanya; pengaktifan
+        // kembali tetap diizinkan.
+        if ($oldValue) {
+            $protectionReason = ReferenceTableCatalog::protectionReason($item);
+
+            if ($protectionReason !== null) {
+                throw ValidationException::withMessages([
+                    'referensi' => sprintf('Item tidak dapat dinonaktifkan karena %s.', $protectionReason),
+                ]);
+            }
+        }
 
         $item->forceFill(['is_active' => ! $oldValue])->save();
 

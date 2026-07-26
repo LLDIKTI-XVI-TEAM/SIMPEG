@@ -24,6 +24,17 @@ class DeleteReferenceItemAction
      */
     public function execute(Model $item, Request $request): void
     {
+        // Baris data sistem ditolak lebih dulu: cek pemakaian saja tidak
+        // cukup karena baris bisa saja belum dirujuk data mana pun padahal
+        // logika aplikasi mencarinya secara langsung berdasarkan kode.
+        $protectionReason = ReferenceTableCatalog::protectionReason($item);
+
+        if ($protectionReason !== null) {
+            throw ValidationException::withMessages([
+                'referensi' => sprintf('Item tidak dapat dihapus karena %s.', $protectionReason),
+            ]);
+        }
+
         $usageDetail = $this->usage->usageDetail($item);
 
         if ($usageDetail !== []) {
