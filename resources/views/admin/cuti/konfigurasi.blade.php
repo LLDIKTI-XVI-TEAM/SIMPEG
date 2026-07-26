@@ -169,7 +169,7 @@
                             <input id="approver-search" name="approver_search" type="search" value="{{ $approverSearch }}" placeholder="Nama atau NIP" aria-describedby="approver-search-help" class="min-h-11 min-w-0 flex-1 rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-all duration-200 placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                             <button type="submit" class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Cari Kandidat</button>
                         </div>
-                        <p id="approver-search-help" class="text-[11px] text-muted">Hasil pencarian mengisi pilihan Verifikator dan PYBMC.</p>
+                        <p id="approver-search-help" class="text-[11px] text-muted">Hasil pencarian mengisi pilihan Verifikator dan PYBMC Khusus.</p>
                     </form>
                 @endif
 
@@ -536,13 +536,167 @@
                     <span class="shrink-0 text-muted">PYBMC aktif</span>
                     <span class="text-right font-semibold text-ink">{{ $globalPybmc?->approver?->nama_lengkap ?? 'Belum ditetapkan' }}</span>
                 </div>
-                <form method="POST" action="{{ route('cuti.config.pybmc-global') }}" class="space-y-3">
+                @php
+                    $pybmcCurrentLabel = $globalPybmc?->approver
+                        ? $globalPybmc->approver->nama_lengkap.' ('.$globalPybmc->approver->nip.')'
+                        : '';
+                    $pybmcPrefillId = (string) old('approver_employee_id', $globalPybmc?->approver_employee_id ?? '');
+                    $pybmcPrefillLabel = old('approver_employee_id') === null ? $pybmcCurrentLabel : '';
+                @endphp
+                <form
+                    method="POST"
+                    action="{{ route('cuti.config.pybmc-global') }}"
+                    class="space-y-3"
+                    x-data="{
+                        pybmcLookupEndpoint: @js(route('cuti.employee-lookup')),
+                        pybmcQuery: @js($pybmcPrefillLabel),
+                        pybmcResults: [],
+                        pybmcOpen: false,
+                        pybmcLoading: false,
+                        pybmcError: '',
+                        pybmcSelectionError: '',
+                        pybmcSelectedId: @js($pybmcPrefillId),
+                        pybmcSelectedName: @js($pybmcPrefillLabel),
+                        pybmcActiveIndex: -1,
+                        pybmcRequestId: 0,
+                        pybmcSearchTimer: null,
+                        searchPybmc() {
+                            window.clearTimeout(this.pybmcSearchTimer);
+                            this.pybmcRequestId++;
+                            this.pybmcError = '';
+                            this.pybmcSelectionError = '';
+                            if (this.pybmcQuery !== this.pybmcSelectedName) {
+                                this.pybmcSelectedId = '';
+                            }
+                            if (this.pybmcQuery.trim().length < 2) {
+                                this.pybmcResults = [];
+                                this.pybmcOpen = false;
+                                this.pybmcLoading = false;
+                                return;
+                            }
+                            this.pybmcSearchTimer = window.setTimeout(() => this.fetchPybmcCandidates(), 250);
+                        },
+                        async fetchPybmcCandidates() {
+                            const requestId = ++this.pybmcRequestId;
+                            this.pybmcLoading = true;
+                            this.pybmcOpen = true;
+                            this.pybmcActiveIndex = -1;
+                            try {
+                                const response = await fetch(`${this.pybmcLookupEndpoint}?q=${encodeURIComponent(this.pybmcQuery.trim())}`, {
+                                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                                });
+                                if (!response.ok) {
+                                    throw new Error('Lookup pegawai tidak tersedia.');
+                                }
+                                const result = await response.json();
+                                if (requestId !== this.pybmcRequestId) return;
+                                this.pybmcResults = Array.isArray(result.data) ? result.data : [];
+                            } catch (error) {
+                                if (requestId !== this.pybmcRequestId) return;
+                                this.pybmcResults = [];
+                                this.pybmcError = 'Pencarian pegawai gagal. Coba lagi.';
+                            } finally {
+                                if (requestId === this.pybmcRequestId) {
+                                    this.pybmcLoading = false;
+                                }
+                            }
+                        },
+                        selectPybmc(candidate) {
+                            this.pybmcRequestId++;
+                            this.pybmcSelectionError = '';
+                            this.pybmcSelectedId = candidate.id;
+                            this.pybmcSelectedName = candidate.nama_lengkap;
+                            this.pybmcQuery = candidate.nama_lengkap;
+                            this.pybmcResults = [];
+                            this.pybmcActiveIndex = -1;
+                            this.pybmcOpen = false;
+                        },
+                        closePybmcLookup() {
+                            window.setTimeout(() => { this.pybmcOpen = false; }, 120);
+                        },
+                        movePybmcActiveIndex(direction) {
+                            if (! this.pybmcOpen || this.pybmcResults.length === 0) return;
+                            const next = this.pybmcActiveIndex + direction;
+                            this.pybmcActiveIndex = Math.min(Math.max(next, 0), this.pybmcResults.length - 1);
+                        },
+                        chooseActivePybmc() {
+                            if (this.pybmcActiveIndex >= 0 && this.pybmcResults[this.pybmcActiveIndex]) {
+                                this.selectPybmc(this.pybmcResults[this.pybmcActiveIndex]);
+                            }
+                        },
+                        guardPybmcSubmit(event) {
+                            if (! this.pybmcSelectedId) {
+                                event.preventDefault();
+                                this.pybmcSelectionError = 'Pilih pegawai dari hasil pencarian terlebih dahulu.';
+                            }
+                        }
+                    }"
+                    @submit="guardPybmcSubmit($event)"
+                >
                     @csrf
-                    <x-form.select name="approver_employee_id" id="pybmc-global-approver" label="Pegawai PYBMC" :required="true" :value="$globalPybmc?->approver_employee_id" placeholder="Pilih PYBMC">
-                        @foreach ($approverCandidates as $approver)
-                            <option value="{{ $approver->id }}">{{ $approver->nama_lengkap }} ({{ $approver->nip }})</option>
-                        @endforeach
-                    </x-form.select>
+                    <input type="hidden" name="approver_employee_id" :value="pybmcSelectedId">
+                    <div class="space-y-1">
+                        <label for="pybmc-global-lookup" class="text-xs font-bold uppercase tracking-wider text-ink">Pegawai PYBMC</label>
+                        <div class="relative">
+                            <input
+                                id="pybmc-global-lookup"
+                                x-model="pybmcQuery"
+                                @input="searchPybmc()"
+                                @focus="pybmcQuery.trim().length >= 2 && (pybmcOpen = true)"
+                                @blur="closePybmcLookup()"
+                                @keydown.arrow-down.prevent="movePybmcActiveIndex(1)"
+                                @keydown.arrow-up.prevent="movePybmcActiveIndex(-1)"
+                                @keydown.enter.prevent="chooseActivePybmc()"
+                                @keydown.escape.prevent="pybmcOpen = false"
+                                type="search"
+                                autocomplete="off"
+                                role="combobox"
+                                aria-autocomplete="list"
+                                :aria-expanded="pybmcOpen.toString()"
+                                aria-controls="pybmc_global_lookup_results"
+                                :aria-activedescendant="pybmcActiveIndex >= 0 ? `pybmc_global_option_${pybmcActiveIndex}` : null"
+                                aria-describedby="pybmc_global_selection_error {{ $errors->has('approver_employee_id') ? 'pybmc_global_lookup_error' : '' }}"
+                                :aria-invalid="{{ $errors->has('approver_employee_id') ? 'true' : 'false' }}"
+                                placeholder="Ketik minimal 2 karakter nama atau NIP"
+                                class="min-h-11 w-full rounded-xl border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-all duration-200 placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 {{ $errors->has('approver_employee_id') ? 'border-danger focus:border-danger focus:ring-danger/20' : 'border-border' }}"
+                            >
+                            <div
+                                id="pybmc_global_lookup_results"
+                                x-cloak
+                                x-show="pybmcOpen"
+                                role="listbox"
+                                aria-label="Hasil pencarian pegawai PYBMC"
+                                class="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-border bg-surface p-1 shadow-md"
+                            >
+                                <div x-show="pybmcLoading" class="flex items-center gap-2 px-3 py-2 text-xs text-muted">
+                                    <x-ui.loading size="sm" color="primary" />
+                                    Memuat kandidat.
+                                </div>
+                                <p x-show="!pybmcLoading && pybmcError" x-text="pybmcError" class="px-3 py-2 text-xs text-danger"></p>
+                                <p x-show="!pybmcLoading && !pybmcError && pybmcResults.length === 0" class="px-3 py-2 text-xs text-muted">Tidak ada kandidat yang cocok.</p>
+                                <template x-for="(candidate, index) in pybmcResults" :key="candidate.id">
+                                    <button
+                                        type="button"
+                                        :id="`pybmc_global_option_${index}`"
+                                        role="option"
+                                        :aria-selected="pybmcActiveIndex === index"
+                                        @mousedown.prevent="selectPybmc(candidate)"
+                                        @mouseenter="pybmcActiveIndex = index"
+                                        :class="pybmcActiveIndex === index ? 'bg-soft text-ink' : 'text-ink'"
+                                        class="flex w-full flex-col rounded-lg px-3 py-2 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    >
+                                        <span x-text="candidate.nama_lengkap" class="text-sm font-semibold"></span>
+                                        <span x-text="`NIP. ${candidate.nip}`" class="text-xs text-muted"></span>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                        <p id="pybmc_global_selection_error" x-show="pybmcSelectionError" x-cloak x-text="pybmcSelectionError" class="text-[11px] font-semibold text-danger" role="alert"></p>
+                        @error('approver_employee_id')
+                            <p id="pybmc_global_lookup_error" class="text-[11px] font-semibold text-danger" role="alert">{{ $message }}</p>
+                        @enderror
+                        <p x-show="pybmcSelectedId && !pybmcSelectedName" x-cloak class="text-xs text-muted">Pilihan sebelumnya dipertahankan. Cari ulang untuk mengganti.</p>
+                    </div>
                     <x-form.textarea name="pybmc_reason" id="pybmc-global-reason" label="Alasan PYBMC Global" :required="true" rows="3" placeholder="Contoh: Pergantian pejabat PYBMC" />
                     <button type="submit" class="inline-flex w-full items-center justify-center rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Simpan PYBMC Global</button>
                 </form>
