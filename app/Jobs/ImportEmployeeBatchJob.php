@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Actions\Employees\ExecuteImportBatchAction;
 use App\Actions\Employees\UploadImportBatchAction;
+use App\Models\ImportBatch;
 use App\Models\SimpegNotification;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
@@ -63,6 +64,13 @@ class ImportEmployeeBatchJob implements ShouldQueue
      */
     public function failed(\Throwable $exception): void
     {
+        // Pastikan laporan permanen ikut menandai kegagalan (no-op bila record belum ada).
+        ImportBatch::whereKey($this->batchId)->update([
+            'status' => 'failed',
+            'error_message' => $exception->getMessage(),
+            'finished_at' => now(),
+        ]);
+
         // Update cache status ke failed jika job gagal sepenuhnya
         $batch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$this->batchId);
         if ($batch) {
