@@ -123,6 +123,217 @@
                         <button type="submit" class="inline-flex items-center justify-center rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Cari Kandidat</button>
                     </form>
                 @endif
+
+                @php
+                    $canAssignKepalaBagian = in_array(auth()->user()?->role, ['super_admin', 'admin_kepegawaian'], true)
+                        && (auth()->user()?->hasPermission('employees.update') ?? false);
+                    $kabagFormOpen = ! $selectedKepalaBagian
+                        || $errors->hasAny(['kepala_bagian_id', 'effective_date', 'redirect_to']);
+                @endphp
+
+                @if ($canAssignKepalaBagian)
+                    <div
+                        class="border-b border-border bg-soft/20 px-5 py-4"
+                        x-data="{
+                            kabagFormOpen: @js((bool) $kabagFormOpen),
+                            kabagLookupEndpoint: @js(route('pegawai.supervisor-lookup', $selectedEmployee->id)),
+                            kabagQuery: '',
+                            kabagResults: [],
+                            kabagOpen: false,
+                            kabagLoading: false,
+                            kabagError: '',
+                            kabagSelectionError: '',
+                            kabagSelectedId: @js((string) old('kepala_bagian_id', '')),
+                            kabagSelectedName: '',
+                            kabagActiveIndex: -1,
+                            kabagRequestId: 0,
+                            kabagSearchTimer: null,
+                            searchKabag() {
+                                window.clearTimeout(this.kabagSearchTimer);
+                                this.kabagRequestId++;
+                                this.kabagError = '';
+                                this.kabagSelectionError = '';
+                                if (this.kabagQuery !== this.kabagSelectedName) {
+                                    this.kabagSelectedId = '';
+                                }
+                                if (this.kabagQuery.trim().length < 2) {
+                                    this.kabagResults = [];
+                                    this.kabagOpen = false;
+                                    this.kabagLoading = false;
+                                    return;
+                                }
+                                this.kabagSearchTimer = window.setTimeout(() => this.fetchKabagCandidates(), 250);
+                            },
+                            async fetchKabagCandidates() {
+                                const requestId = ++this.kabagRequestId;
+                                this.kabagLoading = true;
+                                this.kabagOpen = true;
+                                this.kabagActiveIndex = -1;
+                                try {
+                                    const response = await fetch(`${this.kabagLookupEndpoint}?q=${encodeURIComponent(this.kabagQuery.trim())}`, {
+                                        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                                    });
+                                    if (!response.ok) {
+                                        throw new Error('Lookup Kepala Bagian tidak tersedia.');
+                                    }
+                                    const result = await response.json();
+                                    if (requestId !== this.kabagRequestId) return;
+                                    this.kabagResults = Array.isArray(result.data) ? result.data : [];
+                                } catch (error) {
+                                    if (requestId !== this.kabagRequestId) return;
+                                    this.kabagResults = [];
+                                    this.kabagError = 'Pencarian Kepala Bagian gagal. Coba lagi.';
+                                } finally {
+                                    if (requestId === this.kabagRequestId) {
+                                        this.kabagLoading = false;
+                                    }
+                                }
+                            },
+                            selectKabag(candidate) {
+                                this.kabagRequestId++;
+                                this.kabagSelectionError = '';
+                                this.kabagSelectedId = candidate.id;
+                                this.kabagSelectedName = candidate.nama_lengkap;
+                                this.kabagQuery = candidate.nama_lengkap;
+                                this.kabagResults = [];
+                                this.kabagActiveIndex = -1;
+                                this.kabagOpen = false;
+                            },
+                            closeKabagLookup() {
+                                window.setTimeout(() => { this.kabagOpen = false; }, 120);
+                            },
+                            moveKabagActiveIndex(direction) {
+                                if (! this.kabagOpen || this.kabagResults.length === 0) return;
+                                const next = this.kabagActiveIndex + direction;
+                                this.kabagActiveIndex = Math.min(Math.max(next, 0), this.kabagResults.length - 1);
+                            },
+                            chooseActiveKabag() {
+                                if (this.kabagActiveIndex >= 0 && this.kabagResults[this.kabagActiveIndex]) {
+                                    this.selectKabag(this.kabagResults[this.kabagActiveIndex]);
+                                }
+                            },
+                            guardKabagSubmit(event) {
+                                if (! this.kabagSelectedId) {
+                                    event.preventDefault();
+                                    this.kabagSelectionError = 'Pilih Kepala Bagian dari hasil pencarian terlebih dahulu.';
+                                }
+                            }
+                        }"
+                    >
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                                <h4 class="text-sm font-semibold text-ink">Penetapan Kepala Bagian</h4>
+                                <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-muted">
+                                    @if ($selectedKepalaBagian)
+                                        Kepala Bagian aktif: <span class="font-semibold text-ink">{{ $selectedKepalaBagian->nama_lengkap }} ({{ $selectedKepalaBagian->nip }})</span>. Perubahan memakai alur penetapan yang sama dengan halaman detail pegawai.
+                                    @else
+                                        Pegawai ini belum memiliki Kepala Bagian aktif. Tetapkan langsung dari sini tanpa berpindah ke halaman Data Pegawai.
+                                    @endif
+                                </p>
+                            </div>
+                            @if ($selectedKepalaBagian)
+                                <button type="button" @click="kabagFormOpen = ! kabagFormOpen" :aria-expanded="kabagFormOpen.toString()" aria-controls="kabag-inline-form" class="inline-flex shrink-0 items-center justify-center rounded-xl border border-border bg-surface px-3.5 py-1.5 text-xs font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                    <span x-text="kabagFormOpen ? 'Tutup Form' : 'Ubah Kepala Bagian'"></span>
+                                </button>
+                            @endif
+                        </div>
+
+                        <form
+                            id="kabag-inline-form"
+                            x-show="kabagFormOpen"
+                            x-cloak
+                            method="POST"
+                            action="{{ route('pegawai.assign-atasan', $selectedEmployee->id) }}"
+                            @submit="guardKabagSubmit($event)"
+                            class="mt-4"
+                        >
+                            @csrf
+                            <input type="hidden" name="redirect_to" value="cuti-config">
+                            <input type="hidden" name="kepala_bagian_id" :value="kabagSelectedId">
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_13rem_auto] sm:items-start">
+                                <div class="space-y-1">
+                                    <label for="kabag_inline_lookup" class="text-xs font-bold uppercase tracking-wider text-ink">Cari Kepala Bagian</label>
+                                    <div class="relative">
+                                        <input
+                                            id="kabag_inline_lookup"
+                                            x-model="kabagQuery"
+                                            @input="searchKabag()"
+                                            @focus="kabagQuery.trim().length >= 2 && (kabagOpen = true)"
+                                            @blur="closeKabagLookup()"
+                                            @keydown.arrow-down.prevent="moveKabagActiveIndex(1)"
+                                            @keydown.arrow-up.prevent="moveKabagActiveIndex(-1)"
+                                            @keydown.enter.prevent="chooseActiveKabag()"
+                                            @keydown.escape.prevent="kabagOpen = false"
+                                            type="search"
+                                            autocomplete="off"
+                                            role="combobox"
+                                            aria-autocomplete="list"
+                                            :aria-expanded="kabagOpen.toString()"
+                                            aria-controls="kabag_inline_lookup_results"
+                                            :aria-activedescendant="kabagActiveIndex >= 0 ? `kabag_inline_option_${kabagActiveIndex}` : null"
+                                            aria-describedby="kabag_inline_lookup_help kabag_inline_selection_error {{ $errors->has('kepala_bagian_id') ? 'kabag_inline_lookup_error' : '' }}"
+                                            :aria-invalid="{{ $errors->has('kepala_bagian_id') ? 'true' : 'false' }}"
+                                            placeholder="Ketik minimal 2 karakter nama atau NIP"
+                                            class="w-full rounded-xl border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 {{ $errors->has('kepala_bagian_id') ? 'border-danger focus:border-danger focus:ring-danger/20' : 'border-border' }}"
+                                        >
+                                        <div
+                                            id="kabag_inline_lookup_results"
+                                            x-cloak
+                                            x-show="kabagOpen"
+                                            role="listbox"
+                                            aria-label="Hasil pencarian Kepala Bagian"
+                                            class="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-border bg-surface p-1 shadow-md"
+                                        >
+                                            <div x-show="kabagLoading" class="flex items-center gap-2 px-3 py-2 text-xs text-muted">
+                                                <x-ui.loading size="sm" color="primary" />
+                                                Memuat kandidat.
+                                            </div>
+                                            <p x-show="!kabagLoading && kabagError" x-text="kabagError" class="px-3 py-2 text-xs text-danger"></p>
+                                            <p x-show="!kabagLoading && !kabagError && kabagResults.length === 0" class="px-3 py-2 text-xs text-muted">Tidak ada kandidat yang cocok.</p>
+                                            <template x-for="(candidate, index) in kabagResults" :key="candidate.id">
+                                                <button
+                                                    type="button"
+                                                    :id="`kabag_inline_option_${index}`"
+                                                    role="option"
+                                                    :aria-selected="kabagActiveIndex === index"
+                                                    @mousedown.prevent="selectKabag(candidate)"
+                                                    @mouseenter="kabagActiveIndex = index"
+                                                    :class="kabagActiveIndex === index ? 'bg-soft text-ink' : 'text-ink'"
+                                                    class="flex w-full flex-col rounded-lg px-3 py-2 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                >
+                                                    <span x-text="candidate.nama_lengkap" class="text-sm font-semibold"></span>
+                                                    <span x-text="`NIP. ${candidate.nip}`" class="text-xs text-muted"></span>
+                                                </button>
+                                            </template>
+                                        </div>
+                                    </div>
+                                    <p id="kabag_inline_lookup_help" class="text-[11px] text-muted">Cari nama atau NIP, minimal 2 karakter. Penetapan memakai validasi server yang sama dengan halaman detail pegawai.</p>
+                                    <p id="kabag_inline_selection_error" x-show="kabagSelectionError" x-cloak x-text="kabagSelectionError" class="text-[11px] font-semibold text-danger" role="alert"></p>
+                                    @error('kepala_bagian_id')
+                                        <p id="kabag_inline_lookup_error" class="text-[11px] font-semibold text-danger" role="alert">{{ $message }}</p>
+                                    @enderror
+                                    @error('redirect_to')
+                                        <p class="text-[11px] font-semibold text-danger" role="alert">{{ $message }}</p>
+                                    @enderror
+                                    <p x-show="kabagSelectedName" x-cloak class="text-xs text-muted">Dipilih: <span x-text="kabagSelectedName" class="font-semibold text-ink"></span></p>
+                                    <p x-show="kabagSelectedId && !kabagSelectedName" x-cloak class="text-xs text-muted">Pilihan sebelumnya dipertahankan. Cari ulang untuk mengganti.</p>
+                                </div>
+                                <x-form.input
+                                    name="effective_date"
+                                    type="date"
+                                    label="Tanggal Efektif"
+                                    :value="old('effective_date', now()->toDateString())"
+                                    required
+                                    help="Gunakan hari ini atau tanggal sebelumnya agar penugasan langsung aktif."
+                                />
+                                <div class="sm:pt-6">
+                                    <x-ui.button type="submit" size="sm">Simpan Kepala Bagian</x-ui.button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                @endif
+
                 <form method="POST" action="{{ route('cuti.config.employee-chain.store', $selectedEmployee) }}" class="divide-y divide-border">
                     @csrf
                     <div class="sticky top-0 z-10 border-b border-border bg-surface/95 px-5 py-3 shadow-[0_4px_12px_rgb(15_23_42/0.08)] backdrop-blur-sm sm:hidden">

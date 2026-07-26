@@ -29,6 +29,8 @@ class AssignSupervisorRequest extends FormRequest
             'kepala_bagian_id' => ['nullable', 'uuid', Rule::exists('employees', 'id')->whereNull('deleted_at')],
             'supervisor_id' => ['nullable', 'uuid', Rule::exists('employees', 'id')->whereNull('deleted_at')],
             'effective_date' => ['required', 'date_format:Y-m-d'],
+            // Halaman asal non-default harus berasal dari whitelist agar redirect tidak bisa diarahkan ke URL bebas.
+            'redirect_to' => ['nullable', 'string', 'in:cuti-config'],
         ];
     }
 }
