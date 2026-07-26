@@ -8,6 +8,9 @@ use Illuminate\Support\Collection;
 
 class NotificationRecipientResolver
 {
+    /** @var Collection<int, Employee>|null */
+    private ?Collection $adminRecipientsCache = null;
+
     public function __construct(private readonly NotificationChannelResolver $channels) {}
 
     /**
@@ -54,7 +57,10 @@ class NotificationRecipientResolver
     /** @return Collection<int, Employee> */
     private function adminRecipients(): Collection
     {
-        return User::query()
+        // Di-cache per instance karena scheduler EWS memanggil resolver ini untuk
+        // setiap reminder dalam satu run; tanpa cache, query admin yang sama
+        // diulang ribuan kali pada data pegawai besar.
+        return $this->adminRecipientsCache ??= User::query()
             // EWS rutin hanya perlu ditindaklanjuti Admin Kepegawaian; Super Admin khusus kegagalan scheduler.
             ->where('role', 'admin_kepegawaian')
             ->whereNotNull('employee_id')

@@ -71,7 +71,13 @@ class NotificationService
         string $body,
         array $data,
     ): ?SimpegNotification {
-        if (! $this->channels->isEnabled('in_app')) {
+        // Kebijakan channel dicek per event (fail-closed), bukan hanya channel global,
+        // agar operator bisa mematikan reminder untuk satu jenis event EWS tanpa
+        // mematikan seluruh notifikasi in-app. Menonaktifkan in_app untuk event ini
+        // sengaja ikut menghentikan email reminder: dedup reminder berlabuh pada
+        // record in-app, sehingga tanpa record tersebut email akan terkirim ulang
+        // setiap run scheduler.
+        if (! $this->channels->isEnabledForEvent($type, 'in_app')) {
             return null;
         }
 
@@ -129,7 +135,13 @@ class NotificationService
                 ->first();
         }
 
-        $this->dispatchEmails($employee, collect(), $type, $title, $body, $data);
+        // Fan-out email ke penerima tambahan (Admin Kepegawaian) mengikuti resolver
+        // yang sama dengan createForEmployee, tetapi terbatas pada email; admin tidak
+        // dibuatkan record in-app reminder karena dedup reminder berlabuh pada pegawai.
+        // Email hanya dikirim saat notifikasi pertama kali dibuat supaya refresh
+        // reminder tidak membanjiri email.
+        $additionalRecipients = $this->recipients->additionalRecipients($employee, $type, $data);
+        $this->dispatchEmails($employee, $additionalRecipients, $type, $title, $body, $data);
 
         return $notification;
     }
@@ -262,10 +274,23 @@ class NotificationService
                 'updated_at' => $now,
             ]);
 
-        EwsAlert::query()
-            ->whereIn('id', $notifications->pluck('ews_alert_id')->filter())
-            ->whereNull('notification_acknowledged_at')
-            ->update(['notification_acknowledged_at' => $now]);
+        // Samakan dengan jalur single-read: notifikasi lama (legacy) menyimpan ID alert
+        // di payload JSON data, bukan di kolom ews_alert_id. Keduanya harus diakui agar
+        // reminder EWS tidak muncul kembali setelah pengguna menandai semua terbaca.
+        $alertIds = $notifications
+            ->map(fn (SimpegNotification $notification): mixed => $notification->ews_alert_id
+                ?? $notification->data['ews_alert_id']
+                ?? null)
+            ->filter(fn (mixed $alertId): bool => is_string($alertId) && $alertId !== '')
+            ->unique()
+            ->values();
+
+        if ($alertIds->isNotEmpty()) {
+            EwsAlert::query()
+                ->whereIn('id', $alertIds)
+                ->whereNull('notification_acknowledged_at')
+                ->update(['notification_acknowledged_at' => $now]);
+        }
 
         return $updated;
     }

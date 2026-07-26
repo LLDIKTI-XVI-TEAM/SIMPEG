@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\EwsAlert;
 use App\Models\NotificationEventChannel;
 use App\Models\Permission;
 use App\Models\RefNotificationChannel;
@@ -212,6 +213,30 @@ class NotificationInboxTest extends TestCase
         $this->assertFalse($other->refresh()->is_read);
     }
 
+    public function test_mark_all_as_read_acknowledges_ews_alert_from_column_and_legacy_payload(): void
+    {
+        [$user, $employee] = $this->pegawaiWithEmployee();
+
+        $columnAlert = $this->activeEwsAlertFor($employee, 30);
+        $legacyAlert = $this->activeEwsAlertFor($employee, 60);
+
+        // Notifikasi baru menyimpan ID alert pada kolom ews_alert_id, sedangkan
+        // notifikasi lama hanya menyimpannya di payload JSON data. Bulk mark-as-read
+        // harus mengakui keduanya agar reminder EWS tidak muncul kembali.
+        $this->notificationFor($employee, 'ews.pangkat', 'Alert kolom', false, [
+            'ews_alert_id' => $columnAlert->id,
+        ]);
+        $this->notificationFor($employee, 'ews.pangkat', 'Alert legacy', false, [
+            'data' => ['ews_alert_id' => $legacyAlert->id],
+        ]);
+
+        $this->actingAs($user);
+        $this->patchJsonWithCsrf(self::ENDPOINT.'/tandai-semua-dibaca')->assertOk();
+
+        $this->assertNotNull($columnAlert->refresh()->notification_acknowledged_at);
+        $this->assertNotNull($legacyAlert->refresh()->notification_acknowledged_at);
+    }
+
     public function test_permission_middleware_blocks_notification_update_without_permission(): void
     {
         $role = Role::where('name', 'pegawai')->firstOrFail();
@@ -251,6 +276,17 @@ class NotificationInboxTest extends TestCase
         $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
 
         return [$user, $employee];
+    }
+
+    private function activeEwsAlertFor(Employee $employee, int $intervalDays): EwsAlert
+    {
+        return EwsAlert::create([
+            'employee_id' => $employee->id,
+            'type' => 'KENAIKAN_PANGKAT',
+            'target_date' => now()->addDays(30)->toDateString(),
+            'interval_days' => $intervalDays,
+            'is_processed' => false,
+        ]);
     }
 
     /**
