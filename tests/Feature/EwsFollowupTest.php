@@ -276,6 +276,45 @@ class EwsFollowupTest extends TestCase
         ]);
     }
 
+    public function test_handled_satyalancana_closes_sibling_alerts_and_stops_reminders(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        // Dua tahap pengingat untuk milestone yang sama, keduanya masih aktif.
+        $alert = $this->activeAlertFor($employee, 'SATYALANCANA', now()->addDays(30)->toDateString(), 90);
+        $otherStage = $this->activeAlertFor($employee, 'SATYALANCANA', now()->addDays(30)->toDateString(), 180);
+        foreach ([$alert, $otherStage] as $stageAlert) {
+            SimpegNotification::create([
+                'user_id' => $employee->id,
+                'ews_alert_id' => $stageAlert->id,
+                'type' => 'ews.satyalancana',
+                'title' => 'Peringatan Satyalancana',
+                'body' => 'Segera lengkapi berkas.',
+                'data' => ['ews_alert_id' => $stageAlert->id],
+            ]);
+        }
+
+        $this->actingAs($user)
+            ->postWithCsrf(route('ews.followup.update', $alert), [
+                'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+                'handled_note' => 'Usulan satyalancana sudah diproses.',
+            ])
+            ->assertSessionHasNoErrors();
+
+        // Target satyalancana/PPPK tidak berubah setelah ditangani, sehingga
+        // notifikasi harus ikut ditutup; jika tidak, scheduler berikutnya akan
+        // menghidupkan kembali pengingat dan menghapus acknowledgement.
+        $this->assertSame(EwsAlert::FOLLOWUP_STATUS_HANDLED, $alert->refresh()->followup_status);
+        $this->assertSame(EwsAlert::FOLLOWUP_STATUS_HANDLED, $otherStage->refresh()->followup_status);
+        $this->assertNotNull($alert->notification_acknowledged_at);
+        $this->assertSame(
+            0,
+            SimpegNotification::whereIn('ews_alert_id', [$alert->id, $otherStage->id])
+                ->where('is_read', false)
+                ->count()
+        );
+    }
+
     public function test_failed_pension_followup_cleans_up_uploaded_sk_file(): void
     {
         Storage::fake('public');

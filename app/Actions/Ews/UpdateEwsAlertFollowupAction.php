@@ -48,13 +48,16 @@ class UpdateEwsAlertFollowupAction
                 if ($followupStatus === EwsAlert::FOLLOWUP_STATUS_HANDLED) {
                     if (in_array($alert->type, ['KENAIKAN_PANGKAT', 'KGB'], true)) {
                         $storedSkPaths[] = $this->createApprovedHistory($employee, $alert->type, $request);
-                        $this->resolveCurrentTypeAlerts($employee, $alert->type, $followupStatus, $handledNote, $request);
                     } elseif ($alert->type === 'PENSIUN') {
                         $this->approveRetirement($employee, $request, $storedSkPaths);
-                        $this->resolveCurrentTypeAlerts($employee, $alert->type, $followupStatus, $handledNote, $request);
-                    } else {
-                        $alert->update($this->followupAttributes($followupStatus, $handledNote, $request));
                     }
+
+                    // Semua tipe (termasuk KONTRAK_PPPK dan SATYALANCANA) harus menutup
+                    // alert satu tipe beserta notifikasinya. Untuk tipe yang target
+                    // datanya tidak berubah setelah ditangani, notifikasi yang masih
+                    // unread akan membuat scheduler menghidupkan kembali pengingat dan
+                    // menghapus acknowledgement pada run berikutnya.
+                    $this->resolveCurrentTypeAlerts($employee, $alert->type, $followupStatus, $handledNote, $request);
                 } elseif ($followupStatus === EwsAlert::FOLLOWUP_STATUS_NOT_NEEDED) {
                     // Tidak mengubah riwayat maupun status pegawai; hanya menutup EWS terkait.
                     $this->resolveCurrentTypeAlerts($employee, $alert->type, $followupStatus, $handledNote, $request);
