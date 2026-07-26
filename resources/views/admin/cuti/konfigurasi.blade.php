@@ -163,11 +163,15 @@
 
             @if ($selectedEmployee)
                 @if ($selectedKepalaBagian)
-                    <form method="GET" action="{{ route('cuti.config') }}" class="grid gap-3 border-b border-border bg-soft/20 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                    <form method="GET" action="{{ route('cuti.config') }}" class="space-y-1 border-b border-border bg-soft/20 px-5 py-4">
                         <input type="hidden" name="search" value="{{ $search }}">
                         <input type="hidden" name="employee_id" value="{{ $selectedEmployee->id }}">
-                        <x-form.input name="approver_search" id="approver-search" label="Cari Kandidat Approver" value="{{ $approverSearch }}" placeholder="Nama atau NIP" help="Hasil dibatasi hingga 50 pegawai aktif. Kandidat chain saat ini tetap ditampilkan." />
-                        <button type="submit" class="inline-flex items-center justify-center rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Cari Kandidat</button>
+                        <label for="approver-search" class="text-xs font-bold uppercase tracking-wider text-ink">Cari Kandidat Approver</label>
+                        <div class="flex items-start gap-3">
+                            <input id="approver-search" name="approver_search" type="search" value="{{ $approverSearch }}" placeholder="Nama atau NIP" aria-describedby="approver-search-help" class="min-h-11 min-w-0 flex-1 rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-all duration-200 placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            <button type="submit" class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Cari Kandidat</button>
+                        </div>
+                        <p id="approver-search-help" class="text-[11px] text-muted">Hasil dibatasi hingga 50 pegawai aktif. Kandidat chain saat ini tetap ditampilkan.</p>
                     </form>
                 @endif
 
