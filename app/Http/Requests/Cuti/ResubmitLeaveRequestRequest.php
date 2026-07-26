@@ -82,18 +82,20 @@ class ResubmitLeaveRequestRequest extends FormRequest
                 return;
             }
 
-            $leaveRequest = $this->route('leaveRequest');
-
-            if (! $leaveRequest?->jenisCuti?->mengurangi_saldo_tahunan) {
-                return;
-            }
-
             $mulai = Carbon::createFromFormat('Y-m-d', (string) $this->input('tanggal_mulai'))->startOfDay();
             $selesai = Carbon::createFromFormat('Y-m-d', (string) $this->input('tanggal_selesai'))->startOfDay();
 
+            // PRD §9.4: satu pengajuan cuti apa pun jenisnya tidak boleh melewati tahun kalender,
+            // termasuk saat tanggal diperbaiki pada pengiriman ulang.
             if ($mulai->year !== $selesai->year) {
-                $validator->errors()->add('tanggal_selesai', 'Cuti tahunan yang melintasi pergantian tahun belum dapat diajukan. Pisahkan pengajuan untuk tiap tahun.');
+                $validator->errors()->add('tanggal_selesai', 'Pengajuan cuti tidak boleh melewati tahun kalender. Pisahkan menjadi dua pengajuan terpisah untuk tiap tahun.');
 
+                return;
+            }
+
+            $leaveRequest = $this->route('leaveRequest');
+
+            if (! $leaveRequest?->jenisCuti?->mengurangi_saldo_tahunan) {
                 return;
             }
 
