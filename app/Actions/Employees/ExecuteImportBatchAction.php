@@ -3,6 +3,7 @@
 namespace App\Actions\Employees;
 
 use App\Models\Employee;
+use App\Models\ImportBatch;
 use App\Models\RefStatusPegawai;
 use App\Models\User;
 use App\Services\AuditService;
@@ -51,6 +52,23 @@ class ExecuteImportBatchAction
         $batch['processed_count'] = 0;
         Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $batch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
 
+        // Rekam batch ke database agar laporan hasil tetap tersedia setelah cache kedaluwarsa.
+        ImportBatch::updateOrCreate(['id' => $batchId], [
+            'user_id' => $user?->id,
+            'filename' => $batch['filename'],
+            'type' => $type,
+            'status' => 'processing',
+            'total_rows' => $batch['total_rows'] ?? count($batch['rows'] ?? []),
+            'valid_count' => $batch['validation']['valid_count'] ?? $totalRows,
+            'inserted_count' => 0,
+            'skipped_count' => $batch['validation']['skip_count'] ?? 0,
+            'failed_count' => $batch['validation']['error_count'] ?? 0,
+            'row_issues' => $this->collectRowIssues($batch['validation']['results']),
+            'error_message' => null,
+            'started_at' => now(),
+            'finished_at' => null,
+        ]);
+
         try {
             if ($validRows !== []) {
                 foreach ($validRows as $result) {
@@ -91,6 +109,13 @@ class ExecuteImportBatchAction
                 $userAgent
             );
 
+            // Persist hasil akhir sebelum file sumber dihapus supaya laporan tidak pernah hilang.
+            ImportBatch::whereKey($batchId)->update([
+                'status' => 'completed',
+                'inserted_count' => $processedCount,
+                'finished_at' => now(),
+            ]);
+
             $this->cleanupBatch($batchId, $batch['filename']);
 
             // Set final completed status
@@ -109,6 +134,13 @@ class ExecuteImportBatchAction
             }
 
         } catch (\Throwable $exception) {
+            ImportBatch::whereKey($batchId)->update([
+                'status' => 'failed',
+                'inserted_count' => $processedCount,
+                'error_message' => $exception->getMessage(),
+                'finished_at' => now(),
+            ]);
+
             $failedBatch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
             if ($failedBatch) {
                 $failedBatch['status'] = 'failed';
@@ -146,6 +178,32 @@ class ExecuteImportBatchAction
                 'is_kinerja_baik' => true,
             ]);
         }
+    }
+
+    /**
+     * Kumpulkan baris bermasalah dari hasil validasi untuk laporan permanen:
+     * baris gagal validasi dan baris yang dilewati (NIP sudah terdaftar).
+     *
+     * @param  array<int, array<string, mixed>>  $results
+     * @return array<int, array<string, mixed>>
+     */
+    private function collectRowIssues(array $results): array
+    {
+        $issues = [];
+        foreach ($results as $result) {
+            if (! in_array($result['status'], ['error', 'skip'], true)) {
+                continue;
+            }
+
+            $issues[] = [
+                'row' => $result['row'] ?? null,
+                'nama' => $result['nama'] ?? '-',
+                'kategori' => $result['status'] === 'skip' ? 'dilewati' : 'gagal',
+                'errors' => $result['errors'] ?? [],
+            ];
+        }
+
+        return $issues;
     }
 
     private function cleanupBatch(string $batchId, string $filename): void

@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Models\DisciplineRecord;
 use App\Models\Employee;
 use App\Models\EwsAlert;
+use App\Models\SimpegNotification;
 use App\Models\User;
+use App\Services\EwsEngineService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -106,6 +108,36 @@ class EwsActivePageTest extends TestCase
         $response->assertSee($handled->employee->nama_lengkap);
         $response->assertSee('Berkas sudah selesai diproses.');
         $response->assertDontSee($active->employee->nama_lengkap);
+    }
+
+    public function test_unread_expired_reminder_is_reactivated_and_shown_as_active(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Pegawai Reminder Dipulihkan',
+            'tanggal_kgb_berikutnya' => now()->subDay()->toDateString(),
+        ]);
+
+        app(EwsEngineService::class)->run();
+        $alert = EwsAlert::where('employee_id', $employee->id)->where('type', 'KGB')->firstOrFail();
+        $notification = SimpegNotification::where('ews_alert_id', $alert->id)->firstOrFail();
+        $alert->update([
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_EXPIRED,
+            'is_processed' => true,
+        ]);
+
+        $this->travel(5)->minutes();
+        app(EwsEngineService::class)->run();
+
+        $this->assertSame(EwsAlert::FOLLOWUP_STATUS_ACTIVE, $alert->refresh()->followup_status);
+        $this->assertFalse($alert->is_processed);
+        $this->assertSame(1, SimpegNotification::where('ews_alert_id', $alert->id)->count());
+        $this->assertSame($notification->id, SimpegNotification::where('ews_alert_id', $alert->id)->firstOrFail()->id);
+
+        $this->actingAs($user)
+            ->get(route('ews'))
+            ->assertOk()
+            ->assertSee('Pegawai Reminder Dipulihkan');
     }
 
     public function test_admin_can_see_followup_action_for_active_alert(): void

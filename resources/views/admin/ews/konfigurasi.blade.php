@@ -302,7 +302,66 @@
                     </div>
                 </div>
 
-                {{-- Row 2: Kenaikan Pangkat --}}
+                {{-- Row 2: Masa Berlaku & Milestone Event --}}
+                <div class="border-y border-border bg-soft/20 px-5 py-5">
+                    <div class="mb-4">
+                        <h3 class="text-sm font-semibold text-ink">Masa Berlaku Event EWS</h3>
+                        <p class="mt-0.5 text-xs leading-relaxed text-muted">Ubah durasi dasar setiap event. Perubahan langsung dipakai scheduler untuk data lama dan baru. Nilai BUP global <strong>0</strong> mempertahankan BUP berdasarkan jabatan.</p>
+                    </div>
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                        <label class="rounded-xl border border-border bg-surface p-3">
+                            <span class="block text-xs font-semibold text-ink">Kenaikan Pangkat</span>
+                            <span class="mt-0.5 block text-[10px] text-muted">TMT pangkat + tahun</span>
+                            <span class="mt-2 flex items-center gap-2">
+                                <input type="number" name="pangkat_required_years" min="1" max="100" step="1" value="{{ old('pangkat_required_years', $configs['pangkat_required_years']) }}" class="w-20 rounded-lg border border-border bg-surface px-2 py-1.5 text-center text-xs text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                <span class="text-xs font-medium text-muted">tahun</span>
+                            </span>
+                            @error('pangkat_required_years')<p class="mt-1 text-xs text-danger">{{ $message }}</p>@enderror
+                        </label>
+                        <label class="rounded-xl border border-border bg-surface p-3">
+                            <span class="block text-xs font-semibold text-ink">KGB</span>
+                            <span class="mt-0.5 block text-[10px] text-muted">TMT KGB + tahun</span>
+                            <span class="mt-2 flex items-center gap-2">
+                                <input type="number" name="kgb_required_years" min="1" max="100" step="1" value="{{ old('kgb_required_years', $configs['kgb_required_years']) }}" class="w-20 rounded-lg border border-border bg-surface px-2 py-1.5 text-center text-xs text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                <span class="text-xs font-medium text-muted">tahun</span>
+                            </span>
+                            @error('kgb_required_years')<p class="mt-1 text-xs text-danger">{{ $message }}</p>@enderror
+                        </label>
+                        <label class="rounded-xl border border-border bg-surface p-3">
+                            <span class="block text-xs font-semibold text-ink">BUP Pensiun Global</span>
+                            <span class="mt-0.5 block text-[10px] text-muted">0 = mengikuti BUP jabatan</span>
+                            <span class="mt-2 flex items-center gap-2">
+                                <input type="number" name="pensiun_required_age_years" min="0" max="100" step="1" value="{{ old('pensiun_required_age_years', $configs['pensiun_required_age_years']) }}" class="w-20 rounded-lg border border-border bg-surface px-2 py-1.5 text-center text-xs text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                <span class="text-xs font-medium text-muted">tahun</span>
+                            </span>
+                            @error('pensiun_required_age_years')<p class="mt-1 text-xs text-danger">{{ $message }}</p>@enderror
+                        </label>
+                        <label class="rounded-xl border border-border bg-surface p-3">
+                            <span class="block text-xs font-semibold text-ink">Masa Kontrak PPPK</span>
+                            <span class="mt-0.5 block text-[10px] text-muted">Dipakai jika tanggal akhir kosong</span>
+                            <span class="mt-2 flex items-center gap-2">
+                                <input type="number" name="pppk_contract_years" min="1" max="100" step="1" value="{{ old('pppk_contract_years', $configs['pppk_contract_years']) }}" class="w-20 rounded-lg border border-border bg-surface px-2 py-1.5 text-center text-xs text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                <span class="text-xs font-medium text-muted">tahun</span>
+                            </span>
+                            @error('pppk_contract_years')<p class="mt-1 text-xs text-danger">{{ $message }}</p>@enderror
+                        </label>
+                        <div class="rounded-xl border border-border bg-surface p-3">
+                            <span class="block text-xs font-semibold text-ink">Milestone Satyalancana</span>
+                            <span class="mt-0.5 block text-[10px] text-muted">Harus berurutan dari kecil ke besar</span>
+                            <span class="mt-2 flex items-center gap-1.5">
+                                @foreach(['satyalancana_years_1', 'satyalancana_years_2', 'satyalancana_years_3'] as $field)
+                                    <input type="number" name="{{ $field }}" min="1" max="100" step="1" value="{{ old($field, $configs[$field]) }}" class="w-14 rounded-lg border border-border bg-surface px-1 py-1.5 text-center text-xs text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" aria-label="{{ $field }} dalam tahun">
+                                @endforeach
+                                <span class="text-xs font-medium text-muted">th</span>
+                            </span>
+                            @foreach(['satyalancana_years_1', 'satyalancana_years_2', 'satyalancana_years_3'] as $field)
+                                @error($field)<p class="mt-1 text-xs text-danger">{{ $message }}</p>@enderror
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Row 3: Kenaikan Pangkat --}}
                 <div class="px-5 py-5 grid grid-cols-1 sm:grid-cols-12 gap-4 items-center hover:bg-soft/10 transition-colors">
                     <div class="sm:col-span-5">
                         <div class="flex items-center gap-3">
@@ -313,7 +372,7 @@
                             </div>
                             <div>
                                 <span class="text-sm font-semibold text-ink block">Kenaikan Pangkat</span>
-                                <p class="text-xs text-muted mt-0.5 leading-relaxed">Peringatan periodik menjelang kenaikan pangkat berkala pegawai berdasarkan PP 99/2000 (TMT + 4 Tahun).</p>
+                                <p class="text-xs text-muted mt-0.5 leading-relaxed">Peringatan periodik menjelang kenaikan pangkat berkala dari TMT pangkat ditambah masa yang diatur pada konfigurasi.</p>
                             </div>
                         </div>
                     </div>
@@ -365,7 +424,7 @@
                             </div>
                             <div>
                                 <span class="text-sm font-semibold text-ink block">Kenaikan Gaji Berkala (KGB)</span>
-                                <p class="text-xs text-muted mt-0.5 leading-relaxed">Peringatan periodik menjelang kenaikan gaji berkala (KGB) pegawai (TMT + 2 Tahun).</p>
+                                <p class="text-xs text-muted mt-0.5 leading-relaxed">Peringatan periodik menjelang kenaikan gaji berkala dari TMT KGB ditambah masa yang diatur pada konfigurasi.</p>
                             </div>
                         </div>
                     </div>
@@ -417,7 +476,7 @@
                             </div>
                             <div>
                                 <span class="text-sm font-semibold text-ink block">Batas Usia Pensiun (BUP)</span>
-                                <p class="text-xs text-muted mt-0.5 leading-relaxed">Peringatan pensiun berdasarkan tanggal lahir ditambah usia wajib pensiun pegawai.</p>
+                                <p class="text-xs text-muted mt-0.5 leading-relaxed">Peringatan pensiun berdasarkan BUP jabatan, atau usia BUP global bila diatur pada konfigurasi.</p>
                             </div>
                         </div>
                     </div>
@@ -521,7 +580,7 @@
                             </div>
                             <div>
                                 <span class="text-sm font-semibold text-ink block">Satyalancana</span>
-                                <p class="text-xs text-muted mt-0.5 leading-relaxed">Peringatan menjelang milestone masa kerja 10, 20, dan 30 tahun dari TMT pengangkatan pertama.</p>
+                                <p class="text-xs text-muted mt-0.5 leading-relaxed">Peringatan menjelang tiga milestone masa kerja dari TMT pengangkatan pertama yang dapat diatur pada konfigurasi.</p>
                             </div>
                         </div>
                     </div>

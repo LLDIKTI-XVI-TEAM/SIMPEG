@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\Employees\DownloadImportReportAction;
 use App\Actions\Employees\GenerateImportTemplateAction;
 use App\Actions\Employees\UploadImportBatchAction;
 use App\Actions\Employees\ValidateImportBatchAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Import\ImportEmployeesRequest;
 use App\Jobs\ImportEmployeeBatchJob;
+use App\Models\ImportBatch;
 use App\Support\EmployeeImport\ImportTemplateWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -117,6 +119,24 @@ class EmployeeImportController extends Controller
     }
 
     /**
+     * Unduh laporan hasil import dari record permanen (bukan cache/state browser).
+     */
+    public function report(Request $request, string $batchId, DownloadImportReportAction $action): StreamedResponse
+    {
+        $batch = ImportBatch::find($batchId);
+
+        if ($batch === null) {
+            abort(404, 'Laporan import tidak ditemukan.');
+        }
+
+        if ($batch->user_id !== null && $batch->user_id !== $request->user()?->id) {
+            abort(403, 'Anda tidak memiliki akses ke laporan import ini.');
+        }
+
+        return $action->execute($batch);
+    }
+
+    /**
      * Hasilkan dan unduh template import untuk satu tipe.
      * Controller hanya validasi input dan koordinasi Action + Writer (thin adapter).
      */
@@ -131,7 +151,7 @@ class EmployeeImportController extends Controller
         $format = strtolower((string) request('format', 'xlsx'));
         $format = in_array($format, ['xlsx', 'csv'], true) ? $format : 'xlsx';
 
-        return $writer->stream($type, $definition['headers'], $definition['example'], $format);
+        return $writer->stream($type, $definition['headers'], $definition['examples'], $format);
     }
 
     /**

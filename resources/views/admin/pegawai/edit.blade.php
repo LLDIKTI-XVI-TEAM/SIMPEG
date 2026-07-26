@@ -1,6 +1,11 @@
 <x-layouts.app title="Edit Pegawai">
     @php
         $fotoUrl = $p->foto_url;
+        $isPppkEmployee = strcasecmp((string) $p->jenisPegawai?->nama, 'PPPK') === 0;
+        $pppkAppointment = $p->appointments
+            ->filter(fn ($appointment) => strcasecmp((string) $appointment->jenis_pengangkatan, 'PPPK') === 0)
+            ->sortByDesc('tmt_pengangkatan')
+            ->first();
         $golonganRefOptions = $golonganRefOptions ?? \App\Models\RefGolongan::orderBy('kode')->get();
         $eselonOptions = $eselonOptions ?? \App\Models\RefEselon::orderBy('nama')->get();
     @endphp
@@ -99,110 +104,30 @@
                 this.berkasLainnyaForm.nomor_dokumen = `${prefix}-${randomNum}-${month}-${year}`;
             },
 
-            pangkatHistories: @js($p->rankHistories->keyBy('id')),
-            selectedPangkatId: '{{ $p->latestRank()?->id ?? 'new' }}',
+            // Riwayat bersifat append-only: form riwayat selalu menambah record baru sehingga nilai awal dikosongkan.
             pangkatForm: {
-                golongan_id: '{{ $p->latestRank()?->golongan_id ?? '' }}',
-                no_sk: '{{ $p->latestRank()?->no_sk ?? '' }}',
-                tanggal_sk: '{{ $p->latestRank()?->tanggal_sk?->format('Y-m-d') ?? '' }}',
-                tmt_pangkat: '{{ $p->latestRank()?->tmt_pangkat?->format('Y-m-d') ?? '' }}',
-            },
-            
-            jabatanHistories: @js($p->positionHistories->keyBy('id')),
-            selectedJabatanId: '{{ $p->latestPosition()?->id ?? 'new' }}',
-            jabatanForm: {
-                jabatan_id: '{{ $p->latestPosition()?->jabatan_id ?? '' }}',
-                jenis_jabatan_id: '{{ $p->latestPosition()?->jenis_jabatan_id ?? '' }}',
-                eselon_id: '{{ $p->latestPosition()?->eselon_id ?? '' }}',
-                unit_kerja_id: '{{ $p->latestPosition()?->unit_kerja_id ?? '' }}',
-                kelas_jabatan: '{{ $p->latestPosition()?->kelas_jabatan ?? $p->kelas_jabatan_terakhir ?? '' }}',
-                no_sk: '{{ $p->latestPosition()?->no_sk ?? '' }}',
-                tanggal_sk: '{{ $p->latestPosition()?->tanggal_sk?->format('Y-m-d') ?? '' }}',
-                tmt_jabatan: '{{ $p->latestPosition()?->tmt_jabatan?->format('Y-m-d') ?? '' }}',
-            },
-            
-            kgbHistories: @js($p->salaryHistories->keyBy('id')),
-            selectedKgbId: '{{ $p->latestSalary()?->id ?? 'new' }}',
-            kgbForm: {
-                gaji_pokok: '{{ $p->latestSalary()?->gaji_pokok ? (int) $p->latestSalary()->gaji_pokok : '' }}',
-                no_sk: '{{ $p->latestSalary()?->no_sk ?? '' }}',
-                tanggal_sk: '{{ $p->latestSalary()?->tanggal_sk?->format('Y-m-d') ?? '' }}',
-                tmt_kgb: '{{ $p->latestSalary()?->tmt_kgb?->format('Y-m-d') ?? '' }}',
+                golongan_id: '',
+                no_sk: '',
+                tanggal_sk: '',
+                tmt_pangkat: '',
             },
 
-            loadPangkatData() {
-                if (this.selectedPangkatId === 'new') {
-                    this.pangkatForm.golongan_id = '';
-                    this.pangkatForm.no_sk = '';
-                    this.pangkatForm.tanggal_sk = '';
-                    this.pangkatForm.tmt_pangkat = '';
-                    this.skPangkatName = '';
-                    this.skPangkatSize = '';
-                    this.skPangkatError = '';
-                } else {
-                    const data = this.pangkatHistories[this.selectedPangkatId];
-                    if (data) {
-                        this.pangkatForm.golongan_id = data.golongan_id || '';
-                        this.pangkatForm.no_sk = data.no_sk || '';
-                        this.pangkatForm.tanggal_sk = data.tanggal_sk ? data.tanggal_sk.substring(0, 10) : '';
-                        this.pangkatForm.tmt_pangkat = data.tmt_pangkat ? data.tmt_pangkat.substring(0, 10) : '';
-                        this.skPangkatName = data.file_sk ? data.file_sk.split('/').pop() : '';
-                        this.skPangkatSize = '';
-                        this.skPangkatError = '';
-                    }
-                }
+            jabatanForm: {
+                jabatan_id: '',
+                jenis_jabatan_id: '',
+                eselon_id: '',
+                unit_kerja_id: '',
+                kelas_jabatan: '',
+                no_sk: '',
+                tanggal_sk: '',
+                tmt_jabatan: '',
             },
-            loadJabatanData() {
-                if (this.selectedJabatanId === 'new') {
-                    this.jabatanForm.jabatan_id = '';
-                    this.jabatanForm.jenis_jabatan_id = '';
-                    this.jabatanForm.eselon_id = '';
-                    this.jabatanForm.unit_kerja_id = '';
-                    this.jabatanForm.kelas_jabatan = '';
-                    this.jabatanForm.no_sk = '';
-                    this.jabatanForm.tanggal_sk = '';
-                    this.jabatanForm.tmt_jabatan = '';
-                    this.skJabatanName = '';
-                    this.skJabatanSize = '';
-                    this.skJabatanError = '';
-                } else {
-                    const data = this.jabatanHistories[this.selectedJabatanId];
-                    if (data) {
-                        this.jabatanForm.jabatan_id = data.jabatan_id || '';
-                        this.jabatanForm.jenis_jabatan_id = data.jenis_jabatan_id || '';
-                        this.jabatanForm.eselon_id = data.eselon_id || '';
-                        this.jabatanForm.unit_kerja_id = data.unit_kerja_id || '';
-                        this.jabatanForm.kelas_jabatan = data.kelas_jabatan || '';
-                        this.jabatanForm.no_sk = data.no_sk || '';
-                        this.jabatanForm.tanggal_sk = data.tanggal_sk ? data.tanggal_sk.substring(0, 10) : '';
-                        this.jabatanForm.tmt_jabatan = data.tmt_jabatan ? data.tmt_jabatan.substring(0, 10) : '';
-                        this.skJabatanName = data.file_sk ? data.file_sk.split('/').pop() : '';
-                        this.skJabatanSize = '';
-                        this.skJabatanError = '';
-                    }
-                }
-            },
-            loadKgbData() {
-                if (this.selectedKgbId === 'new') {
-                    this.kgbForm.gaji_pokok = '';
-                    this.kgbForm.no_sk = '';
-                    this.kgbForm.tanggal_sk = '';
-                    this.kgbForm.tmt_kgb = '';
-                    this.skKgbName = '';
-                    this.skKgbSize = '';
-                    this.skKgbError = '';
-                } else {
-                    const data = this.kgbHistories[this.selectedKgbId];
-                    if (data) {
-                        this.kgbForm.gaji_pokok = data.gaji_pokok ? parseInt(data.gaji_pokok) : '';
-                        this.kgbForm.no_sk = data.no_sk || '';
-                        this.kgbForm.tanggal_sk = data.tanggal_sk ? data.tanggal_sk.substring(0, 10) : '';
-                        this.kgbForm.tmt_kgb = data.tmt_kgb ? data.tmt_kgb.substring(0, 10) : '';
-                        this.skKgbName = data.file_sk ? data.file_sk.split('/').pop() : '';
-                        this.skKgbSize = '';
-                        this.skKgbError = '';
-                    }
-                }
+
+            kgbForm: {
+                gaji_pokok: '',
+                no_sk: '',
+                tanggal_sk: '',
+                tmt_kgb: '',
             },
 
             validateUtama() {
@@ -589,12 +514,6 @@
                         </div>
 
                         
-
-                        {{-- Tanggal Pensiun --}}
-                        <div class="space-y-1">
-                            <label for="tanggal_pensiun" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Pensiun</label>
-                            <input id="tanggal_pensiun" name="tanggal_pensiun" type="date" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" value="{{ $p->tanggal_pensiun ? \Carbon\Carbon::parse($p->tanggal_pensiun)->format('Y-m-d') : '' }}" >
-                        </div>
                     </div>
                 </div>
 
@@ -786,20 +705,13 @@
                     <div x-show="subTab === 'pangkat'" class="space-y-6" x-transition>
                         @php $latestRank = $p->latestRank(); @endphp
                         
-                        <div class="space-y-1 mb-4 border-b border-border pb-4">
-                            <label for="pangkat_history_id" class="text-xs font-bold text-primary uppercase tracking-wider font-sans">Pilih Riwayat Kepangkatan</label>
-                            <div class="relative">
-                                <select id="pangkat_history_id" name="pangkat_history_id" x-model="selectedPangkatId" @change="loadPangkatData()" class="w-full appearance-none rounded-lg border border-primary/50 bg-primary/5 px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer font-semibold">
-                                    <option value="new">-- Tambah Riwayat Baru --</option>
-                                    @foreach($p->rankHistories->sortByDesc('tmt_pangkat') as $rh)
-                                        <option value="{{ $rh->id }}">Edit Riwayat: {{ $rh->golongan->nama }} (TMT: {{ $rh->tmt_pangkat ? $rh->tmt_pangkat->format('d-m-Y') : '-' }}) {{ $rh->is_latest ? '[Terbaru]' : '' }}</option>
-                                    @endforeach
-                                </select>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-primary">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                    </svg>
-                                </div>
+                        <div class="mb-4 border-b border-border pb-4">
+                            <div class="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 font-sans">
+                                <p class="text-xs font-bold text-primary uppercase tracking-wider">Tambah Riwayat Kepangkatan Baru</p>
+                                <p class="mt-1 text-xs text-muted">Riwayat kepangkatan bersifat append-only — riwayat yang sudah tersimpan tidak dapat diubah dari form ini.</p>
+                                @if($latestRank)
+                                    <p class="mt-1 text-xs text-muted">Riwayat terbaru: <span class="font-semibold text-ink">{{ $latestRank->golongan?->nama ?? '-' }}</span> (TMT: {{ $latestRank->tmt_pangkat ? $latestRank->tmt_pangkat->format('d-m-Y') : '-' }})</p>
+                                @endif
                             </div>
                         </div>
 
@@ -907,20 +819,13 @@
                     <div x-show="subTab === 'jabatan'" class="space-y-6" x-transition>
                         @php $latestPosition = $p->latestPosition(); @endphp
                         
-                        <div class="space-y-1 mb-4 border-b border-border pb-4">
-                            <label for="jabatan_history_id" class="text-xs font-bold text-primary uppercase tracking-wider font-sans">Pilih Riwayat Jabatan</label>
-                            <div class="relative">
-                                <select id="jabatan_history_id" name="jabatan_history_id" x-model="selectedJabatanId" @change="loadJabatanData()" class="w-full appearance-none rounded-lg border border-primary/50 bg-primary/5 px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer font-semibold">
-                                    <option value="new">-- Tambah Riwayat Baru --</option>
-                                    @foreach($p->positionHistories->sortByDesc('tmt_jabatan') as $jh)
-                                        <option value="{{ $jh->id }}">Edit Riwayat: {{ $jh->nama_jabatan }} (TMT: {{ $jh->tmt_jabatan ? $jh->tmt_jabatan->format('d-m-Y') : '-' }}) {{ $jh->is_latest ? '[Terbaru]' : '' }}</option>
-                                    @endforeach
-                                </select>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-primary">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                    </svg>
-                                </div>
+                        <div class="mb-4 border-b border-border pb-4">
+                            <div class="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 font-sans">
+                                <p class="text-xs font-bold text-primary uppercase tracking-wider">Tambah Riwayat Jabatan Baru</p>
+                                <p class="mt-1 text-xs text-muted">Riwayat jabatan bersifat append-only — riwayat yang sudah tersimpan tidak dapat diubah dari form ini.</p>
+                                @if($latestPosition)
+                                    <p class="mt-1 text-xs text-muted">Riwayat terbaru: <span class="font-semibold text-ink">{{ $latestPosition->nama_jabatan ?? '-' }}</span> (TMT: {{ $latestPosition->tmt_jabatan ? $latestPosition->tmt_jabatan->format('d-m-Y') : '-' }})</p>
+                                @endif
                             </div>
                         </div>
 
@@ -1073,20 +978,13 @@
                     <div x-show="subTab === 'kgb'" class="space-y-6" x-transition>
                         @php $latestSalary = $p->latestSalary(); @endphp
                         
-                        <div class="space-y-1 mb-4 border-b border-border pb-4">
-                            <label for="kgb_history_id" class="text-xs font-bold text-primary uppercase tracking-wider font-sans">Pilih Riwayat KGB</label>
-                            <div class="relative">
-                                <select id="kgb_history_id" name="kgb_history_id" x-model="selectedKgbId" @change="loadKgbData()" class="w-full appearance-none rounded-lg border border-primary/50 bg-primary/5 px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer font-semibold">
-                                    <option value="new">-- Tambah Riwayat Baru --</option>
-                                    @foreach($p->salaryHistories->sortByDesc('tmt_kgb') as $sh)
-                                        <option value="{{ $sh->id }}">Edit Riwayat: Rp {{ number_format($sh->gaji_pokok, 0, ',', '.') }} (TMT: {{ $sh->tmt_kgb ? $sh->tmt_kgb->format('d-m-Y') : '-' }}) {{ $sh->is_latest ? '[Terbaru]' : '' }}</option>
-                                    @endforeach
-                                </select>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-primary">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                    </svg>
-                                </div>
+                        <div class="mb-4 border-b border-border pb-4">
+                            <div class="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 font-sans">
+                                <p class="text-xs font-bold text-primary uppercase tracking-wider">Tambah Riwayat KGB Baru</p>
+                                <p class="mt-1 text-xs text-muted">Riwayat KGB bersifat append-only — riwayat yang sudah tersimpan tidak dapat diubah dari form ini.</p>
+                                @if($latestSalary)
+                                    <p class="mt-1 text-xs text-muted">Riwayat terbaru: <span class="font-semibold text-ink">Rp {{ number_format($latestSalary->gaji_pokok, 0, ',', '.') }}</span> (TMT: {{ $latestSalary->tmt_kgb ? $latestSalary->tmt_kgb->format('d-m-Y') : '-' }})</p>
+                                @endif
                             </div>
                         </div>
 
@@ -1175,7 +1073,7 @@
                             <div class="space-y-1">
                                 <label for="pengangkatan_jenis_pengangkatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Pengangkatan <span class="text-danger">*</span></label>
                                 <div class="relative">
-                                    <select id="pengangkatan_jenis_pengangkatan" name="pengangkatan_jenis_pengangkatan"  class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <select id="pengangkatan_jenis_pengangkatan" name="pengangkatan_jenis_pengangkatan" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
                                         <option value="" disabled {{ empty($p->appointment->jenis_pengangkatan) ? 'selected' : '' }}>Pilih Jenis Pengangkatan</option>
                                         <option value="CPNS" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'CPNS' ? 'selected' : '' }}>CPNS</option>
                                         <option value="PNS" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'PNS' ? 'selected' : '' }}>PNS</option>
@@ -1262,6 +1160,29 @@
                         </div>
 
                         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                            @if ($isPppkEmployee)
+                                <div class="space-y-4 rounded-lg border border-primary/20 bg-primary/5 p-4 sm:col-span-2">
+                                    <div>
+                                        <h4 class="text-sm font-bold text-ink font-sans">Kontrak PPPK</h4>
+                                        <p class="mt-1 text-xs text-muted">Tanggal akhir kontrak diprioritaskan EWS. Jika kosong, EWS memakai TMT PPPK ditambah masa kontrak global.</p>
+                                    </div>
+                                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                        <div class="space-y-1">
+                                            <label for="pppk_tmt_pengangkatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Pengangkatan PPPK</label>
+                                            <input id="pppk_tmt_pengangkatan" name="pppk_tmt_pengangkatan" type="date" value="{{ old('pppk_tmt_pengangkatan', $pppkAppointment?->tmt_pengangkatan?->format('Y-m-d')) }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
+                                            <p class="text-xs text-muted">Mengubah TMT pada riwayat SK Pengangkatan PPPK terbaru.</p>
+                                            @error('pppk_tmt_pengangkatan')<p class="text-xs text-danger">{{ $message }}</p>@enderror
+                                        </div>
+                                        <div class="space-y-1">
+                                            <label for="tanggal_akhir_kontrak" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Akhir Kontrak</label>
+                                            <input id="tanggal_akhir_kontrak" name="tanggal_akhir_kontrak" type="date" value="{{ old('tanggal_akhir_kontrak', $p->tanggal_akhir_kontrak?->format('Y-m-d')) }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
+                                            <p class="text-xs text-muted">Kosongkan untuk memakai TMT PPPK + masa kontrak global.</p>
+                                            @error('tanggal_akhir_kontrak')<p class="text-xs text-danger">{{ $message }}</p>@enderror
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+
                             {{-- Jenis Berkas --}}
                             <div class="space-y-1">
                                 <label for="berkas_lainnya_jenis" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Berkas <span class="text-danger">*</span></label>

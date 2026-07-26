@@ -153,6 +153,11 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
         ->name('pegawai.import.status');
 
+    Route::get('/pegawai/import/{batchId}/laporan', [EmployeeImportController::class, 'report'])
+        ->whereUuid('batchId')
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->name('pegawai.import.report');
+
     Route::get('/ews', [EwsController::class, 'index'])
         ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('ews');
@@ -161,7 +166,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->name('ews.saya');
     Route::match(['post', 'patch'], '/ews/{alert}/followup', [EwsController::class, 'updateFollowup'])
         ->whereUuid('alert')
-        ->middleware(['role:super_admin,admin_kepegawaian'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
         ->name('ews.followup.update');
 
     Route::get('/laporan-export', function () {

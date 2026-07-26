@@ -108,6 +108,12 @@ class EmployeeCreateIntegrationTest extends TestCase
 
         $employee = Employee::where('nip', '199001012024011001')->first();
 
+        $this->assertDatabaseHas('rank_histories', [
+            'employee_id' => $employee->id,
+            'no_sk' => 'SK-PANGKAT-UJI-001',
+            'tmt_pangkat' => '2026-01-02 00:00:00',
+            'is_latest' => true,
+        ]);
         $this->assertSame('2030-01-02', $employee->tanggal_kenaikan_pangkat_berikutnya?->format('Y-m-d'));
         $this->assertSame('2028-03-02', $employee->tanggal_kgb_berikutnya?->format('Y-m-d'));
 

@@ -22,6 +22,7 @@ class PaginateNotificationsAction
         return [
             'notifications' => SimpegNotification::query()
                 ->where('user_id', $employeeId)
+                ->orderBy('is_read')
                 ->orderByDesc('created_at')
                 ->orderByDesc('id')
                 ->paginate($perPage),

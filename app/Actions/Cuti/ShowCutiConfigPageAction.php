@@ -86,7 +86,12 @@ class ShowCutiConfigPageAction
             ->with([
                 'kepalaBagian:id,nama_lengkap,nip',
                 'supervisorAssignments' => fn ($query) => $query
-                    ->whereNull('tanggal_berakhir')
+                    // Hanya penugasan efektif hari ini yang boleh mengisi chain; penugasan mendatang belum dipilih dan tanggal akhir hari ini tetap inklusif.
+                    ->whereDate('tanggal_mulai', '<=', today()->toDateString())
+                    ->where(function ($active): void {
+                        $active->whereNull('tanggal_berakhir')
+                            ->orWhereDate('tanggal_berakhir', '>=', today()->toDateString());
+                    })
                     ->with('kepalaBagian:id,nama_lengkap,nip'),
             ])
             ->where('status_aktif', 'Aktif')

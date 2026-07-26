@@ -4,10 +4,12 @@ namespace App\Actions\Employees;
 
 use App\Models\Document;
 use App\Models\Employee;
+use App\Models\EwsAlert;
 use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
+use App\Models\SimpegNotification;
 use App\Services\AuditService;
 use App\Services\EmployeeFileStorageService;
 use App\Services\Employees\TmtCalculatorService;
@@ -32,6 +34,8 @@ class UpdateEmployeeAction
             $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
             $oldValues = $employee->toArray();
             $validated = $this->normalizeEmployeeContract($validated);
+            $pppkContractChanged = array_key_exists('tanggal_akhir_kontrak', $validated)
+                && ($oldValues['tanggal_akhir_kontrak'] ?? null) !== $validated['tanggal_akhir_kontrak'];
             $rankHistoryChanged = false;
             $positionHistoryChanged = false;
             $salaryHistoryChanged = false;
@@ -88,18 +92,10 @@ class UpdateEmployeeAction
                     }
                 }
 
-                $pangkatId = $request->input('pangkat_history_id');
-                if ($pangkatId && $pangkatId !== 'new') {
-                    $history = $employee->rankHistories()->find($pangkatId);
-                    if ($history) {
-                        $history->update($pangkatData);
-                        $rankHistoryChanged = $history->wasChanged();
-                    }
-                } else {
-                    $pangkatData['is_latest'] = false;
-                    $employee->rankHistories()->create($pangkatData);
-                    $rankHistoryChanged = true;
-                }
+                // Riwayat (pangkat/jabatan/KGB) bersifat append-only: form edit hanya boleh menambah record baru.
+                $pangkatData['is_latest'] = false;
+                $employee->rankHistories()->create($pangkatData);
+                $rankHistoryChanged = true;
             }
 
             // 2. Jabatan (PositionHistory)
@@ -153,18 +149,9 @@ class UpdateEmployeeAction
                     }
                 }
 
-                $jabatanId = $request->input('jabatan_history_id');
-                if ($jabatanId && $jabatanId !== 'new') {
-                    $history = $employee->positionHistories()->find($jabatanId);
-                    if ($history) {
-                        $history->update($jabatanData);
-                        $positionHistoryChanged = $history->wasChanged();
-                    }
-                } else {
-                    $jabatanData['is_latest'] = false;
-                    $employee->positionHistories()->create($jabatanData);
-                    $positionHistoryChanged = true;
-                }
+                $jabatanData['is_latest'] = false;
+                $employee->positionHistories()->create($jabatanData);
+                $positionHistoryChanged = true;
             }
 
             // 3. KGB (SalaryHistory)
@@ -207,18 +194,9 @@ class UpdateEmployeeAction
                     }
                 }
 
-                $kgbId = $request->input('kgb_history_id');
-                if ($kgbId && $kgbId !== 'new') {
-                    $history = $employee->salaryHistories()->find($kgbId);
-                    if ($history) {
-                        $history->update($kgbData);
-                        $salaryHistoryChanged = $history->wasChanged();
-                    }
-                } else {
-                    $kgbData['is_latest'] = false;
-                    $employee->salaryHistories()->create($kgbData);
-                    $salaryHistoryChanged = true;
-                }
+                $kgbData['is_latest'] = false;
+                $employee->salaryHistories()->create($kgbData);
+                $salaryHistoryChanged = true;
             }
 
             // Bangun ulang flag dari seluruh TMT sah setelah semua penulisan agar backfill/null tidak merusak snapshot terbaru.
@@ -289,6 +267,18 @@ class UpdateEmployeeAction
                 }
             }
 
+            if ($request->filled('pppk_tmt_pengangkatan')) {
+                $pppkAppointment = $employee->appointments()
+                    ->whereRaw('UPPER(jenis_pengangkatan) = ?', ['PPPK'])
+                    ->orderByDesc('tmt_pengangkatan')
+                    ->first();
+
+                if ($pppkAppointment && $pppkAppointment->tmt_pengangkatan?->toDateString() !== $validated['pppk_tmt_pengangkatan']) {
+                    $pppkAppointment->update(['tmt_pengangkatan' => $validated['pppk_tmt_pengangkatan']]);
+                    $pppkContractChanged = true;
+                }
+            }
+
             // 5. Berkas Lainnya (KTP, KK, SK Mutasi, SK Pensiun, atau jenis manual)
             if ($request->filled('berkas_lainnya_jenis')
                 && $request->hasFile('file_berkas_lainnya')
@@ -333,6 +323,25 @@ class UpdateEmployeeAction
                             'status_aktif' => $statusPegawai->nama,
                         ]);
                     }
+                }
+            }
+
+            if ($pppkContractChanged) {
+                $activeAlerts = EwsAlert::query()
+                    ->where('employee_id', $employee->id)
+                    ->where('type', 'KONTRAK_PPPK')
+                    ->where('followup_status', EwsAlert::FOLLOWUP_STATUS_ACTIVE)
+                    ->get(['id']);
+
+                if ($activeAlerts->isNotEmpty()) {
+                    $alertIds = $activeAlerts->pluck('id');
+                    EwsAlert::whereIn('id', $alertIds)->update([
+                        'followup_status' => EwsAlert::FOLLOWUP_STATUS_EXPIRED,
+                        'is_processed' => true,
+                    ]);
+                    SimpegNotification::whereIn('ews_alert_id', $alertIds)
+                        ->where('is_read', false)
+                        ->update(['is_read' => true, 'read_at' => now()]);
                 }
             }
 

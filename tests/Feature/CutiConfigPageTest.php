@@ -4,9 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\AuditLog;
 use App\Models\Employee;
+use App\Models\SupervisorAssignment;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 /**
@@ -130,5 +132,97 @@ class CutiConfigPageTest extends TestCase
         $response->assertOk()
             ->assertSee('Target Konfigurasi 001')
             ->assertDontSee('Target Konfigurasi 051');
+    }
+
+    public function test_penugasan_kepala_bagian_terbuka_yang_belum_dimulai_tidak_ditampilkan_atau_dipilih(): void
+    {
+        Carbon::setTestNow('2026-07-23 08:00:00');
+
+        try {
+            $actor = User::factory()->superAdmin()->create();
+            $kepalaBagianMendatang = Employee::factory()->create([
+                'nama_lengkap' => 'Kepala Bagian Mendatang',
+            ]);
+            $pegawai = Employee::factory()->create(['kepala_bagian_id' => null]);
+            SupervisorAssignment::create([
+                'employee_id' => $pegawai->id,
+                'kepala_bagian_id' => $kepalaBagianMendatang->id,
+                'tanggal_mulai' => '2026-07-24',
+                'tanggal_berakhir' => null,
+            ]);
+
+            $response = $this->actingAs($actor)->get(route('cuti.config', [
+                'employee_id' => $pegawai->id,
+            ]));
+
+            $response->assertOk()
+                ->assertSee('Belum ditetapkan')
+                ->assertSee('Pegawai belum memiliki Kepala Bagian aktif. Tetapkan struktur pegawai sebelum menyimpan chain.')
+                ->assertDontSee($kepalaBagianMendatang->nama_lengkap)
+                ->assertDontSee('name="steps[0][approver_employee_id]"', false)
+                ->assertDontSee('value="'.$kepalaBagianMendatang->id.'"', false);
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_penugasan_kepala_bagian_terbuka_yang_sudah_dimulai_tetap_ditampilkan_dan_dipilih(): void
+    {
+        Carbon::setTestNow('2026-07-23 08:00:00');
+
+        try {
+            $actor = User::factory()->superAdmin()->create();
+            $kepalaBagianAktif = Employee::factory()->create([
+                'nama_lengkap' => 'Kepala Bagian Aktif',
+            ]);
+            $pegawai = Employee::factory()->create(['kepala_bagian_id' => null]);
+            SupervisorAssignment::create([
+                'employee_id' => $pegawai->id,
+                'kepala_bagian_id' => $kepalaBagianAktif->id,
+                'tanggal_mulai' => '2026-07-23',
+                'tanggal_berakhir' => null,
+            ]);
+
+            $response = $this->actingAs($actor)->get(route('cuti.config', [
+                'employee_id' => $pegawai->id,
+            ]));
+
+            $response->assertOk()
+                ->assertSee($kepalaBagianAktif->nama_lengkap)
+                ->assertSee('name="steps[0][approver_employee_id]" value="'.$kepalaBagianAktif->id.'"', false)
+                ->assertDontSee('Pegawai belum memiliki Kepala Bagian aktif. Tetapkan struktur pegawai sebelum menyimpan chain.');
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_penugasan_kepala_bagian_yang_berakhir_hari_ini_tetap_ditampilkan_dan_dipilih(): void
+    {
+        Carbon::setTestNow('2026-07-23 08:00:00');
+
+        try {
+            $actor = User::factory()->superAdmin()->create();
+            $kepalaBagianHariTerakhir = Employee::factory()->create([
+                'nama_lengkap' => 'Kepala Bagian Hari Terakhir',
+            ]);
+            $pegawai = Employee::factory()->create(['kepala_bagian_id' => null]);
+            SupervisorAssignment::create([
+                'employee_id' => $pegawai->id,
+                'kepala_bagian_id' => $kepalaBagianHariTerakhir->id,
+                'tanggal_mulai' => '2026-07-01',
+                'tanggal_berakhir' => '2026-07-23',
+            ]);
+
+            $response = $this->actingAs($actor)->get(route('cuti.config', [
+                'employee_id' => $pegawai->id,
+            ]));
+
+            $response->assertOk()
+                ->assertSee($kepalaBagianHariTerakhir->nama_lengkap)
+                ->assertSee('name="steps[0][approver_employee_id]" value="'.$kepalaBagianHariTerakhir->id.'"', false)
+                ->assertDontSee('Pegawai belum memiliki Kepala Bagian aktif. Tetapkan struktur pegawai sebelum menyimpan chain.');
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 }

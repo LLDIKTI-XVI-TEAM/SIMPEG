@@ -20,13 +20,28 @@ class EwsCommandScheduleTest extends TestCase
             ->assertExitCode(0);
     }
 
-    public function test_run_ews_command_is_scheduled_daily_from_default_config_time(): void
+    public function test_run_ews_command_is_checked_every_five_minutes_after_configured_time(): void
     {
-        $event = collect(Schedule::events())
-            ->first(fn ($event): bool => str_contains($event->command ?? '', 'app:run-ews'));
+        $events = collect(Schedule::events())
+            ->filter(fn ($event): bool => str_contains($event->command ?? '', 'app:run-ews'));
 
-        $this->assertNotNull($event);
-        $this->assertSame('0 7 * * *', $event->expression);
+        $this->assertCount(1, $events);
+
+        $event = $events->first();
+        $this->assertSame('*/5 * * * *', $event->expression);
         $this->assertSame('Asia/Makassar', $event->timezone);
+    }
+
+    public function test_run_ews_command_schedule_has_overlap_protection(): void
+    {
+        $events = collect(Schedule::events())
+            ->filter(fn ($event): bool => str_contains($event->command ?? '', 'app:run-ews'));
+
+        // Proteksi overlap wajib agar siklus EWS yang lambat tidak dieksekusi ganda
+        // oleh jadwal lima menit berikutnya. TTL mutex dibatasi agar proses yang
+        // mati paksa tidak memblokir run berikutnya selama 24 jam default.
+        $event = $events->sole();
+        $this->assertTrue($event->withoutOverlapping);
+        $this->assertSame(30, $event->expiresAt);
     }
 }

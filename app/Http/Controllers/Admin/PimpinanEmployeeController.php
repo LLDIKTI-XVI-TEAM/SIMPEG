@@ -135,7 +135,14 @@ class PimpinanEmployeeController extends Controller
                 ->orderBy('nama_anggota'),
             'supervisorAssignments' => fn ($query) => $query
                 ->select(['id', 'employee_id', 'supervisor_id', 'kepala_bagian_id', 'tanggal_mulai', 'tanggal_berakhir'])
-                ->whereNull('tanggal_berakhir')
+                // Hanya assignment yang efektif terhadap hari ini: sudah dimulai dan belum berakhir.
+                // Future assignment (tanggal_mulai > hari ini) tidak boleh dianggap current;
+                // tanggal_berakhir = hari ini bersifat inklusif.
+                ->whereDate('tanggal_mulai', '<=', today())
+                ->where(function ($q) {
+                    $q->whereNull('tanggal_berakhir')
+                        ->orWhereDate('tanggal_berakhir', '>=', today());
+                })
                 ->with([
                     'supervisor:id,nama_lengkap,jabatan_terakhir',
                     'supervisor.positionHistories' => fn ($positions) => $positions

@@ -24,6 +24,7 @@ class NotificationEventChannelMigrationTest extends TestCase
             'ews.kontrak_pppk',
             'ews.pensiun',
             'ews.satyalancana',
+            'ews.tidak_perlu',
         ];
 
         $normalPolicies = DB::table('notification_event_channels')
@@ -35,7 +36,7 @@ class NotificationEventChannelMigrationTest extends TestCase
                 'ref_notification_channels.code',
             ]);
 
-        $this->assertCount(22, $normalPolicies);
+        $this->assertCount(24, $normalPolicies);
         $this->assertTrue($normalPolicies->every(fn (object $policy): bool => (bool) $policy->is_enabled));
 
         foreach ($normalEvents as $eventKey) {
@@ -55,7 +56,7 @@ class NotificationEventChannelMigrationTest extends TestCase
         $this->assertCount(1, $schedulerPolicies);
         $this->assertSame('in_app', $schedulerPolicies->sole()->code);
         $this->assertTrue((bool) $schedulerPolicies->sole()->is_enabled);
-        $this->assertDatabaseCount('notification_event_channels', 23);
+        $this->assertDatabaseCount('notification_event_channels', 25);
 
         $orphanCount = DB::table('notification_event_channels')
             ->leftJoin('ref_notification_channels', 'ref_notification_channels.id', '=', 'notification_event_channels.notification_channel_id')
