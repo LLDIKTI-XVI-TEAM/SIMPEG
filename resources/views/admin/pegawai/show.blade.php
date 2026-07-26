@@ -11,7 +11,7 @@
             ? \Carbon\Carbon::parse($p->tanggal_kgb_berikutnya)->format('d-m-Y')
             : '-';
 
-        $pensiunDate = $p->tanggal_pensiun ? \Carbon\Carbon::parse($p->tanggal_pensiun) : null;
+        $pensiunDate = $estimasiTanggalPensiun ?? ($p->tanggal_pensiun ? \Carbon\Carbon::parse($p->tanggal_pensiun) : null);
         $estimasiPensiun = $pensiunDate ? $pensiunDate->format('d-m-Y') : '-';
 
         $sisaPensiunStr = '-';

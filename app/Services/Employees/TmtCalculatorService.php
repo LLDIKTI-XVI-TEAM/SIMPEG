@@ -3,6 +3,7 @@
 namespace App\Services\Employees;
 
 use App\Models\Employee;
+use App\Models\EwsConfig;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\SalaryHistory;
@@ -18,10 +19,13 @@ class TmtCalculatorService
         $latestRank = $this->latestRank($employee);
         $latestSalary = $this->latestSalary($employee);
 
+        $pangkatRequiredYears = $this->configYears('pangkat_required_years', 4);
+        $kgbRequiredYears = $this->configYears('kgb_required_years', 2);
+
         // Tanpa sumber bertanggal, snapshot lama harus dikosongkan agar tidak dianggap sebagai fakta pegawai.
         $updates = [
-            'tanggal_kenaikan_pangkat_berikutnya' => $latestRank?->tmt_pangkat?->copy()->addYearsNoOverflow(4),
-            'tanggal_kgb_berikutnya' => $latestSalary?->tmt_kgb?->copy()->addYearsNoOverflow(2),
+            'tanggal_kenaikan_pangkat_berikutnya' => $latestRank?->tmt_pangkat?->copy()->addYearsNoOverflow($pangkatRequiredYears),
+            'tanggal_kgb_berikutnya' => $latestSalary?->tmt_kgb?->copy()->addYearsNoOverflow($kgbRequiredYears),
         ];
 
         // Tanggal pensiun manual/import adalah data resmi sehingga kalkulasi hanya mengisi nilai yang masih kosong.
@@ -34,6 +38,11 @@ class TmtCalculatorService
         }
 
         $employee->update($updates);
+    }
+
+    private function configYears(string $key, int $default): int
+    {
+        return max(1, (int) EwsConfig::getVal($key, (string) $default));
     }
 
     private function latestRank(Employee $employee): ?RankHistory

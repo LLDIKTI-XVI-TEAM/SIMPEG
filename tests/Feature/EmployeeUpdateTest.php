@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Appointment;
 use App\Models\Employee;
+use App\Models\EwsAlert;
 use App\Models\RankHistory;
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
@@ -210,6 +212,123 @@ class EmployeeUpdateTest extends TestCase
         $response->assertJsonValidationErrors('tanggal_lahir');
     }
 
+    public function test_web_edit_omits_and_ignores_manual_retirement_date(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create(['tanggal_pensiun' => '2042-05-15']);
+
+        $this->actingAs($user)
+            ->get(route('pegawai.edit', $employee->id))
+            ->assertOk()
+            ->assertDontSee('name="tanggal_pensiun"', false);
+
+        $response = $this->actingAs($user)->post(
+            route('pegawai.update', $employee->id),
+            $this->validPayload($employee, ['tanggal_pensiun' => '2030-01-01'])
+        );
+
+        $response->assertRedirect(route('data-pegawai'));
+        $this->assertSame('2042-05-15', $employee->fresh()->tanggal_pensiun?->toDateString());
+    }
+
+    public function test_pppk_contract_dates_are_shown_saved_and_reset_active_contract_alerts(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $pppk = RefJenisPegawai::where('nama', 'PPPK')->firstOrFail();
+        $employee = Employee::factory()->create([
+            'jenis_pegawai_id' => $pppk->id,
+            'tanggal_akhir_kontrak' => '2028-01-01',
+        ]);
+        $appointment = Appointment::create([
+            'employee_id' => $employee->id,
+            'jenis_pengangkatan' => 'PPPK',
+            'tmt_pengangkatan' => '2024-01-01',
+            'no_sk' => 'SK-PPPK-LAMA',
+            'tanggal_sk' => '2024-01-01',
+        ]);
+        $alert = EwsAlert::create([
+            'employee_id' => $employee->id,
+            'type' => 'KONTRAK_PPPK',
+            'target_date' => '2028-01-01',
+            'interval_days' => 180,
+            'is_processed' => false,
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_ACTIVE,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('pegawai.edit', $employee->id))
+            ->assertOk()
+            ->assertSee('name="pppk_tmt_pengangkatan"', false)
+            ->assertSee('name="tanggal_akhir_kontrak"', false);
+
+        $response = $this->actingAs($user)->post(
+            route('pegawai.update', $employee->id),
+            $this->validPayload($employee, [
+                'pppk_tmt_pengangkatan' => '2025-01-01',
+                'tanggal_akhir_kontrak' => '2029-01-01',
+            ])
+        );
+
+        $response->assertRedirect(route('data-pegawai'));
+        $this->assertSame('2029-01-01', $employee->fresh()->tanggal_akhir_kontrak?->toDateString());
+        $this->assertSame('2025-01-01', $appointment->fresh()->tmt_pengangkatan?->toDateString());
+        $alert->refresh();
+        $this->assertSame(EwsAlert::FOLLOWUP_STATUS_EXPIRED, $alert->followup_status);
+        $this->assertTrue($alert->is_processed);
+    }
+
+    public function test_non_pppk_employee_cannot_view_or_submit_contract_dates(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $pns = RefJenisPegawai::where('nama', 'PNS')->firstOrFail();
+        $employee = Employee::factory()->create([
+            'jenis_pegawai_id' => $pns->id,
+            'tanggal_akhir_kontrak' => null,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('pegawai.edit', $employee->id))
+            ->assertOk()
+            ->assertDontSee('name="pppk_tmt_pengangkatan"', false)
+            ->assertDontSee('name="tanggal_akhir_kontrak"', false);
+
+        $response = $this->actingAs($user)->from(route('pegawai.edit', $employee->id))->post(
+            route('pegawai.update', $employee->id),
+            $this->validPayload($employee, [
+                'pppk_tmt_pengangkatan' => '2025-01-01',
+                'tanggal_akhir_kontrak' => '2029-01-01',
+            ])
+        );
+
+        $response->assertRedirect(route('pegawai.edit', $employee->id));
+        $response->assertSessionHasErrors(['pppk_tmt_pengangkatan', 'tanggal_akhir_kontrak']);
+        $this->assertNull($employee->fresh()->tanggal_akhir_kontrak);
+    }
+
+    public function test_pppk_contract_end_date_cannot_precede_pppk_tmt(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $pppk = RefJenisPegawai::where('nama', 'PPPK')->firstOrFail();
+        $employee = Employee::factory()->create(['jenis_pegawai_id' => $pppk->id]);
+        Appointment::create([
+            'employee_id' => $employee->id,
+            'jenis_pengangkatan' => 'PPPK',
+            'tmt_pengangkatan' => '2025-01-01',
+            'no_sk' => 'SK-PPPK-VALIDASI',
+            'tanggal_sk' => '2025-01-01',
+        ]);
+
+        $response = $this->actingAs($user)->from(route('pegawai.edit', $employee->id))->post(
+            route('pegawai.update', $employee->id),
+            $this->validPayload($employee, [
+                'tanggal_akhir_kontrak' => '2024-12-31',
+            ])
+        );
+
+        $response->assertRedirect(route('pegawai.edit', $employee->id));
+        $response->assertSessionHasErrors('tanggal_akhir_kontrak');
+    }
+
     private function endpoint(Employee $employee): string
     {
         return "/api/v1/pegawai/{$employee->id}";
@@ -333,6 +452,9 @@ class EmployeeUpdateTest extends TestCase
             'tmt_pangkat' => '2026-01-02 00:00:00',
             'is_latest' => 1,
         ]);
+
+        $employee->refresh();
+        $this->assertSame('2030-01-02', $employee->tanggal_kenaikan_pangkat_berikutnya?->format('Y-m-d'));
 
         // Assert PositionHistory was created
         $this->assertDatabaseHas('position_histories', [
@@ -499,6 +621,67 @@ class EmployeeUpdateTest extends TestCase
         if (DB::getDriverName() !== 'sqlite') {
             $this->assertStringContainsString('for update', $queries->get($employeeLockIndex));
         }
+    }
+
+    public function test_web_rank_history_sets_next_promotion_date_from_tmt(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $golongan = RefGolongan::where('kode', 'III/a')->firstOrFail();
+
+        $this->actingAs($user);
+        $response = $this->withSession(['_token' => 'test-token'])
+            ->post("/pegawai/{$employee->id}", $this->validPayload($employee, [
+                'pangkat_history_id' => 'new',
+                'pangkat_golongan_id' => $golongan->id,
+                'pangkat_no_sk' => 'SK-PANGKAT-EWS-001',
+                'pangkat_tanggal_sk' => '2022-07-01',
+                'pangkat_tmt_pangkat' => '2022-07-22',
+            ]), ['X-CSRF-TOKEN' => 'test-token']);
+
+        $response->assertRedirect(route('data-pegawai'));
+        $this->assertDatabaseHas('rank_histories', [
+            'employee_id' => $employee->id,
+            'no_sk' => 'SK-PANGKAT-EWS-001',
+            'is_latest' => true,
+        ]);
+        $this->assertSame('2026-07-22', $employee->fresh()->tanggal_kenaikan_pangkat_berikutnya?->format('Y-m-d'));
+    }
+
+    public function test_web_backdated_rank_history_keeps_latest_snapshot_and_ews_target(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $oldGolongan = RefGolongan::where('kode', 'III/a')->firstOrFail();
+        $latestGolongan = RefGolongan::where('kode', 'III/b')->firstOrFail();
+        $latest = $employee->rankHistories()->create([
+            'golongan_id' => $latestGolongan->id,
+            'no_sk' => 'SK-PANGKAT-LATEST',
+            'tanggal_sk' => '2022-07-01',
+            'tmt_pangkat' => '2022-07-22',
+            'is_latest' => true,
+        ]);
+
+        $this->actingAs($user);
+        $response = $this->withSession(['_token' => 'test-token'])
+            ->post("/pegawai/{$employee->id}", $this->validPayload($employee, [
+                'pangkat_history_id' => 'new',
+                'pangkat_golongan_id' => $oldGolongan->id,
+                'pangkat_no_sk' => 'SK-PANGKAT-LAMA',
+                'pangkat_tanggal_sk' => '2020-07-01',
+                'pangkat_tmt_pangkat' => '2020-07-22',
+            ]), ['X-CSRF-TOKEN' => 'test-token']);
+
+        $response->assertRedirect(route('data-pegawai'));
+        $this->assertTrue($latest->fresh()->is_latest);
+        $this->assertDatabaseHas('rank_histories', [
+            'employee_id' => $employee->id,
+            'no_sk' => 'SK-PANGKAT-LAMA',
+            'is_latest' => false,
+        ]);
+        $employee->refresh();
+        $this->assertSame('III/b', $employee->golongan_terakhir);
+        $this->assertSame('2026-07-22', $employee->tanggal_kenaikan_pangkat_berikutnya?->format('Y-m-d'));
     }
 
     public function test_berkas_lainnya_preset_ktp_is_saved_as_document_on_employee_update(): void

@@ -161,7 +161,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->name('ews.saya');
     Route::match(['post', 'patch'], '/ews/{alert}/followup', [EwsController::class, 'updateFollowup'])
         ->whereUuid('alert')
-        ->middleware(['role:super_admin,admin_kepegawaian'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
         ->name('ews.followup.update');
 
     Route::get('/laporan-export', function () {

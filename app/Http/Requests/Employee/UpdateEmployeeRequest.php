@@ -4,7 +4,9 @@ namespace App\Http\Requests\Employee;
 
 use App\Models\Employee;
 use App\Support\EmployeeValidationRules;
+use Carbon\Carbon;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class UpdateEmployeeRequest extends FormRequest
 {
@@ -36,6 +38,9 @@ class UpdateEmployeeRequest extends FormRequest
 
         // Aturan tambahan khusus form UI web
         if (! $this->wantsJson() && ! $this->is('api/*')) {
+            // Tanggal pensiun dihitung dari tanggal lahir dan BUP pada halaman detail.
+            unset($rules['tanggal_pensiun']);
+
             // Pangkat (Rank)
             $rules['pangkat_golongan_id'] = ['nullable', 'uuid', 'exists:ref_golongan,id'];
             $rules['pangkat_no_sk'] = ['nullable', 'string', 'max:255'];
@@ -69,6 +74,15 @@ class UpdateEmployeeRequest extends FormRequest
             $rules['pengangkatan_tanggal_sk'] = ['nullable', 'date'];
             $rules['file_sk_pengangkatan'] = ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png'];
 
+            $isPppk = strcasecmp((string) $employee->jenisPegawai?->nama, 'PPPK') === 0;
+            if ($isPppk) {
+                $rules['pppk_tmt_pengangkatan'] = ['nullable', 'date'];
+                $rules['tanggal_akhir_kontrak'] = ['nullable', 'date'];
+            } else {
+                $rules['pppk_tmt_pengangkatan'] = ['prohibited'];
+                $rules['tanggal_akhir_kontrak'] = ['prohibited'];
+            }
+
             // Berkas Lainnya (KTP, KK, SK Mutasi, SK Pensiun, atau jenis manual)
             $rules['berkas_lainnya_jenis'] = ['nullable', 'string', 'in:KTP,KK,SK Mutasi,SK Pensiun,Lainnya'];
             $rules['berkas_lainnya_jenis_manual'] = ['nullable', 'required_if:berkas_lainnya_jenis,Lainnya', 'string', 'max:100'];
@@ -84,8 +98,55 @@ class UpdateEmployeeRequest extends FormRequest
         return $rules;
     }
 
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            if (! $this->has('pppk_tmt_pengangkatan') && ! $this->has('tanggal_akhir_kontrak')) {
+                return;
+            }
+
+            $employeeId = $this->route('id') ?? $this->route('employee');
+            $employee = $employeeId instanceof Employee
+                ? $employeeId
+                : Employee::with('jenisPegawai')->find($employeeId);
+
+            if ($employee === null || strcasecmp((string) $employee->jenisPegawai?->nama, 'PPPK') !== 0) {
+                return;
+            }
+
+            $pppkAppointment = $employee->appointments()
+                ->whereRaw('UPPER(jenis_pengangkatan) = ?', ['PPPK'])
+                ->orderByDesc('tmt_pengangkatan')
+                ->first();
+
+            if ($this->filled('pppk_tmt_pengangkatan') && $pppkAppointment === null) {
+                $validator->errors()->add(
+                    'pppk_tmt_pengangkatan',
+                    'Tambahkan SK Pengangkatan PPPK terlebih dahulu sebelum memperbarui TMT kontrak.'
+                );
+
+                return;
+            }
+
+            if (! $this->filled('tanggal_akhir_kontrak')) {
+                return;
+            }
+
+            $tmt = $this->input('pppk_tmt_pengangkatan') ?? $pppkAppointment?->tmt_pengangkatan?->toDateString();
+            if ($tmt !== null && Carbon::parse($this->input('tanggal_akhir_kontrak'))->lt(Carbon::parse($tmt))) {
+                $validator->errors()->add(
+                    'tanggal_akhir_kontrak',
+                    'Tanggal akhir kontrak harus sama dengan atau setelah TMT Pengangkatan PPPK.'
+                );
+            }
+        });
+    }
+
     public function attributes(): array
     {
-        return EmployeeValidationRules::attributes();
+        return array_merge(EmployeeValidationRules::attributes(), [
+            'pppk_tmt_pengangkatan' => 'TMT Pengangkatan PPPK',
+            'tanggal_akhir_kontrak' => 'Tanggal akhir kontrak PPPK',
+        ]);
     }
 }

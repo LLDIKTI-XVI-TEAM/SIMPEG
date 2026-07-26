@@ -56,7 +56,6 @@ class ListActiveEwsAlertsAction
         }
 
         $status = $this->statusFromFilter($filterStatus);
-        $status = $this->statusFromFilter($filterStatus);
         if ($filterStatus === 'semua') {
             // Do not filter by followup_status
         } elseif ($filterStatus === '' || $filterStatus === null) {
@@ -134,6 +133,7 @@ class ListActiveEwsAlertsAction
         return [
             'pegawai_id' => $employee->id,
             'alert_id' => $alert->id,
+            'type' => $alert->type,
             'nama' => $employee->nama_lengkap,
             'nip' => $employee->nip,
             'jenis_event' => $this->typeLabels[$alert->type] ?? $alert->type,

@@ -22,6 +22,7 @@ use App\Http\Requests\Employee\UpdateEmployeeRequest;
 use App\Http\Requests\Employee\UpdateEmployeeSatyalancanaEligibilityRequest;
 use App\Models\AuditLog;
 use App\Models\Employee;
+use App\Models\EwsConfig;
 use App\Models\RefAgama;
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
@@ -312,8 +313,10 @@ class PegawaiController extends Controller
             return redirect()->route('data-pegawai')
                 ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil ditambahkan.')
                 ->with('employee_data_changed', true);
-        } catch (\Exception $e) {
-            return back()->withInput()->with('error', 'Gagal menambahkan pegawai: '.$e->getMessage());
+        } catch (\Throwable $e) {
+            return back()
+                ->withInput($request->except(array_keys($request->allFiles())))
+                ->with('error', 'Gagal menambahkan pegawai: '.$e->getMessage());
         }
     }
 
@@ -344,6 +347,10 @@ class PegawaiController extends Controller
         $unitKerjaOptions = RefUnitKerja::all();
         $eselonOptions = RefEselon::all();
         $jenjangOptions = RefJenjangPendidikan::orderBy('urutan')->get();
+        $bupPensiunYears = max(0, (int) EwsConfig::getVal('pensiun_required_age_years', 0));
+        $estimasiTanggalPensiun = $bupPensiunYears > 0 && $p->tanggal_lahir
+            ? $p->tanggal_lahir->copy()->addYears($bupPensiunYears)
+            : null;
 
         $currentSupervisor = $p->supervisorAssignments
             ->filter(fn ($assignment): bool => $assignment->tanggal_mulai->lte(today())
@@ -361,7 +368,7 @@ class PegawaiController extends Controller
         $selectedSupervisorId = $selectedSupervisor?->id ?? $currentSupervisor?->supervisor?->id;
         $selectedSupervisorName = $selectedSupervisor?->nama_lengkap ?? $currentSupervisor?->supervisor?->nama_lengkap;
 
-        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions', 'currentSupervisor', 'currentSupervisorPosition', 'selectedSupervisorId', 'selectedSupervisorName'));
+        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions', 'estimasiTanggalPensiun', 'currentSupervisor', 'currentSupervisorPosition', 'selectedSupervisorId', 'selectedSupervisorName'));
     }
 
     public function edit($id, PrepareEmployeeEditFormDataAction $action)
@@ -388,8 +395,10 @@ class PegawaiController extends Controller
             }
 
             return $redirect;
-        } catch (\Exception $e) {
-            return back()->withInput()->with('error', 'Gagal memperbarui pegawai: '.$e->getMessage());
+        } catch (\Throwable $e) {
+            return back()
+                ->withInput($request->except(array_keys($request->allFiles())))
+                ->with('error', 'Gagal memperbarui pegawai: '.$e->getMessage());
         }
     }
 
