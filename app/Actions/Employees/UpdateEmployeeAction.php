@@ -92,18 +92,10 @@ class UpdateEmployeeAction
                     }
                 }
 
-                $pangkatId = $request->input('pangkat_history_id');
-                if ($pangkatId && $pangkatId !== 'new') {
-                    $history = $employee->rankHistories()->find($pangkatId);
-                    if ($history) {
-                        $history->update($pangkatData);
-                        $rankHistoryChanged = $history->wasChanged();
-                    }
-                } else {
-                    $pangkatData['is_latest'] = false;
-                    $employee->rankHistories()->create($pangkatData);
-                    $rankHistoryChanged = true;
-                }
+                // Riwayat (pangkat/jabatan/KGB) bersifat append-only: form edit hanya boleh menambah record baru.
+                $pangkatData['is_latest'] = false;
+                $employee->rankHistories()->create($pangkatData);
+                $rankHistoryChanged = true;
             }
 
             // 2. Jabatan (PositionHistory)
@@ -157,18 +149,9 @@ class UpdateEmployeeAction
                     }
                 }
 
-                $jabatanId = $request->input('jabatan_history_id');
-                if ($jabatanId && $jabatanId !== 'new') {
-                    $history = $employee->positionHistories()->find($jabatanId);
-                    if ($history) {
-                        $history->update($jabatanData);
-                        $positionHistoryChanged = $history->wasChanged();
-                    }
-                } else {
-                    $jabatanData['is_latest'] = false;
-                    $employee->positionHistories()->create($jabatanData);
-                    $positionHistoryChanged = true;
-                }
+                $jabatanData['is_latest'] = false;
+                $employee->positionHistories()->create($jabatanData);
+                $positionHistoryChanged = true;
             }
 
             // 3. KGB (SalaryHistory)
@@ -211,18 +194,9 @@ class UpdateEmployeeAction
                     }
                 }
 
-                $kgbId = $request->input('kgb_history_id');
-                if ($kgbId && $kgbId !== 'new') {
-                    $history = $employee->salaryHistories()->find($kgbId);
-                    if ($history) {
-                        $history->update($kgbData);
-                        $salaryHistoryChanged = $history->wasChanged();
-                    }
-                } else {
-                    $kgbData['is_latest'] = false;
-                    $employee->salaryHistories()->create($kgbData);
-                    $salaryHistoryChanged = true;
-                }
+                $kgbData['is_latest'] = false;
+                $employee->salaryHistories()->create($kgbData);
+                $salaryHistoryChanged = true;
             }
 
             // Bangun ulang flag dari seluruh TMT sah setelah semua penulisan agar backfill/null tidak merusak snapshot terbaru.
