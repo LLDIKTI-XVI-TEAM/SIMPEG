@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\Employees\DownloadImportReportAction;
 use App\Actions\Employees\GenerateImportTemplateAction;
 use App\Actions\Employees\UploadImportBatchAction;
 use App\Actions\Employees\ValidateImportBatchAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Import\ImportEmployeesRequest;
 use App\Jobs\ImportEmployeeBatchJob;
+use App\Models\ImportBatch;
 use App\Support\EmployeeImport\ImportTemplateWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -114,6 +116,24 @@ class EmployeeImportController extends Controller
             'error_message' => $batch['error_message'] ?? null,
             'result' => $batch['result'] ?? null,
         ]);
+    }
+
+    /**
+     * Unduh laporan hasil import dari record permanen (bukan cache/state browser).
+     */
+    public function report(Request $request, string $batchId, DownloadImportReportAction $action): StreamedResponse
+    {
+        $batch = ImportBatch::find($batchId);
+
+        if ($batch === null) {
+            abort(404, 'Laporan import tidak ditemukan.');
+        }
+
+        if ($batch->user_id !== null && $batch->user_id !== $request->user()?->id) {
+            abort(403, 'Anda tidak memiliki akses ke laporan import ini.');
+        }
+
+        return $action->execute($batch);
     }
 
     /**

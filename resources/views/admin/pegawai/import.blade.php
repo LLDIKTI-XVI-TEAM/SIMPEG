@@ -105,24 +105,6 @@
             }
         },
         
-        // Download Laporan Kesalahan
-        downloadErrorReport() {
-            let headers = ['Baris', 'Nama Pegawai', 'Kolom Bermasalah', 'Jenis Kesalahan'];
-            let rows = this.validations
-                .filter(v => v.status === 'error')
-                .map(v => [v.row, v.name, v.col || '-', v.error || '']);
-            
-            let csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.map(val => String.fromCharCode(34) + val + String.fromCharCode(34)).join(','))].join('\n');
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.setAttribute('href', url);
-            link.setAttribute('download', `laporan_kegagalan_import.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        },
-        
         // Handle File Upload Select
         handleFileSelect(e) {
             const file = e.target.files ? e.target.files[0] : (e.dataTransfer ? e.dataTransfer.files[0] : null);
@@ -829,13 +811,13 @@
                 <div class="bg-soft/40 border border-border rounded-lg p-4 space-y-3.5 text-xs text-ink font-sans">
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                         <div>
-                            <span class="font-bold">Laporan Kegagalan</span>
-                            <p class="text-[11px] text-muted mt-0.5">Unduh daftar baris bermasalah untuk direvisi.</p>
+                            <span class="font-bold">Laporan Hasil Import</span>
+                            <p class="text-[11px] text-muted mt-0.5">Laporan tersimpan permanen di server: ringkasan hasil beserta baris gagal/dilewati dan alasannya.</p>
                         </div>
-                        <button @click="downloadErrorReport()" x-show="errorRows > 0"
-                            class="inline-flex items-center justify-center rounded-lg border border-danger/15 bg-surface px-4 py-2 font-bold text-danger transition hover:bg-danger/5 shadow-xs cursor-pointer">
+                        <a :href="'/pegawai/import/' + batchId + '/laporan'" x-show="batchId"
+                            class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 font-bold text-primary transition hover:bg-primary/5 shadow-xs cursor-pointer">
                             📥 Unduh Laporan (.csv)
-                        </button>
+                        </a>
                     </div>
                     <div class="border-t border-border/80 pt-3 space-y-1 text-muted text-[11px]">
                         <span class="font-bold text-ink uppercase tracking-wider block text-[9px] mb-1">📝 Audit Log</span>
