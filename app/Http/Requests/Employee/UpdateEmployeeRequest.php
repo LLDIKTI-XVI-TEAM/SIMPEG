@@ -36,6 +36,11 @@ class UpdateEmployeeRequest extends FormRequest
 
         // Aturan tambahan khusus form UI web
         if (! $this->wantsJson() && ! $this->is('api/*')) {
+            // Riwayat kepegawaian bersifat append-only (US-2.6): id riwayat lama ditolak agar record tidak dapat diedit.
+            $rules['pangkat_history_id'] = ['nullable', 'in:new'];
+            $rules['jabatan_history_id'] = ['nullable', 'in:new'];
+            $rules['kgb_history_id'] = ['nullable', 'in:new'];
+
             // Pangkat (Rank)
             $rules['pangkat_golongan_id'] = ['nullable', 'uuid', 'exists:ref_golongan,id'];
             $rules['pangkat_no_sk'] = ['nullable', 'string', 'max:255'];
@@ -82,6 +87,17 @@ class UpdateEmployeeRequest extends FormRequest
         }
 
         return $rules;
+    }
+
+    public function messages(): array
+    {
+        $appendOnly = 'Riwayat kepegawaian bersifat append-only — riwayat lama tidak dapat diubah, tambahkan riwayat baru.';
+
+        return [
+            'pangkat_history_id.in' => $appendOnly,
+            'jabatan_history_id.in' => $appendOnly,
+            'kgb_history_id.in' => $appendOnly,
+        ];
     }
 
     public function attributes(): array

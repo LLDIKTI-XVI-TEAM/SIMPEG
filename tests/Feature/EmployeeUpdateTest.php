@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
@@ -11,6 +12,7 @@ use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
+use App\Models\SalaryHistory;
 use App\Models\User;
 use App\Services\Employees\TmtCalculatorService;
 use Carbon\Carbon;
@@ -661,5 +663,138 @@ class EmployeeUpdateTest extends TestCase
             'id' => $employee->id,
             'status_aktif' => 'Aktif',
         ]);
+    }
+
+    public function test_web_form_rejects_editing_existing_rank_history(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $golongan = RefGolongan::firstOrFail();
+
+        $history = RankHistory::create([
+            'employee_id' => $employee->id,
+            'golongan_id' => $golongan->id,
+            'no_sk' => 'SK-PANGKAT-ASLI-001',
+            'tanggal_sk' => '2020-01-01',
+            'tmt_pangkat' => '2020-01-02',
+            'is_latest' => true,
+        ]);
+
+        $this->actingAs($user);
+        $response = $this->withSession(['_token' => 'test-token'])->post("/pegawai/{$employee->id}", $this->validPayload($employee, [
+            'pangkat_history_id' => $history->id,
+            'pangkat_golongan_id' => $golongan->id,
+            'pangkat_no_sk' => 'SK-PANGKAT-DIUBAH-999',
+            'pangkat_tanggal_sk' => '2021-05-05',
+            'pangkat_tmt_pangkat' => '2021-05-06',
+        ]), ['X-CSRF-TOKEN' => 'test-token']);
+
+        $response->assertSessionHasErrors(['pangkat_history_id']);
+        $this->assertSame(1, $employee->rankHistories()->count());
+        $this->assertDatabaseHas('rank_histories', [
+            'id' => $history->id,
+            'no_sk' => 'SK-PANGKAT-ASLI-001',
+            'tmt_pangkat' => '2020-01-02 00:00:00',
+        ]);
+    }
+
+    public function test_web_form_rejects_editing_existing_position_history(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $jenisJabatan = RefJenisJabatan::firstOrFail();
+        $unitKerja = RefUnitKerja::firstOrFail();
+        $jabatan = RefJabatan::firstOrCreate(
+            ['nama' => 'Analis Kepegawaian Append Only'],
+            ['jenis_jabatan_id' => $jenisJabatan->id]
+        );
+
+        $history = PositionHistory::create([
+            'employee_id' => $employee->id,
+            'jabatan_id' => $jabatan->id,
+            'nama_jabatan' => $jabatan->nama,
+            'jenis_jabatan_id' => $jenisJabatan->id,
+            'unit_kerja_id' => $unitKerja->id,
+            'no_sk' => 'SK-JABATAN-ASLI-001',
+            'tanggal_sk' => '2020-02-01',
+            'tmt_jabatan' => '2020-02-02',
+            'is_latest' => true,
+        ]);
+
+        $this->actingAs($user);
+        $response = $this->withSession(['_token' => 'test-token'])->post("/pegawai/{$employee->id}", $this->validPayload($employee, [
+            'jabatan_history_id' => $history->id,
+            'jabatan_jabatan_id' => $jabatan->id,
+            'jabatan_unit_kerja_id' => $unitKerja->id,
+            'jabatan_no_sk' => 'SK-JABATAN-DIUBAH-999',
+            'jabatan_tanggal_sk' => '2021-06-05',
+            'jabatan_tmt_jabatan' => '2021-06-06',
+        ]), ['X-CSRF-TOKEN' => 'test-token']);
+
+        $response->assertSessionHasErrors(['jabatan_history_id']);
+        $this->assertSame(1, $employee->positionHistories()->count());
+        $this->assertDatabaseHas('position_histories', [
+            'id' => $history->id,
+            'no_sk' => 'SK-JABATAN-ASLI-001',
+            'tmt_jabatan' => '2020-02-02 00:00:00',
+        ]);
+    }
+
+    public function test_web_form_rejects_editing_existing_salary_history(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+
+        $history = SalaryHistory::create([
+            'employee_id' => $employee->id,
+            'gaji_pokok' => 4000000,
+            'no_sk' => 'SK-KGB-ASLI-001',
+            'tanggal_sk' => '2020-03-01',
+            'tmt_kgb' => '2020-03-02',
+            'is_latest' => true,
+        ]);
+
+        $this->actingAs($user);
+        $response = $this->withSession(['_token' => 'test-token'])->post("/pegawai/{$employee->id}", $this->validPayload($employee, [
+            'kgb_history_id' => $history->id,
+            'kgb_gaji_pokok' => '9999999',
+            'kgb_no_sk' => 'SK-KGB-DIUBAH-999',
+            'kgb_tanggal_sk' => '2021-07-05',
+            'kgb_tmt_kgb' => '2021-07-06',
+        ]), ['X-CSRF-TOKEN' => 'test-token']);
+
+        $response->assertSessionHasErrors(['kgb_history_id']);
+        $this->assertSame(1, $employee->salaryHistories()->count());
+        $this->assertDatabaseHas('salary_histories', [
+            'id' => $history->id,
+            'no_sk' => 'SK-KGB-ASLI-001',
+            'tmt_kgb' => '2020-03-02 00:00:00',
+        ]);
+    }
+
+    public function test_edit_page_does_not_offer_editing_existing_history(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $golongan = RefGolongan::firstOrFail();
+
+        RankHistory::create([
+            'employee_id' => $employee->id,
+            'golongan_id' => $golongan->id,
+            'no_sk' => 'SK-PANGKAT-ASLI-001',
+            'tanggal_sk' => '2020-01-01',
+            'tmt_pangkat' => '2020-01-02',
+            'is_latest' => true,
+        ]);
+
+        $this->actingAs($user);
+        $response = $this->get("/pegawai/{$employee->id}/edit");
+
+        $response->assertOk();
+        $response->assertDontSee('Edit Riwayat:');
+        $response->assertDontSee('pangkat_history_id');
+        $response->assertDontSee('jabatan_history_id');
+        $response->assertDontSee('kgb_history_id');
+        $response->assertSee('append-only');
     }
 }
