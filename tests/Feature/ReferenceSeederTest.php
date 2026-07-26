@@ -135,6 +135,7 @@ class ReferenceSeederTest extends TestCase
             'ews.kontrak_pppk',
             'ews.pensiun',
             'ews.satyalancana',
+            'ews.tidak_perlu',
         ];
 
         $policies = DB::table('notification_event_channels')
@@ -148,7 +149,7 @@ class ReferenceSeederTest extends TestCase
                 'ref_notification_channels.code',
             ]);
 
-        $this->assertCount(22, $policies);
+        $this->assertCount(24, $policies);
         $this->assertSame($expectedEvents, $policies->pluck('event_key')->unique()->values()->all());
         $this->assertSame(['email', 'in_app'], $policies->pluck('code')->unique()->sort()->values()->all());
         $this->assertTrue($policies->every(fn (object $policy): bool => (bool) $policy->is_enabled));
@@ -175,7 +176,7 @@ class ReferenceSeederTest extends TestCase
                 'ref_notification_channels.code',
             ]);
 
-        $this->assertDatabaseCount('notification_event_channels', 23);
+        $this->assertDatabaseCount('notification_event_channels', 25);
         $this->assertCount(1, $policies);
         $this->assertSame('in_app', $policies->sole()->code);
         $this->assertTrue((bool) $policies->sole()->is_enabled);
@@ -204,7 +205,7 @@ class ReferenceSeederTest extends TestCase
 
         $this->seedReferenceData();
 
-        $this->assertDatabaseCount('notification_event_channels', 23);
+        $this->assertDatabaseCount('notification_event_channels', 25);
         $this->assertDatabaseHas('notification_event_channels', [
             'event_key' => 'ews.satyalancana',
             'notification_channel_id' => $emailChannelId,
@@ -227,12 +228,8 @@ class ReferenceSeederTest extends TestCase
         $this->assertSame('email', $policy->channel->code);
     }
 
-    public function test_notification_event_channel_foreign_key_restricts_channel_deletion_on_postgresql(): void
+    public function test_notification_event_channel_foreign_key_restricts_channel_deletion(): void
     {
-        if (DB::getDriverName() !== 'pgsql') {
-            $this->markTestSkipped('Perilaku FK restrict kebijakan notifikasi diverifikasi khusus pada PostgreSQL.');
-        }
-
         $this->seedReferenceData();
 
         $this->expectException(QueryException::class);

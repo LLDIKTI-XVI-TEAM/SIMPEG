@@ -71,147 +71,182 @@ class EwsEngineService
                 $configDays('satyalancana_h30', 30),
             ];
 
-            // Scan all active employees
-            $employees = Employee::with(['appointments', 'jenisPegawai', 'disciplineRecords'])
+            $pangkatRequiredYears = $this->configYears('pangkat_required_years', 4);
+            $kgbRequiredYears = $this->configYears('kgb_required_years', 2);
+            $pensiunRequiredAgeYears = max(0, $configDays('pensiun_required_age_years', 0));
+            $pppkContractYears = $this->configYears('pppk_contract_years', 4);
+            $satyalancanaYears = [
+                $this->configYears('satyalancana_years_1', 10),
+                $this->configYears('satyalancana_years_2', 20),
+                $this->configYears('satyalancana_years_3', 30),
+            ];
+
+            // Scan semua pegawai aktif dalam chunk 100 untuk mencegah OOM pada dataset besar.
+            Employee::with(['appointments', 'rankHistories', 'salaryHistories', 'jenisPegawai', 'disciplineRecords'])
                 ->where('status_aktif', 'Aktif')
-                ->get();
+                ->chunkById(100, function ($employees) use (
+                    $pangkatDays, $kgbDays, $pensiunDays, $pppkDays, $satyalancanaDays,
+                    $pangkatRequiredYears, $kgbRequiredYears, $pensiunRequiredAgeYears,
+                    $pppkContractYears, $satyalancanaYears,
+                    &$alertsCreated, &$employeesChecked
+                ): void {
+                    foreach ($employees as $employee) {
+                        $employeesChecked++;
 
-            $employeesChecked = $employees->count();
+                        // 1. Kenaikan Pangkat: gunakan TMT pangkat terbaru agar perubahan masa berlaku langsung diterapkan.
+                        $latestRank = $employee->rankHistories
+                            ->filter(fn ($history): bool => $history->tmt_pangkat !== null)
+                            ->sortByDesc('tmt_pangkat')
+                            ->first();
+                        $targetDate = $latestRank
+                            ? Carbon::parse($latestRank->tmt_pangkat)->addYears($pangkatRequiredYears)
+                            : ($employee->tanggal_kenaikan_pangkat_berikutnya
+                                ? Carbon::parse($employee->tanggal_kenaikan_pangkat_berikutnya)
+                                : null);
+                        if ($targetDate) {
+                            $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
 
-            foreach ($employees as $employee) {
-                // 1. Kenaikan Pangkat
-                if ($employee->tanggal_kenaikan_pangkat_berikutnya) {
-                    $targetDate = Carbon::parse($employee->tanggal_kenaikan_pangkat_berikutnya);
-                    $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
+                            $days = $this->dueStage($pangkatDays, $diffDays);
+                            if ($days !== null) {
+                                $hasActiveDiscipline = $employee->disciplineRecords->contains('is_active', true);
+                                $isEligible = ($employee->is_kinerja_baik === true) && ! $hasActiveDiscipline;
 
-                    foreach ($pangkatDays as $days) {
-                        if ($diffDays === $days) {
-                            $created = $this->createAlertIfNotExist(
-                                $employee,
-                                'KENAIKAN_PANGKAT',
-                                $targetDate->toDateString(),
-                                $days,
-                                'Kenaikan Pangkat'
-                            );
-                            if ($created) {
-                                $alertsCreated++;
+                                $created = $this->createAlertIfNotExist(
+                                    $employee,
+                                    'KENAIKAN_PANGKAT',
+                                    $targetDate->toDateString(),
+                                    $days,
+                                    'Kenaikan Pangkat',
+                                    $isEligible,
+                                );
+                                if ($created) {
+                                    $alertsCreated++;
+                                }
                             }
                         }
-                    }
-                }
 
-                // 2. KGB
-                if ($employee->tanggal_kgb_berikutnya) {
-                    $targetDate = Carbon::parse($employee->tanggal_kgb_berikutnya);
-                    $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
+                        // 2. KGB — gunakan TMT KGB terbaru agar perubahan masa berlaku langsung diterapkan.
+                        $latestKgb = $employee->salaryHistories
+                            ->filter(fn ($history): bool => $history->tmt_kgb !== null)
+                            ->sortByDesc('tmt_kgb')
+                            ->first();
+                        $targetDate = $latestKgb
+                            ? Carbon::parse($latestKgb->tmt_kgb)->addYears($kgbRequiredYears)
+                            : ($employee->tanggal_kgb_berikutnya
+                                ? Carbon::parse($employee->tanggal_kgb_berikutnya)
+                                : null);
+                        if ($targetDate) {
+                            $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
 
-                    foreach ($kgbDays as $days) {
-                        if ($diffDays === $days) {
-                            $created = $this->createAlertIfNotExist(
-                                $employee,
-                                'KGB',
-                                $targetDate->toDateString(),
-                                $days,
-                                'KGB'
-                            );
-                            if ($created) {
-                                $alertsCreated++;
+                            $days = $this->dueStage($kgbDays, $diffDays);
+                            if ($days !== null) {
+                                $created = $this->createAlertIfNotExist(
+                                    $employee,
+                                    'KGB',
+                                    $targetDate->toDateString(),
+                                    $days,
+                                    'KGB',
+                                );
+                                if ($created) {
+                                    $alertsCreated++;
+                                }
                             }
                         }
-                    }
-                }
 
-                // 3. Pensiun
-                if ($employee->tanggal_pensiun) {
-                    $targetDate = Carbon::parse($employee->tanggal_pensiun);
-                    $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
+                        // 3. Pensiun — usia BUP global mengalahkan snapshot per jabatan bila diatur.
+                        $targetDate = $pensiunRequiredAgeYears > 0 && $employee->tanggal_lahir
+                            ? Carbon::parse($employee->tanggal_lahir)->addYears($pensiunRequiredAgeYears)
+                            : ($employee->tanggal_pensiun ? Carbon::parse($employee->tanggal_pensiun) : null);
+                        if ($targetDate) {
+                            $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
 
-                    foreach ($pensiunDays as $days) {
-                        if ($diffDays === $days) {
-                            $created = $this->createAlertIfNotExist(
-                                $employee,
-                                'PENSIUN',
-                                $targetDate->toDateString(),
-                                $days,
-                                'Pensiun'
-                            );
-                            if ($created) {
-                                $alertsCreated++;
+                            $days = $this->dueStage($pensiunDays, $diffDays);
+                            if ($days !== null) {
+                                $created = $this->createAlertIfNotExist(
+                                    $employee,
+                                    'PENSIUN',
+                                    $targetDate->toDateString(),
+                                    $days,
+                                    'Pensiun',
+                                );
+                                if ($created) {
+                                    $alertsCreated++;
+                                }
                             }
                         }
-                    }
-                }
 
-                // 4. Kontrak PPPK
-                $isPppk = $employee->jenisPegawai && strtolower($employee->jenisPegawai->nama) === 'pppk';
-                if ($isPppk) {
-                    $targetDate = null;
+                        // 4. Kontrak PPPK
+                        $isPppk = $employee->jenisPegawai && strtolower($employee->jenisPegawai->nama) === 'pppk';
+                        if ($isPppk) {
+                            $targetDate = null;
 
-                    // Read from employees.tanggal_akhir_kontrak first
-                    if ($employee->tanggal_akhir_kontrak) {
-                        $targetDate = Carbon::parse($employee->tanggal_akhir_kontrak);
-                    } else {
-                        // Fallback to tmt_pengangkatan + 5 years from appointments
-                        $pppkApp = $employee->appointments()
-                            ->where('jenis_pengangkatan', 'PPPK')
-                            ->latest('tmt_pengangkatan')
+                            // Baca dari employees.tanggal_akhir_kontrak terlebih dahulu
+                            if ($employee->tanggal_akhir_kontrak) {
+                                $targetDate = Carbon::parse($employee->tanggal_akhir_kontrak);
+                            } else {
+                                // Fallback: TMT pengangkatan PPPK terbaru + masa kontrak global.
+                                $pppkApp = $employee->appointments
+                                    ->filter(fn ($a): bool => strtoupper((string) $a->jenis_pengangkatan) === 'PPPK' && $a->tmt_pengangkatan !== null)
+                                    ->sortByDesc('tmt_pengangkatan')
+                                    ->first();
+
+                                if ($pppkApp) {
+                                    $targetDate = Carbon::parse($pppkApp->tmt_pengangkatan)->addYears($pppkContractYears);
+                                }
+                            }
+
+                            if ($targetDate) {
+                                $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
+
+                                $days = $this->dueStage($pppkDays, $diffDays);
+                                if ($days !== null) {
+                                    $created = $this->createAlertIfNotExist(
+                                        $employee,
+                                        'KONTRAK_PPPK',
+                                        $targetDate->toDateString(),
+                                        $days,
+                                        'Kontrak PPPK',
+                                    );
+                                    if ($created) {
+                                        $alertsCreated++;
+                                    }
+                                }
+                            }
+                        }
+
+                        // 5. Satyalancana Karya Satya: milestone 10 / 20 / 30 tahun
+                        $firstAppointment = $employee->appointments
+                            ->filter(fn ($appointment): bool => $appointment->tmt_pengangkatan !== null)
+                            ->sortBy('tmt_pengangkatan')
                             ->first();
 
-                        if ($pppkApp) {
-                            $targetDate = Carbon::parse($pppkApp->tmt_pengangkatan)->addYears(5);
-                        }
-                    }
+                        if ($firstAppointment) {
+                            $firstTmt = Carbon::parse($firstAppointment->tmt_pengangkatan)->startOfDay();
+                            $isEligible = $employee->is_satyalancana_eligible === true;
 
-                    if ($targetDate) {
-                        $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
+                            foreach ($satyalancanaYears as $years) {
+                                $targetDate = $firstTmt->copy()->addYears($years);
+                                $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
 
-                        foreach ($pppkDays as $days) {
-                            if ($diffDays === $days) {
-                                $created = $this->createAlertIfNotExist(
-                                    $employee,
-                                    'KONTRAK_PPPK',
-                                    $targetDate->toDateString(),
-                                    $days,
-                                    'Kontrak PPPK'
-                                );
-                                if ($created) {
-                                    $alertsCreated++;
+                                $days = $this->dueStage($satyalancanaDays, $diffDays);
+                                if ($days !== null) {
+                                    $created = $this->createAlertIfNotExist(
+                                        $employee,
+                                        'SATYALANCANA',
+                                        $targetDate->toDateString(),
+                                        $days,
+                                        'Satyalancana '.$years.' Tahun',
+                                        $isEligible,
+                                        $years,
+                                    );
+                                    if ($created) {
+                                        $alertsCreated++;
+                                    }
                                 }
                             }
                         }
                     }
-                }
-
-                // 5. Satyalancana Karya Satya: pengangkatan pertama + 10/20/30 tahun
-                $firstAppointment = $employee->appointments
-                    ->filter(fn ($appointment): bool => $appointment->tmt_pengangkatan !== null)
-                    ->sortBy('tmt_pengangkatan')
-                    ->first();
-
-                if ($firstAppointment) {
-                    $firstTmt = Carbon::parse($firstAppointment->tmt_pengangkatan)->startOfDay();
-
-                    foreach ([10, 20, 30] as $years) {
-                        $targetDate = $firstTmt->copy()->addYears($years);
-                        $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
-
-                        foreach ($satyalancanaDays as $days) {
-                            if ($diffDays === $days) {
-                                $created = $this->createAlertIfNotExist(
-                                    $employee,
-                                    'SATYALANCANA',
-                                    $targetDate->toDateString(),
-                                    $days,
-                                    'Satyalancana '.$years.' Tahun'
-                                );
-                                if ($created) {
-                                    $alertsCreated++;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+                });
 
             // Mark scheduler run as successful
             $run->update([
@@ -240,11 +275,14 @@ class EwsEngineService
             foreach ($superAdmins as $admin) {
                 $employee = Employee::find($admin->employee_id);
                 if ($employee) {
+                    // Pesan exception mentah tidak boleh tampil di notifikasi karena bisa
+                    // membocorkan detail sensitif (kredensial, struktur query, path server).
+                    // Detail teknis lengkap sudah tercatat di log server dan riwayat run.
                     $this->notificationService->createForEmployee(
                         $employee,
                         'ews.scheduler_failed',
                         'Gagal Eksekusi Scheduler EWS',
-                        'Scheduler EWS harian gagal berjalan. Error: '.$e->getMessage()
+                        'Scheduler EWS harian gagal berjalan. Silakan periksa log server atau riwayat eksekusi scheduler untuk detail teknis.'
                     );
                 }
             }
@@ -253,78 +291,129 @@ class EwsEngineService
         }
     }
 
-    /**
-     * Create EwsAlert and optional SimpegNotification if eligible.
-     */
-    protected function createAlertIfNotExist(Employee $employee, string $type, string $targetDate, int $days, string $titleLabel): bool
+    private function configYears(string $key, int $default): int
     {
-        // Check uniqueness at query level first to avoid DB exception
-        $exists = EwsAlert::where('employee_id', $employee->id)
+        return max(1, (int) EwsConfig::getVal($key, (string) $default));
+    }
+
+    /**
+     * Mengambil tahap paling mendesak yang telah mulai berlaku.
+     * Tahap terakhir tetap berlaku setelah tanggal target lewat agar reminder tidak
+     * berhenti sebelum pegawai membaca notifikasinya.
+     *
+     * @param  list<int>  $stages
+     */
+    private function dueStage(array $stages, int $diffDays): ?int
+    {
+        $stages = array_values(array_unique(array_filter($stages, fn (int $days): bool => $days >= 0)));
+        sort($stages);
+
+        foreach ($stages as $stage) {
+            if ($diffDays <= $stage) {
+                return $stage;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Membuat satu alert EWS dan menyegarkan satu notifikasi in-app selama belum dibaca.
+     *
+     * @param  bool|null  $isEligible  null = tidak ada eligibility check untuk tipe ini
+     * @param  int|null  $satyalancanaYears  milestone dalam tahun; diisi hanya untuk SATYALANCANA
+     */
+    protected function createAlertIfNotExist(
+        Employee $employee,
+        string $type,
+        string $targetDate,
+        int $days,
+        string $titleLabel,
+        ?bool $isEligible = null,
+        ?int $satyalancanaYears = null,
+    ): bool {
+        $identity = [
+            'employee_id' => $employee->id,
+            'type' => $type,
+            'target_date' => $targetDate,
+            'interval_days' => $days,
+        ];
+
+        $findAlert = fn () => EwsAlert::query()
+            ->where('employee_id', $employee->id)
             ->where('type', $type)
-            ->where('target_date', $targetDate)
-            ->where('interval_days', $days)
-            ->exists();
+            ->whereDate('target_date', $targetDate)
+            ->where('interval_days', $days);
+        $alert = $findAlert()->first();
+        $wasCreated = false;
 
-        if ($exists) {
-            return false;
+        if ($alert === null) {
+            try {
+                $alert = EwsAlert::create([
+                    ...$identity,
+                    'is_processed' => false,
+                    'is_eligible' => $isEligible,
+                    'satyalancana_years' => $satyalancanaYears,
+                    'followup_status' => EwsAlert::FOLLOWUP_STATUS_ACTIVE,
+                ]);
+                $wasCreated = true;
+            } catch (QueryException $exception) {
+                $alert = $findAlert()->first();
+
+                if ($alert === null) {
+                    throw $exception;
+                }
+            }
         }
 
-        // Try catch block to handle unique key database constraints safely
-        try {
-            $alert = EwsAlert::create([
-                'employee_id' => $employee->id,
-                'type' => $type,
-                'target_date' => $targetDate,
-                'interval_days' => $days,
-                'is_processed' => false,
-                'followup_status' => EwsAlert::FOLLOWUP_STATUS_ACTIVE,
-            ]);
-        } catch (QueryException $e) {
-            // Already created by a concurrent run
-            return false;
+        $timeLabel = $days.' hari';
+        if ($days >= 365 && $days % 365 === 0) {
+            $timeLabel = ($days / 365).' tahun';
+        } elseif ($days >= 30 && $days % 30 === 0) {
+            $timeLabel = ($days / 30).' bulan';
         }
 
-        // Check eligibility for promotion alerts
-        $isEligible = true;
-        if ($type === 'KENAIKAN_PANGKAT') {
-            $hasActiveDiscipline = $employee->disciplineRecords->contains('is_active', true);
-            $isEligible = ($employee->is_kinerja_baik === true) && ! $hasActiveDiscipline;
-        } elseif ($type === 'SATYALANCANA') {
-            $isEligible = $employee->is_satyalancana_eligible === true;
-        }
+        $eligibilityNote = ($isEligible === false)
+            ? ' Perhatian: pegawai saat ini belum memenuhi syarat eligibilitas.'
+            : '';
+        $body = sprintf(
+            'Pemberitahuan EWS: Jadwal %s Anda jatuh pada %s (tahap pengingat H-%s). Harap lengkapi berkas.%s',
+            $titleLabel,
+            Carbon::parse($targetDate)->format('d-m-Y'),
+            $timeLabel,
+            $eligibilityNote,
+        );
 
-        // Send notification only if eligible
-        if ($isEligible) {
-            $timeLabel = $days.' hari';
-            if ($days >= 365 && $days % 365 === 0) {
-                $timeLabel = ($days / 365).' tahun';
-            } elseif ($days >= 30 && $days % 30 === 0) {
-                $timeLabel = ($days / 30).' bulan';
+        $notification = $this->notificationService->upsertEwsReminder(
+            $employee,
+            $alert,
+            'ews.'.strtolower($type),
+            'Peringatan EWS: '.$titleLabel,
+            $body,
+            [
+                'ews_alert_id' => $alert->id,
+                'is_eligible' => $isEligible,
+            ],
+        );
+
+        if ($notification !== null && ! $notification->is_read) {
+            $updates = ['notified_at' => now()];
+
+            // Alert kedaluwarsa dari lifecycle lama tidak boleh menyembunyikan
+            // reminder yang masih belum dibaca. Status manual tetap dihormati.
+            if ($alert->followup_status === EwsAlert::FOLLOWUP_STATUS_EXPIRED) {
+                $updates += [
+                    'followup_status' => EwsAlert::FOLLOWUP_STATUS_ACTIVE,
+                    'is_processed' => false,
+                    'handled_at' => null,
+                    'handled_by' => null,
+                    'handled_note' => null,
+                ];
             }
 
-            $typeLabel = strtolower($type);
-            $notificationType = 'ews.'.$typeLabel;
-
-            $body = sprintf(
-                'Pemberitahuan EWS: Jadwal %s Anda jatuh pada %s (sisa sekitar %s). Harap lengkapi berkas.',
-                $titleLabel,
-                Carbon::parse($targetDate)->format('d-m-Y'),
-                $timeLabel
-            );
-
-            $this->notificationService->createForEmployee(
-                $employee,
-                $notificationType,
-                'Peringatan EWS: '.$titleLabel,
-                $body,
-                ['ews_alert_id' => $alert->id]
-            );
-
-            $alert->update([
-                'notified_at' => now(),
-            ]);
+            $alert->forceFill($updates)->save();
         }
 
-        return true;
+        return $wasCreated;
     }
 }

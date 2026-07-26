@@ -7,6 +7,7 @@ use App\Actions\Cuti\DeclineLeaveAction;
 use App\Jobs\SendSimpegNotificationEmailJob;
 use App\Mail\SimpegNotificationMail;
 use App\Models\Employee;
+use App\Models\EwsAlert;
 use App\Models\LeaveRequest;
 use App\Models\NotificationEventChannel;
 use App\Models\RefJenisCuti;
@@ -646,6 +647,68 @@ class EmailNotificationTest extends TestCase
         }
 
         return $leave;
+    }
+
+    public function test_upsert_ews_reminder_diblokir_saat_kebijakan_event_in_app_nonaktif(): void
+    {
+        Queue::fake();
+        // Channel in_app global tetap aktif; hanya kebijakan event ews.kgb yang mati.
+        // Reminder harus fail-closed per event, bukan hanya mengikuti channel global.
+        $this->setEventChannelPolicy('ews.kgb', 'in_app', false);
+        $this->setEventChannelPolicy('ews.kgb', 'email', true);
+        $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+        $alert = $this->activeEwsAlertFor($employee);
+
+        $notification = app(NotificationService::class)->upsertEwsReminder(
+            $employee,
+            $alert,
+            'ews.kgb',
+            'Pengingat KGB',
+            'KGB berikutnya sudah dekat.',
+            ['ews_alert_id' => $alert->id],
+        );
+
+        $this->assertNull($notification);
+        $this->assertDatabaseMissing('notifications', ['user_id' => $employee->id]);
+        Queue::assertNotPushed(SendSimpegNotificationEmailJob::class);
+    }
+
+    public function test_upsert_ews_reminder_fan_out_email_ke_admin_kepegawaian_saat_pertama_dibuat(): void
+    {
+        Queue::fake();
+        $this->setEventChannelPolicy('ews.kgb', 'in_app', true);
+        $this->setEventChannelPolicy('ews.kgb', 'email', true);
+        $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+        $adminEmployee = Employee::factory()->create(['email' => 'admin@example.test']);
+        User::factory()->create([
+            'role' => 'admin_kepegawaian',
+            'employee_id' => $adminEmployee->id,
+        ]);
+        $alert = $this->activeEwsAlertFor($employee);
+
+        app(NotificationService::class)->upsertEwsReminder(
+            $employee,
+            $alert,
+            'ews.kgb',
+            'Pengingat KGB',
+            'KGB berikutnya sudah dekat.',
+            ['ews_alert_id' => $alert->id],
+        );
+
+        // Fan-out reminder mengikuti alur createForEmployee: pegawai dan Admin
+        // Kepegawaian sama-sama menerima email saat reminder pertama kali dibuat.
+        Queue::assertPushed(SendSimpegNotificationEmailJob::class, 2);
+    }
+
+    private function activeEwsAlertFor(Employee $employee): EwsAlert
+    {
+        return EwsAlert::create([
+            'employee_id' => $employee->id,
+            'type' => 'KGB',
+            'target_date' => now()->addDays(30)->toDateString(),
+            'interval_days' => 30,
+            'is_processed' => false,
+        ]);
     }
 
     /**

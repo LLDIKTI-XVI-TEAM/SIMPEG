@@ -4,10 +4,12 @@ namespace App\Actions\Employees;
 
 use App\Models\Document;
 use App\Models\Employee;
+use App\Models\EwsAlert;
 use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
+use App\Models\SimpegNotification;
 use App\Services\AuditService;
 use App\Services\EmployeeFileStorageService;
 use App\Services\Employees\TmtCalculatorService;
@@ -32,6 +34,8 @@ class UpdateEmployeeAction
             $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
             $oldValues = $employee->toArray();
             $validated = $this->normalizeEmployeeContract($validated);
+            $pppkContractChanged = array_key_exists('tanggal_akhir_kontrak', $validated)
+                && ($oldValues['tanggal_akhir_kontrak'] ?? null) !== $validated['tanggal_akhir_kontrak'];
             $rankHistoryChanged = false;
             $positionHistoryChanged = false;
             $salaryHistoryChanged = false;
@@ -263,6 +267,18 @@ class UpdateEmployeeAction
                 }
             }
 
+            if ($request->filled('pppk_tmt_pengangkatan')) {
+                $pppkAppointment = $employee->appointments()
+                    ->whereRaw('UPPER(jenis_pengangkatan) = ?', ['PPPK'])
+                    ->orderByDesc('tmt_pengangkatan')
+                    ->first();
+
+                if ($pppkAppointment && $pppkAppointment->tmt_pengangkatan?->toDateString() !== $validated['pppk_tmt_pengangkatan']) {
+                    $pppkAppointment->update(['tmt_pengangkatan' => $validated['pppk_tmt_pengangkatan']]);
+                    $pppkContractChanged = true;
+                }
+            }
+
             // 5. Berkas Lainnya (KTP, KK, SK Mutasi, SK Pensiun, atau jenis manual)
             if ($request->filled('berkas_lainnya_jenis')
                 && $request->hasFile('file_berkas_lainnya')
@@ -307,6 +323,25 @@ class UpdateEmployeeAction
                             'status_aktif' => $statusPegawai->nama,
                         ]);
                     }
+                }
+            }
+
+            if ($pppkContractChanged) {
+                $activeAlerts = EwsAlert::query()
+                    ->where('employee_id', $employee->id)
+                    ->where('type', 'KONTRAK_PPPK')
+                    ->where('followup_status', EwsAlert::FOLLOWUP_STATUS_ACTIVE)
+                    ->get(['id']);
+
+                if ($activeAlerts->isNotEmpty()) {
+                    $alertIds = $activeAlerts->pluck('id');
+                    EwsAlert::whereIn('id', $alertIds)->update([
+                        'followup_status' => EwsAlert::FOLLOWUP_STATUS_EXPIRED,
+                        'is_processed' => true,
+                    ]);
+                    SimpegNotification::whereIn('ews_alert_id', $alertIds)
+                        ->where('is_read', false)
+                        ->update(['is_read' => true, 'read_at' => now()]);
                 }
             }
 

@@ -1,6 +1,11 @@
 <x-layouts.app title="Edit Pegawai">
     @php
         $fotoUrl = $p->foto_url;
+        $isPppkEmployee = strcasecmp((string) $p->jenisPegawai?->nama, 'PPPK') === 0;
+        $pppkAppointment = $p->appointments
+            ->filter(fn ($appointment) => strcasecmp((string) $appointment->jenis_pengangkatan, 'PPPK') === 0)
+            ->sortByDesc('tmt_pengangkatan')
+            ->first();
         $golonganRefOptions = $golonganRefOptions ?? \App\Models\RefGolongan::orderBy('kode')->get();
         $eselonOptions = $eselonOptions ?? \App\Models\RefEselon::orderBy('nama')->get();
     @endphp
@@ -509,12 +514,6 @@
                         </div>
 
                         
-
-                        {{-- Tanggal Pensiun --}}
-                        <div class="space-y-1">
-                            <label for="tanggal_pensiun" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Pensiun</label>
-                            <input id="tanggal_pensiun" name="tanggal_pensiun" type="date" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" value="{{ $p->tanggal_pensiun ? \Carbon\Carbon::parse($p->tanggal_pensiun)->format('Y-m-d') : '' }}" >
-                        </div>
                     </div>
                 </div>
 
@@ -1074,7 +1073,7 @@
                             <div class="space-y-1">
                                 <label for="pengangkatan_jenis_pengangkatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Pengangkatan <span class="text-danger">*</span></label>
                                 <div class="relative">
-                                    <select id="pengangkatan_jenis_pengangkatan" name="pengangkatan_jenis_pengangkatan"  class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <select id="pengangkatan_jenis_pengangkatan" name="pengangkatan_jenis_pengangkatan" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
                                         <option value="" disabled {{ empty($p->appointment->jenis_pengangkatan) ? 'selected' : '' }}>Pilih Jenis Pengangkatan</option>
                                         <option value="CPNS" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'CPNS' ? 'selected' : '' }}>CPNS</option>
                                         <option value="PNS" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'PNS' ? 'selected' : '' }}>PNS</option>
@@ -1161,6 +1160,29 @@
                         </div>
 
                         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                            @if ($isPppkEmployee)
+                                <div class="space-y-4 rounded-lg border border-primary/20 bg-primary/5 p-4 sm:col-span-2">
+                                    <div>
+                                        <h4 class="text-sm font-bold text-ink font-sans">Kontrak PPPK</h4>
+                                        <p class="mt-1 text-xs text-muted">Tanggal akhir kontrak diprioritaskan EWS. Jika kosong, EWS memakai TMT PPPK ditambah masa kontrak global.</p>
+                                    </div>
+                                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                        <div class="space-y-1">
+                                            <label for="pppk_tmt_pengangkatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Pengangkatan PPPK</label>
+                                            <input id="pppk_tmt_pengangkatan" name="pppk_tmt_pengangkatan" type="date" value="{{ old('pppk_tmt_pengangkatan', $pppkAppointment?->tmt_pengangkatan?->format('Y-m-d')) }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
+                                            <p class="text-xs text-muted">Mengubah TMT pada riwayat SK Pengangkatan PPPK terbaru.</p>
+                                            @error('pppk_tmt_pengangkatan')<p class="text-xs text-danger">{{ $message }}</p>@enderror
+                                        </div>
+                                        <div class="space-y-1">
+                                            <label for="tanggal_akhir_kontrak" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Akhir Kontrak</label>
+                                            <input id="tanggal_akhir_kontrak" name="tanggal_akhir_kontrak" type="date" value="{{ old('tanggal_akhir_kontrak', $p->tanggal_akhir_kontrak?->format('Y-m-d')) }}" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
+                                            <p class="text-xs text-muted">Kosongkan untuk memakai TMT PPPK + masa kontrak global.</p>
+                                            @error('tanggal_akhir_kontrak')<p class="text-xs text-danger">{{ $message }}</p>@enderror
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+
                             {{-- Jenis Berkas --}}
                             <div class="space-y-1">
                                 <label for="berkas_lainnya_jenis" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Berkas <span class="text-danger">*</span></label>

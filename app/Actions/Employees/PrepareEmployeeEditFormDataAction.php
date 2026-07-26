@@ -25,6 +25,8 @@ class PrepareEmployeeEditFormDataAction
     {
         $p = Employee::with([
             'appointment',
+            'appointments',
+            'jenisPegawai',
             'positionHistories.jabatan',
             'positionHistories.unitKerja',
             'positionHistories.jenisJabatan',

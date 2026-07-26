@@ -48,6 +48,7 @@ class DashboardEwsTest extends TestCase
             ->assertOk()
             ->assertSee('Daftar Peringatan Dini (EWS)', false)
             ->assertDontSee('Pegawai Dashboard Lain', false)
+            ->assertSee('EWS Saya', false)
             ->assertSee(route('ews.saya'), false)
             ->assertDontSee('Budi Santoso', false);
     }

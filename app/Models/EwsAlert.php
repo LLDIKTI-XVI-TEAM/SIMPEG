@@ -13,6 +13,10 @@ use Illuminate\Support\Carbon;
  * @property int $interval_days
  * @property Carbon $target_date
  * @property string $followup_status
+ * @property bool|null $is_eligible
+ * @property int|null $satyalancana_years
+ * @property Carbon|null $notified_at
+ * @property Carbon|null $notification_acknowledged_at
  * @property Carbon|null $handled_at
  * @property string|null $handled_by
  * @property string|null $handled_note
@@ -36,7 +40,10 @@ class EwsAlert extends Model
         'target_date',
         'interval_days',
         'notified_at',
+        'notification_acknowledged_at',
         'is_processed',
+        'is_eligible',
+        'satyalancana_years',
         'followup_status',
         'handled_at',
         'handled_by',
@@ -49,7 +56,10 @@ class EwsAlert extends Model
             'target_date' => 'date',
             'interval_days' => 'integer',
             'notified_at' => 'datetime',
+            'notification_acknowledged_at' => 'datetime',
             'is_processed' => 'boolean',
+            'is_eligible' => 'boolean',
+            'satyalancana_years' => 'integer',
             'handled_at' => 'datetime',
         ];
     }

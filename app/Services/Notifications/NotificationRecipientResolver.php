@@ -8,6 +8,9 @@ use Illuminate\Support\Collection;
 
 class NotificationRecipientResolver
 {
+    /** @var Collection<int, Employee>|null */
+    private ?Collection $adminRecipientsCache = null;
+
     public function __construct(private readonly NotificationChannelResolver $channels) {}
 
     /**
@@ -22,37 +25,42 @@ class NotificationRecipientResolver
             return collect();
         }
 
-        if ($this->isNonEligiblePromotion($type, $data)) {
-            return collect();
-        }
-
         return $this->adminRecipients();
     }
 
     /**
-     * Menahan email pegawai pada EWS kenaikan pangkat yang eksplisit tidak eligible.
+     * Menentukan apakah penerima utama (pegawai) perlu mendapat email untuk event ini.
      *
      * @param  array<string, mixed>|null  $data
      */
     public function shouldEmailPrimaryRecipient(string $type, ?array $data = null): bool
     {
-        if ($this->isNonEligiblePromotion($type, $data)) {
+        return $this->emailEnabled($type, $data);
+    }
+
+    /**
+     * Menentukan jenis notifikasi yang memakai email.
+     * Promosi yang belum eligible menunggu keputusan admin melalui alur follow-up, sehingga tidak mengirim email terlebih dahulu.
+     * Fail-closed: delivery hanya aktif bila channel global dan pasangan kebijakan event-channel sama-sama aktif.
+     *
+     * @param  array<string, mixed>|null  $data
+     */
+    public function emailEnabled(string $type, ?array $data = null): bool
+    {
+        if ($type === 'ews.kenaikan_pangkat' && ($data['is_eligible'] ?? null) === false) {
             return false;
         }
 
-        return $this->emailEnabled($type);
-    }
-
-    /** Menyerahkan keputusan email sepenuhnya ke kebijakan event-channel dua lapis. */
-    public function emailEnabled(string $type): bool
-    {
         return $this->channels->isEnabledForEvent($type, 'email');
     }
 
     /** @return Collection<int, Employee> */
     private function adminRecipients(): Collection
     {
-        return User::query()
+        // Di-cache per instance karena scheduler EWS memanggil resolver ini untuk
+        // setiap reminder dalam satu run; tanpa cache, query admin yang sama
+        // diulang ribuan kali pada data pegawai besar.
+        return $this->adminRecipientsCache ??= User::query()
             // EWS rutin hanya perlu ditindaklanjuti Admin Kepegawaian; Super Admin khusus kegagalan scheduler.
             ->where('role', 'admin_kepegawaian')
             ->whereNotNull('employee_id')
@@ -62,15 +70,5 @@ class NotificationRecipientResolver
             ->filter(fn ($employee): bool => $employee instanceof Employee)
             ->unique('id')
             ->values();
-    }
-
-    /**
-     * Fail-closed sampai keputusan bisnis #34 menetapkan apakah admin perlu email untuk pegawai tidak eligible.
-     *
-     * @param  array<string, mixed>|null  $data
-     */
-    private function isNonEligiblePromotion(string $type, ?array $data): bool
-    {
-        return $type === 'ews.kenaikan_pangkat' && ($data['is_eligible'] ?? true) === false;
     }
 }
