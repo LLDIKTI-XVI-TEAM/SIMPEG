@@ -30,9 +30,9 @@ class EmployeeHistoryService
      */
     public function createRankHistory(Employee $employee, array $data, ?Request $request = null): RankHistory
     {
-        $data = $this->storeSkUpload($data);
+        [$data, $uploadedSkPath] = $this->storeSkUploadWithPath($data);
 
-        return DB::transaction(function () use ($employee, $data, $request): RankHistory {
+        return $this->transactionWithSkCleanup($uploadedSkPath, function () use ($employee, $data, $request): RankHistory {
             $golongan = RefGolongan::findOrFail($data['golongan_id']);
             // Kunci baris pegawai agar dua penulisan paralel tidak sama-sama menyisakan riwayat terbaru.
             $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
@@ -122,9 +122,9 @@ class EmployeeHistoryService
      */
     public function createPositionHistory(Employee $employee, array $data, ?Request $request = null): PositionHistory
     {
-        $data = $this->storeSkUpload($data);
+        [$data, $uploadedSkPath] = $this->storeSkUploadWithPath($data);
 
-        return DB::transaction(function () use ($employee, $data, $request): PositionHistory {
+        return $this->transactionWithSkCleanup($uploadedSkPath, function () use ($employee, $data, $request): PositionHistory {
             $jabatan = RefJabatan::findOrFail($data['jabatan_id']);
             $jenisJabatanId = $data['jenis_jabatan_id'] ?? $jabatan->jenis_jabatan_id;
             // Kunci baris pegawai agar dua penulisan paralel tidak sama-sama menyisakan riwayat terbaru.
@@ -190,9 +190,9 @@ class EmployeeHistoryService
      */
     public function createKgbHistory(Employee $employee, array $data, ?Request $request = null): SalaryHistory
     {
-        $data = $this->storeSkUpload($data);
+        [$data, $uploadedSkPath] = $this->storeSkUploadWithPath($data);
 
-        return DB::transaction(function () use ($employee, $data, $request): SalaryHistory {
+        return $this->transactionWithSkCleanup($uploadedSkPath, function () use ($employee, $data, $request): SalaryHistory {
             // Kunci baris pegawai agar dua penulisan paralel tidak sama-sama menyisakan riwayat terbaru.
             $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
             $history = $employee->salaryHistories()->create([
@@ -237,7 +237,7 @@ class EmployeeHistoryService
     public function createDisciplineRecord(Employee $employee, array $data, ?Request $request = null): DisciplineRecord
     {
         // Proses upload file SK terlebih dahulu (jika ada file baru)
-        $data = $this->storeSkUpload($data);
+        [$data, $uploadedSkPath] = $this->storeSkUploadWithPath($data);
 
         // Jika user memilih dari arsip dokumen, gunakan file_path dokumen sebagai file_sk
         if (empty($data['file_sk']) && ! empty($data['dokumen_id'])) {
@@ -246,7 +246,9 @@ class EmployeeHistoryService
         }
         unset($data['dokumen_id']);
 
-        return DB::transaction(function () use ($employee, $data, $request): DisciplineRecord {
+        // Hanya file yang baru diunggah yang boleh dihapus saat rollback; file dari
+        // arsip dokumen adalah milik data lain dan tidak boleh ikut terhapus.
+        return $this->transactionWithSkCleanup($uploadedSkPath, function () use ($employee, $data, $request): DisciplineRecord {
             $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
             $endDate = isset($data['tanggal_berakhir']) && $data['tanggal_berakhir'] !== null
                 ? Carbon::parse($data['tanggal_berakhir'])
@@ -297,16 +299,42 @@ class EmployeeHistoryService
 
     /**
      * Upload SK disimpan sebelum transaksi data agar model hanya menerima path relatif yang aman.
+     * Path hasil unggahan baru ikut dikembalikan supaya pemanggil bisa menghapusnya
+     * sebagai kompensasi ketika transaksi database gagal (mencegah orphan file).
      *
      * @param  array<string, mixed>  $data
-     * @return array<string, mixed>
+     * @return array{0: array<string, mixed>, 1: string|null}
      */
-    private function storeSkUpload(array $data): array
+    private function storeSkUploadWithPath(array $data): array
     {
+        $uploadedSkPath = null;
+
         if (($data['file_sk'] ?? null) instanceof UploadedFile) {
             $data['file_sk'] = $this->files->storeSk($data['file_sk']);
+            $uploadedSkPath = $data['file_sk'];
         }
 
-        return $data;
+        return [$data, $uploadedSkPath];
+    }
+
+    /**
+     * Menjalankan transaksi riwayat dengan kompensasi storage: karena file SK
+     * diunggah sebelum transaksi, rollback wajib menghapus file baru tersebut
+     * agar storage tidak menyimpan orphan file tanpa data riwayat.
+     *
+     * @template TReturn
+     *
+     * @param  \Closure(): TReturn  $callback
+     * @return TReturn
+     */
+    private function transactionWithSkCleanup(?string $uploadedSkPath, \Closure $callback): mixed
+    {
+        try {
+            return DB::transaction($callback);
+        } catch (\Throwable $exception) {
+            $this->files->deletePublicFile($uploadedSkPath);
+
+            throw $exception;
+        }
     }
 }

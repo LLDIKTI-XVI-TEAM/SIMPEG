@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Models\Employee;
 use App\Models\EwsAlert;
 use App\Models\EwsConfig;
+use App\Models\Permission;
 use App\Models\RefGolongan;
+use App\Models\Role;
 use App\Models\SimpegNotification;
 use App\Models\User;
 use App\Services\EwsEngineService;
@@ -95,6 +97,27 @@ class EwsFollowupTest extends TestCase
             ->assertJsonPath('followup_status', EwsAlert::FOLLOWUP_STATUS_NOT_NEEDED);
 
         $this->assertSame(EwsAlert::FOLLOWUP_STATUS_NOT_NEEDED, $alert->refresh()->followup_status);
+    }
+
+    public function test_followup_is_forbidden_when_role_lacks_employees_update_permission(): void
+    {
+        // Follow-up EWS memutasi riwayat dan status pegawai; role saja tidak cukup,
+        // permission employees.update harus tetap ditegakkan di backend.
+        $role = Role::where('name', 'admin_kepegawaian')->firstOrFail();
+        $permissionId = Permission::where('name', 'employees.update')->firstOrFail()->id;
+        $role->permissions()->detach($permissionId);
+
+        $user = User::factory()->adminKepegawaian()->create();
+        $alert = $this->activeAlert('Pegawai Followup Tanpa Permission');
+
+        $this->actingAs($user)
+            ->postWithCsrf(route('ews.followup.update', $alert), [
+                'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+                'handled_note' => 'Percobaan tanpa permission.',
+            ])
+            ->assertForbidden();
+
+        $this->assertSame(EwsAlert::FOLLOWUP_STATUS_ACTIVE, $alert->refresh()->followup_status);
     }
 
     public function test_pangkat_approval_creates_new_history_and_resets_ews_from_configured_tmt(): void
@@ -251,6 +274,81 @@ class EwsFollowupTest extends TestCase
             'auditable_type' => 'Employee',
             'auditable_id' => $employee->id,
         ]);
+    }
+
+    public function test_failed_pension_followup_cleans_up_uploaded_sk_file(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->superAdmin()->create();
+        $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
+        $alert = $this->activeAlertFor($employee, 'PENSIUN', now()->subDay()->toDateString(), 90);
+
+        // Simulasi kegagalan transaksi setelah file SK tersimpan ke storage:
+        // perubahan status pegawai dipaksa gagal sehingga seluruh transaksi rollback.
+        Employee::updating(function (Employee $updating): void {
+            if ($updating->isDirty('status_pegawai_id')) {
+                throw new \RuntimeException('Simulasi kegagalan transaksi pensiun.');
+            }
+        });
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->actingAs($user)
+                ->postWithCsrf(route('ews.followup.update', $alert), [
+                    'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+                    'handled_note' => 'SK pensiun telah diterbitkan.',
+                    'no_sk' => 'SK-PENSIUN-GAGAL-001',
+                    'tanggal_sk' => '2026-07-25',
+                    'file_sk' => UploadedFile::fake()->create('sk-pensiun.pdf', 128, 'application/pdf'),
+                ]);
+            $this->fail('Kegagalan transaksi pensiun harus diteruskan.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Simulasi kegagalan transaksi pensiun.', $exception->getMessage());
+        }
+
+        // Rollback tidak boleh menyisakan orphan file SK di storage.
+        $this->assertSame([], Storage::disk('public')->allFiles('sk'));
+        $this->assertSame(EwsAlert::FOLLOWUP_STATUS_ACTIVE, $alert->refresh()->followup_status);
+        $this->assertDatabaseMissing('documents', ['employee_id' => $employee->id, 'jenis_dokumen' => 'sk_pensiun']);
+    }
+
+    public function test_failed_pangkat_followup_cleans_up_uploaded_sk_file(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $golongan = RefGolongan::where('kode', 'III/b')->firstOrFail();
+        $alert = $this->activeAlertFor($employee, 'KENAIKAN_PANGKAT', now()->subDay()->toDateString(), 30);
+
+        // Simulasi kegagalan transaksi setelah file SK tersimpan: sinkronisasi
+        // snapshot golongan pegawai dipaksa gagal di dalam transaksi riwayat.
+        Employee::updating(function (Employee $updating): void {
+            if ($updating->isDirty('golongan_terakhir')) {
+                throw new \RuntimeException('Simulasi kegagalan transaksi pangkat.');
+            }
+        });
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->actingAs($user)
+                ->postWithCsrf(route('ews.followup.update', $alert), [
+                    'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+                    'handled_note' => 'SK kenaikan pangkat terbit.',
+                    'golongan_id' => $golongan->id,
+                    'tmt_pangkat' => now()->addDay()->toDateString(),
+                    'no_sk' => 'SK-PANGKAT-GAGAL-001',
+                    'tanggal_sk' => '2026-07-25',
+                    'file_sk' => UploadedFile::fake()->create('sk-pangkat.pdf', 128, 'application/pdf'),
+                ]);
+            $this->fail('Kegagalan transaksi pangkat harus diteruskan.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Simulasi kegagalan transaksi pangkat.', $exception->getMessage());
+        }
+
+        // Rollback tidak boleh menyisakan orphan file SK di storage.
+        $this->assertSame([], Storage::disk('public')->allFiles('sk'));
+        $this->assertSame(EwsAlert::FOLLOWUP_STATUS_ACTIVE, $alert->refresh()->followup_status);
+        $this->assertDatabaseMissing('rank_histories', ['employee_id' => $employee->id, 'no_sk' => 'SK-PANGKAT-GAGAL-001']);
     }
 
     public function test_pension_approval_requires_sk_data(): void

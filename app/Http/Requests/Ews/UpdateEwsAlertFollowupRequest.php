@@ -12,7 +12,10 @@ class UpdateEwsAlertFollowupRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        // Tindak lanjut EWS memutasi riwayat pangkat/KGB dan status pensiun pegawai,
+        // sehingga permission dicek di backend dan tidak boleh hanya mengandalkan
+        // pembatasan role di route atau penyembunyian tombol di UI.
+        return $this->user()?->hasPermission('employees.update') ?? false;
     }
 
     /** @return array<string, array<int, mixed>> */

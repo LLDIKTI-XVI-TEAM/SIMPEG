@@ -31,35 +31,47 @@ class UpdateEwsAlertFollowupAction
     {
         $before = [];
         $employee = null;
+        $storedSkPaths = [];
 
-        $alert = DB::transaction(function () use ($alert, $followupStatus, $handledNote, $request, &$before, &$employee): EwsAlert {
-            $alert = EwsAlert::query()->lockForUpdate()->findOrFail($alert->id);
-            if ($alert->followup_status !== EwsAlert::FOLLOWUP_STATUS_ACTIVE) {
-                throw ValidationException::withMessages([
-                    'followup_status' => 'Alert EWS hanya dapat ditindaklanjuti saat status masih aktif.',
-                ]);
-            }
-
-            $before = $this->alertSnapshot($alert);
-            $employee = Employee::query()->lockForUpdate()->findOrFail($alert->employee_id);
-
-            if ($followupStatus === EwsAlert::FOLLOWUP_STATUS_HANDLED) {
-                if (in_array($alert->type, ['KENAIKAN_PANGKAT', 'KGB'], true)) {
-                    $this->createApprovedHistory($employee, $alert->type, $request);
-                    $this->resolveCurrentTypeAlerts($employee, $alert->type, $followupStatus, $handledNote, $request);
-                } elseif ($alert->type === 'PENSIUN') {
-                    $this->approveRetirement($employee, $request);
-                    $this->resolveCurrentTypeAlerts($employee, $alert->type, $followupStatus, $handledNote, $request);
-                } else {
-                    $alert->update($this->followupAttributes($followupStatus, $handledNote, $request));
+        try {
+            $alert = DB::transaction(function () use ($alert, $followupStatus, $handledNote, $request, &$before, &$employee, &$storedSkPaths): EwsAlert {
+                $alert = EwsAlert::query()->lockForUpdate()->findOrFail($alert->id);
+                if ($alert->followup_status !== EwsAlert::FOLLOWUP_STATUS_ACTIVE) {
+                    throw ValidationException::withMessages([
+                        'followup_status' => 'Alert EWS hanya dapat ditindaklanjuti saat status masih aktif.',
+                    ]);
                 }
-            } elseif ($followupStatus === EwsAlert::FOLLOWUP_STATUS_NOT_NEEDED) {
-                // Tidak mengubah riwayat maupun status pegawai; hanya menutup EWS terkait.
-                $this->resolveCurrentTypeAlerts($employee, $alert->type, $followupStatus, $handledNote, $request);
+
+                $before = $this->alertSnapshot($alert);
+                $employee = Employee::query()->lockForUpdate()->findOrFail($alert->employee_id);
+
+                if ($followupStatus === EwsAlert::FOLLOWUP_STATUS_HANDLED) {
+                    if (in_array($alert->type, ['KENAIKAN_PANGKAT', 'KGB'], true)) {
+                        $storedSkPaths[] = $this->createApprovedHistory($employee, $alert->type, $request);
+                        $this->resolveCurrentTypeAlerts($employee, $alert->type, $followupStatus, $handledNote, $request);
+                    } elseif ($alert->type === 'PENSIUN') {
+                        $this->approveRetirement($employee, $request, $storedSkPaths);
+                        $this->resolveCurrentTypeAlerts($employee, $alert->type, $followupStatus, $handledNote, $request);
+                    } else {
+                        $alert->update($this->followupAttributes($followupStatus, $handledNote, $request));
+                    }
+                } elseif ($followupStatus === EwsAlert::FOLLOWUP_STATUS_NOT_NEEDED) {
+                    // Tidak mengubah riwayat maupun status pegawai; hanya menutup EWS terkait.
+                    $this->resolveCurrentTypeAlerts($employee, $alert->type, $followupStatus, $handledNote, $request);
+                }
+
+                return $alert;
+            });
+        } catch (\Throwable $exception) {
+            // File SK diunggah ke storage di dalam alur transaksi; rollback database
+            // tidak menghapusnya, sehingga kompensasi manual diperlukan agar tidak
+            // ada orphan file tanpa riwayat/dokumen yang merujuknya.
+            foreach (array_filter($storedSkPaths) as $storedSkPath) {
+                $this->files->deletePublicFile($storedSkPath);
             }
 
-            return $alert;
-        });
+            throw $exception;
+        }
 
         $alert->refresh();
         AuditService::log('UPDATE', 'EwsAlert', $alert->id, $before, $this->alertSnapshot($alert), $request);
@@ -81,12 +93,16 @@ class UpdateEwsAlertFollowupAction
         return $alert;
     }
 
-    private function createApprovedHistory(Employee $employee, string $type, Request $request): void
+    /**
+     * Membuat riwayat pangkat/KGB dan mengembalikan path file SK yang tersimpan
+     * agar pemanggil dapat menghapusnya bila transaksi luar akhirnya rollback.
+     */
+    private function createApprovedHistory(Employee $employee, string $type, Request $request): ?string
     {
         if ($type === 'KENAIKAN_PANGKAT') {
             $tmt = (string) $request->input('tmt_pangkat');
             $this->ensureNewerTmt($employee, 'rankHistories', 'tmt_pangkat', $tmt, 'tmt_pangkat');
-            $this->histories->createRankHistory($employee, [
+            $history = $this->histories->createRankHistory($employee, [
                 'golongan_id' => (string) $request->input('golongan_id'),
                 'tmt_pangkat' => $tmt,
                 'no_sk' => (string) $request->input('no_sk'),
@@ -94,25 +110,35 @@ class UpdateEwsAlertFollowupAction
                 'file_sk' => $request->file('file_sk'),
             ], $request);
 
-            return;
+            return $history->file_sk;
         }
 
         $tmt = (string) $request->input('tmt_kgb');
         $this->ensureNewerTmt($employee, 'salaryHistories', 'tmt_kgb', $tmt, 'tmt_kgb');
-        $this->histories->createKgbHistory($employee, [
+        $history = $this->histories->createKgbHistory($employee, [
             'tmt_kgb' => $tmt,
             'gaji_pokok' => $request->input('gaji_pokok'),
             'no_sk' => (string) $request->input('no_sk'),
             'tanggal_sk' => (string) $request->input('tanggal_sk'),
             'file_sk' => $request->file('file_sk'),
         ], $request);
+
+        return $history->file_sk;
     }
 
-    private function approveRetirement(Employee $employee, Request $request): void
+    /**
+     * Menyetujui pensiun. Path SK dicatat ke $storedSkPaths segera setelah file
+     * tersimpan (bukan lewat return) supaya kompensasi rollback tetap bisa
+     * menghapus file walaupun langkah setelah penyimpanan yang gagal.
+     *
+     * @param  array<int, string|null>  $storedSkPaths
+     */
+    private function approveRetirement(Employee $employee, Request $request, array &$storedSkPaths): void
     {
         $oldValues = $employee->getAttributes();
         $pensionStatus = RefStatusPegawai::query()->where('kode', 'PENSIUN')->firstOrFail();
         $filePath = $this->files->storeSk($request->file('file_sk'));
+        $storedSkPaths[] = $filePath;
 
         $employee->documents()->create([
             'jenis_dokumen' => 'sk_pensiun',
