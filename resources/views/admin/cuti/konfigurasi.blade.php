@@ -77,7 +77,6 @@
                     <span class="font-medium text-ink">Konfigurasi Approval</span>
                 </nav>
                 <h2 class="text-2xl font-semibold text-ink">Konfigurasi Approval Cuti</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-muted">Kelola chain approval per pegawai, PYBMC global, dan backfill massal dari satu tempat. Ikuti tiga langkah pada panel utama untuk menyusun chain seorang pegawai.</p>
             </div>
             <a href="{{ route('cuti') }}" class="inline-flex items-center gap-2 rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition hover:bg-soft">
                 Kembali ke Cuti
@@ -136,7 +135,6 @@
         <section class="rounded-xl border border-border bg-surface shadow-sm" aria-labelledby="employee-chain-heading">
             <div class="border-b border-border bg-soft/30 px-5 py-4">
                 <h3 id="employee-chain-heading" class="text-xs font-bold uppercase tracking-wider text-ink">Chain Approval Pegawai</h3>
-                <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-muted">Cari lalu pilih pegawai aktif. Autocomplete menampilkan maksimal 15 hasil agar interaksi tetap ringan.</p>
             </div>
 
             <div class="flex items-center gap-2.5 px-5 pt-4">
@@ -156,7 +154,7 @@
                 :fallback-options="$targetEmployees"
                 label="Cari Pegawai"
                 placeholder="Nama atau NIP"
-                help="Ketik minimal 2 karakter. Hasil dibatasi oleh server agar halaman tetap ringan."
+                help="Ketik minimal 2 karakter."
                 submit-label="Cari Pegawai"
                 class="border-b border-border px-5 pb-4 pt-3"
             />
@@ -171,7 +169,7 @@
                             <input id="approver-search" name="approver_search" type="search" value="{{ $approverSearch }}" placeholder="Nama atau NIP" aria-describedby="approver-search-help" class="min-h-11 min-w-0 flex-1 rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-all duration-200 placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                             <button type="submit" class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Cari Kandidat</button>
                         </div>
-                        <p id="approver-search-help" class="text-[11px] text-muted">Hasil dibatasi hingga 50 pegawai aktif. Kandidat chain saat ini tetap ditampilkan.</p>
+                        <p id="approver-search-help" class="text-[11px] text-muted">Hasil pencarian mengisi pilihan Verifikator dan PYBMC.</p>
                     </form>
                 @endif
 
@@ -278,9 +276,9 @@
                                 <h4 class="text-sm font-semibold text-ink">Penetapan Kepala Bagian</h4>
                                 <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-muted">
                                     @if ($selectedKepalaBagian)
-                                        Kepala Bagian aktif: <span class="font-semibold text-ink">{{ $selectedKepalaBagian->nama_lengkap }} ({{ $selectedKepalaBagian->nip }})</span>. Perubahan memakai alur penetapan yang sama dengan halaman detail pegawai.
+                                        Kepala Bagian aktif: <span class="font-semibold text-ink">{{ $selectedKepalaBagian->nama_lengkap }} ({{ $selectedKepalaBagian->nip }})</span>
                                     @else
-                                        Pegawai ini belum memiliki Kepala Bagian aktif. Tetapkan langsung dari sini tanpa berpindah ke halaman Data Pegawai.
+                                        Belum ada Kepala Bagian aktif — tetapkan di bawah ini.
                                     @endif
                                 </p>
                                 </div>
@@ -361,7 +359,7 @@
                                             </template>
                                         </div>
                                     </div>
-                                    <p id="kabag_inline_lookup_help" class="text-[11px] text-muted">Cari nama atau NIP, minimal 2 karakter. Penetapan memakai validasi server yang sama dengan halaman detail pegawai.</p>
+                                    <p id="kabag_inline_lookup_help" class="text-[11px] text-muted">Ketik minimal 2 karakter nama atau NIP.</p>
                                     <p id="kabag_inline_selection_error" x-show="kabagSelectionError" x-cloak x-text="kabagSelectionError" class="text-[11px] font-semibold text-danger" role="alert"></p>
                                     @error('kepala_bagian_id')
                                         <p id="kabag_inline_lookup_error" class="text-[11px] font-semibold text-danger" role="alert">{{ $message }}</p>
@@ -393,10 +391,7 @@
                     <div class="flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
                         <div class="flex items-center gap-2.5">
                             <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-white" aria-hidden="true">3</span>
-                            <div>
-                                <p class="text-sm font-semibold text-ink">Susun Chain Approval</p>
-                                <p class="text-xs text-muted">Urutan langkah mengikuti struktur di bawah dan berlaku untuk pengajuan berikutnya.</p>
-                            </div>
+                            <p class="text-sm font-semibold text-ink">Susun Chain Approval</p>
                         </div>
                         @if ($selectedKepalaBagian)
                             <p class="rounded-xl border border-primary/15 bg-soft px-4 py-2 text-center text-xs font-semibold text-primary" aria-live="polite">
@@ -420,7 +415,6 @@
                         <div>
                             <label for="kepala-bagian-display" class="text-xs font-bold uppercase tracking-wider text-muted">Kepala Bagian</label>
                             <input id="kepala-bagian-display" type="text" readonly value="{{ $selectedKepalaBagian ? $selectedKepalaBagian->nama_lengkap . ' (' . $selectedKepalaBagian->nip . ')' : 'Belum ditetapkan' }}" class="mt-1 w-full rounded-xl border border-border bg-soft px-4 py-2 text-sm text-ink shadow-sm">
-                            <p class="mt-1 text-[11px] text-muted">Ditentukan dari struktur pegawai. Validasi server tetap menjadi sumber kebenaran.</p>
                         </div>
                     </div>
 
@@ -437,12 +431,12 @@
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                                 <div>
                                     <legend class="text-sm font-semibold text-ink">Verifikator</legend>
-                                    <p class="mt-0.5 text-xs leading-relaxed text-muted">Tambahkan nol atau lebih verifikator. Duplikasi approver dicatat dan dilewati otomatis saat approval.</p>
+                                    <p class="mt-0.5 text-xs leading-relaxed text-muted">Opsional. Approver duplikat dilewati otomatis.</p>
                                 </div>
                                 <button type="button" @click="addVerifier()" :disabled="verifiers.length >= maxVerifierSteps" class="inline-flex items-center justify-center rounded-xl border border-border bg-surface px-3.5 py-1.5 text-xs font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50">Tambah Verifikator</button>
                             </div>
 
-                            <p id="verifier-limit-help" class="text-[11px] text-muted">Maksimum 8 verifikator, sehingga Kepala Bagian dan PYBMC tetap berada dalam batas 10 langkah.</p>
+                            <p id="verifier-limit-help" class="text-[11px] text-muted">Maksimum 8 verifikator.</p>
                             @error('steps')
                                 <p class="text-[11px] font-semibold text-danger" role="alert">{{ $message }}</p>
                             @enderror
@@ -480,7 +474,7 @@
                         <div class="grid gap-4 px-5 py-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:items-end">
                             <div>
                                 <label for="employee-pybmc" class="text-sm font-semibold text-ink">PYBMC Khusus</label>
-                                <p class="mt-0.5 text-xs leading-relaxed text-muted">Opsional. Kosongkan untuk memakai PYBMC global. Jika dipilih, PYBMC khusus menjadi approver final.</p>
+                                <p class="mt-0.5 text-xs leading-relaxed text-muted">Opsional — kosongkan untuk memakai PYBMC global.</p>
                             </div>
                             <div>
                                 <input type="hidden" name="steps[_pybmc][step_type]" value="pybmc" x-bind:disabled="! pybmcEmployeeId">
@@ -498,7 +492,7 @@
                         <div class="grid gap-4 px-5 py-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:items-start">
                             <div>
                                 <label for="employee-chain-reason" class="text-sm font-semibold text-ink">Alasan Perubahan <span class="text-danger">*</span></label>
-                                <p class="mt-1 text-xs leading-relaxed text-muted">Alasan wajib dicatat dalam log audit kepegawaian.</p>
+                                <p class="mt-1 text-xs leading-relaxed text-muted">Dicatat dalam log audit.</p>
                             </div>
                              <div class="space-y-3">
                                  <x-form.textarea name="reason" id="employee-chain-reason" :required="true" rows="3" placeholder="Contoh: Penyesuaian verifikator setelah mutasi jabatan" />
@@ -514,7 +508,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
                         </svg>
                         <p class="text-sm font-semibold text-ink">Pilih pegawai dari hasil pencarian</p>
-                        <p class="max-w-sm text-xs leading-relaxed text-muted">Setelah pegawai dipilih, Kepala Bagian dan penyusunan chain akan tampil pada langkah 2 dan 3.</p>
+                        <p class="max-w-sm text-xs leading-relaxed text-muted">Langkah 2 dan 3 tampil setelah pegawai dipilih.</p>
                     </div>
                 </div>
             @else
@@ -524,7 +518,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                         </svg>
                         <p class="text-sm font-semibold text-ink">Mulai dengan mencari pegawai</p>
-                        <p class="max-w-sm text-xs leading-relaxed text-muted">Ketik nama atau NIP pada kolom pencarian di atas untuk menyusun chain approval per pegawai.</p>
+                        <p class="max-w-sm text-xs leading-relaxed text-muted">Ketik nama atau NIP pada kolom pencarian di atas.</p>
                     </div>
                 </div>
             @endif
@@ -535,7 +529,7 @@
         <section class="overflow-hidden rounded-xl border border-border bg-surface shadow-sm" aria-labelledby="global-pybmc-heading">
             <div class="border-b border-border bg-soft/30 px-5 py-4">
                 <h3 id="global-pybmc-heading" class="text-xs font-bold uppercase tracking-wider text-ink">PYBMC Global</h3>
-                <p class="mt-0.5 text-xs text-muted">Override global mengubah PYBMC pada semua chain aktif. Snapshot pengajuan yang sudah disubmit tetap tidak berubah.</p>
+                <p class="mt-0.5 text-xs text-muted">Override global mengubah PYBMC pada semua chain aktif.</p>
             </div>
             <div class="space-y-4 px-5 py-5">
                 <div class="flex items-center justify-between gap-3 rounded-xl border border-border bg-soft/30 px-4 py-3 text-sm">
@@ -551,7 +545,6 @@
                     </x-form.select>
                     <x-form.textarea name="pybmc_reason" id="pybmc-global-reason" label="Alasan PYBMC Global" :required="true" rows="3" placeholder="Contoh: Pergantian pejabat PYBMC" />
                     <button type="submit" class="inline-flex w-full items-center justify-center rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Simpan PYBMC Global</button>
-                    <p class="text-[11px] leading-relaxed text-muted">Perubahan dicatat dalam audit dan diterapkan ke chain aktif.</p>
                 </form>
             </div>
         </section>
@@ -560,7 +553,7 @@
             <div class="flex items-start justify-between gap-3 border-b border-border bg-soft/30 px-5 py-4">
                 <div>
                     <h3 id="backfill-heading" class="text-xs font-bold uppercase tracking-wider text-ink">Backfill Chain Dinamis</h3>
-                    <p class="mt-0.5 text-xs text-muted">Membuat chain pegawai aktif dari Kepala Bagian dan konfigurasi lama yang tersedia.</p>
+                    <p class="mt-0.5 text-xs text-muted">Buat chain massal untuk pegawai yang belum punya chain.</p>
                 </div>
                 <button
                     type="button"
@@ -574,10 +567,7 @@
                 >?</button>
             </div>
             <div class="space-y-4 px-5 py-5">
-                <div class="space-y-1.5 rounded-xl border border-border bg-soft/30 px-4 py-3 text-sm text-muted">
-                    <p><span class="font-semibold text-ink">{{ $chainStats['active'] }}</span> chain aktif tersedia.</p>
-                    <p>Backfill dapat diulang. Pegawai dengan chain aktif dilewati.</p>
-                </div>
+                <p class="rounded-xl border border-border bg-soft/30 px-4 py-3 text-sm text-muted">Dapat diulang — pegawai yang sudah punya chain aktif dilewati.</p>
                 <form method="POST" action="{{ route('cuti.config.backfill') }}" class="space-y-3">
                     @csrf
                     <x-form.textarea name="backfill_reason" id="backfill-reason" label="Alasan Backfill" :required="true" rows="3" placeholder="Contoh: Backfill awal konfigurasi approval" />
@@ -593,7 +583,6 @@
             <div class="flex items-center justify-between border-b border-border bg-soft/30 px-5 py-4">
                 <div>
                     <h3 id="audit-heading" class="text-xs font-bold uppercase tracking-wider text-ink">Log Perubahan Konfigurasi</h3>
-                    <p class="mt-0.5 text-xs text-muted">Riwayat konfigurasi lama, chain pegawai, dan PYBMC global.</p>
                 </div>
                 <x-ui.badge variant="muted" size="md">{{ count($auditRows) }} entri</x-ui.badge>
             </div>
