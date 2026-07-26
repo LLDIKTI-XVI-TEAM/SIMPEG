@@ -17,40 +17,42 @@ class ImportTemplateWriter
      * Tulis template sebagai unduhan streaming (xlsx berstyle atau csv ber-BOM).
      *
      * @param  array<int, string>  $headers
-     * @param  array<string, string|null>  $example  baris contoh (map header -> nilai)
+     * @param  array<int, array<string, string|null>>  $examples  baris-baris contoh (map header -> nilai)
      */
-    public function stream(string $type, array $headers, array $example, string $format): StreamedResponse
+    public function stream(string $type, array $headers, array $examples, string $format): StreamedResponse
     {
         $filename = 'template_'.$type.'.'.$format;
 
         return $format === 'csv'
-            ? $this->streamCsv($filename, $headers, $example)
-            : $this->streamXlsx($type, $filename, $headers, $example);
+            ? $this->streamCsv($filename, $headers, $examples)
+            : $this->streamXlsx($type, $filename, $headers, $examples);
     }
 
     /**
      * @param  array<int, string>  $headers
-     * @param  array<string, string|null>  $example
+     * @param  array<int, array<string, string|null>>  $examples
      */
-    private function streamCsv(string $filename, array $headers, array $example): StreamedResponse
+    private function streamCsv(string $filename, array $headers, array $examples): StreamedResponse
     {
-        $exampleRow = $this->orderedExample($headers, $example);
+        $exampleRows = array_map(fn (array $example) => $this->orderedExample($headers, $example), $examples);
 
-        return response()->streamDownload(function () use ($headers, $exampleRow) {
+        return response()->streamDownload(function () use ($headers, $exampleRows) {
             $output = fopen('php://output', 'w');
             // BOM agar Excel membaca UTF-8 dengan benar.
             echo "\xEF\xBB\xBF";
             fputcsv($output, $headers);
-            fputcsv($output, $exampleRow);
+            foreach ($exampleRows as $exampleRow) {
+                fputcsv($output, $exampleRow);
+            }
             fclose($output);
         }, $filename, $this->downloadHeaders('text/csv; charset=UTF-8', $filename));
     }
 
     /**
      * @param  array<int, string>  $headers
-     * @param  array<string, string|null>  $example
+     * @param  array<int, array<string, string|null>>  $examples
      */
-    private function streamXlsx(string $type, string $filename, array $headers, array $example): StreamedResponse
+    private function streamXlsx(string $type, string $filename, array $headers, array $examples): StreamedResponse
     {
         $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
@@ -69,12 +71,14 @@ class ImportTemplateWriter
         }
         $sheet->getRowDimension(1)->setRowHeight(30);
 
-        // Baris 2 = baris contoh (memuat penanda agar di-skip importer bila tertinggal).
+        // Baris 2 dst. = baris contoh (memuat penanda agar di-skip importer bila tertinggal).
         // Ditulis eksplisit sebagai string agar NIP/angka panjang tidak berubah jadi notasi ilmiah.
-        $exampleRow = $this->orderedExample($headers, $example);
-        foreach ($exampleRow as $index => $value) {
-            $col = Coordinate::stringFromColumnIndex($index + 1);
-            $sheet->setCellValueExplicit($col.'2', (string) $value, DataType::TYPE_STRING);
+        foreach ($examples as $offset => $example) {
+            $exampleRow = $this->orderedExample($headers, $example);
+            foreach ($exampleRow as $index => $value) {
+                $col = Coordinate::stringFromColumnIndex($index + 1);
+                $sheet->setCellValueExplicit($col.(2 + $offset), (string) $value, DataType::TYPE_STRING);
+            }
         }
 
         $lastCol = Coordinate::stringFromColumnIndex(count($headers));
