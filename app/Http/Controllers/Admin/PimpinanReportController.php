@@ -2,12 +2,19 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\Laporan\PimpinanCustomEmployeeExportAction;
+use App\Actions\Reports\ExportFixedEmployeePdfAction;
 use App\Actions\Reports\ExportLeaveReportAction;
 use App\Actions\Reports\ExportRankHistoryPdfAction;
 use App\Actions\Reports\ExportRankHistoryReportAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Laporan\ExportPegawaiRequest;
 use App\Http\Requests\Reports\LeaveReportFilterRequest;
 use App\Http\Requests\Reports\RankHistoryReportFilterRequest;
+use App\Models\RefJabatan;
+use App\Models\RefJenisPegawai;
+use App\Models\RefUnitKerja;
+use App\Services\Laporan\EmployeeExportDataService;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 class PimpinanReportController extends Controller
@@ -79,7 +86,7 @@ class PimpinanReportController extends Controller
         return $pdf->execute($report->rows($request->validated()));
     }
 
-    public function fixedEmployeeReport(\App\Http\Requests\Laporan\ExportPegawaiRequest $request, \App\Services\Laporan\EmployeeExportDataService $exportData)
+    public function fixedEmployeeReport(ExportPegawaiRequest $request, EmployeeExportDataService $exportData)
     {
         $filters = $request->validated();
         $perPage = (int) request('per_page', 10);
@@ -95,9 +102,9 @@ class PimpinanReportController extends Controller
             ['path' => request()->url(), 'query' => request()->query()]
         );
 
-        $unitKerjaOptions = \App\Models\RefUnitKerja::query()->orderBy('nama')->get(['id', 'nama']);
-        $jenisPegawaiOptions = \App\Models\RefJenisPegawai::query()->orderBy('nama')->get(['id', 'nama']);
-        $jabatanOptions = \App\Models\RefJabatan::query()->orderBy('nama')->get(['id', 'nama']);
+        $unitKerjaOptions = RefUnitKerja::query()->orderBy('nama')->get(['id', 'nama']);
+        $jenisPegawaiOptions = RefJenisPegawai::query()->orderBy('nama')->get(['id', 'nama']);
+        $jabatanOptions = RefJabatan::query()->orderBy('nama')->get(['id', 'nama']);
 
         return view('pimpinan.laporan.nominatif', [
             'filters' => $filters,
@@ -108,7 +115,7 @@ class PimpinanReportController extends Controller
         ]);
     }
 
-    public function exportFixedEmployeeReportExcel(\App\Http\Requests\Laporan\ExportPegawaiRequest $request, \App\Actions\Laporan\PimpinanCustomEmployeeExportAction $action)
+    public function exportFixedEmployeeReportExcel(ExportPegawaiRequest $request, PimpinanCustomEmployeeExportAction $action)
     {
         $validated = $request->validated();
         // Paksa hanya kolom aman PRD (NIP, Nama, Golongan, Jabatan, Unit Kerja, Jenis Pegawai)
@@ -117,7 +124,7 @@ class PimpinanReportController extends Controller
         return $action->execute($validated);
     }
 
-    public function exportFixedEmployeeReportPdf(\App\Http\Requests\Laporan\ExportPegawaiRequest $request, \App\Services\Laporan\EmployeeExportDataService $exportData, \App\Actions\Reports\ExportFixedEmployeePdfAction $pdf)
+    public function exportFixedEmployeeReportPdf(ExportPegawaiRequest $request, EmployeeExportDataService $exportData, ExportFixedEmployeePdfAction $pdf)
     {
         $filters = $request->validated();
         $rows = $exportData->rows($filters);

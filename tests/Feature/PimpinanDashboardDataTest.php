@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Dashboards\BuildPimpinanDashboardAction;
 use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\EwsAlert;
@@ -122,7 +123,7 @@ class PimpinanDashboardDataTest extends TestCase
             'created_at' => now()->subMonths(6),
         ]);
 
-        $action = app(\App\Actions\Dashboards\BuildPimpinanDashboardAction::class);
+        $action = app(BuildPimpinanDashboardAction::class);
         $data = $action->execute($pimpinanUser);
 
         $lastTrendPoint = collect($data['trenPegawai'])->last();
