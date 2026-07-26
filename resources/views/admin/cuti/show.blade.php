@@ -302,7 +302,7 @@
                             Tunda
                         </button>
                         <button type="button" class="{{ $buttonStyles['danger'] }}" @click="open('requestChanges', $event)">
-                            Perlu Perubahan
+                            Perubahan
                         </button>
                         <button type="button" class="{{ $buttonStyles['danger'] }}" @click="open('decline', $event)">
                             Tidak Setujui
