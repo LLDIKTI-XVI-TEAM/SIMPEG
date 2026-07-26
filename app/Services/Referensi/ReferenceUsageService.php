@@ -35,4 +35,30 @@ class ReferenceUsageService
     {
         return $this->usageDetail($item) !== [];
     }
+
+    /**
+     * Menghitung jumlah pemakaian per item untuk satu reference table secara
+     * agregat: satu query GROUP BY per tabel pemakai, bukan satu query count
+     * per baris, supaya halaman daftar data master tetap ringan.
+     *
+     * @return array<string, int> id item => total baris pemakai
+     */
+    public function usageCountMap(string $modelClass): array
+    {
+        $map = [];
+
+        foreach (ReferenceTableCatalog::usageReferences($modelClass) as $reference) {
+            $counts = DB::table($reference['table'])
+                ->select($reference['column'], DB::raw('count(*) as total'))
+                ->whereNotNull($reference['column'])
+                ->groupBy($reference['column'])
+                ->pluck('total', $reference['column']);
+
+            foreach ($counts as $id => $total) {
+                $map[(string) $id] = ($map[(string) $id] ?? 0) + (int) $total;
+            }
+        }
+
+        return $map;
+    }
 }

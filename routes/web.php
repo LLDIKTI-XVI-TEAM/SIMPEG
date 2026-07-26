@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\CutiConfigController;
 use App\Http\Controllers\Admin\CutiController;
 use App\Http\Controllers\Admin\CutiEmployeeLookupController;
 use App\Http\Controllers\Admin\CutiReportController;
+use App\Http\Controllers\Admin\DataMasterController;
 use App\Http\Controllers\Admin\DataMasterEselonController;
 use App\Http\Controllers\Admin\DataMasterGolonganController;
 use App\Http\Controllers\Admin\DataMasterJenisJabatanController;
@@ -193,9 +194,8 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin'])
         ->name('rbac.update');
 
-    Route::get('/data-master', function () {
-        return view('admin.data-master.index');
-    })->middleware(['role:super_admin'])
+    Route::get('/data-master', [DataMasterController::class, 'index'])
+        ->middleware(['role:super_admin'])
         ->name('data-master');
 
     // CRUD reference table memakai kebijakan hapus hybrid: item terpakai hanya
