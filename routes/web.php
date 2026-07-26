@@ -5,6 +5,8 @@ use App\Http\Controllers\Admin\CutiConfigController;
 use App\Http\Controllers\Admin\CutiController;
 use App\Http\Controllers\Admin\CutiEmployeeLookupController;
 use App\Http\Controllers\Admin\CutiReportController;
+use App\Http\Controllers\Admin\DataMasterEselonController;
+use App\Http\Controllers\Admin\DataMasterJenjangPendidikanController;
 use App\Http\Controllers\Admin\DokumenController;
 use App\Http\Controllers\Admin\EmployeeImportController;
 use App\Http\Controllers\Admin\EmployeeSupervisorLookupController;
@@ -192,6 +194,26 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         return view('admin.data-master.index');
     })->middleware(['role:super_admin'])
         ->name('data-master');
+
+    // CRUD reference table memakai kebijakan hapus hybrid: item terpakai hanya
+    // boleh dinonaktifkan, item belum terpakai boleh dihapus permanen.
+    Route::prefix('data-master')->name('data-master.')->middleware('role:super_admin')->group(function (): void {
+        Route::post('/eselon', [DataMasterEselonController::class, 'store'])->name('eselon.store');
+        Route::post('/eselon/{eselon}/update', [DataMasterEselonController::class, 'update'])
+            ->whereUuid('eselon')->name('eselon.update');
+        Route::post('/eselon/{eselon}/toggle-aktif', [DataMasterEselonController::class, 'toggle'])
+            ->whereUuid('eselon')->name('eselon.toggle');
+        Route::post('/eselon/{eselon}/destroy', [DataMasterEselonController::class, 'destroy'])
+            ->whereUuid('eselon')->name('eselon.destroy');
+
+        Route::post('/jenjang-pendidikan', [DataMasterJenjangPendidikanController::class, 'store'])->name('jenjang-pendidikan.store');
+        Route::post('/jenjang-pendidikan/{jenjang}/update', [DataMasterJenjangPendidikanController::class, 'update'])
+            ->whereUuid('jenjang')->name('jenjang-pendidikan.update');
+        Route::post('/jenjang-pendidikan/{jenjang}/toggle-aktif', [DataMasterJenjangPendidikanController::class, 'toggle'])
+            ->whereUuid('jenjang')->name('jenjang-pendidikan.toggle');
+        Route::post('/jenjang-pendidikan/{jenjang}/destroy', [DataMasterJenjangPendidikanController::class, 'destroy'])
+            ->whereUuid('jenjang')->name('jenjang-pendidikan.destroy');
+    });
 
     Route::get('/pegawai/nonaktif-list', [PegawaiController::class, 'inactive'])
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.restore'])
