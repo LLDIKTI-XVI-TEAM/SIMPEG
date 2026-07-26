@@ -30,19 +30,16 @@ class EmployeeImportTemplateTest extends TestCase
     }
 
     /**
-     * Ambil baris pertama dan kedua dari konten CSV streamed, lepas BOM.
+     * Ambil seluruh baris dari konten CSV streamed (header + baris contoh), lepas BOM.
      *
-     * @return array{0: array<int, string>, 1: array<int, string>}
+     * @return array<int, array<int, string>>
      */
     private function csvRows(string $content): array
     {
         $content = preg_replace('/^\xEF\xBB\xBF/', '', $content) ?? $content;
         $lines = explode("\n", trim($content));
 
-        return [
-            str_getcsv($lines[0]),
-            isset($lines[1]) ? str_getcsv($lines[1]) : [],
-        ];
+        return array_map(str_getcsv(...), $lines);
     }
 
     public function test_forbids_pegawai_role_from_downloading_template(): void
@@ -93,13 +90,18 @@ class EmployeeImportTemplateTest extends TestCase
         $this->assertSame([], $result['missing']);
     }
 
-    public function test_example_row_in_downloaded_template_is_flagged_as_example(): void
+    public function test_downloaded_template_contains_two_example_rows_flagged_as_example(): void
     {
         $this->actingAs(User::factory()->adminKepegawaian()->create());
 
-        [, $exampleCells] = $this->csvRows($this->downloadTemplate('utama', 'csv')->streamedContent());
+        $rows = $this->csvRows($this->downloadTemplate('utama', 'csv')->streamedContent());
+        $exampleRows = array_slice($rows, 1);
 
-        $this->assertTrue((new EmployeeRowMapper)->isExampleRow($exampleCells));
+        $this->assertCount(2, $exampleRows);
+        $mapper = new EmployeeRowMapper;
+        foreach ($exampleRows as $exampleCells) {
+            $this->assertTrue($mapper->isExampleRow($exampleCells));
+        }
     }
 
     public function test_uploading_template_with_only_example_row_returns_clear_message(): void

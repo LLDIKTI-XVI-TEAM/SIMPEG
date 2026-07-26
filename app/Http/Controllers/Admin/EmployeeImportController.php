@@ -131,7 +131,7 @@ class EmployeeImportController extends Controller
         $format = strtolower((string) request('format', 'xlsx'));
         $format = in_array($format, ['xlsx', 'csv'], true) ? $format : 'xlsx';
 
-        return $writer->stream($type, $definition['headers'], $definition['example'], $format);
+        return $writer->stream($type, $definition['headers'], $definition['examples'], $format);
     }
 
     /**

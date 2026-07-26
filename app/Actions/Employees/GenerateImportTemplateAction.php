@@ -8,12 +8,12 @@ use InvalidArgumentException;
 class GenerateImportTemplateAction
 {
     /**
-     * Bangun definisi template (header + satu baris contoh) untuk satu tipe import.
+     * Bangun definisi template (header + dua baris contoh) untuk satu tipe import.
      * Header diambil dari UploadImportBatchAction::TEMPLATE_HEADERS (sumber tunggal)
      * agar tidak terjadi drift dengan validasi importer yang menyebabkan kolom
      * wajib seperti Role hilang dari template.
      *
-     * @return array{headers: array<int, string>, example: array<string, string|null>}
+     * @return array{headers: array<int, string>, examples: array<int, array<string, string|null>>}
      */
     public function execute(string $type): array
     {
@@ -30,54 +30,83 @@ class GenerateImportTemplateAction
 
         return [
             'headers' => $headers,
-            'example' => $this->exampleRow($type, $headers),
+            'examples' => $this->exampleRows($type, $headers),
         ];
     }
 
     /**
-     * Susun satu baris contoh. Kolom identitas pertama diisi penanda contoh
-     * sehingga importer dapat melewatinya bila admin lupa menghapus baris ini.
+     * Susun baris-baris contoh. Setiap baris membawa penanda contoh pada kolom
+     * identitas pertama sehingga importer melewatinya bila admin lupa menghapus.
      *
      * @param  array<int, string>  $headers
-     * @return array<string, string|null>
+     * @return array<int, array<string, string|null>>
      */
-    private function exampleRow(string $type, array $headers): array
+    private function exampleRows(string $type, array $headers): array
     {
-        $samples = $this->sampleValues($type);
+        $markerColumn = $type === 'utama' ? 'Nama Pegawai' : 'NIP';
 
-        $row = [];
-        foreach ($headers as $header) {
-            $row[$header] = $samples[$header] ?? null;
+        $rows = [];
+        foreach ($this->sampleValueSets($type) as $samples) {
+            $row = [];
+            foreach ($headers as $header) {
+                $row[$header] = $samples[$header] ?? null;
+            }
+
+            $row[$markerColumn] = EmployeeRowMapper::EXAMPLE_ROW_MARKER;
+            $rows[] = $row;
         }
 
-        // Penanda diletakkan pada kolom nama/identitas pertama tiap tipe.
-        $markerColumn = $type === 'utama' ? 'Nama Pegawai' : 'NIP';
-        $row[$markerColumn] = EmployeeRowMapper::EXAMPLE_ROW_MARKER;
-
-        return $row;
+        return $rows;
     }
 
-    private function sampleValues(string $type): array
+    /**
+     * Dua set nilai contoh: PNS lengkap dan PPPK dengan Pangkat/Pensiun kosong
+     * sebagai panduan bahwa kedua kolom tersebut opsional untuk non-PNS.
+     *
+     * @return array<int, array<string, string|null>>
+     */
+    private function sampleValueSets(string $type): array
     {
         return match ($type) {
             'utama' => [
-                'No' => '1',
-                'Nama Pegawai' => 'Ahmad Fauzi, S.Kom.',
-                'Person' => 'Ahmad Saeful Fauzi',
-                'Person Formula' => 'Ahmad Saeful Fauzi',
-                'Email Pegawai' => 'contoh@example.com',
-                'Golongan' => 'III/a',
-                'Jabatan' => 'Analis Kepegawaian',
-                'Kelas Jabatan' => '7',
-                'NIP' => '000000000000000000',
-                'Nomor Telepon' => '081200000000',
-                'Pangkat' => 'Penata Muda',
-                'Pendidikan Terakhir' => 'S1',
-                'Pensiun' => '2038-01-01',
-                'Prodi Pendidikan Terakhir' => 'Manajemen',
-                'Status Kepegawaian' => 'PNS',
-                'Tanggal Lahir' => '1980-01-01',
-                'Role' => 'pegawai',
+                [
+                    'No' => '1',
+                    'Nama Pegawai' => 'Ahmad Fauzi, S.Kom.',
+                    'Person' => 'Ahmad Saeful Fauzi',
+                    'Person Formula' => 'Ahmad Saeful Fauzi',
+                    'Email Pegawai' => 'contoh@example.com',
+                    'Golongan' => 'III/a',
+                    'Jabatan' => 'Analis Kepegawaian',
+                    'Kelas Jabatan' => '7',
+                    'NIP' => '000000000000000000',
+                    'Nomor Telepon' => '081200000000',
+                    'Pangkat' => 'Penata Muda',
+                    'Pendidikan Terakhir' => 'S1',
+                    'Pensiun' => '2038-01-01',
+                    'Prodi Pendidikan Terakhir' => 'Manajemen',
+                    'Status Kepegawaian' => 'PNS',
+                    'Tanggal Lahir' => '1980-01-01',
+                    'Role' => 'pegawai',
+                ],
+                [
+                    'No' => '2',
+                    'Nama Pegawai' => 'Siti Rahmawati, A.Md.',
+                    'Person' => 'Siti Rahmawati',
+                    'Person Formula' => 'Siti Rahmawati',
+                    'Email Pegawai' => 'contoh2@example.com',
+                    'Golongan' => 'II/c',
+                    'Jabatan' => 'Pengelola Kepegawaian',
+                    'Kelas Jabatan' => '6',
+                    'NIP' => '000000000000000001',
+                    'Nomor Telepon' => '081200000001',
+                    'Pangkat' => null,
+                    'Pendidikan Terakhir' => 'D3',
+                    'Pensiun' => null,
+                    'Prodi Pendidikan Terakhir' => 'Administrasi Perkantoran',
+                    'Status Kepegawaian' => 'PPPK',
+                    'Tanggal Lahir' => '1990-05-15',
+                    'Role' => 'pegawai',
+                ],
             ],
             default => [],
         };
