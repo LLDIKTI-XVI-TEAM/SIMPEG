@@ -670,7 +670,14 @@ class EwsSchedulerTest extends TestCase
         /** @var Expectation $failureNotificationExpectation */
         $failureNotificationExpectation = $notificationMock->shouldReceive('createForEmployee');
         $failureNotificationExpectation
-            ->with(\Mockery::any(), 'ews.scheduler_failed', \Mockery::any(), \Mockery::any())
+            ->with(
+                \Mockery::any(),
+                'ews.scheduler_failed',
+                \Mockery::any(),
+                // Isi notifikasi harus berupa pesan umum yang aman; pesan exception mentah
+                // tidak boleh bocor ke UI karena bisa memuat detail sensitif server.
+                \Mockery::on(fn (string $body): bool => ! str_contains($body, 'Service failure simulation'))
+            )
             ->once()
             ->andReturn(new SimpegNotification);
 

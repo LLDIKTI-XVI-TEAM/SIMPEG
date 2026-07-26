@@ -28,6 +28,12 @@ Schedule::command('notifications:purge-read-ews')
 // langsung berlaku pada scheduler worker yang berjalan terus-menerus.
 Schedule::command('app:run-ews')
     ->everyFiveMinutes()
+    // Satu siklus pemindaian EWS bisa lebih lama dari interval lima menit saat data
+    // pegawai besar. Tanpa proteksi overlap, dua proses scheduler dapat berjalan
+    // bersamaan dan menghasilkan alert/notifikasi ganda. TTL mutex dibatasi 30 menit
+    // supaya proses yang mati paksa (deploy/restart) tidak memblokir run berikutnya
+    // selama 24 jam default.
+    ->withoutOverlapping(30)
     ->timezone('Asia/Makassar')
     ->when(function (): bool {
         $ewsSchedulerTime = (string) EwsConfig::getVal('ews_scheduler_time', '07:00');

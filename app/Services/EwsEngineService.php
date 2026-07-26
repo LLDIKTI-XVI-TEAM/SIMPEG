@@ -275,11 +275,14 @@ class EwsEngineService
             foreach ($superAdmins as $admin) {
                 $employee = Employee::find($admin->employee_id);
                 if ($employee) {
+                    // Pesan exception mentah tidak boleh tampil di notifikasi karena bisa
+                    // membocorkan detail sensitif (kredensial, struktur query, path server).
+                    // Detail teknis lengkap sudah tercatat di log server dan riwayat run.
                     $this->notificationService->createForEmployee(
                         $employee,
                         'ews.scheduler_failed',
                         'Gagal Eksekusi Scheduler EWS',
-                        'Scheduler EWS harian gagal berjalan. Error: '.$e->getMessage()
+                        'Scheduler EWS harian gagal berjalan. Silakan periksa log server atau riwayat eksekusi scheduler untuk detail teknis.'
                     );
                 }
             }
