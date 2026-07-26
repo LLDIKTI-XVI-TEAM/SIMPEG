@@ -331,6 +331,8 @@ class EwsFollowupTest extends TestCase
         });
         $this->withoutExceptionHandling();
 
+        $thrown = false;
+
         try {
             $this->actingAs($user)
                 ->postWithCsrf(route('ews.followup.update', $alert), [
@@ -340,10 +342,12 @@ class EwsFollowupTest extends TestCase
                     'tanggal_sk' => '2026-07-25',
                     'file_sk' => UploadedFile::fake()->create('sk-pensiun.pdf', 128, 'application/pdf'),
                 ]);
-            $this->fail('Kegagalan transaksi pensiun harus diteruskan.');
         } catch (\RuntimeException $exception) {
             $this->assertSame('Simulasi kegagalan transaksi pensiun.', $exception->getMessage());
+            $thrown = true;
         }
+
+        $this->assertTrue($thrown, 'Kegagalan transaksi pensiun harus diteruskan.');
 
         // Rollback tidak boleh menyisakan orphan file SK di storage.
         $this->assertSame([], Storage::disk('public')->allFiles('sk'));
@@ -355,7 +359,10 @@ class EwsFollowupTest extends TestCase
     {
         Storage::fake('public');
         $user = User::factory()->adminKepegawaian()->create();
-        $employee = Employee::factory()->create();
+        // Golongan awal ditetapkan eksplisit agar update snapshot ke III/b selalu
+        // dirty; nilai acak dari factory bisa kebetulan sudah III/b sehingga hook
+        // simulasi kegagalan tidak terpicu dan test menjadi flaky.
+        $employee = Employee::factory()->create(['golongan_terakhir' => 'III/a']);
         $golongan = RefGolongan::where('kode', 'III/b')->firstOrFail();
         $alert = $this->activeAlertFor($employee, 'KENAIKAN_PANGKAT', now()->subDay()->toDateString(), 30);
 
@@ -368,6 +375,8 @@ class EwsFollowupTest extends TestCase
         });
         $this->withoutExceptionHandling();
 
+        $thrown = false;
+
         try {
             $this->actingAs($user)
                 ->postWithCsrf(route('ews.followup.update', $alert), [
@@ -379,10 +388,12 @@ class EwsFollowupTest extends TestCase
                     'tanggal_sk' => '2026-07-25',
                     'file_sk' => UploadedFile::fake()->create('sk-pangkat.pdf', 128, 'application/pdf'),
                 ]);
-            $this->fail('Kegagalan transaksi pangkat harus diteruskan.');
         } catch (\RuntimeException $exception) {
             $this->assertSame('Simulasi kegagalan transaksi pangkat.', $exception->getMessage());
+            $thrown = true;
         }
+
+        $this->assertTrue($thrown, 'Kegagalan transaksi pangkat harus diteruskan.');
 
         // Rollback tidak boleh menyisakan orphan file SK di storage.
         $this->assertSame([], Storage::disk('public')->allFiles('sk'));
