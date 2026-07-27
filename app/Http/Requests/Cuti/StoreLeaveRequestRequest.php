@@ -97,6 +97,20 @@ class StoreLeaveRequestRequest extends FormRequest
                 return;
             }
 
+            // PRD §9.4: satu pengajuan cuti apa pun jenisnya tidak boleh melewati tahun kalender.
+            // Dicek paling awal agar berlaku juga saat data pegawai/TMT belum lengkap.
+            $mulai = Carbon::createFromFormat('Y-m-d', (string) $this->input('tanggal_mulai'))->startOfDay();
+            $selesai = Carbon::createFromFormat('Y-m-d', (string) $this->input('tanggal_selesai'))->startOfDay();
+
+            if ($mulai->year !== $selesai->year) {
+                $validator->errors()->add(
+                    'tanggal_selesai',
+                    'Pengajuan cuti tidak boleh melewati tahun kalender. Pisahkan menjadi dua pengajuan terpisah untuk tiap tahun.',
+                );
+
+                return;
+            }
+
             $employee = $this->user()?->employee;
 
             if ($employee === null) {
@@ -163,17 +177,8 @@ class StoreLeaveRequestRequest extends FormRequest
             return;
         }
 
-        // Cuti tahunan yang melintasi pergantian tahun belum didukung: aturan carry-over saldo antar tahun
-        // belum final, sehingga membebankan seluruh hari ke saldo tahun mulai berisiko salah hitung.
-        if ($mulai->year !== $selesai->year) {
-            $validator->errors()->add(
-                'tanggal_selesai',
-                'Cuti tahunan yang melintasi pergantian tahun belum dapat diajukan. Pisahkan pengajuan untuk tiap tahun.',
-            );
-
-            return;
-        }
-
+        // Batas tahun kalender sudah ditegakkan untuk semua jenis cuti pada withValidator()
+        // sebelum method ini dipanggil, sehingga rentang di sini dijamin satu tahun.
         $hariKerja = app(WorkdayCalculator::class)->calculate($mulai, $selesai);
 
         // Saldo dibebankan ke tahun tanggal mulai; service saldo membaca bucket ledger summary N-2/N-1/tahun berjalan.
