@@ -132,7 +132,7 @@
     }"
     method="GET"
     action="{{ $action }}"
-    {{ $attributes->class('flex flex-col gap-3 sm:flex-row sm:items-end') }}
+    {{ $attributes->class('min-w-0') }}
 >
     @foreach ($preserved as $preservedName => $preservedValue)
         @if ($preservedValue !== null && $preservedValue !== '')
@@ -142,8 +142,10 @@
 
     <input type="hidden" :name="selectedId ? @js($name) : null" x-model="selectedId">
 
-    <div class="relative min-w-0 flex-1 space-y-1" @click.outside="close()">
+    <div class="space-y-1">
         <label for="{{ $id }}" class="text-xs font-bold uppercase tracking-wider text-ink">{{ $label }}</label>
+        <div class="flex items-start gap-3">
+        <div class="relative min-w-0 flex-1" @click.outside="close()">
         <div class="relative">
             <input
                 id="{{ $id }}"
@@ -203,15 +205,17 @@
             </template>
         </div>
 
+        </div>
+
+        @if ($clearUrl)
+            <a x-show="selectedId" x-cloak href="{{ $clearUrl }}" class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Bersihkan</a>
+        @endif
+
+        <button x-show="false" type="submit" class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30">{{ $submitLabel }}</button>
+        </div>
+
         <p id="{{ $helpId }}" class="text-[11px] text-muted">{{ $help }}</p>
         <p id="{{ $statusId }}" class="sr-only" aria-live="polite" x-text="statusMessage()"></p>
-    </div>
-
-    @if ($clearUrl)
-        <a x-show="selectedId" x-cloak href="{{ $clearUrl }}" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Bersihkan</a>
-    @endif
-
-    <button x-show="false" type="submit" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30">{{ $submitLabel }}</button>
 
     <noscript>
         @if ($fallbackOptions->isNotEmpty())

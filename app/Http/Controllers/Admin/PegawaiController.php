@@ -606,6 +606,12 @@ class PegawaiController extends Controller
         $employee = Employee::findOrFail($id);
         $data = $request->validated();
 
+        // Form penetapan juga tersedia inline di halaman Konfigurasi Approval Cuti; nilai redirect_to
+        // sudah dibatasi whitelist pada FormRequest sehingga tidak dapat menjadi open redirect.
+        [$redirectRoute, $redirectParams] = ($data['redirect_to'] ?? null) === 'cuti-config'
+            ? ['cuti.config', ['employee_id' => $id]]
+            : ['pegawai.show', $id];
+
         try {
             $action->execute(
                 $employee,
@@ -614,15 +620,15 @@ class PegawaiController extends Controller
                 $request,
             );
 
-            return redirect()->route('pegawai.show', $id)
+            return redirect()->route($redirectRoute, $redirectParams)
                 ->with('success', 'Kepala bagian untuk '.$employee->nama_lengkap.' berhasil diperbarui.')
                 ->with('employee_data_changed', true);
         } catch (ValidationException $e) {
-            return redirect()->route('pegawai.show', $id)
+            return redirect()->route($redirectRoute, $redirectParams)
                 ->withInput()
                 ->withErrors($e->errors());
         } catch (\Exception $e) {
-            return redirect()->route('pegawai.show', $id)
+            return redirect()->route($redirectRoute, $redirectParams)
                 ->withInput()
                 ->with('error', 'Gagal memperbarui kepala bagian: '.$e->getMessage());
         }
