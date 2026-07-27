@@ -36,6 +36,7 @@ class UserMappingController extends Controller
 
         $rows = collect($paginator->items())->map(function (array $emp, int $index) use ($paginator): array {
             $no = ($paginator->firstItem() ?? 0) + $index;
+
             return $this->formatTableRow($emp, $no);
         })->values()->all();
 
@@ -62,7 +63,7 @@ class UserMappingController extends Controller
 
             $mappingStatus = 'belum_ada_user';
             $mappingStatusLabel = 'Belum Ada User Lokal';
-            
+
             if ($user !== null) {
                 if (blank($user->keycloak_id)) {
                     $mappingStatus = 'identifier_kosong';
@@ -79,7 +80,7 @@ class UserMappingController extends Controller
             $mappedEmail = $user?->email;
             if (empty($mappedEmail)) {
                 $emails = array_filter([$employee->email, $employee->email_pribadi]);
-                $mappedEmail = !empty($emails) ? array_values($emails)[0] : '';
+                $mappedEmail = ! empty($emails) ? array_values($emails)[0] : '';
             }
 
             $empData = [

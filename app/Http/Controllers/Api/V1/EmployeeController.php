@@ -89,7 +89,7 @@ class EmployeeController extends Controller
 
         return response()->json([
             'message' => 'Data baris pegawai berhasil diambil.',
-            'employee' => app(\App\Actions\Employees\ListEmployeesAction::class)->toTableRow($employee),
+            'employee' => app(ListEmployeesAction::class)->toTableRow($employee),
         ]);
     }
 
@@ -182,7 +182,7 @@ class EmployeeController extends Controller
 
             return response()->json([
                 'message' => 'Status pegawai berhasil diperbarui.',
-                'employee' => app(\App\Actions\Employees\ListEmployeesAction::class)->toTableRow($updatedEmployee),
+                'employee' => app(ListEmployeesAction::class)->toTableRow($updatedEmployee),
             ]);
         } catch (\InvalidArgumentException $e) {
             return response()->json([
