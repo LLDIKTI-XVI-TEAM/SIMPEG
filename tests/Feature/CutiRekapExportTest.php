@@ -6,7 +6,6 @@ use App\Actions\Cuti\ShowCutiRekapAction;
 use App\Http\Requests\Cuti\ListCutiRekapRequest;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
-use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
 use App\Models\RefJenisCuti;
@@ -156,7 +155,7 @@ class CutiRekapExportTest extends TestCase
         return $cases;
     }
 
-    public function test_action_rekap_mengembalikan_11_key_dengan_paginasi_dan_rollover_terbatas(): void
+    public function test_action_rekap_hanya_mengembalikan_data_yang_dirender_halaman(): void
     {
         $pegawai = Employee::factory()->create();
         $jenis = RefJenisCuti::create(['nama' => 'Cuti Kontrak Rekap']);
@@ -168,27 +167,14 @@ class CutiRekapExportTest extends TestCase
             ]);
         }
         LeaveBalance::create(['employee_id' => $pegawai->id, 'tahun' => 2026]);
-        foreach (range(1, 11) as $index) {
-            LeaveBalanceLedger::create([
-                'employee_id' => $pegawai->id,
-                'tahun' => 2026,
-                'event_type' => $index <= 6 ? 'rollover_applied' : 'manual_adjustment',
-                'amount' => 1,
-                'reason' => 'Kontrak ledger '.$index,
-                'occurred_at' => now()->subMinutes($index),
-            ]);
-        }
-
         $data = app(ShowCutiRekapAction::class)->execute(['pegawai' => $pegawai->id, 'periode' => '2026']);
 
         $this->assertSame([
             'summary', 'leaveBalances', 'usageRows', 'periode', 'unit', 'pegawaiId', 'jenisId',
-            'selectedEmployee', 'selectedBalance', 'ledgerRows', 'rolloverRows',
+            'selectedEmployee',
         ], array_keys($data));
         $this->assertSame(10, $data['leaveBalances']->perPage());
         $this->assertSame(10, $data['usageRows']->perPage());
-        $this->assertSame(10, $data['ledgerRows']->perPage());
-        $this->assertCount(5, $data['rolloverRows']);
     }
 
     public function test_tautan_laporan_rekap_mempertahankan_filter_kanonis_tanpa_url_legacy(): void

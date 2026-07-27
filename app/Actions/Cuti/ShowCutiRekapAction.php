@@ -4,7 +4,6 @@ namespace App\Actions\Cuti;
 
 use App\Models\Employee;
 use App\Models\LeaveBalance;
-use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveRequest;
 use App\Queries\Cuti\CutiRekapQuery;
 use App\Support\Cuti\CutiReportStatusFormatter;
@@ -56,35 +55,11 @@ class ShowCutiRekapAction
         $selectedEmployee = $pegawaiId === null
             ? null
             : Employee::query()->select(['id', 'nama_lengkap', 'nip'])->find($pegawaiId);
-        $selectedBalance = $selectedEmployee === null
-            ? null
-            : $this->rekapQuery->balanceRows($filters)->first();
-        $ledgerBase = LeaveBalanceLedger::query()
-            ->select(['id', 'employee_id', 'tahun', 'event_type', 'amount', 'source_year', 'reason', 'occurred_at', 'created_at'])
-            ->when(
-                $selectedEmployee !== null,
-                fn ($query) => $query->where('employee_id', $selectedEmployee->id),
-                fn ($query) => $query->whereRaw('1 = 0'),
-            );
-        $ledgerRows = (clone $ledgerBase)
-            ->orderByDesc('occurred_at')
-            ->orderByDesc('created_at')
-            ->paginate(10, ['*'], 'page_ledger')
-            ->withQueryString();
-        $rolloverRows = (clone $ledgerBase)
-            ->whereIn('event_type', [
-                LeaveBalanceLedger::EVENT_ROLLOVER_APPLIED,
-                LeaveBalanceLedger::EVENT_CARRY_OVER_GRANTED,
-                LeaveBalanceLedger::EVENT_CARRY_OVER_EXPIRED,
-            ])
-            ->orderByDesc('occurred_at')
-            ->limit(5)
-            ->get();
 
         return compact(
             'summary', 'leaveBalances', 'usageRows',
             'periode', 'unit', 'pegawaiId', 'jenisId',
-            'selectedEmployee', 'selectedBalance', 'ledgerRows', 'rolloverRows',
+            'selectedEmployee',
         );
     }
 
