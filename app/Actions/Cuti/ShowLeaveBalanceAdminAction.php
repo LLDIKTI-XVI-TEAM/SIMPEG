@@ -22,9 +22,6 @@ class ShowLeaveBalanceAdminAction
         $filters['periode'] = $periode;
         $pegawaiId = $this->stringFilter($filters, 'pegawai');
 
-        $leaveBalances = $this->rekapQuery->balanceRows($filters)
-            ->paginate(10, ['*'], 'page_saldo')
-            ->withQueryString();
         $selectedEmployee = $pegawaiId === null
             ? null
             : Employee::query()->select(['id', 'nama_lengkap', 'nip'])->find($pegawaiId);
@@ -53,7 +50,7 @@ class ShowLeaveBalanceAdminAction
             ->limit(5)
             ->get();
 
-        return compact('leaveBalances', 'periode', 'pegawaiId', 'selectedEmployee', 'selectedBalance', 'ledgerRows', 'rolloverRows');
+        return compact('periode', 'pegawaiId', 'selectedEmployee', 'selectedBalance', 'ledgerRows', 'rolloverRows');
     }
 
     /** @param array<string, mixed> $filters */

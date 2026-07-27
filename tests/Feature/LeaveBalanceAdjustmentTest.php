@@ -442,6 +442,46 @@ class LeaveBalanceAdjustmentTest extends TestCase
         $response->assertDontSee(route('cuti.saldo.adjust', $employee), false);
     }
 
+    public function test_administrasi_saldo_cuti_menyediakan_navigasi_halaman_ledger(): void
+    {
+        $employee = Employee::factory()->create();
+        $user = User::factory()->adminKepegawaian()->create();
+        $balance = LeaveBalance::create($this->balancePayload($employee, 2027));
+
+        // Ledger dipaginasi 10 baris; mutasi ke-11 hanya terjangkau bila kontrol halaman dirender.
+        foreach (range(1, 11) as $index) {
+            LeaveBalanceLedger::create([
+                'employee_id' => $employee->id,
+                'leave_balance_id' => $balance->id,
+                'tahun' => 2027,
+                'event_type' => 'manual_adjustment',
+                'amount' => -1,
+                'source_year' => 2027,
+                'reason' => sprintf('Koreksi ledger urutan %02d.', $index),
+                'occurred_at' => Carbon::now()->subMinutes(11 - $index),
+            ]);
+        }
+
+        $firstPage = $this->actingAs($user)->get(route('cuti.saldo.administrasi', [
+            'pegawai' => $employee->id,
+            'periode' => 2027,
+        ]));
+
+        $firstPage->assertOk();
+        $firstPage->assertSee('page_ledger=2', false);
+        $firstPage->assertSee('Koreksi ledger urutan 11.', false);
+        $firstPage->assertDontSee('Koreksi ledger urutan 01.', false);
+
+        $secondPage = $this->actingAs($user)->get(route('cuti.saldo.administrasi', [
+            'pegawai' => $employee->id,
+            'periode' => 2027,
+            'page_ledger' => 2,
+        ]));
+
+        $secondPage->assertOk();
+        $secondPage->assertSee('Koreksi ledger urutan 01.', false);
+    }
+
     /**
      * @param  array<string, int>  $overrides
      * @return array<string, mixed>

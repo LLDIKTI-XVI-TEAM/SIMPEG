@@ -360,6 +360,11 @@
                                 </x-ui.table-body>
                             </x-ui.table>
                         </div>
+                        @if ($ledgerRows->hasPages())
+                            <div class="border-t border-border px-5 py-3">
+                                {{ $ledgerRows->onEachSide(1)->links('vendor.pagination.simpeg') }}
+                            </div>
+                        @endif
                     </x-ui.card>
                 </section>
             </main>
