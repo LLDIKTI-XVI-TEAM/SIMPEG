@@ -136,8 +136,8 @@
         lastFocusedElement: null,
 
         init() {
-            // Jika ada form mapping yang gagal (error/redirect back), hapus cache
-            // agar data yang ditampilkan tetap segar setelah perubahan.
+            // Jika ada form mapping yang gagal (error/redirect back),
+            // hapus cache agar data yang ditampilkan tetap segar setelah perubahan.
             if (@js($mappingFormShouldReopen)) {
                 this.clearCache();
                 this.fetchPage(1);
@@ -213,6 +213,60 @@
             if (!event.shiftKey && document.activeElement === lastElement) {
                 event.preventDefault();
                 firstElement.focus();
+            }
+        },
+
+        isSubmitting: false,
+
+        async submitEdit() {
+            this.isSubmitting = true;
+            
+            try {
+                const response = await fetch('{{ route("user-management.update") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({
+                        form: 'user-mapping',
+                        employee_id: this.selectedEmployee.id,
+                        role: this.$refs.roleSelect.value,
+                        keycloak_id: this.$refs.keycloakIdentifier.value
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    const rowIndex = this.rows.findIndex(r => r.id === result.data.id);
+                    if (rowIndex !== -1) {
+                        result.data.no = this.rows[rowIndex].no; 
+                        this.rows[rowIndex] = result.data;
+                    }
+                    
+                    const cKey = this.cacheKey + `_p${this.meta.current_page}`;
+                    sessionStorage.setItem(cKey, JSON.stringify({
+                        rows: this.rows,
+                        meta: this.meta
+                    }));
+                    
+                    this.closeEdit();
+                    window.dispatchEvent(new CustomEvent('notify', { detail: { type: 'success', title: 'Berhasil', message: result.message } }));
+                } else {
+                    if (response.status === 422) {
+                        const errorMessages = Object.values(result.errors).flat().join(' ');
+                        window.dispatchEvent(new CustomEvent('notify', { detail: { type: 'error', title: 'Validasi Gagal', message: errorMessages } }));
+                    } else {
+                        window.dispatchEvent(new CustomEvent('notify', { detail: { type: 'error', title: 'Error', message: result.message || 'Terjadi kesalahan sistem.' } }));
+                    }
+                }
+            } catch (error) {
+                window.dispatchEvent(new CustomEvent('notify', { detail: { type: 'error', title: 'Network Error', message: 'Gagal menghubungi server.' } }));
+            } finally {
+                this.isSubmitting = false;
             }
         }
     }" class="space-y-6">
@@ -429,7 +483,7 @@
             <div class="absolute inset-0 bg-ink/30 transition-opacity" @click="closeEdit()"></div>
 
             <div class="fixed inset-0 flex items-center justify-center p-4">
-                <form action="{{ route('user-management.update') }}" method="POST" class="w-full max-w-md bg-surface border border-border rounded-lg shadow-xl flex flex-col overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="user-mapping-modal-title" tabindex="-1" @keydown.tab="trapFocus($event, $el)">
+                <form @submit.prevent="submitEdit()" class="w-full max-w-md bg-surface border border-border rounded-lg shadow-xl flex flex-col overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="user-mapping-modal-title" tabindex="-1" @keydown.tab="trapFocus($event, $el)">
                     @csrf
                     <input type="hidden" name="form" value="user-mapping">
 
@@ -532,9 +586,7 @@
                         <x-ui.button type="button" variant="secondary" size="xs" @click="closeEdit()">
                             Batal
                         </x-ui.button>
-                        <x-ui.button type="submit" variant="primary" size="xs">
-                            Simpan Pemetaan
-                        </x-ui.button>
+                        <x-ui.button type="submit" variant="primary" size="xs" x-bind:disabled="isSubmitting" x-text="isSubmitting ? 'Menyimpan...' : 'Simpan Pemetaan'"></x-ui.button>
                     </div>
 
                 </form>
