@@ -246,6 +246,7 @@
                         @endphp
                         <a
                             href="{{ $href }}"
+                            wire:navigate
                             class="flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm transition-colors {{ $itemClass }}"
                         >
                             @if($menu['icon'] === 'squares-2x2')

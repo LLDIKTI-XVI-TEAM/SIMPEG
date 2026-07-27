@@ -42,6 +42,10 @@ use App\Http\Controllers\Admin\UserMappingController;
 use App\Http\Controllers\Auth\KeycloakAuthController;
 use App\Http\Controllers\Cuti\VerifyLeaveProofController;
 use App\Http\Controllers\DashboardController;
+use App\Livewire\Admin\Pegawai\Create;
+use App\Livewire\Admin\Pegawai\Edit;
+use App\Livewire\Admin\Pegawai\Index;
+use App\Livewire\Admin\Pegawai\Show;
 use App\Models\Employee;
 use App\Models\Permission;
 use App\Models\Role;
@@ -342,20 +346,20 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::post('/laporan/export-pegawai/custom', [LaporanController::class, 'exportPegawaiCustom'])
         ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('laporan.pegawai.custom');
-    Route::get('/pegawai', [PegawaiController::class, 'index'])
+    Route::get('/pegawai', Index::class)
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
         ->name('data-pegawai');
-    Route::get('/pegawai/create', [PegawaiController::class, 'create'])
+    Route::get('/pegawai/create', Create::class)
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.create'])
         ->name('pegawai.create');
     Route::post('/pegawai', [PegawaiController::class, 'store'])
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.create'])
         ->name('pegawai.store');
-    Route::get('/pegawai/{id}', [PegawaiController::class, 'show'])
+    Route::get('/pegawai/{id}', Show::class)
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
         ->name('pegawai.show');
-    Route::get('/pegawai/{id}/edit', [PegawaiController::class, 'edit'])
+    Route::get('/pegawai/{id}/edit', Edit::class)
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
         ->name('pegawai.edit');

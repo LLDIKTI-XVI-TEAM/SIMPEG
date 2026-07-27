@@ -1,4 +1,4 @@
-<x-layouts.app title="Edit Pegawai">
+<div>
     @php
         $fotoUrl = $p->foto_url;
         $isPppkEmployee = strcasecmp((string) $p->jenisPegawai?->nama, 'PPPK') === 0;
@@ -16,9 +16,9 @@
         <div class="flex flex-col gap-1.5">
             <h2 class="text-2xl font-bold text-ink font-sans">Edit Data Pegawai</h2>
             <nav class="flex items-center gap-1.5 text-xs text-muted">
-                <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
+                <a href="{{ route('dashboard') }}" wire:navigate class="transition-colors hover:text-ink">Dashboard</a>
                 <span>/</span>
-                <a href="{{ route('data-pegawai') }}" class="transition-colors hover:text-ink">Data Pegawai</a>
+                <a href="{{ route('data-pegawai') }}" wire:navigate class="transition-colors hover:text-ink">Data Pegawai</a>
                 <span>/</span>
                 <span class="font-medium text-ink">Edit</span>
             </nav>
@@ -1335,4 +1335,4 @@
         });
     </script>
     @endpush
-</x-layouts.app>
+</div>

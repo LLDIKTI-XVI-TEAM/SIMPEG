@@ -1,4 +1,4 @@
-<x-layouts.app title="Data Pegawai">
+<div>
     @php
         $employeeShowUrlPrefix = $employeeShowUrlPrefix ?? route('data-pegawai');
         $serverRenderedDetailLinks = $serverRenderedDetailLinks ?? [];
@@ -40,7 +40,7 @@
     // ===== State Tabel Pegawai =====
     pegawaiRows: @js($initialRows),
     meta: @js($initialMeta),
-    isLoading: true,
+    isLoading: false,
     perPage: {{ $perPage }},
     dataChanged: @js(session('employee_data_changed', false)),
     editedEmployeeId: @js(session('edited_employee_id', null)),
@@ -370,6 +370,7 @@
                 const parsed = JSON.parse(cached);
                 this.pegawaiRows = parsed.rows;
                 this.meta = parsed.meta;
+                this.isLoading = false;
             } else {
                 this.fetchPage(this.meta.current_page);
             }
@@ -383,14 +384,19 @@
     init() {
         if (this.dataChanged) {
             if (this.editedEmployeeId) {
+                this.isLoading = true;
                 this.patchEditedEmployee(this.editedEmployeeId);
             } else {
                 this.clearCache();
+                this.isLoading = true;
                 this.fetchPage(1);
             }
             return;
         }
         
+        // ── Cek sessionStorage terlebih dahulu ──
+        // Jika data ada → tampilkan langsung tanpa loading, tanpa skeleton
+        // Jika tidak ada → set isLoading=true (tampilkan skeleton), lalu fetch
         const cKey = this.cacheKey + `_p${this.meta.current_page}`;
         const cached = sessionStorage.getItem(cKey);
         if (cached) {
@@ -398,14 +404,15 @@
                 const data = JSON.parse(cached);
                 this.pegawaiRows = data.rows;
                 this.meta = data.meta;
-                this.isLoading = false;
+                // isLoading sudah false dari awal — tidak perlu diubah
                 return;
             } catch (e) {
                 sessionStorage.removeItem(cKey);
             }
         }
         
-        // Data tidak ada di cache (karena halaman berupa shell awal), maka fetch!
+        // Data tidak ada di cache → tampilkan skeleton lalu fetch
+        this.isLoading = true;
         this.fetchPage(this.meta.current_page);
     },
 }" class="space-y-6">
@@ -467,7 +474,7 @@
                     </button>
                     <div x-show="open" style="display: none;" x-transition
                         class="absolute right-0 top-full mt-1.5 w-full rounded-lg border border-border bg-surface p-1 shadow-lg z-20">
-                        <a href="{{ route('pegawai.create') }}"
+                        <a href="{{ route('pegawai.create') }}" wire:navigate
                             class="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-ink hover:bg-soft transition-colors font-sans">
                             <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor"
                                 viewBox="0 0 24 24" stroke-width="1.5">
@@ -476,7 +483,7 @@
                             </svg>
                             Tambah Manual
                         </a>
-                        <a href="{{ route('pegawai.import') }}"
+                        <a href="{{ route('pegawai.import') }}" wire:navigate
                             class="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-ink hover:bg-soft transition-colors font-sans mt-1">
                             <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor"
                                 viewBox="0 0 24 24" stroke-width="1.5">
@@ -588,9 +595,9 @@
                             <div class="flex items-center gap-3">
                                 <x-ui.tooltip dynamicText="'Buka detail ' + p.nama_lengkap" position="right">
                                     @if ($isReadOnly)
-                                        <a :href="detailUrl(p)"
+                                        <a :href="detailUrl(p)" wire:navigate
                                     @else
-                                        <a :href="`/pegawai/${p.id}`"
+                                        <a :href="`/pegawai/${p.id}`" wire:navigate
                                     @endif
                                         class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-sm font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20">
                                         <img x-show="p.foto_url" :src="p.foto_url" :alt="'Foto ' + p.nama_lengkap"
@@ -639,14 +646,14 @@
                                 :class="{
                                 'bg-success/10 text-success': p.status_key === 'aktif',
                                 'bg-warning/10 text-warning': p.status_key === 'cuti' || p.status_key === 'mutasi',
-                                'bg-danger/10 text-danger':   p.status_key === 'non-aktif' || p.status_key === 'pensiun',
-                                'bg-muted/10 text-muted':     !['aktif','cuti','mutasi','non-aktif','pensiun'].includes(p.status_key),
+                                'bg-danger/10 text-danger':   p.status_key === 'nonaktif' || p.status_key === 'pensiun',
+                                'bg-muted/10 text-muted':     !['aktif','cuti','mutasi','nonaktif','pensiun'].includes(p.status_key),
                             }">
                                 <span class="h-1.5 w-1.5 rounded-full" :class="{
                                     'bg-success': p.status_key === 'aktif',
                                     'bg-warning': p.status_key === 'cuti' || p.status_key === 'mutasi',
-                                    'bg-danger':  p.status_key === 'non-aktif' || p.status_key === 'pensiun',
-                                    'bg-muted':   !['aktif','cuti','mutasi','non-aktif','pensiun'].includes(p.status_key),
+                                    'bg-danger':  p.status_key === 'nonaktif' || p.status_key === 'pensiun',
+                                    'bg-muted':   !['aktif','cuti','mutasi','nonaktif','pensiun'].includes(p.status_key),
                                 }"></span>
                                 <span x-text="p.status_nama"></span>
                             </span>
@@ -687,9 +694,9 @@
                                 {{-- Detail --}}
                                 <x-ui.tooltip text="Detail" position="top">
                                     @if ($isReadOnly)
-                                        <a :href="detailUrl(p)" :aria-label="'Detail pegawai ' + p.nama_lengkap"
+                                        <a :href="detailUrl(p)" :aria-label="'Detail pegawai ' + p.nama_lengkap" wire:navigate
                                     @else
-                                        <a :href="`/pegawai/${p.id}`"
+                                        <a :href="`/pegawai/${p.id}`" wire:navigate
                                     @endif
                                         class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
@@ -704,7 +711,7 @@
                                 @if (!$isReadOnly)
                                 {{-- Edit --}}
                                 <x-ui.tooltip text="Edit" position="top">
-                                    <a :href="`/pegawai/${p.id}/edit`"
+                                    <a :href="`/pegawai/${p.id}/edit`" wire:navigate
                                         class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
                                             viewBox="0 0 24 24" stroke-width="1.5">
@@ -743,7 +750,7 @@
                                                 Aktif
                                             </button>
                                             <button type="button"
-                                                @click="promptChangeStatus(p.id, 'Non-Aktif'); openStatusDropdown = false"
+                                                @click="promptChangeStatus(p.id, 'Nonaktif'); openStatusDropdown = false"
                                                 class="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-sm text-warning hover:bg-soft transition text-left">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
                                                     viewBox="0 0 24 24" stroke-width="1.5">
@@ -1323,9 +1330,30 @@
         }
 
         function exportFilteredData() {
+            // Find the Alpine component data
+            const alpineData = Alpine.$data(document.querySelector('[x-data="employeeManagement()"]'));
             const form = document.createElement('form');
             form.method = 'GET';
             form.action = '{{ route("pegawai.export") }}';
+            
+            const params = {
+                search: alpineData.search,
+                golongan: alpineData.golongan,
+                unit: alpineData.unit,
+                jenis: alpineData.jenis,
+                status: alpineData.status
+            };
+
+            for (const key in params) {
+                if (params[key]) {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = key;
+                    input.value = params[key];
+                    form.appendChild(input);
+                }
+            }
+            
             document.body.appendChild(form);
             form.submit();
             document.body.removeChild(form);
@@ -1372,4 +1400,4 @@
         });
     </script>
 
-</x-layouts.app>
+</div>
