@@ -50,7 +50,7 @@ class ListPimpinanLeavesAction
         }
         if (filled($filters['status'] ?? null)) {
             if ($filters['status'] === 'menunggu_saya') {
-                $query->where('status', 'menunggu_approval');
+                $query->whereIn('status', ['menunggu_approval', 'ditangguhkan']);
                 if ($user->employee_id) {
                     $query->whereHas('steps', fn ($q) => $q
                         ->where('status', 'active')
