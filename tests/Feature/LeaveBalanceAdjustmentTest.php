@@ -378,6 +378,17 @@ class LeaveBalanceAdjustmentTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_administrasi_saldo_cuti_menolak_format_periode_yang_ambigu(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        foreach (['2026.5', '02026', '2e3'] as $periode) {
+            $this->actingAs($user)
+                ->get(route('cuti.saldo.administrasi', ['periode' => $periode]))
+                ->assertNotFound();
+        }
+    }
+
     public function test_administrasi_saldo_cuti_menolak_role_tanpa_hak_koreksi(): void
     {
         foreach (['pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
