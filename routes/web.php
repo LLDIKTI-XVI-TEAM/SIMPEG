@@ -5,6 +5,12 @@ use App\Http\Controllers\Admin\CutiConfigController;
 use App\Http\Controllers\Admin\CutiController;
 use App\Http\Controllers\Admin\CutiEmployeeLookupController;
 use App\Http\Controllers\Admin\CutiReportController;
+use App\Http\Controllers\Admin\DataMasterController;
+use App\Http\Controllers\Admin\DataMasterEselonController;
+use App\Http\Controllers\Admin\DataMasterGolonganController;
+use App\Http\Controllers\Admin\DataMasterJenisJabatanController;
+use App\Http\Controllers\Admin\DataMasterJenjangPendidikanController;
+use App\Http\Controllers\Admin\DataMasterStatusPegawaiController;
 use App\Http\Controllers\Admin\DokumenController;
 use App\Http\Controllers\Admin\EmployeeImportController;
 use App\Http\Controllers\Admin\EmployeeSupervisorLookupController;
@@ -188,10 +194,53 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin'])
         ->name('rbac.update');
 
-    Route::get('/data-master', function () {
-        return view('admin.data-master.index');
-    })->middleware(['role:super_admin'])
+    Route::get('/data-master', [DataMasterController::class, 'index'])
+        ->middleware(['role:super_admin'])
         ->name('data-master');
+
+    // CRUD reference table memakai kebijakan hapus hybrid: item terpakai hanya
+    // boleh dinonaktifkan, item belum terpakai boleh dihapus permanen.
+    Route::prefix('data-master')->name('data-master.')->middleware('role:super_admin')->group(function (): void {
+        Route::post('/eselon', [DataMasterEselonController::class, 'store'])->name('eselon.store');
+        Route::post('/eselon/{eselon}/update', [DataMasterEselonController::class, 'update'])
+            ->whereUuid('eselon')->name('eselon.update');
+        Route::post('/eselon/{eselon}/toggle-aktif', [DataMasterEselonController::class, 'toggle'])
+            ->whereUuid('eselon')->name('eselon.toggle');
+        Route::post('/eselon/{eselon}/destroy', [DataMasterEselonController::class, 'destroy'])
+            ->whereUuid('eselon')->name('eselon.destroy');
+
+        Route::post('/jenjang-pendidikan', [DataMasterJenjangPendidikanController::class, 'store'])->name('jenjang-pendidikan.store');
+        Route::post('/jenjang-pendidikan/{jenjang}/update', [DataMasterJenjangPendidikanController::class, 'update'])
+            ->whereUuid('jenjang')->name('jenjang-pendidikan.update');
+        Route::post('/jenjang-pendidikan/{jenjang}/toggle-aktif', [DataMasterJenjangPendidikanController::class, 'toggle'])
+            ->whereUuid('jenjang')->name('jenjang-pendidikan.toggle');
+        Route::post('/jenjang-pendidikan/{jenjang}/destroy', [DataMasterJenjangPendidikanController::class, 'destroy'])
+            ->whereUuid('jenjang')->name('jenjang-pendidikan.destroy');
+
+        Route::post('/golongan', [DataMasterGolonganController::class, 'store'])->name('golongan.store');
+        Route::post('/golongan/{golongan}/update', [DataMasterGolonganController::class, 'update'])
+            ->whereUuid('golongan')->name('golongan.update');
+        Route::post('/golongan/{golongan}/toggle-aktif', [DataMasterGolonganController::class, 'toggle'])
+            ->whereUuid('golongan')->name('golongan.toggle');
+        Route::post('/golongan/{golongan}/destroy', [DataMasterGolonganController::class, 'destroy'])
+            ->whereUuid('golongan')->name('golongan.destroy');
+
+        Route::post('/jenis-jabatan', [DataMasterJenisJabatanController::class, 'store'])->name('jenis-jabatan.store');
+        Route::post('/jenis-jabatan/{jenisJabatan}/update', [DataMasterJenisJabatanController::class, 'update'])
+            ->whereUuid('jenisJabatan')->name('jenis-jabatan.update');
+        Route::post('/jenis-jabatan/{jenisJabatan}/toggle-aktif', [DataMasterJenisJabatanController::class, 'toggle'])
+            ->whereUuid('jenisJabatan')->name('jenis-jabatan.toggle');
+        Route::post('/jenis-jabatan/{jenisJabatan}/destroy', [DataMasterJenisJabatanController::class, 'destroy'])
+            ->whereUuid('jenisJabatan')->name('jenis-jabatan.destroy');
+
+        Route::post('/status-pegawai', [DataMasterStatusPegawaiController::class, 'store'])->name('status-pegawai.store');
+        Route::post('/status-pegawai/{statusPegawai}/update', [DataMasterStatusPegawaiController::class, 'update'])
+            ->whereUuid('statusPegawai')->name('status-pegawai.update');
+        Route::post('/status-pegawai/{statusPegawai}/toggle-aktif', [DataMasterStatusPegawaiController::class, 'toggle'])
+            ->whereUuid('statusPegawai')->name('status-pegawai.toggle');
+        Route::post('/status-pegawai/{statusPegawai}/destroy', [DataMasterStatusPegawaiController::class, 'destroy'])
+            ->whereUuid('statusPegawai')->name('status-pegawai.destroy');
+    });
 
     Route::get('/pegawai/nonaktif-list', [PegawaiController::class, 'inactive'])
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.restore'])

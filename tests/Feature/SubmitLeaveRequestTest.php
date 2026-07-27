@@ -817,6 +817,83 @@ class SubmitLeaveRequestTest extends TestCase
         $this->assertDatabaseCount('leave_requests', 0);
     }
 
+    public static function jenisNonTahunanProvider(): array
+    {
+        return [
+            'cuti sakit' => ['Cuti Sakit', false],
+            'cuti melahirkan' => ['Cuti Melahirkan', false],
+            'cuti alasan penting' => ['Cuti Karena Alasan Penting', false],
+            'cuti besar' => ['Cuti Besar', true],
+            'cltn' => ['Cuti Luar Tanggungan Negara (CLTN)', true],
+        ];
+    }
+
+    #[DataProvider('jenisNonTahunanProvider')]
+    public function test_menolak_semua_jenis_cuti_lintas_tahun(string $namaJenis, bool $khususPns): void
+    {
+        $aktor = $this->makePemohon();
+        $jenis = $this->jenisCuti($namaJenis, $khususPns);
+
+        $this->actingAs($aktor['user']);
+        $response = $this->postJson(route(self::ROUTE), $this->payload($jenis, [
+            'tanggal_mulai' => '2026-12-30',
+            'tanggal_selesai' => '2027-01-05',
+        ]));
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['tanggal_selesai']);
+        $this->assertDatabaseCount('leave_requests', 0);
+    }
+
+    public function test_menolak_cuti_tahunan_lintas_tahun_meski_tmt_pengangkatan_kosong(): void
+    {
+        $aktor = $this->makePemohon();
+        $jenis = $this->jenisCuti('Cuti Tahunan');
+        // TMT dihapus untuk memastikan cek tahun kalender berjalan lebih dulu daripada cek TMT.
+        Appointment::query()->where('employee_id', $aktor['employee']->id)->delete();
+
+        $this->actingAs($aktor['user']);
+        $response = $this->postJson(route(self::ROUTE), $this->payload($jenis, [
+            'tanggal_mulai' => '2026-12-30',
+            'tanggal_selesai' => '2027-01-05',
+        ]));
+
+        $response->assertUnprocessable();
+        $response->assertJsonPath(
+            'errors.tanggal_selesai.0',
+            'Pengajuan cuti tidak boleh melewati tahun kalender. Pisahkan menjadi dua pengajuan terpisah untuk tiap tahun.',
+        );
+        $this->assertDatabaseCount('leave_requests', 0);
+    }
+
+    public function test_menolak_resubmit_lintas_tahun_untuk_jenis_non_tahunan(): void
+    {
+        $aktor = $this->makePemohon();
+        $jenis = $this->jenisCuti('Cuti Sakit');
+
+        $this->actingAs($aktor['user']);
+        $this->post(route(self::ROUTE), $this->payload($jenis));
+
+        $leave = LeaveRequest::firstOrFail();
+        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], 'Tanggal harus diperbaiki.');
+
+        $response = $this->patchJson(route('cuti.resubmit', $leave), [
+            'tanggal_mulai' => '2026-12-30',
+            'tanggal_selesai' => '2027-01-05',
+            'alasan' => 'Revisi tanggal sesuai arahan approver.',
+            'alamat_selama_cuti' => 'Jl. Sam Ratulangi No. 2, Manado',
+            'nomor_telepon' => '+62 (431) 123-457',
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['tanggal_selesai']);
+
+        $leave->refresh();
+        $this->assertSame('perlu_perubahan', $leave->status);
+        $this->assertSame('2026-07-06', $leave->tanggal_mulai->toDateString());
+        $this->assertSame('2026-07-10', $leave->tanggal_selesai->toDateString());
+    }
+
     public function test_menolak_pengajuan_saat_rantai_approval_belum_dikonfigurasi(): void
     {
         $aktor = $this->makePemohon();

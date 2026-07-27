@@ -89,13 +89,58 @@
         @if (session('success'))
             <x-ui.alert variant="success">{{ session('success') }}</x-ui.alert>
         @endif
+        @if (session('error'))
+            <x-ui.alert variant="danger">{{ session('error') }}</x-ui.alert>
+        @endif
 
+        {{-- Ringkasan status konfigurasi: dibaca sekilas sebelum admin menyusun chain. --}}
+        <div class="grid gap-4 sm:grid-cols-3">
+            <div class="flex items-center gap-4 rounded-xl border border-border bg-surface p-4 shadow-sm">
+                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary" aria-hidden="true">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
+                    </svg>
+                </span>
+                <div class="min-w-0">
+                    <p class="text-2xl font-semibold leading-tight text-ink">{{ $chainStats['active'] }}</p>
+                    <p class="text-xs text-muted">Chain pegawai aktif</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4 rounded-xl border border-border bg-surface p-4 shadow-sm">
+                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary" aria-hidden="true">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
+                    </svg>
+                </span>
+                <div class="min-w-0">
+                    <p class="truncate text-sm font-semibold leading-tight text-ink" title="{{ $globalPybmc?->approver?->nama_lengkap ?? 'Belum ditetapkan' }}">{{ $globalPybmc?->approver?->nama_lengkap ?? 'Belum ditetapkan' }}</p>
+                    <p class="text-xs text-muted">PYBMC global saat ini</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4 rounded-xl border border-border bg-surface p-4 shadow-sm">
+                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary" aria-hidden="true">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                    </svg>
+                </span>
+                <div class="min-w-0">
+                    <p class="text-2xl font-semibold leading-tight text-ink">{{ count($auditRows) }}</p>
+                    <p class="text-xs text-muted">Perubahan tercatat terakhir</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid gap-6 xl:grid-cols-3 xl:items-start">
+        <div class="space-y-6 xl:col-span-2">
         <section class="rounded-xl border border-border bg-surface shadow-sm" aria-labelledby="employee-chain-heading">
             <div class="border-b border-border bg-soft/30 px-5 py-4">
                 <h3 id="employee-chain-heading" class="text-xs font-bold uppercase tracking-wider text-ink">Chain Approval Pegawai</h3>
-                <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-muted">Cari lalu pilih pegawai aktif. Autocomplete menampilkan maksimal 15 hasil agar interaksi tetap ringan.</p>
             </div>
 
+            <div class="flex items-center gap-2.5 px-5 pt-4">
+                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-white" aria-hidden="true">1</span>
+                <p class="text-sm font-semibold text-ink">Pilih Pegawai</p>
+            </div>
             <x-cuti.employee-combobox
                 id="employee-search"
                 :action="route('cuti.config')"
@@ -109,22 +154,255 @@
                 :fallback-options="$targetEmployees"
                 label="Cari Pegawai"
                 placeholder="Nama atau NIP"
-                help="Ketik minimal 2 karakter. Hasil dibatasi oleh server agar halaman tetap ringan."
+                help="Ketik minimal 2 karakter."
                 submit-label="Cari Pegawai"
-                class="border-b border-border px-5 py-4"
+                class="border-b border-border px-5 pb-4 pt-3"
             />
 
             @if ($selectedEmployee)
                 @if ($selectedKepalaBagian)
-                    <form method="GET" action="{{ route('cuti.config') }}" class="grid gap-3 border-b border-border bg-soft/20 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                    <form method="GET" action="{{ route('cuti.config') }}" class="space-y-1 border-b border-border bg-soft/20 px-5 py-4">
                         <input type="hidden" name="search" value="{{ $search }}">
                         <input type="hidden" name="employee_id" value="{{ $selectedEmployee->id }}">
-                        <x-form.input name="approver_search" id="approver-search" label="Cari Kandidat Approver" value="{{ $approverSearch }}" placeholder="Nama atau NIP" help="Hasil dibatasi hingga 50 pegawai aktif. Kandidat chain saat ini tetap ditampilkan." />
-                        <button type="submit" class="inline-flex items-center justify-center rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Cari Kandidat</button>
+                        <label for="approver-search" class="text-xs font-bold uppercase tracking-wider text-ink">Cari Kandidat Approver</label>
+                        <div class="flex items-start gap-3">
+                            <input id="approver-search" name="approver_search" type="search" value="{{ $approverSearch }}" placeholder="Nama atau NIP" aria-describedby="approver-search-help" class="min-h-11 min-w-0 flex-1 rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-all duration-200 placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            <button type="submit" class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Cari Kandidat</button>
+                        </div>
+                        <p id="approver-search-help" class="text-[11px] text-muted">Hasil pencarian mengisi pilihan Verifikator dan PYBMC Khusus.</p>
                     </form>
                 @endif
+
+                @php
+                    $canAssignKepalaBagian = in_array(auth()->user()?->role, ['super_admin', 'admin_kepegawaian'], true)
+                        && (auth()->user()?->hasPermission('employees.update') ?? false);
+                    $kabagFormOpen = ! $selectedKepalaBagian
+                        || $errors->hasAny(['kepala_bagian_id', 'effective_date', 'redirect_to']);
+                @endphp
+
+                @if ($canAssignKepalaBagian)
+                    <div
+                        class="border-b border-border bg-soft/20 px-5 py-4"
+                        x-data="{
+                            kabagFormOpen: @js((bool) $kabagFormOpen),
+                            kabagLookupEndpoint: @js(route('pegawai.supervisor-lookup', $selectedEmployee->id)),
+                            kabagQuery: '',
+                            kabagResults: [],
+                            kabagOpen: false,
+                            kabagLoading: false,
+                            kabagError: '',
+                            kabagSelectionError: '',
+                            kabagSelectedId: @js((string) old('kepala_bagian_id', '')),
+                            kabagSelectedName: '',
+                            kabagActiveIndex: -1,
+                            kabagRequestId: 0,
+                            kabagSearchTimer: null,
+                            searchKabag() {
+                                window.clearTimeout(this.kabagSearchTimer);
+                                this.kabagRequestId++;
+                                this.kabagError = '';
+                                this.kabagSelectionError = '';
+                                if (this.kabagQuery !== this.kabagSelectedName) {
+                                    this.kabagSelectedId = '';
+                                }
+                                if (this.kabagQuery.trim().length < 2) {
+                                    this.kabagResults = [];
+                                    this.kabagOpen = false;
+                                    this.kabagLoading = false;
+                                    return;
+                                }
+                                this.kabagSearchTimer = window.setTimeout(() => this.fetchKabagCandidates(), 250);
+                            },
+                            async fetchKabagCandidates() {
+                                const requestId = ++this.kabagRequestId;
+                                this.kabagLoading = true;
+                                this.kabagOpen = true;
+                                this.kabagActiveIndex = -1;
+                                try {
+                                    const response = await fetch(`${this.kabagLookupEndpoint}?q=${encodeURIComponent(this.kabagQuery.trim())}`, {
+                                        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                                    });
+                                    if (!response.ok) {
+                                        throw new Error('Lookup Kepala Bagian tidak tersedia.');
+                                    }
+                                    const result = await response.json();
+                                    if (requestId !== this.kabagRequestId) return;
+                                    this.kabagResults = Array.isArray(result.data) ? result.data : [];
+                                } catch (error) {
+                                    if (requestId !== this.kabagRequestId) return;
+                                    this.kabagResults = [];
+                                    this.kabagError = 'Pencarian Kepala Bagian gagal. Coba lagi.';
+                                } finally {
+                                    if (requestId === this.kabagRequestId) {
+                                        this.kabagLoading = false;
+                                    }
+                                }
+                            },
+                            selectKabag(candidate) {
+                                this.kabagRequestId++;
+                                this.kabagSelectionError = '';
+                                this.kabagSelectedId = candidate.id;
+                                this.kabagSelectedName = candidate.nama_lengkap;
+                                this.kabagQuery = candidate.nama_lengkap;
+                                this.kabagResults = [];
+                                this.kabagActiveIndex = -1;
+                                this.kabagOpen = false;
+                            },
+                            closeKabagLookup() {
+                                window.setTimeout(() => { this.kabagOpen = false; }, 120);
+                            },
+                            moveKabagActiveIndex(direction) {
+                                if (! this.kabagOpen || this.kabagResults.length === 0) return;
+                                const next = this.kabagActiveIndex + direction;
+                                this.kabagActiveIndex = Math.min(Math.max(next, 0), this.kabagResults.length - 1);
+                            },
+                            chooseActiveKabag() {
+                                if (this.kabagActiveIndex >= 0 && this.kabagResults[this.kabagActiveIndex]) {
+                                    this.selectKabag(this.kabagResults[this.kabagActiveIndex]);
+                                }
+                            },
+                            guardKabagSubmit(event) {
+                                if (! this.kabagSelectedId) {
+                                    event.preventDefault();
+                                    this.kabagSelectionError = 'Pilih Kepala Bagian dari hasil pencarian terlebih dahulu.';
+                                }
+                            }
+                        }"
+                    >
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div class="flex items-start gap-2.5">
+                                <span class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-white" aria-hidden="true">2</span>
+                                <div>
+                                <h4 class="text-sm font-semibold text-ink">Penetapan Kepala Bagian</h4>
+                                <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-muted">
+                                    @if ($selectedKepalaBagian)
+                                        Kepala Bagian aktif: <span class="font-semibold text-ink">{{ $selectedKepalaBagian->nama_lengkap }} ({{ $selectedKepalaBagian->nip }})</span>
+                                    @else
+                                        Belum ada Kepala Bagian aktif — tetapkan di bawah ini.
+                                    @endif
+                                </p>
+                                </div>
+                            </div>
+                            @if ($selectedKepalaBagian)
+                                <button type="button" @click="kabagFormOpen = ! kabagFormOpen" :aria-expanded="kabagFormOpen.toString()" aria-controls="kabag-inline-form" class="inline-flex shrink-0 items-center justify-center rounded-xl border border-border bg-surface px-3.5 py-1.5 text-xs font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                    <span x-text="kabagFormOpen ? 'Tutup Form' : 'Ubah Kepala Bagian'"></span>
+                                </button>
+                            @endif
+                        </div>
+
+                        <form
+                            id="kabag-inline-form"
+                            x-show="kabagFormOpen"
+                            x-cloak
+                            method="POST"
+                            action="{{ route('pegawai.assign-atasan', $selectedEmployee->id) }}"
+                            @submit="guardKabagSubmit($event)"
+                            class="mt-4"
+                        >
+                            @csrf
+                            <input type="hidden" name="redirect_to" value="cuti-config">
+                            <input type="hidden" name="kepala_bagian_id" :value="kabagSelectedId">
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_13rem_auto] sm:items-start">
+                                <div class="space-y-1">
+                                    <label for="kabag_inline_lookup" class="text-xs font-bold uppercase tracking-wider text-ink">Cari Kepala Bagian</label>
+                                    <div class="relative">
+                                        <input
+                                            id="kabag_inline_lookup"
+                                            x-model="kabagQuery"
+                                            @input="searchKabag()"
+                                            @focus="kabagQuery.trim().length >= 2 && (kabagOpen = true)"
+                                            @blur="closeKabagLookup()"
+                                            @keydown.arrow-down.prevent="moveKabagActiveIndex(1)"
+                                            @keydown.arrow-up.prevent="moveKabagActiveIndex(-1)"
+                                            @keydown.enter.prevent="chooseActiveKabag()"
+                                            @keydown.escape.prevent="kabagOpen = false"
+                                            type="search"
+                                            autocomplete="off"
+                                            role="combobox"
+                                            aria-autocomplete="list"
+                                            :aria-expanded="kabagOpen.toString()"
+                                            aria-controls="kabag_inline_lookup_results"
+                                            :aria-activedescendant="kabagActiveIndex >= 0 ? `kabag_inline_option_${kabagActiveIndex}` : null"
+                                            aria-describedby="kabag_inline_lookup_help kabag_inline_selection_error {{ $errors->has('kepala_bagian_id') ? 'kabag_inline_lookup_error' : '' }}"
+                                            :aria-invalid="{{ $errors->has('kepala_bagian_id') ? 'true' : 'false' }}"
+                                            placeholder="Ketik minimal 2 karakter nama atau NIP"
+                                            class="w-full rounded-xl border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 {{ $errors->has('kepala_bagian_id') ? 'border-danger focus:border-danger focus:ring-danger/20' : 'border-border' }}"
+                                        >
+                                        <div
+                                            id="kabag_inline_lookup_results"
+                                            x-cloak
+                                            x-show="kabagOpen"
+                                            role="listbox"
+                                            aria-label="Hasil pencarian Kepala Bagian"
+                                            class="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-border bg-surface p-1 shadow-md"
+                                        >
+                                            <div x-show="kabagLoading" class="flex items-center gap-2 px-3 py-2 text-xs text-muted">
+                                                <x-ui.loading size="sm" color="primary" />
+                                                Memuat kandidat.
+                                            </div>
+                                            <p x-show="!kabagLoading && kabagError" x-text="kabagError" class="px-3 py-2 text-xs text-danger"></p>
+                                            <p x-show="!kabagLoading && !kabagError && kabagResults.length === 0" class="px-3 py-2 text-xs text-muted">Tidak ada kandidat yang cocok.</p>
+                                            <template x-for="(candidate, index) in kabagResults" :key="candidate.id">
+                                                <button
+                                                    type="button"
+                                                    :id="`kabag_inline_option_${index}`"
+                                                    role="option"
+                                                    :aria-selected="kabagActiveIndex === index"
+                                                    @mousedown.prevent="selectKabag(candidate)"
+                                                    @mouseenter="kabagActiveIndex = index"
+                                                    :class="kabagActiveIndex === index ? 'bg-soft text-ink' : 'text-ink'"
+                                                    class="flex w-full flex-col rounded-lg px-3 py-2 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                >
+                                                    <span x-text="candidate.nama_lengkap" class="text-sm font-semibold"></span>
+                                                    <span x-text="`NIP. ${candidate.nip}`" class="text-xs text-muted"></span>
+                                                </button>
+                                            </template>
+                                        </div>
+                                    </div>
+                                    <p id="kabag_inline_lookup_help" class="text-[11px] text-muted">Ketik minimal 2 karakter nama atau NIP.</p>
+                                    <p id="kabag_inline_selection_error" x-show="kabagSelectionError" x-cloak x-text="kabagSelectionError" class="text-[11px] font-semibold text-danger" role="alert"></p>
+                                    @error('kepala_bagian_id')
+                                        <p id="kabag_inline_lookup_error" class="text-[11px] font-semibold text-danger" role="alert">{{ $message }}</p>
+                                    @enderror
+                                    @error('redirect_to')
+                                        <p class="text-[11px] font-semibold text-danger" role="alert">{{ $message }}</p>
+                                    @enderror
+                                    <p x-show="kabagSelectedName" x-cloak class="text-xs text-muted">Dipilih: <span x-text="kabagSelectedName" class="font-semibold text-ink"></span></p>
+                                    <p x-show="kabagSelectedId && !kabagSelectedName" x-cloak class="text-xs text-muted">Pilihan sebelumnya dipertahankan. Cari ulang untuk mengganti.</p>
+                                </div>
+                                <x-form.input
+                                    name="effective_date"
+                                    type="date"
+                                    label="Tanggal Efektif"
+                                    :value="old('effective_date', now()->toDateString())"
+                                    required
+                                    help="Gunakan hari ini atau tanggal sebelumnya agar penugasan langsung aktif."
+                                />
+                                <div class="sm:pt-6">
+                                    <x-ui.button type="submit" size="sm">Simpan Kepala Bagian</x-ui.button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                @endif
+
                 <form method="POST" action="{{ route('cuti.config.employee-chain.store', $selectedEmployee) }}" class="divide-y divide-border">
                     @csrf
+                    <div class="flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div class="flex items-center gap-2.5">
+                            <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-white" aria-hidden="true">3</span>
+                            <p class="text-sm font-semibold text-ink">Susun Chain Approval</p>
+                        </div>
+                        @if ($selectedKepalaBagian)
+                            <p class="rounded-xl border border-primary/15 bg-soft px-4 py-2 text-center text-xs font-semibold text-primary" aria-live="polite">
+                                Kepala Bagian
+                                <span aria-hidden="true">→</span>
+                                <span x-text="verifiers.length ? `Verifikator ×${verifiers.length}` : 'Tanpa verifikator'"></span>
+                                <span aria-hidden="true">→</span>
+                                <span x-text="pybmcEmployeeId ? 'PYBMC khusus' : 'PYBMC global'"></span>
+                            </p>
+                        @endif
+                    </div>
                     <div class="sticky top-0 z-10 border-b border-border bg-surface/95 px-5 py-3 shadow-[0_4px_12px_rgb(15_23_42/0.08)] backdrop-blur-sm sm:hidden">
                         <button type="submit" class="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30">Simpan Chain Pegawai</button>
                     </div>
@@ -137,7 +415,6 @@
                         <div>
                             <label for="kepala-bagian-display" class="text-xs font-bold uppercase tracking-wider text-muted">Kepala Bagian</label>
                             <input id="kepala-bagian-display" type="text" readonly value="{{ $selectedKepalaBagian ? $selectedKepalaBagian->nama_lengkap . ' (' . $selectedKepalaBagian->nip . ')' : 'Belum ditetapkan' }}" class="mt-1 w-full rounded-xl border border-border bg-soft px-4 py-2 text-sm text-ink shadow-sm">
-                            <p class="mt-1 text-[11px] text-muted">Ditentukan dari struktur pegawai. Validasi server tetap menjadi sumber kebenaran.</p>
                         </div>
                     </div>
 
@@ -154,12 +431,12 @@
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                                 <div>
                                     <legend class="text-sm font-semibold text-ink">Verifikator</legend>
-                                    <p class="mt-0.5 text-xs leading-relaxed text-muted">Tambahkan nol atau lebih verifikator. Duplikasi approver dicatat dan dilewati otomatis saat approval.</p>
+                                    <p class="mt-0.5 text-xs leading-relaxed text-muted">Opsional. Approver duplikat dilewati otomatis.</p>
                                 </div>
                                 <button type="button" @click="addVerifier()" :disabled="verifiers.length >= maxVerifierSteps" class="inline-flex items-center justify-center rounded-xl border border-border bg-surface px-3.5 py-1.5 text-xs font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50">Tambah Verifikator</button>
                             </div>
 
-                            <p id="verifier-limit-help" class="text-[11px] text-muted">Maksimum 8 verifikator, sehingga Kepala Bagian dan PYBMC tetap berada dalam batas 10 langkah.</p>
+                            <p id="verifier-limit-help" class="text-[11px] text-muted">Maksimum 8 verifikator.</p>
                             @error('steps')
                                 <p class="text-[11px] font-semibold text-danger" role="alert">{{ $message }}</p>
                             @enderror
@@ -197,7 +474,7 @@
                         <div class="grid gap-4 px-5 py-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:items-end">
                             <div>
                                 <label for="employee-pybmc" class="text-sm font-semibold text-ink">PYBMC Khusus</label>
-                                <p class="mt-0.5 text-xs leading-relaxed text-muted">Opsional. Kosongkan untuk memakai PYBMC global. Jika dipilih, PYBMC khusus menjadi approver final.</p>
+                                <p class="mt-0.5 text-xs leading-relaxed text-muted">Opsional — kosongkan untuk memakai PYBMC global.</p>
                             </div>
                             <div>
                                 <input type="hidden" name="steps[_pybmc][step_type]" value="pybmc" x-bind:disabled="! pybmcEmployeeId">
@@ -215,7 +492,7 @@
                         <div class="grid gap-4 px-5 py-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:items-start">
                             <div>
                                 <label for="employee-chain-reason" class="text-sm font-semibold text-ink">Alasan Perubahan <span class="text-danger">*</span></label>
-                                <p class="mt-1 text-xs leading-relaxed text-muted">Alasan wajib dicatat dalam log audit kepegawaian.</p>
+                                <p class="mt-1 text-xs leading-relaxed text-muted">Dicatat dalam log audit.</p>
                             </div>
                              <div class="space-y-3">
                                  <x-form.textarea name="reason" id="employee-chain-reason" :required="true" rows="3" placeholder="Contoh: Penyesuaian verifikator setelah mutasi jabatan" />
@@ -225,17 +502,212 @@
                      @endif
                  </form>
             @elseif ($search !== null && trim($search) !== '')
-                <div class="px-5 py-5 text-sm text-muted">Pilih pegawai dari hasil pencarian untuk melihat Kepala Bagian dan menyusun chain.</div>
+                <div class="px-5 py-5">
+                    <div class="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border bg-soft/20 px-6 py-10 text-center">
+                        <svg class="h-8 w-8 text-muted/60" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                        </svg>
+                        <p class="text-sm font-semibold text-ink">Pilih pegawai dari hasil pencarian</p>
+                        <p class="max-w-sm text-xs leading-relaxed text-muted">Langkah 2 dan 3 tampil setelah pegawai dipilih.</p>
+                    </div>
+                </div>
             @else
-                <div class="px-5 py-5 text-sm text-muted">Cari pegawai untuk mulai menyusun chain per pegawai.</div>
+                <div class="px-5 py-5">
+                    <div class="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border bg-soft/20 px-6 py-10 text-center">
+                        <svg class="h-8 w-8 text-muted/60" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                        </svg>
+                        <p class="text-sm font-semibold text-ink">Mulai dengan mencari pegawai</p>
+                        <p class="max-w-sm text-xs leading-relaxed text-muted">Ketik nama atau NIP pada kolom pencarian di atas.</p>
+                    </div>
+                </div>
             @endif
+        </section>
+        </div>
+
+        <div class="space-y-6">
+        <section class="overflow-hidden rounded-xl border border-border bg-surface shadow-sm" aria-labelledby="global-pybmc-heading">
+            <div class="border-b border-border bg-soft/30 px-5 py-4">
+                <h3 id="global-pybmc-heading" class="text-xs font-bold uppercase tracking-wider text-ink">PYBMC Global</h3>
+                <p class="mt-0.5 text-xs text-muted">Override global mengubah PYBMC pada semua chain aktif.</p>
+            </div>
+            <div class="space-y-4 px-5 py-5">
+                <div class="flex items-center justify-between gap-3 rounded-xl border border-border bg-soft/30 px-4 py-3 text-sm">
+                    <span class="shrink-0 text-muted">PYBMC aktif</span>
+                    <span class="text-right font-semibold text-ink">{{ $globalPybmc?->approver?->nama_lengkap ?? 'Belum ditetapkan' }}</span>
+                </div>
+                @php
+                    $pybmcCurrentLabel = $globalPybmc?->approver
+                        ? $globalPybmc->approver->nama_lengkap.' ('.$globalPybmc->approver->nip.')'
+                        : '';
+                    $pybmcPrefillId = (string) old('approver_employee_id', $globalPybmc?->approver_employee_id ?? '');
+                    $pybmcPrefillLabel = old('approver_employee_id') === null ? $pybmcCurrentLabel : '';
+                @endphp
+                <form
+                    method="POST"
+                    action="{{ route('cuti.config.pybmc-global') }}"
+                    class="space-y-3"
+                    x-data="{
+                        pybmcLookupEndpoint: @js(route('cuti.employee-lookup')),
+                        pybmcQuery: @js($pybmcPrefillLabel),
+                        pybmcResults: [],
+                        pybmcOpen: false,
+                        pybmcLoading: false,
+                        pybmcError: '',
+                        pybmcSelectionError: '',
+                        pybmcSelectedId: @js($pybmcPrefillId),
+                        pybmcSelectedName: @js($pybmcPrefillLabel),
+                        pybmcActiveIndex: -1,
+                        pybmcRequestId: 0,
+                        pybmcSearchTimer: null,
+                        searchPybmc() {
+                            window.clearTimeout(this.pybmcSearchTimer);
+                            this.pybmcRequestId++;
+                            this.pybmcError = '';
+                            this.pybmcSelectionError = '';
+                            if (this.pybmcQuery !== this.pybmcSelectedName) {
+                                this.pybmcSelectedId = '';
+                            }
+                            if (this.pybmcQuery.trim().length < 2) {
+                                this.pybmcResults = [];
+                                this.pybmcOpen = false;
+                                this.pybmcLoading = false;
+                                return;
+                            }
+                            this.pybmcSearchTimer = window.setTimeout(() => this.fetchPybmcCandidates(), 250);
+                        },
+                        async fetchPybmcCandidates() {
+                            const requestId = ++this.pybmcRequestId;
+                            this.pybmcLoading = true;
+                            this.pybmcOpen = true;
+                            this.pybmcActiveIndex = -1;
+                            try {
+                                const response = await fetch(`${this.pybmcLookupEndpoint}?q=${encodeURIComponent(this.pybmcQuery.trim())}`, {
+                                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                                });
+                                if (!response.ok) {
+                                    throw new Error('Lookup pegawai tidak tersedia.');
+                                }
+                                const result = await response.json();
+                                if (requestId !== this.pybmcRequestId) return;
+                                this.pybmcResults = Array.isArray(result.data) ? result.data : [];
+                            } catch (error) {
+                                if (requestId !== this.pybmcRequestId) return;
+                                this.pybmcResults = [];
+                                this.pybmcError = 'Pencarian pegawai gagal. Coba lagi.';
+                            } finally {
+                                if (requestId === this.pybmcRequestId) {
+                                    this.pybmcLoading = false;
+                                }
+                            }
+                        },
+                        selectPybmc(candidate) {
+                            this.pybmcRequestId++;
+                            this.pybmcSelectionError = '';
+                            this.pybmcSelectedId = candidate.id;
+                            this.pybmcSelectedName = candidate.nama_lengkap;
+                            this.pybmcQuery = candidate.nama_lengkap;
+                            this.pybmcResults = [];
+                            this.pybmcActiveIndex = -1;
+                            this.pybmcOpen = false;
+                        },
+                        closePybmcLookup() {
+                            window.setTimeout(() => { this.pybmcOpen = false; }, 120);
+                        },
+                        movePybmcActiveIndex(direction) {
+                            if (! this.pybmcOpen || this.pybmcResults.length === 0) return;
+                            const next = this.pybmcActiveIndex + direction;
+                            this.pybmcActiveIndex = Math.min(Math.max(next, 0), this.pybmcResults.length - 1);
+                        },
+                        chooseActivePybmc() {
+                            if (this.pybmcActiveIndex >= 0 && this.pybmcResults[this.pybmcActiveIndex]) {
+                                this.selectPybmc(this.pybmcResults[this.pybmcActiveIndex]);
+                            }
+                        },
+                        guardPybmcSubmit(event) {
+                            if (! this.pybmcSelectedId) {
+                                event.preventDefault();
+                                this.pybmcSelectionError = 'Pilih pegawai dari hasil pencarian terlebih dahulu.';
+                            }
+                        }
+                    }"
+                    @submit="guardPybmcSubmit($event)"
+                >
+                    @csrf
+                    <input type="hidden" name="approver_employee_id" :value="pybmcSelectedId">
+                    <div class="space-y-1">
+                        <label for="pybmc-global-lookup" class="text-xs font-bold uppercase tracking-wider text-ink">Pegawai PYBMC</label>
+                        <div class="relative">
+                            <input
+                                id="pybmc-global-lookup"
+                                x-model="pybmcQuery"
+                                @input="searchPybmc()"
+                                @focus="pybmcQuery.trim().length >= 2 && (pybmcOpen = true)"
+                                @blur="closePybmcLookup()"
+                                @keydown.arrow-down.prevent="movePybmcActiveIndex(1)"
+                                @keydown.arrow-up.prevent="movePybmcActiveIndex(-1)"
+                                @keydown.enter.prevent="chooseActivePybmc()"
+                                @keydown.escape.prevent="pybmcOpen = false"
+                                type="search"
+                                autocomplete="off"
+                                role="combobox"
+                                aria-autocomplete="list"
+                                :aria-expanded="pybmcOpen.toString()"
+                                aria-controls="pybmc_global_lookup_results"
+                                :aria-activedescendant="pybmcActiveIndex >= 0 ? `pybmc_global_option_${pybmcActiveIndex}` : null"
+                                aria-describedby="pybmc_global_selection_error {{ $errors->has('approver_employee_id') ? 'pybmc_global_lookup_error' : '' }}"
+                                :aria-invalid="{{ $errors->has('approver_employee_id') ? 'true' : 'false' }}"
+                                placeholder="Ketik minimal 2 karakter nama atau NIP"
+                                class="min-h-11 w-full rounded-xl border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-all duration-200 placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 {{ $errors->has('approver_employee_id') ? 'border-danger focus:border-danger focus:ring-danger/20' : 'border-border' }}"
+                            >
+                            <div
+                                id="pybmc_global_lookup_results"
+                                x-cloak
+                                x-show="pybmcOpen"
+                                role="listbox"
+                                aria-label="Hasil pencarian pegawai PYBMC"
+                                class="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-border bg-surface p-1 shadow-md"
+                            >
+                                <div x-show="pybmcLoading" class="flex items-center gap-2 px-3 py-2 text-xs text-muted">
+                                    <x-ui.loading size="sm" color="primary" />
+                                    Memuat kandidat.
+                                </div>
+                                <p x-show="!pybmcLoading && pybmcError" x-text="pybmcError" class="px-3 py-2 text-xs text-danger"></p>
+                                <p x-show="!pybmcLoading && !pybmcError && pybmcResults.length === 0" class="px-3 py-2 text-xs text-muted">Tidak ada kandidat yang cocok.</p>
+                                <template x-for="(candidate, index) in pybmcResults" :key="candidate.id">
+                                    <button
+                                        type="button"
+                                        :id="`pybmc_global_option_${index}`"
+                                        role="option"
+                                        :aria-selected="pybmcActiveIndex === index"
+                                        @mousedown.prevent="selectPybmc(candidate)"
+                                        @mouseenter="pybmcActiveIndex = index"
+                                        :class="pybmcActiveIndex === index ? 'bg-soft text-ink' : 'text-ink'"
+                                        class="flex w-full flex-col rounded-lg px-3 py-2 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    >
+                                        <span x-text="candidate.nama_lengkap" class="text-sm font-semibold"></span>
+                                        <span x-text="`NIP. ${candidate.nip}`" class="text-xs text-muted"></span>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                        <p id="pybmc_global_selection_error" x-show="pybmcSelectionError" x-cloak x-text="pybmcSelectionError" class="text-[11px] font-semibold text-danger" role="alert"></p>
+                        @error('approver_employee_id')
+                            <p id="pybmc_global_lookup_error" class="text-[11px] font-semibold text-danger" role="alert">{{ $message }}</p>
+                        @enderror
+                        <p x-show="pybmcSelectedId && !pybmcSelectedName" x-cloak class="text-xs text-muted">Pilihan sebelumnya dipertahankan. Cari ulang untuk mengganti.</p>
+                    </div>
+                    <x-form.textarea name="pybmc_reason" id="pybmc-global-reason" label="Alasan PYBMC Global" :required="true" rows="3" placeholder="Contoh: Pergantian pejabat PYBMC" />
+                    <button type="submit" class="inline-flex w-full items-center justify-center rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Simpan PYBMC Global</button>
+                </form>
+            </div>
         </section>
 
         <section class="overflow-hidden rounded-xl border border-border bg-surface shadow-sm" aria-labelledby="backfill-heading">
             <div class="flex items-start justify-between gap-3 border-b border-border bg-soft/30 px-5 py-4">
                 <div>
                     <h3 id="backfill-heading" class="text-xs font-bold uppercase tracking-wider text-ink">Backfill Chain Dinamis</h3>
-                    <p class="mt-0.5 text-xs text-muted">Membuat chain pegawai aktif dari Kepala Bagian dan konfigurasi lama yang tersedia.</p>
+                    <p class="mt-0.5 text-xs text-muted">Buat chain massal untuk pegawai yang belum punya chain.</p>
                 </div>
                 <button
                     type="button"
@@ -248,12 +720,9 @@
                     aria-controls="backfill-help-dialog"
                 >?</button>
             </div>
-            <div class="grid gap-4 px-5 py-5 md:grid-cols-[1fr_auto] md:items-start">
-                <div class="space-y-2 text-sm text-muted">
-                    <p><span class="font-semibold text-ink">{{ $chainStats['active'] }}</span> chain aktif tersedia.</p>
-                    <p>Backfill dapat diulang. Pegawai dengan chain aktif dilewati.</p>
-                </div>
-                <form method="POST" action="{{ route('cuti.config.backfill') }}" class="w-full max-w-md space-y-3">
+            <div class="space-y-4 px-5 py-5">
+                <p class="rounded-xl border border-border bg-soft/30 px-4 py-3 text-sm text-muted">Dapat diulang — pegawai yang sudah punya chain aktif dilewati.</p>
+                <form method="POST" action="{{ route('cuti.config.backfill') }}" class="space-y-3">
                     @csrf
                     <x-form.textarea name="backfill_reason" id="backfill-reason" label="Alasan Backfill" :required="true" rows="3" placeholder="Contoh: Backfill awal konfigurasi approval" />
                     <button type="submit" class="inline-flex w-full items-center justify-center rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Jalankan Backfill Chain</button>
@@ -261,34 +730,13 @@
             </div>
         </section>
 
-        <section class="overflow-hidden rounded-xl border border-border bg-surface shadow-sm" aria-labelledby="global-pybmc-heading">
-            <div class="border-b border-border bg-soft/30 px-5 py-4">
-                <h3 id="global-pybmc-heading" class="text-xs font-bold uppercase tracking-wider text-ink">PYBMC Global</h3>
-                <p class="mt-0.5 text-xs text-muted">Override global mengubah PYBMC pada semua chain aktif. Snapshot pengajuan yang sudah disubmit tetap tidak berubah.</p>
-            </div>
-            <div class="grid gap-4 px-5 py-5 md:grid-cols-[1fr_auto] md:items-start">
-                <div class="space-y-2 text-sm text-muted">
-                    <p>PYBMC aktif: <span class="font-semibold text-ink">{{ $globalPybmc?->approver?->nama_lengkap ?? 'Belum ditetapkan' }}</span></p>
-                    <p>Perubahan dicatat dalam audit dan diterapkan ke chain aktif.</p>
-                </div>
-                <form method="POST" action="{{ route('cuti.config.pybmc-global') }}" class="w-full max-w-md space-y-3">
-                    @csrf
-                    <x-form.select name="approver_employee_id" id="pybmc-global-approver" label="Pegawai PYBMC" :required="true" :value="$globalPybmc?->approver_employee_id" placeholder="Pilih PYBMC">
-                        @foreach ($approverCandidates as $approver)
-                            <option value="{{ $approver->id }}">{{ $approver->nama_lengkap }} ({{ $approver->nip }})</option>
-                        @endforeach
-                    </x-form.select>
-                    <x-form.textarea name="pybmc_reason" id="pybmc-global-reason" label="Alasan PYBMC Global" :required="true" rows="3" placeholder="Contoh: Pergantian pejabat PYBMC" />
-                    <button type="submit" class="inline-flex w-full items-center justify-center rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Simpan PYBMC Global</button>
-                </form>
-            </div>
-        </section>
+        </div>
+        </div>
 
         <section class="overflow-hidden rounded-xl border border-border bg-surface shadow-sm" aria-labelledby="audit-heading">
             <div class="flex items-center justify-between border-b border-border bg-soft/30 px-5 py-4">
                 <div>
                     <h3 id="audit-heading" class="text-xs font-bold uppercase tracking-wider text-ink">Log Perubahan Konfigurasi</h3>
-                    <p class="mt-0.5 text-xs text-muted">Riwayat konfigurasi lama, chain pegawai, dan PYBMC global.</p>
                 </div>
                 <x-ui.badge variant="muted" size="md">{{ count($auditRows) }} entri</x-ui.badge>
             </div>
