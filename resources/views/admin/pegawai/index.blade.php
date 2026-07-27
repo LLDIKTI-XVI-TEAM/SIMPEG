@@ -40,7 +40,7 @@
     // ===== State Tabel Pegawai =====
     pegawaiRows: @js($initialRows),
     meta: @js($initialMeta),
-    isLoading: false,
+    isLoading: true,
     perPage: {{ $perPage }},
     dataChanged: @js(session('employee_data_changed', false)),
     editedEmployeeId: @js(session('edited_employee_id', null)),
@@ -384,15 +384,13 @@
         if (this.dataChanged) {
             if (this.editedEmployeeId) {
                 this.patchEditedEmployee(this.editedEmployeeId);
-                // Kita juga perlu men-set cache untuk halaman 1 karena saat redirect data `$initialRows` adalah halaman 1 yang segar
-                const cKey = this.cacheKey + `_p1`;
-                sessionStorage.setItem(cKey, JSON.stringify({ rows: this.pegawaiRows, meta: this.meta }));
             } else {
                 this.clearCache();
                 this.fetchPage(1);
             }
             return;
         }
+        
         const cKey = this.cacheKey + `_p${this.meta.current_page}`;
         const cached = sessionStorage.getItem(cKey);
         if (cached) {
@@ -400,14 +398,15 @@
                 const data = JSON.parse(cached);
                 this.pegawaiRows = data.rows;
                 this.meta = data.meta;
+                this.isLoading = false;
                 return;
             } catch (e) {
                 sessionStorage.removeItem(cKey);
             }
         }
-        if (this.pegawaiRows.length > 0) {
-            sessionStorage.setItem(cKey, JSON.stringify({ rows: this.pegawaiRows, meta: this.meta }));
-        }
+        
+        // Data tidak ada di cache (karena halaman berupa shell awal), maka fetch!
+        this.fetchPage(this.meta.current_page);
     },
 }" class="space-y-6">
 
