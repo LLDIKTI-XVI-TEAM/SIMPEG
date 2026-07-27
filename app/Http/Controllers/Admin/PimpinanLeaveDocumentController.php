@@ -56,7 +56,8 @@ class PimpinanLeaveDocumentController extends Controller
 
         return [
             'path' => $proof->document_path,
-            'filename' => 'Dokumen_Verifikasi_Cuti_'.strtoupper(substr($leave->id, 0, 8)).'.pdf',
+            // Nama unduhan disamakan dengan formulir resmi pada halaman pegawai karena isinya kini identik.
+            'filename' => 'Formulir_Cuti_'.strtoupper(substr($leave->id, 0, 8)).'.pdf',
         ];
     }
 }
