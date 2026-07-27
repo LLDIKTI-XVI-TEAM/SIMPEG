@@ -93,7 +93,10 @@ class BuildPimpinanDashboardAction
                     return [
                         'nama' => $history->employee?->nama_lengkap ?? '-',
                         'nip' => $history->employee?->nip ?? '-',
-                        'golongan_awal' => $prevRank?->golongan?->kode ?? '-',
+                        // Pangkat pertama pegawai tidak punya golongan asal, dan itu keadaan yang sah.
+                        // Nilainya dibiarkan null; penanda teks seperti '-' akan lolos guard !empty()
+                        // di view sehingga transisi golongan tampil seolah punya asal.
+                        'golongan_awal' => $prevRank?->golongan?->kode,
                         'golongan_tujuan' => $history->golongan?->kode ?? '-',
                         'golongan' => $history->golongan?->kode ?? '-',
                         'tmt' => $history->tmt_pangkat?->toDateString() ?? '-',
