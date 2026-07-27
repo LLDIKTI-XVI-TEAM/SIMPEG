@@ -29,7 +29,7 @@ class BuildPimpinanDashboardAction
                 return [
                     'label' => $now->copy()->subMonths($offset)->translatedFormat('M Y'),
                     'jumlah' => Employee::query()
-                        ->whereNotIn('status_aktif', ['Non-Aktif', 'Mutasi'])
+                        ->where('status_aktif', 'Aktif')
                         ->whereDate('created_at', '<=', $targetDate)
                         ->where(function ($q) use ($targetDate): void {
                             $q->whereNull('tanggal_pensiun')
