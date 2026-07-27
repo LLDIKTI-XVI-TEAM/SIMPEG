@@ -369,6 +369,15 @@ class LeaveBalanceAdjustmentTest extends TestCase
         }
     }
 
+    public function test_administrasi_saldo_cuti_menolak_filter_pegawai_dengan_uuid_rusak(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user)
+            ->get(route('cuti.saldo.administrasi', ['pegawai' => 'bukan-uuid']))
+            ->assertNotFound();
+    }
+
     public function test_administrasi_saldo_cuti_menolak_role_tanpa_hak_koreksi(): void
     {
         foreach (['pimpinan', 'kepala_bagian', 'pegawai'] as $role) {

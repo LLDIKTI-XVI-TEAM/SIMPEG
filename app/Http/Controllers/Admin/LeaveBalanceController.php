@@ -7,6 +7,7 @@ use App\Actions\Cuti\SetOpeningLeaveBalanceAction;
 use App\Actions\Cuti\ShowLeaveBalanceAdminAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Cuti\AdjustLeaveBalanceRequest;
+use App\Http\Requests\Cuti\ListCutiRekapRequest;
 use App\Http\Requests\Cuti\OpeningLeaveBalanceRequest;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
@@ -17,9 +18,9 @@ use Illuminate\Http\Request;
 class LeaveBalanceController extends Controller
 {
     /** Menampilkan administrasi saldo dengan data yang disusun Action agar controller tetap tipis. */
-    public function administrasi(Request $request, ShowLeaveBalanceAdminAction $action)
+    public function administrasi(ListCutiRekapRequest $request, ShowLeaveBalanceAdminAction $action)
     {
-        return view('admin.cuti.administrasi-saldo', $action->execute($request->query()));
+        return view('admin.cuti.administrasi-saldo', $action->execute($request->validated()));
     }
 
     /**
