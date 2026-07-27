@@ -69,6 +69,30 @@ class EmployeeController extends Controller
         ]);
     }
 
+    public function tableRow(Employee $employee): JsonResponse
+    {
+        $employee->load([
+            'jenisPegawai:id,nama',
+            'statusPegawai:id,nama',
+            'rankHistories:id,employee_id,file_sk',
+            'positionHistories' => fn ($query) => $query
+                ->select(['id', 'employee_id', 'file_sk', 'is_latest', 'tmt_jabatan', 'jabatan_id', 'unit_kerja_id'])
+                ->with(['jabatan:id,nama', 'unitKerja:id,nama'])
+                ->orderByDesc('is_latest')
+                ->orderByDesc('tmt_jabatan'),
+            'salaryHistories:id,employee_id,file_sk',
+            'appointments' => fn ($query) => $query
+                ->select(['id', 'employee_id', 'file_sk', 'tmt_pengangkatan'])
+                ->orderByDesc('tmt_pengangkatan'),
+            'documents:id,employee_id,file_path',
+        ]);
+
+        return response()->json([
+            'message' => 'Data baris pegawai berhasil diambil.',
+            'employee' => app(\App\Actions\Employees\ListEmployeesAction::class)->toTableRow($employee),
+        ]);
+    }
+
     public function documentStatus(Employee $employee, ShowEmployeeDocumentStatusAction $action): JsonResponse
     {
         return response()->json([
@@ -140,9 +164,25 @@ class EmployeeController extends Controller
         try {
             $updatedEmployee = $action->execute($employee, $request->status, $request);
 
+            $updatedEmployee->load([
+                'jenisPegawai:id,nama',
+                'statusPegawai:id,nama',
+                'rankHistories:id,employee_id,file_sk',
+                'positionHistories' => fn ($query) => $query
+                    ->select(['id', 'employee_id', 'file_sk', 'is_latest', 'tmt_jabatan', 'jabatan_id', 'unit_kerja_id'])
+                    ->with(['jabatan:id,nama', 'unitKerja:id,nama'])
+                    ->orderByDesc('is_latest')
+                    ->orderByDesc('tmt_jabatan'),
+                'salaryHistories:id,employee_id,file_sk',
+                'appointments' => fn ($query) => $query
+                    ->select(['id', 'employee_id', 'file_sk', 'tmt_pengangkatan'])
+                    ->orderByDesc('tmt_pengangkatan'),
+                'documents:id,employee_id,file_path',
+            ]);
+
             return response()->json([
                 'message' => 'Status pegawai berhasil diperbarui.',
-                'employee' => $this->employeeListPayload($updatedEmployee),
+                'employee' => app(\App\Actions\Employees\ListEmployeesAction::class)->toTableRow($updatedEmployee),
             ]);
         } catch (\InvalidArgumentException $e) {
             return response()->json([

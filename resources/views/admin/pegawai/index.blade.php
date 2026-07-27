@@ -43,6 +43,7 @@
     isLoading: false,
     perPage: {{ $perPage }},
     dataChanged: @js(session('employee_data_changed', false)),
+    editedEmployeeId: @js(session('edited_employee_id', null)),
     sort: '{{ $sort }}',
     direction: '{{ $direction }}',
     employeeShowUrlPrefix: @js($employeeShowUrlPrefix),
@@ -171,8 +172,28 @@
                 const data = await res.json();
                 throw new Error(data.message || `HTTP ${res.status}`);
             }
-            this.clearCache();
-            this.fetchPage(this.meta.current_page);
+            const data = await res.json();
+            
+            // Perbarui cache sessionStorage di semua halaman yang mungkin mengandung pegawai ini
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                if (key && key.startsWith('pegawai_')) {
+                    try {
+                        const cached = JSON.parse(sessionStorage.getItem(key));
+                        const idx = cached.rows.findIndex(r => r.id === this.statusPegawaiId);
+                        if (idx !== -1) {
+                            cached.rows[idx] = Object.assign({}, cached.rows[idx], data.employee);
+                            sessionStorage.setItem(key, JSON.stringify(cached));
+                        }
+                    } catch(e) {}
+                }
+            }
+            // Perbarui data di halaman yang sedang aktif tanpa reload
+            const idx = this.pegawaiRows.findIndex(r => r.id === this.statusPegawaiId);
+            if (idx !== -1) {
+                this.pegawaiRows[idx] = Object.assign({}, this.pegawaiRows[idx], data.employee);
+            }
+            
             this.showStatusModal = false;
         } catch (error) {
             console.error('Error changing status:', error);
@@ -229,8 +250,29 @@
                 const data = await res.json();
                 throw new Error(data.message || `HTTP ${res.status}`);
             }
-            this.clearCache();
-            this.fetchPage(this.meta.current_page);
+            // Hapus pegawai dari semua halaman di cache sessionStorage
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                if (key && key.startsWith('pegawai_')) {
+                    try {
+                        const cached = JSON.parse(sessionStorage.getItem(key));
+                        const idx = cached.rows.findIndex(r => r.id === this.deletePegawaiId);
+                        if (idx !== -1) {
+                            cached.rows.splice(idx, 1);
+                            cached.meta.total = Math.max(0, cached.meta.total - 1);
+                            sessionStorage.setItem(key, JSON.stringify(cached));
+                        }
+                    } catch(e) {}
+                }
+            }
+            
+            // Hapus dari data yang tampil sekarang
+            const idx = this.pegawaiRows.findIndex(r => r.id === this.deletePegawaiId);
+            if (idx !== -1) {
+                this.pegawaiRows.splice(idx, 1);
+                this.meta.total = Math.max(0, this.meta.total - 1);
+            }
+            
             this.showDeleteModal = false;
         } catch (error) {
             console.error('Error menghapus pegawai:', error);
@@ -301,10 +343,57 @@
         }
     },
 
-    init() {
-        if (this.dataChanged) {
+    async patchEditedEmployee(id) {
+        try {
+            const res = await fetch(`/api/v1/pegawai/${id}/table-row`, {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            
+            // Perbarui cache sessionStorage di semua halaman yang mungkin mengandung pegawai ini
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                if (key && key.startsWith('pegawai_')) {
+                    try {
+                        const cached = JSON.parse(sessionStorage.getItem(key));
+                        const idx = cached.rows.findIndex(r => r.id === id);
+                        if (idx !== -1) {
+                            cached.rows[idx] = Object.assign({}, cached.rows[idx], data.employee);
+                            sessionStorage.setItem(key, JSON.stringify(cached));
+                        }
+                    } catch(e) {}
+                }
+            }
+            
+            // Setelah cache di-patch, coba muat ulang data dari cache untuk halaman saat ini
+            const cKey = this.cacheKey + `_p${this.meta.current_page}`;
+            const cached = sessionStorage.getItem(cKey);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                this.pegawaiRows = parsed.rows;
+                this.meta = parsed.meta;
+            } else {
+                this.fetchPage(this.meta.current_page);
+            }
+        } catch (e) {
+            console.error('Gagal mem-patch pegawai yang diedit:', e);
             this.clearCache();
             this.fetchPage(1);
+        }
+    },
+
+    init() {
+        if (this.dataChanged) {
+            if (this.editedEmployeeId) {
+                this.patchEditedEmployee(this.editedEmployeeId);
+                // Kita juga perlu men-set cache untuk halaman 1 karena saat redirect data `$initialRows` adalah halaman 1 yang segar
+                const cKey = this.cacheKey + `_p1`;
+                sessionStorage.setItem(cKey, JSON.stringify({ rows: this.pegawaiRows, meta: this.meta }));
+            } else {
+                this.clearCache();
+                this.fetchPage(1);
+            }
             return;
         }
         const cKey = this.cacheKey + `_p${this.meta.current_page}`;
