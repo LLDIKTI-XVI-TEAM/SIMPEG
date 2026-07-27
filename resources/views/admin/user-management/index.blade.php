@@ -13,34 +13,70 @@
         perPage: 10,
         filters: { search: '', role: '', status: '' },
 
-        fetchPage(page) {
+        get cacheKey() {
+            const f = this.filters;
+            return `usermapping_pp${this.perPage}_s${f.search}_r${f.role}_st${f.status}`;
+        },
+
+        clearCache() {
+            const toDelete = [];
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                if (key && key.startsWith('usermapping_')) toDelete.push(key);
+            }
+            toDelete.forEach(k => sessionStorage.removeItem(k));
+        },
+
+        async fetchPage(page) {
             if (page < 1 || (this.meta.last_page > 0 && page > this.meta.last_page)) return;
+
+            // ── Cek cache sessionStorage terlebih dahulu ──
+            const cKey = this.cacheKey + `_p${page}`;
+            const cached = sessionStorage.getItem(cKey);
+            if (cached) {
+                try {
+                    const data = JSON.parse(cached);
+                    this.rows = data.rows;
+                    this.meta = data.meta;
+                    return;
+                } catch (e) {
+                    sessionStorage.removeItem(cKey);
+                }
+            }
+
+            // ── Fetch dari server jika cache tidak ada ──
             this.isLoading = true;
-            const params = new URLSearchParams({
-                page,
-                per_page: this.perPage,
-                search: this.filters.search,
-                role: this.filters.role,
-                status: this.filters.status,
-            });
-            fetch(`{{ route('user-management.data') }}?` + params.toString(), {
-                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-            })
-            .then(r => r.json())
-            .then(json => {
+            try {
+                const params = new URLSearchParams({
+                    page,
+                    per_page: this.perPage,
+                    ...Object.fromEntries(Object.entries(this.filters).filter(([, v]) => v !== '')),
+                });
+                const res = await fetch(`{{ route('user-management.data') }}?` + params.toString(), {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const json = await res.json();
+
                 this.rows = json.data;
                 this.meta = json.meta;
                 this.perPage = json.meta.per_page;
-            })
-            .finally(() => { this.isLoading = false; });
+                sessionStorage.setItem(cKey, JSON.stringify({ rows: json.data, meta: json.meta }));
+            } catch (e) {
+                console.error('Gagal fetch data user-mapping:', e);
+            } finally {
+                this.isLoading = false;
+            }
         },
 
         setPerPage(val) {
             this.perPage = parseInt(val) || 10;
+            this.clearCache();
             this.fetchPage(1);
         },
 
         applyFilter() {
+            this.clearCache();
             this.fetchPage(1);
         },
 
@@ -57,10 +93,31 @@
         lastFocusedElement: null,
 
         init() {
-            this.fetchPage(1);
-            if (this.showEditModal) {
+            // Jika ada form mapping yang gagal (error/redirect back), hapus cache
+            // agar data yang ditampilkan tetap segar setelah perubahan.
+            if (@js($mappingFormShouldReopen)) {
+                this.clearCache();
+                this.fetchPage(1);
                 this.$nextTick(() => this.focusModalField());
+                return;
             }
+
+            // Coba manfaatkan cache yang sudah ada dari kunjungan sebelumnya
+            const cKey = this.cacheKey + `_p${this.meta.current_page}`;
+            const cached = sessionStorage.getItem(cKey);
+            if (cached) {
+                try {
+                    const data = JSON.parse(cached);
+                    this.rows = data.rows;
+                    this.meta = data.meta;
+                    return; // Data sudah ada — tidak perlu fetch ke server
+                } catch (e) {
+                    sessionStorage.removeItem(cKey);
+                }
+            }
+
+            // Tidak ada cache — fetch dari server
+            this.fetchPage(1);
         },
 
         openEdit(emp, trigger) {
