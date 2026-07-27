@@ -183,6 +183,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/user-management', [UserMappingController::class, 'index'])
         ->middleware(['role:super_admin'])
         ->name('user-management');
+    Route::get('/user-management/data', [UserMappingController::class, 'data'])
+        ->middleware(['role:super_admin'])
+        ->name('user-management.data');
     Route::post('/user-management/update', [UserMappingController::class, 'update'])
         ->middleware(['role:super_admin'])
         ->name('user-management.update');
