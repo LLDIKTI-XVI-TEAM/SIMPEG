@@ -142,7 +142,8 @@ class AdminKepegawaianAccessTest extends TestCase
         $response->assertSee('Buka Laporan & Export', false);
         $response->assertSee(route('cuti.laporan'), false);
         $response->assertDontSee('/laporan/export-cuti', false);
-        $response->assertSee('Admin Saldo Cuti', false);
+        $response->assertDontSee('Input Saldo Awal', false);
+        $response->assertDontSee(route('cuti.saldo.opening-balance', ['employee' => '00000000-0000-0000-0000-000000000000']), false);
         $response->assertDontSee('activeFilters', false);
         $response->assertDontSee('Preview PDF resmi', false);
     }

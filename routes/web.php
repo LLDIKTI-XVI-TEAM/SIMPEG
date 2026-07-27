@@ -253,6 +253,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/cuti/rekap', [CutiController::class, 'rekap'])
         ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('cuti.rekap');
+    Route::get('/cuti/administrasi-saldo', [LeaveBalanceController::class, 'administrasi'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:cuti.balance.adjust'])
+        ->name('cuti.saldo.administrasi');
     Route::get('/cuti/pegawai/cari', CutiEmployeeLookupController::class)
         ->middleware(['role:super_admin,admin_kepegawaian,pimpinan', 'throttle:60,1'])
         ->name('cuti.employee-lookup');

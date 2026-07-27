@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Actions\Cuti\AdjustLeaveBalanceAction;
 use App\Actions\Cuti\SetOpeningLeaveBalanceAction;
+use App\Actions\Cuti\ShowLeaveBalanceAdminAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Cuti\AdjustLeaveBalanceRequest;
 use App\Http\Requests\Cuti\OpeningLeaveBalanceRequest;
@@ -15,6 +16,12 @@ use Illuminate\Http\Request;
 
 class LeaveBalanceController extends Controller
 {
+    /** Menampilkan administrasi saldo dengan data yang disusun Action agar controller tetap tipis. */
+    public function administrasi(Request $request, ShowLeaveBalanceAdminAction $action)
+    {
+        return view('admin.cuti.administrasi-saldo', $action->execute($request->query()));
+    }
+
     /**
      * Web: Menampilkan halaman saldo cuti pribadi untuk pengguna login.
      */
@@ -78,9 +85,9 @@ class LeaveBalanceController extends Controller
      */
     private function redirectToAdminBalancePanel(Employee $employee, int $tahun)
     {
-        return redirect()->to(route('cuti.rekap', [
+        return redirect()->route('cuti.saldo.administrasi', [
             'pegawai' => $employee->id,
             'periode' => $tahun,
-        ]).'#admin-saldo-cuti');
+        ]);
     }
 }

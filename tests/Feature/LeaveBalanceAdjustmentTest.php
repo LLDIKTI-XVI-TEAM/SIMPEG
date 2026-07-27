@@ -289,10 +289,10 @@ class LeaveBalanceAdjustmentTest extends TestCase
             'reason' => 'Input saldo awal melalui halaman admin.',
         ]);
 
-        $response->assertRedirect(route('cuti.rekap', [
+        $response->assertRedirect(route('cuti.saldo.administrasi', [
             'pegawai' => $employee->id,
             'periode' => 2027,
-        ]).'#admin-saldo-cuti');
+        ]));
         $response->assertSessionHas('success');
         $this->assertDatabaseHas('leave_balances', [
             'employee_id' => $employee->id,
@@ -324,10 +324,10 @@ class LeaveBalanceAdjustmentTest extends TestCase
             'reason' => 'Koreksi saldo setelah validasi dokumen.',
         ]);
 
-        $response->assertRedirect(route('cuti.rekap', [
+        $response->assertRedirect(route('cuti.saldo.administrasi', [
             'pegawai' => $employee->id,
             'periode' => 2027,
-        ]).'#admin-saldo-cuti');
+        ]));
         $response->assertSessionHas('success');
         $this->assertDatabaseHas('leave_balances', [
             'employee_id' => $employee->id,
@@ -359,7 +359,32 @@ class LeaveBalanceAdjustmentTest extends TestCase
         $this->assertDatabaseCount('leave_balance_ledger', 0);
     }
 
-    public function test_rekap_cuti_menampilkan_panel_admin_saldo_dan_riwayat_ledger(): void
+    public function test_super_admin_dan_admin_kepegawaian_bisa_membuka_administrasi_saldo_cuti(): void
+    {
+        foreach ([
+            User::factory()->superAdmin()->create(),
+            User::factory()->adminKepegawaian()->create(),
+        ] as $user) {
+            $this->actingAs($user)->get(route('cuti.saldo.administrasi'))->assertOk();
+        }
+    }
+
+    public function test_administrasi_saldo_cuti_menolak_role_tanpa_hak_koreksi(): void
+    {
+        foreach (['pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
+            $this->actingAs(User::factory()->create(['role' => $role]))
+                ->get(route('cuti.saldo.administrasi'))
+                ->assertForbidden();
+        }
+    }
+
+    public function test_tamu_dialihkan_saat_membuka_administrasi_saldo_cuti(): void
+    {
+        $this->get(route('cuti.saldo.administrasi'))
+            ->assertRedirect(route('login'));
+    }
+
+    public function test_administrasi_saldo_cuti_menampilkan_tab_dan_formulir_mutasi(): void
     {
         $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Saldo Admin']);
         $user = User::factory()->adminKepegawaian()->create();
@@ -381,14 +406,16 @@ class LeaveBalanceAdjustmentTest extends TestCase
             'occurred_at' => Carbon::now(),
         ]);
 
-        $response = $this->actingAs($user)->get(route('cuti.rekap', [
+        $response = $this->actingAs($user)->get(route('cuti.saldo.administrasi', [
             'pegawai' => $employee->id,
             'periode' => 2027,
         ]));
 
         $response->assertOk();
-        $response->assertSee('Input Saldo Awal', false);
+        $response->assertSee('Pendaftaran Saldo Awal', false);
         $response->assertSee('Koreksi Saldo', false);
+        $response->assertSee(route('cuti.saldo.opening-balance', $employee), false);
+        $response->assertSee(route('cuti.saldo.adjust', $employee), false);
         $response->assertSee('Ledger Saldo', false);
         $response->assertSee('Status Rollover', false);
         $response->assertSee('Koreksi tampil di ledger.', false);
@@ -398,6 +425,21 @@ class LeaveBalanceAdjustmentTest extends TestCase
         $response->assertDontSee('Periode Laporan:', false);
         $response->assertDontSee('>Tahunan<', false);
         $response->assertDontSee('>Sakit<', false);
+    }
+
+    public function test_rekap_cuti_tidak_lagi_menampilkan_formulir_mutasi_saldo(): void
+    {
+        $employee = Employee::factory()->create();
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $response = $this->actingAs($user)->get(route('cuti.rekap', [
+            'pegawai' => $employee->id,
+            'periode' => 2027,
+        ]));
+
+        $response->assertOk();
+        $response->assertDontSee(route('cuti.saldo.opening-balance', $employee), false);
+        $response->assertDontSee(route('cuti.saldo.adjust', $employee), false);
     }
 
     /**
