@@ -75,6 +75,49 @@
             this.fetchPage(1);
         },
 
+        handleSearch() {
+            // 1. Cek apakah ada exact cache dari pencarian ini (pernah di-fetch)
+            const exactCacheKey = this.cacheKey + '_p1';
+            if (sessionStorage.getItem(exactCacheKey)) {
+                this.fetchPage(1); // Ini akan instan baca dari cache
+                return;
+            }
+
+            // 2. Cek semua sessionStorage via REGEX untuk nama sesuai request
+            if (this.filters.search) {
+                const regex = new RegExp(this.filters.search, 'i');
+                let matchedRows = [];
+                for (let i = 0; i < sessionStorage.length; i++) {
+                    const key = sessionStorage.key(i);
+                    // Ambil dari history cache usermapping
+                    if (key && key.startsWith('usermapping_')) {
+                        try {
+                            const data = JSON.parse(sessionStorage.getItem(key));
+                            if (data && data.rows) {
+                                // Cari di array rows nama yang match regex
+                                const matches = data.rows.filter(r => regex.test(r.nama));
+                                matchedRows.push(...matches);
+                            }
+                        } catch (e) {}
+                    }
+                }
+
+                // Hapus duplikat berdasarkan ID pegawai
+                const uniqueMatched = Array.from(new Map(matchedRows.map(item => [item.id, item])).values());
+
+                if (uniqueMatched.length > 0) {
+                    this.rows = uniqueMatched;
+                    // Modifikasi meta secara lokal seolah-olah hanya ada sekian data
+                    this.meta = { ...this.meta, current_page: 1, last_page: 1, total: uniqueMatched.length, per_page: uniqueMatched.length };
+                    return; // Selesai, ambil dari cache lokal!
+                }
+            }
+
+            // 3. Jika di cache tidak ada sama sekali, fallback hit API
+            this.clearCache();
+            this.fetchPage(1);
+        },
+
         applyFilter() {
             this.clearCache();
             this.fetchPage(1);
@@ -188,6 +231,14 @@
                 </div>
             </div>
             <div class="flex items-center gap-3">
+                <button type="button" @click="clearCache(); fetchPage(meta.current_page);"
+                    class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm cursor-pointer"
+                    title="Refresh Data">
+                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                    </svg>
+                    Refresh
+                </button>
                 <x-ui.button href="{{ route('audit-log') }}" variant="muted">
                     <svg class="w-4 h-4 mr-1.5 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
@@ -240,6 +291,7 @@
             setPerPage="setPerPage($event.target.value)"
             searchModel="filters.search"
             searchPlaceholder="Cari nama, NIP, atau email pegawai..."
+            searchCols="col-span-1 sm:col-span-2 lg:col-span-4"
             emptyTitle="Tidak ada pegawai yang sesuai filter"
             emptyIcon="search"
             :colspanCount="count($tableColumns)"

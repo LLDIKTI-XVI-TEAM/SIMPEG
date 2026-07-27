@@ -18,6 +18,7 @@
     'checkAllId' => null,   // Jika diisi, kolom dengan key='check' akan menampilkan checkbox select-all
     'checkAllAction' => null, // Alpine expression untuk @change pada checkbox select-all, mis. "toggleAll($event.target.checked)"
     'filterClass' => null,
+    'searchCols' => null,
 ])
 
 @php
@@ -31,7 +32,9 @@
         <x-ui.filter-bar
             :searchModel="$searchModel"
             :searchPlaceholder="$searchPlaceholder"
+            :searchCols="$searchCols"
             :class="$filterClass"
+            @search-enter="$data.handleSearch ? $data.handleSearch() : ($data.applyFilter ? $data.applyFilter() : null)"
         >
             {{ $filters ?? '' }}
         </x-ui.filter-bar>
