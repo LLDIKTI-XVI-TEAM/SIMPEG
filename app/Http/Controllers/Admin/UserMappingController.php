@@ -94,4 +94,3 @@ class UserMappingController extends Controller
         return back()->with('success', 'Akses User berhasil diperbarui!');
     }
 }
-
