@@ -439,8 +439,24 @@
         @endif
 
         {{-- PAGE CONTENT --}}
-        <main class="flex-1 overflow-y-auto bg-page">
-            <div class="mx-auto max-w-7xl px-4 py-6 lg:px-6">
+        <main class="flex-1 overflow-y-auto bg-page relative">
+            
+            {{-- Skeleton Loader (Hidden by Default) --}}
+            <div id="global-skeleton" class="hidden absolute inset-0 z-50 bg-page px-4 py-6 lg:px-6 pointer-events-none">
+                <div class="mx-auto max-w-7xl animate-pulse space-y-6">
+                    <div class="h-8 w-1/4 rounded-lg bg-border"></div>
+                    <div class="h-[200px] w-full rounded-xl bg-border/60"></div>
+                    <div class="space-y-3">
+                        <div class="h-12 w-full rounded-lg bg-border/60"></div>
+                        <div class="h-12 w-full rounded-lg bg-border/60"></div>
+                        <div class="h-12 w-full rounded-lg bg-border/60"></div>
+                        <div class="h-12 w-full rounded-lg bg-border/60"></div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Main Content --}}
+            <div id="main-content" class="mx-auto max-w-7xl px-4 py-6 lg:px-6">
                 {{ $slot }}
             </div>
         </main>
