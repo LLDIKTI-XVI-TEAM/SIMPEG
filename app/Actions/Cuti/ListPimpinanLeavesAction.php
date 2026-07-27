@@ -55,6 +55,8 @@ class ListPimpinanLeavesAction
                     $query->whereHas('steps', fn ($q) => $q
                         ->where('status', 'active')
                         ->where('approver_employee_id', $user->employee_id));
+                } else {
+                    $query->whereRaw('1 = 0');
                 }
             } elseif ($filters['status'] !== 'all') {
                 $statuses = match ($filters['status']) {
