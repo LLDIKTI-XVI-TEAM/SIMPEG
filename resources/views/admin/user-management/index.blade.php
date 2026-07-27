@@ -71,55 +71,14 @@
 
         setPerPage(val) {
             this.perPage = parseInt(val) || 10;
-            this.clearCache();
             this.fetchPage(1);
         },
 
         handleSearch() {
-            // 1. Cek apakah ada exact cache dari pencarian ini (pernah di-fetch)
-            const exactCacheKey = this.cacheKey + '_p1';
-            if (sessionStorage.getItem(exactCacheKey)) {
-                this.fetchPage(1); // Ini akan instan baca dari cache
-                return;
-            }
-
-            // 2. Cek semua sessionStorage via REGEX untuk nama sesuai request
-            if (this.filters.search) {
-                const regex = new RegExp(this.filters.search, 'i');
-                let matchedRows = [];
-                for (let i = 0; i < sessionStorage.length; i++) {
-                    const key = sessionStorage.key(i);
-                    // Ambil dari history cache usermapping
-                    if (key && key.startsWith('usermapping_')) {
-                        try {
-                            const data = JSON.parse(sessionStorage.getItem(key));
-                            if (data && data.rows) {
-                                // Cari di array rows nama yang match regex
-                                const matches = data.rows.filter(r => regex.test(r.nama));
-                                matchedRows.push(...matches);
-                            }
-                        } catch (e) {}
-                    }
-                }
-
-                // Hapus duplikat berdasarkan ID pegawai
-                const uniqueMatched = Array.from(new Map(matchedRows.map(item => [item.id, item])).values());
-
-                if (uniqueMatched.length > 0) {
-                    this.rows = uniqueMatched;
-                    // Modifikasi meta secara lokal seolah-olah hanya ada sekian data
-                    this.meta = { ...this.meta, current_page: 1, last_page: 1, total: uniqueMatched.length, per_page: uniqueMatched.length };
-                    return; // Selesai, ambil dari cache lokal!
-                }
-            }
-
-            // 3. Jika di cache tidak ada sama sekali, fallback hit API
-            this.clearCache();
             this.fetchPage(1);
         },
 
         applyFilter() {
-            this.clearCache();
             this.fetchPage(1);
         },
 

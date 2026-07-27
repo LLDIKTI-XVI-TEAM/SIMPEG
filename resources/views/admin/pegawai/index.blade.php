@@ -128,7 +128,6 @@
     },
 
     applyFilter() {
-        this.clearCache();
         this.fetchPage(1);
     },
 
@@ -139,13 +138,11 @@
             this.sort = column;
             this.direction = 'asc';
         }
-        this.clearCache();
         this.fetchPage(1);
     },
 
     setPerPage(val) {
         this.perPage = parseInt(val);
-        this.clearCache();
         this.fetchPage(1);
     },
 
