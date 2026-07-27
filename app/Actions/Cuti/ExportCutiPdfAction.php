@@ -41,6 +41,8 @@ class ExportCutiPdfAction
 
         $pdf = Pdf::loadView('admin.cuti.pdf.laporan-cuti', [
             'rows' => $rows,
+            'summaryRows' => $this->rekapQuery->summaryRows($rows, $filters),
+            'periodLabel' => $this->rekapQuery->periodLabel($filters),
             'filters' => $filters,
             'generatedAt' => now(),
         ])->setPaper('a4', 'portrait');

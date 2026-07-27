@@ -3,12 +3,14 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
 use App\Models\User;
 use App\Queries\Cuti\CutiRekapQuery;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\View;
 use Tests\TestCase;
 
 class CutiPdfExportTest extends TestCase
@@ -75,8 +77,11 @@ class CutiPdfExportTest extends TestCase
         $this->assertStringNotContainsString('<script>', $content);
         $this->assertStringNotContainsString('javascript:', strtolower($content));
 
+        $detailRows = (new CutiRekapQuery)->detailRows(['pegawai' => $pegawai->id])->get();
         $html = view('admin.cuti.pdf.laporan-cuti', [
-            'rows' => (new CutiRekapQuery)->detailRows(['pegawai' => $pegawai->id])->get(),
+            'rows' => $detailRows,
+            'summaryRows' => (new CutiRekapQuery)->summaryRows($detailRows, []),
+            'periodLabel' => (new CutiRekapQuery)->periodLabel([]),
             'filters' => [],
             'generatedAt' => now(),
         ])->render();
@@ -92,9 +97,12 @@ class CutiPdfExportTest extends TestCase
         $rows = (new CutiRekapQuery)->detailRows(['pegawai' => $pegawai->id])->get();
         $rows->each(fn (LeaveRequest $row) => $row->setAttribute('report_status', 'Disetujui'));
 
+        $filters = ['periode' => 'Juni 2026'];
         $html = view('admin.cuti.pdf.laporan-cuti', [
             'rows' => $rows,
-            'filters' => ['periode' => 'Juni 2026'],
+            'summaryRows' => (new CutiRekapQuery)->summaryRows($rows, $filters),
+            'periodLabel' => (new CutiRekapQuery)->periodLabel($filters),
+            'filters' => $filters,
             'generatedAt' => now(),
         ])->render();
 
@@ -119,6 +127,38 @@ class CutiPdfExportTest extends TestCase
         $this->assertStringNotContainsString('<img', $html);
         $this->assertStringNotContainsString('http://', $html);
         $this->assertStringNotContainsString('https://', $html);
+    }
+
+    public function test_pdf_menyediakan_rekap_agregasi_per_pegawai_untuk_template(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $pegawai = Employee::factory()->create(['nip' => '198203032008041002', 'nama_lengkap' => 'Pegawai Rekap PDF']);
+        $tahunan = RefJenisCuti::create(['nama' => 'Cuti Tahunan']);
+        $sakit = RefJenisCuti::create(['nama' => 'Cuti Sakit']);
+        $this->createLeaveRequest($pegawai, $tahunan, '2026-06-02', 'disetujui', 3);
+        $this->createLeaveRequest($pegawai, $tahunan, '2026-06-09', 'disetujui', 2);
+        $this->createLeaveRequest($pegawai, $sakit, '2026-06-16', 'disetujui', 1);
+        $this->createLeaveRequest($pegawai, $tahunan, '2026-06-23', 'menunggu_approval', 8);
+        LeaveBalance::create(['employee_id' => $pegawai->id, 'tahun' => 2026, 'sisa' => 9]);
+
+        $captured = null;
+        View::composer('admin.cuti.pdf.laporan-cuti', function ($view) use (&$captured): void {
+            $captured ??= $view->getData();
+        });
+
+        $this->actingAs($user)->get(route('cuti.laporan.pdf', ['pegawai' => $pegawai->id, 'periode' => '2026-06']));
+
+        $this->assertIsArray($captured);
+        $this->assertArrayHasKey('summaryRows', $captured);
+        $summary = collect($captured['summaryRows'])->keyBy('jenis');
+        $this->assertCount(2, $summary);
+        $this->assertSame(5, $summary['Cuti Tahunan']['total_hari']);
+        $this->assertSame(1, $summary['Cuti Sakit']['total_hari']);
+        $this->assertSame(9, $summary['Cuti Tahunan']['sisa_saldo']);
+        $this->assertSame('198203032008041002', $summary['Cuti Tahunan']['nip']);
+        $this->assertSame('Pegawai Rekap PDF', $summary['Cuti Tahunan']['nama']);
+        $this->assertSame(2026, $summary['Cuti Tahunan']['saldo_tahun']);
+        $this->assertSame('2026-06', $captured['periodLabel']);
     }
 
     public function test_pdf_menolak_501_baris_tanpa_truncation(): void
@@ -154,16 +194,21 @@ class CutiPdfExportTest extends TestCase
             && str_contains(strtolower($message), 'persempit filter'));
     }
 
-    private function createLeaveRequest(Employee $employee, RefJenisCuti $jenis, string $date): LeaveRequest
-    {
+    private function createLeaveRequest(
+        Employee $employee,
+        RefJenisCuti $jenis,
+        string $date,
+        string $status = 'disetujui',
+        int $hari = 1,
+    ): LeaveRequest {
         return LeaveRequest::create([
             'employee_id' => $employee->id,
             'jenis_cuti_id' => $jenis->id,
             'tanggal_mulai' => $date,
             'tanggal_selesai' => $date,
-            'jumlah_hari_kerja' => 1,
+            'jumlah_hari_kerja' => $hari,
             'alasan' => 'Data PDF',
-            'status' => 'disetujui',
+            'status' => $status,
         ]);
     }
 }
