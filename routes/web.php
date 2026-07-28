@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\DataMasterGolonganController;
 use App\Http\Controllers\Admin\DataMasterJenisJabatanController;
 use App\Http\Controllers\Admin\DataMasterJenjangPendidikanController;
 use App\Http\Controllers\Admin\DataMasterStatusPegawaiController;
+use App\Http\Controllers\Admin\DataMasterUnitKerjaController;
 use App\Http\Controllers\Admin\DokumenController;
 use App\Http\Controllers\Admin\EmployeeImportController;
 use App\Http\Controllers\Admin\EmployeeSupervisorLookupController;
@@ -239,6 +240,14 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
             ->whereUuid('jenisJabatan')->name('jenis-jabatan.toggle');
         Route::post('/jenis-jabatan/{jenisJabatan}/destroy', [DataMasterJenisJabatanController::class, 'destroy'])
             ->whereUuid('jenisJabatan')->name('jenis-jabatan.destroy');
+
+        Route::post('/unit-kerja', [DataMasterUnitKerjaController::class, 'store'])->name('unit-kerja.store');
+        Route::post('/unit-kerja/{unitKerja}/update', [DataMasterUnitKerjaController::class, 'update'])
+            ->whereUuid('unitKerja')->name('unit-kerja.update');
+        Route::post('/unit-kerja/{unitKerja}/toggle-aktif', [DataMasterUnitKerjaController::class, 'toggle'])
+            ->whereUuid('unitKerja')->name('unit-kerja.toggle');
+        Route::post('/unit-kerja/{unitKerja}/destroy', [DataMasterUnitKerjaController::class, 'destroy'])
+            ->whereUuid('unitKerja')->name('unit-kerja.destroy');
 
         Route::post('/status-pegawai', [DataMasterStatusPegawaiController::class, 'store'])->name('status-pegawai.store');
         Route::post('/status-pegawai/{statusPegawai}/update', [DataMasterStatusPegawaiController::class, 'update'])
