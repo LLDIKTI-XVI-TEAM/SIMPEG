@@ -152,6 +152,7 @@
                         $activeRole === 'kepala_bagian' ? ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge'] : null,
                         ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
                         ['label' => 'Rekap Cuti', 'route' => 'cuti.rekap', 'icon' => 'document-text'],
+                        in_array($activeRole, ['super_admin', 'admin_kepegawaian'], true) ? ['label' => 'Administrasi Saldo Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal'] : null,
                         ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down'],
                         $activeRole === 'super_admin' ? ['label' => 'Konfigurasi Approval Cuti', 'route' => 'cuti.config', 'icon' => 'cog-6-tooth'] : null,
                     ])

@@ -127,8 +127,10 @@
                                                 class="text-xs font-semibold {{ $statusClass[$row['status']] ?? 'text-muted' }}">{{ $row['status_label'] }}</span>
                                         </x-ui.table-td>
                                         <x-ui.table-td align="right" padding="sm">
-                                            <a href="{{ route('cuti.rekap', array_filter(['pegawai' => $row['employee_id'], 'periode' => $row['tahun']])) }}#admin-saldo-cuti"
-                                                class="text-xs font-semibold text-primary hover:underline">Koreksi</a>
+                                            @if(auth()->user()?->hasPermission('cuti.balance.adjust'))
+                                                <a href="{{ route('cuti.saldo.administrasi', array_filter(['pegawai' => $row['employee_id'], 'periode' => $row['tahun']])) }}"
+                                                    class="text-xs font-semibold text-primary hover:underline">Administrasi Saldo</a>
+                                            @endif
                                         </x-ui.table-td>
                                     </x-ui.table-row>
 
@@ -212,129 +214,6 @@
                 </x-ui.card>
             </div>
 
-            <aside id="admin-saldo-cuti" class="grid grid-cols-1 gap-4 xl:grid-cols-3">
-                <x-ui.card class="h-full xl:col-span-2">
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                            <h3 class="text-sm font-semibold text-ink">Admin Saldo Cuti</h3>
-                            <p class="mt-1 text-xs text-muted">Klik Koreksi pada tabel rekap untuk membuka bucket, formulir koreksi, dan ledger saldo pegawai.</p>
-                        </div>
-                        @if($selectedEmployee)
-                            <span class="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">{{ $selectedEmployee->nama_lengkap }}</span>
-                        @endif
-                    </div>
-
-                    @if($selectedBalance)
-                        <div class="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
-                            @foreach([
-                                'N-2' => $selectedBalance->sisa_n2,
-                                'N-1' => $selectedBalance->sisa_n1,
-                                'Tahun berjalan' => $selectedBalance->sisa_tahun_berjalan,
-                                'Terpakai' => $selectedBalance->terpakai,
-                                'Hangus' => $selectedBalance->hangus,
-                            ] as $label => $value)
-                                <div class="rounded-xl border border-border bg-soft/40 p-3">
-                                    <p class="text-[10px] font-bold uppercase tracking-wide text-muted">{{ $label }}</p>
-                                    <p class="mt-1 text-xl font-bold text-ink">{{ $value }}</p>
-                                </div>
-                            @endforeach
-                        </div>
-                    @else
-                        <div class="mt-4 rounded-xl border border-dashed border-border p-5 text-sm text-muted">
-                            Belum ada saldo untuk filter pegawai dan periode ini. Admin dapat mengisi saldo awal jika memiliki izin koreksi.
-                        </div>
-                    @endif
-
-                    @if(auth()->user()?->hasPermission('cuti.balance.adjust') && $selectedEmployee)
-                        <div class="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                            <form method="POST" action="{{ route('cuti.saldo.opening-balance', $selectedEmployee) }}" class="space-y-3 rounded-xl border border-border p-4">
-                                @csrf
-                                <h4 class="text-sm font-semibold text-ink">Input Saldo Awal</h4>
-                                <input type="hidden" name="tahun" value="{{ is_numeric($periode) ? $periode : now()->year }}">
-                                <div class="grid grid-cols-3 gap-2">
-                                    <x-form.input name="sisa_n2" label="N-2" type="number" value="{{ $selectedBalance?->sisa_n2 ?? 0 }}" min="0" required />
-                                    <x-form.input name="sisa_n1" label="N-1" type="number" value="{{ $selectedBalance?->sisa_n1 ?? 0 }}" min="0" required />
-                                    <x-form.input name="sisa_tahun_berjalan" label="Berjalan" type="number" value="{{ $selectedBalance?->sisa_tahun_berjalan ?? 12 }}" min="0" required />
-                                </div>
-                                <x-form.textarea name="reason" label="Alasan saldo awal" rows="3" placeholder="Contoh: Input saldo awal hasil rekonsiliasi." required />
-                                <button type="submit" class="w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90">Simpan Saldo Awal</button>
-                            </form>
-
-                            <form method="POST" action="{{ route('cuti.saldo.adjust', $selectedEmployee) }}" class="space-y-3 rounded-xl border border-border p-4">
-                                @csrf
-                                <h4 class="text-sm font-semibold text-ink">Koreksi Saldo</h4>
-                                <input type="hidden" name="tahun" value="{{ is_numeric($periode) ? $periode : ($selectedBalance?->tahun ?? now()->year) }}">
-                                <x-form.select name="bucket" label="Bucket" required>
-                                    <option value="current">Tahun berjalan</option>
-                                    <option value="n1">N-1</option>
-                                    <option value="n2">N-2</option>
-                                </x-form.select>
-                                <x-form.input name="amount" label="Jumlah koreksi" type="number" value="1" required help="Gunakan angka negatif untuk debit. Debit otomatis diclamp agar saldo tidak negatif." />
-                                <x-form.textarea name="reason" label="Alasan koreksi" rows="3" placeholder="Alasan koreksi wajib diisi." required />
-                                <button type="submit" class="w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90">Simpan Koreksi</button>
-                            </form>
-                        </div>
-                    @endif
-                </x-ui.card>
-
-                <x-ui.card class="h-full">
-                    <h3 class="text-sm font-semibold text-ink">Status Rollover</h3>
-                    <p class="mt-1 text-xs text-muted">Riwayat rollover bersifat baca-saja. Eksekusi hanya lewat command CLI ops.</p>
-                    <div class="mt-4 space-y-3">
-                        @forelse($rolloverRows as $rollover)
-                            <div class="rounded-xl border border-border p-3">
-                                <div class="flex items-center justify-between gap-3">
-                                    <p class="text-xs font-semibold text-ink">{{ $rollover->event_type }}</p>
-                                    <span class="text-xs text-muted">{{ $rollover->tahun }}</span>
-                                </div>
-                                <p class="mt-1 text-xs text-muted">{{ $rollover->reason }}</p>
-                            </div>
-                        @empty
-                            <p class="rounded-xl border border-dashed border-border p-4 text-xs text-muted">Belum ada riwayat rollover untuk pegawai ini.</p>
-                        @endforelse
-                    </div>
-                </x-ui.card>
-            </aside>
-
-            <x-ui.card padding="none" class="overflow-hidden">
-                <div class="border-b border-border px-5 py-4">
-                    <h3 class="text-sm font-semibold text-ink">Ledger Saldo</h3>
-                    <p class="mt-1 text-xs text-muted">Buku besar append-only untuk saldo cuti pegawai terpilih.</p>
-                </div>
-                <div class="overflow-x-auto">
-                    <x-ui.table>
-                        <x-ui.table-head>
-                            <x-ui.table-row>
-                                <x-ui.table-th>Tanggal</x-ui.table-th>
-                                <x-ui.table-th>Event</x-ui.table-th>
-                                <x-ui.table-th align="right">Delta</x-ui.table-th>
-                                <x-ui.table-th>Tahun sumber</x-ui.table-th>
-                                <x-ui.table-th>Alasan</x-ui.table-th>
-                            </x-ui.table-row>
-                        </x-ui.table-head>
-                        <x-ui.table-body>
-                            @forelse($ledgerRows as $ledger)
-                                <x-ui.table-row>
-                                    <x-ui.table-td padding="sm" class="text-xs text-muted">{{ optional($ledger->occurred_at)->translatedFormat('d M Y H:i') }}</x-ui.table-td>
-                                    <x-ui.table-td padding="sm" class="text-xs text-ink">{{ $ledger->event_type }}</x-ui.table-td>
-                                    <x-ui.table-td align="right" padding="sm" class="text-sm font-semibold {{ $ledger->amount < 0 ? 'text-danger' : 'text-success' }}">{{ $ledger->amount }}</x-ui.table-td>
-                                    <x-ui.table-td padding="sm" class="text-xs text-muted">{{ $ledger->source_year ?? '-' }}</x-ui.table-td>
-                                    <x-ui.table-td padding="sm" class="max-w-md text-sm text-muted">{{ $ledger->reason ?? '-' }}</x-ui.table-td>
-                                </x-ui.table-row>
-                            @empty
-                                <x-ui.table-row>
-                                    <x-ui.table-td colspan="5" align="center" class="px-5 py-8 text-muted">Pilih pegawai untuk melihat ledger saldo.</x-ui.table-td>
-                                </x-ui.table-row>
-                            @endforelse
-                        </x-ui.table-body>
-                    </x-ui.table>
-                </div>
-                @if($ledgerRows->hasPages())
-                    <div class="border-t border-border px-5 py-3">
-                        {{ $ledgerRows->onEachSide(1)->links('vendor.pagination.simpeg') }}
-                    </div>
-                @endif
-            </x-ui.card>
         </div>
 
     </div>
