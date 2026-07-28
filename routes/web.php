@@ -618,6 +618,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
             Route::get('/laporan/kepangkatan/pdf', [PimpinanReportController::class, 'exportRankHistoriesPdf'])->name('laporan.kepangkatan.pdf');
             Route::get('/laporan/pegawai', [PimpinanEmployeeController::class, 'reportPage'])->name('laporan.pegawai');
             Route::get('/laporan/pegawai/custom', [PimpinanEmployeeController::class, 'reportCustom'])->name('laporan.pegawai.custom');
+            Route::get('/laporan/nominatif', [PimpinanReportController::class, 'fixedEmployeeReport'])->name('laporan.nominatif');
+            Route::get('/laporan/nominatif/excel', [PimpinanReportController::class, 'exportFixedEmployeeReportExcel'])->name('laporan.nominatif.excel');
+            Route::get('/laporan/nominatif/pdf', [PimpinanReportController::class, 'exportFixedEmployeeReportPdf'])->name('laporan.nominatif.pdf');
             Route::get('/laporan', [PimpinanReportController::class, 'index'])->name('laporan.index');
         });
 

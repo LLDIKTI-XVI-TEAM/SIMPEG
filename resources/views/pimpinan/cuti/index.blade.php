@@ -12,7 +12,7 @@
             'menunggu_approval' => 'Menunggu',
             'disetujui' => 'Disetujui',
             'ditangguhkan' => 'Ditangguhkan',
-            'perlu_perubahan' => 'Perlu Perubahan',
+            'perlu_perubahan' => 'Perubahan',
             'tidak_disetujui' => 'Tidak Disetujui',
         ];
     @endphp

@@ -32,7 +32,9 @@ services:
       - simpeg_net
 
   scheduler:
-    image: docker.io/library/simpeg-app:latest
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
     container_name: simpeg_scheduler
     working_dir: /var/www/html
     command: php artisan schedule:work

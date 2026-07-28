@@ -102,6 +102,39 @@ class PimpinanDashboardDataTest extends TestCase
             ->assertDontSee('Admin HR');
     }
 
+    public function test_tren_pegawai_aktif_excludes_non_aktif_and_mutasi_employees(): void
+    {
+        $this->seed(RbacSeeder::class);
+        $pimpinanUser = User::factory()->pimpinan()->create();
+
+        // Pegawai Non-Aktif tanpa tanggal pensiun
+        Employee::factory()->create([
+            'status_aktif' => 'Non-Aktif',
+            'tanggal_pensiun' => null,
+            'created_at' => now()->subMonths(6),
+        ]);
+
+        // Pegawai Mutasi tanpa tanggal pensiun
+        Employee::factory()->create([
+            'status_aktif' => 'Mutasi',
+            'tanggal_pensiun' => null,
+            'created_at' => now()->subMonths(6),
+        ]);
+
+        // Pegawai Aktif
+        $aktif = Employee::factory()->create([
+            'status_aktif' => 'Aktif',
+            'tanggal_pensiun' => null,
+            'created_at' => now()->subMonths(6),
+        ]);
+
+        $action = app(BuildPimpinanDashboardAction::class);
+        $data = $action->execute($pimpinanUser);
+
+        $lastTrendPoint = collect($data['trenPegawai'])->last();
+        $this->assertEquals(1, $lastTrendPoint['jumlah']);
+    }
+
     /**
      * Mengambil potongan HTML satu baris kenaikan pangkat.
      * Gagal keras bila penanda tidak ada supaya assertion tidak lolos pada irisan kosong.

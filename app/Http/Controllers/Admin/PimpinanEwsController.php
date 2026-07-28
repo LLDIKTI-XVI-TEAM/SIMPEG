@@ -4,16 +4,17 @@ namespace App\Http\Controllers\Admin;
 
 use App\Actions\Ews\ListActiveEwsAlertsAction;
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
+use App\Http\Requests\Ews\PimpinanEwsFilterRequest;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 class PimpinanEwsController extends Controller
 {
-    public function index(Request $request, ListActiveEwsAlertsAction $action)
+    public function index(PimpinanEwsFilterRequest $request, ListActiveEwsAlertsAction $action)
     {
-        $filterSearch = trim((string) $request->query('search', ''));
-        $filterEvent = (string) $request->query('event', '');
-        $filterStatus = (string) $request->query('status', '');
+        $validated = $request->validated();
+        $filterSearch = trim((string) ($validated['search'] ?? ''));
+        $filterEvent = (string) ($validated['event'] ?? '');
+        $filterStatus = (string) ($validated['status'] ?? '');
         $data = $action->execute($filterEvent, $filterStatus);
 
         if ($filterSearch !== '') {
