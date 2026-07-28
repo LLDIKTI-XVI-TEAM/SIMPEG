@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceLedger;
+use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveRequest;
 use App\Models\User;
 use App\Services\AuditService;
@@ -39,6 +40,75 @@ class LeaveBalanceService
         }
 
         return $this->calculator->availableTotal($this->bucketsFromBalance($balance));
+    }
+
+    /**
+     * Menyusun preview saldo tanpa menulis entitlement atau ledger dari endpoint GET.
+     *
+     * Kontrak preview sengaja menggunakan mesin bucket dan eligibility yang sama dengan
+     * `availableFor()`. Bedanya, preview hanya menampilkan entitlement virtual bila baris
+     * saldo belum pernah dibuat; penulisan entitlement tetap terjadi pada alur mutasi
+     * yang sah (submit/final approval). Dengan demikian refresh form Pegawai tidak
+     * memiliki efek samping data.
+     *
+     * Alokasi aktif dibaca dari event reservasi yang append-only. Event tersebut
+     * tidak mengubah saldo final; ia hanya mengurangi hak yang masih dapat diajukan.
+     *
+     * @return array{
+     *     tahun:int,
+     *     tanggal_acuan:string,
+     *     eligible:bool,
+     *     jatah_dasar:int,
+     *     carry_over:int,
+     *     terpakai_final:int,
+     *     koreksi_administratif:int,
+     *     saldo_aktual:int,
+     *     dialokasikan_aktif:int,
+     *     saldo_dapat_diajukan:int,
+     *     bucket:array{n2:int,n1:int,current:int}
+     * }
+     */
+    public function previewFor(Employee|string $employee, Carbon $asOf): array
+    {
+        $employeeModel = $this->resolveEmployee($employee);
+        $tahun = $asOf->year;
+        $balance = LeaveBalance::query()
+            ->where('employee_id', $employeeModel->id)
+            ->where('tahun', $tahun)
+            ->first();
+
+        $eligible = $balance !== null || $this->isEligibleForAnnualEntitlement($employeeModel, $tahun, $asOf);
+        $buckets = $balance === null
+            ? ($eligible
+                ? ['n2' => 0, 'n1' => 0, 'current' => $this->calculator->annualEntitlement()]
+                : ['n2' => 0, 'n1' => 0, 'current' => 0])
+            : $this->bucketsFromBalance($balance);
+        $saldoAktual = $this->calculator->availableTotal($buckets);
+        $dialokasikanAktif = max(0, (int) LeaveBalanceReservationEvent::query()
+            ->forActiveRequests()
+            ->where('employee_id', $employeeModel->id)
+            ->where('tahun', $tahun)
+            ->sum('amount'));
+
+        return [
+            'tahun' => $tahun,
+            'tanggal_acuan' => $asOf->toDateString(),
+            'eligible' => $eligible,
+            'jatah_dasar' => $balance === null
+                ? ($eligible ? $this->calculator->annualEntitlement() : 0)
+                : (int) $balance->jatah_awal,
+            'carry_over' => $buckets['n2'] + $buckets['n1'],
+            'terpakai_final' => (int) ($balance?->terpakai ?? 0),
+            'koreksi_administratif' => (int) LeaveBalanceLedger::query()
+                ->where('employee_id', $employeeModel->id)
+                ->where('tahun', $tahun)
+                ->where('event_type', LeaveBalanceLedger::EVENT_MANUAL_ADJUSTMENT)
+                ->sum('amount'),
+            'saldo_aktual' => $saldoAktual,
+            'dialokasikan_aktif' => $dialokasikanAktif,
+            'saldo_dapat_diajukan' => max(0, $saldoAktual - $dialokasikanAktif),
+            'bucket' => $buckets,
+        ];
     }
 
     /**
@@ -637,6 +707,22 @@ class LeaveBalanceService
         }
 
         return Employee::query()->with('appointment')->findOrFail($employee);
+    }
+
+    /**
+     * Menentukan kelayakan entitlement tanpa menulis baris saldo. Digunakan khusus
+     * oleh preview read-only; mutasi tetap memakai `ensureAnnualEntitlement()`.
+     */
+    private function isEligibleForAnnualEntitlement(Employee $employee, int $tahun, Carbon $asOf): bool
+    {
+        if ($this->hasApprovedCutiBesar($employee->id, $tahun)) {
+            return false;
+        }
+
+        $tmt = $employee->appointment?->tmt_pengangkatan;
+
+        return $tmt !== null
+            && $tmt->copy()->addYear()->startOfDay()->lessThanOrEqualTo($asOf->copy()->startOfDay());
     }
 
     /**

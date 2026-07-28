@@ -3,7 +3,10 @@
 namespace App\Actions\Cuti;
 
 use App\Models\LeaveRequest;
+use App\Models\User;
 use App\Services\AuditService;
+use App\Services\Cuti\LeaveBalanceReservationService;
+use App\Services\Cuti\LeaveEligibilityService;
 use App\Services\EmployeeFileStorageService;
 use App\Services\WorkdayCalculator;
 use Illuminate\Http\Request;
@@ -19,6 +22,8 @@ class ResubmitLeaveRequestAction
     public function __construct(
         private readonly WorkdayCalculator $workdayCalculator,
         private readonly EmployeeFileStorageService $files,
+        private readonly LeaveBalanceReservationService $reservations,
+        private readonly LeaveEligibilityService $eligibility,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -41,8 +46,18 @@ class ResubmitLeaveRequestAction
         }
 
         try {
-            $transactionResult = DB::transaction(function () use ($leaveRequest, $data, $mulai, $selesai, $newLampiranPath): array {
+            $requestUser = $request->user();
+            $actor = $requestUser instanceof User ? $requestUser : null;
+
+            $transactionResult = DB::transaction(function () use ($leaveRequest, $data, $mulai, $selesai, $newLampiranPath, $actor): array {
                 $locked = LeaveRequest::query()->whereKey($leaveRequest->id)->lockForUpdate()->firstOrFail();
+                $employee = $locked->employee()->firstOrFail();
+
+                // Pemeriksaan FormRequest hanya memberi umpan balik awal. Rangkaian
+                // dikunci dan dihitung kembali di sini agar resubmit paralel tidak
+                // dapat menggeser periode melewati batas kalender yang sama.
+                $this->eligibility->assertResubmissionAllowed($locked, $employee, $mulai, $selesai);
+
                 $oldValues = $locked->only([
                     'tanggal_mulai',
                     'tanggal_selesai',
@@ -53,16 +68,20 @@ class ResubmitLeaveRequestAction
                     'lampiran_path',
                     'status',
                 ]);
+                $newWorkdays = $this->workdayCalculator->calculate($mulai, $selesai);
+
                 $locked->forceFill([
                     'tanggal_mulai' => $mulai->toDateString(),
                     'tanggal_selesai' => $selesai->toDateString(),
-                    'jumlah_hari_kerja' => $this->workdayCalculator->calculate($mulai, $selesai),
+                    'jumlah_hari_kerja' => $newWorkdays,
                     'alasan' => $data['alasan'],
                     'alamat_selama_cuti' => $data['alamat_selama_cuti'],
                     'nomor_telepon' => $data['nomor_telepon'],
                     'lampiran_path' => $newLampiranPath ?? $locked->lampiran_path,
                     'status' => 'menunggu_approval',
                 ])->save();
+
+                $this->reservations->adjustForResubmission($locked, $mulai, $newWorkdays, $actor);
 
                 return ['leaveRequest' => $locked, 'oldValues' => $oldValues];
             });

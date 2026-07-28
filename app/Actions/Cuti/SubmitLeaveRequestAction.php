@@ -4,8 +4,12 @@ namespace App\Actions\Cuti;
 
 use App\Models\Employee;
 use App\Models\LeaveRequest;
+use App\Models\RefJenisCuti;
+use App\Models\User;
 use App\Services\AuditService;
 use App\Services\Cuti\ApprovalChainResolver;
+use App\Services\Cuti\LeaveBalanceReservationService;
+use App\Services\Cuti\LeaveEligibilityService;
 use App\Services\EmployeeFileStorageService;
 use App\Services\NotificationService;
 use App\Services\WorkdayCalculator;
@@ -26,6 +30,8 @@ class SubmitLeaveRequestAction
         private readonly EmployeeFileStorageService $files,
         private readonly NotificationService $notifications,
         private readonly ApprovalChainResolver $approvalChains,
+        private readonly LeaveBalanceReservationService $reservations,
+        private readonly LeaveEligibilityService $eligibility,
     ) {}
 
     /**
@@ -57,6 +63,7 @@ class SubmitLeaveRequestAction
 
         $mulai = Carbon::createFromFormat('Y-m-d', (string) $data['tanggal_mulai'])->startOfDay();
         $selesai = Carbon::createFromFormat('Y-m-d', (string) $data['tanggal_selesai'])->startOfDay();
+        $leaveType = RefJenisCuti::query()->findOrFail($data['jenis_cuti_id']);
 
         // Hari kerja selalu dihitung ulang di server agar tidak bergantung pada nilai yang dikirim klien.
         $jumlahHariKerja = $this->workdayCalculator->calculate($mulai, $selesai);
@@ -69,10 +76,45 @@ class SubmitLeaveRequestAction
         // Penyimpanan pengajuan dan notifikasi atasan dibungkus transaksi agar tidak ada pengajuan tersimpan
         // tanpa notifikasi pasangannya bila salah satu langkah gagal.
         try {
-            $leaveRequest = DB::transaction(function () use ($employee, $data, $mulai, $selesai, $jumlahHariKerja, $lampiranPath, $steps) {
+            $requestUser = $request->user();
+            $actor = $requestUser instanceof User ? $requestUser : null;
+
+            $leaveRequest = DB::transaction(function () use ($employee, $data, $mulai, $selesai, $jumlahHariKerja, $lampiranPath, $steps, $actor, $leaveType, $request) {
+                // K-CUT-02/K-CUT-03: service mengulang kelayakan di dalam transaksi
+                // dan mengunci rangkaian yang dipilih agar submit paralel tidak bisa
+                // melampaui batas kumulatif Melahirkan atau CLTN.
+                [$leaveCase, $caseCreated] = $this->eligibility->resolveForNewSubmission(
+                    $employee,
+                    $leaveType,
+                    $mulai,
+                    $selesai,
+                    $data['leave_request_case_id'] ?? null,
+                    $actor,
+                );
+
+                if ($caseCreated && $leaveCase !== null) {
+                    // Keterkaitan baru harus menjadi bukti audit sebelum request
+                    // disimpan. logOrFail membuat transaksi gagal tertutup bila
+                    // jejak rangkaian tidak dapat dicatat.
+                    AuditService::logOrFail(
+                        'CREATE',
+                        'LeaveRequestCase',
+                        $leaveCase->id,
+                        null,
+                        [
+                            'employee_id' => $employee->id,
+                            'jenis_cuti_id' => $leaveType->id,
+                            'jenis_cuti_code' => $leaveType->code,
+                            'tanggal_mulai_rangkaian' => $mulai->toDateString(),
+                        ],
+                        $request,
+                    );
+                }
+
                 $leaveRequest = LeaveRequest::create([
                     'employee_id' => $employee->id,
                     'jenis_cuti_id' => $data['jenis_cuti_id'],
+                    'leave_request_case_id' => $leaveCase?->id,
                     'tanggal_mulai' => $mulai->toDateString(),
                     'tanggal_selesai' => $selesai->toDateString(),
                     'jumlah_hari_kerja' => $jumlahHariKerja,
@@ -112,6 +154,10 @@ class SubmitLeaveRequestAction
                         'decision_note' => $isEarlierDuplicate ? 'Dilewati otomatis karena approver muncul lagi pada step otoritas lebih akhir.' : null,
                     ]);
                 }
+
+                // Reservasi ditulis sebelum notifikasi. Bila saldo aktif tidak cukup, seluruh
+                // pengajuan dan snapshot step ikut rollback sehingga tidak ada request setengah jadi.
+                $this->reservations->reserveForNewRequest($leaveRequest, $actor);
 
                 $this->notifyActiveApprover($leaveRequest);
 
