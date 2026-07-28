@@ -302,44 +302,8 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin'])
         ->name('ews.config.update');
 
-    Route::get('/laporan/export-pegawai', function () {
-        $employees = Employee::with(['jenisPegawai:id,nama', 'statusPegawai:id,nama'])
-            ->orderBy('nama_lengkap')
-            ->get();
-
-        $pegawai = $employees->map(function ($emp) {
-            return [
-                'id' => $emp->id,
-                'nama' => $emp->nama_lengkap,
-                'nip' => $emp->nip,
-                'unit' => $emp->unitKerja?->nama ?? '-',
-                'golongan' => $emp->golongan_terakhir ?? '-',
-                'jabatan' => $emp->jabatan_terakhir ?? '-',
-                'jenis' => $emp->jenisPegawai?->nama ?? '-',
-                'status' => $emp->statusPegawai?->nama ?? $emp->status_aktif ?? '-',
-                'email' => $emp->email_pribadi ?? '-',
-                'no_hp' => $emp->no_hp ?? '-',
-                'tanggal_lahir' => $emp->tanggal_lahir?->translatedFormat('d F Y') ?? '-',
-                'tanggal_pensiun' => $emp->tanggal_pensiun?->translatedFormat('d F Y') ?? '-',
-                'pendidikan' => $emp->pendidikan_terakhir ?? '-',
-                'pangkat' => $emp->pangkat_terakhir ?? '-',
-            ];
-        })->toArray();
-
-        $unitList = collect($pegawai)->pluck('unit')->unique()->filter(fn ($v) => $v !== '-')->sort()->values();
-        $golonganList = collect($pegawai)->pluck('golongan')->unique()->filter(fn ($v) => $v !== '-')->sort()->values();
-        $jenisList = collect($pegawai)->pluck('jenis')->unique()->filter(fn ($v) => $v !== '-')->sort()->values();
-        $statusList = collect($pegawai)->pluck('status')->unique()->filter(fn ($v) => $v !== '-')->sort()->values();
-
-        return view('admin.laporan.export-pegawai', [
-            'pegawai' => $pegawai,
-            'unitList' => $unitList,
-            'golonganList' => $golonganList,
-            'jenisList' => $jenisList,
-            'statusList' => $statusList,
-            'title' => 'Laporan - Export Pegawai',
-        ]);
-    })->middleware(['role:super_admin,admin_kepegawaian'])
+    Route::get('/laporan/export-pegawai', [LaporanController::class, 'exportPegawai'])
+        ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('laporan.pegawai');
 
     Route::get('/laporan/export-pegawai/excel', [LaporanController::class, 'exportPegawaiExcel'])
