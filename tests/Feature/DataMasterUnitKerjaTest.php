@@ -10,6 +10,7 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -366,7 +367,8 @@ class DataMasterUnitKerjaTest extends TestCase
         $unit = $this->unit('Bagian Cache', 'bagian');
 
         foreach ([
-            ['route' => route('data-master.unit-kerja.update', $unit), 'data' => ['nama' => 'Bagian Cache Baru', 'jenis_unit' => 'bagian']],
+            ['route' => route('data-master.unit-kerja.store'), 'data' => ['nama' => 'Bagian Cache Baru', 'jenis_unit' => 'bagian']],
+            ['route' => route('data-master.unit-kerja.update', $unit), 'data' => ['nama' => 'Bagian Cache Diperbarui', 'jenis_unit' => 'bagian']],
             ['route' => route('data-master.unit-kerja.toggle', $unit), 'data' => []],
             ['route' => route('data-master.unit-kerja.destroy', $unit), 'data' => []],
         ] as $mutasi) {
@@ -375,6 +377,68 @@ class DataMasterUnitKerjaTest extends TestCase
             $this->actingAs($user)->postWithCsrf($mutasi['route'], $mutasi['data'])->assertRedirect();
 
             $this->assertNull(Cache::get('ref.unit_kerja'));
+        }
+    }
+
+    public function test_cache_unit_kerja_baru_dihapus_setelah_transaksi_commit(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        Cache::put('ref.unit_kerja', ['stale'], 3600);
+
+        DB::transaction(function () use ($user): void {
+            $this->actingAs($user)
+                ->postWithCsrf(route('data-master.unit-kerja.store'), [
+                    'nama' => 'Bagian Cache Setelah Commit',
+                    'jenis_unit' => 'bagian',
+                ])
+                ->assertRedirect();
+
+            // Cache lama tetap tersedia sampai write database dapat dilihat transaksi lain.
+            $this->assertSame(['stale'], Cache::get('ref.unit_kerja'));
+        });
+
+        $this->assertNull(Cache::get('ref.unit_kerja'));
+    }
+
+    public function test_setiap_mutasi_dibatalkan_saat_audit_gagal_disimpan(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $unitUpdate = $this->unit('Bagian Audit Update', 'bagian');
+        $unitToggle = $this->unit('Bagian Audit Toggle', 'bagian');
+        $unitDelete = $this->unit('Bagian Audit Delete', 'bagian');
+        $dispatcher = AuditLog::getEventDispatcher();
+        AuditLog::creating(function (): void {
+            throw new \RuntimeException('Simulasi kegagalan audit unit kerja.');
+        });
+
+        try {
+            $this->actingAs($user)->withoutExceptionHandling();
+
+            $this->assertAuditFailure(fn () => $this->postWithCsrf(
+                route('data-master.unit-kerja.store'),
+                ['nama' => 'Bagian Audit Create', 'jenis_unit' => 'bagian'],
+            ));
+            $this->assertDatabaseMissing('ref_unit_kerja', ['nama' => 'Bagian Audit Create']);
+
+            $this->assertAuditFailure(fn () => $this->postWithCsrf(
+                route('data-master.unit-kerja.update', $unitUpdate),
+                ['nama' => 'Bagian Audit Update Baru', 'jenis_unit' => 'bagian'],
+            ));
+            $this->assertSame('Bagian Audit Update', $unitUpdate->refresh()->nama);
+
+            $this->assertAuditFailure(fn () => $this->postWithCsrf(
+                route('data-master.unit-kerja.toggle', $unitToggle),
+                [],
+            ));
+            $this->assertTrue($unitToggle->refresh()->is_active);
+
+            $this->assertAuditFailure(fn () => $this->postWithCsrf(
+                route('data-master.unit-kerja.destroy', $unitDelete),
+                [],
+            ));
+            $this->assertDatabaseHas('ref_unit_kerja', ['id' => $unitDelete->id]);
+        } finally {
+            AuditLog::setEventDispatcher($dispatcher);
         }
     }
 
@@ -411,19 +475,178 @@ class DataMasterUnitKerjaTest extends TestCase
         $this->assertTrue($unit->refresh()->is_active);
     }
 
-    public function test_mutasi_unit_kerja_menghapus_cache_dropdown(): void
+    public function test_unit_baru_tidak_dapat_dibuat_di_bawah_ancestor_nonaktif(): void
     {
-        Cache::put('ref.unit_kerja', ['stale'], 3600);
         $user = User::factory()->superAdmin()->create();
+        $ancestor = $this->unit('Lembaga Nonaktif', 'lembaga');
+        $ancestor->forceFill(['is_active' => false])->save();
+        $parent = $this->unit('Bagian di Cabang Nonaktif', 'bagian', $ancestor, 1);
 
         $this->actingAs($user)
             ->postWithCsrf(route('data-master.unit-kerja.store'), [
-                'nama' => 'Bagian Segar',
+                'nama' => 'Urusan Aktif Terlarang',
+                'jenis_unit' => 'urusan',
+                'parent_id' => $parent->id,
+            ])
+            ->assertSessionHasErrors(['parent_id']);
+
+        $this->assertDatabaseMissing('ref_unit_kerja', ['nama' => 'Urusan Aktif Terlarang']);
+        $this->assertDatabaseMissing('audit_logs', [
+            'event' => 'CREATE',
+            'auditable_type' => 'RefUnitKerja',
+        ]);
+    }
+
+    public function test_unit_aktif_tidak_dapat_dipindahkan_ke_parent_nonaktif(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $parentAwal = $this->unit('Lembaga Awal', 'lembaga');
+        $unit = $this->unit('Bagian Tetap Aktif', 'bagian', $parentAwal, 1);
+        $parentNonaktif = $this->unit('Lembaga Tujuan Nonaktif', 'lembaga');
+        $parentNonaktif->forceFill(['is_active' => false])->save();
+
+        $this->actingAs($user)
+            ->postWithCsrf(route('data-master.unit-kerja.update', $unit), [
+                'nama' => $unit->nama,
+                'jenis_unit' => $unit->jenis_unit,
+                'parent_id' => $parentNonaktif->id,
+            ])
+            ->assertSessionHasErrors(['parent_id']);
+
+        $this->assertSame($parentAwal->id, $unit->refresh()->parent_id);
+        $this->assertSame(1, $unit->level);
+        $this->assertDatabaseMissing('audit_logs', [
+            'event' => 'UPDATE',
+            'auditable_type' => 'RefUnitKerja',
+            'auditable_id' => $unit->id,
+        ]);
+    }
+
+    public function test_unit_tidak_dapat_diaktifkan_saat_ancestor_masih_nonaktif(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $parent = $this->unit('Bagian Induk Nonaktif', 'bagian');
+        $parent->forceFill(['is_active' => false])->save();
+        $unit = $this->unit('Urusan Anak Nonaktif', 'urusan', $parent, 1);
+        $unit->forceFill(['is_active' => false])->save();
+
+        $this->actingAs($user)
+            ->postWithCsrf(route('data-master.unit-kerja.toggle', $unit), [])
+            ->assertSessionHasErrors();
+
+        $this->assertFalse($unit->refresh()->is_active);
+        $this->assertDatabaseMissing('audit_logs', [
+            'event' => 'CONFIG_UPDATE',
+            'auditable_type' => 'RefUnitKerja',
+            'auditable_id' => $unit->id,
+        ]);
+    }
+
+    public function test_update_tanpa_parent_id_mempertahankan_parent_dan_level(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $parent = $this->unit('Bagian Parent Efektif', 'bagian');
+        $unit = $this->unit('Urusan Parent Efektif', 'urusan', $parent, 1);
+
+        $this->actingAs($user)
+            ->postWithCsrf(route('data-master.unit-kerja.update', $unit), [
+                'nama' => 'Urusan Parent Efektif Baru',
+                'jenis_unit' => 'urusan',
+                'keterangan' => 'Parent tidak dikirim oleh klien.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $unit->refresh();
+        $this->assertSame($parent->id, $unit->parent_id);
+        $this->assertSame(1, $unit->level);
+    }
+
+    public function test_unit_nonaktif_dapat_diedit_tanpa_mengganti_parent_nonaktif(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $parent = $this->unit('Bagian Parent Lama', 'bagian');
+        $parent->forceFill(['is_active' => false])->save();
+        $unit = $this->unit('Urusan Nonaktif Lama', 'urusan', $parent, 1);
+        $unit->forceFill(['is_active' => false])->save();
+
+        $this->actingAs($user)
+            ->postWithCsrf(route('data-master.unit-kerja.update', $unit), [
+                'nama' => 'Urusan Nonaktif Diperbarui',
+                'jenis_unit' => 'urusan',
+                'parent_id' => $parent->id,
+                'keterangan' => 'Metadata tetap dapat diperbarui.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $unit->refresh();
+        $this->assertSame('Urusan Nonaktif Diperbarui', $unit->nama);
+        $this->assertSame($parent->id, $unit->parent_id);
+        $this->assertSame(1, $unit->level);
+    }
+
+    public function test_parent_harus_diaktifkan_sebelum_anaknya(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $parent = $this->unit('Bagian Aktif Bertahap', 'bagian');
+        $parent->forceFill(['is_active' => false])->save();
+        $unit = $this->unit('Urusan Aktif Bertahap', 'urusan', $parent, 1);
+        $unit->forceFill(['is_active' => false])->save();
+
+        $this->actingAs($user)
+            ->postWithCsrf(route('data-master.unit-kerja.toggle', $parent), [])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+        $this->postWithCsrf(route('data-master.unit-kerja.toggle', $unit), [])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertTrue($parent->refresh()->is_active);
+        $this->assertTrue($unit->refresh()->is_active);
+        $this->assertSame(2, AuditLog::query()
+            ->where('event', 'CONFIG_UPDATE')
+            ->where('auditable_type', 'RefUnitKerja')
+            ->count());
+    }
+
+    public function test_setiap_mutasi_hierarki_memperoleh_lock_transaksi(): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Advisory transaction lock diverifikasi khusus pada PostgreSQL.');
+        }
+
+        $lockQueries = [];
+        DB::listen(function ($query) use (&$lockQueries): void {
+            if (str_contains(strtolower($query->sql), 'pg_advisory_xact_lock')) {
+                $lockQueries[] = $query->sql;
+            }
+        });
+
+        $user = User::factory()->superAdmin()->create();
+        $this->actingAs($user)
+            ->postWithCsrf(route('data-master.unit-kerja.store'), [
+                'nama' => 'Bagian Mutasi Terkunci',
                 'jenis_unit' => 'bagian',
             ])
             ->assertRedirect();
+        $this->assertCount(1, $lockQueries);
 
-        $this->assertNull(Cache::get('ref.unit_kerja'));
+        $unit = RefUnitKerja::query()->where('nama', 'Bagian Mutasi Terkunci')->firstOrFail();
+        $this->postWithCsrf(route('data-master.unit-kerja.update', $unit), [
+            'nama' => 'Bagian Mutasi Terkunci Baru',
+            'jenis_unit' => 'bagian',
+        ])->assertRedirect();
+        $this->assertCount(2, $lockQueries);
+
+        $this->postWithCsrf(route('data-master.unit-kerja.toggle', $unit), [])->assertRedirect();
+        $this->assertCount(3, $lockQueries);
+
+        $this->postWithCsrf(route('data-master.unit-kerja.toggle', $unit), [])->assertRedirect();
+        $this->assertCount(4, $lockQueries);
+
+        $this->postWithCsrf(route('data-master.unit-kerja.destroy', $unit), [])->assertRedirect();
+        $this->assertCount(5, $lockQueries);
     }
 
     public function test_admin_kepegawaian_tidak_boleh_mengelola_unit_kerja(): void
@@ -439,6 +662,20 @@ class DataMasterUnitKerjaTest extends TestCase
             ->assertForbidden();
 
         $this->assertSame(1, RefUnitKerja::query()->count());
+    }
+
+    private function assertAuditFailure(callable $mutation): void
+    {
+        $exceptionObserved = false;
+
+        try {
+            $mutation();
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Simulasi kegagalan audit unit kerja.', $exception->getMessage());
+            $exceptionObserved = true;
+        }
+
+        $this->assertTrue($exceptionObserved, 'Mutasi wajib meneruskan kegagalan audit.');
     }
 
     private function unit(string $nama, string $jenis, ?RefUnitKerja $parent = null, int $level = 0): RefUnitKerja

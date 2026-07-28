@@ -136,6 +136,41 @@ class DataMasterPageTest extends TestCase
         $this->assertStringContainsString('>Keterangan tersimpan B.</textarea>', $content);
     }
 
+    public function test_dropdown_parent_tidak_menawarkan_unit_nonaktif_baru_tetapi_mempertahankan_parent_saat_ini(): void
+    {
+        $parentAktif = RefUnitKerja::create([
+            'nama' => 'Bagian Parent Aktif',
+            'jenis_unit' => 'bagian',
+            'level' => 0,
+        ]);
+        $parentNonaktif = RefUnitKerja::create([
+            'nama' => 'Bagian Parent Nonaktif',
+            'jenis_unit' => 'bagian',
+            'level' => 0,
+            'is_active' => false,
+        ]);
+        RefUnitKerja::create([
+            'nama' => 'Urusan Existing Nonaktif',
+            'jenis_unit' => 'urusan',
+            'parent_id' => $parentNonaktif->id,
+            'level' => 1,
+            'is_active' => false,
+        ]);
+        $user = User::factory()->superAdmin()->create();
+
+        $content = $this->actingAs($user)->get(route('data-master'))->assertOk()->getContent();
+
+        $this->assertGreaterThan(
+            1,
+            preg_match_all('/<option\s+value="'.preg_quote($parentAktif->id, '/').'"/', $content),
+        );
+        $this->assertSame(
+            1,
+            preg_match_all('/<option\s+value="'.preg_quote($parentNonaktif->id, '/').'"/', $content),
+        );
+        $this->assertStringContainsString('Bagian Parent Nonaktif (Nonaktif)', $content);
+    }
+
     public function test_jumlah_pemakai_ditampilkan_dari_agregat_database(): void
     {
         $golongan = RefGolongan::create(['kode' => 'IV/a', 'nama' => 'Pembina Uji', 'urutan' => 13]);

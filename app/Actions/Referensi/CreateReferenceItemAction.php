@@ -6,7 +6,7 @@ use App\Services\AuditService;
 use App\Services\Referensi\ReferenceTableCatalog;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class CreateReferenceItemAction
 {
@@ -18,18 +18,13 @@ class CreateReferenceItemAction
      */
     public function execute(string $modelClass, array $data, Request $request): Model
     {
-        $item = $modelClass::create($data);
+        return DB::transaction(function () use ($modelClass, $data, $request): Model {
+            $item = $modelClass::create($data);
 
-        AuditService::log('CREATE', class_basename($modelClass), $item->getKey(), null, $item->toArray(), $request);
-        $this->forgetCaches($modelClass);
+            AuditService::logOrFail('CREATE', class_basename($modelClass), $item->getKey(), null, $item->toArray(), $request);
+            ReferenceTableCatalog::forgetCachesAfterCommit($modelClass);
 
-        return $item;
-    }
-
-    private function forgetCaches(string $modelClass): void
-    {
-        foreach (ReferenceTableCatalog::cacheKeys($modelClass) as $cacheKey) {
-            Cache::forget($cacheKey);
-        }
+            return $item;
+        });
     }
 }

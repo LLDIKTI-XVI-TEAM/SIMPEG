@@ -3,6 +3,7 @@
 namespace App\Actions\Referensi;
 
 use App\Models\RefUnitKerja;
+use App\Services\Referensi\UnitKerjaHierarchyService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -11,6 +12,7 @@ class UpdateUnitKerjaAction
     public function __construct(
         private readonly UpdateReferenceItemAction $update,
         private readonly SyncUnitKerjaLevelAction $syncLevel,
+        private readonly UnitKerjaHierarchyService $hierarchy,
     ) {}
 
     /**
@@ -25,8 +27,26 @@ class UpdateUnitKerjaAction
     public function execute(RefUnitKerja $unit, array $data, Request $request): RefUnitKerja
     {
         return DB::transaction(function () use ($unit, $data, $request): RefUnitKerja {
+            $this->hierarchy->lockForMutation();
+
+            $unit = RefUnitKerja::query()->findOrFail($unit->getKey());
+            $parentId = array_key_exists('parent_id', $data)
+                ? (is_string($data['parent_id']) ? $data['parent_id'] : null)
+                : $unit->parent_id;
+            $allowInactiveChain = ! $unit->is_active
+                && $unit->parent_id === $parentId;
+
+            if ($parentId !== null) {
+                $this->hierarchy->ensureParentAllowed(
+                    $parentId,
+                    $unit->id,
+                    $allowInactiveChain,
+                );
+            }
+
+            $data['level'] = $this->hierarchy->levelFromParent($parentId);
             $this->update->execute($unit, $data, $request);
-            $this->syncLevel->execute($unit->refresh());
+            $this->syncLevel->execute($unit);
 
             return $unit->refresh();
         });

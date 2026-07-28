@@ -3,20 +3,12 @@
 namespace App\Http\Requests\Referensi;
 
 use App\Models\RefUnitKerja;
+use App\Services\Referensi\UnitKerjaHierarchyService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
 class StoreUnitKerjaRequest extends FormRequest
 {
-    /** Rantai induk calon parent bersih sampai unit tertinggi. */
-    private const CHAIN_CLEAN = 'clean';
-
-    /** Calon parent ternyata berada di bawah unit yang sedang diubah. */
-    private const CHAIN_DESCENDANT = 'descendant';
-
-    /** Rantai induk calon parent sudah membentuk lingkaran. */
-    private const CHAIN_CORRUPT = 'corrupt';
-
     /**
      * Kosakata resmi jenis unit mengikuti struktur organisasi yang di-seed.
      * Nilai default kolom database ('unit_kerja') sengaja tidak diikutkan
@@ -73,7 +65,9 @@ class StoreUnitKerjaRequest extends FormRequest
             }
 
             $unit = $this->boundUnit();
-            $parentId = $this->input('parent_id');
+            $parentId = $this->exists('parent_id')
+                ? $this->input('parent_id')
+                : $unit?->parent_id;
 
             if (! is_string($parentId) || $parentId === '') {
                 return;
@@ -85,50 +79,27 @@ class StoreUnitKerjaRequest extends FormRequest
                 return;
             }
 
-            match ($this->parentChainVerdict($parentId, $unit?->id)) {
-                self::CHAIN_DESCENDANT => $validator->errors()->add(
-                    'parent_id',
-                    'Unit induk tidak boleh diambil dari sub-unit di bawahnya.',
-                ),
-                self::CHAIN_CORRUPT => $validator->errors()->add(
-                    'parent_id',
-                    'Rantai induk unit tujuan sudah membentuk lingkaran. Perbaiki struktur unit tersebut lebih dulu.',
-                ),
-                default => null,
-            };
+            $message = app(UnitKerjaHierarchyService::class)->parentValidationMessage(
+                $parentId,
+                $unit?->id,
+                $this->allowsCurrentInactiveParent($unit, $parentId),
+            );
+
+            if ($message !== null) {
+                $validator->errors()->add('parent_id', $message);
+            }
         });
     }
 
     /**
-     * Menelusuri rantai induk calon parent dan membedakan rantai bersih,
-     * keturunan unit saat update, serta lingkaran pada data lama.
+     * Unit nonaktif boleh mempertahankan relasi lama saat metadata diedit.
+     * Parent nonaktif tetap tidak boleh dipilih sebagai relasi baru.
      */
-    private function parentChainVerdict(string $candidateParentId, ?string $unitId): string
+    private function allowsCurrentInactiveParent(?RefUnitKerja $unit, string $parentId): bool
     {
-        $visited = [];
-        $cursor = $candidateParentId;
-
-        while ($cursor !== '') {
-            if (isset($visited[$cursor])) {
-                return self::CHAIN_CORRUPT;
-            }
-
-            $visited[$cursor] = true;
-
-            $parentId = RefUnitKerja::query()->whereKey($cursor)->value('parent_id');
-
-            if ($parentId === null) {
-                return self::CHAIN_CLEAN;
-            }
-
-            if ($unitId !== null && $parentId === $unitId) {
-                return self::CHAIN_DESCENDANT;
-            }
-
-            $cursor = (string) $parentId;
-        }
-
-        return self::CHAIN_CLEAN;
+        return $unit !== null
+            && ! $unit->is_active
+            && $unit->parent_id === $parentId;
     }
 
     protected function boundUnit(): ?RefUnitKerja
@@ -136,34 +107,6 @@ class StoreUnitKerjaRequest extends FormRequest
         $unit = $this->route('unitKerja');
 
         return $unit instanceof RefUnitKerja ? $unit : null;
-    }
-
-    /**
-     * Payload siap simpan. Level tidak pernah berasal dari input pengguna:
-     * nilainya diturunkan dari induk supaya kedalaman pohon tidak dapat
-     * dipalsukan lewat form. Disediakan sebagai method terpisah agar kontrak
-     * validated() bawaan Laravel (akses per key) tetap utuh.
-     *
-     * @return array<string, mixed>
-     */
-    public function unitKerjaData(): array
-    {
-        /** @var array<string, mixed> $data */
-        $data = $this->validated();
-        $parentId = $data['parent_id'] ?? null;
-
-        $data['level'] = $this->levelFromParent(is_string($parentId) ? $parentId : null);
-
-        return $data;
-    }
-
-    protected function levelFromParent(?string $parentId): int
-    {
-        if ($parentId === null) {
-            return 0;
-        }
-
-        return (int) (RefUnitKerja::query()->whereKey($parentId)->value('level') ?? 0) + 1;
     }
 
     /** @return array<string, string> */

@@ -48,6 +48,7 @@
                 class="w-full rounded-xl border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                 <option value="">Tanpa induk (unit tertinggi)</option>
                 @foreach ($unitKerja as $induk)
+                    @continue(! $induk->is_active)
                     <option value="{{ $induk->id }}" @selected(old('parent_id') === $induk->id)>
                         {{ str_repeat('— ', $induk->level).$induk->nama }}
                     </option>
@@ -158,8 +159,9 @@
                                         {{-- Diri sendiri dan sub-unitnya dikeluarkan agar pilihan yang membentuk siklus tidak pernah tampil. --}}
                                         @foreach ($unitKerja as $kandidat)
                                             @continue(in_array($kandidat->id, $unitKerjaCycleGuard[$item->id] ?? [], true))
+                                            @continue(! $kandidat->is_active && $item->parent_id !== $kandidat->id)
                                             <option value="{{ $kandidat->id }}" @selected($item->parent_id === $kandidat->id)>
-                                                {{ str_repeat('— ', $kandidat->level).$kandidat->nama }}
+                                                {{ str_repeat('— ', $kandidat->level).$kandidat->nama }}{{ $kandidat->is_active ? '' : ' (Nonaktif)' }}
                                             </option>
                                         @endforeach
                                     </select>
