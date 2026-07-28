@@ -218,6 +218,12 @@ class Employee extends Model
         return $this->hasMany(LeaveRequest::class);
     }
 
+    /** @return HasMany<LeaveRequestCase, $this> */
+    public function leaveRequestCases(): HasMany
+    {
+        return $this->hasMany(LeaveRequestCase::class);
+    }
+
     /** @return HasMany<LeaveBalance, $this> */
     public function leaveBalances(): HasMany
     {

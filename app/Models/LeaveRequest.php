@@ -12,6 +12,7 @@ use Illuminate\Support\Carbon;
 /**
  * @property string $id
  * @property string $employee_id
+ * @property string|null $leave_request_case_id
  * @property string $status
  * @property int $jumlah_hari_kerja
  * @property string $alasan
@@ -22,6 +23,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property-read Employee|null $employee
  * @property-read RefJenisCuti|null $jenisCuti
+ * @property-read LeaveRequestCase|null $leaveRequestCase
  * @property-read LeaveProof|null $proof
  * @property LeaveRequestStep|null $activeStep
  */
@@ -32,6 +34,7 @@ class LeaveRequest extends Model
     protected $fillable = [
         'employee_id',
         'jenis_cuti_id',
+        'leave_request_case_id',
         'tanggal_mulai',
         'tanggal_selesai',
         'jumlah_hari_kerja',
@@ -63,6 +66,12 @@ class LeaveRequest extends Model
         return $this->belongsTo(RefJenisCuti::class, 'jenis_cuti_id');
     }
 
+    /** @return BelongsTo<LeaveRequestCase, $this> */
+    public function leaveRequestCase(): BelongsTo
+    {
+        return $this->belongsTo(LeaveRequestCase::class, 'leave_request_case_id');
+    }
+
     /** @return HasMany<LeaveApproval, $this> */
     public function approvals(): HasMany
     {
@@ -79,5 +88,11 @@ class LeaveRequest extends Model
     public function proof(): HasOne
     {
         return $this->hasOne(LeaveProof::class);
+    }
+
+    /** @return HasMany<LeaveBalanceReservationEvent, $this> */
+    public function balanceReservationEvents(): HasMany
+    {
+        return $this->hasMany(LeaveBalanceReservationEvent::class);
     }
 }

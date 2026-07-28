@@ -653,6 +653,7 @@ class SubmitLeaveRequestTest extends TestCase
     public function test_cuti_create_form_exposes_ledger_backed_available_balance(): void
     {
         $aktor = $this->makePemohon();
+        $this->jenisCuti('Cuti Tahunan');
 
         // Saldo awal ditulis lewat service ledger agar angka tersedia yang dilihat pemohon
         // berasal dari sumber yang sama dengan validasi saldo saat submit (bukan kolom summary lama).
@@ -668,7 +669,14 @@ class SubmitLeaveRequestTest extends TestCase
         $response = $this->get(route('cuti.create'));
 
         $response->assertOk();
-        $response->assertViewHas('saldoTersedia', 7);
+        $response->assertViewHas('saldoCuti', function (array $saldoCuti): bool {
+            return $saldoCuti['saldo_aktual'] === 7
+                && $saldoCuti['saldo_dapat_diajukan'] === 7
+                && $saldoCuti['dialokasikan_aktif'] === 0;
+        });
+        $response->assertSee('Saldo Tersedia Aktual', escape: false);
+        $response->assertSee('Masih Dapat Diajukan', escape: false);
+        $response->assertSee('data-mengurangi-saldo-tahunan="true"', escape: false);
     }
 
     public function test_menolak_lampiran_melebihi_batas(): void
