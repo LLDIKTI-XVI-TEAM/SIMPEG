@@ -105,7 +105,7 @@ class EmployeeReportExportTest extends TestCase
         }
     }
 
-    public function test_custom_export_uses_canonical_column_order_and_rejects_sensitive_columns(): void
+    public function test_custom_export_preserves_user_column_order_and_rejects_sensitive_columns(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();
         $employee = $this->createEmployee(
@@ -119,6 +119,8 @@ class EmployeeReportExportTest extends TestCase
             ],
         );
 
+        // Kirim kolom dalam urutan: tanggal_pensiun → nama → nip.
+        // Excel harus mencerminkan urutan tersebut persis (bukan urutan baku).
         $response = $this->actingAs($admin)->post(route('laporan.pegawai.custom'), [
             'columns' => ['tanggal_pensiun', 'nama', 'nip'],
             'status' => 'Aktif',
@@ -132,12 +134,13 @@ class EmployeeReportExportTest extends TestCase
         try {
             $sheet = $spreadsheet->getActiveSheet();
 
-            $this->assertSame('NIP', $sheet->getCell('A1')->getValue());
+            // Urutan kolom mengikuti input user: A=Tanggal Pensiun, B=Nama, C=NIP.
+            $this->assertSame('Tanggal Pensiun', $sheet->getCell('A1')->getValue());
             $this->assertSame('Nama', $sheet->getCell('B1')->getValue());
-            $this->assertSame('Tanggal Pensiun', $sheet->getCell('C1')->getValue());
-            $this->assertSame($employee->nip, $sheet->getCell('A2')->getValue());
+            $this->assertSame('NIP', $sheet->getCell('C1')->getValue());
+            $this->assertSame('2038-08-17', $sheet->getCell('A2')->getValue());
             $this->assertSame('Nadia Custom', $sheet->getCell('B2')->getValue());
-            $this->assertSame('2038-08-17', $sheet->getCell('C2')->getValue());
+            $this->assertSame($employee->nip, $sheet->getCell('C2')->getValue());
         } finally {
             $spreadsheet->disconnectWorksheets();
         }
