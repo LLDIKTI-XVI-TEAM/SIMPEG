@@ -24,16 +24,16 @@ class ExportEmployeeAction
      */
     public function execute(Request $request): StreamedResponse
     {
-        $requestedNips = collect($request->input('nips', []))
-            ->filter(fn ($nip) => is_string($nip) && trim($nip) !== '')
-            ->map(fn (string $nip) => trim($nip))
+        $requestedIds = collect($request->input('ids', []))
+            ->filter(fn ($id) => is_string($id) && trim($id) !== '')
+            ->map(fn (string $id) => trim($id))
             ->unique()
             ->values();
 
         $query = Employee::query()->with(['jenisPegawai:id,nama', 'statusPegawai:id,nama']);
 
-        if ($requestedNips->isNotEmpty()) {
-            $query->whereIn('nip', $requestedNips->all());
+        if ($requestedIds->isNotEmpty()) {
+            $query->whereIn('id', $requestedIds->all());
         } else {
             $search = mb_strtolower(trim((string) $request->query('search', '')));
             $golongan = trim((string) $request->query('golongan', ''));
@@ -86,10 +86,10 @@ class ExportEmployeeAction
 
         $pegawaiData = $query->orderBy('nama_lengkap')->get();
 
-        if ($requestedNips->isNotEmpty()) {
-            $requestedOrder = $requestedNips->flip();
+        if ($requestedIds->isNotEmpty()) {
+            $requestedOrder = $requestedIds->flip();
             $pegawaiData = $pegawaiData
-                ->sortBy(fn (Employee $employee) => $requestedOrder[$employee->nip] ?? PHP_INT_MAX)
+                ->sortBy(fn (Employee $employee) => $requestedOrder[$employee->id] ?? PHP_INT_MAX)
                 ->values();
         }
 

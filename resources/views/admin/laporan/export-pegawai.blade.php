@@ -7,7 +7,7 @@
     {{-- Data pegawai disuntikkan lewat script JSON agar aman dari escaping HTML --}}
     <script id="pegawai-data" type="application/json">{!! $pegawaiJson !!}</script>
 
-    <div x-data="exportPegawai" class="space-y-6">
+    <div x-data="exportPegawai({{ $pegawaiJson }})" class="space-y-6">
 
         {{-- ============================================================ --}}
         {{-- PRINT ONLY HEADER (Kop Surat Resmi)                         --}}
@@ -469,15 +469,15 @@
 
     @push('scripts')
     <script>
-    document.addEventListener('alpine:init', () => {
-        Alpine.data('exportPegawai', () => ({
-            // =====================================================================
-            // DATA SOURCE — diisi dari PHP
-            // =====================================================================
-            allPegawai: JSON.parse(document.getElementById('pegawai-data').textContent),
+        const registerExportPegawai = () => {
+            Alpine.data('exportPegawai', (initialPegawai = []) => ({
+                // =====================================================================
+                // DATA SOURCE — diisi dari PHP
+                // =====================================================================
+                allPegawai: initialPegawai,
 
-            // =====================================================================
-            // FILTER STATE
+                // =====================================================================
+                // FILTER STATE
             // =====================================================================
             searchQuery: '',
             activeUnit: '',
@@ -633,9 +633,15 @@
                 return row[key] ?? '-';
             },
 
-            printReport() { window.print(); },
-        }));
-    });
+            printReport() { window.print(); }
+            }));
+        };
+
+        if (window.Alpine) {
+            registerExportPegawai();
+        } else {
+            document.addEventListener('alpine:init', registerExportPegawai);
+        }
     </script>
     @endpush
 

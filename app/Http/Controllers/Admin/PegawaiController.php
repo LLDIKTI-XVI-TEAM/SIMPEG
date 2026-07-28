@@ -148,22 +148,16 @@ class PegawaiController extends Controller
         $direction = strtolower((string) $request->query('direction', 'asc'));
         $direction = in_array($direction, ['asc', 'desc'], true) ? $direction : 'asc';
 
-        // === Initial page data — menggunakan ListEmployeesAction (sama seperti API) ===
-        $validated = array_merge($filters, [
-            'sort' => $sort,
-            'direction' => $direction,
-            'per_page' => $perPage,
-        ]);
-
-        $paginator = $listAction->execute($validated);
-        $initialRows = $paginator->items(); // sudah berupa flat array dari ->through()
+        // === Initial page data — dikosongkan agar loading halaman instan ===
+        // Data akan diambil melalui AJAX oleh AlpineJS atau dari sessionStorage
+        $initialRows = [];
         $initialMeta = [
-            'total' => $paginator->total(),
-            'current_page' => $paginator->currentPage(),
-            'last_page' => $paginator->lastPage(),
-            'from' => $paginator->firstItem() ?? 0,
-            'to' => $paginator->lastItem() ?? 0,
-            'per_page' => $paginator->perPage(),
+            'total' => 0,
+            'current_page' => 1,
+            'last_page' => 1,
+            'from' => 0,
+            'to' => 0,
+            'per_page' => $perPage,
         ];
 
         return view('admin.pegawai.index', compact(
@@ -387,7 +381,8 @@ class PegawaiController extends Controller
 
             $redirect = redirect()->route('data-pegawai')
                 ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil diperbarui.')
-                ->with('employee_data_changed', true);
+                ->with('employee_data_changed', true)
+                ->with('edited_employee_id', $employee->id);
 
             // Jika ada berkas lainnya yang diunggah, bersihkan juga cache halaman dokumen
             if ($request->hasFile('file_berkas_lainnya') && $request->file('file_berkas_lainnya')->isValid()) {
