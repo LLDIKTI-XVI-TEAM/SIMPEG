@@ -4,9 +4,19 @@ namespace App\Http\Requests\Referensi;
 
 use App\Models\RefUnitKerja;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class StoreUnitKerjaRequest extends FormRequest
 {
+    /** Rantai induk calon parent bersih sampai unit tertinggi. */
+    private const CHAIN_CLEAN = 'clean';
+
+    /** Calon parent ternyata berada di bawah unit yang sedang diubah. */
+    private const CHAIN_DESCENDANT = 'descendant';
+
+    /** Rantai induk calon parent sudah membentuk lingkaran. */
+    private const CHAIN_CORRUPT = 'corrupt';
+
     /**
      * Kosakata resmi jenis unit mengikuti struktur organisasi yang di-seed.
      * Nilai default kolom database ('unit_kerja') sengaja tidak diikutkan
@@ -46,6 +56,86 @@ class StoreUnitKerjaRequest extends FormRequest
         if ($this->input('parent_id') === '') {
             $this->merge(['parent_id' => null]);
         }
+    }
+
+    /**
+     * Calon induk wajib berada pada rantai yang bersih. Pada update, guard
+     * yang sama juga mencegah unit memilih diri sendiri atau keturunannya.
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            // Nilai yang sudah gagal aturan uuid/exists tidak boleh diquery:
+            // PostgreSQL menolak sintaks uuid yang rusak dengan error 500,
+            // bukan pesan validasi.
+            if ($validator->errors()->has('parent_id')) {
+                return;
+            }
+
+            $unit = $this->boundUnit();
+            $parentId = $this->input('parent_id');
+
+            if (! is_string($parentId) || $parentId === '') {
+                return;
+            }
+
+            if ($unit !== null && $parentId === $unit->id) {
+                $validator->errors()->add('parent_id', 'Unit induk tidak boleh unit itu sendiri.');
+
+                return;
+            }
+
+            match ($this->parentChainVerdict($parentId, $unit?->id)) {
+                self::CHAIN_DESCENDANT => $validator->errors()->add(
+                    'parent_id',
+                    'Unit induk tidak boleh diambil dari sub-unit di bawahnya.',
+                ),
+                self::CHAIN_CORRUPT => $validator->errors()->add(
+                    'parent_id',
+                    'Rantai induk unit tujuan sudah membentuk lingkaran. Perbaiki struktur unit tersebut lebih dulu.',
+                ),
+                default => null,
+            };
+        });
+    }
+
+    /**
+     * Menelusuri rantai induk calon parent dan membedakan rantai bersih,
+     * keturunan unit saat update, serta lingkaran pada data lama.
+     */
+    private function parentChainVerdict(string $candidateParentId, ?string $unitId): string
+    {
+        $visited = [];
+        $cursor = $candidateParentId;
+
+        while ($cursor !== '') {
+            if (isset($visited[$cursor])) {
+                return self::CHAIN_CORRUPT;
+            }
+
+            $visited[$cursor] = true;
+
+            $parentId = RefUnitKerja::query()->whereKey($cursor)->value('parent_id');
+
+            if ($parentId === null) {
+                return self::CHAIN_CLEAN;
+            }
+
+            if ($unitId !== null && $parentId === $unitId) {
+                return self::CHAIN_DESCENDANT;
+            }
+
+            $cursor = (string) $parentId;
+        }
+
+        return self::CHAIN_CLEAN;
+    }
+
+    protected function boundUnit(): ?RefUnitKerja
+    {
+        $unit = $this->route('unitKerja');
+
+        return $unit instanceof RefUnitKerja ? $unit : null;
     }
 
     /**

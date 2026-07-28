@@ -1,8 +1,18 @@
 {{-- Tab unit kerja: data nyata dari database, disusun depth-first di controller.
      Self-FK parent_id bersifat nullOnDelete sehingga penghapusan induk dijaga
      guard aplikasi (kolom pemakaian menghitung sub-unit), bukan database. --}}
+@php
+    $unitKerjaFormContext = old('form_context');
+    $unitKerjaCreateFailed = $errors->any() && old('tab') === 'unit_kerja' && $unitKerjaFormContext === 'create';
+    $unitKerjaEditId = $errors->any()
+        && old('tab') === 'unit_kerja'
+        && is_string($unitKerjaFormContext)
+        && $unitKerjaFormContext !== 'create'
+            ? $unitKerjaFormContext
+            : null;
+@endphp
 <div x-show="activeTab === 'unit_kerja'"
-    x-data="{ showTambah: {{ $errors->any() && old('tab') === 'unit_kerja' ? 'true' : 'false' }}, editId: null }"
+    x-data="{ showTambah: {{ $unitKerjaCreateFailed ? 'true' : 'false' }}, editId: @js($unitKerjaEditId) }"
     class="rounded-lg bg-surface p-6 shadow-sm space-y-6" style="display: none;">
     <div class="pb-4 flex items-center justify-between gap-4">
         <div>
@@ -21,6 +31,7 @@
         class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 items-end rounded-lg border border-border bg-soft/30 p-4">
         @csrf
         <input type="hidden" name="tab" value="unit_kerja">
+        <input type="hidden" name="form_context" value="create">
         <x-form.input name="nama" label="Nama Unit Kerja" required placeholder="cth: Urusan Keuangan" />
         <div class="space-y-1">
             <label for="unit-kerja-jenis-baru" class="text-[10px] font-bold text-muted uppercase tracking-wide font-sans">Jenis Unit</label>
@@ -43,6 +54,10 @@
                 @endforeach
             </select>
         </div>
+        <x-form.textarea name="keterangan" id="unit-kerja-keterangan-baru" label="Keterangan"
+            :value="$unitKerjaCreateFailed ? old('keterangan') : null"
+            :error-key="$unitKerjaCreateFailed ? 'keterangan' : 'unit_kerja_create_keterangan'"
+            rows="2" placeholder="Deskripsi singkat fungsi unit" wrapper-class="sm:col-span-2 lg:col-span-3" />
         <button type="submit"
             class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
             Simpan
@@ -55,6 +70,7 @@
                 <x-ui.table-row>
                     <x-ui.table-th>Nama Unit Kerja</x-ui.table-th>
                     <x-ui.table-th>Jenis Unit</x-ui.table-th>
+                    <x-ui.table-th>Keterangan</x-ui.table-th>
                     <x-ui.table-th align="center">Status</x-ui.table-th>
                     <x-ui.table-th align="center">Pemakaian</x-ui.table-th>
                     <x-ui.table-th align="right">Aksi</x-ui.table-th>
@@ -76,6 +92,9 @@
                             </span>
                         </x-ui.table-td>
                         <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $jenisLabel }}</x-ui.table-td>
+                        <x-ui.table-td padding="sm" class="max-w-xs text-sm text-muted">
+                            {{ $item->keterangan ?: '—' }}
+                        </x-ui.table-td>
                         <x-ui.table-td align="center" padding="sm">
                             @if ($item->is_active)
                                 <span class="inline-flex items-center rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-semibold text-success">Aktif</span>
@@ -111,11 +130,12 @@
                         </x-ui.table-td>
                     </x-ui.table-row>
                     <tr id="unit-kerja-edit-{{ $item->id }}" x-show="editId === '{{ $item->id }}'" style="display: none;">
-                        <td colspan="5" class="bg-soft/30 px-4 py-4">
+                        <td colspan="6" class="bg-soft/30 px-4 py-4">
                             <form method="POST" action="{{ route('data-master.unit-kerja.update', $item) }}"
                                 class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 items-end">
                                 @csrf
                                 <input type="hidden" name="tab" value="unit_kerja">
+                                <input type="hidden" name="form_context" value="{{ $item->id }}">
                                 <div class="space-y-1">
                                     <label for="unit-kerja-nama-{{ $item->id }}" class="text-[10px] font-bold text-muted uppercase tracking-wide font-sans">Nama Unit Kerja</label>
                                     <input id="unit-kerja-nama-{{ $item->id }}" name="nama" value="{{ $item->nama }}" required
@@ -144,6 +164,11 @@
                                         @endforeach
                                     </select>
                                 </div>
+                                <x-form.textarea name="keterangan" id="unit-kerja-keterangan-{{ $item->id }}" label="Keterangan"
+                                    :value="$unitKerjaEditId === $item->id ? old('keterangan') : $item->keterangan"
+                                    :error-key="$unitKerjaEditId === $item->id ? 'keterangan' : 'unit_kerja_edit_'.$item->id.'_keterangan'"
+                                    rows="2" placeholder="Deskripsi singkat fungsi unit"
+                                    wrapper-class="sm:col-span-2 lg:col-span-3" />
                                 <button type="submit"
                                     class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
                                     Perbarui
@@ -153,7 +178,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" class="px-4 py-8 text-center text-sm text-muted">Belum ada data unit kerja.</td>
+                        <td colspan="6" class="px-4 py-8 text-center text-sm text-muted">Belum ada data unit kerja.</td>
                     </tr>
                 @endforelse
             </x-ui.table-body>

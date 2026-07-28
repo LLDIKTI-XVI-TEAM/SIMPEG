@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\RefJenisJabatan;
 use App\Models\RefUnitKerja;
@@ -49,8 +50,40 @@ class DataMasterUnitKerjaTest extends TestCase
             'parent_id' => null,
             'level' => 0,
             'is_active' => true,
+            'keterangan' => 'Root struktur uji.',
         ]);
         $this->assertDatabaseHas('audit_logs', ['event' => 'CREATE', 'auditable_type' => 'RefUnitKerja']);
+    }
+
+    public function test_super_admin_dapat_memperbarui_keterangan_unit_kerja_dengan_audit(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $unit = $this->unit('Bagian Berketerangan', 'bagian');
+        $unit->forceFill(['keterangan' => 'Keterangan lama.'])->save();
+
+        $this->actingAs($user)
+            ->postWithCsrf(route('data-master.unit-kerja.update', $unit), [
+                'nama' => 'Bagian Berketerangan',
+                'jenis_unit' => 'bagian',
+                'keterangan' => 'Keterangan baru.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('ref_unit_kerja', [
+            'id' => $unit->id,
+            'keterangan' => 'Keterangan baru.',
+        ]);
+
+        $audit = AuditLog::query()
+            ->where('event', 'UPDATE')
+            ->where('auditable_type', 'RefUnitKerja')
+            ->where('auditable_id', $unit->id)
+            ->latest('created_at')
+            ->firstOrFail();
+
+        $this->assertSame('Keterangan lama.', $audit->old_values['keterangan']);
+        $this->assertSame('Keterangan baru.', $audit->new_values['keterangan']);
     }
 
     public function test_level_anak_dihitung_otomatis_dari_induk(): void
@@ -301,6 +334,30 @@ class DataMasterUnitKerjaTest extends TestCase
             ->assertSessionHasErrors(['parent_id']);
 
         $this->assertNull($polos->refresh()->parent_id);
+    }
+
+    public function test_unit_baru_tidak_dapat_ditempelkan_ke_rantai_induk_yang_melingkar(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $a = $this->unit('Bagian Lingkar Create A', 'bagian');
+        $b = $this->unit('Bagian Lingkar Create B', 'bagian', $a, 1);
+        // Data lama yang korup harus ditolak pada create, bukan diperluas
+        // dengan unit baru yang mewarisi level tidak tepercaya.
+        $a->forceFill(['parent_id' => $b->id])->save();
+
+        $this->actingAs($user)
+            ->postWithCsrf(route('data-master.unit-kerja.store'), [
+                'nama' => 'Bagian Baru di Lingkaran',
+                'jenis_unit' => 'bagian',
+                'parent_id' => $b->id,
+            ])
+            ->assertSessionHasErrors(['parent_id']);
+
+        $this->assertDatabaseMissing('ref_unit_kerja', ['nama' => 'Bagian Baru di Lingkaran']);
+        $this->assertDatabaseMissing('audit_logs', [
+            'event' => 'CREATE',
+            'auditable_type' => 'RefUnitKerja',
+        ]);
     }
 
     public function test_setiap_mutasi_menghapus_cache_dropdown(): void
