@@ -10,19 +10,6 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ExportCustomPegawaiExcelAction
 {
-    /** @var list<string> */
-    private const COLUMN_ORDER = [
-        'nip',
-        'nama',
-        'golongan',
-        'jabatan',
-        'unit',
-        'jenis',
-        'status',
-        'pendidikan',
-        'tanggal_pensiun',
-    ];
-
     public function __construct(
         private readonly EmployeeExportDataService $employeeExportData,
         private readonly EmployeeExportSpreadsheetService $spreadsheet,
@@ -33,17 +20,17 @@ class ExportCustomPegawaiExcelAction
     {
         /** @var list<string> $requestedColumns */
         $requestedColumns = $validated['columns'];
-        $selectedColumns = array_fill_keys($requestedColumns, true);
-        $columns = [];
 
-        foreach (self::COLUMN_ORDER as $column) {
-            if (isset($selectedColumns[$column])) {
-                $columns[$column] = CustomEmployeeExportRequest::ALLOWED_COLUMNS[$column];
+        // Pertahankan urutan kolom sesuai permintaan pengguna (bukan urutan baku).
+        $columns = [];
+        foreach ($requestedColumns as $key) {
+            if (isset(CustomEmployeeExportRequest::ALLOWED_COLUMNS[$key])) {
+                $columns[$key] = CustomEmployeeExportRequest::ALLOWED_COLUMNS[$key];
             }
         }
 
         $workbook = $this->spreadsheet->make(
-            $this->employeeExportData->rows($validated),
+            $this->employeeExportData->rows($validated, defaultToActive: false),
             $columns,
             'Nominatif Pegawai Custom',
         );
