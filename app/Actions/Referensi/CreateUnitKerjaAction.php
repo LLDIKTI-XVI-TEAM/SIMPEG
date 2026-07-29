@@ -24,6 +24,7 @@ class CreateUnitKerjaAction
     {
         return DB::transaction(function () use ($data, $request): RefUnitKerja {
             $this->hierarchy->lockForMutation();
+            $this->hierarchy->ensureNameAvailable($data['nama']);
 
             $parentId = is_string($data['parent_id'] ?? null)
                 ? $data['parent_id']

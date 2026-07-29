@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Referensi\CreateUnitKerjaAction;
+use App\Actions\Referensi\UpdateUnitKerjaAction;
 use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\RefJenisJabatan;
@@ -9,9 +11,11 @@ use App\Models\RefUnitKerja;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 /**
@@ -172,6 +176,43 @@ class DataMasterUnitKerjaTest extends TestCase
             ->assertSessionHasErrors(['nama']);
 
         $this->assertSame(1, RefUnitKerja::query()->where('nama', 'Urusan Keuangan Unik')->count());
+    }
+
+    public function test_action_create_memeriksa_ulang_nama_setelah_lock(): void
+    {
+        $existing = $this->unit('Bagian Nama Terkunci', 'bagian');
+        $request = Request::create('/data-master/unit-kerja', 'POST');
+
+        try {
+            app(CreateUnitKerjaAction::class)->execute([
+                'nama' => $existing->nama,
+                'jenis_unit' => 'bagian',
+            ], $request);
+            $this->fail('Create wajib menolak nama yang menjadi duplikat setelah validasi request.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('nama', $exception->errors());
+        }
+
+        $this->assertSame(1, RefUnitKerja::query()->where('nama', $existing->nama)->count());
+    }
+
+    public function test_action_update_memeriksa_ulang_nama_setelah_lock(): void
+    {
+        $existing = $this->unit('Bagian Nama Existing', 'bagian');
+        $unit = $this->unit('Bagian Nama Awal', 'bagian');
+        $request = Request::create("/data-master/unit-kerja/{$unit->id}", 'POST');
+
+        try {
+            app(UpdateUnitKerjaAction::class)->execute($unit, [
+                'nama' => $existing->nama,
+                'jenis_unit' => $unit->jenis_unit,
+            ], $request);
+            $this->fail('Update wajib menolak nama yang menjadi duplikat setelah validasi request.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('nama', $exception->errors());
+        }
+
+        $this->assertSame('Bagian Nama Awal', $unit->refresh()->nama);
     }
 
     public function test_jenis_unit_dibatasi_pada_kosakata_resmi(): void

@@ -30,6 +30,8 @@ class UpdateUnitKerjaAction
             $this->hierarchy->lockForMutation();
 
             $unit = RefUnitKerja::query()->findOrFail($unit->getKey());
+            $this->hierarchy->ensureNameAvailable($data['nama'], $unit->id);
+
             $parentId = array_key_exists('parent_id', $data)
                 ? (is_string($data['parent_id']) ? $data['parent_id'] : null)
                 : $unit->parent_id;

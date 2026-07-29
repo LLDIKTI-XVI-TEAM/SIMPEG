@@ -33,6 +33,27 @@ class UnitKerjaHierarchyService
     }
 
     /**
+     * Memeriksa ulang keunikan nama setelah mutex diperoleh. Validasi request
+     * dapat menjadi usang saat dua mutasi menunggu lock yang sama.
+     *
+     * @throws ValidationException bila nama sudah digunakan unit lain
+     */
+    public function ensureNameAvailable(string $name, ?string $unitId = null): void
+    {
+        $query = RefUnitKerja::query()->where('nama', $name);
+
+        if ($unitId !== null) {
+            $query->whereKeyNot($unitId);
+        }
+
+        if ($query->exists()) {
+            throw ValidationException::withMessages([
+                'nama' => 'Nama unit kerja sudah digunakan.',
+            ]);
+        }
+    }
+
+    /**
      * Mengembalikan pesan pelanggaran relasi parent, atau null bila rantai
      * bersih, memenuhi kebijakan status, dan tidak kembali ke unit yang diubah.
      */
