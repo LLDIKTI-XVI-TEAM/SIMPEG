@@ -97,3 +97,8 @@ input:-webkit-autofill:active {
         scrollbar-color: var(--color-primary) var(--color-soft);
     }
 }
+
+/* Hide default Turbo Progress Bar as we use skeleton loading */
+.turbo-progress-bar {
+    display: none !important;
+}

@@ -1,4 +1,4 @@
-<x-layouts.app title="Detail Pegawai">
+<div>
 
     @php
         $allDocuments   = collect($p->documents ?? []);
@@ -677,22 +677,22 @@
             <div>
                 <h2 class="mb-1 text-2xl font-extrabold text-ink tracking-tight font-sans">Detail Pegawai</h2>
                 <nav class="flex items-center gap-1.5 text-xs text-muted mb-4">
-                    <a href="{{ auth()->user()->role === 'pimpinan' ? route('pimpinan.dashboard') : route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
+                    <a href="{{ auth()->user()->role === 'pimpinan' ? route('pimpinan.dashboard') : route('dashboard') }}" wire:navigate class="transition-colors hover:text-ink">Dashboard</a>
                     <span>/</span>
-                    <a href="{{ auth()->user()->role === 'pimpinan' ? route('pimpinan.pegawai.index') : route('data-pegawai') }}" class="transition-colors hover:text-ink">Data Pegawai</a>
+                    <a href="{{ auth()->user()->role === 'pimpinan' ? route('pimpinan.pegawai.index') : route('data-pegawai') }}" wire:navigate class="transition-colors hover:text-ink">Data Pegawai</a>
                     <span>/</span>
                     <span class="font-medium text-ink">Detail Pegawai</span>
                 </nav>
             </div>
             <div class="flex items-center gap-3 shrink-0">
-                <a href="{{ auth()->user()->role === 'pimpinan' ? route('pimpinan.pegawai.index') : route('data-pegawai') }}" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-soft shadow-sm">
+                <a href="javascript:void(0)" onclick="if(document.referrer.includes(window.location.hostname)) { history.back(); } else { window.location.href = '{{ auth()->user()->role === 'pimpinan' ? route('pimpinan.pegawai.index') : route('data-pegawai') }}'; }" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-soft shadow-sm">
                     <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
                     </svg>
                     Kembali
                 </a>
                 @if(auth()->user()->role !== 'pimpinan')
-                <a href="{{ route('pegawai.edit', $p->id) }}" class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm">
+                <a href="{{ route('pegawai.edit', $p->id) }}" wire:navigate class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm">
                     <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
                     </svg>
@@ -2067,4 +2067,4 @@
 
 </div>{{-- /x-data utama --}}
 
-</x-layouts.app>
+</div>

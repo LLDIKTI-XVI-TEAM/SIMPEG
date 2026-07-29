@@ -222,7 +222,10 @@ class ReferenceSeeder extends Seeder
             );
         }
 
-        // §16.12 ref_bup
+        // §16.12 ref_bup — tabel deprecated (lihat App\Models\RefBup): tidak dibaca perhitungan
+        // BUP mana pun. Sumber BUP resmi adalah ref_jabatan.default_bup dengan fallback
+        // ref_jenis_jabatan.maks_usia_pensiun. Seed dipertahankan karena migrasi is_active sudah
+        // menyentuh tabel ini; jangan menambah baris baru di sini.
         $bup = [
             ['jenis_jabatan' => 'Pelaksana / Fungsional Umum', 'bup_tahun' => 58],
             ['jenis_jabatan' => 'Fungsional Ahli Pertama', 'bup_tahun' => 58],

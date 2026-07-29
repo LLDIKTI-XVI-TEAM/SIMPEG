@@ -63,15 +63,18 @@ class PimpinanEmployeeDetailTest extends TestCase
             'jabatan_terakhir' => 'Pranata Komputer',
         ]);
 
+        $apiResponse = $this->actingAs(User::factory()->pimpinan()->create())
+            ->getJson(route('api.v1.pegawai.index'));
+
+        $apiResponse->assertOk()
+            ->assertJsonFragment(['nama_lengkap' => 'Pegawai Daftar Aktual'])
+            ->assertJsonFragment(['jabatan' => 'Pranata Komputer']);
+
         $this->actingAs(User::factory()->pimpinan()->create())
             ->get(route('pimpinan.pegawai.index'))
             ->assertOk()
-            ->assertSee('Pegawai Daftar Aktual')
-            ->assertSee('Pranata Komputer')
-            ->assertSee('type="submit"', false)
-            ->assertSee(route('pimpinan.pegawai.show', $employee), false)
-            ->assertSee('aria-label="Detail pegawai Pegawai Daftar Aktual"', false)
-            ->assertDontSee('href="#"', false);
+            ->assertSee(':href="detailUrl(p)"', false)
+            ->assertSee(':aria-label="\'Detail pegawai \' + p.nama_lengkap"', false);
     }
 
     public function test_pimpinan_sees_read_only_family_and_active_supervisor_without_family_nik(): void

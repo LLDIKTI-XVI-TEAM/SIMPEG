@@ -224,6 +224,12 @@ class Employee extends Model
         return $this->hasMany(LeaveRequest::class);
     }
 
+    /** @return HasMany<LeaveRequestCase, $this> */
+    public function leaveRequestCases(): HasMany
+    {
+        return $this->hasMany(LeaveRequestCase::class);
+    }
+
     /** @return HasMany<LeaveBalance, $this> */
     public function leaveBalances(): HasMany
     {
@@ -331,16 +337,27 @@ class Employee extends Model
     protected function statusAktif(): Attribute
     {
         return Attribute::make(
-            get: fn ($value, array $attributes) => $attributes['status_pegawai_id'] ?? null
-                ? (RefStatusPegawai::whereKey($attributes['status_pegawai_id'])->value('nama') ?? $value)
-                : $value,
+            get: function ($value, array $attributes) {
+                $statusId = $attributes['status_pegawai_id'] ?? null;
+                if ($statusId) {
+                    $nama = RefStatusPegawai::whereKey($statusId)->value('nama');
+                    if ($nama === 'Nonaktif') {
+                        return 'Non-Aktif';
+                    }
+
+                    return $nama ?? $value;
+                }
+
+                return $value;
+            },
             set: function ($value): array {
+                $searchName = $value === 'Non-Aktif' ? 'Nonaktif' : $value;
                 $statusPegawaiId = $value !== null
-                    ? RefStatusPegawai::where('nama', $value)->value('id')
+                    ? RefStatusPegawai::where('nama', $searchName)->value('id')
                     : null;
 
                 return [
-                    'status_aktif' => $value,
+                    'status_aktif' => $value === 'Nonaktif' ? 'Non-Aktif' : $value,
                     'status_pegawai_id' => $statusPegawaiId,
                 ];
             },
@@ -351,12 +368,17 @@ class Employee extends Model
     {
         return Attribute::make(
             get: fn ($value, array $attributes) => $value,
-            set: fn ($value) => [
-                'status_pegawai_id' => $value,
-                'status_aktif' => $value
-                    ? (RefStatusPegawai::whereKey($value)->value('nama') ?? 'Aktif')
-                    : null,
-            ],
+            set: function ($value) {
+                $nama = $value ? RefStatusPegawai::whereKey($value)->value('nama') : null;
+                if ($nama === 'Nonaktif') {
+                    $nama = 'Non-Aktif';
+                }
+
+                return [
+                    'status_pegawai_id' => $value,
+                    'status_aktif' => $nama ?? 'Aktif',
+                ];
+            },
         );
     }
 

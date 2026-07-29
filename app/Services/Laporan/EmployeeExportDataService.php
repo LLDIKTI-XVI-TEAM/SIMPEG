@@ -40,6 +40,8 @@ class EmployeeExportDataService
                 'status_aktif',
                 'pendidikan_terakhir',
                 'tanggal_pensiun',
+                'email_pribadi',
+                'no_hp',
             ])
             ->with([
                 'jenisPegawai:id,nama',
@@ -84,25 +86,50 @@ class EmployeeExportDataService
             ->when($pensiunSampai !== '', fn (Builder $query) => $query->whereDate('tanggal_pensiun', '<=', $pensiunSampai))
             ->get();
 
-        return $this->sortRows(
-            $employees->map(function (Employee $employee): array {
-                $currentPosition = $employee->positionHistories->first();
+        $prefixField = $this->stringFilter($filters, 'prefix_field');
+        $prefixValue = mb_strtolower($this->stringFilter($filters, 'prefix_value'));
+        $sort = $this->stringFilter($filters, 'sort') ?: 'nama';
+        $sortDir = $this->stringFilter($filters, 'sort_dir') === 'desc' ? 'desc' : 'asc';
 
-                return [
-                    'id' => $employee->id,
-                    'nip' => $employee->nip,
-                    'nama' => $employee->nama_lengkap,
-                    'golongan' => $employee->golongan_terakhir ?: '-',
-                    'jabatan' => $employee->jabatan_terakhir ?: ($currentPosition?->nama_jabatan ?: '-'),
-                    'unit' => $currentPosition?->unitKerja?->nama ?: '-',
-                    'jenis' => $employee->jenisPegawai?->nama ?: '-',
-                    'status' => $employee->statusPegawai?->nama ?: ($employee->status_aktif ?: '-'),
-                    'pendidikan' => $employee->pendidikan_terakhir ?: '-',
-                    'tanggal_pensiun' => $employee->tanggal_pensiun?->format('Y-m-d') ?: '-',
-                ];
-            }),
-            $this->stringFilter($filters, 'sort') ?: 'nama',
-        );
+        $rowStart = max(1, (int) ($filters['row_start'] ?? 1));
+        $rowEnd = (int) ($filters['row_end'] ?? 0);
+
+        $mapped = $employees->map(function (Employee $employee): array {
+            $currentPosition = $employee->positionHistories->first();
+
+            return [
+                'id' => $employee->id,
+                'nip' => $employee->nip,
+                'nama' => $employee->nama_lengkap,
+                'golongan' => $employee->golongan_terakhir ?: '-',
+                'jabatan' => $employee->jabatan_terakhir ?: ($currentPosition?->nama_jabatan ?: '-'),
+                'unit' => $currentPosition?->unitKerja?->nama ?: '-',
+                'jenis' => $employee->jenisPegawai?->nama ?: '-',
+                'status' => $employee->statusPegawai?->nama ?: ($employee->status_aktif ?: '-'),
+                'pendidikan' => $employee->pendidikan_terakhir ?: '-',
+                'tanggal_pensiun' => $employee->tanggal_pensiun?->format('Y-m-d') ?: '-',
+                'email' => $employee->getRawOriginal('email_pribadi') ?: '-',
+                'no_hp' => $employee->no_hp ?: '-',
+            ];
+        });
+
+        if ($prefixField !== '' && $prefixValue !== '') {
+            $mapped = $mapped->filter(function (array $row) use ($prefixField, $prefixValue): bool {
+                $val = mb_strtolower((string) ($row[$prefixField] ?? ''));
+
+                return str_starts_with($val, $prefixValue);
+            });
+        }
+
+        $sorted = $this->sortRows($mapped, $sort, $sortDir);
+
+        if ($rowEnd > 0) {
+            $length = $rowEnd - $rowStart + 1;
+
+            return $sorted->slice($rowStart - 1, max(0, $length))->values();
+        }
+
+        return $sorted->slice($rowStart - 1)->values();
     }
 
     /**
@@ -129,7 +156,7 @@ class EmployeeExportDataService
      * @param  Collection<int, array<string, string>>  $rows
      * @return Collection<int, array<string, string>>
      */
-    private function sortRows(Collection $rows, string $sort): Collection
+    private function sortRows(Collection $rows, string $sort, string $sortDir = 'asc'): Collection
     {
         $golonganOrder = [
             'IV/e' => 1, 'IV/d' => 2, 'IV/c' => 3, 'IV/b' => 4, 'IV/a' => 5,
@@ -138,12 +165,18 @@ class EmployeeExportDataService
             'I/d' => 14, 'I/c' => 15, 'I/b' => 16, 'I/a' => 17,
         ];
 
-        return match ($sort) {
+        $sorted = match ($sort) {
             'nip' => $rows->sortBy('nip', SORT_NATURAL | SORT_FLAG_CASE)->values(),
             'golongan' => $rows->sortBy(
                 fn (array $row): int => $golonganOrder[$row['golongan']] ?? PHP_INT_MAX
             )->values(),
             default => $rows->sortBy('nama', SORT_NATURAL | SORT_FLAG_CASE)->values(),
         };
+
+        if ($sortDir === 'desc') {
+            $sorted = $sorted->reverse()->values();
+        }
+
+        return $sorted;
     }
 }

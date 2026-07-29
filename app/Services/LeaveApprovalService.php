@@ -7,6 +7,7 @@ use App\Models\LeaveApproval;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
 use App\Models\User;
+use App\Services\Cuti\LeaveBalanceReservationService;
 use App\Services\Cuti\LeaveBalanceService;
 use App\Services\Cuti\LeaveProofService;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -36,6 +37,8 @@ class LeaveApprovalService
      */
     public function __construct(
         private readonly LeaveProofService $proofs,
+        private readonly LeaveBalanceService $balances,
+        private readonly LeaveBalanceReservationService $reservations,
     ) {}
 
     /**
@@ -85,6 +88,10 @@ class LeaveApprovalService
             // bukti dibangun dari status final yang sudah tersimpan. Penerbitan bukti (termasuk audit fail-closed)
             // berjalan dalam transaksi luar ini; jika gagal, exception membubung dan me-rollback status, saldo,
             // ledger, catatan approval, serta bukti secara atomik.
+            // Konversi dan pemotongan berada dalam transaksi yang sama. Konversi
+            // dilakukan lebih dulu agar seluruh mutasi memakai urutan kunci yang sama:
+            // request, pegawai, lalu saldo. Jika deduction gagal, event konversi ikut rollback.
+            $this->reservations->convertForFinalApproval($locked, $actingUser);
             $this->deductBalanceIfRequired($locked);
             $locked->forceFill(['status' => self::STATUS_DISETUJUI])->save();
             $this->proofs->generateForApprovedRequest($locked->refresh(), $actor, $actingUser);
@@ -163,6 +170,7 @@ class LeaveApprovalService
             ])->save();
 
             $this->recordApproval($locked, $actor, $activeStep->step_order, 'NOT_APPROVED', $komentar);
+            $this->reservations->releaseForNotApproved($locked);
             $locked->steps()
                 ->where('status', 'pending')
                 ->update([
@@ -304,6 +312,6 @@ class LeaveApprovalService
      */
     private function deductBalanceIfRequired(LeaveRequest $leaveRequest): void
     {
-        app(LeaveBalanceService::class)->deductForFinalApproval($leaveRequest);
+        $this->balances->deductForFinalApproval($leaveRequest);
     }
 }

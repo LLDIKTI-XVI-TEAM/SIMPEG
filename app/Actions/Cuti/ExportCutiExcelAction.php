@@ -57,11 +57,19 @@ class ExportCutiExcelAction
         $detailSheet->setTitle('Detail Cuti');
         $this->writeDetailSheet($detailSheet, $details);
 
+        $summarySheet = $spreadsheet->createSheet();
+        $summarySheet->setTitle('Ringkasan Cuti');
+        $this->writeSummarySheet(
+            $summarySheet,
+            $this->rekapQuery->summaryRows($details, $filters),
+            $this->rekapQuery->saldoYear($filters),
+        );
+
         $balanceSheet = $spreadsheet->createSheet();
         $balanceSheet->setTitle('Saldo Cuti');
         $this->writeBalanceSheet($balanceSheet, $balances);
 
-        $filename = 'Laporan_Cuti_'.now()->format('Ymd_His').'.xlsx';
+        $filename = 'Rekap_Cuti_'.$this->rekapQuery->periodLabel($filters).'_'.now()->format('Ymd').'.xlsx';
 
         return response()->streamDownload(function () use ($spreadsheet): void {
             try {
@@ -97,6 +105,39 @@ class ExportCutiExcelAction
             $sheet->getStyle('F'.$row.':G'.$row)->getNumberFormat()->setFormatCode('yyyy-mm-dd');
             $sheet->setCellValue('H'.$row, $leaveRequest->jumlah_hari_kerja);
             $this->setSafeText($sheet, 'I'.$row, $this->statusFormatter->format($leaveRequest));
+        }
+    }
+
+    /**
+     * Ringkasan hari cuti disetujui per pegawai per jenis; saldo '-' berarti belum ada baris saldo tahun tersebut.
+     *
+     * Tahun saldo dicantumkan pada judul kolom karena rekap tanpa filter periode dapat mencakup
+     * beberapa tahun sedangkan saldo yang ditampilkan hanya milik satu tahun.
+     *
+     * @param  iterable<int, array{employee_id: string, nip: string, nama: string, jenis: string, total_hari: int, sisa_saldo: int|string, saldo_tahun: int}>  $rows
+     */
+    private function writeSummarySheet(Worksheet $sheet, iterable $rows, int $saldoTahun): void
+    {
+        $headers = ['No', 'NIP', 'Nama Pegawai', 'Jenis Cuti', 'Total Hari Disetujui', "Sisa Saldo Cuti Tahunan {$saldoTahun}"];
+        foreach ($headers as $index => $header) {
+            $sheet->setCellValueExplicit([$index + 1, 1], $header, DataType::TYPE_STRING);
+        }
+        $sheet->freezePane('A2');
+
+        foreach ($rows as $index => $summary) {
+            $row = $index + 2;
+            $sheet->setCellValue('A'.$row, $index + 1);
+            $this->setSafeText($sheet, 'B'.$row, $summary['nip']);
+            $this->setSafeText($sheet, 'C'.$row, $summary['nama']);
+            $this->setSafeText($sheet, 'D'.$row, $summary['jenis']);
+            $sheet->setCellValueExplicit('E'.$row, $summary['total_hari'], DataType::TYPE_NUMERIC);
+            // Saldo bertipe campuran: angka bila baris saldo ada, penanda '-' bila belum ada.
+            // Penanda tidak melalui safeText karena nilainya dibangkitkan sistem, bukan input pengguna.
+            $sheet->setCellValueExplicit(
+                'F'.$row,
+                $summary['sisa_saldo'],
+                is_int($summary['sisa_saldo']) ? DataType::TYPE_NUMERIC : DataType::TYPE_STRING,
+            );
         }
     }
 

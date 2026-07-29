@@ -148,7 +148,7 @@
         </div>
 
         <div class="border-t border-border px-4 py-3">
-            <a href="{{ route('notifications.index') }}" class="text-xs font-semibold text-primary hover:underline">Lihat semua notifikasi</a>
+            <a href="{{ route('notifications.index') }}" wire:navigate class="text-xs font-semibold text-primary hover:underline">Lihat semua notifikasi</a>
         </div>
     </div>
 </div>

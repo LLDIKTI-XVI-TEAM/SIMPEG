@@ -74,6 +74,10 @@ Route::middleware($employeeGroupMiddleware)
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
             ->whereUuid('employee')
             ->name('show');
+        Route::get('/{employee}/table-row', [EmployeeController::class, 'tableRow'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
+            ->whereUuid('employee')
+            ->name('table-row');
         Route::put('/{employee}', [EmployeeController::class, 'update'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.update'])
             ->whereUuid('employee')

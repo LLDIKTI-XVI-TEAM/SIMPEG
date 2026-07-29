@@ -37,6 +37,20 @@
                 </div>
             </a>
 
+            {{-- Laporan Nominatif Fixed --}}
+            <a href="{{ route('pimpinan.laporan.nominatif') }}"
+               class="group flex flex-col gap-3 rounded-xl border border-border bg-surface p-5 shadow-sm transition hover:border-primary/40 hover:shadow-md">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-white">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z" />
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-sm font-semibold text-ink group-hover:text-primary">Laporan Nominatif</p>
+                    <p class="mt-0.5 text-xs text-muted">Laporan nominatif baku pegawai (Unduh PDF & Excel)</p>
+                </div>
+            </a>
+
             {{-- Laporan Pegawai Custom --}}
             <a href="{{ route('pimpinan.laporan.pegawai') }}"
                class="group flex flex-col gap-3 rounded-xl border border-border bg-surface p-5 shadow-sm transition hover:border-primary/40 hover:shadow-md">
@@ -46,7 +60,7 @@
                     </svg>
                 </div>
                 <div>
-                    <p class="text-sm font-semibold text-ink group-hover:text-success">Laporan Pegawai</p>
+                    <p class="text-sm font-semibold text-ink group-hover:text-success">Laporan Custom Pegawai</p>
                     <p class="mt-0.5 text-xs text-muted">Unduh data pegawai dengan kolom dan filter pilihan</p>
                 </div>
             </a>

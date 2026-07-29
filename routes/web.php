@@ -43,6 +43,10 @@ use App\Http\Controllers\Admin\UserMappingController;
 use App\Http\Controllers\Auth\KeycloakAuthController;
 use App\Http\Controllers\Cuti\VerifyLeaveProofController;
 use App\Http\Controllers\DashboardController;
+use App\Livewire\Admin\Pegawai\Create;
+use App\Livewire\Admin\Pegawai\Edit;
+use App\Livewire\Admin\Pegawai\Index;
+use App\Livewire\Admin\Pegawai\Show;
 use App\Models\Employee;
 use App\Models\Permission;
 use App\Models\Role;
@@ -192,6 +196,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/user-management', [UserMappingController::class, 'index'])
         ->middleware(['role:super_admin'])
         ->name('user-management');
+    Route::get('/user-management/data', [UserMappingController::class, 'data'])
+        ->middleware(['role:super_admin'])
+        ->name('user-management.data');
     Route::post('/user-management/update', [UserMappingController::class, 'update'])
         ->middleware(['role:super_admin'])
         ->name('user-management.update');
@@ -262,6 +269,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/cuti/rekap', [CutiController::class, 'rekap'])
         ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('cuti.rekap');
+    Route::get('/cuti/administrasi-saldo', [LeaveBalanceController::class, 'administrasi'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:cuti.balance.adjust'])
+        ->name('cuti.saldo.administrasi');
     Route::get('/cuti/pegawai/cari', CutiEmployeeLookupController::class)
         ->middleware(['role:super_admin,admin_kepegawaian,pimpinan', 'throttle:60,1'])
         ->name('cuti.employee-lookup');
@@ -301,44 +311,8 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin'])
         ->name('ews.config.update');
 
-    Route::get('/laporan/export-pegawai', function () {
-        $employees = Employee::with(['jenisPegawai:id,nama', 'statusPegawai:id,nama'])
-            ->orderBy('nama_lengkap')
-            ->get();
-
-        $pegawai = $employees->map(function ($emp) {
-            return [
-                'id' => $emp->id,
-                'nama' => $emp->nama_lengkap,
-                'nip' => $emp->nip,
-                'unit' => $emp->unitKerja?->nama ?? '-',
-                'golongan' => $emp->golongan_terakhir ?? '-',
-                'jabatan' => $emp->jabatan_terakhir ?? '-',
-                'jenis' => $emp->jenisPegawai?->nama ?? '-',
-                'status' => $emp->statusPegawai?->nama ?? $emp->status_aktif ?? '-',
-                'email' => $emp->email_pribadi ?? '-',
-                'no_hp' => $emp->no_hp ?? '-',
-                'tanggal_lahir' => $emp->tanggal_lahir?->translatedFormat('d F Y') ?? '-',
-                'tanggal_pensiun' => $emp->tanggal_pensiun?->translatedFormat('d F Y') ?? '-',
-                'pendidikan' => $emp->pendidikan_terakhir ?? '-',
-                'pangkat' => $emp->pangkat_terakhir ?? '-',
-            ];
-        })->toArray();
-
-        $unitList = collect($pegawai)->pluck('unit')->unique()->filter(fn ($v) => $v !== '-')->sort()->values();
-        $golonganList = collect($pegawai)->pluck('golongan')->unique()->filter(fn ($v) => $v !== '-')->sort()->values();
-        $jenisList = collect($pegawai)->pluck('jenis')->unique()->filter(fn ($v) => $v !== '-')->sort()->values();
-        $statusList = collect($pegawai)->pluck('status')->unique()->filter(fn ($v) => $v !== '-')->sort()->values();
-
-        return view('admin.laporan.export-pegawai', [
-            'pegawai' => $pegawai,
-            'unitList' => $unitList,
-            'golonganList' => $golonganList,
-            'jenisList' => $jenisList,
-            'statusList' => $statusList,
-            'title' => 'Laporan - Export Pegawai',
-        ]);
-    })->middleware(['role:super_admin,admin_kepegawaian'])
+    Route::get('/laporan/export-pegawai', [LaporanController::class, 'exportPegawai'])
+        ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('laporan.pegawai');
 
     Route::get('/laporan/export-pegawai/excel', [LaporanController::class, 'exportPegawaiExcel'])
@@ -348,20 +322,20 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::post('/laporan/export-pegawai/custom', [LaporanController::class, 'exportPegawaiCustom'])
         ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('laporan.pegawai.custom');
-    Route::get('/pegawai', [PegawaiController::class, 'index'])
+    Route::get('/pegawai', Index::class)
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
         ->name('data-pegawai');
-    Route::get('/pegawai/create', [PegawaiController::class, 'create'])
+    Route::get('/pegawai/create', Create::class)
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.create'])
         ->name('pegawai.create');
     Route::post('/pegawai', [PegawaiController::class, 'store'])
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.create'])
         ->name('pegawai.store');
-    Route::get('/pegawai/{id}', [PegawaiController::class, 'show'])
+    Route::get('/pegawai/{id}', Show::class)
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
         ->name('pegawai.show');
-    Route::get('/pegawai/{id}/edit', [PegawaiController::class, 'edit'])
+    Route::get('/pegawai/{id}/edit', Edit::class)
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
         ->name('pegawai.edit');
@@ -627,6 +601,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
             Route::get('/laporan/kepangkatan/pdf', [PimpinanReportController::class, 'exportRankHistoriesPdf'])->name('laporan.kepangkatan.pdf');
             Route::get('/laporan/pegawai', [PimpinanEmployeeController::class, 'reportPage'])->name('laporan.pegawai');
             Route::get('/laporan/pegawai/custom', [PimpinanEmployeeController::class, 'reportCustom'])->name('laporan.pegawai.custom');
+            Route::get('/laporan/nominatif', [PimpinanReportController::class, 'fixedEmployeeReport'])->name('laporan.nominatif');
+            Route::get('/laporan/nominatif/excel', [PimpinanReportController::class, 'exportFixedEmployeeReportExcel'])->name('laporan.nominatif.excel');
+            Route::get('/laporan/nominatif/pdf', [PimpinanReportController::class, 'exportFixedEmployeeReportPdf'])->name('laporan.nominatif.pdf');
             Route::get('/laporan', [PimpinanReportController::class, 'index'])->name('laporan.index');
         });
 

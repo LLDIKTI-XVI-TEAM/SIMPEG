@@ -146,7 +146,7 @@ class CutiListDisplayTest extends TestCase
             ->assertSee('Belum ada pengajuan cuti yang sesuai dengan filter.', false);
     }
 
-    public function test_list_uses_official_perlu_perubahan_label(): void
+    public function test_list_uses_official_perubahan_label(): void
     {
         $user = User::factory()->superAdmin()->create();
         $jenis = RefJenisCuti::create([
@@ -171,9 +171,10 @@ class CutiListDisplayTest extends TestCase
 
         $response->assertOk();
         $this->assertMatchesRegularExpression(
-            '/<tr\\b[^>]*\\bdata-status="perlu_perubahan"[^>]*>.*?Perlu Perubahan/s',
+            '/<tr\\b[^>]*\\bdata-status="perlu_perubahan"[^>]*>.*?Perubahan/s',
             $response->getContent(),
         );
+        $response->assertDontSee('Perlu Perubahan');
     }
 
     public function test_pegawai_only_sees_own_rows_and_counters(): void

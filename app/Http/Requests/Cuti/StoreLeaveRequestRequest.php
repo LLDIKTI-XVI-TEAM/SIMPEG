@@ -5,11 +5,13 @@ namespace App\Http\Requests\Cuti;
 use App\Models\Employee;
 use App\Models\RefJenisCuti;
 use App\Services\Cuti\ApprovalChainResolver;
-use App\Services\Cuti\LeaveBalanceService;
+use App\Services\Cuti\LeaveBalanceReservationService;
+use App\Services\Cuti\LeaveEligibilityService;
 use App\Services\WorkdayCalculator;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Memvalidasi pengajuan cuti oleh pegawai.
@@ -57,6 +59,9 @@ class StoreLeaveRequestRequest extends FormRequest
     {
         return [
             'jenis_cuti_id' => ['required', 'string', 'exists:ref_jenis_cuti,id'],
+            // Hanya Cuti Melahirkan dan CLTN yang dapat memakai rangkaian eksplisit;
+            // kecocokan pemilik dan jenis diperiksa kembali oleh LeaveEligibilityService.
+            'leave_request_case_id' => ['nullable', 'uuid', 'exists:leave_request_cases,id'],
             'tanggal_mulai' => ['required', 'date_format:Y-m-d'],
             // Tanggal selesai tidak boleh mendahului tanggal mulai agar rentang cuti selalu valid.
             'tanggal_selesai' => ['required', 'date_format:Y-m-d', 'after_or_equal:tanggal_mulai'],
@@ -76,6 +81,7 @@ class StoreLeaveRequestRequest extends FormRequest
     {
         return [
             'jenis_cuti_id' => 'jenis cuti',
+            'leave_request_case_id' => 'rangkaian pengajuan cuti',
             'tanggal_mulai' => 'tanggal mulai',
             'tanggal_selesai' => 'tanggal selesai',
             'alasan' => 'alasan',
@@ -141,12 +147,23 @@ class StoreLeaveRequestRequest extends FormRequest
                 return;
             }
 
-            // Jenis cuti khusus PNS tidak boleh diajukan oleh pegawai non-PNS (misalnya PPPK).
-            if ($jenis->khusus_pns && ! $this->employeeIsPns($employee)) {
-                $validator->errors()->add(
-                    'jenis_cuti_id',
-                    'Jenis cuti ini hanya dapat diajukan oleh pegawai berstatus PNS.',
+            try {
+                // K-CUT-03: jenis khusus PNS, masa kerja Cuti Besar, keterkaitan
+                // eksplisit Melahirkan/CLTN, dan durasi kalender divalidasi oleh
+                // service. Action mengulang pemeriksaan ini di dalam transaksi.
+                app(LeaveEligibilityService::class)->assertCanBeSubmitted(
+                    $employee,
+                    $jenis,
+                    $mulai,
+                    $selesai,
+                    $this->input('leave_request_case_id'),
                 );
+            } catch (ValidationException $exception) {
+                foreach ($exception->errors() as $field => $messages) {
+                    foreach ($messages as $message) {
+                        $validator->errors()->add($field, $message);
+                    }
+                }
 
                 return;
             }
@@ -181,25 +198,17 @@ class StoreLeaveRequestRequest extends FormRequest
         // sebelum method ini dipanggil, sehingga rentang di sini dijamin satu tahun.
         $hariKerja = app(WorkdayCalculator::class)->calculate($mulai, $selesai);
 
-        // Saldo dibebankan ke tahun tanggal mulai; service saldo membaca bucket ledger summary N-2/N-1/tahun berjalan.
-        $sisaSaldo = app(LeaveBalanceService::class)->availableFor($employee, $mulai->year, $mulai);
+        // Saldo dibebankan ke tahun tanggal mulai. Nilai ini sudah mengurangi alokasi
+        // pengajuan tahunan aktif lain, tetapi belum memotong saldo final di ledger.
+        $sisaSaldo = app(LeaveBalanceReservationService::class)->availableForSubmission($employee, $mulai->year, $mulai);
 
-        // Pengecekan saldo di sini bersifat indikatif dan tidak mengunci baris saldo. Pemotongan saldo final
-        // beserta pengecekan terhadap akumulasi pengajuan yang masih menunggu harus dilakukan pada tahap
-        // persetujuan dengan penguncian baris agar bebas dari kondisi balapan antar-pengajuan.
+        // FormRequest memberi umpan balik awal. Action tetap mengulang pengecekan sambil
+        // mengunci baris saldo sebelum menulis event reservasi agar submit paralel aman.
         if ($sisaSaldo < $hariKerja) {
             $validator->errors()->add(
                 'tanggal_selesai',
                 "Saldo cuti tahunan tidak mencukupi. Sisa saldo {$sisaSaldo} hari, sedangkan pengajuan membutuhkan {$hariKerja} hari kerja.",
             );
         }
-    }
-
-    /**
-     * Menentukan apakah pegawai berstatus PNS berdasarkan referensi jenis pegawai.
-     */
-    private function employeeIsPns(Employee $employee): bool
-    {
-        return $employee->jenisPegawai?->nama === 'PNS';
     }
 }

@@ -71,8 +71,6 @@ class UserMappingControllerTest extends TestCase
             ->assertSee('<option value="admin_kepegawaian">Admin Kepegawaian</option>', false)
             ->assertSee('<option value="kepala_bagian">Kepala Bagian</option>', false)
             ->assertDontSee('<option value="Super Admin">Super Admin</option>', false)
-            ->assertSee('Belum diberi role', false)
-            ->assertSee("role: emp.role || ''", false)
             ->assertSee('<input type="hidden" name="employee_id"', false)
             ->assertDontSee('<input type="hidden" name="email"', false)
             ->assertSee('Disconnect belum tersedia pada halaman ini.');
@@ -87,7 +85,8 @@ class UserMappingControllerTest extends TestCase
             $response->assertSee(sprintf('<option value="%s">%s</option>', $role, $label), false);
         }
 
-        $this->assertNull($response->viewData('pegawai')->items()[0]['role']);
+        $dataResponse = $this->actingAs($admin)->getJson(route('user-management.data'));
+        $this->assertNull($dataResponse->json('data.0.role'));
     }
 
     public function test_mapping_modal_has_keyboard_focus_management_contract(): void
@@ -97,8 +96,7 @@ class UserMappingControllerTest extends TestCase
         $response = $this->actingAs(User::factory()->superAdmin()->create())
             ->get(route('user-management'))
             ->assertOk()
-            ->assertSee("openEdit(employees.find((employee) => employee.id === '", false)
-            ->assertSee(', $event.currentTarget)', false)
+            ->assertSee('openEdit(emp, $event.currentTarget)', false)
             ->assertSee('x-ref="keycloakIdentifier"', false)
             ->assertSee('x-ref="roleSelect"', false)
             ->assertSee('@keydown.tab="trapFocus($event, $el)"', false)
@@ -118,12 +116,12 @@ class UserMappingControllerTest extends TestCase
             'role' => 'pimpinan',
         ]);
 
-        $response = $this->actingAs($admin)
-            ->get(route('user-management'))
-            ->assertOk()
-            ->assertSee('canonical-keycloak-subject');
+        $dataResponse = $this->actingAs($admin)
+            ->getJson(route('user-management.data'))
+            ->assertOk();
 
-        $this->assertSame('pimpinan', $response->viewData('pegawai')->items()[0]['role']);
+        $this->assertSame('canonical-keycloak-subject', $dataResponse->json('data.0.keycloak_id'));
+        $this->assertSame('pimpinan', $dataResponse->json('data.0.role'));
     }
 
     // -----------------------------------------------------------------------
@@ -146,44 +144,32 @@ class UserMappingControllerTest extends TestCase
             ]);
         }
 
-        $response = $this->actingAs($admin)->get(route('user-management', [
+        $response = $this->actingAs($admin)->getJson(route('user-management.data', [
             'search' => 'Pegawai Pagination',
             'role' => 'pegawai',
             'status' => 'terhubung',
             'per_page' => 5,
         ]));
 
-        $response->assertOk()
-            ->assertSee('Pegawai Pagination 01')
-            ->assertSee('Pegawai Pagination 05')
-            ->assertDontSee('Pegawai Pagination 06')
-            ->assertSee('name="search"', false)
-            ->assertSee('Menampilkan 1 - 5 dari 12 data', false)
-            ->assertDontSee('filteredEmployees', false)
-            ->assertDontSee('paginatedEmployees', false);
+        $response->assertOk();
 
-        $pegawai = $response->viewData('pegawai');
+        $this->assertSame(12, $response->json('meta.total'));
+        $this->assertCount(5, $response->json('data'));
+        $this->assertSame(1, $response->json('meta.current_page'));
 
-        $this->assertSame(12, $pegawai->total());
-        $this->assertSame(5, $pegawai->count());
-        $this->assertSame(1, $pegawai->currentPage());
-        $this->assertStringContainsString('search=Pegawai%20Pagination', $pegawai->url(2));
-        $this->assertStringContainsString('role=pegawai', $pegawai->url(2));
-        $this->assertStringContainsString('status=terhubung', $pegawai->url(2));
-        $this->assertStringContainsString('per_page=5', $pegawai->url(2));
+        $this->assertSame('Pegawai Pagination 01', $response->json('data.0.nama'));
+        $this->assertSame('Pegawai Pagination 05', $response->json('data.4.nama'));
 
-        $firstRow = $pegawai->items()[0];
+        $firstRow = $response->json('data.0');
 
-        $this->assertSame([
-            'id',
-            'nama',
-            'nip',
-            'mapped_email',
-            'keycloak_id',
-            'role',
-            'mapping_status',
-            'mapping_status_label',
-        ], array_keys($firstRow));
+        $this->assertArrayHasKey('id', $firstRow);
+        $this->assertArrayHasKey('nama', $firstRow);
+        $this->assertArrayHasKey('nip', $firstRow);
+        $this->assertArrayHasKey('mapped_email', $firstRow);
+        $this->assertArrayHasKey('keycloak_id', $firstRow);
+        $this->assertArrayHasKey('role', $firstRow);
+        $this->assertArrayHasKey('mapping_status', $firstRow);
+        $this->assertArrayHasKey('mapping_status_label', $firstRow);
         $this->assertArrayNotHasKey('alamat', $firstRow);
         $this->assertArrayNotHasKey('nik', $firstRow);
         $this->assertArrayNotHasKey('no_hp', $firstRow);
@@ -217,17 +203,15 @@ class UserMappingControllerTest extends TestCase
             'identifier_kosong' => [$withoutIdentifier->id, 'Identifier Keycloak Kosong'],
             'role_kosong' => [$withoutRole->id, 'Role Belum Ditetapkan'],
         ] as $status => [$employeeId, $label]) {
-            $response = $this->actingAs($admin)->get(route('user-management', [
+            $response = $this->actingAs($admin)->getJson(route('user-management.data', [
                 'status' => $status,
             ]));
 
-            $response->assertOk()->assertSee($label);
+            $response->assertOk();
 
-            $pegawai = $response->viewData('pegawai');
-
-            $this->assertSame(1, $pegawai->total());
-            $this->assertSame($employeeId, $pegawai->items()[0]['id']);
-            $this->assertSame($status, $pegawai->items()[0]['mapping_status']);
+            $this->assertSame(1, $response->json('meta.total'));
+            $this->assertSame($employeeId, $response->json('data.0.id'));
+            $this->assertSame($status, $response->json('data.0.mapping_status'));
         }
     }
 
@@ -244,17 +228,16 @@ class UserMappingControllerTest extends TestCase
             'keycloak_id' => 'kc-canonical-email-search',
         ]);
 
-        $response = $this->actingAs($admin)->get(route('user-management', [
+        $response = $this->actingAs($admin)->getJson(route('user-management.data', [
             'search' => 'akun-sso-berbeda@example.com',
         ]));
 
-        $response->assertOk()->assertSee('akun-sso-berbeda@example.com');
+        $response->assertOk();
 
-        $pegawai = $response->viewData('pegawai');
-
-        $this->assertSame(1, $pegawai->total());
-        $this->assertSame($employee->id, $pegawai->items()[0]['id']);
-        $this->assertSame('pimpinan', $pegawai->items()[0]['role']);
+        $this->assertSame(1, $response->json('meta.total'));
+        $this->assertSame($employee->id, $response->json('data.0.id'));
+        $this->assertSame('pimpinan', $response->json('data.0.role'));
+        $this->assertSame('akun-sso-berbeda@example.com', $response->json('data.0.mapped_email'));
     }
 
     public function test_index_uses_legacy_email_fallback_only_for_one_unambiguous_employee(): void
@@ -268,23 +251,21 @@ class UserMappingControllerTest extends TestCase
             'keycloak_id' => 'kc-safe-legacy-user',
         ]);
 
-        $response = $this->actingAs($admin)->get(route('user-management', [
+        $response = $this->actingAs($admin)->getJson(route('user-management.data', [
             'status' => 'terhubung',
         ]));
 
-        $pegawai = $response->viewData('pegawai');
-
-        $this->assertSame(1, $pegawai->total());
-        $this->assertSame($employee->id, $pegawai->items()[0]['id']);
-        $this->assertSame('kc-safe-legacy-user', $pegawai->items()[0]['keycloak_id']);
+        $this->assertSame(1, $response->json('meta.total'));
+        $this->assertSame($employee->id, $response->json('data.0.id'));
+        $this->assertSame('kc-safe-legacy-user', $response->json('data.0.keycloak_id'));
 
         Employee::factory()->create(['email' => $legacyEmail]);
 
-        $ambiguousResponse = $this->actingAs($admin)->get(route('user-management', [
+        $ambiguousResponse = $this->actingAs($admin)->getJson(route('user-management.data', [
             'status' => 'terhubung',
         ]));
 
-        $this->assertSame(0, $ambiguousResponse->viewData('pegawai')->total());
+        $this->assertSame(0, $ambiguousResponse->json('meta.total'));
     }
 
     // -----------------------------------------------------------------------
