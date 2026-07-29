@@ -95,12 +95,46 @@ class ReferenceSeederTest extends TestCase
             'is_enabled' => false,
         ]);
 
-        DB::table('ref_notification_channels')->where('code', 'email')->update(['is_enabled' => false]);
-        $this->seedReferenceData();
+        DB::table('ref_notification_channels')->where('code', 'email')->update([
+            'is_enabled' => false,
+            'config' => json_encode(['operator_setting' => 'dipertahankan'], JSON_THROW_ON_ERROR),
+        ]);
+        app(ReferenceSeeder::class)->run();
 
         $this->assertDatabaseHas('ref_notification_channels', [
             'code' => 'email',
             'is_enabled' => false,
+        ]);
+        $email = RefNotificationChannel::query()->where('code', 'email')->firstOrFail();
+        $this->assertSame(['operator_setting' => 'dipertahankan'], $email->config);
+    }
+
+    public function test_reference_seeder_recreates_missing_core_channels_with_documented_defaults(): void
+    {
+        $this->seedReferenceData();
+
+        $coreChannelIds = RefNotificationChannel::query()
+            ->whereIn('code', ['in_app', 'email', 'whatsapp_business'])
+            ->pluck('id');
+        NotificationEventChannel::query()->whereIn('notification_channel_id', $coreChannelIds)->delete();
+        RefNotificationChannel::query()->whereIn('id', $coreChannelIds)->delete();
+
+        app(ReferenceSeeder::class)->run();
+
+        $this->assertDatabaseHas('ref_notification_channels', [
+            'code' => 'in_app',
+            'is_enabled' => true,
+            'config' => null,
+        ]);
+        $this->assertDatabaseHas('ref_notification_channels', [
+            'code' => 'email',
+            'is_enabled' => true,
+            'config' => null,
+        ]);
+        $this->assertDatabaseHas('ref_notification_channels', [
+            'code' => 'whatsapp_business',
+            'is_enabled' => false,
+            'config' => null,
         ]);
     }
 

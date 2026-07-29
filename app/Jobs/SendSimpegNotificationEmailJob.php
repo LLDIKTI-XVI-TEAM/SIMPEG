@@ -4,6 +4,8 @@ namespace App\Jobs;
 
 use App\Mail\SimpegNotificationMail;
 use App\Models\Employee;
+use App\Services\Notifications\NotificationChannelResolver;
+use App\Services\Notifications\NotificationEventCatalog;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -26,6 +28,7 @@ class SendSimpegNotificationEmailJob implements ShouldQueue
      */
     public function __construct(
         public readonly string $employeeId,
+        public readonly string $eventKey,
         public readonly string $title,
         public readonly string $body,
         private readonly ?array $data = null,
@@ -34,8 +37,16 @@ class SendSimpegNotificationEmailJob implements ShouldQueue
     /**
      * Mengirim email ke alamat pegawai bila tersedia; pegawai tanpa email dilewati aman.
      */
-    public function handle(): void
-    {
+    public function handle(
+        NotificationEventCatalog $catalog,
+        NotificationChannelResolver $channels,
+    ): void {
+        // Job tertunda harus menghormati kill-switch terbaru, bukan snapshot kebijakan saat enqueue.
+        if (! $catalog->supportsChannel($this->eventKey, 'email')
+            || ! $channels->isEnabledForEvent($this->eventKey, 'email')) {
+            return;
+        }
+
         $employee = Employee::find($this->employeeId);
 
         $email = $employee?->email_pribadi ?? $employee?->email;
