@@ -30,6 +30,9 @@ Route::middleware($employeeGroupMiddleware)
         Route::post('/', [EmployeeController::class, 'store'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.create'])
             ->name('store');
+        Route::post('/check-identity', [EmployeeController::class, 'checkIdentity'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.create'])
+            ->name('check-identity');
         Route::post('/import', [EmployeeImportController::class, 'store'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.import'])
             ->name('import.store');

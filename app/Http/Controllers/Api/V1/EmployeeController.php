@@ -47,6 +47,27 @@ class EmployeeController extends Controller
         return back()->with('success', 'Data pegawai berhasil ditambahkan.');
     }
 
+    public function checkIdentity(Request $request): JsonResponse
+    {
+        $request->validate([
+            'type' => ['required', 'string', 'in:nip,nik'],
+            'value' => ['required', 'string'],
+            'except_id' => ['nullable', 'uuid']
+        ]);
+
+        $query = Employee::where($request->type, $request->value);
+        if ($request->filled('except_id')) {
+            $query->where('id', '!=', $request->except_id);
+        }
+
+        $exists = $query->exists();
+
+        return response()->json([
+            'is_unique' => !$exists,
+            'message' => $exists ? strtoupper($request->type) . ' sudah terdaftar.' : strtoupper($request->type) . ' tersedia.',
+        ]);
+    }
+
     public function update(UpdateEmployeeRequest $request, Employee $employee, UpdateEmployeeAction $action): JsonResponse|RedirectResponse
     {
         $employee = $action->execute($employee, $request->validated(), $request);

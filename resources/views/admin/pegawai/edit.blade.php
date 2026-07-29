@@ -41,42 +41,46 @@
             isSubmitting: false,
             activeTab: 'utama',
             subTab: 'pangkat',
-            nip: '{{ old('nip', $p->nip ?? '') }}',
+            nip: {{ json_encode(old('nip', $p->nip ?? '')) }},
             nipError: '',
-            nik: '{{ old('nik', $p->nik ?? '') }}',
-            kk: '{{ old('kk', $p->no_kk ?? '') }}',
+            nipSuccess: '',
+            isCheckingNip: false,
+            nik: {{ json_encode(old('nik', $p->nik ?? '')) }},
+            kk: {{ json_encode(old('no_kk', $p->no_kk ?? '')) }},
             nikError: '',
+            nikSuccess: '',
+            isCheckingNik: false,
             kkError: '',
-            fotoPreview: @js($fotoUrl),
+            fotoPreview: {{ json_encode($fotoUrl) }},
             
             // File uploads state
-            skPangkatName: '{{ $p->latestRank() && $p->latestRank()->file_sk ? basename($p->latestRank()->file_sk) : "" }}',
+            skPangkatName: {{ json_encode($p->latestRank() && $p->latestRank()->file_sk ? basename($p->latestRank()->file_sk) : "") }},
             skPangkatSize: '',
             skPangkatError: '',
             skPangkatMode: 'upload', // 'upload' | 'arsip'
             selectedArsipPangkatId: '',
-            arsipPangkatList: @js($arsipPangkat),
+            arsipPangkatList: {{ json_encode($arsipPangkat) }},
             
-            skJabatanName: '{{ $p->latestPosition() && $p->latestPosition()->file_sk ? basename($p->latestPosition()->file_sk) : "" }}',
+            skJabatanName: {{ json_encode($p->latestPosition() && $p->latestPosition()->file_sk ? basename($p->latestPosition()->file_sk) : "") }},
             skJabatanSize: '',
             skJabatanError: '',
             skJabatanMode: 'upload',
             selectedArsipJabatanId: '',
-            arsipJabatanList: @js($arsipJabatan),
+            arsipJabatanList: {{ json_encode($arsipJabatan) }},
             
-            skKgbName: '{{ $p->latestSalary() && $p->latestSalary()->file_sk ? basename($p->latestSalary()->file_sk) : "" }}',
+            skKgbName: {{ json_encode($p->latestSalary() && $p->latestSalary()->file_sk ? basename($p->latestSalary()->file_sk) : "") }},
             skKgbSize: '',
             skKgbError: '',
             skKgbMode: 'upload',
             selectedArsipKgbId: '',
-            arsipKgbList: @js($arsipKgb),
+            arsipKgbList: {{ json_encode($arsipKgb) }},
             
-            skPengangkatanName: '{{ $p->appointment && $p->appointment->file_sk ? basename($p->appointment->file_sk) : "" }}',
+            skPengangkatanName: {{ json_encode($p->appointment && $p->appointment->file_sk ? basename($p->appointment->file_sk) : "") }},
             skPengangkatanSize: '',
             skPengangkatanError: '',
             skPengangkatanMode: 'upload',
             selectedArsipPengangkatanId: '',
-            arsipPengangkatanList: @js($arsipPengangkatan ?? []),
+            arsipPengangkatanList: {{ json_encode($arsipPengangkatan ?? []) }},
 
             berkasLainnyaName: '',
             berkasLainnyaSize: '',
@@ -147,20 +151,71 @@
                     this.nikError = '';
                 }
             },
-            validateKk() {
+            validateNikLocal() {
+                this.nik = this.nik.replace(/\D/g, '');
+                this.nikSuccess = '';
+                if (this.nik.length > 0 && this.nik.length !== 16) {
+                    this.nikError = 'NIK harus tepat 16 digit.';
+                } else {
+                    this.nikError = '';
+                }
+            },
+            validateKkLocal() {
                 this.kk = this.kk.replace(/\D/g, '');
-                if (this.kk.length > 0 && this.kk.length < 16) {
-                    this.kkError = '';
+                if (this.kk.length > 0 && this.kk.length !== 16) {
+                    this.kkError = 'Nomor KK harus tepat 16 digit.';
                 } else {
                     this.kkError = '';
                 }
             },
-            validateNip() {
+            validateNipLocal() {
                 this.nip = this.nip.replace(/\D/g, '');
-                if (this.nip.length > 0 && this.nip.length < 18) {
-                    this.nipError = '';
+                this.nipSuccess = '';
+                if (this.nip.length > 0 && this.nip.length < 10) {
+                    this.nipError = 'NIP harus minimal 10 digit.';
                 } else {
                     this.nipError = '';
+                }
+            },
+            async checkIdentity(type) {
+                if (type === 'nip' && this.nip.length < 10) return;
+                if (type === 'nik' && this.nik.length !== 16) return;
+                
+                const value = type === 'nip' ? this.nip : this.nik;
+                const isCheckingVar = type === 'nip' ? 'isCheckingNip' : 'isCheckingNik';
+                const errorVar = type === 'nip' ? 'nipError' : 'nikError';
+                const successVar = type === 'nip' ? 'nipSuccess' : 'nikSuccess';
+                
+                this[isCheckingVar] = true;
+                this[errorVar] = '';
+                this[successVar] = '';
+                
+                try {
+                    const response = await fetch('/api/v1/pegawai/check-identity', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name=\'csrf-token\']').getAttribute('content')
+                        },
+                        body: JSON.stringify({
+                            type: type,
+                            value: value,
+                            except_id: '{{ $p->id }}'
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.is_unique) {
+                        this[successVar] = data.message;
+                    } else {
+                        this[errorVar] = data.message;
+                    }
+                } catch (error) {
+                    this[errorVar] = 'Terjadi kesalahan saat mengecek data.';
+                } finally {
+                    this[isCheckingVar] = false;
                 }
             },
             handleFotoChange(e) {
@@ -339,9 +394,18 @@
                         {{-- NIP --}}
                         <div class="space-y-1">
                             <label for="nip" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">NIP</label>
-                            <input id="nip" name="nip" type="text" maxlength="18" x-model="nip" @input="validateNip" value="{{ $p->nip }}" placeholder="198503122010011001" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <div class="relative w-full">
+                                <input id="nip" name="nip" type="text" maxlength="18" x-model="nip" @input="validateNipLocal" value="{{ $p->nip }}" placeholder="198503122010011001" class="w-full rounded-lg border border-border bg-surface px-4 py-2 pr-20 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                <div class="absolute inset-y-0 right-0 flex items-center pr-2">
+                                    <button type="button" @click="checkIdentity('nip')" class="rounded bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50" :disabled="isCheckingNip || nip.length < 10">
+                                        <span x-show="!isCheckingNip">Cek</span>
+                                        <span x-show="isCheckingNip">...</span>
+                                    </button>
+                                </div>
+                            </div>
                             <p class="text-xs text-muted">Data ini penting untuk dilengkapi.</p>
                             <p x-show="nipError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="nipError"></p>
+                            <p x-show="nipSuccess" class="text-[11px] text-success font-semibold mt-1 font-sans" x-text="nipSuccess"></p>
                         </div>
 
                         {{-- Status Kepegawaian (READ-ONLY - ubah melalui SK Pengangkatan di Berkas & SK) --}}
@@ -523,15 +587,25 @@
                         {{-- NIK --}}
                         <div class="space-y-1">
                             <label for="nik" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">NIK (No. KTP)</label>
-                            <input id="nik" name="nik" type="text" maxlength="16" x-model="nik" @input="validateNik" placeholder="3273251203850002" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <div class="relative w-full">
+                                <input id="nik" name="nik" type="text" maxlength="16" x-model="nik" @input="validateNikLocal" placeholder="3273251203850002" class="w-full rounded-lg border border-border bg-surface px-4 py-2 pr-20 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                <div class="absolute inset-y-0 right-0 flex items-center pr-2">
+                                    <button type="button" @click="checkIdentity('nik')" class="rounded bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50" :disabled="isCheckingNik || nik.length !== 16">
+                                        <span x-show="!isCheckingNik">Cek</span>
+                                        <span x-show="isCheckingNik">...</span>
+                                    </button>
+                                </div>
+                            </div>
                             <p class="text-xs text-muted">Data ini penting untuk dilengkapi.</p>
                             <p x-show="nikError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="nikError"></p>
+                            <p x-show="nikSuccess" class="text-[11px] text-success font-semibold mt-1 font-sans" x-text="nikSuccess"></p>
                         </div>
 
                         {{-- KK --}}
                         <div class="space-y-1">
                             <label for="no_kk" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor Kartu Keluarga (KK)</label>
-                            <input id="no_kk" name="no_kk" type="text" maxlength="16" x-model="kk" @input="validateKk" placeholder="3273250102120045" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <input id="no_kk" name="no_kk" type="text" maxlength="16" x-model="kk" @input="validateKkLocal" placeholder="3273250102120045" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                            <p class="text-[11px] text-muted font-sans mt-1">Harus 16 digit angka.</p>
                             <p x-show="kkError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="kkError"></p>
                         </div>
 

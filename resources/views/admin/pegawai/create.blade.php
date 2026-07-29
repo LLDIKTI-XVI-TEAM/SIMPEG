@@ -89,10 +89,17 @@
                             placeholder="198503122010011001"
                             maxlength="18"
                             x-model="nip"
-                            x-on:input="validateNip"
+                            x-on:input="validateNipLocal"
                             
                         >
+                            <x-slot:suffix>
+                                <button type="button" @click="checkIdentity('nip')" class="rounded bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50" :disabled="isCheckingNip || nip.length < 10">
+                                    <span x-show="!isCheckingNip">Cek</span>
+                                    <span x-show="isCheckingNip">...</span>
+                                </button>
+                            </x-slot:suffix>
                             <p x-show="nipError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="nipError"></p>
+                            <p x-show="nipSuccess" class="text-[11px] text-success font-semibold mt-1 font-sans" x-text="nipSuccess"></p>
                         </x-form.input>
 
                         {{-- Jenis Pegawai --}}
@@ -161,12 +168,7 @@
 
                         
 
-                        {{-- Tanggal Pensiun --}}
-                        <x-form.date
-                            name="tanggal_pensiun"
-                            label="Tanggal Pensiun"
-                            id="tanggal_pensiun"
-                        />
+                        
 
                         {{-- Penanda ini dipakai cuti untuk membedakan Kepala Lembaga dari jabatan biasa. --}}
                         <div class="space-y-1 rounded-lg border border-border bg-soft/40 p-4 sm:col-span-2">
@@ -194,10 +196,17 @@
                             placeholder="3273251203850002"
                             maxlength="16"
                             x-model="nik"
-                            x-on:input="validateNik"
+                            x-on:input="validateNikLocal"
                             
                         >
+                            <x-slot:suffix>
+                                <button type="button" @click="checkIdentity('nik')" class="rounded bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50" :disabled="isCheckingNik || nik.length !== 16">
+                                    <span x-show="!isCheckingNik">Cek</span>
+                                    <span x-show="isCheckingNik">...</span>
+                                </button>
+                            </x-slot:suffix>
                             <p x-show="nikError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="nikError"></p>
+                            <p x-show="nikSuccess" class="text-[11px] text-success font-semibold mt-1 font-sans" x-text="nikSuccess"></p>
                         </x-form.input>
 
                         {{-- KK --}}
@@ -209,7 +218,8 @@
                             placeholder="3273250102120045"
                             maxlength="16"
                             x-model="kk"
-                            x-on:input="validateKk"
+                            x-on:input="validateKkLocal"
+                            help="Harus 16 digit angka."
                         >
                             <p x-show="kkError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="kkError"></p>
                         </x-form.input>
@@ -571,21 +581,7 @@
                                         <p x-show="skJabatanError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skJabatanError"></p>
                                     </div>
                                 </div>
-                                <div x-show="skJabatanMode === 'arsip'" class="mt-1 space-y-2">
-                                    <input type="hidden" name="existing_document_id_jabatan" :value="selectedArsipJabatanId">
-                                    <div class="relative">
-                                        <select x-model="selectedArsipJabatanId" @change="onSelectArsipJabatan()" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                            <option value="">-- Pilih dokumen dari arsip --</option>
-                                            <template x-for="doc in arsipJabatanList" :key="doc.id">
-                                                <option :value="doc.id" x-text="doc.label"></option>
-                                            </template>
-                                        </select>
-                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></div>
-                                    </div>
-                                    <template x-if="selectedArsipJabatanId">
-                                        <p class="text-xs text-success font-semibold font-sans">✓ Dokumen arsip dipilih. No. SK dan Tanggal SK telah terisi otomatis.</p>
-                                    </template>
-                                </div>
+
                             </div>
                         </div>
                     </div>
@@ -648,21 +644,7 @@
                                         <p x-show="skKgbError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skKgbError"></p>
                                     </div>
                                 </div>
-                                <div x-show="skKgbMode === 'arsip'" class="mt-1 space-y-2">
-                                    <input type="hidden" name="existing_document_id_kgb" :value="selectedArsipKgbId">
-                                    <div class="relative">
-                                        <select x-model="selectedArsipKgbId" @change="onSelectArsipKgb()" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                            <option value="">-- Pilih dokumen dari arsip --</option>
-                                            <template x-for="doc in arsipKgbList" :key="doc.id">
-                                                <option :value="doc.id" x-text="doc.label"></option>
-                                            </template>
-                                        </select>
-                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></div>
-                                    </div>
-                                    <template x-if="selectedArsipKgbId">
-                                        <p class="text-xs text-success font-semibold font-sans">✓ Dokumen arsip dipilih. No. SK dan Tanggal SK telah terisi otomatis.</p>
-                                    </template>
-                                </div>
+
                             </div>
                         </div>
                     </div>
@@ -728,21 +710,7 @@
                                         <p x-show="skPengangkatanError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skPengangkatanError"></p>
                                     </div>
                                 </div>
-                                <div x-show="skPengangkatanMode === 'arsip'" class="mt-1 space-y-2">
-                                    <input type="hidden" name="existing_document_id_pengangkatan" :value="selectedArsipPengangkatanId">
-                                    <div class="relative">
-                                        <select x-model="selectedArsipPengangkatanId" @change="onSelectArsipPengangkatan()" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                            <option value="">-- Pilih dokumen dari arsip --</option>
-                                            <template x-for="doc in arsipPengangkatanList" :key="doc.id">
-                                                <option :value="doc.id" x-text="doc.label"></option>
-                                            </template>
-                                        </select>
-                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></div>
-                                    </div>
-                                    <template x-if="selectedArsipPengangkatanId">
-                                        <p class="text-xs text-success font-semibold font-sans">✓ Dokumen arsip dipilih. No. SK dan Tanggal SK telah terisi otomatis.</p>
-                                    </template>
-                                </div>
+
                             </div>
                         </div>
                     </div>
@@ -889,11 +857,15 @@
                 isSubmitting: false,
                 activeTab: 'utama',
                 subTab: 'pangkat',
-                nip: '{{ old('nip') }}',
+                nip: {{ json_encode(old('nip')) }},
                 nipError: '',
-                nik: '{{ old('nik') }}',
-                kk: '{{ old('kk') }}',
+                nipSuccess: '',
+                isCheckingNip: false,
+                nik: {{ json_encode(old('nik')) }},
+                kk: {{ json_encode(old('no_kk')) }},
                 nikError: '',
+                nikSuccess: '',
+                isCheckingNik: false,
                 kkError: '',
                 fotoPreview: null,
                 
@@ -970,8 +942,8 @@
                     }
 
                     const elNip = document.getElementById('nip');
-                    if (this.nip.length > 0 && this.nip.length < 18) {
-                        this.nipError = 'NIP harus tepat 18 digit sebelum melanjutkan';
+                    if (this.nip.length > 0 && this.nip.length < 10) {
+                        this.nipError = 'NIP harus minimal 10 digit sebelum melanjutkan';
                         if (elNip) {
                             elNip.setCustomValidity('Mohon lengkapi NIP dengan tepat 18 digit.');
                             elNip.reportValidity();
@@ -1022,28 +994,70 @@
                     }
                     return true;
                 },
-                validateNik() {
+                validateNikLocal() {
                     this.nik = this.nik.replace(/\D/g, '');
-                    if (this.nik.length > 0 && this.nik.length < 16) {
-                        this.nikError = '';
+                    this.nikSuccess = '';
+                    if (this.nik.length > 0 && this.nik.length !== 16) {
+                        this.nikError = 'NIK harus tepat 16 digit.';
                     } else {
                         this.nikError = '';
                     }
                 },
-                validateKk() {
+                validateKkLocal() {
                     this.kk = this.kk.replace(/\D/g, '');
-                    if (this.kk.length > 0 && this.kk.length < 16) {
-                        this.kkError = '';
+                    if (this.kk.length > 0 && this.kk.length !== 16) {
+                        this.kkError = 'Nomor KK harus tepat 16 digit.';
                     } else {
                         this.kkError = '';
                     }
                 },
-                validateNip() {
+                validateNipLocal() {
                     this.nip = this.nip.replace(/\D/g, '');
-                    if (this.nip.length > 0 && this.nip.length < 18) {
-                        this.nipError = '';
+                    this.nipSuccess = '';
+                    if (this.nip.length > 0 && this.nip.length < 10) {
+                        this.nipError = 'NIP harus minimal 10 digit.';
                     } else {
                         this.nipError = '';
+                    }
+                },
+                async checkIdentity(type) {
+                    if (type === 'nip' && this.nip.length < 10) return;
+                    if (type === 'nik' && this.nik.length !== 16) return;
+                    
+                    const value = type === 'nip' ? this.nip : this.nik;
+                    const isCheckingVar = type === 'nip' ? 'isCheckingNip' : 'isCheckingNik';
+                    const errorVar = type === 'nip' ? 'nipError' : 'nikError';
+                    const successVar = type === 'nip' ? 'nipSuccess' : 'nikSuccess';
+                    
+                    this[isCheckingVar] = true;
+                    this[errorVar] = '';
+                    this[successVar] = '';
+                    
+                    try {
+                        const response = await fetch('/api/v1/pegawai/check-identity', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name=\\'csrf-token\\']').getAttribute('content')
+                            },
+                            body: JSON.stringify({
+                                type: type,
+                                value: value
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.is_unique) {
+                            this[successVar] = data.message;
+                        } else {
+                            this[errorVar] = data.message;
+                        }
+                    } catch (error) {
+                        this[errorVar] = 'Terjadi kesalahan saat mengecek data.';
+                    } finally {
+                        this[isCheckingVar] = false;
                     }
                 },
                 handleFotoChange(e) {
