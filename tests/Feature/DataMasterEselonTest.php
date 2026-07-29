@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\RefEselon;
 use App\Models\RefJabatan;
 use App\Models\User;
@@ -148,6 +149,31 @@ class DataMasterEselonTest extends TestCase
             ->assertRedirect();
 
         $this->assertNull(Cache::get('ref.eselon'));
+    }
+
+    public function test_mutasi_eselon_dibatalkan_saat_audit_gagal_disimpan(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $dispatcher = AuditLog::getEventDispatcher();
+        AuditLog::creating(function (): void {
+            throw new \RuntimeException('Simulasi kegagalan audit eselon.');
+        });
+        $exceptionObserved = false;
+
+        try {
+            $this->actingAs($user)->withoutExceptionHandling()->postWithCsrf(
+                route('data-master.eselon.store'),
+                ['kode' => 'III.b', 'nama' => 'Eselon III.b'],
+            );
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Simulasi kegagalan audit eselon.', $exception->getMessage());
+            $exceptionObserved = true;
+        } finally {
+            AuditLog::setEventDispatcher($dispatcher);
+        }
+
+        $this->assertTrue($exceptionObserved, 'Mutasi referensi wajib meneruskan kegagalan audit.');
+        $this->assertDatabaseMissing('ref_eselon', ['kode' => 'III.b']);
     }
 
     public function test_admin_kepegawaian_tidak_boleh_mengelola_eselon(): void
