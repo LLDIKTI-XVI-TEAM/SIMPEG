@@ -13,10 +13,10 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-3" x-data="cutiForm(@js($saldoCuti), @js($continuationLeaveCases))">
             <div class="lg:col-span-2">
                 @if(!$isKepalaLembaga)
-                <form action="{{ route('cuti.store') }}" method="POST" enctype="multipart/form-data" class="rounded-xl border border-border bg-surface shadow-sm overflow-hidden" x-data="cutiForm()">
+                <form action="{{ route('cuti.store') }}" method="POST" enctype="multipart/form-data" class="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
                     @csrf
                     
                     <div class="border-b border-border bg-soft px-6 py-4">
@@ -54,11 +54,11 @@
                         <!-- Jenis Cuti -->
                         <div>
                             <label for="jenis_cuti_id" class="block text-sm font-medium text-ink mb-1">Jenis Cuti <span class="text-danger">*</span></label>
-                            <x-form.select id="jenis_cuti_id" name="jenis_cuti_id" required x-model="selectedJenisCuti" @change="validateSaldo"
+                            <x-form.select id="jenis_cuti_id" name="jenis_cuti_id" required x-model="selectedJenisCuti" @change="onLeaveTypeChanged"
                                 :disabled="$formLocked">
                                 <option value="">Pilih Jenis Cuti</option>
                                 @foreach($jenisCuti as $jenis)
-                                    <option value="{{ $jenis->id }}" data-nama="{{ $jenis->nama }}">{{ $jenis->nama }}</option>
+                                    <option value="{{ $jenis->id }}" data-code="{{ $jenis->code }}" data-mengurangi-saldo-tahunan="{{ $jenis->mengurangi_saldo_tahunan ? 'true' : 'false' }}">{{ $jenis->nama }}</option>
                                 @endforeach
                             </x-form.select>
                             @error('jenis_cuti_id')
@@ -66,11 +66,30 @@
                             @enderror
                         </div>
 
+                        {{-- K-CUT-02: sambungkan pengajuan yang dipecah karena batas tahun ke rangkaian
+                            eksplisit milik pemohon. Tidak ada hubungan yang disimpulkan dari teks alasan. --}}
+                        <div x-show="requiresLeaveCase()" x-cloak>
+                            <label for="leave_request_case_id" class="mb-1 block text-sm font-medium text-ink">Rangkaian Pengajuan</label>
+                            <x-form.select id="leave_request_case_id" name="leave_request_case_id" x-model="selectedLeaveRequestCase"
+                                :disabled="$formLocked" aria-describedby="leave_request_case_id-help">
+                                <option value="">Pengajuan baru (bukan kelanjutan rangkaian sebelumnya)</option>
+                                <template x-for="leaveCase in casesForSelectedType()" :key="leaveCase.id">
+                                    <option :value="leaveCase.id" x-text="leaveCase.label"></option>
+                                </template>
+                            </x-form.select>
+                            <p id="leave_request_case_id-help" class="mt-1 text-xs text-muted">
+                                Pilih rangkaian yang sama bila Cuti Melahirkan atau CLTN perlu dibuat sebagai pengajuan lanjutan di tahun kalender berbeda. Batas durasi dihitung untuk seluruh rangkaian.
+                            </p>
+                            @error('leave_request_case_id')
+                                <p class="mt-1 text-xs text-danger" role="alert">{{ $message }}</p>
+                            @enderror
+                        </div>
+
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <!-- Tanggal Mulai -->
                             <div>
                                 <label for="tanggal_mulai" class="block text-sm font-medium text-ink mb-1">Tanggal Mulai <span class="text-danger">*</span></label>
-                                <input type="date" id="tanggal_mulai" name="tanggal_mulai" required x-model="startDate" @change="calculateDays"
+                                <input type="date" id="tanggal_mulai" name="tanggal_mulai" required x-model="startDate" @change="onStartDateChanged"
                                     class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                                     {{ $formLocked ? 'disabled' : '' }}>
                                 @error('tanggal_mulai')
@@ -203,31 +222,45 @@
                         Info Saldo Cuti Tahunan
                     </h3>
                     
-                    @if($saldoTahunan)
-                    <div class="space-y-3">
+                    <div class="space-y-3" aria-live="polite" aria-atomic="true">
+                        <div class="flex items-center justify-between gap-3 border-b border-border/50 pb-2">
+                            <span class="text-sm text-muted">Tahun saldo</span>
+                            <span class="text-sm font-semibold text-ink" x-text="balance.tahun"></span>
+                        </div>
                         <div class="flex justify-between items-center pb-2 border-b border-border/50">
-                            <span class="text-sm text-muted">Jatah Tahun Ini</span>
-                            <span class="text-sm font-semibold text-ink">{{ $saldoTahunan->jatah_awal }} Hari</span>
+                            <span class="text-sm text-muted">Jatah Dasar Tahun Ini</span>
+                            <span class="text-sm font-semibold text-ink" x-text="formatDays(balance.jatah_dasar)"></span>
                         </div>
                         <div class="flex justify-between items-center pb-2 border-b border-border/50">
                             <span class="text-sm text-muted">Sisa Tahun Lalu</span>
-                            <span class="text-sm font-semibold text-ink">{{ $saldoTahunan->carry_over }} Hari</span>
+                            <span class="text-sm font-semibold text-ink" x-text="formatDays(balance.carry_over)"></span>
                         </div>
                         <div class="flex justify-between items-center pb-2 border-b border-border/50">
-                            <span class="text-sm text-muted">Sudah Terpakai</span>
-                            <span class="text-sm font-semibold text-danger">{{ $saldoTahunan->terpakai }} Hari</span>
+                            <span class="text-sm text-muted">Cuti yang Sudah Disetujui</span>
+                            <span class="text-sm font-semibold text-danger" x-text="formatDays(balance.terpakai_final)"></span>
+                        </div>
+                        <div class="flex justify-between items-center pb-2 border-b border-border/50" x-show="balance.koreksi_administratif !== 0">
+                            <span class="text-sm text-muted">Koreksi Administratif</span>
+                            <span class="text-sm font-semibold" :class="balance.koreksi_administratif > 0 ? 'text-success' : 'text-danger'" x-text="formatSignedDays(balance.koreksi_administratif)"></span>
+                        </div>
+                        <div class="flex justify-between items-center pb-2 border-b border-border/50">
+                            <span class="text-sm font-semibold text-ink">Saldo Tersedia Aktual</span>
+                            <span class="text-lg font-bold text-success" x-text="formatDays(balance.saldo_aktual)"></span>
+                        </div>
+                        <div class="flex justify-between items-center pb-2 border-b border-border/50">
+                            <span class="text-sm text-muted">Dialokasikan untuk Pengajuan Aktif</span>
+                            <span class="text-sm font-semibold text-ink" x-text="formatDays(balance.dialokasikan_aktif)"></span>
                         </div>
                         <div class="flex justify-between items-center pt-1">
-                            <span class="text-sm font-semibold text-ink">Sisa Saldo</span>
-                            {{-- Angka otoritatif diambil dari saldo ledger (saldoTersedia), sumber yang sama dengan validasi saat submit. --}}
-                            <span class="text-lg font-bold text-success">{{ $saldoTersedia }} Hari</span>
+                            <span class="text-sm font-semibold text-ink">Masih Dapat Diajukan</span>
+                            <span class="text-lg font-bold text-primary" x-text="formatDays(balance.saldo_dapat_diajukan)"></span>
                         </div>
+                        <p class="pt-1 text-xs text-muted" x-text="balanceStatus"></p>
+                        <p class="text-xs text-danger" x-show="balanceError" x-text="balanceError"></p>
+                        <button type="button" class="text-xs font-semibold text-primary hover:underline disabled:cursor-wait disabled:opacity-60" @click="refreshBalance" :disabled="isRefreshingBalance">
+                            <span x-text="isRefreshingBalance ? 'Memperbarui saldo…' : 'Perbarui saldo'"></span>
+                        </button>
                     </div>
-                    @else
-                    <div class="text-center py-4">
-                        <p class="text-sm text-muted">Data saldo cuti belum tersedia.</p>
-                    </div>
-                    @endif
                 </div>
 
                 <!-- Info Approval -->
@@ -260,7 +293,7 @@
     <!-- AlpineJS logic for form -->
     <script>
         document.addEventListener('alpine:init', () => {
-            Alpine.data('cutiForm', () => ({
+            Alpine.data('cutiForm', (initialBalance, continuationLeaveCases) => ({
                 startDate: '',
                 endDate: '',
                 workDays: 0,
@@ -268,23 +301,125 @@
                 workdayError: '',
                 isCalculating: false,
                 workdayRequestId: 0,
-                selectedJenisCuti: '',
-                sisaSaldoTahunan: {{ (int) $saldoTersedia }},
+                selectedJenisCuti: @js(old('jenis_cuti_id', '')),
+                selectedLeaveRequestCase: @js(old('leave_request_case_id', '')),
+                continuationLeaveCases,
+                balance: initialBalance,
+                balanceRequestId: 0,
+                isRefreshingBalance: false,
+                balanceError: '',
+                balanceStatus: initialBalance.eligible
+                    ? 'Saldo dimuat saat halaman dibuka.'
+                    : 'Hak cuti tahunan belum tersedia untuk tanggal acuan ini.',
                 saldoError: false,
                 saldoErrorMsg: '',
-                
+
+                init() {
+                    this.handleWindowFocus = () => this.refreshBalance();
+                    window.addEventListener('focus', this.handleWindowFocus);
+                },
+
+                destroy() {
+                    window.removeEventListener('focus', this.handleWindowFocus);
+                },
+
+                formatDays(value) {
+                    return `${Number(value ?? 0)} Hari`;
+                },
+
+                formatSignedDays(value) {
+                    const amount = Number(value ?? 0);
+                    const sign = amount > 0 ? '+' : '';
+
+                    return `${sign}${amount} Hari`;
+                },
+
+                selectedLeaveTypeCode() {
+                    const select = document.getElementById('jenis_cuti_id');
+
+                    return select?.options[select.selectedIndex]?.getAttribute('data-code') ?? '';
+                },
+
+                requiresLeaveCase() {
+                    return ['melahirkan', 'cltn'].includes(this.selectedLeaveTypeCode());
+                },
+
+                casesForSelectedType() {
+                    const code = this.selectedLeaveTypeCode();
+
+                    return this.continuationLeaveCases.filter((leaveCase) => leaveCase.jenis_cuti_code === code);
+                },
+
+                onLeaveTypeChanged() {
+                    // Hubungan harus dipilih ulang bila jenis diubah; ID rangkaian
+                    // dari jenis sebelumnya tidak boleh ikut terkirim diam-diam.
+                    this.selectedLeaveRequestCase = '';
+                    this.validateSaldo();
+                },
+
+                onStartDateChanged() {
+                    this.refreshBalance();
+                    this.calculateDays();
+                },
+
+                async refreshBalance() {
+                    const referenceDate = this.startDate || this.balance.tanggal_acuan;
+
+                    if (!referenceDate) {
+                        return;
+                    }
+
+                    const requestId = ++this.balanceRequestId;
+                    this.isRefreshingBalance = true;
+                    this.balanceError = '';
+
+                    try {
+                        const response = await fetch(`/api/v1/cuti/balance-preview?tanggal_mulai=${encodeURIComponent(referenceDate)}`, {
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Preview saldo tidak tersedia.');
+                        }
+
+                        const result = await response.json();
+                        if (requestId !== this.balanceRequestId) {
+                            return;
+                        }
+
+                        this.balance = result.data;
+                        this.balanceStatus = this.balance.eligible
+                            ? `Saldo diperbarui untuk tahun ${this.balance.tahun}.`
+                            : 'Hak cuti tahunan belum tersedia untuk tanggal acuan ini.';
+                        this.validateSaldo();
+                    } catch (error) {
+                        if (requestId !== this.balanceRequestId) {
+                            return;
+                        }
+
+                        this.balanceError = 'Saldo terbaru belum dapat dimuat. Validasi akhir tetap dilakukan saat pengajuan dikirim.';
+                    } finally {
+                        if (requestId === this.balanceRequestId) {
+                            this.isRefreshingBalance = false;
+                        }
+                    }
+                },
+
                 validateSaldo() {
                     this.saldoError = false;
                     this.saldoErrorMsg = '';
                     
                     const select = document.getElementById('jenis_cuti_id');
                     if (select.selectedIndex > 0) {
-                        const namaJenis = select.options[select.selectedIndex].getAttribute('data-nama');
+                        const mengurangiSaldoTahunan = select.options[select.selectedIndex].getAttribute('data-mengurangi-saldo-tahunan') === 'true';
                         
-                        // Jika cuti tahunan dan jumlah hari melebihi sisa saldo
-                        if (namaJenis && namaJenis.toLowerCase().includes('tahunan') && this.workDays > this.sisaSaldoTahunan) {
+                        // Metadata jenis cuti berasal dari database; nama tampilan tidak dipakai sebagai aturan bisnis.
+                        if (mengurangiSaldoTahunan && this.workDays > this.balance.saldo_dapat_diajukan) {
                             this.saldoError = true;
-                            this.saldoErrorMsg = `Saldo cuti tahunan tidak mencukupi. Sisa saldo Anda: ${this.sisaSaldoTahunan} hari, sedangkan pengajuan: ${this.workDays} hari.`;
+                            this.saldoErrorMsg = `Saldo cuti tahunan tidak mencukupi. Saldo yang masih dapat diajukan: ${this.balance.saldo_dapat_diajukan} hari, sedangkan pengajuan: ${this.workDays} hari.`;
                         }
                     }
                 },

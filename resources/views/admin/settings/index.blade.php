@@ -65,7 +65,6 @@
         ['tabel' => 'ref_golongan', 'deskripsi' => 'Data Golongan PNS (I/a s/d IV/e)', 'baris' => 17, 'sprint' => 'Sprint 1', 'route' => 'data-master'],
         ['tabel' => 'ref_jenis_jabatan', 'deskripsi' => 'Struktural, Fungsional Tertentu, Fungsional Umum, Pimpinan Tinggi', 'baris' => 4, 'sprint' => 'Sprint 1', 'route' => 'data-master'],
         ['tabel' => 'ref_unit_kerja', 'deskripsi' => 'Pembagian sub-bidang / sekretariat LLDIKTI XVI', 'baris' => 6, 'sprint' => 'Sprint 1', 'route' => 'data-master'],
-        ['tabel' => 'ref_bup', 'deskripsi' => 'Batas Usia Pensiun per jenis jabatan kepegawaian', 'baris' => 3, 'sprint' => 'Sprint 1', 'route' => 'data-master'],
         ['tabel' => 'ref_eselon', 'deskripsi' => 'Tingkat jabatan struktural eselonering (I/a s/d IV/b)', 'baris' => 8, 'sprint' => 'Sprint 2', 'route' => 'data-master'],
         ['tabel' => 'ref_jenis_cuti', 'deskripsi' => 'Kategori cuti (Cuti Tahunan, Sakit, Melahirkan, Penting, dll)', 'baris' => 6, 'sprint' => 'Sprint 2', 'route' => 'data-master'],
         ['tabel' => 'ref_agama', 'deskripsi' => 'Daftar agama resmi untuk administrasi pegawai', 'baris' => 6, 'sprint' => 'Sprint 2', 'route' => 'data-master'],

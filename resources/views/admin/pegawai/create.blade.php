@@ -1,11 +1,11 @@
-<x-layouts.app title="Tambah Pegawai">
+<div>
     <div class="mx-auto max-w-7xl space-y-6">
         
         <x-admin.page-header title="Tambah Pegawai Baru">
             <x-slot:breadcrumb>
-                <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
+                <a href="{{ route('dashboard') }}" wire:navigate class="transition-colors hover:text-ink">Dashboard</a>
                 <span>/</span>
-                <a href="{{ route('data-pegawai') }}" class="transition-colors hover:text-ink">Data Pegawai</a>
+                <a href="{{ route('data-pegawai') }}" wire:navigate class="transition-colors hover:text-ink">Data Pegawai</a>
                 <span>/</span>
                 <span class="font-medium text-ink">Tambah</span>
             </x-slot:breadcrumb>
@@ -826,7 +826,7 @@
                 {{-- Action Buttons --}}
                 <div class="border-t border-border pt-6 flex justify-between items-center gap-3">
                     <div>
-                        <a href="{{ route('data-pegawai') }}" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft">
+                        <a href="javascript:void(0)" onclick="if(document.referrer.includes(window.location.hostname)) { history.back(); } else { window.location.href = '{{ route('data-pegawai') }}'; }" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft">
                             <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
                             </svg>
@@ -1200,4 +1200,4 @@
     });
 </script>
 @endpush
-</x-layouts.app>
+</div>

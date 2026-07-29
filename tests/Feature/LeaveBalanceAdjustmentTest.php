@@ -289,10 +289,10 @@ class LeaveBalanceAdjustmentTest extends TestCase
             'reason' => 'Input saldo awal melalui halaman admin.',
         ]);
 
-        $response->assertRedirect(route('cuti.rekap', [
+        $response->assertRedirect(route('cuti.saldo.administrasi', [
             'pegawai' => $employee->id,
             'periode' => 2027,
-        ]).'#admin-saldo-cuti');
+        ]));
         $response->assertSessionHas('success');
         $this->assertDatabaseHas('leave_balances', [
             'employee_id' => $employee->id,
@@ -324,10 +324,10 @@ class LeaveBalanceAdjustmentTest extends TestCase
             'reason' => 'Koreksi saldo setelah validasi dokumen.',
         ]);
 
-        $response->assertRedirect(route('cuti.rekap', [
+        $response->assertRedirect(route('cuti.saldo.administrasi', [
             'pegawai' => $employee->id,
             'periode' => 2027,
-        ]).'#admin-saldo-cuti');
+        ]));
         $response->assertSessionHas('success');
         $this->assertDatabaseHas('leave_balances', [
             'employee_id' => $employee->id,
@@ -359,7 +359,52 @@ class LeaveBalanceAdjustmentTest extends TestCase
         $this->assertDatabaseCount('leave_balance_ledger', 0);
     }
 
-    public function test_rekap_cuti_menampilkan_panel_admin_saldo_dan_riwayat_ledger(): void
+    public function test_super_admin_dan_admin_kepegawaian_bisa_membuka_administrasi_saldo_cuti(): void
+    {
+        foreach ([
+            User::factory()->superAdmin()->create(),
+            User::factory()->adminKepegawaian()->create(),
+        ] as $user) {
+            $this->actingAs($user)->get(route('cuti.saldo.administrasi'))->assertOk();
+        }
+    }
+
+    public function test_administrasi_saldo_cuti_menolak_filter_pegawai_dengan_uuid_rusak(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user)
+            ->get(route('cuti.saldo.administrasi', ['pegawai' => 'bukan-uuid']))
+            ->assertNotFound();
+    }
+
+    public function test_administrasi_saldo_cuti_menolak_format_periode_yang_ambigu(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        foreach (['2026.5', '02026', '2e3'] as $periode) {
+            $this->actingAs($user)
+                ->get(route('cuti.saldo.administrasi', ['periode' => $periode]))
+                ->assertNotFound();
+        }
+    }
+
+    public function test_administrasi_saldo_cuti_menolak_role_tanpa_hak_koreksi(): void
+    {
+        foreach (['pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
+            $this->actingAs(User::factory()->create(['role' => $role]))
+                ->get(route('cuti.saldo.administrasi'))
+                ->assertForbidden();
+        }
+    }
+
+    public function test_tamu_dialihkan_saat_membuka_administrasi_saldo_cuti(): void
+    {
+        $this->get(route('cuti.saldo.administrasi'))
+            ->assertRedirect(route('login'));
+    }
+
+    public function test_administrasi_saldo_cuti_menampilkan_tab_dan_formulir_mutasi(): void
     {
         $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Saldo Admin']);
         $user = User::factory()->adminKepegawaian()->create();
@@ -381,14 +426,16 @@ class LeaveBalanceAdjustmentTest extends TestCase
             'occurred_at' => Carbon::now(),
         ]);
 
-        $response = $this->actingAs($user)->get(route('cuti.rekap', [
+        $response = $this->actingAs($user)->get(route('cuti.saldo.administrasi', [
             'pegawai' => $employee->id,
             'periode' => 2027,
         ]));
 
         $response->assertOk();
-        $response->assertSee('Input Saldo Awal', false);
+        $response->assertSee('Pendaftaran Saldo Awal', false);
         $response->assertSee('Koreksi Saldo', false);
+        $response->assertSee(route('cuti.saldo.opening-balance', $employee), false);
+        $response->assertSee(route('cuti.saldo.adjust', $employee), false);
         $response->assertSee('Ledger Saldo', false);
         $response->assertSee('Status Rollover', false);
         $response->assertSee('Koreksi tampil di ledger.', false);
@@ -398,6 +445,61 @@ class LeaveBalanceAdjustmentTest extends TestCase
         $response->assertDontSee('Periode Laporan:', false);
         $response->assertDontSee('>Tahunan<', false);
         $response->assertDontSee('>Sakit<', false);
+    }
+
+    public function test_rekap_cuti_tidak_lagi_menampilkan_formulir_mutasi_saldo(): void
+    {
+        $employee = Employee::factory()->create();
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $response = $this->actingAs($user)->get(route('cuti.rekap', [
+            'pegawai' => $employee->id,
+            'periode' => 2027,
+        ]));
+
+        $response->assertOk();
+        $response->assertDontSee(route('cuti.saldo.opening-balance', $employee), false);
+        $response->assertDontSee(route('cuti.saldo.adjust', $employee), false);
+    }
+
+    public function test_administrasi_saldo_cuti_menyediakan_navigasi_halaman_ledger(): void
+    {
+        $employee = Employee::factory()->create();
+        $user = User::factory()->adminKepegawaian()->create();
+        $balance = LeaveBalance::create($this->balancePayload($employee, 2027));
+
+        // Ledger dipaginasi 10 baris; mutasi ke-11 hanya terjangkau bila kontrol halaman dirender.
+        foreach (range(1, 11) as $index) {
+            LeaveBalanceLedger::create([
+                'employee_id' => $employee->id,
+                'leave_balance_id' => $balance->id,
+                'tahun' => 2027,
+                'event_type' => 'manual_adjustment',
+                'amount' => -1,
+                'source_year' => 2027,
+                'reason' => sprintf('Koreksi ledger urutan %02d.', $index),
+                'occurred_at' => Carbon::now()->subMinutes(11 - $index),
+            ]);
+        }
+
+        $firstPage = $this->actingAs($user)->get(route('cuti.saldo.administrasi', [
+            'pegawai' => $employee->id,
+            'periode' => 2027,
+        ]));
+
+        $firstPage->assertOk();
+        $firstPage->assertSee('page_ledger=2', false);
+        $firstPage->assertSee('Koreksi ledger urutan 11.', false);
+        $firstPage->assertDontSee('Koreksi ledger urutan 01.', false);
+
+        $secondPage = $this->actingAs($user)->get(route('cuti.saldo.administrasi', [
+            'pegawai' => $employee->id,
+            'periode' => 2027,
+            'page_ledger' => 2,
+        ]));
+
+        $secondPage->assertOk();
+        $secondPage->assertSee('Koreksi ledger urutan 01.', false);
     }
 
     /**

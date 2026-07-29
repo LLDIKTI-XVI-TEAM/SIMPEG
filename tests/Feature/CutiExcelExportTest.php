@@ -30,7 +30,7 @@ class CutiExcelExportTest extends TestCase
         $this->seed(RbacSeeder::class);
     }
 
-    public function test_excel_memuat_dua_sheet_data_kanonis_tanggal_typed_dan_saldo_materialized(): void
+    public function test_excel_memuat_tiga_sheet_data_kanonis_tanggal_typed_dan_saldo_materialized(): void
     {
         $user = User::factory()->superAdmin()->create();
         $pegawai = Employee::factory()->create([
@@ -63,27 +63,36 @@ class CutiExcelExportTest extends TestCase
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         );
         $this->assertMatchesRegularExpression(
-            '/attachment; filename=Laporan_Cuti_\d{8}_\d{6}\.xlsx/',
+            '/attachment; filename=Rekap_Cuti_2026_\d{8}\.xlsx/',
             (string) $response->headers->get('Content-Disposition'),
         );
 
         $spreadsheet = $this->loadWorkbook($response->streamedContent());
         try {
-            $this->assertSame(['Detail Cuti', 'Saldo Cuti'], $spreadsheet->getSheetNames());
+            $this->assertSame(['Detail Cuti', 'Ringkasan Cuti', 'Saldo Cuti'], $spreadsheet->getSheetNames());
             $detail = $spreadsheet->getSheetByName('Detail Cuti');
+            $summary = $spreadsheet->getSheetByName('Ringkasan Cuti');
             $balance = $spreadsheet->getSheetByName('Saldo Cuti');
             $this->assertNotNull($detail);
+            $this->assertNotNull($summary);
             $this->assertNotNull($balance);
             $this->assertSame('A2', $detail->getFreezePane());
+            $this->assertSame('A2', $summary->getFreezePane());
             $this->assertSame('A2', $balance->getFreezePane());
             $this->assertSame(
                 ['No', 'NIP', 'Nama', 'Nama (Aman)', 'Jenis Cuti', 'Tanggal Mulai', 'Tanggal Selesai', 'Hari Kerja', 'Status'],
                 $detail->rangeToArray('A1:I1')[0],
             );
             $this->assertSame(
+                ['No', 'NIP', 'Nama Pegawai', 'Jenis Cuti', 'Total Hari Disetujui', 'Sisa Saldo Cuti Tahunan 2026'],
+                $summary->rangeToArray('A1:F1')[0],
+            );
+            $this->assertSame(
                 ['No', 'NIP', 'Nama', 'Tahun', 'Sisa N-2', 'Sisa N-1', 'Sisa Tahun Berjalan', 'Sisa', 'Hangus'],
                 $balance->rangeToArray('A1:I1')[0],
             );
+            // Pengajuan pada skenario ini masih menunggu approval sehingga ringkasan wajib kosong.
+            $this->assertSame(1, $summary->getHighestDataRow());
             $this->assertSame('I', $detail->getHighestDataColumn());
             $this->assertSame('I', $balance->getHighestDataColumn());
             $this->assertSame($expectedIds, [$included->id]);
@@ -112,6 +121,157 @@ class CutiExcelExportTest extends TestCase
         } finally {
             $spreadsheet->disconnectWorksheets();
         }
+    }
+
+    public function test_ringkasan_menjumlahkan_hari_disetujui_dan_memisahkan_jenis_cuti(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $pegawai = Employee::factory()->create(['nip' => '198001012006041001', 'nama_lengkap' => 'Pegawai Rekap']);
+        $tahunan = RefJenisCuti::create(['nama' => 'Cuti Tahunan']);
+        $sakit = RefJenisCuti::create(['nama' => 'Cuti Sakit']);
+
+        // Dua pengajuan disetujui pada jenis yang sama wajib teragregasi menjadi satu baris.
+        $this->createLeaveRequest($pegawai, $tahunan, '2026-06-01', 'disetujui', 3);
+        $this->createLeaveRequest($pegawai, $tahunan, '2026-06-10', 'disetujui', 2);
+        $this->createLeaveRequest($pegawai, $sakit, '2026-06-15', 'disetujui', 4);
+        // Status non-final tidak boleh masuk hitungan saldo terpakai.
+        $this->createLeaveRequest($pegawai, $tahunan, '2026-06-20', 'tidak_disetujui', 7);
+        $this->createLeaveRequest($pegawai, $tahunan, '2026-06-25', 'menunggu_approval', 9);
+        $this->createLeaveRequest($pegawai, $tahunan, '2026-06-27', 'ditangguhkan', 6);
+        $this->createLeaveRequest($pegawai, $tahunan, '2026-06-28', 'perlu_perubahan', 8);
+        LeaveBalance::create(['employee_id' => $pegawai->id, 'tahun' => 2026, 'sisa' => 6]);
+
+        $spreadsheet = $this->loadWorkbook($this->actingAs($user)
+            ->get(route('cuti.laporan.excel', ['pegawai' => $pegawai->id, 'periode' => '2026']))
+            ->streamedContent());
+
+        try {
+            $summary = $spreadsheet->getSheetByName('Ringkasan Cuti');
+            $this->assertNotNull($summary);
+            $this->assertSame(3, $summary->getHighestDataRow());
+            // formatData dimatikan agar total hari dibandingkan sebagai integer, bukan teks terformat.
+            $rows = $summary->rangeToArray('A2:F3', null, true, false);
+            $byJenis = collect($rows)->keyBy(3);
+
+            $this->assertSame(5, $byJenis['Cuti Tahunan'][4]);
+            $this->assertSame(4, $byJenis['Cuti Sakit'][4]);
+            $this->assertSame(6, $byJenis['Cuti Tahunan'][5]);
+            $this->assertSame('198001012006041001', $byJenis['Cuti Tahunan'][1]);
+            $this->assertSame('Pegawai Rekap', $byJenis['Cuti Tahunan'][2]);
+        } finally {
+            $spreadsheet->disconnectWorksheets();
+        }
+    }
+
+    public function test_ringkasan_memisahkan_pegawai_dan_jenis_bernama_sama(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $anwar = Employee::factory()->create(['nip' => '198001010001', 'nama_lengkap' => 'Anwar']);
+        $budi = Employee::factory()->create(['nip' => '199002020002', 'nama_lengkap' => 'Budi']);
+        // Skema ref_jenis_cuti tidak menjamin nama unik, jadi dua baris bernama sama harus tetap terpisah.
+        $tahunanA = RefJenisCuti::create(['nama' => 'Cuti Tahunan']);
+        $tahunanB = RefJenisCuti::create(['nama' => 'Cuti Tahunan']);
+        $this->createLeaveRequest($anwar, $tahunanA, '2026-06-03', 'disetujui', 2);
+        $this->createLeaveRequest($budi, $tahunanA, '2026-06-04', 'disetujui', 3);
+        $this->createLeaveRequest($anwar, $tahunanB, '2026-06-05', 'disetujui', 4);
+
+        $spreadsheet = $this->loadWorkbook($this->actingAs($user)
+            ->get(route('cuti.laporan.excel', ['periode' => '2026']))
+            ->streamedContent());
+
+        try {
+            $summary = $spreadsheet->getSheetByName('Ringkasan Cuti');
+            $this->assertNotNull($summary);
+            $this->assertSame(4, $summary->getHighestDataRow());
+            $rows = $summary->rangeToArray('A2:F4', null, true, false);
+            // Urutan mengikuti nama pegawai sehingga dua baris Anwar berdekatan sebelum Budi.
+            $this->assertSame(['Anwar', 'Anwar', 'Budi'], array_column($rows, 2));
+            // Dua jenis bernama sama membuat urutan antar keduanya seri, jadi yang dikunci adalah nilainya.
+            $anwar = array_slice(array_column($rows, 4), 0, 2);
+            sort($anwar);
+            $this->assertSame([2, 4], $anwar);
+            $this->assertSame(3, $rows[2][4]);
+        } finally {
+            $spreadsheet->disconnectWorksheets();
+        }
+    }
+
+    public function test_ringkasan_mengabaikan_pegawai_tanpa_cuti_disetujui_dan_mengamankan_formula(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $berbahaya = Employee::factory()->create(['nip' => "\t=1980", 'nama_lengkap' => '  -Nama Berbahaya']);
+        $tanpaCuti = Employee::factory()->create(['nama_lengkap' => 'Tanpa Cuti']);
+        $jenis = RefJenisCuti::create(['nama' => '@Jenis Berbahaya']);
+        $this->createLeaveRequest($berbahaya, $jenis, '2026-06-05', 'disetujui', 2);
+        // Saldo tanpa pengajuan disetujui tidak boleh memunculkan baris ringkasan.
+        LeaveBalance::create(['employee_id' => $tanpaCuti->id, 'tahun' => 2026, 'sisa' => 12]);
+
+        $spreadsheet = $this->loadWorkbook($this->actingAs($user)
+            ->get(route('cuti.laporan.excel', ['periode' => '2026']))
+            ->streamedContent());
+
+        try {
+            $summary = $spreadsheet->getSheetByName('Ringkasan Cuti');
+            $this->assertNotNull($summary);
+            $this->assertSame(2, $summary->getHighestDataRow());
+            $this->assertSame("'\t=1980", $summary->getCell('B2')->getValue());
+            $this->assertSame("'  -Nama Berbahaya", $summary->getCell('C2')->getValue());
+            $this->assertSame("'@Jenis Berbahaya", $summary->getCell('D2')->getValue());
+            // Saldo absen ditandai '-' mengikuti perilaku laporan pimpinan.
+            $this->assertSame('-', $summary->getCell('F2')->getValue());
+            foreach (['B2', 'C2', 'D2'] as $cell) {
+                $this->assertSame(DataType::TYPE_STRING, $summary->getCell($cell)->getDataType());
+            }
+        } finally {
+            $spreadsheet->disconnectWorksheets();
+        }
+    }
+
+    public function test_tanpa_filter_periode_saldo_memakai_tahun_berjalan_dan_diberi_label(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $pegawai = Employee::factory()->create();
+        $jenis = RefJenisCuti::create(['nama' => 'Cuti Tahunan']);
+        $tahunIni = (int) now()->year;
+        $this->createLeaveRequest($pegawai, $jenis, $tahunIni.'-06-10', 'disetujui', 2);
+        LeaveBalance::create(['employee_id' => $pegawai->id, 'tahun' => $tahunIni, 'sisa' => 11]);
+        LeaveBalance::create(['employee_id' => $pegawai->id, 'tahun' => $tahunIni - 1, 'sisa' => 4]);
+
+        $spreadsheet = $this->loadWorkbook($this->actingAs($user)
+            ->get(route('cuti.laporan.excel'))
+            ->streamedContent());
+
+        try {
+            $summary = $spreadsheet->getSheetByName('Ringkasan Cuti');
+            $this->assertNotNull($summary);
+            $this->assertSame('Sisa Saldo Cuti Tahunan '.$tahunIni, $summary->getCell('F1')->getValue());
+            $this->assertSame(11, $summary->getCell('F2')->getValue());
+        } finally {
+            $spreadsheet->disconnectWorksheets();
+        }
+    }
+
+    public function test_nama_file_excel_mengikuti_periode_filter(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+
+        $tanpaPeriode = $this->actingAs($user)->get(route('cuti.laporan.excel'));
+        $this->assertMatchesRegularExpression(
+            '/attachment; filename=Rekap_Cuti_Semua_Tahun_\d{8}\.xlsx/',
+            (string) $tanpaPeriode->headers->get('Content-Disposition'),
+        );
+
+        $bulanan = $this->actingAs($user)->get(route('cuti.laporan.excel', ['periode' => '2026-06']));
+        $this->assertMatchesRegularExpression(
+            '/attachment; filename=Rekap_Cuti_2026-06_\d{8}\.xlsx/',
+            (string) $bulanan->headers->get('Content-Disposition'),
+        );
+
+        $namaBulan = $this->actingAs($user)->get(route('cuti.laporan.excel', ['periode' => 'Juni 2026']));
+        $this->assertMatchesRegularExpression(
+            '/attachment; filename=Rekap_Cuti_2026-06_\d{8}\.xlsx/',
+            (string) $namaBulan->headers->get('Content-Disposition'),
+        );
     }
 
     public function test_excel_mengamankan_semua_awalan_formula_dan_kontrol(): void
@@ -267,12 +427,17 @@ class CutiExcelExportTest extends TestCase
             && str_contains(strtolower($message), 'persempit filter'));
     }
 
-    private function createLeaveRequest(Employee $employee, RefJenisCuti $jenis, string $date): LeaveRequest
-    {
+    private function createLeaveRequest(
+        Employee $employee,
+        RefJenisCuti $jenis,
+        string $date,
+        string $status = 'menunggu_approval',
+        int $hari = 1,
+    ): LeaveRequest {
         return LeaveRequest::create([
             'employee_id' => $employee->id, 'jenis_cuti_id' => $jenis->id,
             'tanggal_mulai' => $date, 'tanggal_selesai' => $date,
-            'jumlah_hari_kerja' => 1, 'alasan' => 'Data Excel', 'status' => 'menunggu_approval',
+            'jumlah_hari_kerja' => $hari, 'alasan' => 'Data Excel', 'status' => $status,
         ]);
     }
 

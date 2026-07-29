@@ -7,8 +7,10 @@ use App\Models\LeaveApprovalChain;
 use App\Models\LeaveApprovalChainStep;
 use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceLedger;
+use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveProof;
 use App\Models\LeaveRequest;
+use App\Models\LeaveRequestCase;
 use App\Models\LeaveRequestStep;
 use App\Models\RefJenisCuti;
 use Illuminate\Database\QueryException;
@@ -17,6 +19,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -71,6 +74,15 @@ class CutiFoundationSchemaTest extends TestCase
                 'acted_at',
                 'decision_note',
             ],
+            'leave_requests' => [
+                'leave_request_case_id',
+            ],
+            'leave_request_cases' => [
+                'id',
+                'employee_id',
+                'jenis_cuti_id',
+                'created_by',
+            ],
             'leave_balances' => [
                 'sisa_n2',
                 'sisa_n1',
@@ -88,6 +100,20 @@ class CutiFoundationSchemaTest extends TestCase
                 'amount',
                 'source_year',
                 'sumber_carry_over',
+                'reason',
+                'dedup_key',
+                'metadata',
+                'created_by',
+                'occurred_at',
+            ],
+            'leave_balance_reservation_events' => [
+                'id',
+                'employee_id',
+                'leave_request_id',
+                'leave_balance_id',
+                'tahun',
+                'event_type',
+                'amount',
                 'reason',
                 'dedup_key',
                 'metadata',
@@ -131,6 +157,11 @@ class CutiFoundationSchemaTest extends TestCase
             'alasan' => 'Uji fondasi revisi cuti.',
             'status' => 'Draft',
         ]);
+        $leaveCase = LeaveRequestCase::create([
+            'employee_id' => $pemohon->id,
+            'jenis_cuti_id' => $jenisCuti->id,
+        ]);
+        $cuti->update(['leave_request_case_id' => $leaveCase->id]);
         $saldo = LeaveBalance::create([
             'employee_id' => $pemohon->id,
             'tahun' => 2026,
@@ -168,6 +199,15 @@ class CutiFoundationSchemaTest extends TestCase
             'event_type' => 'opening_balance_set',
             'amount' => 12,
         ]);
+        $reservation = LeaveBalanceReservationEvent::create([
+            'employee_id' => $pemohon->id,
+            'leave_request_id' => $cuti->id,
+            'leave_balance_id' => $saldo->id,
+            'tahun' => 2026,
+            'event_type' => LeaveBalanceReservationEvent::EVENT_RESERVED,
+            'amount' => 1,
+            'dedup_key' => 'reservation-uji-fondasi',
+        ]);
         $proof = LeaveProof::create([
             'leave_request_id' => $cuti->id,
             'token' => 'token-uji-fondasi',
@@ -181,7 +221,13 @@ class CutiFoundationSchemaTest extends TestCase
 
         $this->assertCount(1, $chain->steps);
         $this->assertCount(1, $cuti->steps);
+        $this->assertSame($leaveCase->id, $cuti->leaveRequestCase->id);
+        $this->assertSame($pemohon->id, $leaveCase->employee->id);
+        $this->assertSame($jenisCuti->id, $leaveCase->jenisCuti->id);
+        $this->assertSame($cuti->id, $leaveCase->leaveRequests->sole()->id);
         $this->assertTrue($saldo->ledgerEntries()->where('event_type', 'opening_balance_set')->exists());
+        $this->assertSame(1, $cuti->balanceReservationEvents()->sum('amount'));
+        $this->assertSame($reservation->id, $saldo->reservationEvents()->firstOrFail()->id);
         $this->assertSame('token-uji-fondasi', $cuti->proof->token);
         $this->assertSame('application/pdf', $proof->document_mime);
         $this->assertSame([
@@ -221,6 +267,24 @@ class CutiFoundationSchemaTest extends TestCase
             'name' => 'Rantai aktif duplikat',
             'effective_from' => '2026-01-02',
         ]);
+    }
+
+    public function test_rangkaian_pengajuan_cuti_bersifat_append_only(): void
+    {
+        $pemohon = Employee::factory()->create();
+        $jenisCuti = RefJenisCuti::create([
+            'nama' => 'Cuti Melahirkan Append Only',
+            'code' => 'melahirkan_append_only',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+        $leaveCase = LeaveRequestCase::create([
+            'employee_id' => $pemohon->id,
+            'jenis_cuti_id' => $jenisCuti->id,
+        ]);
+
+        $this->expectException(LogicException::class);
+        $leaveCase->update(['created_by' => Str::uuid()->toString()]);
     }
 
     public function test_constraint_fondasi_revisi_cuti_menolak_duplikasi_token_bukti(): void
@@ -324,6 +388,67 @@ class CutiFoundationSchemaTest extends TestCase
             'event_type' => 'event_sembarang',
             'amount' => 0,
         ]);
+    }
+
+    public function test_reservation_event_menolak_mutasi_dan_event_type_tidak_dikenal(): void
+    {
+        $employee = Employee::factory()->create();
+        $jenisCuti = RefJenisCuti::create([
+            'nama' => 'Cuti Tahunan Reservasi',
+            'code' => 'tahunan_reservasi',
+            'mengurangi_saldo_tahunan' => true,
+            'khusus_pns' => false,
+        ]);
+        $cuti = LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $jenisCuti->id,
+            'tanggal_mulai' => '2026-07-06',
+            'tanggal_selesai' => '2026-07-06',
+            'jumlah_hari_kerja' => 1,
+            'alasan' => 'Uji event reservasi.',
+            'status' => 'menunggu_approval',
+        ]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('event_type reservasi saldo cuti tidak diizinkan: event_sembarang');
+
+        LeaveBalanceReservationEvent::create([
+            'employee_id' => $employee->id,
+            'leave_request_id' => $cuti->id,
+            'tahun' => 2026,
+            'event_type' => 'event_sembarang',
+            'amount' => 1,
+        ]);
+    }
+
+    public function test_reservation_event_append_only_after_written(): void
+    {
+        $employee = Employee::factory()->create();
+        $jenisCuti = RefJenisCuti::create([
+            'nama' => 'Cuti Tahunan Reservasi Immutable',
+            'code' => 'tahunan_reservasi_immutable',
+            'mengurangi_saldo_tahunan' => true,
+            'khusus_pns' => false,
+        ]);
+        $cuti = LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $jenisCuti->id,
+            'tanggal_mulai' => '2026-07-06',
+            'tanggal_selesai' => '2026-07-06',
+            'jumlah_hari_kerja' => 1,
+            'alasan' => 'Uji immutability reservasi.',
+            'status' => 'menunggu_approval',
+        ]);
+        $event = LeaveBalanceReservationEvent::create([
+            'employee_id' => $employee->id,
+            'leave_request_id' => $cuti->id,
+            'tahun' => 2026,
+            'event_type' => LeaveBalanceReservationEvent::EVENT_RESERVED,
+            'amount' => 1,
+        ]);
+
+        $this->expectException(LogicException::class);
+        $event->forceFill(['amount' => 2])->save();
     }
 
     #[DataProvider('forbiddenCashConversionEventProvider')]

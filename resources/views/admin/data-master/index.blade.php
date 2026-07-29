@@ -5,52 +5,14 @@
             'golongan' => 'Golongan',
             'jenis_jabatan' => 'Jenis Jabatan',
             'eselon' => 'Eselon',
+            'status_pegawai' => 'Status Pegawai',
             'jenis_cuti' => 'Jenis Cuti',
             'agama' => 'Agama',
             'jenis_kelamin' => 'Jenis Kelamin',
             'status_perkawinan' => 'Status Perkawinan',
             'jenjang_pendidikan' => 'Jenjang Pendidikan',
             'unit_kerja' => 'Unit Kerja',
-            'bup' => 'Batas Usia Pensiun',
             'hari_libur' => 'Hari Libur / Cuti Bersama',
-        ];
-
-        $dataGolongan = [
-            ['kode' => 'I/a', 'nama' => 'Juru Muda'],
-            ['kode' => 'I/b', 'nama' => 'Juru Muda Tingkat 1'],
-            ['kode' => 'I/c', 'nama' => 'Juru'],
-            ['kode' => 'I/d', 'nama' => 'Juru Tingkat 1'],
-            ['kode' => 'II/a', 'nama' => 'Pengatur Muda'],
-            ['kode' => 'II/b', 'nama' => 'Pengatur Muda Tingkat 1'],
-            ['kode' => 'II/c', 'nama' => 'Pengatur'],
-            ['kode' => 'II/d', 'nama' => 'Pengatur Tingkat 1'],
-            ['kode' => 'III/a', 'nama' => 'Penata Muda'],
-            ['kode' => 'III/b', 'nama' => 'Penata Muda Tingkat 1'],
-            ['kode' => 'III/c', 'nama' => 'Penata'],
-            ['kode' => 'III/d', 'nama' => 'Penata Tingkat 1'],
-            ['kode' => 'IV/a', 'nama' => 'Pembina'],
-            ['kode' => 'IV/b', 'nama' => 'Pembina Tingkat 1'],
-            ['kode' => 'IV/c', 'nama' => 'Pembina Utama Muda'],
-            ['kode' => 'IV/d', 'nama' => 'Pembina Utama Madya'],
-            ['kode' => 'IV/e', 'nama' => 'Pembina Utama'],
-        ];
-
-        $dataJenisJabatan = [
-            ['id' => 1, 'nama' => 'Struktural', 'maks_usia' => 60, 'catatan' => 'Dapat disesuaikan berdasarkan jabatan detail'],
-            ['id' => 2, 'nama' => 'Fungsional Tertentu', 'maks_usia' => '58 / 60 / 65', 'catatan' => 'Mengikuti jenjang atau jabatan detail'],
-            ['id' => 3, 'nama' => 'Fungsional Umum / Pelaksana', 'maks_usia' => 58, 'catatan' => 'Default umum'],
-            ['id' => 4, 'nama' => 'Pimpinan Tinggi', 'maks_usia' => 60, 'catatan' => 'Jabatan pimpinan tinggi madya dan pratama'],
-        ];
-
-        $dataEselon = [
-            ['kode' => 'I.a', 'nama' => 'Eselon I.a'],
-            ['kode' => 'I.b', 'nama' => 'Eselon I.b'],
-            ['kode' => 'II.a', 'nama' => 'Eselon II.a'],
-            ['kode' => 'II.b', 'nama' => 'Eselon II.b'],
-            ['kode' => 'III.a', 'nama' => 'Eselon III.a'],
-            ['kode' => 'III.b', 'nama' => 'Eselon III.b'],
-            ['kode' => 'IV.a', 'nama' => 'Eselon IV.a'],
-            ['kode' => 'IV.b', 'nama' => 'Eselon IV.b'],
         ];
 
         $dataJenisCuti = [
@@ -83,33 +45,11 @@
             ['id' => 4, 'nama' => 'Cerai Mati'],
         ];
 
-        $dataPendidikan = [
-            ['id' => 1, 'nama' => 'SD'],
-            ['id' => 2, 'nama' => 'SMP'],
-            ['id' => 3, 'nama' => 'SMA / SMK / Sederajat'],
-            ['id' => 4, 'nama' => 'D1'],
-            ['id' => 5, 'nama' => 'D2'],
-            ['id' => 6, 'nama' => 'D3'],
-            ['id' => 7, 'nama' => 'D4 / S1'],
-            ['id' => 8, 'nama' => 'S2 / Profesi'],
-            ['id' => 9, 'nama' => 'S3'],
-        ];
-
         $dataUnitKerja = [
             ['id' => 1, 'nama' => 'Bagian Umum', 'keterangan' => 'Pusat administrasi'],
             ['id' => 2, 'nama' => 'Kelompok Kerja Akademik dan Kemahasiswaan', 'keterangan' => 'Layanan akademik'],
             ['id' => 3, 'nama' => 'Kelompok Kerja Sumber Daya Perguruan Tinggi', 'keterangan' => 'Layanan SDM PT'],
             ['id' => 4, 'nama' => 'Kelompok Kerja Kelembagaan dan Sistem Informasi', 'keterangan' => 'Layanan kelembagaan'],
-        ];
-
-        $dataBUP = [
-            ['jenis' => 'Pelaksana / Fungsional Umum', 'bup' => 58],
-            ['jenis' => 'Fungsional Ahli Pertama', 'bup' => 58],
-            ['jenis' => 'Fungsional Ahli Muda', 'bup' => 58],
-            ['jenis' => 'Fungsional Ahli Madya', 'bup' => 60],
-            ['jenis' => 'Fungsional Ahli Utama', 'bup' => 65],
-            ['jenis' => 'Struktural Eselon I & II', 'bup' => 60],
-            ['jenis' => 'Struktural Eselon III & IV', 'bup' => 58],
         ];
 
         $dataHariLibur = [
@@ -142,7 +82,7 @@
     </x-admin.page-header>
 
     <div x-data="{ 
-        activeTab: 'golongan', 
+        activeTab: '{{ old('tab', session('data_master_tab') ?: 'golongan') }}',
         isModalOpen: false, 
         modalMode: 'tambah',
         isDeleteModalOpen: false,
@@ -194,196 +134,31 @@
                 </div>
             </div>
 
+            @if (session('success'))
+                <x-ui.alert variant="success">{{ session('success') }}</x-ui.alert>
+            @endif
+            @if ($errors->any())
+                <x-ui.alert variant="danger">
+                    <p class="font-bold">Periksa kembali isian Anda:</p>
+                    <ul class="list-disc pl-4 mt-1 space-y-0.5">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </x-ui.alert>
+            @endif
+
             {{-- TAB: GOLONGAN --}}
-            <div x-show="activeTab === 'golongan'"
-                class="rounded-lg bg-surface p-6 shadow-sm space-y-6" style="display: none;">
-                <div class="pb-4 flex items-center justify-between">
-                    <div>
-                        <h2 class="text-2xl font-bold text-primary font-sans leading-tight">Golongan Pangkat</h2>
-                        <p class="text-[11px] text-muted mt-0.5 font-sans leading-normal">Data referensi golongan
-                            kepangkatan PNS.</p>
-                    </div>
-                    <button @click="openModal('tambah')"
-                        class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90">
-                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                        Tambah
-                    </button>
-                </div>
-                <div class="rounded-lg overflow-hidden">
-                    <x-ui.table>
-                        <x-ui.table-head>
-                            <x-ui.table-row>
-                                <x-ui.table-th>
-                                    Kode</x-ui.table-th>
-                                <x-ui.table-th>
-                                    Nama Pangkat</x-ui.table-th>
-                                <x-ui.table-th align="right" class="select-none">
-                                    <div class="flex justify-end">
-                                        <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.936 6.936 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                        </svg>
-                                    </div>
-                                </x-ui.table-th>
-                            </x-ui.table-row>
-                        </x-ui.table-head>
-                        <x-ui.table-body>
-                            @foreach($dataGolongan as $item)
-                                <x-ui.table-row :interactive="true">
-                                    <x-ui.table-td padding="sm" class="text-sm font-medium">{{ $item['kode'] }}</x-ui.table-td>
-                                    <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item['nama'] }}</x-ui.table-td>
-                                    <x-ui.table-td align="right" padding="sm">
-                                        <div class="flex items-center justify-end gap-1.5">
-                                            <x-ui.button type="button" @click="openModal('edit')" variant="secondary" size="icon" title="Edit">
-                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
-                                                </svg>
-                                            </x-ui.button>
-                                            <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['kode'] }} - {{ $item['nama'] }}' })" variant="danger" size="icon" title="Hapus">
-                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                                                </svg>
-                                            </x-ui.button>
-                                        </div>
-                                    </x-ui.table-td>
-                                </x-ui.table-row>
-                            @endforeach
-                        </x-ui.table-body>
-                    </x-ui.table>
-                </div>
-            </div>
+            @include('admin.data-master.partials.tab-golongan')
 
             {{-- TAB: JENIS JABATAN --}}
-            <div x-show="activeTab === 'jenis_jabatan'"
-                class="rounded-lg bg-surface p-6 shadow-sm space-y-6" style="display: none;">
-                <div class="pb-4 flex items-center justify-between">
-                    <div>
-                        <h2 class="text-2xl font-bold text-primary font-sans leading-tight">Jenis Jabatan</h2>
-                        <p class="text-[11px] text-muted mt-0.5 font-sans leading-normal">Data referensi jenis jabatan
-                            dan maksimal usia pensiun.</p>
-                    </div>
-                    <button @click="openModal('tambah')"
-                        class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90">
-                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                        Tambah
-                    </button>
-                </div>
-                <div class="rounded-lg overflow-hidden">
-                    <x-ui.table>
-                        <x-ui.table-head>
-                            <x-ui.table-row>
-                                <x-ui.table-th>
-                                    ID</x-ui.table-th>
-                                <x-ui.table-th>
-                                    Nama Jabatan</x-ui.table-th>
-                                <x-ui.table-th align="center">
-                                    Maks Usia</x-ui.table-th>
-                                <x-ui.table-th>
-                                    Catatan</x-ui.table-th>
-                                <x-ui.table-th align="right" class="select-none">
-                                    <div class="flex justify-end">
-                                        <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.936 6.936 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                        </svg>
-                                    </div>
-                                </x-ui.table-th>
-                            </x-ui.table-row>
-                        </x-ui.table-head>
-                        <x-ui.table-body>
-                            @foreach($dataJenisJabatan as $item)
-                                <x-ui.table-row :interactive="true">
-                                    <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item['id'] }}</x-ui.table-td>
-                                    <x-ui.table-td padding="sm" class="text-sm font-medium">{{ $item['nama'] }}</x-ui.table-td>
-                                    <x-ui.table-td align="center" padding="sm" class="text-sm font-medium text-warning">
-                                        {{ $item['maks_usia'] }}
-                                    </x-ui.table-td>
-                                    <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item['catatan'] }}</x-ui.table-td>
-                                    <x-ui.table-td align="right" padding="sm">
-                                        <div class="flex items-center justify-end gap-1.5">
-                                            <x-ui.button type="button" @click="openModal('edit')" variant="secondary" size="icon" title="Edit">
-                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
-                                                </svg>
-                                            </x-ui.button>
-                                            <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" variant="danger" size="icon" title="Hapus">
-                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                                                </svg>
-                                            </x-ui.button>
-                                        </div>
-                                    </x-ui.table-td>
-                                </x-ui.table-row>
-                            @endforeach
-                        </x-ui.table-body>
-                    </x-ui.table>
-                </div>
-            </div>
+            @include('admin.data-master.partials.tab-jenis-jabatan')
 
             {{-- TAB: ESELON --}}
-            <div x-show="activeTab === 'eselon'"
-                class="rounded-lg bg-surface p-6 shadow-sm space-y-6" style="display: none;">
-                <div class="pb-4 flex items-center justify-between">
-                    <div>
-                        <h2 class="text-2xl font-bold text-primary font-sans leading-tight">Eselon</h2>
-                        <p class="text-[11px] text-muted mt-0.5 font-sans leading-normal">Data referensi kode eselon
-                            struktural.</p>
-                    </div>
-                    <button @click="openModal('tambah')"
-                        class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90">
-                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                        Tambah
-                    </button>
-                </div>
-                <div class="rounded-lg overflow-hidden">
-                    <x-ui.table>
-                        <x-ui.table-head>
-                            <x-ui.table-row>
-                                <x-ui.table-th>
-                                    Kode</x-ui.table-th>
-                                <x-ui.table-th>
-                                    Nama Eselon</x-ui.table-th>
-                                <x-ui.table-th align="right" class="select-none">
-                                    <div class="flex justify-end">
-                                        <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.936 6.936 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                        </svg>
-                                    </div>
-                                </x-ui.table-th>
-                            </x-ui.table-row>
-                        </x-ui.table-head>
-                        <x-ui.table-body>
-                            @foreach($dataEselon as $item)
-                                <x-ui.table-row :interactive="true">
-                                    <x-ui.table-td padding="sm" class="text-sm font-medium">{{ $item['kode'] }}</x-ui.table-td>
-                                    <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item['nama'] }}</x-ui.table-td>
-                                    <x-ui.table-td align="right" padding="sm">
-                                        <div class="flex items-center justify-end gap-1.5">
-                                            <x-ui.button type="button" @click="openModal('edit')" variant="secondary" size="icon" title="Edit">
-                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
-                                                </svg>
-                                            </x-ui.button>
-                                            <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" variant="danger" size="icon" title="Hapus">
-                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                                                </svg>
-                                            </x-ui.button>
-                                        </div>
-                                    </x-ui.table-td>
-                                </x-ui.table-row>
-                            @endforeach
-                        </x-ui.table-body>
-                    </x-ui.table>
-                </div>
-            </div>
+            @include('admin.data-master.partials.tab-eselon')
+
+            {{-- TAB: STATUS PEGAWAI --}}
+            @include('admin.data-master.partials.tab-status-pegawai')
 
             {{-- TAB: JENIS CUTI --}}
             <div x-show="activeTab === 'jenis_cuti'"
@@ -644,65 +419,7 @@
             </div>
 
             {{-- TAB: JENJANG PENDIDIKAN --}}
-            <div x-show="activeTab === 'jenjang_pendidikan'"
-                class="rounded-lg bg-surface p-6 shadow-sm space-y-6" style="display: none;">
-                <div class="pb-4 flex items-center justify-between">
-                    <div>
-                        <h2 class="text-2xl font-bold text-primary font-sans leading-tight">Jenjang Pendidikan</h2>
-                        <p class="text-[11px] text-muted mt-0.5 font-sans leading-normal">Data referensi jenjang
-                            pendidikan formal.</p>
-                    </div>
-                    <button @click="openModal('tambah')"
-                        class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90">
-                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                        Tambah
-                    </button>
-                </div>
-                <div class="rounded-lg overflow-hidden">
-                    <x-ui.table>
-                        <x-ui.table-head>
-                            <x-ui.table-row>
-                                <x-ui.table-th>
-                                    ID</x-ui.table-th>
-                                <x-ui.table-th>
-                                    Jenjang Pendidikan</x-ui.table-th>
-                                <x-ui.table-th align="right" class="select-none">
-                                    <div class="flex justify-end">
-                                        <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.936 6.936 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                        </svg>
-                                    </div>
-                                </x-ui.table-th>
-                            </x-ui.table-row>
-                        </x-ui.table-head>
-                        <x-ui.table-body>
-                            @foreach($dataPendidikan as $item)
-                                <x-ui.table-row :interactive="true">
-                                    <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item['id'] }}</x-ui.table-td>
-                                    <x-ui.table-td padding="sm" class="text-sm font-medium">{{ $item['nama'] }}</x-ui.table-td>
-                                    <x-ui.table-td align="right" padding="sm">
-                                        <div class="flex items-center justify-end gap-1.5">
-                                            <x-ui.button type="button" @click="openModal('edit')" variant="secondary" size="icon" title="Edit">
-                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
-                                                </svg>
-                                            </x-ui.button>
-                                            <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" variant="danger" size="icon" title="Hapus">
-                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                                                </svg>
-                                            </x-ui.button>
-                                        </div>
-                                    </x-ui.table-td>
-                                </x-ui.table-row>
-                            @endforeach
-                        </x-ui.table-body>
-                    </x-ui.table>
-                </div>
-            </div>
+            @include('admin.data-master.partials.tab-jenjang-pendidikan')
 
             {{-- TAB: UNIT KERJA --}}
             <div x-show="activeTab === 'unit_kerja'"
@@ -755,68 +472,6 @@
                                                 </svg>
                                             </x-ui.button>
                                             <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" variant="danger" size="icon" title="Hapus">
-                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                                                </svg>
-                                            </x-ui.button>
-                                        </div>
-                                    </x-ui.table-td>
-                                </x-ui.table-row>
-                            @endforeach
-                        </x-ui.table-body>
-                    </x-ui.table>
-                </div>
-            </div>
-
-            {{-- TAB: BATAS USIA PENSIUN --}}
-            <div x-show="activeTab === 'bup'"
-                class="rounded-lg bg-surface p-6 shadow-sm space-y-6" style="display: none;">
-                <div class="pb-4 flex items-center justify-between">
-                    <div>
-                        <h2 class="text-2xl font-bold text-primary font-sans leading-tight">Batas Usia Pensiun (BUP)
-                        </h2>
-                        <p class="text-[11px] text-muted mt-0.5 font-sans leading-normal">Data referensi aturan usia
-                            pensiun berdasarkan jabatan.</p>
-                    </div>
-                    <button @click="openModal('tambah')"
-                        class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90">
-                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                        Tambah
-                    </button>
-                </div>
-                <div class="rounded-lg overflow-hidden">
-                    <x-ui.table>
-                        <x-ui.table-head>
-                            <x-ui.table-row>
-                                <x-ui.table-th>
-                                    Jenis Jabatan BUP</x-ui.table-th>
-                                <x-ui.table-th align="center">
-                                    BUP (Tahun)</x-ui.table-th>
-                                <x-ui.table-th align="right" class="select-none">
-                                    <div class="flex justify-end">
-                                        <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.936 6.936 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                        </svg>
-                                    </div>
-                                </x-ui.table-th>
-                            </x-ui.table-row>
-                        </x-ui.table-head>
-                        <x-ui.table-body>
-                            @foreach($dataBUP as $item)
-                                <x-ui.table-row :interactive="true">
-                                    <x-ui.table-td padding="sm" class="text-sm font-medium">{{ $item['jenis'] }}</x-ui.table-td>
-                                    <x-ui.table-td align="center" padding="sm" class="text-sm font-bold text-danger">{{ $item['bup'] }}</x-ui.table-td>
-                                    <x-ui.table-td align="right" padding="sm">
-                                        <div class="flex items-center justify-end gap-1.5">
-                                            <x-ui.button type="button" @click="openModal('edit')" variant="secondary" size="icon" title="Edit">
-                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
-                                                </svg>
-                                            </x-ui.button>
-                                            <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['jenis'] }}' })" variant="danger" size="icon" title="Hapus">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                                 </svg>
@@ -921,62 +576,10 @@
                 {{-- BODY: Dynamic Forms based on activeTab --}}
                 <div class="space-y-4">
 
-                    {{-- Form Golongan --}}
-                    <div x-show="activeTab === 'golongan'" class="space-y-4">
-                        <div>
-                            <label class="mb-1 block text-sm font-semibold text-ink">Kode Pangkat</label>
-                            <input type="text"
-                                class="w-full rounded-lg border border-primary/15 bg-transparent px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
-                                placeholder="Contoh: III/a">
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-semibold text-ink">Nama Pangkat</label>
-                            <input type="text"
-                                class="w-full rounded-lg border border-primary/15 bg-transparent px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
-                                placeholder="Contoh: Penata Muda">
-                        </div>
-                    </div>
-
-                    {{-- Form Jenis Jabatan --}}
-                    <div x-show="activeTab === 'jenis_jabatan'" class="space-y-4">
-                        <div>
-                            <label class="mb-1 block text-sm font-semibold text-ink">Nama Jabatan</label>
-                            <input type="text"
-                                class="w-full rounded-lg border border-primary/15 bg-transparent px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
-                                placeholder="Masukkan nama jabatan">
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="mb-1 block text-sm font-semibold text-ink">Maks Usia Pensiun</label>
-                                <input type="number"
-                                    class="w-full rounded-lg border border-primary/15 bg-transparent px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
-                                    placeholder="Contoh: 60">
-                            </div>
-                        </div>
-                        <x-form.textarea
-                            label="Catatan"
-                            rows="2"
-                            label-class="mb-1 block text-sm font-semibold normal-case tracking-normal"
-                            placeholder="Catatan opsional..."
-                            class="border-primary/15 bg-transparent focus:ring-1 focus:ring-primary/30"
-                        />
-                    </div>
-
-                    {{-- Form Eselon --}}
-                    <div x-show="activeTab === 'eselon'" class="space-y-4">
-                        <div>
-                            <label class="mb-1 block text-sm font-semibold text-ink">Kode Eselon</label>
-                            <input type="text"
-                                class="w-full rounded-lg border border-primary/15 bg-transparent px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
-                                placeholder="Contoh: I.a">
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-semibold text-ink">Nama Eselon</label>
-                            <input type="text"
-                                class="w-full rounded-lg border border-primary/15 bg-transparent px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
-                                placeholder="Contoh: Eselon I.a">
-                        </div>
-                    </div>
+                    {{-- Form untuk tab golongan, jenis jabatan, eselon,
+                         status pegawai, dan jenjang pendidikan sudah pindah
+                         ke form nyata di partial masing-masing tab. Modal ini
+                         hanya melayani tab yang masih mock. --}}
 
                     {{-- Form Jenis Cuti --}}
                     <div x-show="activeTab === 'jenis_cuti'" class="space-y-4">
@@ -1032,16 +635,6 @@
                         </div>
                     </div>
 
-                    {{-- Form Jenjang Pendidikan --}}
-                    <div x-show="activeTab === 'jenjang_pendidikan'" class="space-y-4">
-                        <div>
-                            <label class="mb-1 block text-sm font-semibold text-ink">Jenjang Pendidikan</label>
-                            <input type="text"
-                                class="w-full rounded-lg border border-primary/15 bg-transparent px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
-                                placeholder="Contoh: S1">
-                        </div>
-                    </div>
-
                     {{-- Form Unit Kerja --}}
                     <div x-show="activeTab === 'unit_kerja'" class="space-y-4">
                         <div>
@@ -1057,22 +650,6 @@
                             placeholder="Penjelasan unit kerja..."
                             class="border-primary/15 bg-transparent focus:ring-1 focus:ring-primary/30"
                         />
-                    </div>
-
-                    {{-- Form BUP --}}
-                    <div x-show="activeTab === 'bup'" class="space-y-4">
-                        <div>
-                            <label class="mb-1 block text-sm font-semibold text-ink">Jenis Jabatan BUP</label>
-                            <input type="text"
-                                class="w-full rounded-lg border border-primary/15 bg-transparent px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
-                                placeholder="Contoh: Fungsional Ahli Muda">
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-semibold text-ink">BUP (Tahun)</label>
-                            <input type="number"
-                                class="w-full rounded-lg border border-primary/15 bg-transparent px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
-                                placeholder="Contoh: 58">
-                        </div>
                     </div>
 
                     {{-- Form Hari Libur --}}

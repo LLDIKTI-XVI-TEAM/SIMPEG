@@ -7,7 +7,7 @@
     {{-- Data pegawai disuntikkan lewat script JSON agar aman dari escaping HTML --}}
     <script id="pegawai-data" type="application/json">{!! $pegawaiJson !!}</script>
 
-    <div x-data="exportPegawai" class="space-y-6">
+    <div x-data="exportPegawai({{ $pegawaiJson }})" class="space-y-6">
 
         {{-- ============================================================ --}}
         {{-- PRINT ONLY HEADER (Kop Surat Resmi)                         --}}
@@ -138,7 +138,7 @@
                                         <select x-model="activeUnit"
                                             class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                                             <option value="">Semua Unit Kerja</option>
-                                            @foreach($unitList as $unit)
+                                            @foreach($filterOptions['units'] as $unit)
                                                 <option value="{{ $unit }}">{{ $unit }}</option>
                                             @endforeach
                                         </select>
@@ -155,7 +155,7 @@
                                         <select x-model="activeGolongan"
                                             class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                                             <option value="">Semua Golongan</option>
-                                            @foreach($golonganList as $gol)
+                                            @foreach($filterOptions['golongan'] as $gol)
                                                 <option value="{{ $gol }}">{{ $gol }}</option>
                                             @endforeach
                                         </select>
@@ -172,7 +172,7 @@
                                         <select x-model="activeJenis"
                                             class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                                             <option value="">Semua Jenis</option>
-                                            @foreach($jenisList as $jenis)
+                                            @foreach($filterOptions['jenis'] as $jenis)
                                                 <option value="{{ $jenis }}">{{ $jenis }}</option>
                                             @endforeach
                                         </select>
@@ -189,7 +189,7 @@
                                         <select x-model="activeStatus"
                                             class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                                             <option value="">Semua Status</option>
-                                            @foreach($statusList as $st)
+                                            @foreach($filterOptions['status'] as $st)
                                                 <option value="{{ $st }}">{{ $st }}</option>
                                             @endforeach
                                         </select>
@@ -389,7 +389,7 @@
             maxWidth="2xl"
             bodyClass="p-6"
         >
-            <form method="POST" action="{{ route('laporan.pegawai.custom') }}" @submit.prevent="submitCustomExport($event)" class="space-y-5">
+            <form method="POST" action="{{ route('laporan.pegawai.custom') }}" @submit="showCustomExportModal = false" class="space-y-5">
                 @csrf
 
                 <input type="hidden" name="search" :value="searchQuery">
@@ -398,6 +398,11 @@
                 <input type="hidden" name="jenis" :value="activeJenis">
                 <input type="hidden" name="status" :value="activeStatus">
                 <input type="hidden" name="sort" :value="sortBy">
+                <input type="hidden" name="sort_dir" :value="sortDir">
+                <input type="hidden" name="prefix_field" :value="prefixField">
+                <input type="hidden" name="prefix_value" :value="prefixValue">
+                <input type="hidden" name="row_start" :value="rowStart">
+                <input type="hidden" name="row_end" :value="rowEnd">
 
                 <div>
                     <p class="text-sm text-ink font-sans">Pilih kolom laporan. NIK, No. KK, kontak pribadi, dan data sensitif lain tidak tersedia.</p>
@@ -469,15 +474,15 @@
 
     @push('scripts')
     <script>
-    document.addEventListener('alpine:init', () => {
-        Alpine.data('exportPegawai', () => ({
-            // =====================================================================
-            // DATA SOURCE — diisi dari PHP
-            // =====================================================================
-            allPegawai: JSON.parse(document.getElementById('pegawai-data').textContent),
+        const registerExportPegawai = () => {
+            Alpine.data('exportPegawai', (initialPegawai = []) => ({
+                // =====================================================================
+                // DATA SOURCE — diisi dari PHP
+                // =====================================================================
+                allPegawai: initialPegawai,
 
-            // =====================================================================
-            // FILTER STATE
+                // =====================================================================
+                // FILTER STATE
             // =====================================================================
             searchQuery: '',
             activeUnit: '',
@@ -493,20 +498,18 @@
             // KONFIGURASI EXPORT (Column Picker & Row Range)
             // =====================================================================
             columns: {
-                no:       { label: 'No',                  active: true,  key: 'no' },
-                nip:      { label: 'NIP',                 active: true,  key: 'nip' },
-                nama:     { label: 'Nama Pegawai',        active: true,  key: 'nama' },
-                golongan: { label: 'Golongan',            active: true,  key: 'golongan' },
-                jabatan:  { label: 'Jabatan',             active: true,  key: 'jabatan' },
-                unit:     { label: 'Unit Kerja',          active: true,  key: 'unit' },
-                jenis:    { label: 'Jenis Pegawai',       active: true,  key: 'jenis' },
-                status:   { label: 'Status',              active: true,  key: 'status' },
-                email:         { label: 'Email',               active: false, key: 'email' },
-                no_hp:         { label: 'No. HP',             active: false, key: 'no_hp' },
-                tanggal_lahir:   { label: 'Tanggal Lahir',        active: false, key: 'tanggal_lahir' },
-                tanggal_pensiun: { label: 'Tgl. Pensiun',         active: false, key: 'tanggal_pensiun' },
-                pendidikan:      { label: 'Pendidikan Terakhir',  active: false, key: 'pendidikan' },
-                pangkat:         { label: 'Pangkat',              active: false, key: 'pangkat' },
+                no:              { label: 'No',                  active: true,  key: 'no' },
+                nip:             { label: 'NIP',                 active: true,  key: 'nip' },
+                nama:            { label: 'Nama Pegawai',        active: true,  key: 'nama' },
+                golongan:        { label: 'Golongan',            active: true,  key: 'golongan' },
+                jabatan:         { label: 'Jabatan',             active: true,  key: 'jabatan' },
+                unit:            { label: 'Unit Kerja',          active: true,  key: 'unit' },
+                jenis:           { label: 'Jenis Pegawai',       active: true,  key: 'jenis' },
+                status:          { label: 'Status',              active: true,  key: 'status' },
+                pendidikan:      { label: 'Pendidikan Terakhir', active: false, key: 'pendidikan' },
+                tanggal_pensiun: { label: 'Tgl. Pensiun',        active: false, key: 'tanggal_pensiun' },
+                email:           { label: 'Email',               active: false, key: 'email' },
+                no_hp:           { label: 'No. HP',              active: false, key: 'no_hp' },
             },
             rowStart: 1,
             rowEnd: '',
@@ -633,9 +636,15 @@
                 return row[key] ?? '-';
             },
 
-            printReport() { window.print(); },
-        }));
-    });
+            printReport() { window.print(); }
+            }));
+        };
+
+        if (window.Alpine) {
+            registerExportPegawai();
+        } else {
+            document.addEventListener('alpine:init', registerExportPegawai);
+        }
     </script>
     @endpush
 

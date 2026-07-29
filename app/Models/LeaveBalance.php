@@ -64,4 +64,10 @@ class LeaveBalance extends Model
     {
         return $this->hasMany(LeaveBalanceLedger::class);
     }
+
+    /** @return HasMany<LeaveBalanceReservationEvent, $this> */
+    public function reservationEvents(): HasMany
+    {
+        return $this->hasMany(LeaveBalanceReservationEvent::class);
+    }
 }

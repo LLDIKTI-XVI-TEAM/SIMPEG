@@ -16,7 +16,7 @@ class PimpinanLeaveFilterRequest extends FormRequest
     {
         if (! $this->has('status')) {
             $this->merge([
-                'status' => 'menunggu_saya',
+                'status' => $this->filled('search') ? 'all' : 'menunggu_saya',
             ]);
         }
     }

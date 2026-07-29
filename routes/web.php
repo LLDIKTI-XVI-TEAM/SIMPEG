@@ -5,6 +5,12 @@ use App\Http\Controllers\Admin\CutiConfigController;
 use App\Http\Controllers\Admin\CutiController;
 use App\Http\Controllers\Admin\CutiEmployeeLookupController;
 use App\Http\Controllers\Admin\CutiReportController;
+use App\Http\Controllers\Admin\DataMasterController;
+use App\Http\Controllers\Admin\DataMasterEselonController;
+use App\Http\Controllers\Admin\DataMasterGolonganController;
+use App\Http\Controllers\Admin\DataMasterJenisJabatanController;
+use App\Http\Controllers\Admin\DataMasterJenjangPendidikanController;
+use App\Http\Controllers\Admin\DataMasterStatusPegawaiController;
 use App\Http\Controllers\Admin\DokumenController;
 use App\Http\Controllers\Admin\EmployeeImportController;
 use App\Http\Controllers\Admin\EmployeeSupervisorLookupController;
@@ -36,6 +42,10 @@ use App\Http\Controllers\Admin\UserMappingController;
 use App\Http\Controllers\Auth\KeycloakAuthController;
 use App\Http\Controllers\Cuti\VerifyLeaveProofController;
 use App\Http\Controllers\DashboardController;
+use App\Livewire\Admin\Pegawai\Create;
+use App\Livewire\Admin\Pegawai\Edit;
+use App\Livewire\Admin\Pegawai\Index;
+use App\Livewire\Admin\Pegawai\Show;
 use App\Models\Employee;
 use App\Models\Permission;
 use App\Models\Role;
@@ -177,6 +187,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/user-management', [UserMappingController::class, 'index'])
         ->middleware(['role:super_admin'])
         ->name('user-management');
+    Route::get('/user-management/data', [UserMappingController::class, 'data'])
+        ->middleware(['role:super_admin'])
+        ->name('user-management.data');
     Route::post('/user-management/update', [UserMappingController::class, 'update'])
         ->middleware(['role:super_admin'])
         ->name('user-management.update');
@@ -188,10 +201,53 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin'])
         ->name('rbac.update');
 
-    Route::get('/data-master', function () {
-        return view('admin.data-master.index');
-    })->middleware(['role:super_admin'])
+    Route::get('/data-master', [DataMasterController::class, 'index'])
+        ->middleware(['role:super_admin'])
         ->name('data-master');
+
+    // CRUD reference table memakai kebijakan hapus hybrid: item terpakai hanya
+    // boleh dinonaktifkan, item belum terpakai boleh dihapus permanen.
+    Route::prefix('data-master')->name('data-master.')->middleware('role:super_admin')->group(function (): void {
+        Route::post('/eselon', [DataMasterEselonController::class, 'store'])->name('eselon.store');
+        Route::post('/eselon/{eselon}/update', [DataMasterEselonController::class, 'update'])
+            ->whereUuid('eselon')->name('eselon.update');
+        Route::post('/eselon/{eselon}/toggle-aktif', [DataMasterEselonController::class, 'toggle'])
+            ->whereUuid('eselon')->name('eselon.toggle');
+        Route::post('/eselon/{eselon}/destroy', [DataMasterEselonController::class, 'destroy'])
+            ->whereUuid('eselon')->name('eselon.destroy');
+
+        Route::post('/jenjang-pendidikan', [DataMasterJenjangPendidikanController::class, 'store'])->name('jenjang-pendidikan.store');
+        Route::post('/jenjang-pendidikan/{jenjang}/update', [DataMasterJenjangPendidikanController::class, 'update'])
+            ->whereUuid('jenjang')->name('jenjang-pendidikan.update');
+        Route::post('/jenjang-pendidikan/{jenjang}/toggle-aktif', [DataMasterJenjangPendidikanController::class, 'toggle'])
+            ->whereUuid('jenjang')->name('jenjang-pendidikan.toggle');
+        Route::post('/jenjang-pendidikan/{jenjang}/destroy', [DataMasterJenjangPendidikanController::class, 'destroy'])
+            ->whereUuid('jenjang')->name('jenjang-pendidikan.destroy');
+
+        Route::post('/golongan', [DataMasterGolonganController::class, 'store'])->name('golongan.store');
+        Route::post('/golongan/{golongan}/update', [DataMasterGolonganController::class, 'update'])
+            ->whereUuid('golongan')->name('golongan.update');
+        Route::post('/golongan/{golongan}/toggle-aktif', [DataMasterGolonganController::class, 'toggle'])
+            ->whereUuid('golongan')->name('golongan.toggle');
+        Route::post('/golongan/{golongan}/destroy', [DataMasterGolonganController::class, 'destroy'])
+            ->whereUuid('golongan')->name('golongan.destroy');
+
+        Route::post('/jenis-jabatan', [DataMasterJenisJabatanController::class, 'store'])->name('jenis-jabatan.store');
+        Route::post('/jenis-jabatan/{jenisJabatan}/update', [DataMasterJenisJabatanController::class, 'update'])
+            ->whereUuid('jenisJabatan')->name('jenis-jabatan.update');
+        Route::post('/jenis-jabatan/{jenisJabatan}/toggle-aktif', [DataMasterJenisJabatanController::class, 'toggle'])
+            ->whereUuid('jenisJabatan')->name('jenis-jabatan.toggle');
+        Route::post('/jenis-jabatan/{jenisJabatan}/destroy', [DataMasterJenisJabatanController::class, 'destroy'])
+            ->whereUuid('jenisJabatan')->name('jenis-jabatan.destroy');
+
+        Route::post('/status-pegawai', [DataMasterStatusPegawaiController::class, 'store'])->name('status-pegawai.store');
+        Route::post('/status-pegawai/{statusPegawai}/update', [DataMasterStatusPegawaiController::class, 'update'])
+            ->whereUuid('statusPegawai')->name('status-pegawai.update');
+        Route::post('/status-pegawai/{statusPegawai}/toggle-aktif', [DataMasterStatusPegawaiController::class, 'toggle'])
+            ->whereUuid('statusPegawai')->name('status-pegawai.toggle');
+        Route::post('/status-pegawai/{statusPegawai}/destroy', [DataMasterStatusPegawaiController::class, 'destroy'])
+            ->whereUuid('statusPegawai')->name('status-pegawai.destroy');
+    });
 
     Route::get('/pegawai/nonaktif-list', [PegawaiController::class, 'inactive'])
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.restore'])
@@ -204,6 +260,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/cuti/rekap', [CutiController::class, 'rekap'])
         ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('cuti.rekap');
+    Route::get('/cuti/administrasi-saldo', [LeaveBalanceController::class, 'administrasi'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:cuti.balance.adjust'])
+        ->name('cuti.saldo.administrasi');
     Route::get('/cuti/pegawai/cari', CutiEmployeeLookupController::class)
         ->middleware(['role:super_admin,admin_kepegawaian,pimpinan', 'throttle:60,1'])
         ->name('cuti.employee-lookup');
@@ -243,44 +302,8 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin'])
         ->name('ews.config.update');
 
-    Route::get('/laporan/export-pegawai', function () {
-        $employees = Employee::with(['jenisPegawai:id,nama', 'statusPegawai:id,nama'])
-            ->orderBy('nama_lengkap')
-            ->get();
-
-        $pegawai = $employees->map(function ($emp) {
-            return [
-                'id' => $emp->id,
-                'nama' => $emp->nama_lengkap,
-                'nip' => $emp->nip,
-                'unit' => $emp->unitKerja?->nama ?? '-',
-                'golongan' => $emp->golongan_terakhir ?? '-',
-                'jabatan' => $emp->jabatan_terakhir ?? '-',
-                'jenis' => $emp->jenisPegawai?->nama ?? '-',
-                'status' => $emp->statusPegawai?->nama ?? $emp->status_aktif ?? '-',
-                'email' => $emp->email_pribadi ?? '-',
-                'no_hp' => $emp->no_hp ?? '-',
-                'tanggal_lahir' => $emp->tanggal_lahir?->translatedFormat('d F Y') ?? '-',
-                'tanggal_pensiun' => $emp->tanggal_pensiun?->translatedFormat('d F Y') ?? '-',
-                'pendidikan' => $emp->pendidikan_terakhir ?? '-',
-                'pangkat' => $emp->pangkat_terakhir ?? '-',
-            ];
-        })->toArray();
-
-        $unitList = collect($pegawai)->pluck('unit')->unique()->filter(fn ($v) => $v !== '-')->sort()->values();
-        $golonganList = collect($pegawai)->pluck('golongan')->unique()->filter(fn ($v) => $v !== '-')->sort()->values();
-        $jenisList = collect($pegawai)->pluck('jenis')->unique()->filter(fn ($v) => $v !== '-')->sort()->values();
-        $statusList = collect($pegawai)->pluck('status')->unique()->filter(fn ($v) => $v !== '-')->sort()->values();
-
-        return view('admin.laporan.export-pegawai', [
-            'pegawai' => $pegawai,
-            'unitList' => $unitList,
-            'golonganList' => $golonganList,
-            'jenisList' => $jenisList,
-            'statusList' => $statusList,
-            'title' => 'Laporan - Export Pegawai',
-        ]);
-    })->middleware(['role:super_admin,admin_kepegawaian'])
+    Route::get('/laporan/export-pegawai', [LaporanController::class, 'exportPegawai'])
+        ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('laporan.pegawai');
 
     Route::get('/laporan/export-pegawai/excel', [LaporanController::class, 'exportPegawaiExcel'])
@@ -290,20 +313,20 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::post('/laporan/export-pegawai/custom', [LaporanController::class, 'exportPegawaiCustom'])
         ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('laporan.pegawai.custom');
-    Route::get('/pegawai', [PegawaiController::class, 'index'])
+    Route::get('/pegawai', Index::class)
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
         ->name('data-pegawai');
-    Route::get('/pegawai/create', [PegawaiController::class, 'create'])
+    Route::get('/pegawai/create', Create::class)
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.create'])
         ->name('pegawai.create');
     Route::post('/pegawai', [PegawaiController::class, 'store'])
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.create'])
         ->name('pegawai.store');
-    Route::get('/pegawai/{id}', [PegawaiController::class, 'show'])
+    Route::get('/pegawai/{id}', Show::class)
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
         ->name('pegawai.show');
-    Route::get('/pegawai/{id}/edit', [PegawaiController::class, 'edit'])
+    Route::get('/pegawai/{id}/edit', Edit::class)
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
         ->name('pegawai.edit');

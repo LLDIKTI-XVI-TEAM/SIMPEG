@@ -70,6 +70,7 @@ class ExportFixedEmployeePdfAction
             '0.95 g',
             "{$left} {$top} 782 {$rowHeight} re f",
             '0 0 0 RG',
+            '0 0 0 rg',
             '0.6 w',
         ];
         $x = $left;
