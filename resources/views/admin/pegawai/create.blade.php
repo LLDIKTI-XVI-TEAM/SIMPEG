@@ -21,6 +21,11 @@
         {{-- Validation Errors --}}
         @if ($errors->any())
             <x-ui.alert variant="danger" title="Terdapat kesalahan pengisian form">
+                <ul class="list-disc pl-5 mt-2 space-y-1 text-sm">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
             </x-ui.alert>
         @endif
 
@@ -89,17 +94,11 @@
                             placeholder="198503122010011001"
                             maxlength="18"
                             x-model="nip"
-                            x-on:input="validateNipLocal"
+                            x-on:input="validateNip"
                             
                         >
-                            <x-slot:suffix>
-                                <button type="button" @click="checkIdentity('nip')" class="rounded bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50" :disabled="isCheckingNip || nip.length < 10">
-                                    <span x-show="!isCheckingNip">Cek</span>
-                                    <span x-show="isCheckingNip">...</span>
-                                </button>
-                            </x-slot:suffix>
                             <p x-show="nipError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="nipError"></p>
-                            <p x-show="nipSuccess" class="text-[11px] text-success font-semibold mt-1 font-sans" x-text="nipSuccess"></p>
+                            <p x-show="!nipError" class="text-[11px] text-muted mt-1 font-sans">Format: 18 digit angka.</p>
                         </x-form.input>
 
                         {{-- Jenis Pegawai --}}
@@ -168,7 +167,12 @@
 
                         
 
-                        
+                        {{-- Tanggal Pensiun --}}
+                        <x-form.date
+                            name="tanggal_pensiun"
+                            label="Tanggal Pensiun"
+                            id="tanggal_pensiun"
+                        />
 
                         {{-- Penanda ini dipakai cuti untuk membedakan Kepala Lembaga dari jabatan biasa. --}}
                         <div class="space-y-1 rounded-lg border border-border bg-soft/40 p-4 sm:col-span-2">
@@ -196,17 +200,11 @@
                             placeholder="3273251203850002"
                             maxlength="16"
                             x-model="nik"
-                            x-on:input="validateNikLocal"
+                            x-on:input="validateNik"
                             
                         >
-                            <x-slot:suffix>
-                                <button type="button" @click="checkIdentity('nik')" class="rounded bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50" :disabled="isCheckingNik || nik.length !== 16">
-                                    <span x-show="!isCheckingNik">Cek</span>
-                                    <span x-show="isCheckingNik">...</span>
-                                </button>
-                            </x-slot:suffix>
                             <p x-show="nikError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="nikError"></p>
-                            <p x-show="nikSuccess" class="text-[11px] text-success font-semibold mt-1 font-sans" x-text="nikSuccess"></p>
+                            <p x-show="!nikError" class="text-[11px] text-muted mt-1 font-sans">Format: 16 digit angka.</p>
                         </x-form.input>
 
                         {{-- KK --}}
@@ -218,10 +216,10 @@
                             placeholder="3273250102120045"
                             maxlength="16"
                             x-model="kk"
-                            x-on:input="validateKkLocal"
-                            help="Harus 16 digit angka."
+                            x-on:input="validateKk"
                         >
                             <p x-show="kkError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="kkError"></p>
+                            <p x-show="!kkError" class="text-[11px] text-muted mt-1 font-sans">Format: 16 digit angka.</p>
                         </x-form.input>
 
                         {{-- Tempat Lahir --}}
@@ -857,15 +855,11 @@
                 isSubmitting: false,
                 activeTab: 'utama',
                 subTab: 'pangkat',
-                nip: {{ json_encode(old('nip', '')) }},
+                nip: '{{ old('nip') }}',
                 nipError: '',
-                nipSuccess: '',
-                isCheckingNip: false,
-                nik: {{ json_encode(old('nik', '')) }},
-                kk: {{ json_encode(old('no_kk', '')) }},
+                nik: '{{ old('nik') }}',
+                kk: '{{ old('kk') }}',
                 nikError: '',
-                nikSuccess: '',
-                isCheckingNik: false,
                 kkError: '',
                 fotoPreview: null,
                 
@@ -942,8 +936,8 @@
                     }
 
                     const elNip = document.getElementById('nip');
-                    if (this.nip.length > 0 && this.nip.length < 10) {
-                        this.nipError = 'NIP harus minimal 10 digit sebelum melanjutkan';
+                    if (this.nip.length > 0 && this.nip.length < 18) {
+                        this.nipError = 'NIP harus tepat 18 digit sebelum melanjutkan';
                         if (elNip) {
                             elNip.setCustomValidity('Mohon lengkapi NIP dengan tepat 18 digit.');
                             elNip.reportValidity();
@@ -994,70 +988,28 @@
                     }
                     return true;
                 },
-                validateNikLocal() {
+                validateNik() {
                     this.nik = this.nik.replace(/\D/g, '');
-                    this.nikSuccess = '';
-                    if (this.nik.length > 0 && this.nik.length !== 16) {
-                        this.nikError = 'NIK harus tepat 16 digit.';
+                    if (this.nik.length > 0 && this.nik.length < 16) {
+                        this.nikError = '';
                     } else {
                         this.nikError = '';
                     }
                 },
-                validateKkLocal() {
+                validateKk() {
                     this.kk = this.kk.replace(/\D/g, '');
-                    if (this.kk.length > 0 && this.kk.length !== 16) {
-                        this.kkError = 'Nomor KK harus tepat 16 digit.';
+                    if (this.kk.length > 0 && this.kk.length < 16) {
+                        this.kkError = '';
                     } else {
                         this.kkError = '';
                     }
                 },
-                validateNipLocal() {
+                validateNip() {
                     this.nip = this.nip.replace(/\D/g, '');
-                    this.nipSuccess = '';
-                    if (this.nip.length > 0 && this.nip.length < 10) {
-                        this.nipError = 'NIP harus minimal 10 digit.';
+                    if (this.nip.length > 0 && this.nip.length < 18) {
+                        this.nipError = '';
                     } else {
                         this.nipError = '';
-                    }
-                },
-                async checkIdentity(type) {
-                    if (type === 'nip' && this.nip.length < 10) return;
-                    if (type === 'nik' && this.nik.length !== 16) return;
-                    
-                    const value = type === 'nip' ? this.nip : this.nik;
-                    const isCheckingVar = type === 'nip' ? 'isCheckingNip' : 'isCheckingNik';
-                    const errorVar = type === 'nip' ? 'nipError' : 'nikError';
-                    const successVar = type === 'nip' ? 'nipSuccess' : 'nikSuccess';
-                    
-                    this[isCheckingVar] = true;
-                    this[errorVar] = '';
-                    this[successVar] = '';
-                    
-                    try {
-                        const response = await fetch('/api/v1/pegawai/check-identity', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name=\\'csrf-token\\']').getAttribute('content')
-                            },
-                            body: JSON.stringify({
-                                type: type,
-                                value: value
-                            })
-                        });
-                        
-                        const data = await response.json();
-                        
-                        if (data.is_unique) {
-                            this[successVar] = data.message;
-                        } else {
-                            this[errorVar] = data.message;
-                        }
-                    } catch (error) {
-                        this[errorVar] = 'Terjadi kesalahan saat mengecek data.';
-                    } finally {
-                        this[isCheckingVar] = false;
                     }
                 },
                 handleFotoChange(e) {
@@ -1129,8 +1081,7 @@
                     this.berkasLainnyaError = res.error;
                     if (res.error) e.target.value = '';
                 }
-        });
-        
+            });
         document.addEventListener('DOMContentLoaded', function() {
             const requiredElements = document.querySelectorAll('input[required], select[required], textarea[required]');
             requiredElements.forEach(el => {
