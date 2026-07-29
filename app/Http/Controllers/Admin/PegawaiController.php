@@ -379,10 +379,28 @@ class PegawaiController extends Controller
         try {
             $employee = $action->execute($employee, $request->validated(), $request);
 
+            $employee->load([
+                'jenisPegawai:id,nama',
+                'statusPegawai:id,nama',
+                'rankHistories:id,employee_id,file_sk',
+                'positionHistories' => fn ($query) => $query
+                    ->select(['id', 'employee_id', 'file_sk', 'is_latest', 'tmt_jabatan', 'jabatan_id', 'unit_kerja_id'])
+                    ->with(['jabatan:id,nama', 'unitKerja:id,nama'])
+                    ->orderByDesc('is_latest')
+                    ->orderByDesc('tmt_jabatan'),
+                'salaryHistories:id,employee_id,file_sk',
+                'appointments' => fn ($query) => $query
+                    ->select(['id', 'employee_id', 'file_sk', 'tmt_pengangkatan'])
+                    ->orderByDesc('tmt_pengangkatan'),
+                'documents:id,employee_id,file_path',
+            ]);
+            $editedEmployeeData = app(\App\Actions\Employees\ListEmployeesAction::class)->toTableRow($employee);
+
             $redirect = redirect()->route('data-pegawai')
                 ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil diperbarui.')
                 ->with('employee_data_changed', true)
-                ->with('edited_employee_id', $employee->id);
+                ->with('edited_employee_id', $employee->id)
+                ->with('edited_employee_data', $editedEmployeeData);
 
             // Jika ada berkas lainnya yang diunggah, bersihkan juga cache halaman dokumen
             if ($request->hasFile('file_berkas_lainnya') && $request->file('file_berkas_lainnya')->isValid()) {
