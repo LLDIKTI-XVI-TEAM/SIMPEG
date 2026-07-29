@@ -1191,8 +1191,6 @@
                                         <option value="" disabled>Pilih Jenis Berkas</option>
                                         <option value="KTP">KTP</option>
                                         <option value="KK">Kartu Keluarga (KK)</option>
-                                        <option value="SK Mutasi">SK Mutasi</option>
-                                        <option value="SK Pensiun">SK Pensiun</option>
                                         <option value="Lainnya">Lainnya...</option>
                                     </select>
                                     <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">

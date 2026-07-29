@@ -762,8 +762,6 @@
                                         <option value="" disabled>Pilih Jenis Berkas</option>
                                         <option value="KTP">KTP</option>
                                         <option value="KK">Kartu Keluarga (KK)</option>
-                                        <option value="SK Mutasi">SK Mutasi</option>
-                                        <option value="SK Pensiun">SK Pensiun</option>
                                         <option value="Lainnya">Lainnya...</option>
                                     </select>
                                     <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
@@ -887,8 +885,7 @@
 
     @push('scripts')
     <script>
-        document.addEventListener('alpine:init', () => {
-            Alpine.data('createPegawai', () => ({
+        window.createPegawai = () => ({
                 isSubmitting: false,
                 activeTab: 'utama',
                 subTab: 'pangkat',
@@ -1118,8 +1115,8 @@
                     this.berkasLainnyaError = res.error;
                     if (res.error) e.target.value = '';
                 }
-            }));
         });
+        
         document.addEventListener('DOMContentLoaded', function() {
             const requiredElements = document.querySelectorAll('input[required], select[required], textarea[required]');
             requiredElements.forEach(el => {

@@ -160,6 +160,22 @@ class PegawaiController extends Controller
             'per_page' => $perPage,
         ];
 
+        // Jika request BUKAN dari AJAX/API, DAN BUKAN redirect dari form edit/delete, kita load data awal.
+        // Jika session 'employee_data_changed' true, berarti redirect dari action lain yang mana AlpineJS
+        // akan me-rehydrate datanya dari sessionStorage, jadi skip query yang mahal.
+        if (!$request->ajax() && !Str::startsWith($request->path(), 'api/') && !session('employee_data_changed')) {
+            $initialPageData = $listAction->execute($filters, $perPage);
+            $initialRows = $initialPageData->items();
+            $initialMeta = [
+                'total' => $initialPageData->total(),
+                'current_page' => $initialPageData->currentPage(),
+                'last_page' => $initialPageData->lastPage(),
+                'from' => $initialPageData->firstItem(),
+                'to' => $initialPageData->lastItem(),
+                'per_page' => $initialPageData->perPage(),
+            ];
+        }
+
         return view('admin.pegawai.index', compact(
             'perPage',
             'sort',
@@ -394,7 +410,12 @@ class PegawaiController extends Controller
                     ->orderByDesc('tmt_pengangkatan'),
                 'documents:id,employee_id,file_path',
             ]);
-            $editedEmployeeData = app(\App\Actions\Employees\ListEmployeesAction::class)->toTableRow($employee);
+            
+            $tableRow = app(ListEmployeesAction::class)->toTableRow($employee);
+            
+            // Gabungkan data tabel ringkas dengan data lengkap employee agar semua perubahan 
+            // (termasuk relasi dan file SK) tercatat di cache sessionStorage
+            $editedEmployeeData = array_merge($employee->toArray(), $tableRow);
 
             $redirect = redirect()->route('data-pegawai')
                 ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil diperbarui.')

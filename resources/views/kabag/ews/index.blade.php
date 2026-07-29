@@ -17,10 +17,10 @@
     {{-- SUMMARY CARDS --}}
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
         @php
-            $countMerah = collect($alerts)->filter(fn($a) => $a['sisa_hari'] < 30)->count();
-            $countKuning = collect($alerts)->filter(fn($a) => $a['sisa_hari'] >= 30 && $a['sisa_hari'] <= 90)->count();
-            $countHijau = collect($alerts)->filter(fn($a) => $a['sisa_hari'] > 90)->count();
-            $countTotal = collect($alerts)->count();
+            $countMerah = collect($raw_alerts)->filter(fn($a) => $a['sisa_hari'] < 30)->count();
+            $countKuning = collect($raw_alerts)->filter(fn($a) => $a['sisa_hari'] >= 30 && $a['sisa_hari'] <= 90)->count();
+            $countHijau = collect($raw_alerts)->filter(fn($a) => $a['sisa_hari'] > 90)->count();
+            $countTotal = collect($raw_alerts)->count();
         @endphp
         
         <x-ui.stat-card label="Total Peringatan" value="{{ $countTotal }}" variant="primary" size="lg" accent>
@@ -220,12 +220,16 @@
                 </x-ui.table>
             </div>
             
-            @if(count($alerts) > 0)
-            <div class="border-t border-border bg-surface px-6 py-3">
-                <p class="text-sm text-muted font-sans">
-                    Menampilkan <span class="font-semibold text-ink">{{ count($alerts) }}</span> peringatan EWS aktif untuk bawahan langsung Anda.
-                </p>
-            </div>
+            @if($alerts->hasPages())
+                <div class="border-t border-border bg-surface px-6 py-4">
+                    {{ $alerts->links() }}
+                </div>
+            @elseif($alerts->total() > 0)
+                <div class="border-t border-border bg-surface px-6 py-3">
+                    <p class="text-sm text-muted font-sans">
+                        Menampilkan <span class="font-semibold text-ink">{{ $alerts->total() }}</span> peringatan EWS aktif untuk bawahan langsung Anda.
+                    </p>
+                </div>
             @endif
         </x-ui.card>
     </div>
