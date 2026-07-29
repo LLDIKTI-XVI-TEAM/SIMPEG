@@ -385,16 +385,9 @@ class PegawaiController extends Controller
         try {
             $employee = $action->execute($employee, $request->validated(), $request);
 
-            $redirect = redirect()->route('data-pegawai')
+            return redirect()->route('data-pegawai')
                 ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil diperbarui.')
                 ->with('employee_data_changed', true);
-
-            // Jika ada berkas lainnya yang diunggah, bersihkan juga cache halaman dokumen
-            if ($request->hasFile('file_berkas_lainnya') && $request->file('file_berkas_lainnya')->isValid()) {
-                $redirect = $redirect->with('document_data_changed', true);
-            }
-
-            return $redirect;
         } catch (\Throwable $e) {
             return back()
                 ->withInput($request->except(array_keys($request->allFiles())))

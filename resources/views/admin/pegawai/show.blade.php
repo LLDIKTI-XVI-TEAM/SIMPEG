@@ -1,8 +1,8 @@
 <x-layouts.app title="Detail Pegawai">
 
     @php
-        // Mapping riwayat berkas digital pegawai
-        $riwayatDokumen = $p->documents ?? [];
+        $allDocuments   = collect($p->documents ?? []);
+        $riwayatDokumen = $allDocuments;
 
         $estimasiPangkatNext = $p->tanggal_kenaikan_pangkat_berikutnya
             ? \Carbon\Carbon::parse($p->tanggal_kenaikan_pangkat_berikutnya)->format('d-m-Y')
@@ -61,7 +61,7 @@
         arsipDokumen: [],
         loadingArsip: false,
         disiplinFileMode: 'arsip',
-        
+
         keluargaList: {{ ($p->families ?? collect())->map(fn($f) => ['id' => $f->id, 'nama_anggota' => $f->nama_anggota, 'hubungan' => $f->hubungan, 'nik' => auth()->user()->role === 'pimpinan' ? null : $f->nik, 'tempat_lahir' => $f->tempat_lahir, 'tanggal_lahir' => $f->tanggal_lahir, 'jenis_kelamin' => $f->jenis_kelamin === 'P' ? 'Perempuan' : 'Laki-laki', 'pekerjaan' => $f->pekerjaan, 'status' => $f->status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'])->toJson() }},
         keluargaLoading: false,
         isDeletingKeluarga: false,
@@ -1039,6 +1039,42 @@
                     </div>
 
                     <div class="space-y-4">
+                        <h3 class="text-xs font-bold text-ink uppercase tracking-wider font-sans border-b border-border pb-1.5">Status Kepegawaian</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                            <div class="space-y-0.5">
+                                <span class="font-semibold text-muted font-sans">Status Saat Ini</span>
+                                <p class="text-ink font-sans font-bold">{{ $p->statusPegawai->nama ?? $p->status_aktif ?? '-' }}</p>
+                            </div>
+                            <div class="space-y-0.5">
+                                <span class="font-semibold text-muted font-sans">Tanggal Efektif</span>
+                                <p class="text-ink font-sans">{{ $p->status_tanggal ? \Carbon\Carbon::parse($p->status_tanggal)->format('d-m-Y') : '-' }}</p>
+                            </div>
+                            <div class="space-y-0.5 sm:col-span-2">
+                                <span class="font-semibold text-muted font-sans">Alasan</span>
+                                <p class="text-ink font-sans">{{ $p->status_alasan ?? '-' }}</p>
+                            </div>
+                            @if($p->status_deskripsi)
+                            <div class="space-y-0.5 sm:col-span-2">
+                                <span class="font-semibold text-muted font-sans">Deskripsi</span>
+                                <p class="text-ink font-sans">{{ $p->status_deskripsi }}</p>
+                            </div>
+                            @endif
+                            <div class="space-y-0.5 sm:col-span-2">
+                                <span class="font-semibold text-muted font-sans">Berkas SK Status</span>
+                                @if($p->status_berkas_path)
+                                    <p class="text-ink font-sans">
+                                        <a href="{{ asset('storage/'.$p->status_berkas_path) }}" target="_blank" class="text-primary hover:underline font-semibold">
+                                            {{ $p->status_nomor_berkas ?? 'Lihat Berkas' }}
+                                        </a>
+                                    </p>
+                                @else
+                                    <p class="text-muted font-sans">Tidak ada berkas terlampir.</p>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
                         <h3 class="text-xs font-bold text-ink uppercase tracking-wider font-sans border-b border-border pb-1.5">Kontak & Rumah</h3>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                             <div class="space-y-0.5">
@@ -1460,25 +1496,23 @@
                 </div>
             </div>
 
-            {{-- TAB 9: BERKAS DOKUMEN SK --}}
+            {{-- TAB 9: DOKUMEN & SK --}}
             <div x-show="activeTab === 'docs'" style="display: none;" class="space-y-4" x-transition>
                 <div>
-                    <h3 class="text-sm font-bold text-ink font-sans">Daftar Berkas Fisik Kepegawaian</h3>
-                    <p class="text-xs text-muted font-sans mt-0.5">Daftar berkas PDF pendukung mutasi pangkat, jabatan, dan KGB.</p>
+                    <h3 class="text-sm font-bold text-ink font-sans">Daftar Dokumen & Berkas Pegawai</h3>
+                    <p class="text-xs text-muted font-sans mt-0.5">Seluruh berkas kepegawaian termasuk SK, ijazah, KTP/KK, dan dokumen lainnya.</p>
                 </div>
 
                 <div class="overflow-x-auto rounded-lg border border-border">
                     <table class="w-full">
                         <thead class="bg-soft border-b border-border">
-                            <tr>
-                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Nama Dokumen</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Kategori</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Nomor Dokumen</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Tanggal Terbit</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Ukuran</th>
-                                @if(auth()->user()->role !== 'pimpinan')
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border">Aksi</th>
-                                        @endif
+                            <tr class="text-left text-xs font-semibold text-muted uppercase tracking-wide font-sans">
+                                <th class="px-4 py-3">Nama Dokumen</th>
+                                <th class="px-4 py-3">Kategori</th>
+                                <th class="px-4 py-3">Nomor Dokumen</th>
+                                <th class="px-4 py-3">Tanggal Terbit</th>
+                                <th class="px-4 py-3">Ukuran</th>
+                                <th class="px-4 py-3">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border text-xs font-sans text-ink">
@@ -1486,41 +1520,36 @@
                             <tr class="transition-colors hover:bg-soft/30">
                                 <td class="px-4 py-3 max-w-xs">
                                     <div class="flex items-start gap-2.5">
-                                        <div class="flex h-8 w-6 shrink-0 flex-col items-center justify-between rounded border border-border bg-soft p-0.5 shadow-sm relative">
-                                            <div class="w-full bg-primary/10 text-primary text-[5px] font-bold text-center py-0.5 uppercase tracking-wide">
-                                                {{ pathinfo($doc->file_path, PATHINFO_EXTENSION) ?: 'PDF' }}
-                                            </div>
+                                        <div class="flex h-8 w-6 shrink-0 items-center justify-center rounded border border-border bg-soft p-0.5 shadow-sm">
+                                            <span class="text-[5px] font-bold text-primary uppercase">{{ strtoupper(pathinfo($doc->file_path, PATHINFO_EXTENSION) ?: 'file') }}</span>
                                         </div>
                                         <div class="min-w-0">
                                             <p class="font-bold font-sans truncate">{{ $doc->nama_dokumen }}</p>
-                                            <p class="text-xs text-muted truncate">{{ $doc->keterangan ?? '-' }}</p>
+                                            @if($doc->keterangan)
+                                            <p class="text-[10px] text-muted truncate">{{ $doc->keterangan }}</p>
+                                            @endif
                                         </div>
                                     </div>
                                 </td>
                                 <td class="px-4 py-3 text-muted font-sans">{{ \App\Support\Documents\DocumentCategory::label($doc->jenis_dokumen) }}</td>
-                                <td class="px-4 py-3 text-muted">{{ $doc->nomor_dokumen ?? '-' }}</td>
+                                <td class="px-4 py-3 text-muted font-mono">{{ $doc->nomor_dokumen ?? '-' }}</td>
                                 <td class="px-4 py-3 text-muted">{{ $doc->tanggal_dokumen ? \Carbon\Carbon::parse($doc->tanggal_dokumen)->format('d-m-Y') : '-' }}</td>
                                 <td class="px-4 py-3 text-muted">{{ $doc->fileSizeLabel() }}</td>
-                                <td class="px-4 py-3 text-left">
-                                    <div class="flex items-center justify-start gap-1.5">
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center gap-1.5">
                                         <a href="{{ route('dokumen.show', $doc->id) }}"
                                             class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
-                                            title="Detail" aria-label="Lihat detail {{ $doc->nama_dokumen }}">
-                                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
-                                                viewBox="0 0 24 24" stroke-width="1.5">
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                                            title="Lihat detail">
+                                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                             </svg>
                                         </a>
                                         <a href="{{ route('dokumen.download', $doc->id) }}"
                                             class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
-                                            title="Unduh" aria-label="Unduh {{ $doc->nama_dokumen }}">
-                                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
-                                                viewBox="0 0 24 24" stroke-width="1.5">
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                            title="Unduh">
+                                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                                             </svg>
                                         </a>
                                     </div>
@@ -1529,7 +1558,7 @@
                             @empty
                             <tr>
                                 <td colspan="6" class="px-4 py-6 text-center text-muted font-sans">
-                                    Belum ada dokumen atau SK kepegawaian yang diunggah untuk staf ini.
+                                    Belum ada dokumen atau berkas yang diunggah untuk pegawai ini.
                                 </td>
                             </tr>
                             @endforelse

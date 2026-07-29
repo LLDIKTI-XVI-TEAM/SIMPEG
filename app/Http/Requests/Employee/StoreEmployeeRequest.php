@@ -59,14 +59,6 @@ class StoreEmployeeRequest extends FormRequest
             $rules['pengangkatan_tanggal_sk'] = ['nullable', 'required_with:pengangkatan_jenis_pengangkatan,pengangkatan_tmt_pengangkatan,pengangkatan_no_sk,file_sk_pengangkatan', 'date'];
             $rules['file_sk_pengangkatan'] = ['nullable', 'required_with:pengangkatan_jenis_pengangkatan,pengangkatan_tmt_pengangkatan,pengangkatan_no_sk,pengangkatan_tanggal_sk', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png'];
 
-            // Berkas Lainnya (KTP, KK, SK Mutasi, SK Pensiun, atau jenis manual)
-            $rules['berkas_lainnya_jenis'] = ['nullable', 'required_with:berkas_lainnya_tanggal,file_berkas_lainnya', 'string', 'in:KTP,KK,SK Mutasi,SK Pensiun,Lainnya'];
-            $rules['berkas_lainnya_jenis_manual'] = ['nullable', 'required_if:berkas_lainnya_jenis,Lainnya', 'string', 'max:100'];
-            $rules['berkas_lainnya_nomor'] = ['nullable', 'string', 'max:100'];
-            $rules['berkas_lainnya_deskripsi'] = ['nullable', 'string', 'max:2000'];
-            $rules['berkas_lainnya_tanggal'] = ['nullable', 'required_with:berkas_lainnya_jenis,file_berkas_lainnya', 'date'];
-            $rules['file_berkas_lainnya'] = ['nullable', 'required_with:berkas_lainnya_jenis,berkas_lainnya_tanggal', 'file', 'max:10240', 'mimes:pdf,doc,docx,jpg,jpeg,png'];
-
             // Override foto khusus web (file upload)
             $rules['foto'] = ['nullable', 'image', 'max:10240', 'mimes:jpg,jpeg,png'];
         }
@@ -81,7 +73,6 @@ class StoreEmployeeRequest extends FormRequest
             'file_sk_jabatan' => 'File SK Jabatan',
             'file_sk_kgb' => 'File SK KGB',
             'file_sk_pengangkatan' => 'File SK Pengangkatan',
-            'file_berkas_lainnya' => 'File Berkas Lainnya',
         ]);
     }
 }

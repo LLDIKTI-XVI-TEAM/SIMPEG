@@ -257,6 +257,7 @@ class ReferenceSeeder extends Seeder
             'ews.kontrak_pppk',
             'ews.satyalancana',
             'ews.tidak_perlu',
+            'status_pegawai.diubah',
         ];
         $notificationChannels = RefNotificationChannel::query()
             ->whereIn('code', ['in_app', 'email'])

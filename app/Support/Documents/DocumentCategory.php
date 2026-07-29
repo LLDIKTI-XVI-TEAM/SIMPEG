@@ -12,6 +12,7 @@ class DocumentCategory
         'sk_hukuman_disiplin' => 'SK Hukuman Disiplin',
         'sk_mutasi' => 'SK Mutasi',
         'sk_pensiun' => 'SK Pensiun',
+        'sk_status_pegawai' => 'SK Perubahan Status Pegawai',
         'ijazah' => 'Ijazah',
         'ktp_kk' => 'KTP & KK',
         'lainnya' => 'Lainnya',

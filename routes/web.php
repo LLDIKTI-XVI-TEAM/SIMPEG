@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\DataMasterGolonganController;
 use App\Http\Controllers\Admin\DataMasterJenisJabatanController;
 use App\Http\Controllers\Admin\DataMasterJenjangPendidikanController;
 use App\Http\Controllers\Admin\DataMasterStatusPegawaiController;
+use App\Http\Controllers\Admin\StatusPegawaiController;
 use App\Http\Controllers\Admin\DokumenController;
 use App\Http\Controllers\Admin\EmployeeImportController;
 use App\Http\Controllers\Admin\EmployeeSupervisorLookupController;
@@ -115,6 +116,14 @@ if (app()->environment(['local', 'testing'])) {
 
 Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_kepegawaian,pimpinan,kepala_bagian,pegawai'])->group(function (): void {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    Route::get('/super-admin/status-pegawai', [StatusPegawaiController::class, 'index'])
+        ->middleware(['role:super_admin'])
+        ->name('super-admin.status-pegawai.index');
+        
+    Route::post('/super-admin/status-pegawai', [StatusPegawaiController::class, 'store'])
+        ->middleware(['role:super_admin'])
+        ->name('super-admin.status-pegawai.store');
 
     Route::get('/admin/search', [GlobalSearchController::class, 'search'])
         ->middleware('role:super_admin,admin_kepegawaian,pimpinan')

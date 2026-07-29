@@ -77,6 +77,7 @@
                     'hari-libur',
                     'ews.config',
                     'kepala-bagian.bawahan.index',
+                    'super-admin.status-pegawai.index',
                 ],
                 'pimpinan' => [
                     'audit-log',
@@ -86,6 +87,7 @@
                     'data-backup',
                     'ews.config',
                     'kepala-bagian.bawahan.index',
+                    'super-admin.status-pegawai.index',
                 ],
                 'kepala_bagian' => [
                     'data-pegawai',
@@ -102,6 +104,7 @@
                     'laporan.pegawai',
                     'cuti.laporan',
                     'ews.config',
+                    'super-admin.status-pegawai.index',
                 ],
                 'pegawai' => [
                     'data-pegawai',
@@ -121,6 +124,7 @@
                     'pengaturan',
                     'audit-log',
                     'kepala-bagian.bawahan.index',
+                    'super-admin.status-pegawai.index',
                 ],
             ];
 
@@ -137,6 +141,7 @@
                     'group' => 'Kepegawaian',
                     'items' => [
                         ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users'],
+                        ['label' => 'Status Pegawai', 'route' => 'super-admin.status-pegawai.index', 'icon' => 'users'],
                         ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'],
                         ['label' => 'Data Backup', 'route' => 'data-backup', 'icon' => 'user-minus'],
                         ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open'],

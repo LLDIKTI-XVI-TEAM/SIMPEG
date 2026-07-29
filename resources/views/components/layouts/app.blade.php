@@ -77,6 +77,7 @@
                     'hari-libur',
                     'ews.config',
                     'data-backup',
+                    'super-admin.status-pegawai.index',
                 ],
                 'pimpinan' => [
                     'audit-log',
@@ -85,6 +86,7 @@
                     'rbac',
                     'data-backup',
                     'ews.config',
+                    'super-admin.status-pegawai.index',
                 ],
                 'kepala_bagian' => [
                     'data-pegawai',
@@ -104,6 +106,7 @@
                     'cuti.rekap',
                     'ews',
                     'ews.config',
+                    'super-admin.status-pegawai.index',
                 ],
 
                 'pegawai' => [
@@ -123,6 +126,7 @@
                     'hari-libur',
                     'pengaturan',
                     'audit-log',
+                    'super-admin.status-pegawai.index',
                 ],
             ];
 
@@ -139,6 +143,7 @@
                     'group' => 'Kepegawaian',
                     'items' => array_filter([
                         ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users'],
+                        ['label' => 'Status Pegawai', 'route' => 'super-admin.status-pegawai.index', 'icon' => 'users'],
                         $activeRole === 'kepala_bagian' ? ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'] : null,
                         ['label' => 'Data Backup', 'route' => 'data-backup', 'icon' => 'user-minus'],
                         ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open'],
