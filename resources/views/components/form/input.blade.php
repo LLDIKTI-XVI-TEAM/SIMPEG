@@ -41,25 +41,33 @@
         </label>
     @endif
 
-    <input
-        id="{{ $fieldId }}"
-        name="{{ $name }}"
-        type="{{ $type }}"
-        @if ($placeholder) placeholder="{{ $placeholder }}" @endif
-        @if ($type !== 'password') value="{{ $inputValue }}" @endif
-        @required(filter_var($required, FILTER_VALIDATE_BOOL))
-        @disabled(filter_var($disabled, FILTER_VALIDATE_BOOL))
-        @if ($hasError) aria-invalid="true" @endif
-        @if ($describedBy !== '') aria-describedby="{{ $describedBy }}" @endif
-        {{ $attributes->class([
-            'w-full rounded-xl border bg-surface text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans transition-all duration-200',
-            $sizes[$size] ?? $sizes['md'],
-            'border-danger focus:border-danger focus:ring-danger/20' => $hasError,
-            'border-border' => ! $hasError,
-            'cursor-pointer' => $type === 'date' || $type === 'time',
-            'cursor-not-allowed opacity-70' => filter_var($disabled, FILTER_VALIDATE_BOOL),
-        ]) }}
-    >
+    <div class="relative w-full">
+        <input
+            id="{{ $fieldId }}"
+            name="{{ $name }}"
+            type="{{ $type }}"
+            @if ($placeholder) placeholder="{{ $placeholder }}" @endif
+            @if ($type !== 'password') value="{{ $inputValue }}" @endif
+            @required(filter_var($required, FILTER_VALIDATE_BOOL))
+            @disabled(filter_var($disabled, FILTER_VALIDATE_BOOL))
+            @if ($hasError) aria-invalid="true" @endif
+            @if ($describedBy !== '') aria-describedby="{{ $describedBy }}" @endif
+            {{ $attributes->class([
+                'w-full rounded-xl border bg-surface text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans transition-all duration-200',
+                $sizes[$size] ?? $sizes['md'],
+                'border-danger focus:border-danger focus:ring-danger/20' => $hasError,
+                'border-border' => ! $hasError,
+                'cursor-pointer' => $type === 'date' || $type === 'time',
+                'cursor-not-allowed opacity-70' => filter_var($disabled, FILTER_VALIDATE_BOOL),
+                isset($suffix) ? 'pr-20' : '',
+            ]) }}
+        >
+        @if (isset($suffix))
+            <div class="absolute inset-y-0 right-0 flex items-center pr-2">
+                {{ $suffix }}
+            </div>
+        @endif
+    </div>
 
     {{ $slot }}
 

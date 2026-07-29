@@ -89,10 +89,17 @@
                             placeholder="198503122010011001"
                             maxlength="18"
                             x-model="nip"
-                            x-on:input="validateNip"
+                            x-on:input="validateNipLocal"
                             
                         >
+                            <x-slot:suffix>
+                                <button type="button" @click="checkIdentity('nip')" class="rounded bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50" :disabled="isCheckingNip || nip.length < 10">
+                                    <span x-show="!isCheckingNip">Cek</span>
+                                    <span x-show="isCheckingNip">...</span>
+                                </button>
+                            </x-slot:suffix>
                             <p x-show="nipError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="nipError"></p>
+                            <p x-show="nipSuccess" class="text-[11px] text-success font-semibold mt-1 font-sans" x-text="nipSuccess"></p>
                         </x-form.input>
 
                         {{-- Jenis Pegawai --}}
@@ -161,12 +168,7 @@
 
                         
 
-                        {{-- Tanggal Pensiun --}}
-                        <x-form.date
-                            name="tanggal_pensiun"
-                            label="Tanggal Pensiun"
-                            id="tanggal_pensiun"
-                        />
+                        
 
                         {{-- Penanda ini dipakai cuti untuk membedakan Kepala Lembaga dari jabatan biasa. --}}
                         <div class="space-y-1 rounded-lg border border-border bg-soft/40 p-4 sm:col-span-2">
@@ -194,10 +196,17 @@
                             placeholder="3273251203850002"
                             maxlength="16"
                             x-model="nik"
-                            x-on:input="validateNik"
+                            x-on:input="validateNikLocal"
                             
                         >
+                            <x-slot:suffix>
+                                <button type="button" @click="checkIdentity('nik')" class="rounded bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50" :disabled="isCheckingNik || nik.length !== 16">
+                                    <span x-show="!isCheckingNik">Cek</span>
+                                    <span x-show="isCheckingNik">...</span>
+                                </button>
+                            </x-slot:suffix>
                             <p x-show="nikError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="nikError"></p>
+                            <p x-show="nikSuccess" class="text-[11px] text-success font-semibold mt-1 font-sans" x-text="nikSuccess"></p>
                         </x-form.input>
 
                         {{-- KK --}}
@@ -209,7 +218,8 @@
                             placeholder="3273250102120045"
                             maxlength="16"
                             x-model="kk"
-                            x-on:input="validateKk"
+                            x-on:input="validateKkLocal"
+                            help="Harus 16 digit angka."
                         >
                             <p x-show="kkError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="kkError"></p>
                         </x-form.input>
@@ -362,6 +372,11 @@
                                 :class="subTab === 'pengangkatan' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'"
                                 class="text-xs transition-colors cursor-pointer focus:outline-none font-sans">
                             D. SK Pengangkatan
+                        </button>
+                        <button type="button" @click="subTab = 'lainnya'"
+                                :class="subTab === 'lainnya' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'"
+                                class="text-xs transition-colors cursor-pointer focus:outline-none font-sans">
+                            E. Berkas Lainnya
                         </button>
                     </div>
 
@@ -566,21 +581,7 @@
                                         <p x-show="skJabatanError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skJabatanError"></p>
                                     </div>
                                 </div>
-                                <div x-show="skJabatanMode === 'arsip'" class="mt-1 space-y-2">
-                                    <input type="hidden" name="existing_document_id_jabatan" :value="selectedArsipJabatanId">
-                                    <div class="relative">
-                                        <select x-model="selectedArsipJabatanId" @change="onSelectArsipJabatan()" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                            <option value="">-- Pilih dokumen dari arsip --</option>
-                                            <template x-for="doc in arsipJabatanList" :key="doc.id">
-                                                <option :value="doc.id" x-text="doc.label"></option>
-                                            </template>
-                                        </select>
-                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></div>
-                                    </div>
-                                    <template x-if="selectedArsipJabatanId">
-                                        <p class="text-xs text-success font-semibold font-sans">✓ Dokumen arsip dipilih. No. SK dan Tanggal SK telah terisi otomatis.</p>
-                                    </template>
-                                </div>
+
                             </div>
                         </div>
                     </div>
@@ -643,21 +644,7 @@
                                         <p x-show="skKgbError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skKgbError"></p>
                                     </div>
                                 </div>
-                                <div x-show="skKgbMode === 'arsip'" class="mt-1 space-y-2">
-                                    <input type="hidden" name="existing_document_id_kgb" :value="selectedArsipKgbId">
-                                    <div class="relative">
-                                        <select x-model="selectedArsipKgbId" @change="onSelectArsipKgb()" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                            <option value="">-- Pilih dokumen dari arsip --</option>
-                                            <template x-for="doc in arsipKgbList" :key="doc.id">
-                                                <option :value="doc.id" x-text="doc.label"></option>
-                                            </template>
-                                        </select>
-                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></div>
-                                    </div>
-                                    <template x-if="selectedArsipKgbId">
-                                        <p class="text-xs text-success font-semibold font-sans">✓ Dokumen arsip dipilih. No. SK dan Tanggal SK telah terisi otomatis.</p>
-                                    </template>
-                                </div>
+
                             </div>
                         </div>
                     </div>
@@ -723,25 +710,82 @@
                                         <p x-show="skPengangkatanError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skPengangkatanError"></p>
                                     </div>
                                 </div>
-                                <div x-show="skPengangkatanMode === 'arsip'" class="mt-1 space-y-2">
-                                    <input type="hidden" name="existing_document_id_pengangkatan" :value="selectedArsipPengangkatanId">
-                                    <div class="relative">
-                                        <select x-model="selectedArsipPengangkatanId" @change="onSelectArsipPengangkatan()" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                            <option value="">-- Pilih dokumen dari arsip --</option>
-                                            <template x-for="doc in arsipPengangkatanList" :key="doc.id">
-                                                <option :value="doc.id" x-text="doc.label"></option>
-                                            </template>
-                                        </select>
-                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></div>
-                                    </div>
-                                    <template x-if="selectedArsipPengangkatanId">
-                                        <p class="text-xs text-success font-semibold font-sans">✓ Dokumen arsip dipilih. No. SK dan Tanggal SK telah terisi otomatis.</p>
-                                    </template>
-                                </div>
+
                             </div>
                         </div>
                     </div>
 
+                    {{-- SUB-TAB E: BERKAS LAINNYA --}}
+                    <div x-show="subTab === 'lainnya'" class="space-y-6" x-transition style="display: none;">
+                        <div class="rounded-lg bg-soft/40 border border-border px-4 py-3">
+                            <p class="text-[11px] text-muted font-sans">Berkas ini akan tersimpan ke arsip dokumen pegawai saat Anda menekan tombol "Simpan Pegawai". Kosongkan bila tidak ingin menambah berkas.</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                            {{-- Jenis Berkas --}}
+                            <div class="space-y-1">
+                                <label for="berkas_lainnya_jenis" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Berkas <span class="text-danger">*</span></label>
+                                <div class="relative">
+                                    <select id="berkas_lainnya_jenis" name="berkas_lainnya_jenis" x-model="berkasLainnyaForm.jenis" @change="generateNomorDokumen()" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                        <option value="" disabled>Pilih Jenis Berkas</option>
+                                        <option value="KTP">KTP</option>
+                                        <option value="KK">Kartu Keluarga (KK)</option>
+                                        <option value="Lainnya">Lainnya...</option>
+                                    </select>
+                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- Input Manual Jenis Berkas Lainnya --}}
+                            <div class="space-y-1" x-show="berkasLainnyaForm.jenis === 'Lainnya'" x-transition>
+                                <label for="berkas_lainnya_jenis_manual" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Sebutkan Jenis Berkas <span class="text-danger">*</span></label>
+                                <input id="berkas_lainnya_jenis_manual" name="berkas_lainnya_jenis_manual" type="text" @input="generateNomorDokumen()" placeholder="Misal: Sertifikat Pelatihan" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" x-model="berkasLainnyaForm.jenis_manual">
+                            </div>
+
+                            {{-- Nomor Dokumen --}}
+                            <div class="space-y-1" :class="berkasLainnyaForm.jenis !== 'Lainnya' ? 'sm:col-span-2' : ''">
+                                <label for="berkas_lainnya_nomor" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor Dokumen</label>
+                                <input id="berkas_lainnya_nomor" name="berkas_lainnya_nomor" type="text" placeholder="KTP-1234-07-2026" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans" x-model="berkasLainnyaForm.nomor_dokumen">
+                            </div>
+
+                            {{-- Deskripsi Berkas --}}
+                            <div class="space-y-1 sm:col-span-2">
+                                <label for="berkas_lainnya_deskripsi" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Deskripsi</label>
+                                <textarea id="berkas_lainnya_deskripsi" name="berkas_lainnya_deskripsi" style="min-height: 50px; height: 50px;" placeholder="Keterangan opsional terkait berkas" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans resize-none" x-model="berkasLainnyaForm.deskripsi"></textarea>
+                            </div>
+
+                            {{-- Tanggal Berkas --}}
+                            <div class="space-y-1">
+                                <label for="berkas_lainnya_tanggal" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Berkas</label>
+                                <input id="berkas_lainnya_tanggal" name="berkas_lainnya_tanggal" type="date" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" x-model="berkasLainnyaForm.tanggal">
+                                <p class="text-[10px] text-muted font-sans mt-0.5">Boleh dikosongkan jika tidak relevan.</p>
+                            </div>
+
+                            {{-- Upload Berkas Lainnya --}}
+                            <div class="space-y-2 sm:col-span-2 border-t border-border pt-4">
+                                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans block">File Berkas Lainnya <span class="text-danger">*</span></label>
+                                <div class="mt-1">
+                                    <div class="border-2 border-dashed border-border rounded-lg p-6 bg-soft/50 text-center relative hover:border-primary transition">
+                                        <input type="file" id="file_berkas_lainnya" name="file_berkas_lainnya" accept=".pdf,image/*" @change="handleBerkasLainnyaChange" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+                                        <svg class="mx-auto h-10 w-10 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" /></svg>
+                                        <p class="text-xs text-ink font-semibold mt-2 font-sans">Klik atau Seret berkas (PDF/JPG/PNG, maks 10MB)</p>
+                                        <template x-if="berkasLainnyaName">
+                                            <div class="mt-3 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink font-mono shadow-sm">
+                                                <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                                                <span x-text="berkasLainnyaName"></span>
+                                                <span class="text-muted" x-show="berkasLainnyaSize" x-text="'(' + berkasLainnyaSize + ')'"></span>
+                                            </div>
+                                        </template>
+                                        <p x-show="berkasLainnyaError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="berkasLainnyaError"></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 
@@ -809,16 +853,19 @@
 
     @push('scripts')
     <script>
-        document.addEventListener('alpine:init', () => {
-            Alpine.data('createPegawai', () => ({
+        window.createPegawai = () => ({
                 isSubmitting: false,
                 activeTab: 'utama',
                 subTab: 'pangkat',
-                nip: '{{ old('nip') }}',
+                nip: {{ json_encode(old('nip', '')) }},
                 nipError: '',
-                nik: '{{ old('nik') }}',
-                kk: '{{ old('kk') }}',
+                nipSuccess: '',
+                isCheckingNip: false,
+                nik: {{ json_encode(old('nik', '')) }},
+                kk: {{ json_encode(old('no_kk', '')) }},
                 nikError: '',
+                nikSuccess: '',
+                isCheckingNik: false,
                 kkError: '',
                 fotoPreview: null,
                 
@@ -859,6 +906,27 @@
                 skPengangkatanName: '',
                 skPengangkatanSize: '',
                 skPengangkatanError: '',
+                
+                berkasLainnyaName: '',
+                berkasLainnyaSize: '',
+                berkasLainnyaError: '',
+                berkasLainnyaForm: {
+                    jenis: '',
+                    jenis_manual: '',
+                    nomor_dokumen: '',
+                    deskripsi: '',
+                    tanggal: ''
+                },
+
+                generateNomorDokumen() {
+                    const jenis = this.berkasLainnyaForm.jenis === 'Lainnya' ? (this.berkasLainnyaForm.jenis_manual || 'BERKAS') : (this.berkasLainnyaForm.jenis || 'BERKAS');
+                    const prefix = jenis.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10).toUpperCase();
+                    const randomNum = Math.floor(1000 + Math.random() * 9000);
+                    const today = new Date();
+                    const month = String(today.getMonth() + 1).padStart(2, '0');
+                    const year = today.getFullYear();
+                    this.berkasLainnyaForm.nomor_dokumen = `${prefix}-${randomNum}-${month}-${year}`;
+                },
 
                 validateUtama() {
                     const requiredIds = [];
@@ -874,8 +942,8 @@
                     }
 
                     const elNip = document.getElementById('nip');
-                    if (this.nip.length > 0 && this.nip.length < 18) {
-                        this.nipError = 'NIP harus tepat 18 digit sebelum melanjutkan';
+                    if (this.nip.length > 0 && this.nip.length < 10) {
+                        this.nipError = 'NIP harus minimal 10 digit sebelum melanjutkan';
                         if (elNip) {
                             elNip.setCustomValidity('Mohon lengkapi NIP dengan tepat 18 digit.');
                             elNip.reportValidity();
@@ -926,28 +994,70 @@
                     }
                     return true;
                 },
-                validateNik() {
+                validateNikLocal() {
                     this.nik = this.nik.replace(/\D/g, '');
-                    if (this.nik.length > 0 && this.nik.length < 16) {
-                        this.nikError = '';
+                    this.nikSuccess = '';
+                    if (this.nik.length > 0 && this.nik.length !== 16) {
+                        this.nikError = 'NIK harus tepat 16 digit.';
                     } else {
                         this.nikError = '';
                     }
                 },
-                validateKk() {
+                validateKkLocal() {
                     this.kk = this.kk.replace(/\D/g, '');
-                    if (this.kk.length > 0 && this.kk.length < 16) {
-                        this.kkError = '';
+                    if (this.kk.length > 0 && this.kk.length !== 16) {
+                        this.kkError = 'Nomor KK harus tepat 16 digit.';
                     } else {
                         this.kkError = '';
                     }
                 },
-                validateNip() {
+                validateNipLocal() {
                     this.nip = this.nip.replace(/\D/g, '');
-                    if (this.nip.length > 0 && this.nip.length < 18) {
-                        this.nipError = '';
+                    this.nipSuccess = '';
+                    if (this.nip.length > 0 && this.nip.length < 10) {
+                        this.nipError = 'NIP harus minimal 10 digit.';
                     } else {
                         this.nipError = '';
+                    }
+                },
+                async checkIdentity(type) {
+                    if (type === 'nip' && this.nip.length < 10) return;
+                    if (type === 'nik' && this.nik.length !== 16) return;
+                    
+                    const value = type === 'nip' ? this.nip : this.nik;
+                    const isCheckingVar = type === 'nip' ? 'isCheckingNip' : 'isCheckingNik';
+                    const errorVar = type === 'nip' ? 'nipError' : 'nikError';
+                    const successVar = type === 'nip' ? 'nipSuccess' : 'nikSuccess';
+                    
+                    this[isCheckingVar] = true;
+                    this[errorVar] = '';
+                    this[successVar] = '';
+                    
+                    try {
+                        const response = await fetch('/api/v1/pegawai/check-identity', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name=\\'csrf-token\\']').getAttribute('content')
+                            },
+                            body: JSON.stringify({
+                                type: type,
+                                value: value
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.is_unique) {
+                            this[successVar] = data.message;
+                        } else {
+                            this[errorVar] = data.message;
+                        }
+                    } catch (error) {
+                        this[errorVar] = 'Terjadi kesalahan saat mengecek data.';
+                    } finally {
+                        this[isCheckingVar] = false;
                     }
                 },
                 handleFotoChange(e) {
@@ -1011,9 +1121,16 @@
                     this.skPengangkatanSize = res.size;
                     this.skPengangkatanError = res.error;
                     if (res.error) e.target.value = '';
+                },
+                handleBerkasLainnyaChange(e) {
+                    const res = this.validateFile(e.target.files[0]);
+                    this.berkasLainnyaName = res.name;
+                    this.berkasLainnyaSize = res.size;
+                    this.berkasLainnyaError = res.error;
+                    if (res.error) e.target.value = '';
                 }
-            }));
         });
+        
         document.addEventListener('DOMContentLoaded', function() {
             const requiredElements = document.querySelectorAll('input[required], select[required], textarea[required]');
             requiredElements.forEach(el => {

@@ -92,7 +92,7 @@ class PimpinanEmployeeController extends Controller
         $jenisPegawaiOptions = RefJenisPegawai::query()->orderBy('nama')->get(['id', 'nama']);
         $statusOptions = RefStatusPegawai::query()->orderByDesc('is_default')->orderBy('nama')->get(['id', 'nama']);
 
-        return view('admin.pegawai.index', compact(
+        return view('pimpinan.pegawai.index', compact(
             'initialRows', 'initialMeta',
             'golonganOptions', 'unitKerjaOptions', 'jenisPegawaiOptions', 'statusOptions',
             'employees',

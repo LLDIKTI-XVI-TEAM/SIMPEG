@@ -344,6 +344,7 @@
                                         editDoc.deskripsi = doc.keterangan;
                                         showEditModal = true;
                                     "
+                                    x-show="doc.jenis_dokumen !== 'sk_mutasi' && doc.jenis_dokumen !== 'sk_pensiun'"
                                     class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
                                     title="Edit" :aria-label="'Edit ' + (doc.nama_dokumen || doc.nama)">
                                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -353,7 +354,8 @@
                                 @endif
                                 @if(auth()->user()->role === 'super_admin')
                                 <button type="button" @click="deleteDocId = doc.id; deleteDocName = doc.nama_dokumen || doc.nama; showDeleteModal = true"
-                                    class="flex h-8 w-8 items-center justify-center rounded-lg border border-danger/30 bg-surface text-danger transition hover:bg-danger/10 shadow-sm"
+                                    x-show="doc.jenis_dokumen !== 'sk_mutasi' && doc.jenis_dokumen !== 'sk_pensiun'"
+                                    class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-danger transition hover:bg-red-50 shadow-sm"
                                     title="Hapus" :aria-label="'Hapus ' + (doc.nama_dokumen || doc.nama)">
                                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
@@ -452,10 +454,10 @@
                 <div class="space-y-1">
                     <label class="text-xs font-semibold text-ink font-sans">Kategori Dokumen <span class="text-danger">*</span></label>
                     <div class="relative">
-                        <x-form.select name="kategori_dokumen" required
-                           >
-                            @foreach ($categoryLabels as $value => $label)
-                                <option value="{{ $value }}">{{ $label }}</option>
+                        <x-form.select name="kategori_dokumen" required>
+                            <option value="">Pilih Kategori</option>
+                            @foreach (\App\Support\Documents\DocumentCategory::editableLabels() as $val => $label)
+                                <option value="{{ $val }}" {{ old('kategori_dokumen') === $val ? 'selected' : '' }}>{{ $label }}</option>
                             @endforeach
                         </x-form.select>
                     </div>
@@ -554,9 +556,11 @@
                     <label class="text-xs font-semibold text-ink font-sans">Kategori Dokumen <span class="text-danger">*</span></label>
                     <div class="relative">
                         <x-form.select name="kategori_dokumen" required x-model="editDoc.kategori_dokumen"
-                           >
-                            @foreach ($categoryLabels as $value => $label)
-                                <option value="{{ $value }}">{{ $label }}</option>
+                            ::disabled="isUploading"
+                            class="bg-surface shadow-sm focus:border-primary focus:ring focus:ring-primary/20">
+                            <option value="">Pilih Kategori</option>
+                            @foreach (\App\Support\Documents\DocumentCategory::editableLabels() as $val => $label)
+                                <option value="{{ $val }}">{{ $label }}</option>
                             @endforeach
                         </x-form.select>
                     </div>

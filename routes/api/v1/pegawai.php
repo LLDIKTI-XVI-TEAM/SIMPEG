@@ -30,6 +30,9 @@ Route::middleware($employeeGroupMiddleware)
         Route::post('/', [EmployeeController::class, 'store'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.create'])
             ->name('store');
+        Route::post('/check-identity', [EmployeeController::class, 'checkIdentity'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.create'])
+            ->name('check-identity');
         Route::post('/import', [EmployeeImportController::class, 'store'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.import'])
             ->name('import.store');
@@ -94,10 +97,6 @@ Route::middleware($employeeGroupMiddleware)
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
             ->whereUuid('employee')
             ->name('arsip-dokumen.index');
-        Route::post('/{employee}/berkas-lainnya', [EmployeeDocumentController::class, 'storeBerkasLainnya'])
-            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.update'])
-            ->whereUuid('employee')
-            ->name('berkas-lainnya.store');
         Route::get('/{employee}/status-dokumen', [EmployeeController::class, 'documentStatus'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
             ->whereUuid('employee')

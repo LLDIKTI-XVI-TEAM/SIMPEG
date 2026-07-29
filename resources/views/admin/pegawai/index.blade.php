@@ -44,6 +44,7 @@
     perPage: {{ $perPage }},
     dataChanged: @js(session('employee_data_changed', false)),
     editedEmployeeId: @js(session('edited_employee_id', null)),
+    editedEmployeeData: @js(session('edited_employee_data', null)),
     sort: '{{ $sort }}',
     direction: '{{ $direction }}',
     employeeShowUrlPrefix: @js($employeeShowUrlPrefix),
@@ -171,25 +172,8 @@
             }
             const data = await res.json();
             
-            // Perbarui cache sessionStorage di semua halaman yang mungkin mengandung pegawai ini
-            for (let i = 0; i < sessionStorage.length; i++) {
-                const key = sessionStorage.key(i);
-                if (key && key.startsWith('pegawai_')) {
-                    try {
-                        const cached = JSON.parse(sessionStorage.getItem(key));
-                        const idx = cached.rows.findIndex(r => r.id === this.statusPegawaiId);
-                        if (idx !== -1) {
-                            cached.rows[idx] = Object.assign({}, cached.rows[idx], data.employee);
-                            sessionStorage.setItem(key, JSON.stringify(cached));
-                        }
-                    } catch(e) {}
-                }
-            }
-            // Perbarui data di halaman yang sedang aktif tanpa reload
-            const idx = this.pegawaiRows.findIndex(r => r.id === this.statusPegawaiId);
-            if (idx !== -1) {
-                this.pegawaiRows[idx] = Object.assign({}, this.pegawaiRows[idx], data.employee);
-            }
+            // Gunakan fungsi helper untuk update cache dan state UI
+            this.applyEditedDataToCache(this.statusPegawaiId, data.employee);
             
             this.showStatusModal = false;
         } catch (error) {
@@ -327,7 +311,11 @@
             if (response.ok) {
                 this.successMessage = data.message || 'Riwayat berhasil ditambahkan.';
                 this.resetForm();
-                setTimeout(() => { this.showRiwayatModal = false; this.successMessage = ''; window.location.reload(); }, 1200);
+                
+                // Ambil data terbaru dari backend dan update cache secara instan
+                this.patchEditedEmployee(this.riwayatEmployeeId);
+                
+                setTimeout(() => { this.showRiwayatModal = false; this.successMessage = ''; }, 1200);
             } else if (response.status === 422 && data.errors) {
                 this.errors = data.errors;
             } else {
@@ -348,32 +336,7 @@
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             
-            // Perbarui cache sessionStorage di semua halaman yang mungkin mengandung pegawai ini
-            for (let i = 0; i < sessionStorage.length; i++) {
-                const key = sessionStorage.key(i);
-                if (key && key.startsWith('pegawai_')) {
-                    try {
-                        const cached = JSON.parse(sessionStorage.getItem(key));
-                        const idx = cached.rows.findIndex(r => r.id === id);
-                        if (idx !== -1) {
-                            cached.rows[idx] = Object.assign({}, cached.rows[idx], data.employee);
-                            sessionStorage.setItem(key, JSON.stringify(cached));
-                        }
-                    } catch(e) {}
-                }
-            }
-            
-            // Setelah cache di-patch, coba muat ulang data dari cache untuk halaman saat ini
-            const cKey = this.cacheKey + `_p${this.meta.current_page}`;
-            const cached = sessionStorage.getItem(cKey);
-            if (cached) {
-                const parsed = JSON.parse(cached);
-                this.pegawaiRows = parsed.rows;
-                this.meta = parsed.meta;
-                this.isLoading = false;
-            } else {
-                this.fetchPage(this.meta.current_page);
-            }
+            this.applyEditedDataToCache(id, data.employee);
         } catch (e) {
             console.error('Gagal mem-patch pegawai yang diedit:', e);
             this.clearCache();
@@ -381,9 +344,41 @@
         }
     },
 
+    applyEditedDataToCache(id, data) {
+        // Perbarui cache sessionStorage di semua halaman yang mungkin mengandung pegawai ini
+        for (let i = 0; i < sessionStorage.length; i++) {
+            const key = sessionStorage.key(i);
+            if (key && key.startsWith('pegawai_')) {
+                try {
+                    const cached = JSON.parse(sessionStorage.getItem(key));
+                    const idx = cached.rows.findIndex(r => r.id === id);
+                    if (idx !== -1) {
+                        cached.rows[idx] = Object.assign({}, cached.rows[idx], data);
+                        sessionStorage.setItem(key, JSON.stringify(cached));
+                    }
+                } catch(e) {}
+            }
+        }
+        
+        // Setelah cache di-patch, coba muat ulang data dari cache untuk halaman saat ini
+        const cKey = this.cacheKey + `_p${this.meta.current_page}`;
+        const cached = sessionStorage.getItem(cKey);
+        if (cached) {
+            const parsed = JSON.parse(cached);
+            this.pegawaiRows = parsed.rows;
+            this.meta = parsed.meta;
+            this.isLoading = false;
+        } else {
+            this.fetchPage(this.meta.current_page);
+        }
+    },
+
     init() {
         if (this.dataChanged) {
-            if (this.editedEmployeeId) {
+            if (this.editedEmployeeId && this.editedEmployeeData) {
+                // Perbarui cache secara sinkron tanpa loading delay untuk pengalaman instant save
+                this.applyEditedDataToCache(this.editedEmployeeId, this.editedEmployeeData);
+            } else if (this.editedEmployeeId) {
                 this.isLoading = true;
                 this.patchEditedEmployee(this.editedEmployeeId);
             } else {

@@ -160,6 +160,26 @@ class PegawaiController extends Controller
             'per_page' => $perPage,
         ];
 
+        // Jika request BUKAN dari AJAX/API, DAN BUKAN redirect dari form edit/delete, kita load data awal.
+        // Jika session 'employee_data_changed' true, berarti redirect dari action lain yang mana AlpineJS
+        // akan me-rehydrate datanya dari sessionStorage, jadi skip query yang mahal.
+        if (!$request->ajax() && !Str::startsWith($request->path(), 'api/') && !session('employee_data_changed')) {
+            $initialPageData = $listAction->execute(array_merge($filters, [
+                'sort' => $sort,
+                'direction' => $direction,
+                'per_page' => $perPage,
+            ]));
+            $initialRows = $initialPageData->items();
+            $initialMeta = [
+                'total' => $initialPageData->total(),
+                'current_page' => $initialPageData->currentPage(),
+                'last_page' => $initialPageData->lastPage(),
+                'from' => $initialPageData->firstItem(),
+                'to' => $initialPageData->lastItem(),
+                'per_page' => $initialPageData->perPage(),
+            ];
+        }
+
         return view('admin.pegawai.index', compact(
             'perPage',
             'sort',
@@ -379,10 +399,33 @@ class PegawaiController extends Controller
         try {
             $employee = $action->execute($employee, $request->validated(), $request);
 
-            return redirect()->route('data-pegawai')
+            $employee->load([
+                'jenisPegawai:id,nama',
+                'statusPegawai:id,nama',
+                'rankHistories:id,employee_id,file_sk',
+                'positionHistories' => fn ($query) => $query
+                    ->select(['id', 'employee_id', 'file_sk', 'is_latest', 'tmt_jabatan', 'jabatan_id', 'unit_kerja_id'])
+                    ->with(['jabatan:id,nama', 'unitKerja:id,nama'])
+                    ->orderByDesc('is_latest')
+                    ->orderByDesc('tmt_jabatan'),
+                'salaryHistories:id,employee_id,file_sk',
+                'appointments' => fn ($query) => $query
+                    ->select(['id', 'employee_id', 'file_sk', 'tmt_pengangkatan'])
+                    ->orderByDesc('tmt_pengangkatan'),
+                'documents:id,employee_id,file_path',
+            ]);
+            
+            $tableRow = app(ListEmployeesAction::class)->toTableRow($employee);
+            
+            // Gabungkan data tabel ringkas dengan data lengkap employee agar semua perubahan 
+            // (termasuk relasi dan file SK) tercatat di cache sessionStorage
+            $editedEmployeeData = array_merge($employee->toArray(), $tableRow);
+
+            $redirect = redirect()->route('data-pegawai')
                 ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil diperbarui.')
                 ->with('employee_data_changed', true)
-                ->with('edited_employee_id', $employee->id);
+                ->with('edited_employee_id', $employee->id)
+                ->with('edited_employee_data', $editedEmployeeData);
 
             // Jika ada berkas lainnya yang diunggah, bersihkan juga cache halaman dokumen
             if ($request->hasFile('file_berkas_lainnya') && $request->file('file_berkas_lainnya')->isValid()) {

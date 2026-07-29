@@ -39,6 +39,8 @@ use Illuminate\Support\Carbon;
  * @property bool $is_satyalancana_eligible
  * @property string|null $satyalancana_note
  * @property bool $is_kepala_lembaga
+ * @property string|null $foto_url
+ * @property string|null $foto_public_path
  * @property-read RefJenisPegawai|null $jenisPegawai
  * @property-read User|null $user
  * @property-read Employee|null $kepalaBagian
