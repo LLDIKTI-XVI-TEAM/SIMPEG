@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::table('employees', function (Blueprint $table) {
             // Ubah tipe data enum menjadi string karena opsi status bertambah
             $table->string('status_aktif', 50)->default('Aktif')->change();
-            
+
             // Kolom baru untuk detail status
             $table->string('status_alasan')->nullable();
             $table->text('status_deskripsi')->nullable();
@@ -43,4 +43,3 @@ return new class extends Migration
         });
     }
 };
-

@@ -11,7 +11,6 @@ use App\Http\Controllers\Admin\DataMasterGolonganController;
 use App\Http\Controllers\Admin\DataMasterJenisJabatanController;
 use App\Http\Controllers\Admin\DataMasterJenjangPendidikanController;
 use App\Http\Controllers\Admin\DataMasterStatusPegawaiController;
-use App\Http\Controllers\Admin\StatusPegawaiController;
 use App\Http\Controllers\Admin\DokumenController;
 use App\Http\Controllers\Admin\EmployeeImportController;
 use App\Http\Controllers\Admin\EmployeeSupervisorLookupController;
@@ -39,6 +38,7 @@ use App\Http\Controllers\Admin\PimpinanReportController;
 use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\RbacController;
 use App\Http\Controllers\Admin\SettingsController;
+use App\Http\Controllers\Admin\StatusPegawaiController;
 use App\Http\Controllers\Admin\UserMappingController;
 use App\Http\Controllers\Auth\KeycloakAuthController;
 use App\Http\Controllers\Cuti\VerifyLeaveProofController;
@@ -124,7 +124,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/super-admin/status-pegawai', [StatusPegawaiController::class, 'index'])
         ->middleware(['role:super_admin'])
         ->name('super-admin.status-pegawai.index');
-        
+
     Route::post('/super-admin/status-pegawai', [StatusPegawaiController::class, 'store'])
         ->middleware(['role:super_admin'])
         ->name('super-admin.status-pegawai.store');

@@ -32,17 +32,17 @@ class EmployeeDocumentController extends Controller
 
         $documents = $query->get(['id', 'nama_dokumen', 'nomor_dokumen', 'tanggal_dokumen', 'file_path', 'jenis_dokumen'])
             ->map(fn ($doc) => [
-                'id'           => $doc->id,
+                'id' => $doc->id,
                 'nama_dokumen' => $doc->nama_dokumen,
                 'nomor_dokumen' => $doc->nomor_dokumen,
-                'tanggal'      => $doc->tanggal_dokumen?->format('d-m-Y'),
-                'file_path'    => $doc->file_path,
+                'tanggal' => $doc->tanggal_dokumen?->format('d-m-Y'),
+                'file_path' => $doc->file_path,
                 'jenis_dokumen' => $doc->jenis_dokumen,
             ]);
 
         return response()->json([
             'employee_id' => $employee->id,
-            'documents'   => $documents,
+            'documents' => $documents,
         ]);
     }
 
@@ -57,22 +57,22 @@ class EmployeeDocumentController extends Controller
         StoreBerkasLainnyaRequest $request,
         Employee $employee,
     ): JsonResponse {
-        $file      = $request->file('berkas');
-        $category  = $request->input('kategori_dokumen');
+        $file = $request->file('berkas');
+        $category = $request->input('kategori_dokumen');
         $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension());
-        $filename  = $employee->id . '_' . $category . '_' . Str::uuid() . '.' . $extension;
-        $filePath  = $file->storeAs($employee->id . '/' . $category, $filename, Document::STORAGE_DISK);
+        $filename = $employee->id.'_'.$category.'_'.Str::uuid().'.'.$extension;
+        $filePath = $file->storeAs($employee->id.'/'.$category, $filename, Document::STORAGE_DISK);
 
         try {
             $document = DB::transaction(function () use ($employee, $request, $filePath, $category): Document {
                 $doc = Document::create([
-                    'employee_id'     => $employee->id,
-                    'jenis_dokumen'   => $category,
-                    'nama_dokumen'    => $request->input('nama_dokumen'),
-                    'nomor_dokumen'   => $request->input('nomor_dokumen'),
+                    'employee_id' => $employee->id,
+                    'jenis_dokumen' => $category,
+                    'nama_dokumen' => $request->input('nama_dokumen'),
+                    'nomor_dokumen' => $request->input('nomor_dokumen'),
                     'tanggal_dokumen' => $request->input('tanggal_terbit'),
-                    'file_path'       => $filePath,
-                    'keterangan'      => $request->input('keterangan'),
+                    'file_path' => $filePath,
+                    'keterangan' => $request->input('keterangan'),
                 ]);
 
                 AuditService::log('CREATE', 'Document', $doc->id, null, $doc->toArray(), $request);
@@ -86,17 +86,17 @@ class EmployeeDocumentController extends Controller
         }
 
         return response()->json([
-            'message'  => 'Berkas berhasil diunggah.',
+            'message' => 'Berkas berhasil diunggah.',
             'document' => [
-                'id'              => $document->id,
-                'nama_dokumen'    => $document->nama_dokumen,
-                'jenis_dokumen'   => $document->jenis_dokumen,
-                'kategori_label'  => DocumentCategory::label($document->jenis_dokumen),
-                'nomor_dokumen'   => $document->nomor_dokumen,
+                'id' => $document->id,
+                'nama_dokumen' => $document->nama_dokumen,
+                'jenis_dokumen' => $document->jenis_dokumen,
+                'kategori_label' => DocumentCategory::label($document->jenis_dokumen),
+                'nomor_dokumen' => $document->nomor_dokumen,
                 'tanggal_dokumen' => $document->tanggal_dokumen?->format('d-m-Y'),
-                'file_size'       => $document->fileSizeLabel(),
-                'detail_url'      => route('dokumen.show', $document->id),
-                'download_url'    => route('dokumen.download', $document->id),
+                'file_size' => $document->fileSizeLabel(),
+                'detail_url' => route('dokumen.show', $document->id),
+                'download_url' => route('dokumen.download', $document->id),
             ],
         ], 201);
     }
