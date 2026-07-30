@@ -20,9 +20,12 @@ class UpdateDocumentRequest extends FormRequest
 
     public function rules(): array
     {
-        $id = $this->route('dokuman') ?? $this->route('id') ?? $this->route('document');
-        $document = $id ? Document::find($id) : null;
-        $isStatusDoc = $document && $document->kategori_dokumen === 'sk_status_pegawai';
+        $param = $this->route('dokuman') ?? $this->route('id') ?? $this->route('document');
+
+        /** @var \App\Models\Document|null $document */
+        $document = $param instanceof Document ? $param : (is_scalar($param) ? Document::find($param) : null);
+
+        $isStatusDoc = $document !== null && $document->jenis_dokumen === 'sk_status_pegawai';
 
         $editableKeys = DocumentCategory::editableKeys();
 
