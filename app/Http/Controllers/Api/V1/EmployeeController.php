@@ -12,7 +12,6 @@ use App\Actions\Employees\ShowEmployeeAction;
 use App\Actions\Employees\ShowEmployeeDocumentStatusAction;
 use App\Actions\Employees\ShowMyProfileAction;
 use App\Actions\Employees\UpdateEmployeeAction;
-
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Employee\AssignSupervisorRequest;
 use App\Http\Requests\Employee\ListEmployeesRequest;
@@ -175,7 +174,6 @@ class EmployeeController extends Controller
             'message' => 'Data pegawai berhasil dinonaktifkan.',
         ]);
     }
-
 
     public function restore(string $employee, Request $request, RestoreEmployeeAction $action): JsonResponse
     {

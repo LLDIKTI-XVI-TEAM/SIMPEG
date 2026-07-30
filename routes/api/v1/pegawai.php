@@ -49,7 +49,6 @@ Route::middleware($employeeGroupMiddleware)
             ->whereUuid('employee')
             ->name('destroy');
 
-
         Route::post('/{employee}/restore', [EmployeeController::class, 'restore'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.restore'])
             ->whereUuid('employee')

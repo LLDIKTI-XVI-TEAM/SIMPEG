@@ -3,11 +3,13 @@
 namespace App\Services\Laporan;
 
 use App\Models\Employee;
+use App\Models\EwsConfig;
 use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -28,7 +30,7 @@ class EmployeeExportDataService
         $pensiunDari = $this->stringFilter($filters, 'pensiun_dari');
         $pensiunSampai = $this->stringFilter($filters, 'pensiun_sampai');
 
-        $bup = max(0, (int) \App\Models\EwsConfig::getVal('pensiun_required_age_years', 0));
+        $bup = max(0, (int) EwsConfig::getVal('pensiun_required_age_years', 0));
 
         $employees = Employee::query()
             ->select([
@@ -86,14 +88,14 @@ class EmployeeExportDataService
             ->when($jabatan !== '', fn (Builder $query) => $query->where('jabatan_terakhir', $jabatan))
             ->when($pensiunDari !== '', function (Builder $query) use ($pensiunDari, $bup) {
                 if ($bup > 0) {
-                    $query->whereDate('tanggal_lahir', '>=', \Carbon\Carbon::parse($pensiunDari)->subYears($bup)->format('Y-m-d'));
+                    $query->whereDate('tanggal_lahir', '>=', Carbon::parse($pensiunDari)->subYears($bup)->format('Y-m-d'));
                 } else {
                     $query->whereDate('tanggal_pensiun', '>=', $pensiunDari);
                 }
             })
             ->when($pensiunSampai !== '', function (Builder $query) use ($pensiunSampai, $bup) {
                 if ($bup > 0) {
-                    $query->whereDate('tanggal_lahir', '<=', \Carbon\Carbon::parse($pensiunSampai)->subYears($bup)->format('Y-m-d'));
+                    $query->whereDate('tanggal_lahir', '<=', Carbon::parse($pensiunSampai)->subYears($bup)->format('Y-m-d'));
                 } else {
                     $query->whereDate('tanggal_pensiun', '<=', $pensiunSampai);
                 }

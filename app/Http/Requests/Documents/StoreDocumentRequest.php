@@ -24,9 +24,9 @@ class StoreDocumentRequest extends FormRequest
             'nomor_dokumen' => ['nullable', 'string', 'max:100'],
             'tanggal_terbit' => ['nullable', 'date'],
             'kategori_dokumen' => [
-                'required', 
-                'string', 
-                Rule::in(array_filter(DocumentCategory::editableKeys(), fn ($key) => $key !== 'sk_status_pegawai'))
+                'required',
+                'string',
+                Rule::in(array_filter(DocumentCategory::editableKeys(), fn ($key) => $key !== 'sk_status_pegawai')),
             ],
             'pegawai_id' => ['required', 'uuid', 'exists:employees,id'],
             'deskripsi' => ['nullable', 'string'],
