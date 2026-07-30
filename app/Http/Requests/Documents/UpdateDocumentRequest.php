@@ -19,11 +19,21 @@ class UpdateDocumentRequest extends FormRequest
 
     public function rules(): array
     {
+        $id = $this->route('dokuman') ?? $this->route('id') ?? $this->route('document');
+        $document = $id ? \App\Models\Document::find($id) : null;
+        $isStatusDoc = $document && $document->kategori_dokumen === 'sk_status_pegawai';
+
+        $editableKeys = DocumentCategory::editableKeys();
+        
+        $kategoriRules = $isStatusDoc 
+            ? ['required', 'string', Rule::in(['sk_status_pegawai'])]
+            : ['required', 'string', Rule::in(array_filter($editableKeys, fn ($key) => $key !== 'sk_status_pegawai'))];
+
         return [
             'nama_dokumen' => ['required', 'string', 'max:255'],
             'nomor_dokumen' => ['nullable', 'string', 'max:100'],
             'tanggal_terbit' => ['nullable', 'date'],
-            'kategori_dokumen' => ['required', 'string', Rule::in(DocumentCategory::editableKeys())],
+            'kategori_dokumen' => $kategoriRules,
             'deskripsi' => ['nullable', 'string'],
             'berkas' => [
                 'nullable', // Optional when updating

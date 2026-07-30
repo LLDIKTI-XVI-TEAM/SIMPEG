@@ -354,7 +354,7 @@
                                 @endif
                                 @if(auth()->user()->role === 'super_admin')
                                 <button type="button" @click="deleteDocId = doc.id; deleteDocName = doc.nama_dokumen || doc.nama; showDeleteModal = true"
-                                    x-show="doc.jenis_dokumen !== 'sk_mutasi' && doc.jenis_dokumen !== 'sk_pensiun'"
+                                    x-show="doc.jenis_dokumen !== 'sk_mutasi' && doc.jenis_dokumen !== 'sk_pensiun' && doc.jenis_dokumen !== 'sk_status_pegawai'"
                                     class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-danger transition hover:bg-red-50 shadow-sm"
                                     title="Hapus" :aria-label="'Hapus ' + (doc.nama_dokumen || doc.nama)">
                                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -557,9 +557,12 @@
                 <div class="space-y-1">
                     <label class="text-xs font-semibold text-ink font-sans">Kategori Dokumen <span class="text-danger">*</span></label>
                     <div class="relative">
+                        <template x-if="editDoc.kategori_dokumen === 'sk_status_pegawai'">
+                            <input type="hidden" name="kategori_dokumen" value="sk_status_pegawai">
+                        </template>
                         <x-form.select name="kategori_dokumen" required x-model="editDoc.kategori_dokumen"
-                            ::disabled="isUploading"
-                            class="bg-surface shadow-sm focus:border-primary focus:ring focus:ring-primary/20">
+                            ::disabled="isUploading || editDoc.kategori_dokumen === 'sk_status_pegawai'"
+                            class="bg-surface shadow-sm focus:border-primary focus:ring focus:ring-primary/20 disabled:opacity-60 disabled:bg-soft">
                             <option value="">Pilih Kategori</option>
                             @foreach (\App\Support\Documents\DocumentCategory::editableLabels() as $val => $label)
                                 <option value="{{ $val }}">{{ $label }}</option>

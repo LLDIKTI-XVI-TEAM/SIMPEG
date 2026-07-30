@@ -28,6 +28,8 @@ class EmployeeExportDataService
         $pensiunDari = $this->stringFilter($filters, 'pensiun_dari');
         $pensiunSampai = $this->stringFilter($filters, 'pensiun_sampai');
 
+        $bup = max(0, (int) \App\Models\EwsConfig::getVal('pensiun_required_age_years', 0));
+
         $employees = Employee::query()
             ->select([
                 'id',
@@ -38,7 +40,7 @@ class EmployeeExportDataService
                 'jenis_pegawai_id',
                 'status_pegawai_id',
                 'status_aktif',
-                'pendidikan_terakhir',
+                'tanggal_lahir',
                 'tanggal_pensiun',
                 'email_pribadi',
                 'no_hp',
@@ -82,8 +84,20 @@ class EmployeeExportDataService
                 });
             })
             ->when($jabatan !== '', fn (Builder $query) => $query->where('jabatan_terakhir', $jabatan))
-            ->when($pensiunDari !== '', fn (Builder $query) => $query->whereDate('tanggal_pensiun', '>=', $pensiunDari))
-            ->when($pensiunSampai !== '', fn (Builder $query) => $query->whereDate('tanggal_pensiun', '<=', $pensiunSampai))
+            ->when($pensiunDari !== '', function (Builder $query) use ($pensiunDari, $bup) {
+                if ($bup > 0) {
+                    $query->whereDate('tanggal_lahir', '>=', \Carbon\Carbon::parse($pensiunDari)->subYears($bup)->format('Y-m-d'));
+                } else {
+                    $query->whereDate('tanggal_pensiun', '>=', $pensiunDari);
+                }
+            })
+            ->when($pensiunSampai !== '', function (Builder $query) use ($pensiunSampai, $bup) {
+                if ($bup > 0) {
+                    $query->whereDate('tanggal_lahir', '<=', \Carbon\Carbon::parse($pensiunSampai)->subYears($bup)->format('Y-m-d'));
+                } else {
+                    $query->whereDate('tanggal_pensiun', '<=', $pensiunSampai);
+                }
+            })
             ->get();
 
         $prefixField = $this->stringFilter($filters, 'prefix_field');
@@ -94,8 +108,15 @@ class EmployeeExportDataService
         $rowStart = max(1, (int) ($filters['row_start'] ?? 1));
         $rowEnd = (int) ($filters['row_end'] ?? 0);
 
-        $mapped = $employees->map(function (Employee $employee): array {
+        $mapped = $employees->map(function (Employee $employee) use ($bup): array {
             $currentPosition = $employee->positionHistories->first();
+
+            $pensiunDate = null;
+            if ($bup > 0 && $employee->tanggal_lahir) {
+                $pensiunDate = $employee->tanggal_lahir->copy()->addYears($bup);
+            } else {
+                $pensiunDate = $employee->tanggal_pensiun;
+            }
 
             return [
                 'id' => $employee->id,
@@ -107,7 +128,7 @@ class EmployeeExportDataService
                 'jenis' => $employee->jenisPegawai?->nama ?: '-',
                 'status' => $employee->statusPegawai?->nama ?: ($employee->status_aktif ?: '-'),
                 'pendidikan' => $employee->pendidikan_terakhir ?: '-',
-                'tanggal_pensiun' => $employee->tanggal_pensiun?->format('Y-m-d') ?: '-',
+                'tanggal_pensiun' => $pensiunDate?->format('Y-m-d') ?: '-',
                 'email' => $employee->getRawOriginal('email_pribadi') ?: '-',
                 'no_hp' => $employee->no_hp ?: '-',
             ];

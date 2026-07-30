@@ -11,14 +11,19 @@
             ? \Carbon\Carbon::parse($p->tanggal_kgb_berikutnya)->format('d-m-Y')
             : '-';
 
-        $pensiunDate = $estimasiTanggalPensiun ?? ($p->tanggal_pensiun ? \Carbon\Carbon::parse($p->tanggal_pensiun) : null);
+        $now = \Carbon\Carbon::now();
+        $bup = max(0, (int) \App\Models\EwsConfig::getVal('pensiun_required_age_years', 0));
+        
+        if ($bup > 0 && $p->tanggal_lahir) {
+            $pensiunDate = $p->tanggal_lahir->copy()->addYears($bup);
+        } else {
+            $pensiunDate = $estimasiTanggalPensiun ?? ($p->tanggal_pensiun ? \Carbon\Carbon::parse($p->tanggal_pensiun) : null);
+        }
+
         $estimasiPensiun = $pensiunDate ? $pensiunDate->format('d-m-Y') : '-';
 
         $sisaPensiunStr = '-';
         if ($pensiunDate) {
-            $now = \Carbon\Carbon::now();
-            $bup = max(0, (int) \App\Models\EwsConfig::getVal('pensiun_required_age_years', 0));
-            
             if ($bup > 0 && $p->tanggal_lahir) {
                 $umur = $p->tanggal_lahir->age;
                 $sisaTahun = $bup - $umur;

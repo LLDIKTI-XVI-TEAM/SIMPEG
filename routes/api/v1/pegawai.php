@@ -49,10 +49,7 @@ Route::middleware($employeeGroupMiddleware)
             ->whereUuid('employee')
             ->name('destroy');
 
-        Route::patch('/{employee}/status', [EmployeeController::class, 'updateStatus'])
-            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.update', 'role:super_admin'])
-            ->whereUuid('employee')
-            ->name('update-status');
+
         Route::post('/{employee}/restore', [EmployeeController::class, 'restore'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.restore'])
             ->whereUuid('employee')

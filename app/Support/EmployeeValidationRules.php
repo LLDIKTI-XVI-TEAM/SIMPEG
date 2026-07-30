@@ -138,7 +138,6 @@ class EmployeeValidationRules
             'foto' => 'Foto',
             'jenis_pegawai_id' => 'Jenis Pegawai',
             'jenis_pegawai' => 'Jenis Pegawai',
-            'tanggal_pensiun' => 'Tanggal Pensiun',
             'status_aktif' => 'Status Aktif',
             'status_pegawai_id' => 'Status Pegawai',
             'status_keterangan' => 'Keterangan Status',

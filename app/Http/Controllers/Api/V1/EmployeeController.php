@@ -12,7 +12,7 @@ use App\Actions\Employees\ShowEmployeeAction;
 use App\Actions\Employees\ShowEmployeeDocumentStatusAction;
 use App\Actions\Employees\ShowMyProfileAction;
 use App\Actions\Employees\UpdateEmployeeAction;
-use App\Actions\Employees\UpdateEmployeeStatusAction;
+
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Employee\AssignSupervisorRequest;
 use App\Http\Requests\Employee\ListEmployeesRequest;
@@ -176,41 +176,6 @@ class EmployeeController extends Controller
         ]);
     }
 
-    public function updateStatus(Employee $employee, Request $request, UpdateEmployeeStatusAction $action): JsonResponse
-    {
-        $request->validate([
-            'status' => 'required|string',
-        ]);
-
-        try {
-            $updatedEmployee = $action->execute($employee, $request->status, $request);
-
-            $updatedEmployee->load([
-                'jenisPegawai:id,nama',
-                'statusPegawai:id,nama',
-                'rankHistories:id,employee_id,file_sk',
-                'positionHistories' => fn ($query) => $query
-                    ->select(['id', 'employee_id', 'file_sk', 'is_latest', 'tmt_jabatan', 'jabatan_id', 'unit_kerja_id'])
-                    ->with(['jabatan:id,nama', 'unitKerja:id,nama'])
-                    ->orderByDesc('is_latest')
-                    ->orderByDesc('tmt_jabatan'),
-                'salaryHistories:id,employee_id,file_sk',
-                'appointments' => fn ($query) => $query
-                    ->select(['id', 'employee_id', 'file_sk', 'tmt_pengangkatan'])
-                    ->orderByDesc('tmt_pengangkatan'),
-                'documents:id,employee_id,file_path',
-            ]);
-
-            return response()->json([
-                'message' => 'Status pegawai berhasil diperbarui.',
-                'employee' => app(ListEmployeesAction::class)->toTableRow($updatedEmployee),
-            ]);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json([
-                'message' => $e->getMessage(),
-            ], 422);
-        }
-    }
 
     public function restore(string $employee, Request $request, RestoreEmployeeAction $action): JsonResponse
     {
