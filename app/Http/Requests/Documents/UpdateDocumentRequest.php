@@ -22,7 +22,7 @@ class UpdateDocumentRequest extends FormRequest
     {
         $param = $this->route('dokuman') ?? $this->route('id') ?? $this->route('document');
 
-        /** @var \App\Models\Document|null $document */
+        /** @var Document|null $document */
         $document = $param instanceof Document ? $param : (is_scalar($param) ? Document::find($param) : null);
 
         $isStatusDoc = $document !== null && $document->jenis_dokumen === 'sk_status_pegawai';
