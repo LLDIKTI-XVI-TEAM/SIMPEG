@@ -457,7 +457,9 @@
                         <x-form.select name="kategori_dokumen" required>
                             <option value="">Pilih Kategori</option>
                             @foreach (\App\Support\Documents\DocumentCategory::editableLabels() as $val => $label)
-                                <option value="{{ $val }}" {{ old('kategori_dokumen') === $val ? 'selected' : '' }}>{{ $label }}</option>
+                                @if($val !== 'sk_status_pegawai')
+                                    <option value="{{ $val }}" {{ old('kategori_dokumen') === $val ? 'selected' : '' }}>{{ $label }}</option>
+                                @endif
                             @endforeach
                         </x-form.select>
                     </div>
