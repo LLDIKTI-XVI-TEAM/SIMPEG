@@ -52,7 +52,7 @@ class EmployeeController extends Controller
         $request->validate([
             'type' => ['required', 'string', 'in:nip,nik'],
             'value' => ['required', 'string'],
-            'except_id' => ['nullable', 'uuid']
+            'except_id' => ['nullable', 'uuid'],
         ]);
 
         $query = Employee::where($request->type, $request->value);
@@ -63,8 +63,8 @@ class EmployeeController extends Controller
         $exists = $query->exists();
 
         return response()->json([
-            'is_unique' => !$exists,
-            'message' => $exists ? strtoupper($request->type) . ' sudah terdaftar.' : strtoupper($request->type) . ' tersedia.',
+            'is_unique' => ! $exists,
+            'message' => $exists ? strtoupper($request->type).' sudah terdaftar.' : strtoupper($request->type).' tersedia.',
         ]);
     }
 

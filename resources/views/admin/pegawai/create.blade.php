@@ -167,12 +167,6 @@
 
                         
 
-                        {{-- Tanggal Pensiun --}}
-                        <x-form.date
-                            name="tanggal_pensiun"
-                            label="Tanggal Pensiun"
-                            id="tanggal_pensiun"
-                        />
 
                         {{-- Penanda ini dipakai cuti untuk membedakan Kepala Lembaga dari jabatan biasa. --}}
                         <div class="space-y-1 rounded-lg border border-border bg-soft/40 p-4 sm:col-span-2">

@@ -47,7 +47,6 @@ class EmployeeValidationRules
             'prodi_pendidikan_terakhir' => ['nullable', 'string', 'max:255'],
 
             // Pensiun
-            'tanggal_pensiun' => ['nullable', 'date'],
 
             // Penanda eksplisit Kepala Lembaga untuk kebutuhan dokumen cuti tanpa inferensi jabatan bebas.
             'is_kepala_lembaga' => ['sometimes', 'boolean'],
@@ -139,6 +138,7 @@ class EmployeeValidationRules
             'foto' => 'Foto',
             'jenis_pegawai_id' => 'Jenis Pegawai',
             'jenis_pegawai' => 'Jenis Pegawai',
+            'tanggal_pensiun' => 'Tanggal Pensiun',
             'status_aktif' => 'Status Aktif',
             'status_pegawai_id' => 'Status Pegawai',
             'status_keterangan' => 'Keterangan Status',
@@ -151,7 +151,7 @@ class EmployeeValidationRules
             'kelas_jabatan_terakhir' => 'Kelas Jabatan',
             'pendidikan_terakhir' => 'Pendidikan Terakhir',
             'prodi_pendidikan_terakhir' => 'Prodi Pendidikan Terakhir',
-            'tanggal_pensiun' => 'Tanggal Pensiun',
+
             'is_kepala_lembaga' => 'Penanda Kepala Lembaga',
             'alamat' => 'Alamat',
             'no_hp' => 'Nomor HP',

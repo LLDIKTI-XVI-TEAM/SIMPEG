@@ -17,11 +17,19 @@
         $sisaPensiunStr = '-';
         if ($pensiunDate) {
             $now = \Carbon\Carbon::now();
-            if ($pensiunDate->isFuture()) {
-                $diff = $now->diff($pensiunDate);
-                $sisaPensiunStr = $diff->y . ' Tahun, ' . $diff->m . ' Bulan lagi';
+            $bup = max(0, (int) \App\Models\EwsConfig::getVal('pensiun_required_age_years', 0));
+            
+            if ($bup > 0 && $p->tanggal_lahir) {
+                $umur = $p->tanggal_lahir->age;
+                $sisaTahun = $bup - $umur;
+                $sisaPensiunStr = $sisaTahun > 0 ? $sisaTahun . ' Tahun lagi' : 'Memasuki Usia Pensiun';
             } else {
-                $sisaPensiunStr = 'Memasuki Usia Pensiun';
+                if ($pensiunDate->isFuture()) {
+                    $diff = $now->diff($pensiunDate);
+                    $sisaPensiunStr = $diff->y . ' Tahun, ' . $diff->m . ' Bulan lagi';
+                } else {
+                    $sisaPensiunStr = 'Memasuki Usia Pensiun';
+                }
             }
         }
 

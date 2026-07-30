@@ -11,6 +11,7 @@ use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Satu-satunya jalur untuk mengubah status kepegawaian (Status Pegawai).
@@ -90,13 +91,20 @@ class ChangeEmployeeStatusAction
 
         // Notifikasi bersifat fire-and-forget setelah transaksi berhasil, agar kegagalan
         // pengiriman notifikasi tidak membatalkan perubahan status yang sudah tersimpan.
-        $this->notifications->createForEmployee(
-            $employee,
-            'status_pegawai.diubah',
-            'Status Kepegawaian Anda Diperbarui',
-            'Status kepegawaian Anda telah diubah menjadi "'.$status->nama.'". Alasan: '.$data['alasan'],
-            ['status_pegawai_id' => $status->id, 'url' => route('profil', [], false)],
-        );
+        try {
+            $this->notifications->createForEmployee(
+                $employee,
+                'status_pegawai.diubah',
+                'Status Kepegawaian Anda Diperbarui',
+                'Status kepegawaian Anda telah diubah menjadi "'.$status->nama.'". Alasan: '.$data['alasan'],
+                ['status_pegawai_id' => $status->id, 'url' => route('profil', [], false)],
+            );
+        } catch (\Throwable $e) {
+            Log::error('Notification failed after status change', [
+                'employee_id' => $employee->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return $employee;
     }
