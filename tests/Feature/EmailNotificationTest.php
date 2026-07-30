@@ -447,7 +447,7 @@ class EmailNotificationTest extends TestCase
 
     public function test_job_has_three_tries(): void
     {
-        $job = new SendSimpegNotificationEmailJob('employee-id', 'Judul', 'Isi pesan');
+        $job = new SendSimpegNotificationEmailJob('employee-id', 'cuti.disetujui', 'Judul', 'Isi pesan');
 
         $this->assertSame(3, $job->tries);
     }
@@ -456,9 +456,10 @@ class EmailNotificationTest extends TestCase
     {
         Mail::fake();
         $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
-        $job = new SendSimpegNotificationEmailJob($employee->id, 'Judul Notifikasi', 'Isi notifikasi', ['url' => '/dashboard']);
+        $this->setEventChannelPolicy('cuti.disetujui', 'email', true);
+        $job = new SendSimpegNotificationEmailJob($employee->id, 'cuti.disetujui', 'Judul Notifikasi', 'Isi notifikasi', ['url' => '/dashboard']);
 
-        $job->handle();
+        app()->call([$job, 'handle']);
 
         Mail::assertSent(SimpegNotificationMail::class, function (SimpegNotificationMail $mail): bool {
             return $mail->hasTo('pegawai@example.test') && $mail->title === 'Judul Notifikasi';
@@ -488,6 +489,7 @@ class EmailNotificationTest extends TestCase
 
         $job = new SendSimpegNotificationEmailJob(
             $employee->id,
+            'cuti.disetujui',
             'Pengajuan Cuti Disetujui',
             'Pengajuan cuti Anda telah disetujui sepenuhnya.',
         );
@@ -520,6 +522,62 @@ class EmailNotificationTest extends TestCase
             'type' => 'cuti.disetujui',
         ]);
         Queue::assertPushed(SendSimpegNotificationEmailJob::class);
+    }
+
+    public function test_job_queued_dilewati_bila_policy_email_dimatikan_sebelum_handle(): void
+    {
+        Queue::fake();
+        Mail::fake();
+        $this->enableEventChannels('cuti.disetujui');
+        $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+
+        app(NotificationService::class)->createForEmployee(
+            employee: $employee,
+            type: 'cuti.disetujui',
+            title: 'Pengajuan Cuti Disetujui',
+            body: 'Pengajuan cuti telah disetujui.',
+        );
+
+        $queuedJob = null;
+        Queue::assertPushed(SendSimpegNotificationEmailJob::class, function (SendSimpegNotificationEmailJob $job) use (&$queuedJob): bool {
+            $queuedJob = $job;
+
+            return true;
+        });
+        $this->setEventChannelPolicy('cuti.disetujui', 'email', false);
+
+        $this->assertInstanceOf(SendSimpegNotificationEmailJob::class, $queuedJob);
+        app()->call([$queuedJob, 'handle']);
+
+        Mail::assertNothingSent();
+    }
+
+    public function test_job_queued_dilewati_bila_master_email_dimatikan_sebelum_handle(): void
+    {
+        Queue::fake();
+        Mail::fake();
+        $this->enableEventChannels('cuti.disetujui');
+        $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+
+        app(NotificationService::class)->createForEmployee(
+            employee: $employee,
+            type: 'cuti.disetujui',
+            title: 'Pengajuan Cuti Disetujui',
+            body: 'Pengajuan cuti telah disetujui.',
+        );
+
+        $queuedJob = null;
+        Queue::assertPushed(SendSimpegNotificationEmailJob::class, function (SendSimpegNotificationEmailJob $job) use (&$queuedJob): bool {
+            $queuedJob = $job;
+
+            return true;
+        });
+        RefNotificationChannel::query()->where('code', 'email')->update(['is_enabled' => false]);
+
+        $this->assertInstanceOf(SendSimpegNotificationEmailJob::class, $queuedJob);
+        app()->call([$queuedJob, 'handle']);
+
+        Mail::assertNothingSent();
     }
 
     public function test_email_template_contains_title_body_and_cta_without_sensitive_payload(): void
