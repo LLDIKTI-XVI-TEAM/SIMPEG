@@ -105,6 +105,38 @@ class EmployeeReportExportTest extends TestCase
         }
     }
 
+    public function test_preview_and_standard_export_reject_contact_data(): void
+    {
+        $admin = User::factory()->adminKepegawaian()->create();
+        $this->createEmployee(
+            RefUnitKerja::query()
+                ->where('nama', 'Urusan Organisasi Tata Laksana dan SDM')
+                ->firstOrFail(),
+            [
+                'nama_lengkap' => 'Pegawai Tanpa Kontak Laporan',
+                'nip' => '198503122010011005',
+                'email_pribadi' => 'pii-preview-unique@example.test',
+                'no_hp' => '081234567890',
+            ],
+        );
+
+        $this->actingAs($admin)
+            ->get(route('laporan.pegawai'))
+            ->assertOk()
+            ->assertDontSee('pii-preview-unique@example.test', false)
+            ->assertDontSee('081234567890', false)
+            ->assertDontSee('"email"', false)
+            ->assertDontSee('"no_hp"', false);
+
+        $this->actingAs($admin)
+            ->from(route('laporan.pegawai'))
+            ->get(route('laporan.pegawai.excel', [
+                'columns' => ['nama', 'email', 'no_hp'],
+            ]))
+            ->assertRedirect(route('laporan.pegawai'))
+            ->assertSessionHasErrors(['columns.1', 'columns.2']);
+    }
+
     public function test_custom_export_preserves_user_column_order_and_rejects_sensitive_columns(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();
@@ -147,9 +179,11 @@ class EmployeeReportExportTest extends TestCase
 
         $this->actingAs($admin)
             ->from(route('laporan.pegawai'))
-            ->post(route('laporan.pegawai.custom'), ['columns' => ['nik']])
+            ->post(route('laporan.pegawai.custom'), [
+                'columns' => ['nik', 'email', 'no_hp'],
+            ])
             ->assertRedirect(route('laporan.pegawai'))
-            ->assertSessionHasErrors('columns.0');
+            ->assertSessionHasErrors(['columns.0', 'columns.1', 'columns.2']);
     }
 
     /** @param array<string, mixed> $overrides */

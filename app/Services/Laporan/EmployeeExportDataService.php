@@ -40,8 +40,6 @@ class EmployeeExportDataService
                 'status_aktif',
                 'pendidikan_terakhir',
                 'tanggal_pensiun',
-                'email_pribadi',
-                'no_hp',
             ])
             ->with([
                 'jenisPegawai:id,nama',
@@ -108,8 +106,6 @@ class EmployeeExportDataService
                 'status' => $employee->statusPegawai?->nama ?: ($employee->status_aktif ?: '-'),
                 'pendidikan' => $employee->pendidikan_terakhir ?: '-',
                 'tanggal_pensiun' => $employee->tanggal_pensiun?->format('Y-m-d') ?: '-',
-                'email' => $employee->getRawOriginal('email_pribadi') ?: '-',
-                'no_hp' => $employee->no_hp ?: '-',
             ];
         });
 
