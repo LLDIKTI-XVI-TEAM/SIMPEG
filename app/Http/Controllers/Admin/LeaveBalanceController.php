@@ -61,7 +61,7 @@ class LeaveBalanceController extends Controller
 
         $action->execute($employee, $payload, $actor);
 
-        return $this->redirectToAdminBalancePanel($employee, (int) $payload['tahun'])
+        return $this->redirectToAdminBalancePanel($employee, (int) $payload['tahun'], $payload)
             ->with('success', 'Saldo awal cuti berhasil disimpan.');
     }
 
@@ -77,18 +77,23 @@ class LeaveBalanceController extends Controller
 
         $action->execute($employee, $payload, $actor);
 
-        return $this->redirectToAdminBalancePanel($employee, (int) $payload['tahun'])
+        return $this->redirectToAdminBalancePanel($employee, (int) $payload['tahun'], $payload)
             ->with('success', 'Koreksi saldo cuti berhasil disimpan.');
     }
 
     /**
      * Mengembalikan admin ke panel saldo pegawai yang baru dikoreksi agar konteks audit dan ledger tetap terlihat.
+     *
+     * @param  array<string, mixed>  $payload  Payload tervalidasi yang memuat konteks filter opsional.
      */
-    private function redirectToAdminBalancePanel(Employee $employee, int $tahun)
+    private function redirectToAdminBalancePanel(Employee $employee, int $tahun, array $payload)
     {
-        return redirect()->route('cuti.saldo.administrasi', [
+        return redirect()->route('cuti.saldo.administrasi', array_filter([
             'pegawai' => $employee->id,
             'periode' => $tahun,
-        ]);
+            'status' => $payload['status'] ?? null,
+            'search' => $payload['search'] ?? null,
+            'tab' => $payload['tab'] ?? null,
+        ], static fn (mixed $value): bool => $value !== null && $value !== ''));
     }
 }

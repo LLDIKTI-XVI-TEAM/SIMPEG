@@ -27,6 +27,9 @@ class OpeningLeaveBalanceRequest extends FormRequest
             'sisa_n1' => ['required', 'integer', 'min:0', 'max:24'],
             'sisa_tahun_berjalan' => ['required', 'integer', 'min:0', 'max:24'],
             'reason' => ['required', 'string', 'min:5', 'max:500'],
+            'status' => ['nullable', 'in:perlu_tindakan,sudah_terdaftar,semua_pegawai'],
+            'search' => ['nullable', 'string', 'max:150'],
+            'tab' => ['nullable', 'in:pendaftaran,koreksi'],
         ];
     }
 

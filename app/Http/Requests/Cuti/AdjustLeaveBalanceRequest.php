@@ -25,6 +25,9 @@ class AdjustLeaveBalanceRequest extends FormRequest
             'bucket' => ['required', 'in:n2,n1,current'],
             'amount' => ['required', 'integer', 'not_in:0', 'min:-24', 'max:24'],
             'reason' => ['required', 'string', 'min:5', 'max:500'],
+            'status' => ['nullable', 'in:perlu_tindakan,sudah_terdaftar,semua_pegawai'],
+            'search' => ['nullable', 'string', 'max:150'],
+            'tab' => ['nullable', 'in:pendaftaran,koreksi'],
         ];
     }
 
