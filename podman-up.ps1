@@ -1,5 +1,5 @@
 # =============================================================
-# SIMPEG - python -m podman_compose Helper Script
+# SIMPEG - podman compose Helper Script
 # Jalankan script ini dengan: .\podman-up.ps1
 # Untuk stop: .\podman-up.ps1 down
 # =============================================================
@@ -18,7 +18,7 @@ if (-not (Get-Command podman -ErrorAction SilentlyContinue)) {
     }
 }
 
-Write-Host "`n=== SIMPEG - python -m podman_compose ===" -ForegroundColor Cyan
+Write-Host "`n=== SIMPEG - podman compose ===" -ForegroundColor Cyan
 Write-Host "Podman version: $(podman --version)" -ForegroundColor DarkGray
 
 $action = if ($args.Count -gt 0) { $args[0] } else { "up" }
@@ -32,42 +32,45 @@ switch ($action) {
         }
 
         Write-Host "`n[1/3] Building containers..." -ForegroundColor Cyan
-        python -m podman_compose build
+        podman compose build
 
         Write-Host "`n[2/3] Starting containers..." -ForegroundColor Cyan
-        python -m podman_compose up -d
+        podman compose up -d
 
         Write-Host "`n[3/3] Installing dependencies & setup Laravel..." -ForegroundColor Cyan
-        python -m podman_compose exec app composer install --no-interaction
-        python -m podman_compose exec app php artisan key:generate --force
-        python -m podman_compose exec app php artisan migrate --force
-        python -m podman_compose exec app php artisan storage:link 2>$null
+        $origErrorAction = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        podman compose exec app composer install --no-interaction
+        podman compose exec app php artisan key:generate --force
+        podman compose exec app php artisan migrate --force
+        podman compose exec app php artisan storage:link --force 2>$null
+        $ErrorActionPreference = $origErrorAction
 
         Write-Host "`n============================================" -ForegroundColor Green
         Write-Host "  SIMPEG berjalan di: http://localhost:8000" -ForegroundColor Green
         Write-Host "============================================" -ForegroundColor Green
         Write-Host "`nContainers:" -ForegroundColor Cyan
-        python -m podman_compose ps
+        podman compose ps
     }
     "down" {
         Write-Host "Stopping containers..." -ForegroundColor Yellow
-        python -m podman_compose down
+        podman compose down
         Write-Host "[OK] Containers stopped." -ForegroundColor Green
     }
     "restart" {
         Write-Host "Restarting containers..." -ForegroundColor Yellow
-        python -m podman_compose restart
-        python -m podman_compose ps
+        podman compose restart
+        podman compose ps
     }
     "logs" {
-        python -m podman_compose logs -f
+        podman compose logs -f
     }
     "shell" {
-        python -m podman_compose exec app bash
+        podman compose exec app bash
     }
     "artisan" {
         $artisanArgs = $args[1..($args.Count - 1)] -join " "
-        python -m podman_compose exec app php artisan $artisanArgs
+        podman compose exec app php artisan $artisanArgs
     }
     default {
         Write-Host "Usage: .\podman-up.ps1 [command]" -ForegroundColor Yellow
