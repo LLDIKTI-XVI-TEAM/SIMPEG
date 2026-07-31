@@ -1,12 +1,11 @@
 <x-layouts.app title="Administrasi Saldo Cuti">
     @php
-        // Tahun acuan mutasi diambil dari filter periode agar saldo awal dan koreksi menulis ke tahun yang sedang dilihat.
-        $tahunAcuan = is_numeric($periode) ? (int) $periode : ($selectedBalance?->tahun ?? now()->year);
+        $tahunAcuan = (int) $periode;
         $canAdjust = auth()->user()?->hasPermission('cuti.balance.adjust');
         $bucketCards = [
-            'N-2' => $selectedBalance?->sisa_n2,
-            'N-1' => $selectedBalance?->sisa_n1,
-            'Tahun berjalan' => $selectedBalance?->sisa_tahun_berjalan,
+            sprintf('Saldo N-2 (%d)', $tahunAcuan - 2) => $selectedBalance?->sisa_n2,
+            sprintf('Saldo N-1 (%d)', $tahunAcuan - 1) => $selectedBalance?->sisa_n1,
+            sprintf('Saldo tahun berjalan (%d)', $tahunAcuan) => $selectedBalance?->sisa_tahun_berjalan,
             'Terpakai' => $selectedBalance?->terpakai,
             'Hangus' => $selectedBalance?->hangus,
         ];
@@ -15,15 +14,12 @@
             'pembukaan_belum_tercatat' => 'Pembukaan belum tercatat',
             'saldo_awal_tercatat' => 'Saldo awal tercatat',
         ];
-        $queueState = array_filter([
-            'periode' => $periode,
+        // Tautan kembali menjaga posisi antrian, tetapi membuang state yang hanya berlaku di workspace pegawai.
+        $queueUrl = route('cuti.saldo.administrasi', array_filter([
             'status' => $status,
             'search' => $search,
-            'pegawai' => $pegawaiId,
-            'tab' => $tab,
             'page_pegawai' => request('page_pegawai'),
-            'page_ledger' => request('page_ledger'),
-        ], static fn ($value) => $value !== null && $value !== '');
+        ], static fn ($value) => $value !== null && $value !== ''));
         $requestedTab = old('tab', $tab);
         $initialTab = in_array($requestedTab, ['pendaftaran', 'koreksi'], true) ? $requestedTab : $tab;
     @endphp
@@ -39,19 +35,9 @@
 
                 return `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`;
             },
-            syncEmployeeComboboxTab() {
-                const wrapper = this.$refs.employeeCombobox;
-                const tabInput = wrapper?.querySelector('form > input[name=tab]');
-                const clearLink = wrapper?.querySelector('a[href]');
-
-                if (tabInput) tabInput.value = this.activeTab;
-                if (clearLink) clearLink.href = this.withActiveTab(clearLink.href);
-            },
-            syncPaginatorTabs() {
-                [this.$refs.queuePaginator, this.$refs.ledgerPaginator].forEach((wrapper) => {
-                    wrapper?.querySelectorAll('a[href]').forEach((link) => {
-                        link.href = this.withActiveTab(link.href);
-                    });
+            syncLedgerPaginatorTab() {
+                this.$refs.ledgerPaginator?.querySelectorAll('a[href]').forEach((link) => {
+                    link.href = this.withActiveTab(link.href);
                 });
             },
             selectTab(tab) {
@@ -60,8 +46,7 @@
                 url.searchParams.set('tab', tab);
                 window.history.replaceState({}, '', url);
                 this.$nextTick(() => {
-                    this.syncEmployeeComboboxTab();
-                    this.syncPaginatorTabs();
+                    this.syncLedgerPaginatorTab();
                     document.getElementById('tab-' + tab)?.focus();
                 });
             },
@@ -71,7 +56,7 @@
                 this.selectTab(this.tabs[next]);
             },
         }"
-        x-init="$nextTick(() => { syncEmployeeComboboxTab(); syncPaginatorTabs(); })"
+        x-init="$nextTick(() => syncLedgerPaginatorTab())"
     >
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -86,7 +71,7 @@
                 </p>
             </div>
             <div class="flex shrink-0 items-center gap-2">
-                <a href="{{ route('cuti.rekap', array_filter(['periode' => $periode, 'pegawai' => $pegawaiId])) }}"
+                <a href="{{ route('cuti.rekap', array_filter(['pegawai' => $pegawaiId])) }}"
                     class="inline-flex items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-ink shadow-sm transition hover:bg-soft">
                     Lihat Rekap Cuti
                 </a>
@@ -112,41 +97,36 @@
             </x-ui.alert>
         @endif
 
+        @if (! $selectedEmployee)
         <section class="rounded-xl border border-border bg-surface px-5 py-4 shadow-sm" aria-labelledby="filter-antrian-title">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                    <h3 id="filter-antrian-title" class="text-sm font-semibold text-ink">Filter Antrian Pegawai</h3>
-                    <p class="mt-1 text-xs text-muted">Saring pegawai berdasarkan periode, nama, atau NIP.</p>
+                    <h3 id="filter-antrian-title" class="text-sm font-semibold text-ink">Cari pegawai</h3>
+                    <p class="mt-1 text-xs text-muted">Kelola saldo cuti tahun {{ $tahunAcuan }}. Cari pegawai berdasarkan nama atau NIP.</p>
                 </div>
                 <form
                     method="GET"
                     action="{{ route('cuti.saldo.administrasi') }}"
-                    x-data="{ initialPeriod: @js((string) $periode) }"
-                    x-on:submit="if ($refs.periode.value !== initialPeriod) { $refs.pageLedger.disabled = true }"
-                    class="grid w-full gap-3 sm:grid-cols-[minmax(9rem,0.4fr)_minmax(14rem,1fr)_auto] sm:items-end lg:max-w-3xl"
+                    class="grid w-full gap-3 sm:grid-cols-[minmax(14rem,1fr)_auto] sm:items-end lg:max-w-3xl"
                 >
                     <input type="hidden" name="status" value="{{ $status }}">
-                    <input type="hidden" name="pegawai" value="{{ $pegawaiId }}">
-                    <input type="hidden" name="tab" value="{{ $tab }}" x-bind:value="activeTab">
-                    <input x-ref="pageLedger" type="hidden" name="page_ledger" value="{{ request('page_ledger') }}">
-                    <x-form.input
-                        x-ref="periode"
-                        name="periode"
-                        label="Periode"
-                        type="number"
-                        min="2000"
-                        max="2100"
-                        :value="$periode"
-                        required
-                    />
                     <x-form.input
                         name="search"
-                        label="Cari nama atau NIP"
+                        label="Cari pegawai"
                         type="search"
                         maxlength="150"
                         :value="$search"
+                        placeholder="Masukkan nama atau NIP"
                     />
-                    <x-ui.button type="submit" class="min-h-11">Terapkan Filter</x-ui.button>
+                    <div class="flex items-center gap-2">
+                        <x-ui.button type="submit" class="min-h-11">Cari</x-ui.button>
+                        @if ($search !== '')
+                            <a href="{{ route('cuti.saldo.administrasi', array_filter(['status' => $status])) }}"
+                                class="inline-flex min-h-11 items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                Reset pencarian
+                            </a>
+                        @endif
+                    </div>
                 </form>
             </div>
         </section>
@@ -167,14 +147,9 @@
                             ] as $statusValue => $statusLabel)
                                 <a
                                     href="{{ route('cuti.saldo.administrasi', array_filter([
-                                        'periode' => $periode,
                                         'status' => $statusValue,
                                         'search' => $search,
-                                        'pegawai' => $pegawaiId,
-                                        'tab' => $tab,
-                                        'page_ledger' => request('page_ledger'),
                                     ])) }}"
-                                    x-bind:href="withActiveTab($el.getAttribute('href'))"
                                     @if ($status === $statusValue) aria-current="page" @endif
                                     @class([
                                         'inline-flex min-h-11 items-center justify-center rounded-xl border px-3.5 py-2 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-primary/20',
@@ -214,7 +189,6 @@
                                     <x-ui.table-td padding="sm" align="right">
                                         <a
                                             href="{{ route('cuti.saldo.administrasi', array_filter([
-                                                'periode' => $periode,
                                                 'status' => $status,
                                                 'search' => $search,
                                                 'pegawai' => $row['employee_id'],
@@ -251,7 +225,6 @@
                             </div>
                             <a
                                 href="{{ route('cuti.saldo.administrasi', array_filter([
-                                    'periode' => $periode,
                                     'status' => $status,
                                     'search' => $search,
                                     'pegawai' => $row['employee_id'],
@@ -270,39 +243,17 @@
                 </div>
 
                 @if ($employeeRows->hasPages())
-                    <div x-ref="queuePaginator" class="border-t border-border px-5 py-3">
+                    <div class="border-t border-border px-5 py-3">
                         {{ $employeeRows->onEachSide(1)->links('vendor.pagination.simpeg') }}
                     </div>
                 @endif
             </x-ui.card>
         </section>
-
-        <section x-ref="employeeCombobox" class="rounded-xl border border-border bg-surface px-5 py-4 shadow-sm" aria-label="Pilih pegawai administrasi saldo">
-            <x-cuti.employee-combobox
-                id="saldo-admin-pegawai"
-                :action="route('cuti.saldo.administrasi')"
-                name="pegawai"
-                query-name="search"
-                :selected-id="$pegawaiId"
-                :selected-label="$selectedEmployee ? $selectedEmployee->nama_lengkap . ' (' . $selectedEmployee->nip . ')' : null"
-                :preserved="array_intersect_key($queueState, array_flip(['periode', 'status', 'search', 'tab', 'page_pegawai']))"
-                :clear-url="route('cuti.saldo.administrasi', array_filter([
-                    'periode' => $periode,
-                    'status' => $status,
-                    'search' => $search,
-                    'tab' => $tab,
-                    'page_pegawai' => request('page_pegawai'),
-                ]))"
-                :fallback-options="$selectedEmployee ? collect([$selectedEmployee]) : collect()"
-                fallback-name="pegawai"
-                fallback-label="ID Pegawai"
-                fallback-placeholder="Masukkan UUID pegawai"
-                label="Pilih Pegawai"
-                help="Ketik minimal 2 karakter nama atau NIP pegawai yang saldonya akan dikelola."
-                submit-label="Terapkan"
-            />
-        </section>
-
+        @else
+        <a href="{{ $queueUrl }}"
+            class="inline-flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">
+            Kembali ke antrian pegawai
+        </a>
         <div class="flex flex-col gap-6 lg:flex-row">
             <aside class="w-full shrink-0 lg:w-64">
                 <x-ui.card padding="sm" class="space-y-1">
@@ -352,9 +303,10 @@
                             <h3 class="text-sm font-semibold text-ink">Ringkasan Saldo Pegawai</h3>
                             <p class="mt-1 text-xs text-muted">Tahun acuan: {{ $tahunAcuan }}</p>
                         </div>
-                        @if ($selectedEmployee)
-                            <span class="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">{{ $selectedEmployee->nama_lengkap }}</span>
-                        @endif
+                        <div class="text-right">
+                            <p class="text-xs font-semibold text-primary">{{ $selectedEmployee->nama_lengkap }}</p>
+                            <p class="mt-1 text-xs text-muted">NIP {{ $selectedEmployee->nip }}</p>
+                        </div>
                     </div>
 
                     @if ($selectedBalance)
@@ -365,10 +317,6 @@
                                     <p class="mt-1 text-xl font-bold text-ink">{{ $value }}</p>
                                 </div>
                             @endforeach
-                        </div>
-                    @elseif (! $selectedEmployee)
-                        <div class="mt-4 rounded-xl border border-dashed border-border p-5 text-sm text-muted">
-                            Pilih satu pegawai dari antrian atau pencarian untuk membuka workspace administrasi saldo.
                         </div>
                     @else
                         <div class="mt-4 rounded-xl border border-dashed border-border p-5 text-sm text-muted">
@@ -391,11 +339,7 @@
                             Isi sisa hak cuti N-2, N-1, dan tahun berjalan. Saldo awal hanya dapat didaftarkan atau diperbarui sebelum ada pemotongan cuti tahunan pada tahun tersebut.
                         </p>
 
-                        @if (! $selectedEmployee)
-                            <div class="mt-4 rounded-xl border border-dashed border-border p-5 text-sm text-muted">
-                                Pilih pegawai terlebih dahulu untuk mendaftarkan saldo awal.
-                            </div>
-                        @elseif (! $canAdjust)
+                        @if (! $canAdjust)
                             <div class="mt-4 rounded-xl border border-dashed border-border p-5 text-sm text-muted">
                                 Anda tidak memiliki hak untuk mengubah saldo cuti.
                             </div>
@@ -405,6 +349,7 @@
                                 <input type="hidden" name="status" value="{{ $status }}">
                                 <input type="hidden" name="search" value="{{ $search }}">
                                 <input type="hidden" name="tab" value="{{ $tab }}" x-bind:value="activeTab">
+                                <input type="hidden" name="page_pegawai" value="{{ request('page_pegawai') }}">
                                 <input type="hidden" name="tahun" value="{{ $tahunAcuan }}">
 
                                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -476,11 +421,7 @@
                             Koreksi mengubah satu bucket saja. Gunakan angka negatif untuk mengurangi; debit otomatis dibatasi agar saldo tidak negatif.
                         </p>
 
-                        @if (! $selectedEmployee)
-                            <div class="mt-4 rounded-xl border border-dashed border-border p-5 text-sm text-muted">
-                                Pilih pegawai terlebih dahulu untuk melakukan koreksi saldo.
-                            </div>
-                        @elseif (! $canAdjust)
+                        @if (! $canAdjust)
                             <div class="mt-4 rounded-xl border border-dashed border-border p-5 text-sm text-muted">
                                 Anda tidak memiliki hak untuk mengubah saldo cuti.
                             </div>
@@ -490,6 +431,7 @@
                                 <input type="hidden" name="status" value="{{ $status }}">
                                 <input type="hidden" name="search" value="{{ $search }}">
                                 <input type="hidden" name="tab" value="{{ $tab }}" x-bind:value="activeTab">
+                                <input type="hidden" name="page_pegawai" value="{{ request('page_pegawai') }}">
                                 <input type="hidden" name="tahun" value="{{ $tahunAcuan }}">
 
                                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -593,5 +535,6 @@
                 </section>
             </main>
         </div>
+        @endif
     </div>
 </x-layouts.app>
