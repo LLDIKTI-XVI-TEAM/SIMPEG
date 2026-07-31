@@ -6,6 +6,7 @@ use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use InvalidArgumentException;
+use LogicException;
 
 /**
  * Ledger append-only untuk mutasi saldo cuti tahunan dan koreksi yang diaudit.
@@ -85,6 +86,14 @@ class LeaveBalanceLedger extends Model
                     "event_type ledger cuti tidak diizinkan: {$ledger->event_type}"
                 );
             }
+        });
+
+        static::updating(function (): void {
+            throw new LogicException('Ledger saldo cuti bersifat append-only dan tidak dapat diubah.');
+        });
+
+        static::deleting(function (): void {
+            throw new LogicException('Ledger saldo cuti bersifat append-only dan tidak dapat dihapus.');
         });
     }
 

@@ -10,6 +10,16 @@ use Illuminate\Database\Query\Builder as QueryBuilder;
 
 class LeaveBalanceAdminEmployeeQuery
 {
+    /** @return list<string> */
+    private function initializationEventTypes(): array
+    {
+        return [
+            LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET,
+            LeaveBalanceLedger::EVENT_ANNUAL_ENTITLEMENT_GRANTED,
+            LeaveBalanceLedger::EVENT_ROLLOVER_APPLIED,
+        ];
+    }
+
     /**
      * Membatasi populasi pada pegawai yang belum dihapus dan mencocokkan pencarian tanpa membedakan kapitalisasi.
      *
@@ -47,13 +57,13 @@ class LeaveBalanceAdminEmployeeQuery
                 [$periode],
             )
             ->selectRaw(
-                'exists (select 1 from leave_balance_ledger where leave_balance_ledger.employee_id = employees.id and leave_balance_ledger.tahun = ? and leave_balance_ledger.event_type = ?) as has_opening_event_same_year',
-                [$periode, LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET],
+                'exists (select 1 from leave_balance_ledger where leave_balance_ledger.employee_id = employees.id and leave_balance_ledger.tahun = ? and leave_balance_ledger.event_type in (?, ?, ?)) as has_opening_event_same_year',
+                [$periode, ...$this->initializationEventTypes()],
             );
     }
 
     /**
-     * Menyusun EXISTS terkorelasi agar status pendaftaran hanya mengakui event pembukaan pada tahun pilihan.
+     * Menyusun EXISTS terkorelasi agar status pendaftaran mengakui pembukaan admin atau inisialisasi resmi sistem.
      */
     private function openingEventExists(QueryBuilder $query, int $periode): void
     {
@@ -62,7 +72,7 @@ class LeaveBalanceAdminEmployeeQuery
             ->from('leave_balance_ledger')
             ->whereColumn('leave_balance_ledger.employee_id', 'employees.id')
             ->where('leave_balance_ledger.tahun', $periode)
-            ->where('leave_balance_ledger.event_type', LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET);
+            ->whereIn('leave_balance_ledger.event_type', $this->initializationEventTypes());
     }
 
     /**
