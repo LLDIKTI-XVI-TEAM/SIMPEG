@@ -147,6 +147,7 @@
                             id="pendidikan_terakhir"
                             
                         >
+                            <option value="">-- Kosong --</option>
                             <option value="Diploma III (D3)">Diploma III (D3)</option>
                             <option value="Sarjana (S1)">Sarjana (S1)</option>
                             <option value="Magister (S2)">Magister (S2)</option>

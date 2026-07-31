@@ -610,10 +610,11 @@
                             <div class="relative">
                                 <select id="pendidikan_terakhir" name="pendidikan_terakhir"
                                     class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="" {{ empty($p->pendidikan_terakhir) ? 'selected' : '' }}>-- Kosong --</option>
                                     <option value="Diploma III (D3)" {{ $p->pendidikan_terakhir == 'Diploma III (D3)' ? 'selected' : '' }}>Diploma III (D3)</option>
-                                    <option value="Sarjana (S1)" {{ $p->pendidikan_terakhir == 'Sarjana (S1)' ? 'selected' : '' }}>Sarjana (S1)</option>
-                                    <option value="Magister (S2)" {{ $p->pendidikan_terakhir == 'Magister (S2)' ? 'selected' : '' }}>Magister (S2)</option>
-                                    <option value="Doktor (S3)" {{ $p->pendidikan_terakhir == 'Doktor (S3)' ? 'selected' : '' }}>Doktor (S3)</option>
+                                    <option value="Sarjana (S1)" {{ in_array($p->pendidikan_terakhir, ['Sarjana (S1)', 'S1']) ? 'selected' : '' }}>Sarjana (S1)</option>
+                                    <option value="Magister (S2)" {{ in_array($p->pendidikan_terakhir, ['Magister (S2)', 'S2']) ? 'selected' : '' }}>Magister (S2)</option>
+                                    <option value="Doktor (S3)" {{ in_array($p->pendidikan_terakhir, ['Doktor (S3)', 'S3']) ? 'selected' : '' }}>Doktor (S3)</option>
                                     <option value="SMA / Sederajat" {{ $p->pendidikan_terakhir == 'SMA / Sederajat' ? 'selected' : '' }}>SMA / Sederajat</option>
                                 </select>
                                 <div

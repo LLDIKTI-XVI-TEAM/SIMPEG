@@ -43,7 +43,7 @@ class EmployeeValidationRules
             'kelas_jabatan_terakhir' => ['nullable', 'string', 'max:10'],
 
             // Pendidikan snapshot
-            'pendidikan_terakhir' => ['nullable', 'string', 'max:20'],
+            'pendidikan_terakhir' => ['nullable', 'string', 'max:50'],
             'prodi_pendidikan_terakhir' => ['nullable', 'string', 'max:255'],
 
             // Pensiun
