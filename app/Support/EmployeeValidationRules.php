@@ -28,7 +28,7 @@ class EmployeeValidationRules
             'foto' => ['nullable', File::image()->types(['jpg', 'jpeg', 'png'])->max('10mb')],
             'jenis_pegawai_id' => ['nullable', 'uuid', 'exists:ref_jenis_pegawai,id'],
             'status_aktif' => ['nullable', 'in:Aktif,Non-Aktif,Pensiun,Mutasi'],
-            'status_pegawai_id' => ['nullable', 'uuid', 'exists:ref_status_pegawai,id'],
+            'status_pegawai_id' => ['nullable', 'uuid', Rule::exists('ref_status_pegawai', 'id')->where('is_active', true)],
             'status_keterangan' => ['nullable', 'string', 'max:2000'],
             'kepala_bagian_id' => ['nullable', 'uuid', 'exists:employees,id'],
 

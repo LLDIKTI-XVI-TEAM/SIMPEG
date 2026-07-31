@@ -13,7 +13,7 @@ class StatusPegawaiController extends Controller
     public function index()
     {
         $employees = Employee::orderBy('nama_lengkap', 'asc')->get();
-        $statusOptions = RefStatusPegawai::orderByDesc('is_default')->orderBy('nama')->get();
+        $statusOptions = RefStatusPegawai::where('is_active', true)->orderByDesc('is_default')->orderBy('nama')->get();
 
         return view('admin.status-pegawai.index', compact('employees', 'statusOptions'));
     }

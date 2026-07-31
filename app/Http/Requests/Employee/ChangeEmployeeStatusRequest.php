@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Employee;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class ChangeEmployeeStatusRequest extends FormRequest
 {
@@ -17,7 +18,7 @@ class ChangeEmployeeStatusRequest extends FormRequest
     {
         return [
             'pegawai_id' => ['required', 'uuid', 'exists:employees,id'],
-            'status_pegawai_id' => ['required', 'uuid', 'exists:ref_status_pegawai,id'],
+            'status_pegawai_id' => ['required', 'uuid', Rule::exists('ref_status_pegawai', 'id')->where('is_active', true)],
             'tanggal' => ['required', 'date'],
             'alasan' => ['required', 'string', 'max:255'],
             'deskripsi' => ['nullable', 'string', 'max:2000'],

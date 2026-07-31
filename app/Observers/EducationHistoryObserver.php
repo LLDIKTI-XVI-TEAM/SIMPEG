@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Models\EducationHistory;
+use App\Models\Employee;
 
 class EducationHistoryObserver
 {
@@ -24,9 +25,10 @@ class EducationHistoryObserver
 
     private function syncEmployeeEducation(EducationHistory $educationHistory): void
     {
+        /** @var Employee|null $employee */
         $employee = $educationHistory->employee;
 
-        if (!$employee) {
+        if (! $employee) {
             return;
         }
 
@@ -39,7 +41,7 @@ class EducationHistoryObserver
 
         if ($latestEducation) {
             $employee->updateQuietly([
-                'pendidikan_terakhir' => $latestEducation->jenjang_nama,
+                'pendidikan_terakhir' => $latestEducation->getAttribute('jenjang_nama'),
                 'prodi_pendidikan_terakhir' => $latestEducation->jurusan,
             ]);
         } else {
