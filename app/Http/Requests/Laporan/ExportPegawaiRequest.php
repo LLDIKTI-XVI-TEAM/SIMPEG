@@ -24,8 +24,6 @@ class ExportPegawaiRequest extends FormRequest
         'status' => 'Status',
         'pendidikan' => 'Pendidikan Terakhir',
         'tanggal_pensiun' => 'Tgl. Pensiun',
-        'email' => 'Email',
-        'no_hp' => 'No. HP',
     ];
 
     /** @var list<string> */

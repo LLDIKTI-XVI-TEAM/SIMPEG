@@ -1,13 +1,9 @@
 <x-layouts.app title="Daftar Nominatif Pegawai">
 
-    @php
-        $pegawaiJson = json_encode($pegawai);
-    @endphp
-
-    {{-- Data pegawai disuntikkan lewat script JSON agar aman dari escaping HTML --}}
-    <script id="pegawai-data" type="application/json">{!! $pegawaiJson !!}</script>
-
-    <div x-data="exportPegawai({{ $pegawaiJson }})" class="space-y-6">
+    <div
+        x-data="exportPegawai(@js($pegawai), @js($filterOptions), @js($initialFilters))"
+        class="space-y-6"
+    >
 
         {{-- ============================================================ --}}
         {{-- PRINT ONLY HEADER (Kop Surat Resmi)                         --}}
@@ -475,21 +471,22 @@
     @push('scripts')
     <script>
         const registerExportPegawai = () => {
-            Alpine.data('exportPegawai', (initialPegawai = []) => ({
+            Alpine.data('exportPegawai', (initialPegawai = [], initialFilterOptions = {}, initialFilters = {}) => ({
                 // =====================================================================
                 // DATA SOURCE — diisi dari PHP
                 // =====================================================================
                 allPegawai: initialPegawai,
+                filterOptions: initialFilterOptions,
 
                 // =====================================================================
                 // FILTER STATE
             // =====================================================================
-            searchQuery: '',
-            activeUnit: '',
-            activeGolongan: '',
-            activeJenis: '',
-            activeStatus: '',
-            sortBy: 'nama',
+            searchQuery: initialFilters.search ?? '',
+            activeUnit: initialFilters.unit ?? '',
+            activeGolongan: initialFilters.golongan ?? '',
+            activeJenis: initialFilters.jenis ?? '',
+            activeStatus: initialFilters.status ?? 'Aktif',
+            sortBy: initialFilters.sort ?? 'nama',
             sortDir: 'asc',
             prefixField: 'nama',
             prefixValue: '',
@@ -508,8 +505,6 @@
                 status:          { label: 'Status',              active: true,  key: 'status' },
                 pendidikan:      { label: 'Pendidikan Terakhir', active: false, key: 'pendidikan' },
                 tanggal_pensiun: { label: 'Tgl. Pensiun',        active: false, key: 'tanggal_pensiun' },
-                email:           { label: 'Email',               active: false, key: 'email' },
-                no_hp:           { label: 'No. HP',              active: false, key: 'no_hp' },
             },
             rowStart: 1,
             rowEnd: '',

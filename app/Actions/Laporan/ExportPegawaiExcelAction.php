@@ -41,8 +41,6 @@ class ExportPegawaiExcelAction
         'status' => 'Status',
         'pendidikan' => 'Pendidikan Terakhir',
         'tanggal_pensiun' => 'Tgl. Pensiun',
-        'email' => 'Email',
-        'no_hp' => 'No. HP',
     ];
 
     public function __construct(
