@@ -38,13 +38,30 @@ switch ($action) {
         podman compose up -d
 
         Write-Host "`n[3/3] Installing dependencies & setup Laravel..." -ForegroundColor Cyan
-        $origErrorAction = $ErrorActionPreference
-        $ErrorActionPreference = "Continue"
         podman compose exec app composer install --no-interaction
+        if ($LASTEXITCODE -ne 0) {
+            throw "composer install gagal. Setup Laravel dihentikan."
+        }
+
         podman compose exec app php artisan key:generate --force
+        if ($LASTEXITCODE -ne 0) {
+            throw "key:generate gagal. Setup Laravel dihentikan."
+        }
+
         podman compose exec app php artisan migrate --force
-        podman compose exec app php artisan storage:link --force 2>$null
-        $ErrorActionPreference = $origErrorAction
+        if ($LASTEXITCODE -ne 0) {
+            throw "migrate gagal. Setup Laravel dihentikan."
+        }
+
+        # storage:link idempotent; kegagalan karena link sudah ada tidak
+        # boleh menggagalkan setup yang telah selesai.
+        $storageLinkErrorAction = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = "Continue"
+            podman compose exec app php artisan storage:link --force 2>$null
+        } finally {
+            $ErrorActionPreference = $storageLinkErrorAction
+        }
 
         Write-Host "`n============================================" -ForegroundColor Green
         Write-Host "  SIMPEG berjalan di: http://localhost:8000" -ForegroundColor Green

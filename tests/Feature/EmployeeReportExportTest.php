@@ -137,6 +137,36 @@ class EmployeeReportExportTest extends TestCase
             ->assertSessionHasErrors(['columns.1', 'columns.2']);
     }
 
+    public function test_preview_preserves_export_configuration_in_initial_filter_state(): void
+    {
+        $admin = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($admin)
+            ->get(route('laporan.pegawai', [
+                'jabatan' => 'Analis Kepegawaian',
+                'pensiun_dari' => '2030-01-01',
+                'pensiun_sampai' => '2040-12-31',
+                'sort' => 'nip',
+                'sort_dir' => 'desc',
+                'prefix_field' => 'nip',
+                'prefix_value' => '1985',
+                'row_start' => 2,
+                'row_end' => 5,
+            ]))
+            ->assertOk()
+            ->assertViewHas('initialFilters', function (array $filters): bool {
+                return $filters['jabatan'] === 'Analis Kepegawaian'
+                    && $filters['pensiun_dari'] === '2030-01-01'
+                    && $filters['pensiun_sampai'] === '2040-12-31'
+                    && $filters['sort'] === 'nip'
+                    && $filters['sort_dir'] === 'desc'
+                    && $filters['prefix_field'] === 'nip'
+                    && $filters['prefix_value'] === '1985'
+                    && $filters['row_start'] === 2
+                    && $filters['row_end'] === 5;
+            });
+    }
+
     public function test_custom_export_preserves_user_column_order_and_rejects_sensitive_columns(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();

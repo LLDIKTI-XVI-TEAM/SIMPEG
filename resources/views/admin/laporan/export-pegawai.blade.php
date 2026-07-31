@@ -474,9 +474,9 @@
             pensiunDari: initialFilters.pensiun_dari ?? '',
             pensiunSampai: initialFilters.pensiun_sampai ?? '',
             sortBy: initialFilters.sort === 'no' ? 'nama' : (initialFilters.sort ?? 'nama'),
-            sortDir: 'asc',
-            prefixField: 'nama',
-            prefixValue: '',
+            sortDir: initialFilters.sort_dir ?? 'asc',
+            prefixField: initialFilters.prefix_field ?? 'nama',
+            prefixValue: initialFilters.prefix_value ?? '',
 
             // =====================================================================
             // KONFIGURASI EXPORT (Column Picker & Row Range)
@@ -493,8 +493,8 @@
                 tanggal_pensiun: { label: 'Tgl. Pensiun',        active: false, key: 'tanggal_pensiun' },
             },
             columnOrder: ['nip', 'nama', 'golongan', 'jabatan', 'unit', 'jenis', 'status', 'pendidikan', 'tanggal_pensiun'],
-            rowStart: 1,
-            rowEnd: '',
+            rowStart: initialFilters.row_start ?? 1,
+            rowEnd: initialFilters.row_end ?? '',
 
             // =====================================================================
             // UI STATE
