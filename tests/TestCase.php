@@ -6,9 +6,17 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Support\Facades\Storage;
 
 abstract class TestCase extends BaseTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Storage::fake('local');
+    }
+
     /**
      * Menyediakan reference data yang konsisten bagi test yang membutuhkan relasi master data.
      */

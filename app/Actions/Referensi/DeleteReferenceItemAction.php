@@ -7,7 +7,7 @@ use App\Services\Referensi\ReferenceTableCatalog;
 use App\Services\Referensi\ReferenceUsageService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class DeleteReferenceItemAction
@@ -24,43 +24,38 @@ class DeleteReferenceItemAction
      */
     public function execute(Model $item, Request $request): void
     {
-        // Baris data sistem ditolak lebih dulu: cek pemakaian saja tidak
-        // cukup karena baris bisa saja belum dirujuk data mana pun padahal
-        // logika aplikasi mencarinya secara langsung berdasarkan kode.
-        $protectionReason = ReferenceTableCatalog::protectionReason($item);
+        DB::transaction(function () use ($item, $request): void {
+            // Baris data sistem ditolak lebih dulu: cek pemakaian saja tidak
+            // cukup karena baris bisa saja belum dirujuk data mana pun padahal
+            // logika aplikasi mencarinya secara langsung berdasarkan kode.
+            $protectionReason = ReferenceTableCatalog::protectionReason($item);
 
-        if ($protectionReason !== null) {
-            throw ValidationException::withMessages([
-                'referensi' => sprintf('Item tidak dapat dihapus karena %s.', $protectionReason),
-            ]);
-        }
+            if ($protectionReason !== null) {
+                throw ValidationException::withMessages([
+                    'referensi' => sprintf('Item tidak dapat dihapus karena %s.', $protectionReason),
+                ]);
+            }
 
-        $usageDetail = $this->usage->usageDetail($item);
+            $usageDetail = $this->usage->usageDetail($item);
 
-        if ($usageDetail !== []) {
-            $usageSummary = collect($usageDetail)
-                ->map(fn (int $count, string $label): string => sprintf('%s (%d)', $label, $count))
-                ->implode(', ');
+            if ($usageDetail !== []) {
+                $usageSummary = collect($usageDetail)
+                    ->map(fn (int $count, string $label): string => sprintf('%s (%d)', $label, $count))
+                    ->implode(', ');
 
-            throw ValidationException::withMessages([
-                'referensi' => sprintf(
-                    'Item tidak dapat dihapus karena masih dipakai oleh: %s. Gunakan nonaktifkan sebagai gantinya.',
-                    $usageSummary,
-                ),
-            ]);
-        }
+                throw ValidationException::withMessages([
+                    'referensi' => sprintf(
+                        'Item tidak dapat dihapus karena masih dipakai oleh: %s. Gunakan nonaktifkan sebagai gantinya.',
+                        $usageSummary,
+                    ),
+                ]);
+            }
 
-        $snapshot = $item->toArray();
-        $item->delete();
+            $snapshot = $item->toArray();
+            $item->delete();
 
-        AuditService::log('DELETE', class_basename($item), $item->getKey(), $snapshot, null, $request);
-        $this->forgetCaches($item::class);
-    }
-
-    private function forgetCaches(string $modelClass): void
-    {
-        foreach (ReferenceTableCatalog::cacheKeys($modelClass) as $cacheKey) {
-            Cache::forget($cacheKey);
-        }
+            AuditService::logOrFail('DELETE', class_basename($item), $item->getKey(), $snapshot, null, $request);
+            ReferenceTableCatalog::forgetCachesAfterCommit($item::class);
+        });
     }
 }

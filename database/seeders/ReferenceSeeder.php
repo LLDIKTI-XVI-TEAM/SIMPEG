@@ -244,7 +244,12 @@ class ReferenceSeeder extends Seeder
             ['code' => 'email', 'name' => 'Email', 'is_enabled' => true, 'config' => null],
             ['code' => 'whatsapp_business', 'name' => 'WhatsApp Business', 'is_enabled' => false, 'config' => null],
         ] as $channel) {
-            RefNotificationChannel::firstOrCreate(['code' => $channel['code']], $channel);
+            $notificationChannel = RefNotificationChannel::firstOrNew(['code' => $channel['code']]);
+
+            // Default hanya diisi untuk channel baru agar status dan config pilihan operator tidak tertimpa.
+            if (! $notificationChannel->exists) {
+                $notificationChannel->forceFill($channel)->save();
+            }
         }
 
         $supportedNotificationEvents = [

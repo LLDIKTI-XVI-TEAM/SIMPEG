@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\DataMasterGolonganController;
 use App\Http\Controllers\Admin\DataMasterJenisJabatanController;
 use App\Http\Controllers\Admin\DataMasterJenjangPendidikanController;
 use App\Http\Controllers\Admin\DataMasterStatusPegawaiController;
+use App\Http\Controllers\Admin\DataMasterUnitKerjaController;
 use App\Http\Controllers\Admin\DokumenController;
 use App\Http\Controllers\Admin\EmployeeImportController;
 use App\Http\Controllers\Admin\EmployeeSupervisorLookupController;
@@ -26,6 +27,7 @@ use App\Http\Controllers\Admin\KepalaBagianLeaveDecisionController;
 use App\Http\Controllers\Admin\KepalaLembagaSupportingDocumentController;
 use App\Http\Controllers\Admin\LaporanController;
 use App\Http\Controllers\Admin\LeaveBalanceController;
+use App\Http\Controllers\Admin\NotificationChannelController;
 use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\PegawaiController;
 use App\Http\Controllers\Admin\PimpinanDashboardController;
@@ -208,6 +210,19 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     // CRUD reference table memakai kebijakan hapus hybrid: item terpakai hanya
     // boleh dinonaktifkan, item belum terpakai boleh dihapus permanen.
     Route::prefix('data-master')->name('data-master.')->middleware('role:super_admin')->group(function (): void {
+        Route::get('/channel-notifikasi', [NotificationChannelController::class, 'index'])
+            ->name('channel-notifikasi.index');
+        Route::post('/channel-notifikasi', [NotificationChannelController::class, 'store'])
+            ->name('channel-notifikasi.store');
+        Route::post('/channel-notifikasi/{notificationChannel}/update', [NotificationChannelController::class, 'update'])
+            ->whereUuid('notificationChannel')->name('channel-notifikasi.update');
+        Route::post('/channel-notifikasi/{notificationChannel}/status', [NotificationChannelController::class, 'setEnabled'])
+            ->whereUuid('notificationChannel')->name('channel-notifikasi.status');
+        Route::post('/channel-notifikasi/{notificationChannel}/destroy', [NotificationChannelController::class, 'destroy'])
+            ->whereUuid('notificationChannel')->name('channel-notifikasi.destroy');
+        Route::post('/channel-notifikasi/{notificationChannel}/kebijakan-event', [NotificationChannelController::class, 'setEventPolicy'])
+            ->whereUuid('notificationChannel')->name('channel-notifikasi.policy');
+
         Route::post('/eselon', [DataMasterEselonController::class, 'store'])->name('eselon.store');
         Route::post('/eselon/{eselon}/update', [DataMasterEselonController::class, 'update'])
             ->whereUuid('eselon')->name('eselon.update');
@@ -239,6 +254,14 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
             ->whereUuid('jenisJabatan')->name('jenis-jabatan.toggle');
         Route::post('/jenis-jabatan/{jenisJabatan}/destroy', [DataMasterJenisJabatanController::class, 'destroy'])
             ->whereUuid('jenisJabatan')->name('jenis-jabatan.destroy');
+
+        Route::post('/unit-kerja', [DataMasterUnitKerjaController::class, 'store'])->name('unit-kerja.store');
+        Route::post('/unit-kerja/{unitKerja}/update', [DataMasterUnitKerjaController::class, 'update'])
+            ->whereUuid('unitKerja')->name('unit-kerja.update');
+        Route::post('/unit-kerja/{unitKerja}/toggle-aktif', [DataMasterUnitKerjaController::class, 'toggle'])
+            ->whereUuid('unitKerja')->name('unit-kerja.toggle');
+        Route::post('/unit-kerja/{unitKerja}/destroy', [DataMasterUnitKerjaController::class, 'destroy'])
+            ->whereUuid('unitKerja')->name('unit-kerja.destroy');
 
         Route::post('/status-pegawai', [DataMasterStatusPegawaiController::class, 'store'])->name('status-pegawai.store');
         Route::post('/status-pegawai/{statusPegawai}/update', [DataMasterStatusPegawaiController::class, 'update'])

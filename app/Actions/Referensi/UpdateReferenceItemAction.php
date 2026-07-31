@@ -6,7 +6,7 @@ use App\Services\AuditService;
 use App\Services\Referensi\ReferenceTableCatalog;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class UpdateReferenceItemAction
 {
@@ -18,20 +18,15 @@ class UpdateReferenceItemAction
      */
     public function execute(Model $item, array $data, Request $request): Model
     {
-        $oldValues = $item->toArray();
+        return DB::transaction(function () use ($item, $data, $request): Model {
+            $oldValues = $item->toArray();
 
-        $item->fill($data)->save();
+            $item->fill($data)->save();
 
-        AuditService::log('UPDATE', class_basename($item), $item->getKey(), $oldValues, $item->refresh()->toArray(), $request);
-        $this->forgetCaches($item::class);
+            AuditService::logOrFail('UPDATE', class_basename($item), $item->getKey(), $oldValues, $item->refresh()->toArray(), $request);
+            ReferenceTableCatalog::forgetCachesAfterCommit($item::class);
 
-        return $item;
-    }
-
-    private function forgetCaches(string $modelClass): void
-    {
-        foreach (ReferenceTableCatalog::cacheKeys($modelClass) as $cacheKey) {
-            Cache::forget($cacheKey);
-        }
+            return $item;
+        });
     }
 }

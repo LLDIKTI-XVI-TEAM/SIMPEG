@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property string $id
@@ -22,8 +23,6 @@ class RefNotificationChannel extends Model
     protected $fillable = [
         'code',
         'name',
-        'is_enabled',
-        'config',
     ];
 
     protected function casts(): array
@@ -37,5 +36,11 @@ class RefNotificationChannel extends Model
     public function scopeEnabled(Builder $query): Builder
     {
         return $query->where('is_enabled', true);
+    }
+
+    /** @return HasMany<NotificationEventChannel, $this> */
+    public function eventPolicies(): HasMany
+    {
+        return $this->hasMany(NotificationEventChannel::class, 'notification_channel_id');
     }
 }
