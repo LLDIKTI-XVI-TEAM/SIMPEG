@@ -15,6 +15,11 @@ class LeaveBalanceAdminPageRequest extends ListCutiRekapRequest
         return [
             'periode' => ['nullable', 'string', 'regex:/^(?:20\d{2}|2100)$/'],
             'pegawai' => ['nullable', 'uuid'],
+            'status' => ['nullable', 'in:perlu_tindakan,sudah_terdaftar,semua_pegawai'],
+            'search' => ['nullable', 'string', 'max:150'],
+            'tab' => ['nullable', 'in:pendaftaran,koreksi'],
+            'page_pegawai' => ['nullable', 'integer', 'min:1'],
+            'page_ledger' => ['nullable', 'integer', 'min:1'],
         ];
     }
 

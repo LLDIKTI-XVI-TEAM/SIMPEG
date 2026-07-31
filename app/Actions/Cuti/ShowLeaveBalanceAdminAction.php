@@ -5,10 +5,14 @@ namespace App\Actions\Cuti;
 use App\Models\Employee;
 use App\Models\LeaveBalanceLedger;
 use App\Queries\Cuti\CutiRekapQuery;
+use App\Queries\Cuti\LeaveBalanceAdminEmployeeQuery;
 
 class ShowLeaveBalanceAdminAction
 {
-    public function __construct(private readonly CutiRekapQuery $rekapQuery) {}
+    public function __construct(
+        private readonly CutiRekapQuery $rekapQuery,
+        private readonly LeaveBalanceAdminEmployeeQuery $employeeQuery,
+    ) {}
 
     /**
      * Menyusun data administrasi saldo dari sumber rekap kanonis agar saldo dan ledger tetap konsisten.
@@ -21,6 +25,11 @@ class ShowLeaveBalanceAdminAction
         $periode = $this->stringFilter($filters, 'periode') ?? (string) now()->year;
         $filters['periode'] = $periode;
         $pegawaiId = $this->stringFilter($filters, 'pegawai');
+        $status = $this->stringFilter($filters, 'status') ?? 'perlu_tindakan';
+        $search = trim($this->stringFilter($filters, 'search') ?? '');
+        $tab = $this->stringFilter($filters, 'tab') ?? 'pendaftaran';
+        $employeeRows = $this->employeeQuery->employeeRows((int) $periode, $status, $search);
+        $statusCounts = $this->employeeQuery->statusCounts((int) $periode, $search);
 
         $selectedEmployee = $pegawaiId === null
             ? null
@@ -30,6 +39,7 @@ class ShowLeaveBalanceAdminAction
             : $this->rekapQuery->balanceRows($filters)->first();
         $ledgerBase = LeaveBalanceLedger::query()
             ->select(['id', 'employee_id', 'tahun', 'event_type', 'amount', 'source_year', 'reason', 'occurred_at', 'created_at'])
+            ->where('tahun', (int) $periode)
             ->when(
                 $selectedEmployee !== null,
                 fn ($query) => $query->where('employee_id', $selectedEmployee->id),
@@ -38,6 +48,7 @@ class ShowLeaveBalanceAdminAction
         $ledgerRows = (clone $ledgerBase)
             ->orderByDesc('occurred_at')
             ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->paginate(10, ['*'], 'page_ledger')
             ->withQueryString();
         $rolloverRows = (clone $ledgerBase)
@@ -47,10 +58,23 @@ class ShowLeaveBalanceAdminAction
                 LeaveBalanceLedger::EVENT_CARRY_OVER_EXPIRED,
             ])
             ->orderByDesc('occurred_at')
+            ->orderByDesc('id')
             ->limit(5)
             ->get();
 
-        return compact('periode', 'pegawaiId', 'selectedEmployee', 'selectedBalance', 'ledgerRows', 'rolloverRows');
+        return compact(
+            'periode',
+            'pegawaiId',
+            'status',
+            'search',
+            'tab',
+            'employeeRows',
+            'statusCounts',
+            'selectedEmployee',
+            'selectedBalance',
+            'ledgerRows',
+            'rolloverRows',
+        );
     }
 
     /** @param array<string, mixed> $filters */
