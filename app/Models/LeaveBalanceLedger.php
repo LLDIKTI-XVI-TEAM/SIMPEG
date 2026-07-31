@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasUuid;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use InvalidArgumentException;
@@ -20,6 +21,7 @@ use LogicException;
  * @property string|null $dedup_key
  * @property array<string, mixed>|null $metadata
  * @property string|null $created_by
+ * @property CarbonInterface|null $occurred_at
  */
 class LeaveBalanceLedger extends Model
 {
