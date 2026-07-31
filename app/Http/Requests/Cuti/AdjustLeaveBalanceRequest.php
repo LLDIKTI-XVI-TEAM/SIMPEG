@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Cuti;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 /**
  * Memvalidasi koreksi manual saldo cuti.
@@ -28,7 +29,22 @@ class AdjustLeaveBalanceRequest extends FormRequest
             'status' => ['nullable', 'in:perlu_tindakan,sudah_terdaftar,semua_pegawai'],
             'search' => ['nullable', 'string', 'max:150'],
             'tab' => ['nullable', 'in:pendaftaran,koreksi'],
+            'page_pegawai' => ['nullable', 'integer', 'min:1'],
         ];
+    }
+
+    /** Tahun tersembunyi tetap dianggap input klien dan harus cocok dengan tahun aplikasi. */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            if ($validator->errors()->has('tahun')) {
+                return;
+            }
+
+            if ((int) $this->input('tahun') !== now(config('app.timezone'))->year) {
+                $validator->errors()->add('tahun', 'Tahun saldo harus sama dengan tahun berjalan.');
+            }
+        });
     }
 
     /**

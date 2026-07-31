@@ -22,7 +22,8 @@ class ShowLeaveBalanceAdminAction
      */
     public function execute(array $filters): array
     {
-        $periode = $this->stringFilter($filters, 'periode') ?? (string) now()->year;
+        // Tahun administrasi berasal dari waktu aplikasi, bukan parameter klien yang dapat dimanipulasi.
+        $periode = (string) now(config('app.timezone'))->year;
         $filters['periode'] = $periode;
         $pegawaiId = $this->stringFilter($filters, 'pegawai');
         $status = $this->stringFilter($filters, 'status') ?? 'perlu_tindakan';

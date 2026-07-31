@@ -3,7 +3,7 @@
 namespace App\Http\Requests\Cuti;
 
 /**
- * Menjaga filter administrasi saldo tetap menunjuk satu tahun kalender yang pasti.
+ * Menjaga administrasi saldo hanya membuka tahun aplikasi yang sedang berjalan.
  */
 class LeaveBalanceAdminPageRequest extends ListCutiRekapRequest
 {
@@ -24,7 +24,7 @@ class LeaveBalanceAdminPageRequest extends ListCutiRekapRequest
     }
 
     /**
-     * Format tahun yang ambigu ditolak sebelum query agar saldo yang ditampilkan dan dimutasi tidak berbeda periode.
+     * Parameter lama diterima hanya bila sama dengan tahun aplikasi, lalu dibuang agar URL turunan tetap kanonis.
      */
     protected function prepareForValidation(): void
     {
@@ -35,5 +35,11 @@ class LeaveBalanceAdminPageRequest extends ListCutiRekapRequest
         if ($periode !== null && (is_array($periode) || ! is_string($periode) || preg_match('/^(?:20\d{2}|2100)$/', $periode) !== 1)) {
             abort(404);
         }
+
+        if ($periode !== null && (int) $periode !== now(config('app.timezone'))->year) {
+            abort(404);
+        }
+
+        $this->query->remove('periode');
     }
 }
