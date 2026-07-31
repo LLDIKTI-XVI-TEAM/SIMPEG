@@ -21,13 +21,20 @@
             'page_pegawai' => request('page_pegawai'),
         ], static fn ($value) => $value !== null && $value !== ''));
         $requestedTab = old('tab', $tab);
-        $initialTab = in_array($requestedTab, ['pendaftaran', 'koreksi'], true) ? $requestedTab : $tab;
+        $isBalanceInitialized = (bool) $balanceInitialization['initialized'];
+        $initialTab = $isBalanceInitialized && in_array($requestedTab, ['pendaftaran', 'koreksi'], true)
+            ? $requestedTab
+            : 'pendaftaran';
+        $baseline = $balanceInitialization['baseline'];
+        $correctionTabActive = $isBalanceInitialized ? "activeTab === 'koreksi'" : 'false';
+        $correctionTabClick = $isBalanceInitialized ? "selectTab('koreksi')" : null;
+        $correctionTabIndex = $isBalanceInitialized ? "activeTab === 'koreksi' ? 0 : -1" : '-1';
     @endphp
 
     <div
         class="space-y-6"
         x-data="{
-            tabs: ['pendaftaran', 'koreksi'],
+            tabs: @js($isBalanceInitialized ? ['pendaftaran', 'koreksi'] : ['pendaftaran']),
             activeTab: @js($initialTab),
             withActiveTab(url, tab = this.activeTab) {
                 const nextUrl = new URL(url, window.location.origin);
@@ -266,8 +273,8 @@
                         label="Kategori administrasi saldo cuti"
                         x-on:keydown.arrow-down.prevent="focusTab(1)"
                         x-on:keydown.arrow-up.prevent="focusTab(-1)"
-                        x-on:keydown.home.prevent="selectTab('pendaftaran')"
-                        x-on:keydown.end.prevent="selectTab('koreksi')"
+                        x-on:keydown.home.prevent="selectTab(tabs[0])"
+                        x-on:keydown.end.prevent="selectTab(tabs[tabs.length - 1])"
                     >
                         <x-ui.tab
                             variant="sidebar"
@@ -281,18 +288,26 @@
                             <span>Pendaftaran Saldo Awal</span>
                         </x-ui.tab>
 
-                        <x-ui.tab
-                            variant="sidebar"
-                            active="activeTab === 'koreksi'"
-                            click="selectTab('koreksi')"
-                            id="tab-koreksi"
-                            aria-controls="panel-koreksi"
-                            x-bind:tabindex="activeTab === 'koreksi' ? 0 : -1"
-                            class="min-h-11 focus-visible:ring-2 focus-visible:ring-primary/40"
-                        >
-                            <span>Koreksi Saldo</span>
-                        </x-ui.tab>
+                            <x-ui.tab
+                                variant="sidebar"
+                                :active="$correctionTabActive"
+                                :click="$correctionTabClick"
+                                id="tab-koreksi"
+                                aria-controls="panel-koreksi"
+                                aria-disabled="{{ $isBalanceInitialized ? 'false' : 'true' }}"
+                                aria-describedby="{{ $isBalanceInitialized ? '' : 'koreksi-locked-message' }}"
+                                x-on:click.prevent="{{ $isBalanceInitialized ? 'false' : 'true' }}"
+                                x-bind:tabindex="{{ $correctionTabIndex }}"
+                                class="min-h-11 focus-visible:ring-2 focus-visible:ring-primary/40 {{ $isBalanceInitialized ? '' : 'cursor-not-allowed opacity-50 hover:bg-transparent hover:text-muted' }}"
+                            >
+                                <span>Koreksi Saldo</span>
+                            </x-ui.tab>
                     </x-ui.tabs>
+                    @if (! $isBalanceInitialized)
+                        <p id="koreksi-locked-message" class="mt-3 px-3 text-xs leading-relaxed text-muted">
+                            Daftarkan saldo awal pegawai terlebih dahulu sebelum melakukan koreksi.
+                        </p>
+                    @endif
                 </x-ui.card>
             </aside>
 
@@ -302,6 +317,9 @@
                         <div>
                             <h3 class="text-sm font-semibold text-ink">Ringkasan Saldo Pegawai</h3>
                             <p class="mt-1 text-xs text-muted">Tahun acuan: {{ $tahunAcuan }}</p>
+                            <p class="mt-1 max-w-2xl text-xs leading-relaxed text-muted">
+                                Saldo ini adalah nilai berjalan dan dapat berubah melalui koreksi atau pemotongan cuti.
+                            </p>
                         </div>
                         <div class="text-right">
                             <p class="text-xs font-semibold text-primary">{{ $selectedEmployee->nama_lengkap }}</p>
@@ -335,15 +353,21 @@
                 >
                     <x-ui.card>
                         <h3 class="text-sm font-semibold text-ink">Pendaftaran Saldo Awal</h3>
-                        <p class="mt-1 text-xs leading-relaxed text-muted">
-                            Isi sisa hak cuti N-2, N-1, dan tahun berjalan. Saldo awal hanya dapat didaftarkan atau diperbarui sebelum ada pemotongan cuti tahunan pada tahun tersebut.
-                        </p>
+                        @if ($isBalanceInitialized)
+                            <p class="mt-1 max-w-2xl text-xs leading-relaxed text-muted">
+                                Saldo awal pegawai sudah tercatat. Gunakan Koreksi Saldo untuk menambah atau mengurangi saldo dengan alasan yang dapat diaudit.
+                            </p>
+                        @else
+                            <p class="mt-1 max-w-2xl text-xs leading-relaxed text-muted">
+                                Isi sisa hak cuti N-2, N-1, dan tahun berjalan. Pendaftaran hanya dilakukan satu kali sebagai baseline yang tidak dapat ditimpa.
+                            </p>
+                        @endif
 
                         @if (! $canAdjust)
                             <div class="mt-4 rounded-xl border border-dashed border-border p-5 text-sm text-muted">
                                 Anda tidak memiliki hak untuk mengubah saldo cuti.
                             </div>
-                        @else
+                        @elseif (! $isBalanceInitialized)
                             <form method="POST" action="{{ route('cuti.saldo.opening-balance', $selectedEmployee) }}" class="mt-4 space-y-4">
                                 @csrf
                                 <input type="hidden" name="status" value="{{ $status }}">
@@ -402,6 +426,53 @@
                                     Simpan Saldo Awal
                                 </button>
                             </form>
+                        @else
+                            <div class="mt-5 space-y-4" aria-label="Baseline saldo awal baca-saja">
+                                <div class="flex flex-col gap-3 rounded-xl border border-border bg-soft/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+                                    <div>
+                                        <p class="text-xs font-bold uppercase tracking-wide text-muted">Status baseline</p>
+                                        <p class="mt-1 text-sm font-semibold text-ink">Tercatat dan terkunci</p>
+                                    </div>
+                                    <div class="sm:text-right">
+                                        <p class="text-xs font-bold uppercase tracking-wide text-muted">Sumber inisialisasi</p>
+                                        <p class="mt-1 text-sm font-semibold text-primary">
+                                            {{ $balanceInitialization['source'] === 'admin' ? 'Admin' : 'Sistem/Rollover' }}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                @if ($balanceInitialization['source'] === 'system')
+                                    <x-ui.alert variant="info">
+                                        Baseline ini dibentuk oleh entitlement tahunan dan rollover sistem. Nilainya ditampilkan dari event inisialisasi dan ringkasan resmi yang tersedia.
+                                    </x-ui.alert>
+                                @endif
+
+                                @if ($baseline)
+                                    <dl class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                        @foreach ([
+                                            sprintf('Baseline N-2 (%d)', $tahunAcuan - 2) => $baseline['n2'],
+                                            sprintf('Baseline N-1 (%d)', $tahunAcuan - 1) => $baseline['n1'],
+                                            sprintf('Baseline tahun berjalan (%d)', $tahunAcuan) => $baseline['current'],
+                                        ] as $label => $value)
+                                            <div class="rounded-xl border border-border bg-surface p-4">
+                                                <dt class="text-xs font-bold uppercase tracking-wide text-muted">{{ $label }}</dt>
+                                                <dd class="mt-1 text-xl font-bold text-ink">{{ $value ?? 'Tidak tersedia' }}</dd>
+                                            </div>
+                                        @endforeach
+                                    </dl>
+                                @endif
+
+                                <dl class="grid gap-3 text-xs sm:grid-cols-2">
+                                    <div>
+                                        <dt class="font-semibold text-muted">Tercatat pada</dt>
+                                        <dd class="mt-1 text-ink">{{ optional($balanceInitialization['occurred_at'])->format('d/m/Y H:i') ?? 'Tidak tersedia' }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="font-semibold text-muted">Alasan atau sumber</dt>
+                                        <dd class="mt-1 text-ink">{{ $balanceInitialization['reason'] ?? 'Inisialisasi saldo resmi.' }}</dd>
+                                    </div>
+                                </dl>
+                            </div>
                         @endif
                     </x-ui.card>
                 </section>
@@ -421,7 +492,11 @@
                             Koreksi mengubah satu bucket saja. Gunakan angka negatif untuk mengurangi; debit otomatis dibatasi agar saldo tidak negatif.
                         </p>
 
-                        @if (! $canAdjust)
+                        @if (! $isBalanceInitialized)
+                            <div class="mt-4 rounded-xl border border-dashed border-border p-5 text-sm text-muted">
+                                Daftarkan saldo awal pegawai terlebih dahulu sebelum melakukan koreksi.
+                            </div>
+                        @elseif (! $canAdjust)
                             <div class="mt-4 rounded-xl border border-dashed border-border p-5 text-sm text-muted">
                                 Anda tidak memiliki hak untuk mengubah saldo cuti.
                             </div>
