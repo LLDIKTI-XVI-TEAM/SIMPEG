@@ -78,7 +78,7 @@ class LeaveBalanceAdjustmentTest extends TestCase
         $this->assertSame($actor->id, $audit->new_values['corrected_by']);
     }
 
-    public function test_opening_balance_set_bisa_diedit_sebelum_ada_pemotongan(): void
+    public function test_opening_balance_set_hanya_sekali_dan_baseline_tetap_immutable(): void
     {
         $employee = Employee::factory()->create();
         $actor = User::factory()->adminKepegawaian()->create();
@@ -89,22 +89,31 @@ class LeaveBalanceAdjustmentTest extends TestCase
             'n1' => 2,
             'current' => 12,
         ], 'Input saldo awal pertama.', $actor);
-        $service->setOpeningBalance($employee, 2027, [
-            'n2' => 5,
-            'n1' => 5,
-            'current' => 12,
-        ], 'Percobaan input ulang.', $actor);
+        $opening = LeaveBalanceLedger::where('event_type', LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET)->firstOrFail();
+        $original = $this->immutableLedgerPayload($opening);
+        $auditCount = AuditLog::count();
+
+        try {
+            $service->setOpeningBalance($employee, 2027, [
+                'n2' => 5,
+                'n1' => 5,
+                'current' => 12,
+            ], 'Percobaan input ulang.', $actor);
+            $this->fail('Pembukaan kedua harus ditolak.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                'Saldo awal pegawai sudah tercatat. Gunakan Koreksi Saldo untuk perubahan yang dapat diaudit.',
+                $exception->errors()['saldo'][0],
+            );
+        }
 
         $balance = LeaveBalance::where('employee_id', $employee->id)->where('tahun', 2027)->firstOrFail();
-        $this->assertSame(5, $balance->sisa_n2);
-        $this->assertSame(5, $balance->sisa_n1);
-        $this->assertSame(22, $balance->sisa);
+        $this->assertSame(1, $balance->sisa_n2);
+        $this->assertSame(2, $balance->sisa_n1);
+        $this->assertSame(15, $balance->sisa);
         $this->assertSame(1, LeaveBalanceLedger::where('event_type', 'opening_balance_set')->count());
-        $this->assertDatabaseHas('leave_balance_ledger', [
-            'event_type' => 'opening_balance_set',
-            'amount' => 22,
-            'reason' => 'Percobaan input ulang.',
-        ]);
+        $this->assertSame($original, $this->immutableLedgerPayload($opening->fresh()));
+        $this->assertSame($auditCount, AuditLog::count());
     }
 
     public function test_opening_balance_set_tidak_bisa_diedit_setelah_ada_pemotongan(): void
@@ -167,17 +176,157 @@ class LeaveBalanceAdjustmentTest extends TestCase
         ], 'Percobaan saldo awal setelah cuti terpakai.', $actor);
     }
 
+    public function test_manual_adjustment_ditolak_sebelum_inisialisasi_tanpa_efek_samping(): void
+    {
+        $employee = Employee::factory()->create();
+        $actor = User::factory()->adminKepegawaian()->create();
+
+        try {
+            app(LeaveBalanceService::class)->adjustBalance(
+                $employee,
+                2027,
+                'current',
+                2,
+                'Percobaan koreksi sebelum saldo awal.',
+                $actor,
+            );
+            $this->fail('Koreksi sebelum inisialisasi harus ditolak.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                'Daftarkan saldo awal pegawai terlebih dahulu sebelum melakukan koreksi.',
+                $exception->errors()['saldo'][0],
+            );
+        }
+
+        $this->assertDatabaseMissing('leave_balances', [
+            'employee_id' => $employee->id,
+            'tahun' => 2027,
+        ]);
+        $this->assertDatabaseCount('leave_balance_ledger', 0);
+        $this->assertDatabaseCount('audit_logs', 0);
+    }
+
+    public function test_balance_row_dan_legacy_manual_adjustment_tidak_dianggap_inisialisasi(): void
+    {
+        $employee = Employee::factory()->create();
+        $actor = User::factory()->adminKepegawaian()->create();
+        $balance = LeaveBalance::create($this->balancePayload($employee, 2027));
+        $this->createLedgerEvent(
+            $employee,
+            $balance,
+            2027,
+            LeaveBalanceLedger::EVENT_MANUAL_ADJUSTMENT,
+            'Koreksi legacy tanpa sumber inisialisasi.',
+        );
+        $summaryBefore = $balance->only(['sisa_n2', 'sisa_n1', 'sisa_tahun_berjalan', 'sisa']);
+        $ledgerCount = LeaveBalanceLedger::count();
+        $auditCount = AuditLog::count();
+
+        try {
+            app(LeaveBalanceService::class)->adjustBalance(
+                $employee,
+                2027,
+                'current',
+                1,
+                'Percobaan koreksi orphan kedua.',
+                $actor,
+            );
+            $this->fail('Ledger koreksi legacy tidak boleh membuka lifecycle saldo.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('saldo', $exception->errors());
+        }
+
+        $this->assertSame($summaryBefore, $balance->fresh()->only(array_keys($summaryBefore)));
+        $this->assertSame($ledgerCount, LeaveBalanceLedger::count());
+        $this->assertSame($auditCount, AuditLog::count());
+    }
+
+    public function test_koreksi_setelah_pembukaan_mengubah_saldo_aktual_tanpa_mengubah_baseline(): void
+    {
+        $employee = Employee::factory()->create();
+        $actor = User::factory()->adminKepegawaian()->create();
+        $service = app(LeaveBalanceService::class);
+        $service->setOpeningBalance($employee, 2027, [
+            'n2' => 2,
+            'n1' => 4,
+            'current' => 12,
+        ], 'Baseline admin yang immutable.', $actor);
+        $opening = LeaveBalanceLedger::where('event_type', LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET)->firstOrFail();
+        $baseline = $this->immutableLedgerPayload($opening);
+
+        $service->adjustBalance($employee, 2027, 'current', -3, 'Koreksi hasil rekonsiliasi.', $actor);
+
+        $balance = LeaveBalance::where('employee_id', $employee->id)->where('tahun', 2027)->firstOrFail();
+        $this->assertSame(9, $balance->sisa_tahun_berjalan);
+        $this->assertSame(15, $balance->sisa);
+        $this->assertSame($baseline, $this->immutableLedgerPayload($opening->fresh()));
+        $this->assertDatabaseHas('leave_balance_ledger', [
+            'employee_id' => $employee->id,
+            'tahun' => 2027,
+            'event_type' => LeaveBalanceLedger::EVENT_MANUAL_ADJUSTMENT,
+            'amount' => -3,
+            'reason' => 'Koreksi hasil rekonsiliasi.',
+        ]);
+    }
+
+    public function test_inisialisasi_sistem_mengunci_pembukaan_dan_mengizinkan_koreksi(): void
+    {
+        foreach ([
+            LeaveBalanceLedger::EVENT_ANNUAL_ENTITLEMENT_GRANTED,
+            LeaveBalanceLedger::EVENT_ROLLOVER_APPLIED,
+        ] as $eventType) {
+            $employee = Employee::factory()->create();
+            $actor = User::factory()->adminKepegawaian()->create();
+            $balance = LeaveBalance::create($this->balancePayload($employee, 2027, [
+                'sisa_n1' => $eventType === LeaveBalanceLedger::EVENT_ROLLOVER_APPLIED ? 4 : 0,
+                'carry_over' => $eventType === LeaveBalanceLedger::EVENT_ROLLOVER_APPLIED ? 4 : 0,
+                'sisa' => $eventType === LeaveBalanceLedger::EVENT_ROLLOVER_APPLIED ? 16 : 12,
+            ]));
+            $this->createLedgerEvent($employee, $balance, 2027, $eventType, 'Inisialisasi resmi oleh sistem.');
+            $summaryBefore = $balance->only(['sisa_n2', 'sisa_n1', 'sisa_tahun_berjalan', 'sisa']);
+            $ledgerCount = LeaveBalanceLedger::count();
+            $auditCount = AuditLog::count();
+
+            try {
+                app(LeaveBalanceService::class)->setOpeningBalance($employee, 2027, [
+                    'n2' => 1,
+                    'n1' => 1,
+                    'current' => 12,
+                ], 'Percobaan menimpa inisialisasi sistem.', $actor);
+                $this->fail('Pembukaan admin setelah inisialisasi sistem harus ditolak.');
+            } catch (ValidationException $exception) {
+                $this->assertArrayHasKey('saldo', $exception->errors());
+            }
+
+            $this->assertSame($summaryBefore, $balance->fresh()->only(array_keys($summaryBefore)));
+            $this->assertSame($ledgerCount, LeaveBalanceLedger::count());
+            $this->assertSame($auditCount, AuditLog::count());
+
+            app(LeaveBalanceService::class)->adjustBalance(
+                $employee,
+                2027,
+                'current',
+                1,
+                'Koreksi setelah inisialisasi sistem.',
+                $actor,
+            );
+
+            $this->assertSame($summaryBefore['sisa'] + 1, $balance->fresh()->sisa);
+        }
+    }
+
     public function test_manual_adjustment_credit_menambah_bucket_dan_mencatat_audit(): void
     {
         $employee = Employee::factory()->create();
         $actor = User::factory()->superAdmin()->create();
-        LeaveBalance::create($this->balancePayload($employee, 2027, [
+        $balance = LeaveBalance::create($this->balancePayload($employee, 2027, [
             'sisa_n2' => 1,
             'sisa_n1' => 2,
             'sisa_tahun_berjalan' => 8,
             'carry_over' => 3,
             'sisa' => 11,
         ]));
+        $this->createLedgerEvent($employee, $balance, 2027, LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET, 'Baseline koreksi kredit.');
 
         app(LeaveBalanceService::class)->adjustBalance($employee, 2027, 'current', 3, 'Koreksi tambahan hak cuti tahunan.', $actor);
 
@@ -216,6 +365,7 @@ class LeaveBalanceAdjustmentTest extends TestCase
             'sisa_n1' => 0,
             'sisa_tahun_berjalan' => 0,
         ]));
+        $this->createLedgerEvent($employee, $balance, 2027, LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET, 'Baseline legacy yang sudah terdaftar.');
 
         app(LeaveBalanceService::class)->adjustBalance($employee, 2027, 'current', 1, 'Koreksi dari saldo legacy kosong.', $actor);
 
@@ -238,12 +388,13 @@ class LeaveBalanceAdjustmentTest extends TestCase
     {
         $employee = Employee::factory()->create();
         $actor = User::factory()->adminKepegawaian()->create();
-        LeaveBalance::create($this->balancePayload($employee, 2027, [
+        $balance = LeaveBalance::create($this->balancePayload($employee, 2027, [
             'sisa_n2' => 0,
             'sisa_n1' => 0,
             'sisa_tahun_berjalan' => 2,
             'sisa' => 2,
         ]));
+        $this->createLedgerEvent($employee, $balance, 2027, LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET, 'Baseline koreksi debit.');
 
         app(LeaveBalanceService::class)->adjustBalance($employee, 2027, 'current', -10, 'Koreksi kelebihan input; niat -10.', $actor);
 
@@ -308,14 +459,69 @@ class LeaveBalanceAdjustmentTest extends TestCase
         ]);
     }
 
+    public function test_direct_post_menolak_koreksi_sebelum_inisialisasi_dan_pembukaan_duplikat(): void
+    {
+        $adjustmentEmployee = Employee::factory()->create();
+        $openingEmployee = Employee::factory()->create();
+        $user = User::factory()->adminKepegawaian()->create();
+        $service = app(LeaveBalanceService::class);
+        $service->setOpeningBalance($openingEmployee, 2027, [
+            'n2' => 1,
+            'n1' => 2,
+            'current' => 12,
+        ], 'Pembukaan pertama via service.', $user);
+        $opening = LeaveBalanceLedger::where('employee_id', $openingEmployee->id)
+            ->where('event_type', LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET)
+            ->firstOrFail();
+        $openingBefore = $this->immutableLedgerPayload($opening);
+        $balanceBefore = LeaveBalance::where('employee_id', $openingEmployee->id)->firstOrFail()
+            ->only(['sisa_n2', 'sisa_n1', 'sisa_tahun_berjalan', 'sisa']);
+        $ledgerCount = LeaveBalanceLedger::count();
+        $auditCount = AuditLog::count();
+
+        $this->actingAs($user)->post(route('cuti.saldo.adjust', $adjustmentEmployee), [
+            'tahun' => 2027,
+            'bucket' => 'current',
+            'amount' => 1,
+            'reason' => 'Direct POST sebelum inisialisasi.',
+        ])->assertSessionHasErrors([
+            'saldo' => 'Daftarkan saldo awal pegawai terlebih dahulu sebelum melakukan koreksi.',
+        ]);
+
+        $this->assertDatabaseMissing('leave_balances', [
+            'employee_id' => $adjustmentEmployee->id,
+            'tahun' => 2027,
+        ]);
+        $this->assertSame($ledgerCount, LeaveBalanceLedger::count());
+        $this->assertSame($auditCount, AuditLog::count());
+        $this->flushSession();
+
+        $this->actingAs($user)->post(route('cuti.saldo.opening-balance', $openingEmployee), [
+            'tahun' => 2027,
+            'sisa_n2' => 6,
+            'sisa_n1' => 6,
+            'sisa_tahun_berjalan' => 12,
+            'reason' => 'Direct POST pembukaan duplikat.',
+        ])->assertSessionHasErrors([
+            'saldo' => 'Saldo awal pegawai sudah tercatat. Gunakan Koreksi Saldo untuk perubahan yang dapat diaudit.',
+        ]);
+
+        $this->assertSame($balanceBefore, LeaveBalance::where('employee_id', $openingEmployee->id)->firstOrFail()
+            ->only(array_keys($balanceBefore)));
+        $this->assertSame($openingBefore, $this->immutableLedgerPayload($opening->fresh()));
+        $this->assertSame($ledgerCount, LeaveBalanceLedger::count());
+        $this->assertSame($auditCount, AuditLog::count());
+    }
+
     public function test_admin_kepegawaian_bisa_koreksi_saldo_via_web(): void
     {
         $employee = Employee::factory()->create();
         $user = User::factory()->adminKepegawaian()->create();
-        LeaveBalance::create($this->balancePayload($employee, 2027, [
+        $balance = LeaveBalance::create($this->balancePayload($employee, 2027, [
             'sisa_tahun_berjalan' => 5,
             'sisa' => 5,
         ]));
+        $this->createLedgerEvent($employee, $balance, 2027, LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET, 'Baseline koreksi web.');
 
         $response = $this->actingAs($user)->post(route('cuti.saldo.adjust', $employee), [
             'tahun' => 2027,
@@ -372,7 +578,8 @@ class LeaveBalanceAdjustmentTest extends TestCase
     {
         $employee = Employee::factory()->create();
         $user = User::factory()->adminKepegawaian()->create();
-        LeaveBalance::create($this->balancePayload($employee, 2027));
+        $balance = LeaveBalance::create($this->balancePayload($employee, 2027));
+        $this->createLedgerEvent($employee, $balance, 2027, LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET, 'Baseline koreksi dengan konteks daftar.');
 
         $response = $this->actingAs($user)->post(route('cuti.saldo.adjust', $employee), [
             'tahun' => 2027,
@@ -688,36 +895,71 @@ class LeaveBalanceAdjustmentTest extends TestCase
             ->assertRedirect(route('login'));
     }
 
-    public function test_administrasi_saldo_cuti_menampilkan_tab_dan_formulir_mutasi(): void
+    public function test_administrasi_saldo_sebelum_inisialisasi_mengunci_koreksi_dan_mengaktifkan_pendaftaran(): void
+    {
+        $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Belum Inisialisasi']);
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $response = $this->actingAs($user)->get(route('cuti.saldo.administrasi', [
+            'pegawai' => $employee->id,
+            'tab' => 'koreksi',
+        ]));
+
+        $response->assertOk();
+        $response->assertViewHas('balanceInitialization', function (array $initialization): bool {
+            $this->assertFalse($initialization['initialized']);
+            $this->assertNull($initialization['source']);
+
+            return true;
+        });
+        $response->assertSee('Daftarkan saldo awal pegawai terlebih dahulu sebelum melakukan koreksi.', false);
+        $response->assertSee('aria-disabled="true"', false);
+        $response->assertSee('x-on:click.prevent', false);
+        $response->assertSee('x-on:keydown.home.prevent="selectTab(tabs[0])"', false);
+        $response->assertSee('x-on:keydown.end.prevent="selectTab(tabs[tabs.length - 1])"', false);
+        $response->assertDontSee('x-on:keydown.end.prevent="selectTab(&#039;koreksi&#039;)"', false);
+        $response->assertSee(route('cuti.saldo.opening-balance', $employee), false);
+        $response->assertDontSee(route('cuti.saldo.adjust', $employee), false);
+        $response->assertDontSee('Saldo awal pegawai sudah tercatat.', false);
+    }
+
+    public function test_administrasi_saldo_setelah_pembukaan_menampilkan_baseline_read_only_dan_koreksi(): void
     {
         $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Saldo Admin']);
         $user = User::factory()->adminKepegawaian()->create();
-        $balance = LeaveBalance::create($this->balancePayload($employee, 2027, [
-            'sisa_n2' => 1,
-            'sisa_n1' => 2,
-            'sisa_tahun_berjalan' => 9,
-            'carry_over' => 3,
-            'sisa' => 12,
-        ]));
-        LeaveBalanceLedger::create([
-            'employee_id' => $employee->id,
-            'leave_balance_id' => $balance->id,
-            'tahun' => 2027,
-            'event_type' => 'manual_adjustment',
-            'amount' => -1,
-            'source_year' => 2027,
-            'reason' => 'Koreksi tampil di ledger.',
-            'occurred_at' => Carbon::now(),
-        ]);
+        $service = app(LeaveBalanceService::class);
+        $service->setOpeningBalance($employee, 2027, [
+            'n2' => 1,
+            'n1' => 2,
+            'current' => 12,
+        ], 'Baseline admin tampil baca-saja.', $user);
+        $service->adjustBalance($employee, 2027, 'current', -3, 'Koreksi tampil di ledger.', $user);
 
         $response = $this->actingAs($user)->get(route('cuti.saldo.administrasi', [
             'pegawai' => $employee->id,
         ]));
 
         $response->assertOk();
+        $response->assertViewHas('balanceInitialization', function (array $initialization) use ($user): bool {
+            $this->assertTrue($initialization['initialized']);
+            $this->assertSame('admin', $initialization['source']);
+            $this->assertSame(['n2' => 1, 'n1' => 2, 'current' => 12], $initialization['baseline']);
+            $this->assertSame($user->id, $initialization['actor_id']);
+
+            return true;
+        });
         $response->assertSee('Pendaftaran Saldo Awal', false);
         $response->assertSee('Koreksi Saldo', false);
-        $response->assertSee(route('cuti.saldo.opening-balance', $employee), false);
+        $response->assertSee('Saldo awal pegawai sudah tercatat. Gunakan Koreksi Saldo untuk menambah atau mengurangi saldo dengan alasan yang dapat diaudit.', false);
+        $response->assertSee('Sumber inisialisasi', false);
+        $response->assertSee('Admin', false);
+        $response->assertSee('Baseline N-2 (2025)', false);
+        $response->assertSee('Baseline N-1 (2026)', false);
+        $response->assertSee('Baseline tahun berjalan (2027)', false);
+        $response->assertSee('>1<', false);
+        $response->assertSee('>2<', false);
+        $response->assertSee('>12<', false);
+        $response->assertDontSee(route('cuti.saldo.opening-balance', $employee), false);
         $response->assertSee(route('cuti.saldo.adjust', $employee), false);
         $response->assertSee('Ledger Saldo', false);
         $response->assertSee('Status Rollover', false);
@@ -725,12 +967,114 @@ class LeaveBalanceAdjustmentTest extends TestCase
         $response->assertSee('Saldo N-2 (2025)', false);
         $response->assertSee('Saldo N-1 (2026)', false);
         $response->assertSee('Saldo tahun berjalan (2027)', false);
+        $response->assertSee('Saldo ini adalah nilai berjalan dan dapat berubah melalui koreksi atau pemotongan cuti.', false);
         $response->assertDontSee('Jalankan Rollover', false);
         $response->assertDontSee('data per halaman', false);
         $response->assertDontSee('Preview PDF resmi', false);
         $response->assertDontSee('Periode Laporan:', false);
         $response->assertDontSee('>Tahunan<', false);
         $response->assertDontSee('>Sakit<', false);
+    }
+
+    public function test_administrasi_saldo_inisialisasi_rollover_menampilkan_baseline_sistem_read_only(): void
+    {
+        $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Rollover']);
+        $user = User::factory()->adminKepegawaian()->create();
+        $balance = LeaveBalance::create($this->balancePayload($employee, 2027, [
+            'sisa_n1' => 5,
+            'carry_over' => 5,
+            'sisa' => 17,
+        ]));
+        $this->createLedgerEvent($employee, $balance, 2027, LeaveBalanceLedger::EVENT_ROLLOVER_APPLIED, 'Rollover resmi sistem.');
+        LeaveBalanceLedger::create([
+            'employee_id' => $employee->id,
+            'leave_balance_id' => $balance->id,
+            'tahun' => 2027,
+            'event_type' => LeaveBalanceLedger::EVENT_ANNUAL_ENTITLEMENT_GRANTED,
+            'amount' => 12,
+            'source_year' => 2027,
+            'reason' => 'Jatah tahunan sistem.',
+            'occurred_at' => Carbon::now(),
+        ]);
+        LeaveBalanceLedger::create([
+            'employee_id' => $employee->id,
+            'leave_balance_id' => $balance->id,
+            'tahun' => 2027,
+            'event_type' => LeaveBalanceLedger::EVENT_CARRY_OVER_GRANTED,
+            'amount' => 5,
+            'source_year' => 2026,
+            'reason' => 'Carry-over sistem.',
+            'metadata' => ['n2' => 0, 'n1' => 5],
+            'occurred_at' => Carbon::now(),
+        ]);
+        app(LeaveBalanceService::class)->adjustBalance(
+            $employee,
+            2027,
+            'current',
+            -3,
+            'Koreksi setelah baseline sistem tercatat.',
+            $user,
+        );
+
+        $response = $this->actingAs($user)->get(route('cuti.saldo.administrasi', [
+            'pegawai' => $employee->id,
+        ]));
+
+        $response->assertOk();
+        $response->assertViewHas('balanceInitialization', function (array $initialization): bool {
+            $this->assertTrue($initialization['initialized']);
+            $this->assertSame('system', $initialization['source']);
+            $this->assertSame(['n2' => 0, 'n1' => 5, 'current' => 12], $initialization['baseline']);
+
+            return true;
+        });
+        $response->assertViewHas('selectedBalance', function (LeaveBalance $currentBalance): bool {
+            $this->assertSame(9, $currentBalance->sisa_tahun_berjalan);
+            $this->assertSame(14, $currentBalance->sisa);
+
+            return true;
+        });
+        $response->assertSee('Sistem/Rollover', false);
+        $response->assertSee('Baseline ini dibentuk oleh entitlement tahunan dan rollover sistem.', false);
+        $response->assertDontSee(route('cuti.saldo.opening-balance', $employee), false);
+        $response->assertSee(route('cuti.saldo.adjust', $employee), false);
+    }
+
+    public function test_baseline_sistem_tidak_memakai_summary_mutable_saat_event_bucket_tidak_tersedia(): void
+    {
+        $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Baseline Parsial']);
+        $user = User::factory()->adminKepegawaian()->create();
+        $balance = LeaveBalance::create($this->balancePayload($employee, 2027, [
+            'sisa_n2' => 4,
+            'sisa_n1' => 5,
+            'sisa_tahun_berjalan' => 9,
+            'carry_over' => 9,
+            'sisa' => 18,
+        ]));
+        $this->createLedgerEvent(
+            $employee,
+            $balance,
+            2027,
+            LeaveBalanceLedger::EVENT_ROLLOVER_APPLIED,
+            'Marker rollover tanpa rincian baseline.',
+        );
+
+        $response = $this->actingAs($user)->get(route('cuti.saldo.administrasi', [
+            'pegawai' => $employee->id,
+        ]));
+
+        $response->assertOk();
+        $response->assertViewHas('balanceInitialization', function (array $initialization): bool {
+            $this->assertTrue($initialization['initialized']);
+            $this->assertSame('system', $initialization['source']);
+            $this->assertSame(['n2' => null, 'n1' => null, 'current' => null], $initialization['baseline']);
+
+            return true;
+        });
+        $this->assertSame(3, substr_count($response->getContent(), '>Tidak tersedia<'));
+        $response->assertSee('>4<', false);
+        $response->assertSee('>5<', false);
+        $response->assertSee('>9<', false);
     }
 
     public function test_administrasi_saldo_list_state_hanya_menampilkan_pencarian_status_dan_antrian(): void
@@ -803,7 +1147,7 @@ class LeaveBalanceAdjustmentTest extends TestCase
             $selectedEmployee,
             $balance,
             2027,
-            LeaveBalanceLedger::EVENT_MANUAL_ADJUSTMENT,
+            LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET,
             'Riwayat workspace dua state.',
         );
 
@@ -841,7 +1185,7 @@ class LeaveBalanceAdjustmentTest extends TestCase
         $response->assertSee('198801010001', false);
         $response->assertSee('Ringkasan Saldo Pegawai', false);
         $response->assertSee('Riwayat workspace dua state.', false);
-        $response->assertSee(route('cuti.saldo.opening-balance', $selectedEmployee), false);
+        $response->assertDontSee(route('cuti.saldo.opening-balance', $selectedEmployee), false);
         $response->assertSee(route('cuti.saldo.adjust', $selectedEmployee), false);
         $response->assertDontSee('Antrian Administrasi Saldo', false);
         $response->assertDontSee('Pegawai Queue Tidak Tampil', false);
@@ -934,6 +1278,37 @@ class LeaveBalanceAdjustmentTest extends TestCase
 
             return true;
         });
+    }
+
+    public function test_antrian_menganggap_inisialisasi_sistem_sudah_terdaftar(): void
+    {
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Pegawai Inisialisasi Sistem',
+            'nip' => '198009',
+        ]);
+        $balance = LeaveBalance::create($this->balancePayload($employee, 2027));
+        $this->createLedgerEvent(
+            $employee,
+            $balance,
+            2027,
+            LeaveBalanceLedger::EVENT_ANNUAL_ENTITLEMENT_GRANTED,
+            'Entitlement tahunan resmi sistem.',
+        );
+
+        $response = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('cuti.saldo.administrasi', ['status' => 'sudah_terdaftar']));
+
+        $response->assertOk();
+        $response->assertViewHas('employeeRows', function ($rows) use ($employee): bool {
+            $row = $rows->firstWhere('employee_id', $employee->id);
+
+            $this->assertNotNull($row);
+            $this->assertSame('saldo_awal_tercatat', $row['status_code']);
+
+            return true;
+        });
+        $response->assertSee('Lihat atau koreksi saldo', false);
+        $response->assertDontSee('Daftarkan saldo awal', false);
     }
 
     public function test_administrasi_saldo_filter_semua_pegawai_tidak_menerapkan_predikat_pembukaan(): void
@@ -1470,6 +1845,19 @@ class LeaveBalanceAdjustmentTest extends TestCase
             'reason' => $reason,
             'occurred_at' => $occurredAt ?? Carbon::now(),
         ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function immutableLedgerPayload(LeaveBalanceLedger $ledger): array
+    {
+        return [
+            'amount' => $ledger->amount,
+            'reason' => $ledger->reason,
+            'metadata' => $ledger->metadata,
+            'created_by' => $ledger->created_by,
+            'occurred_at' => $ledger->occurred_at?->toIso8601String(),
+            'created_at' => $ledger->created_at?->toIso8601String(),
+        ];
     }
 
     /** @return array<string, string> */
