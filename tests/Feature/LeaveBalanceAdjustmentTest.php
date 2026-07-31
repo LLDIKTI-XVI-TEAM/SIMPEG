@@ -11,6 +11,7 @@ use App\Services\Cuti\LeaveBalanceService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -343,6 +344,135 @@ class LeaveBalanceAdjustmentTest extends TestCase
         ]);
     }
 
+    public function test_opening_balance_redirect_mempertahankan_konteks_filter_dan_tab(): void
+    {
+        $employee = Employee::factory()->create();
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $response = $this->actingAs($user)->post(route('cuti.saldo.opening-balance', $employee), [
+            'tahun' => 2027,
+            'sisa_n2' => 2,
+            'sisa_n1' => 4,
+            'sisa_tahun_berjalan' => 12,
+            'reason' => 'Input saldo awal dengan konteks daftar.',
+            'status' => 'semua_pegawai',
+            'search' => 'Sutarto',
+            'tab' => 'pendaftaran',
+        ]);
+
+        $response->assertRedirect(route('cuti.saldo.administrasi', [
+            'pegawai' => $employee->id,
+            'periode' => 2027,
+            'status' => 'semua_pegawai',
+            'search' => 'Sutarto',
+            'tab' => 'pendaftaran',
+        ]));
+    }
+
+    public function test_adjustment_redirect_mempertahankan_konteks_filter_dan_tab(): void
+    {
+        $employee = Employee::factory()->create();
+        $user = User::factory()->adminKepegawaian()->create();
+        LeaveBalance::create($this->balancePayload($employee, 2027));
+
+        $response = $this->actingAs($user)->post(route('cuti.saldo.adjust', $employee), [
+            'tahun' => 2027,
+            'bucket' => 'current',
+            'amount' => 1,
+            'reason' => 'Koreksi saldo dengan konteks daftar.',
+            'status' => 'semua_pegawai',
+            'search' => 'Sutarto',
+            'tab' => 'koreksi',
+        ]);
+
+        $response->assertRedirect(route('cuti.saldo.administrasi', [
+            'pegawai' => $employee->id,
+            'periode' => 2027,
+            'status' => 'semua_pegawai',
+            'search' => 'Sutarto',
+            'tab' => 'koreksi',
+        ]));
+    }
+
+    public function test_form_mutasi_menolak_konteks_return_yang_tidak_aman(): void
+    {
+        $openingEmployee = Employee::factory()->create();
+        $adjustmentEmployee = Employee::factory()->create();
+        $user = User::factory()->adminKepegawaian()->create();
+        LeaveBalance::create($this->balancePayload($adjustmentEmployee, 2027));
+        $invalidContext = [
+            'status' => 'aktif',
+            'search' => str_repeat('a', 151),
+            'tab' => 'hapus',
+        ];
+
+        $ledgerCountBeforeOpening = LeaveBalanceLedger::count();
+        $openingResponse = $this->actingAs($user)->post(
+            route('cuti.saldo.opening-balance', $openingEmployee),
+            [
+                'tahun' => 2027,
+                'sisa_n2' => 2,
+                'sisa_n1' => 4,
+                'sisa_tahun_berjalan' => 12,
+                'reason' => 'Payload domain pembukaan tetap valid.',
+                ...$invalidContext,
+            ],
+        );
+
+        $openingResponse->assertSessionHasErrors(['status', 'search', 'tab']);
+        $this->assertSame($ledgerCountBeforeOpening, LeaveBalanceLedger::count());
+
+        $this->flushSession();
+        $ledgerCountBeforeAdjustment = LeaveBalanceLedger::count();
+        $adjustmentResponse = $this->actingAs($user)->post(
+            route('cuti.saldo.adjust', $adjustmentEmployee),
+            [
+                'tahun' => 2027,
+                'bucket' => 'current',
+                'amount' => 1,
+                'reason' => 'Payload domain koreksi tetap valid.',
+                ...$invalidContext,
+            ],
+        );
+
+        $adjustmentResponse->assertSessionHasErrors(['status', 'search', 'tab']);
+        $this->assertSame($ledgerCountBeforeAdjustment, LeaveBalanceLedger::count());
+    }
+
+    public function test_validasi_mutasi_kembali_ke_referer_dengan_old_input(): void
+    {
+        $employee = Employee::factory()->create();
+        $user = User::factory()->adminKepegawaian()->create();
+        LeaveBalance::create($this->balancePayload($employee, 2027));
+        $referer = route('cuti.saldo.administrasi', [
+            'periode' => 2027,
+            'pegawai' => $employee->id,
+            'status' => 'perlu_tindakan',
+            'search' => 'Pegawai',
+            'tab' => 'koreksi',
+            'page_pegawai' => 2,
+            'page_ledger' => 3,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->from($referer)
+            ->post(route('cuti.saldo.adjust', $employee), [
+                'tahun' => 2027,
+                'bucket' => 'current',
+                'amount' => 1,
+                'reason' => '',
+                'status' => 'perlu_tindakan',
+                'search' => 'Pegawai',
+                'tab' => 'koreksi',
+            ]);
+
+        $response->assertRedirect($referer);
+        $response->assertSessionHasErrors('reason');
+        $response->assertSessionHasInput('status', 'perlu_tindakan');
+        $response->assertSessionHasInput('search', 'Pegawai');
+        $response->assertSessionHasInput('tab', 'koreksi');
+    }
+
     public function test_koreksi_saldo_via_web_wajib_punya_alasan(): void
     {
         $employee = Employee::factory()->create();
@@ -389,12 +519,46 @@ class LeaveBalanceAdjustmentTest extends TestCase
         }
     }
 
+    public function test_administrasi_saldo_memvalidasi_filter_dan_pagination(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        foreach ([
+            ['status' => 'aktif', 'field' => 'status'],
+            ['search' => str_repeat('a', 151), 'field' => 'search'],
+            ['tab' => 'ringkasan', 'field' => 'tab'],
+            ['page_pegawai' => 0, 'field' => 'page_pegawai'],
+            ['page_ledger' => -1, 'field' => 'page_ledger'],
+        ] as $case) {
+            $field = $case['field'];
+            unset($case['field']);
+
+            $this->actingAs($user)
+                ->get(route('cuti.saldo.administrasi', $case))
+                ->assertSessionHasErrors($field);
+        }
+
+        foreach ([
+            ['periode' => ['2027']],
+            ['pegawai' => ['00000000-0000-0000-0000-000000000000']],
+        ] as $query) {
+            $this->actingAs($user)
+                ->get(route('cuti.saldo.administrasi').'?'.http_build_query($query))
+                ->assertNotFound();
+        }
+    }
+
     public function test_administrasi_saldo_cuti_menolak_role_tanpa_hak_koreksi(): void
     {
+        $employeeMarker = 'Pegawai Queue Rahasia RBAC';
+        Employee::factory()->create(['nama_lengkap' => $employeeMarker]);
+
         foreach (['pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
-            $this->actingAs(User::factory()->create(['role' => $role]))
-                ->get(route('cuti.saldo.administrasi'))
-                ->assertForbidden();
+            $response = $this->actingAs(User::factory()->create(['role' => $role]))
+                ->get(route('cuti.saldo.administrasi'));
+
+            $response->assertForbidden();
+            $response->assertDontSee($employeeMarker, false);
         }
     }
 
@@ -445,6 +609,411 @@ class LeaveBalanceAdjustmentTest extends TestCase
         $response->assertDontSee('Periode Laporan:', false);
         $response->assertDontSee('>Tahunan<', false);
         $response->assertDontSee('>Sakit<', false);
+    }
+
+    public function test_administrasi_saldo_default_menampilkan_queue_perlu_tindakan_dengan_tiga_klasifikasi(): void
+    {
+        $andi = Employee::factory()->create([
+            'nama_lengkap' => 'Andi Tanpa Saldo',
+            'nip' => '198001',
+        ]);
+        $budi = Employee::factory()->create([
+            'nama_lengkap' => 'Budi Tanpa Pembukaan',
+            'nip' => '198002',
+        ]);
+        $citra = Employee::factory()->create([
+            'nama_lengkap' => 'Citra Sudah Terdaftar',
+            'nip' => '198003',
+        ]);
+        $balancePending = LeaveBalance::create($this->balancePayload($budi, 2027));
+        $citraBalance = LeaveBalance::create($this->balancePayload($citra, 2027));
+        $this->createLedgerEvent(
+            $citra,
+            $citraBalance,
+            2027,
+            LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET,
+            'Saldo awal Citra sudah tercatat.',
+        );
+
+        $response = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('cuti.saldo.administrasi', ['periode' => 2027]));
+
+        $response->assertOk();
+        $response->assertViewHas('status', 'perlu_tindakan');
+        $response->assertViewHas('employeeRows', function ($employeeRows) use ($andi, $budi): bool {
+            $this->assertSame('page_pegawai', $employeeRows->getPageName());
+            $this->assertSame(10, $employeeRows->perPage());
+            $this->assertSame([$andi->id, $budi->id], $employeeRows->pluck('employee_id')->all());
+            $this->assertSame(
+                ['saldo_belum_tersedia', 'pembukaan_belum_tercatat'],
+                $employeeRows->pluck('status_code')->all(),
+            );
+
+            return true;
+        });
+        $response->assertViewHas('statusCounts', [
+            'perlu_tindakan' => 2,
+            'sudah_terdaftar' => 1,
+            'semua_pegawai' => 3,
+        ]);
+        $response->assertDontSee('Citra Sudah Terdaftar', false);
+    }
+
+    public function test_administrasi_saldo_filter_sudah_terdaftar_hanya_memuat_opening_event_tahun_aktif(): void
+    {
+        Employee::factory()->create([
+            'nama_lengkap' => 'Andi Tanpa Saldo',
+            'nip' => '198001',
+        ]);
+        $budi = Employee::factory()->create([
+            'nama_lengkap' => 'Budi Tanpa Pembukaan',
+            'nip' => '198002',
+        ]);
+        $citra = Employee::factory()->create([
+            'nama_lengkap' => 'Citra Sudah Terdaftar',
+            'nip' => '198003',
+        ]);
+        LeaveBalance::create($this->balancePayload($budi, 2027));
+        $citraBalance = LeaveBalance::create($this->balancePayload($citra, 2027));
+        $this->createLedgerEvent(
+            $citra,
+            $citraBalance,
+            2027,
+            LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET,
+            'Saldo awal Citra sudah tercatat.',
+        );
+
+        $response = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('cuti.saldo.administrasi', [
+                'periode' => 2027,
+                'status' => 'sudah_terdaftar',
+            ]));
+
+        $response->assertOk();
+        $response->assertViewHas('status', 'sudah_terdaftar');
+        $response->assertViewHas('employeeRows', function ($employeeRows) use ($citra): bool {
+            $this->assertSame([$citra->id], $employeeRows->pluck('employee_id')->all());
+            $this->assertSame(['saldo_awal_tercatat'], $employeeRows->pluck('status_code')->all());
+
+            return true;
+        });
+    }
+
+    public function test_administrasi_saldo_filter_semua_pegawai_tidak_menerapkan_predikat_pembukaan(): void
+    {
+        $andi = Employee::factory()->create([
+            'nama_lengkap' => 'Andi Tanpa Saldo',
+            'nip' => '198001',
+        ]);
+        $budi = Employee::factory()->create([
+            'nama_lengkap' => 'Budi Tanpa Pembukaan',
+            'nip' => '198002',
+        ]);
+        $citra = Employee::factory()->create([
+            'nama_lengkap' => 'Citra Sudah Terdaftar',
+            'nip' => '198003',
+        ]);
+        LeaveBalance::create($this->balancePayload($budi, 2027));
+        $citraBalance = LeaveBalance::create($this->balancePayload($citra, 2027));
+        $this->createLedgerEvent(
+            $citra,
+            $citraBalance,
+            2027,
+            LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET,
+            'Saldo awal Citra sudah tercatat.',
+        );
+
+        $response = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('cuti.saldo.administrasi', [
+                'periode' => 2027,
+                'status' => 'semua_pegawai',
+            ]));
+
+        $response->assertOk();
+        $response->assertViewHas('status', 'semua_pegawai');
+        $response->assertViewHas('employeeRows', function ($employeeRows) use ($andi, $budi, $citra): bool {
+            $this->assertSame([$andi->id, $budi->id, $citra->id], $employeeRows->pluck('employee_id')->all());
+            $this->assertSame(
+                ['saldo_belum_tersedia', 'pembukaan_belum_tercatat', 'saldo_awal_tercatat'],
+                $employeeRows->pluck('status_code')->all(),
+            );
+
+            return true;
+        });
+    }
+
+    public function test_hitungan_status_mengabaikan_status_aktif_tetapi_menghormati_search(): void
+    {
+        $andiPending = Employee::factory()->create([
+            'nama_lengkap' => 'Andi Pending',
+            'nip' => '777001',
+        ]);
+        $andiRegistered = Employee::factory()->create([
+            'nama_lengkap' => 'Andi Terdaftar',
+            'nip' => '777002',
+        ]);
+        Employee::factory()->create([
+            'nama_lengkap' => 'Bukan Hasil',
+            'nip' => '888001',
+        ]);
+        $balance = LeaveBalance::create($this->balancePayload($andiRegistered, 2027));
+        $this->createLedgerEvent(
+            $andiRegistered,
+            $balance,
+            2027,
+            LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET,
+            'Pembukaan Andi terdaftar.',
+        );
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $registeredResponse = $this->actingAs($user)->get(route('cuti.saldo.administrasi', [
+            'periode' => 2027,
+            'status' => 'sudah_terdaftar',
+            'search' => 'ANDI',
+        ]));
+
+        $registeredResponse->assertOk();
+        $registeredResponse->assertViewHas('search', 'ANDI');
+        $registeredResponse->assertViewHas('statusCounts', [
+            'perlu_tindakan' => 1,
+            'sudah_terdaftar' => 1,
+            'semua_pegawai' => 2,
+        ]);
+        $registeredResponse->assertViewHas('employeeRows', function ($rows) use ($andiRegistered): bool {
+            $this->assertSame(1, $rows->total());
+            $this->assertSame([$andiRegistered->id], $rows->pluck('employee_id')->all());
+
+            return true;
+        });
+
+        $pendingResponse = $this->actingAs($user)->get(route('cuti.saldo.administrasi', [
+            'periode' => 2027,
+            'status' => 'semua_pegawai',
+            'search' => '777001',
+        ]));
+
+        $pendingResponse->assertOk();
+        $pendingResponse->assertViewHas('search', '777001');
+        $pendingResponse->assertViewHas('employeeRows', function ($rows) use ($andiPending): bool {
+            $this->assertSame(1, $rows->total());
+            $this->assertSame([$andiPending->id], $rows->pluck('employee_id')->all());
+
+            return true;
+        });
+    }
+
+    public function test_antrian_pegawai_dipaginasi_sepuluh_baris_dengan_page_name_terpisah(): void
+    {
+        $employees = collect(range(1, 11))->mapWithKeys(function (int $index): array {
+            $employee = Employee::factory()->create([
+                'nama_lengkap' => sprintf('Pegawai Antrian %02d', $index),
+                'nip' => sprintf('990%03d', $index),
+            ]);
+
+            return [$index => $employee];
+        });
+        $user = User::factory()->adminKepegawaian()->create();
+        $filters = [
+            'periode' => 2027,
+            'status' => 'perlu_tindakan',
+            'search' => 'Pegawai',
+        ];
+
+        $firstPage = $this->actingAs($user)->get(route('cuti.saldo.administrasi', $filters));
+
+        $firstPage->assertOk();
+        $firstPage->assertViewHas('employeeRows', function ($rows) use ($employees): bool {
+            $this->assertSame('page_pegawai', $rows->getPageName());
+            $this->assertSame(1, $rows->currentPage());
+            $this->assertSame(10, $rows->count());
+            $this->assertSame(11, $rows->total());
+            $this->assertSame(
+                $employees->take(10)->pluck('id')->all(),
+                $rows->pluck('employee_id')->all(),
+            );
+
+            return true;
+        });
+        $firstPage->assertSee('page_pegawai=2', false);
+        $firstPage->assertSee('Pegawai Antrian 01', false);
+        $firstPage->assertDontSee('Pegawai Antrian 11', false);
+
+        $secondPage = $this->actingAs($user)->get(route('cuti.saldo.administrasi', [
+            ...$filters,
+            'page_pegawai' => 2,
+        ]));
+
+        $secondPage->assertOk();
+        $secondPage->assertViewHas('employeeRows', function ($rows) use ($employees): bool {
+            $this->assertSame('page_pegawai', $rows->getPageName());
+            $this->assertSame(2, $rows->currentPage());
+            $this->assertSame(1, $rows->count());
+            $this->assertSame(11, $rows->total());
+            $this->assertSame([$employees->get(11)->id], $rows->pluck('employee_id')->all());
+
+            return true;
+        });
+        $secondPage->assertSee('Pegawai Antrian 11', false);
+        $secondPage->assertSee('periode=2027', false);
+        $secondPage->assertSee('status=perlu_tindakan', false);
+        $secondPage->assertSee('search=Pegawai', false);
+    }
+
+    public function test_query_count_antrian_tidak_bertumbuh_per_pegawai(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        Employee::factory()->create([
+            'nama_lengkap' => 'Pegawai Query Tunggal',
+            'nip' => '992001',
+        ]);
+
+        $requestQueue = fn () => $this->actingAs($user)
+            ->get(route('cuti.saldo.administrasi', [
+                'periode' => 2027,
+                'status' => 'semua_pegawai',
+            ]));
+        $activeQueries = null;
+
+        DB::listen(function ($query) use (&$activeQueries): void {
+            if ($activeQueries !== null) {
+                $activeQueries[] = $query->sql;
+            }
+        });
+
+        $countQueries = function () use (&$activeQueries, $requestQueue): int {
+            $activeQueries = [];
+
+            try {
+                $requestQueue()
+                    ->assertOk();
+
+                return count($activeQueries);
+            } finally {
+                $activeQueries = null;
+            }
+        };
+
+        $requestQueue()
+            ->assertOk();
+        $singleCount = $countQueries();
+
+        foreach (range(1, 20) as $index) {
+            $employee = Employee::factory()->create([
+                'nama_lengkap' => sprintf('Pegawai Query Banyak %02d', $index),
+                'nip' => sprintf('993%03d', $index),
+            ]);
+
+            if ($index % 3 === 1) {
+                LeaveBalance::create($this->balancePayload($employee, 2027));
+            }
+
+            if ($index % 3 === 2) {
+                $balance = LeaveBalance::create($this->balancePayload($employee, 2027));
+                $this->createLedgerEvent(
+                    $employee,
+                    $balance,
+                    2027,
+                    LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET,
+                    sprintf('Pembukaan query pegawai %02d.', $index),
+                );
+            }
+        }
+
+        $requestQueue()
+            ->assertOk();
+        $manyCount = $countQueries();
+
+        $this->assertLessThanOrEqual($singleCount + 2, $manyCount);
+    }
+
+    public function test_event_pembukaan_tahun_lain_tidak_mendaftarkan_pegawai_pada_periode_aktif(): void
+    {
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Dewi Pembukaan Tahun Lalu',
+            'nip' => '198004',
+        ]);
+        $balance2026 = LeaveBalance::create($this->balancePayload($employee, 2026));
+        $this->createLedgerEvent(
+            $employee,
+            $balance2026,
+            2026,
+            LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET,
+            'Saldo awal hanya berlaku untuk 2026.',
+        );
+        LeaveBalance::create($this->balancePayload($employee, 2027));
+
+        $response = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('cuti.saldo.administrasi', [
+                'periode' => 2027,
+                'status' => 'perlu_tindakan',
+            ]));
+
+        $response->assertOk();
+        $response->assertViewHas('employeeRows', function ($rows) use ($employee): bool {
+            $row = $rows->firstWhere('employee_id', $employee->id);
+
+            $this->assertNotNull($row);
+            $this->assertTrue($row['has_balance_row']);
+            $this->assertFalse($row['has_opening_event_same_year']);
+            $this->assertSame('pembukaan_belum_tercatat', $row['status_code']);
+
+            return true;
+        });
+    }
+
+    public function test_ringkasan_saldo_membedakan_baris_hilang_dari_nilai_nol_persisted(): void
+    {
+        $tanpaSaldo = Employee::factory()->create([
+            'nama_lengkap' => 'Eka Tanpa Saldo',
+            'nip' => '198005',
+        ]);
+        $saldoNol = Employee::factory()->create([
+            'nama_lengkap' => 'Fani Saldo Nol',
+            'nip' => '198006',
+        ]);
+        LeaveBalance::create($this->balancePayload($saldoNol, 2027, [
+            'jatah_awal' => 0,
+            'carry_over' => 0,
+            'terpakai' => 0,
+            'sisa' => 0,
+            'sisa_n2' => 0,
+            'sisa_n1' => 0,
+            'sisa_tahun_berjalan' => 0,
+            'terpakai_tahun_berjalan' => 0,
+            'hangus' => 0,
+        ]));
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $missingResponse = $this->actingAs($user)->get(route('cuti.saldo.administrasi', [
+            'pegawai' => $tanpaSaldo->id,
+            'periode' => 2027,
+        ]));
+
+        $missingResponse->assertOk();
+        $missingResponse->assertViewHas('selectedBalance', null);
+        $missingResponse->assertSee('Belum ada saldo untuk pegawai dan tahun ini.', false);
+        foreach (['N-2', 'N-1', 'Tahun berjalan', 'Terpakai', 'Hangus'] as $balanceCardLabel) {
+            $missingResponse->assertDontSee(">{$balanceCardLabel}</p>", false);
+        }
+
+        $zeroResponse = $this->actingAs($user)->get(route('cuti.saldo.administrasi', [
+            'pegawai' => $saldoNol->id,
+            'periode' => 2027,
+        ]));
+
+        $zeroResponse->assertOk();
+        $zeroResponse->assertViewHas('selectedBalance', function (?LeaveBalance $balance): bool {
+            $this->assertNotNull($balance);
+            $this->assertSame(0, $balance->sisa_n2);
+            $this->assertSame(0, $balance->sisa_n1);
+            $this->assertSame(0, $balance->sisa_tahun_berjalan);
+            $this->assertSame(0, $balance->terpakai);
+            $this->assertSame(0, $balance->hangus);
+
+            return true;
+        });
+        $zeroResponse->assertSee('>0<', false);
+        $zeroResponse->assertDontSee('Belum ada saldo untuk pegawai dan tahun ini.', false);
     }
 
     public function test_rekap_cuti_tidak_lagi_menampilkan_formulir_mutasi_saldo(): void
@@ -502,6 +1071,148 @@ class LeaveBalanceAdjustmentTest extends TestCase
         $secondPage->assertSee('Koreksi ledger urutan 01.', false);
     }
 
+    public function test_tab_dan_dua_paginator_mempertahankan_state_url_yang_relevan(): void
+    {
+        $employees = collect(range(1, 11))->map(function (int $index): Employee {
+            return Employee::factory()->create([
+                'nama_lengkap' => sprintf('Pegawai State %02d', $index),
+                'nip' => sprintf('991%03d', $index),
+            ]);
+        });
+        $selectedEmployee = $employees->first();
+        $this->assertInstanceOf(Employee::class, $selectedEmployee);
+        $balance = LeaveBalance::create($this->balancePayload($selectedEmployee, 2027));
+
+        foreach (range(1, 11) as $index) {
+            $this->createLedgerEvent(
+                $selectedEmployee,
+                $balance,
+                2027,
+                LeaveBalanceLedger::EVENT_MANUAL_ADJUSTMENT,
+                sprintf('Ledger state urutan %02d.', $index),
+                Carbon::now()->subMinutes(11 - $index),
+            );
+        }
+
+        $response = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('cuti.saldo.administrasi', [
+                'periode' => 2027,
+                'pegawai' => $selectedEmployee->id,
+                'status' => 'semua_pegawai',
+                'search' => 'Pegawai',
+                'tab' => 'koreksi',
+                'page_pegawai' => 1,
+                'page_ledger' => 2,
+            ]));
+
+        $response->assertOk();
+        $response->assertViewHas('tab', 'koreksi');
+        foreach ([
+            '<input type="hidden" name="periode" value="2027">',
+            '<input type="hidden" name="status" value="semua_pegawai">',
+            '<input type="hidden" name="search" value="Pegawai">',
+            '<input type="hidden" name="tab" value="koreksi">',
+            '<input type="hidden" name="page_pegawai" value="1">',
+        ] as $preservedInput) {
+            $response->assertSee($preservedInput, false);
+        }
+        $response->assertDontSee('<input type="hidden" name="page_ledger"', false);
+
+        foreach ([
+            'page_pegawai=2',
+            'page_ledger=2',
+            'status=semua_pegawai',
+            'search=Pegawai',
+            'tab=koreksi',
+        ] as $queryFragment) {
+            $response->assertSee($queryFragment, false);
+        }
+
+        $queueTarget = $employees->get(2);
+        $this->assertInstanceOf(Employee::class, $queueTarget);
+        $queueSelectionUrl = route('cuti.saldo.administrasi', [
+            'periode' => 2027,
+            'status' => 'semua_pegawai',
+            'search' => 'Pegawai',
+            'pegawai' => $queueTarget->id,
+            'tab' => 'pendaftaran',
+            'page_pegawai' => 1,
+        ]);
+        $unsafeQueueSelectionUrl = route('cuti.saldo.administrasi', [
+            'periode' => 2027,
+            'status' => 'semua_pegawai',
+            'search' => 'Pegawai',
+            'pegawai' => $queueTarget->id,
+            'tab' => 'pendaftaran',
+            'page_pegawai' => 1,
+            'page_ledger' => 1,
+        ]);
+
+        $response->assertSee($queueSelectionUrl);
+        $response->assertDontSee($unsafeQueueSelectionUrl);
+    }
+
+    public function test_workspace_ledger_dan_rollover_hanya_memuat_periode_aktif(): void
+    {
+        $employee = Employee::factory()->create();
+        $balance2026 = LeaveBalance::create($this->balancePayload($employee, 2026));
+        $balance2027 = LeaveBalance::create($this->balancePayload($employee, 2027));
+
+        $this->createLedgerEvent(
+            $employee,
+            $balance2026,
+            2026,
+            LeaveBalanceLedger::EVENT_MANUAL_ADJUSTMENT,
+            'Ledger tahun lama tidak boleh tampil.',
+        );
+        $this->createLedgerEvent(
+            $employee,
+            $balance2027,
+            2027,
+            LeaveBalanceLedger::EVENT_MANUAL_ADJUSTMENT,
+            'Ledger tahun aktif tampil.',
+        );
+        $this->createLedgerEvent(
+            $employee,
+            $balance2026,
+            2026,
+            LeaveBalanceLedger::EVENT_ROLLOVER_APPLIED,
+            'Rollover tahun lama tidak boleh tampil.',
+        );
+        $this->createLedgerEvent(
+            $employee,
+            $balance2027,
+            2027,
+            LeaveBalanceLedger::EVENT_ROLLOVER_APPLIED,
+            'Rollover tahun aktif tampil.',
+        );
+
+        $response = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('cuti.saldo.administrasi', [
+                'periode' => 2027,
+                'pegawai' => $employee->id,
+                'tab' => 'koreksi',
+            ]));
+
+        $response->assertOk();
+        $response->assertSee('Ledger tahun aktif tampil.', false);
+        $response->assertSee('Rollover tahun aktif tampil.', false);
+        $response->assertDontSee('Ledger tahun lama tidak boleh tampil.', false);
+        $response->assertDontSee('Rollover tahun lama tidak boleh tampil.', false);
+        $response->assertViewHas('rolloverRows', function ($rolloverRows): bool {
+            $this->assertSame([2027], $rolloverRows->pluck('tahun')->unique()->values()->all());
+
+            return true;
+        });
+        $response->assertViewHas('ledgerRows', function ($ledgerRows): bool {
+            $this->assertSame(2, $ledgerRows->total());
+            $this->assertSame(2, $ledgerRows->count());
+            $this->assertSame([2027], $ledgerRows->pluck('tahun')->unique()->values()->all());
+
+            return true;
+        });
+    }
+
     /**
      * @param  array<string, int>  $overrides
      * @return array<string, mixed>
@@ -521,5 +1232,25 @@ class LeaveBalanceAdjustmentTest extends TestCase
             'terpakai_tahun_berjalan' => 0,
             'hangus' => 0,
         ], $overrides);
+    }
+
+    private function createLedgerEvent(
+        Employee $employee,
+        LeaveBalance $balance,
+        int $tahun,
+        string $eventType,
+        string $reason,
+        ?Carbon $occurredAt = null,
+    ): LeaveBalanceLedger {
+        return LeaveBalanceLedger::create([
+            'employee_id' => $employee->id,
+            'leave_balance_id' => $balance->id,
+            'tahun' => $tahun,
+            'event_type' => $eventType,
+            'amount' => 0,
+            'source_year' => $tahun,
+            'reason' => $reason,
+            'occurred_at' => $occurredAt ?? Carbon::now(),
+        ]);
     }
 }
