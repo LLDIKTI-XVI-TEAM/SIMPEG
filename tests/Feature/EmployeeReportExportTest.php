@@ -167,6 +167,40 @@ class EmployeeReportExportTest extends TestCase
             });
     }
 
+    public function test_preview_leaves_initial_row_range_for_frontend_to_apply_once(): void
+    {
+        $admin = User::factory()->adminKepegawaian()->create();
+        $unit = RefUnitKerja::query()
+            ->where('nama', 'Urusan Organisasi Tata Laksana dan SDM')
+            ->firstOrFail();
+
+        foreach (range(1, 5) as $number) {
+            $this->createEmployee($unit, [
+                'nama_lengkap' => "Pegawai Rentang {$number}",
+                'nip' => sprintf('198503122010011%03d', $number),
+            ]);
+        }
+
+        $this->actingAs($admin)
+            ->get(route('laporan.pegawai', [
+                'status' => 'Aktif',
+                'sort' => 'nip',
+                'row_start' => 2,
+                'row_end' => 5,
+            ]))
+            ->assertOk()
+            ->assertViewHas('pegawai', function (array $pegawai): bool {
+                return array_column($pegawai, 'nip') === [
+                    '198503122010011001',
+                    '198503122010011002',
+                    '198503122010011003',
+                    '198503122010011004',
+                    '198503122010011005',
+                ];
+            })
+            ->assertViewHas('initialFilters', fn (array $filters): bool => $filters['row_start'] === 2 && $filters['row_end'] === 5);
+    }
+
     public function test_custom_export_preserves_user_column_order_and_rejects_sensitive_columns(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();

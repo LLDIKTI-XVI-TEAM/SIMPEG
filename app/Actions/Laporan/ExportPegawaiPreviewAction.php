@@ -12,8 +12,13 @@ class ExportPegawaiPreviewAction
     /** @param array<string, mixed> $filters */
     public function execute(array $filters): View
     {
+        // Range baris diterapkan oleh Alpine pada pratinjau. Kirim data yang
+        // belum dipotong agar range dari initialFilters tidak diterapkan dua kali.
+        $previewFilters = $filters;
+        unset($previewFilters['row_start'], $previewFilters['row_end']);
+
         return view('admin.laporan.export-pegawai', [
-            'pegawai' => $this->employeeExportData->rows($filters, defaultToActive: false)->all(),
+            'pegawai' => $this->employeeExportData->rows($previewFilters, defaultToActive: false)->all(),
             'filterOptions' => $this->employeeExportData->filterOptions(),
             'initialFilters' => [
                 'search' => (string) ($filters['search'] ?? ''),
