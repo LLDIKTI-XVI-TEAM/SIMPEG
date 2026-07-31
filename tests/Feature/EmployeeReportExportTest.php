@@ -30,11 +30,16 @@ class EmployeeReportExportTest extends TestCase
     public function test_guest_and_unauthorized_role_cannot_access_employee_export(): void
     {
         $this->get(route('laporan.pegawai'))->assertRedirect(route('login'));
+        $this->get(route('laporan.pegawai.preview'))->assertRedirect(route('login'));
 
         $pegawai = User::factory()->pegawai()->create();
 
         $this->actingAs($pegawai)
             ->get(route('laporan.pegawai'))
+            ->assertForbidden();
+
+        $this->actingAs($pegawai)
+            ->get(route('laporan.pegawai.preview'))
             ->assertForbidden();
     }
 
@@ -67,7 +72,19 @@ class EmployeeReportExportTest extends TestCase
             ->get(route('laporan.pegawai'))
             ->assertOk()
             ->assertSee('Ahmad Export')
-            ->assertSee('Pegawai Pensiun');
+            ->assertDontSee('Pegawai Pensiun');
+
+        $this->actingAs($admin)
+            ->getJson(route('laporan.pegawai.preview'))
+            ->assertOk()
+            ->assertJsonCount(2, 'pegawai')
+            ->assertJsonMissing(['nama' => 'Pegawai Pensiun']);
+
+        $this->actingAs($admin)
+            ->getJson(route('laporan.pegawai.preview', ['status' => '']))
+            ->assertOk()
+            ->assertJsonCount(3, 'pegawai')
+            ->assertJsonFragment(['nama' => 'Pegawai Pensiun']);
 
         $response = $this->actingAs($admin)->get(route('laporan.pegawai.excel', [
             'unit' => $unitKepegawaian->nama,
@@ -129,6 +146,12 @@ class EmployeeReportExportTest extends TestCase
             ->assertDontSee('"no_hp"', false);
 
         $this->actingAs($admin)
+            ->getJson(route('laporan.pegawai.preview'))
+            ->assertOk()
+            ->assertJsonMissing(['email_pribadi' => 'pii-preview-unique@example.test'])
+            ->assertJsonMissing(['no_hp' => '081234567890']);
+
+        $this->actingAs($admin)
             ->from(route('laporan.pegawai'))
             ->get(route('laporan.pegawai.excel', [
                 'columns' => ['nama', 'email', 'no_hp'],
@@ -167,7 +190,7 @@ class EmployeeReportExportTest extends TestCase
             });
     }
 
-    public function test_preview_leaves_initial_row_range_for_frontend_to_apply_once(): void
+    public function test_preview_applies_initial_row_range_once_on_backend(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();
         $unit = RefUnitKerja::query()
@@ -191,7 +214,6 @@ class EmployeeReportExportTest extends TestCase
             ->assertOk()
             ->assertViewHas('pegawai', function (array $pegawai): bool {
                 return array_column($pegawai, 'nip') === [
-                    '198503122010011001',
                     '198503122010011002',
                     '198503122010011003',
                     '198503122010011004',
@@ -199,6 +221,90 @@ class EmployeeReportExportTest extends TestCase
                 ];
             })
             ->assertViewHas('initialFilters', fn (array $filters): bool => $filters['row_start'] === 2 && $filters['row_end'] === 5);
+    }
+
+    public function test_preview_endpoint_can_restore_rows_after_a_filter_is_cleared(): void
+    {
+        $admin = User::factory()->adminKepegawaian()->create();
+        $unit = RefUnitKerja::query()
+            ->where('nama', 'Urusan Organisasi Tata Laksana dan SDM')
+            ->firstOrFail();
+        $analyst = $this->createEmployee($unit, [
+            'nama_lengkap' => 'Pegawai Analis',
+            'nip' => '198503122010011011',
+            'jabatan_terakhir' => 'Analis Kepegawaian',
+        ]);
+        $dataManager = $this->createEmployee($unit, [
+            'nama_lengkap' => 'Pegawai Pengelola',
+            'nip' => '198503122010011012',
+            'jabatan_terakhir' => 'Pengelola Data',
+        ]);
+
+        $this->actingAs($admin)
+            ->getJson(route('laporan.pegawai.preview', [
+                'status' => 'Aktif',
+                'jabatan' => 'Analis Kepegawaian',
+                'sort' => 'nip',
+            ]))
+            ->assertOk()
+            ->assertJsonCount(1, 'pegawai')
+            ->assertJsonPath('pegawai.0.nip', $analyst->nip);
+
+        $this->actingAs($admin)
+            ->getJson(route('laporan.pegawai.preview', [
+                'status' => 'Aktif',
+                'sort' => 'nip',
+            ]))
+            ->assertOk()
+            ->assertJsonCount(2, 'pegawai')
+            ->assertJsonPath('pegawai.0.nip', $analyst->nip)
+            ->assertJsonPath('pegawai.1.nip', $dataManager->nip);
+    }
+
+    public function test_preview_endpoint_and_custom_export_use_the_same_sorted_range(): void
+    {
+        $admin = User::factory()->adminKepegawaian()->create();
+        $unit = RefUnitKerja::query()
+            ->where('nama', 'Urusan Organisasi Tata Laksana dan SDM')
+            ->firstOrFail();
+
+        $this->createEmployee($unit, [
+            'nama_lengkap' => 'A b',
+            'nip' => '198503122010011021',
+        ]);
+        $this->createEmployee($unit, [
+            'nama_lengkap' => 'A-b',
+            'nip' => '198503122010011022',
+        ]);
+        $this->createEmployee($unit, [
+            'nama_lengkap' => 'A2',
+            'nip' => '198503122010011023',
+        ]);
+
+        $filters = [
+            'status' => 'Aktif',
+            'sort' => 'nama',
+            'row_start' => 2,
+            'row_end' => 2,
+        ];
+        $preview = $this->actingAs($admin)
+            ->getJson(route('laporan.pegawai.preview', $filters))
+            ->assertOk()
+            ->assertJsonCount(1, 'pegawai');
+
+        $response = $this->actingAs($admin)->post(route('laporan.pegawai.custom'), [
+            ...$filters,
+            'columns' => ['nama'],
+        ]);
+        $response->assertOk();
+
+        $spreadsheet = $this->loadSpreadsheet($response->streamedContent());
+
+        try {
+            $this->assertSame($preview->json('pegawai.0.nama'), $spreadsheet->getActiveSheet()->getCell('A2')->getValue());
+        } finally {
+            $spreadsheet->disconnectWorksheets();
+        }
     }
 
     public function test_custom_export_preserves_user_column_order_and_rejects_sensitive_columns(): void

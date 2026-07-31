@@ -36,13 +36,13 @@
             </div>
             <div class="flex w-full flex-wrap items-center gap-3 sm:w-auto sm:justify-end">
                 {{-- Cetak PDF --}}
-                <x-ui.button @click="printReport()" variant="secondary">
+                <x-ui.button @click="printReport()" x-bind:disabled="previewLoading" variant="secondary">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.617 0-1.11-.476-1.12-1.09l-.23-2.523M19.5 10.5v.375c0 .621-.504 1.125-1.125 1.125H5.625A1.125 1.125 0 0 1 4.5 11.25v-.375m15 0V9a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 9v1.5m15 0A1.5 1.5 0 0 0 18 9h-3V6a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3H6a1.5 1.5 0 0 0-1.5 1.5" />
                     </svg>
                     Cetak PDF
                 </x-ui.button>
-                <x-ui.button type="submit" form="custom-export-form" variant="secondary">
+                <x-ui.button type="submit" form="custom-export-form" x-bind:disabled="previewLoading" variant="secondary">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
                     </svg>
@@ -352,9 +352,11 @@
         {{-- ============================================================ --}}
         <x-ui.card padding="none" class="overflow-hidden print:border-none print:shadow-none print:bg-transparent">
             {{-- Header (Screen only) --}}
-            <div class="px-6 py-4 border-b border-border bg-surface print:hidden">
+            <div class="flex items-center justify-between gap-3 px-6 py-4 border-b border-border bg-surface print:hidden">
                 <h3 class="text-sm font-semibold text-ink font-sans">Pratinjau Data Export</h3>
+                <p x-cloak x-show="previewLoading" role="status" aria-live="polite" class="text-xs font-medium text-muted font-sans">Memperbarui pratinjau…</p>
             </div>
+            <p x-cloak x-show="previewError" role="alert" class="px-6 pt-4 text-sm text-danger font-sans print:hidden" x-text="previewError"></p>
 
             {{-- Table --}}
             <div class="overflow-x-auto print:overflow-visible">
@@ -461,6 +463,7 @@
                 // =====================================================================
                 allPegawai: initialPegawai,
                 filterOptions: initialFilterOptions,
+                previewEndpoint: @js(route('laporan.pegawai.preview')),
 
                 // =====================================================================
                 // FILTER STATE
@@ -502,6 +505,10 @@
             configOpen: true,
             currentPage: 1,
             perPage: 10,
+            previewLoading: false,
+            previewError: '',
+            previewRequestId: 0,
+            previewRefreshTimer: null,
             exportError: @js($errors->first('columns') ?: $errors->first('columns.0')),
             pensiunError: @js($errors->first('pensiun_dari') ?: $errors->first('pensiun_sampai')),
 
@@ -509,76 +516,111 @@
             // WATCHERS
             // =====================================================================
             init() {
-                this.$watch('searchQuery',    () => this.currentPage = 1);
-                this.$watch('activeUnit',     () => this.currentPage = 1);
-                this.$watch('activeGolongan', () => this.currentPage = 1);
-                this.$watch('activeJenis',    () => this.currentPage = 1);
-                this.$watch('activeStatus',   () => this.currentPage = 1);
-                this.$watch('activeJabatan',  () => this.currentPage = 1);
-                this.$watch('pensiunDari',    () => this.currentPage = 1);
-                this.$watch('pensiunSampai',  () => this.currentPage = 1);
-                this.$watch('sortBy',         () => this.currentPage = 1);
-                this.$watch('sortDir',        () => this.currentPage = 1);
-                this.$watch('prefixField',    () => this.currentPage = 1);
-                this.$watch('prefixValue',    () => this.currentPage = 1);
-                this.$watch('rowStart',       () => this.currentPage = 1);
-                this.$watch('rowEnd',         () => this.currentPage = 1);
+                [
+                    'searchQuery', 'activeUnit', 'activeGolongan', 'activeJenis', 'activeStatus',
+                    'activeJabatan', 'pensiunDari', 'pensiunSampai', 'sortBy', 'sortDir',
+                    'prefixField', 'prefixValue', 'rowStart', 'rowEnd',
+                ].forEach((field) => this.$watch(field, () => {
+                    this.currentPage = 1;
+                    this.queuePreviewRefresh();
+                }));
             },
 
             // =====================================================================
-            // COMPUTED: Filter saja tanpa sort
+            // PREVIEW: Backend adalah sumber kanonis untuk filter, urutan, dan range.
+            // Browser hanya menampilkan data yang dikembalikan endpoint preview.
             // =====================================================================
             get filteredPegawai() {
-                return this.allPegawai.filter(p => {
-                    const query = this.searchQuery.toLowerCase().trim();
-                    const matchesSearch = !query ||
-                        p.nama.toLowerCase().includes(query) ||
-                        p.nip.replace(/\s+/g, '').includes(query.replace(/\s+/g, ''));
-                    const matchesUnit     = !this.activeUnit     || p.unit     === this.activeUnit;
-                    const matchesGolongan = !this.activeGolongan || p.golongan === this.activeGolongan;
-                    const matchesJenis    = !this.activeJenis    || p.jenis    === this.activeJenis;
-                    const matchesStatus   = !this.activeStatus   || p.status   === this.activeStatus;
-                    const matchesJabatan  = !this.activeJabatan  || p.jabatan  === this.activeJabatan;
-                    const tanggalPensiun  = p.tanggal_pensiun === '-' ? '' : p.tanggal_pensiun;
-                    const matchesPensiunDari = !this.pensiunDari || (tanggalPensiun !== '' && tanggalPensiun >= this.pensiunDari);
-                    const matchesPensiunSampai = !this.pensiunSampai || (tanggalPensiun !== '' && tanggalPensiun <= this.pensiunSampai);
-                    const pf = this.prefixValue.trim().toLowerCase();
-                    const matchesPrefix = !pf || String(p[this.prefixField] ?? '').toLowerCase().startsWith(pf);
-                    return matchesSearch && matchesUnit && matchesGolongan && matchesJenis && matchesStatus && matchesJabatan && matchesPensiunDari && matchesPensiunSampai && matchesPrefix;
-                });
+                return this.allPegawai;
             },
 
-            // =====================================================================
-            // COMPUTED: Filter → Sort → Slice range
-            // Urutan ini mengikuti EmployeeExportDataService agar pratinjau
-            // dan file Excel memakai baris yang sama.
-            // =====================================================================
+            // Data telah difilter, diurutkan, dan diberi range oleh backend.
             get exportRows() {
-                const filtered = this.filteredPegawai;
-                const result = [...filtered];
-                const golonganOrder = {
-                    'IV/e':1,'IV/d':2,'IV/c':3,'IV/b':4,'IV/a':5,
-                    'III/d':6,'III/c':7,'III/b':8,'III/a':9,
-                    'II/d':10,'II/c':11,'II/b':12,'II/a':13,
-                    'I/d':14,'I/c':15,'I/b':16,'I/a':17
+                return this.allPegawai;
+            },
+
+            queuePreviewRefresh() {
+                const requestId = ++this.previewRequestId;
+
+                if (this.previewRefreshTimer !== null) {
+                    window.clearTimeout(this.previewRefreshTimer);
+                }
+
+                if (this.pensiunDari && this.pensiunSampai && this.pensiunSampai < this.pensiunDari) {
+                    this.pensiunError = 'Tanggal pensiun sampai harus sama dengan atau setelah tanggal pensiun dari.';
+                    this.previewLoading = false;
+
+                    return;
+                }
+
+                this.pensiunError = '';
+                this.previewLoading = true;
+                this.previewRefreshTimer = window.setTimeout(() => this.refreshPreview(requestId), 350);
+            },
+
+            previewParams() {
+                const params = new URLSearchParams();
+                const values = {
+                    search: this.searchQuery.trim(),
+                    unit: this.activeUnit,
+                    golongan: this.activeGolongan,
+                    jenis: this.activeJenis,
+                    status: this.activeStatus,
+                    jabatan: this.activeJabatan,
+                    pensiun_dari: this.pensiunDari,
+                    pensiun_sampai: this.pensiunSampai,
+                    sort: this.sortBy,
+                    sort_dir: this.sortDir,
+                    prefix_field: this.prefixField,
+                    prefix_value: this.prefixValue.trim(),
+                    row_start: Math.max(1, Number(this.rowStart) || 1),
+                    row_end: this.rowEnd,
                 };
-                const dir = this.sortDir === 'desc' ? -1 : 1;
-                result.sort((a, b) => {
-                    if (this.sortBy === 'golongan') {
-                        return dir * ((golonganOrder[a.golongan] || 99) - (golonganOrder[b.golongan] || 99));
+
+                Object.entries(values).forEach(([key, value]) => {
+                    if (key === 'status' || (value !== '' && value !== null && value !== undefined)) {
+                        params.set(key, String(value));
                     }
-                    const va = String(a[this.sortBy] ?? '');
-                    const vb = String(b[this.sortBy] ?? '');
-                    return dir * va.localeCompare(vb, 'id', { numeric: true, sensitivity: 'base' });
                 });
 
-                const start = Math.max(1, parseInt(this.rowStart) || 1) - 1;
-                const rawEnd = this.rowEnd;
-                const end = (rawEnd !== '' && rawEnd !== null && Number(rawEnd) > 0)
-                    ? Number(rawEnd)
-                    : result.length;
+                return params;
+            },
 
-                return result.slice(start, Math.min(end, result.length));
+            async refreshPreview(requestId) {
+                const params = this.previewParams();
+                this.previewRefreshTimer = null;
+                this.previewLoading = true;
+                this.previewError = '';
+
+                try {
+                    const response = await fetch(`${this.previewEndpoint}?${params.toString()}`, {
+                        headers: {
+                            Accept: 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                    });
+                    const payload = await response.json().catch(() => null);
+
+                    if (!response.ok || !Array.isArray(payload?.pegawai)) {
+                        throw new Error(payload?.message ?? 'Pratinjau tidak dapat diperbarui. Muat ulang halaman dan masuk kembali bila sesi berakhir.');
+                    }
+
+                    if (requestId !== this.previewRequestId) {
+                        return;
+                    }
+
+                    this.allPegawai = payload?.pegawai ?? [];
+                    const query = params.toString();
+                    window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
+                } catch (error) {
+                    if (requestId === this.previewRequestId) {
+                        this.previewError = error.message || 'Pratinjau tidak dapat diperbarui. Coba lagi.';
+                    }
+                } finally {
+                    if (requestId === this.previewRequestId) {
+                        this.previewLoading = false;
+                    }
+                }
             },
 
             // =====================================================================

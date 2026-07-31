@@ -3,6 +3,7 @@
 namespace App\Actions\Laporan;
 
 use App\Services\Laporan\EmployeeExportDataService;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 class ExportPegawaiPreviewAction
@@ -12,20 +13,15 @@ class ExportPegawaiPreviewAction
     /** @param array<string, mixed> $filters */
     public function execute(array $filters): View
     {
-        // Range baris diterapkan oleh Alpine pada pratinjau. Kirim data yang
-        // belum dipotong agar range dari initialFilters tidak diterapkan dua kali.
-        $previewFilters = $filters;
-        unset($previewFilters['row_start'], $previewFilters['row_end']);
-
         return view('admin.laporan.export-pegawai', [
-            'pegawai' => $this->employeeExportData->rows($previewFilters, defaultToActive: false)->all(),
+            'pegawai' => $this->previewRows($filters)->all(),
             'filterOptions' => $this->employeeExportData->filterOptions(),
             'initialFilters' => [
                 'search' => (string) ($filters['search'] ?? ''),
                 'unit' => (string) ($filters['unit'] ?? ''),
                 'golongan' => (string) ($filters['golongan'] ?? ''),
                 'jenis' => (string) ($filters['jenis'] ?? ''),
-                'status' => (string) (($filters['status'] ?? null) ?: 'Aktif'),
+                'status' => array_key_exists('status', $filters) ? (string) $filters['status'] : 'Aktif',
                 'jabatan' => (string) ($filters['jabatan'] ?? ''),
                 'pensiun_dari' => (string) ($filters['pensiun_dari'] ?? ''),
                 'pensiun_sampai' => (string) ($filters['pensiun_sampai'] ?? ''),
@@ -38,5 +34,18 @@ class ExportPegawaiPreviewAction
             ],
             'title' => 'Laporan - Export Pegawai',
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return Collection<int, array<string, string>>
+     */
+    public function previewRows(array $filters): Collection
+    {
+        if (! array_key_exists('status', $filters)) {
+            $filters['status'] = 'Aktif';
+        }
+
+        return $this->employeeExportData->rows($filters, defaultToActive: false);
     }
 }
