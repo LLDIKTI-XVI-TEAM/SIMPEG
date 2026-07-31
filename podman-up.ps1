@@ -18,7 +18,7 @@ if (-not (Get-Command podman -ErrorAction SilentlyContinue)) {
     }
 }
 
-Write-Host "`n=== SIMPEG - podman compose ===" -ForegroundColor Cyan
+Write-Host "`n=== SIMPEG - Podman Compose ===" -ForegroundColor Cyan
 Write-Host "Podman version: $(podman --version)" -ForegroundColor DarkGray
 
 $action = if ($args.Count -gt 0) { $args[0] } else { "up" }
