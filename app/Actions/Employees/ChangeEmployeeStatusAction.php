@@ -31,7 +31,7 @@ class ChangeEmployeeStatusAction
     ) {}
 
     /**
-     * @param  array{status_pegawai_id: string, alasan: string, deskripsi: ?string, tanggal: string}  $data
+     * @param  array{status_pegawai_id: string, keterangan: string, tanggal: string}  $data
      */
     public function execute(Employee $employee, array $data, Request $request, ?UploadedFile $berkas = null): Employee
     {
@@ -77,8 +77,7 @@ class ChangeEmployeeStatusAction
                 'employee_id' => $employee->id,
                 'status_pegawai_id' => $status->id,
                 'status_nama' => $status->nama,
-                'alasan' => $data['alasan'],
-                'deskripsi' => $data['deskripsi'] ?? null,
+                'keterangan' => $data['keterangan'] ?? null,
                 'tanggal_efektif' => $data['tanggal'],
                 'nomor_berkas' => $nomorBerkas,
                 'file_sk' => $filePath,
@@ -90,8 +89,7 @@ class ChangeEmployeeStatusAction
             $employee->update([
                 'status_pegawai_id' => $status->id,
                 'status_aktif' => $status->nama,
-                'status_alasan' => $data['alasan'],
-                'status_deskripsi' => $data['deskripsi'] ?? null,
+                'status_keterangan' => $data['keterangan'] ?? null,
                 'status_tanggal' => $data['tanggal'],
                 'status_berkas_path' => $filePath,
                 'status_nomor_berkas' => $nomorBerkas,
@@ -110,7 +108,7 @@ class ChangeEmployeeStatusAction
                 $employee,
                 'status_pegawai.diubah',
                 'Status Kepegawaian Anda Diperbarui',
-                'Status kepegawaian Anda telah diubah menjadi "'.$status->nama.'". Alasan: '.$data['alasan'],
+                'Status kepegawaian Anda telah diubah menjadi "'.$status->nama.'". '.($data['keterangan'] ? 'Keterangan: '.$data['keterangan'] : ''),
                 ['status_pegawai_id' => $status->id, 'url' => route('profil', [], false)],
             );
         } catch (\Throwable $e) {

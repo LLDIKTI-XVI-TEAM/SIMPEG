@@ -38,7 +38,7 @@ class ChangeEmployeeStatusTest extends TestCase
             'pegawai_id' => $employee->id,
             'status_pegawai_id' => $mutasi->id,
             'tanggal' => '2026-08-01',
-            'alasan' => 'Pindah unit kerja',
+            'keterangan' => 'Pindah unit kerja',
         ]);
 
         $response->assertRedirect();
@@ -47,7 +47,7 @@ class ChangeEmployeeStatusTest extends TestCase
         $employee->refresh();
         $this->assertSame($mutasi->id, $employee->status_pegawai_id);
         $this->assertSame('Mutasi', $employee->status_aktif);
-        $this->assertSame('Pindah unit kerja', $employee->status_alasan);
+        $this->assertSame('Pindah unit kerja', $employee->status_keterangan);
         $this->assertNull($employee->status_berkas_path);
 
         // Tanpa berkas, tidak ada dokumen yang tercipta.
@@ -70,7 +70,7 @@ class ChangeEmployeeStatusTest extends TestCase
             'pegawai_id' => $employee->id,
             'status_pegawai_id' => $pensiun->id,
             'tanggal' => '2026-08-01',
-            'alasan' => 'Batas usia pensiun',
+            'keterangan' => 'Batas usia pensiun',
             'berkas' => UploadedFile::fake()->create('sk-pensiun.pdf', 200, 'application/pdf'),
         ]);
 
@@ -88,7 +88,7 @@ class ChangeEmployeeStatusTest extends TestCase
         Storage::disk(Document::STORAGE_DISK)->assertExists($document->file_path);
     }
 
-    public function test_second_change_with_new_attachment_replaces_old_document_and_deletes_old_file(): void
+    public function test_second_change_with_new_attachment_creates_second_document_and_preserves_old_file(): void
     {
         $admin = User::factory()->superAdmin()->create();
         $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
@@ -99,7 +99,7 @@ class ChangeEmployeeStatusTest extends TestCase
             'pegawai_id' => $employee->id,
             'status_pegawai_id' => $mutasi->id,
             'tanggal' => '2026-08-01',
-            'alasan' => 'Alasan pertama',
+            'keterangan' => 'Keterangan pertama',
             'berkas' => UploadedFile::fake()->create('sk-mutasi.pdf', 200, 'application/pdf'),
         ])->assertRedirect();
 
@@ -113,24 +113,25 @@ class ChangeEmployeeStatusTest extends TestCase
             'pegawai_id' => $employee->id,
             'status_pegawai_id' => $pensiun->id,
             'tanggal' => '2026-09-01',
-            'alasan' => 'Alasan kedua',
+            'keterangan' => 'Keterangan kedua',
             'berkas' => UploadedFile::fake()->create('sk-pensiun.pdf', 200, 'application/pdf'),
         ])->assertRedirect();
 
         $employee->refresh();
         $this->assertSame('Pensiun', $employee->status_aktif);
-        $this->assertSame('Alasan kedua', $employee->status_alasan);
+        $this->assertSame('Keterangan kedua', $employee->status_keterangan);
 
-        // Hanya satu dokumen SK status yang tersisa (yang lama ditimpa/dihapus).
-        $this->assertSame(1, Document::where('employee_id', $employee->id)->count());
+        // Sistem history: kedua dokumen tetap ada (append-only)
+        $this->assertSame(2, Document::where('employee_id', $employee->id)->count());
         $newFilePath = $employee->status_berkas_path;
         $this->assertNotSame($oldFilePath, $newFilePath);
 
-        Storage::disk(Document::STORAGE_DISK)->assertMissing($oldFilePath);
+        // Kedua file tetap ada di storage
+        Storage::disk(Document::STORAGE_DISK)->assertExists($oldFilePath);
         Storage::disk(Document::STORAGE_DISK)->assertExists($newFilePath);
     }
 
-    public function test_change_without_new_attachment_removes_previous_document_and_file(): void
+    public function test_change_without_new_attachment_preserves_previous_document_and_file(): void
     {
         $admin = User::factory()->superAdmin()->create();
         $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
@@ -141,7 +142,7 @@ class ChangeEmployeeStatusTest extends TestCase
             'pegawai_id' => $employee->id,
             'status_pegawai_id' => $mutasi->id,
             'tanggal' => '2026-08-01',
-            'alasan' => 'Alasan pertama',
+            'keterangan' => 'Keterangan pertama',
             'berkas' => UploadedFile::fake()->create('sk-mutasi.pdf', 200, 'application/pdf'),
         ])->assertRedirect();
 
@@ -153,14 +154,18 @@ class ChangeEmployeeStatusTest extends TestCase
             'pegawai_id' => $employee->id,
             'status_pegawai_id' => $pensiun->id,
             'tanggal' => '2026-09-01',
-            'alasan' => 'Alasan kedua tanpa berkas',
+            'keterangan' => 'Keterangan kedua tanpa berkas',
         ])->assertRedirect();
 
         $employee->refresh();
+
+        // Employee snapshot tidak punya berkas (karena status change kedua tanpa file)
         $this->assertNull($employee->status_berkas_path);
         $this->assertNull($employee->status_nomor_berkas);
-        $this->assertDatabaseCount('documents', 0);
-        Storage::disk(Document::STORAGE_DISK)->assertMissing($oldFilePath);
+
+        // Tapi dokumen pertama tetap ada di history (append-only)
+        $this->assertSame(1, Document::where('employee_id', $employee->id)->count());
+        Storage::disk(Document::STORAGE_DISK)->assertExists($oldFilePath);
     }
 
     public function test_can_change_status_to_values_beyond_original_enum(): void
@@ -177,7 +182,7 @@ class ChangeEmployeeStatusTest extends TestCase
             'pegawai_id' => $employee->id,
             'status_pegawai_id' => $pemberhentian->id,
             'tanggal' => '2026-08-01',
-            'alasan' => 'Diberhentikan sementara dari tugas',
+            'keterangan' => 'Diberhentikan sementara dari tugas',
         ]);
 
         $response->assertRedirect();

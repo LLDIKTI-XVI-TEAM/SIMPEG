@@ -1,7 +1,5 @@
 <?php
 
-use App\Models\Employee;
-use App\Models\EmployeeStatusHistory;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 

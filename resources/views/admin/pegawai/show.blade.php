@@ -1073,14 +1073,10 @@
                                 <span class="font-semibold text-muted font-sans">Tanggal Efektif</span>
                                 <p class="text-ink font-sans">{{ $p->status_tanggal ? \Carbon\Carbon::parse($p->status_tanggal)->format('d-m-Y') : '-' }}</p>
                             </div>
+                            @if($p->status_keterangan)
                             <div class="space-y-0.5 sm:col-span-2">
-                                <span class="font-semibold text-muted font-sans">Alasan</span>
-                                <p class="text-ink font-sans">{{ $p->status_alasan ?? '-' }}</p>
-                            </div>
-                            @if($p->status_deskripsi)
-                            <div class="space-y-0.5 sm:col-span-2">
-                                <span class="font-semibold text-muted font-sans">Deskripsi</span>
-                                <p class="text-ink font-sans">{{ $p->status_deskripsi }}</p>
+                                <span class="font-semibold text-muted font-sans">Keterangan</span>
+                                <p class="text-ink font-sans">{{ $p->status_keterangan }}</p>
                             </div>
                             @endif
                             <div class="space-y-0.5 sm:col-span-2">
@@ -2129,14 +2125,10 @@
                                     <span class="font-semibold text-ink">Tanggal:</span>
                                     {{ $history->tanggal_efektif->format('d M Y') }}
                                 </p>
+                                @if($history->keterangan)
                                 <p>
-                                    <span class="font-semibold text-ink">Alasan:</span>
-                                    {{ $history->alasan }}
-                                </p>
-                                @if($history->deskripsi)
-                                <p class="text-[11px]">
-                                    <span class="font-semibold text-ink">Deskripsi:</span>
-                                    {{ Str::limit($history->deskripsi, 100) }}
+                                    <span class="font-semibold text-ink">Keterangan:</span>
+                                    {{ Str::limit($history->keterangan, 100) }}
                                 </p>
                                 @endif
                                 @php

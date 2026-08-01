@@ -12,8 +12,7 @@ use Illuminate\Support\Carbon;
  * @property string $employee_id
  * @property string|null $status_pegawai_id
  * @property string $status_nama
- * @property string $alasan
- * @property string|null $deskripsi
+ * @property string|null $keterangan
  * @property Carbon $tanggal_efektif
  * @property string|null $nomor_berkas
  * @property string|null $file_sk
@@ -33,8 +32,7 @@ class EmployeeStatusHistory extends Model
         'employee_id',
         'status_pegawai_id',
         'status_nama',
-        'alasan',
-        'deskripsi',
+        'keterangan',
         'tanggal_efektif',
         'nomor_berkas',
         'file_sk',
