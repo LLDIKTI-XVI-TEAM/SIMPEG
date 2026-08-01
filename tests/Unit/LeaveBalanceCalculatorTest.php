@@ -139,14 +139,21 @@ class LeaveBalanceCalculatorTest extends TestCase
      * @param  array{n2:int, n1:int, current:int, hangus:int, maxUsable:int}  $expected
      */
     #[DataProvider('rolloverProvider')]
-    public function test_rollover_applies_caps_and_records_hangus(
+    public function test_rollover_applies_eligibility_caps_and_records_hangus(
         int $previousN1,
         int $previousCurrent,
+        bool $sourceYearNoApprovedAnnualLeave,
         bool $twoYearsNoAnnualLeave,
         int $postponedByDuty,
         array $expected,
     ): void {
-        $result = $this->calculator->calculateRollover($previousN1, $previousCurrent, $twoYearsNoAnnualLeave, $postponedByDuty);
+        $result = $this->calculator->calculateRollover(
+            previousN1: $previousN1,
+            previousCurrent: $previousCurrent,
+            sourceYearNoApprovedAnnualLeave: $sourceYearNoApprovedAnnualLeave,
+            twoYearsNoAnnualLeave: $twoYearsNoAnnualLeave,
+            postponedByDuty: $postponedByDuty,
+        );
 
         $this->assertSame($expected, $result);
     }
@@ -156,67 +163,52 @@ class LeaveBalanceCalculatorTest extends TestCase
      *     0: int,
      *     1: int,
      *     2: bool,
-     *     3: int,
-     *     4: array{n2:int, n1:int, current:int, hangus:int, maxUsable:int}
+     *     3: bool,
+     *     4: int,
+     *     5: array{n2:int, n1:int, current:int, hangus:int, maxUsable:int}
      * }>
      */
     public static function rolloverProvider(): array
     {
         return [
-            'tanpa carry-over: seluruh sisa lama sudah habis, maksimal terpakai 12' => [
-                0,
-                0,
-                false,
-                0,
+            'tanpa sisa tidak membuat carry' => [
+                0, 0, true, false, 0,
                 ['n2' => 0, 'n1' => 0, 'current' => 12, 'hangus' => 0, 'maxUsable' => 12],
             ],
-            'normal: sisa di atas 6 masuk N-1 maksimal 6, cap 18' => [
-                0,
-                10,
-                false,
-                0,
-                ['n2' => 0, 'n1' => 6, 'current' => 12, 'hangus' => 4, 'maxUsable' => 18],
-            ],
-            'dua tahun tanpa cuti tahunan: N-2 dan N-1 masing-masing 6, cap 24' => [
-                8,
-                9,
-                true,
-                0,
-                ['n2' => 6, 'n1' => 6, 'current' => 12, 'hangus' => 5, 'maxUsable' => 24],
-            ],
-            'cuti tahunan sebagian mematahkan aturan dua tahun: kembali ke cap 18' => [
-                8,
-                9,
-                false,
-                0,
-                ['n2' => 0, 'n1' => 6, 'current' => 12, 'hangus' => 11, 'maxUsable' => 18],
-            ],
-            'penangguhan dinas: sisa ditangguhkan dihitung penuh tahun berikutnya, total maksimal 24' => [
-                0,
-                0,
-                false,
-                10,
-                ['n2' => 0, 'n1' => 10, 'current' => 12, 'hangus' => 0, 'maxUsable' => 22],
-            ],
-            'penangguhan dinas: sisa normal dan sisa ditangguhkan harus dipisah agar tidak double-count' => [
-                0,
-                2,
-                false,
-                4,
+            'Rule 1 tepat 6 hari dibawa seluruhnya' => [
+                0, 6, true, false, 0,
                 ['n2' => 0, 'n1' => 6, 'current' => 12, 'hangus' => 0, 'maxUsable' => 18],
             ],
-            'penangguhan dinas: sisa di atas total 24 hangus' => [
-                0,
-                6,
-                false,
-                10,
+            'Rule 1 tepat 7 hari dibatasi 6 dan 1 hangus' => [
+                0, 7, true, false, 0,
+                ['n2' => 0, 'n1' => 6, 'current' => 12, 'hangus' => 1, 'maxUsable' => 18],
+            ],
+            'approved annual leave menggagalkan ordinary carry 6 hari' => [
+                0, 6, false, false, 0,
+                ['n2' => 0, 'n1' => 0, 'current' => 12, 'hangus' => 6, 'maxUsable' => 12],
+            ],
+            'approved annual leave menggagalkan ordinary carry 7 hari' => [
+                0, 7, false, false, 0,
+                ['n2' => 0, 'n1' => 0, 'current' => 12, 'hangus' => 7, 'maxUsable' => 12],
+            ],
+            'Rule 2 dua tahun tanpa approval mempertahankan N-2 dan N-1 dengan cap 24' => [
+                8, 9, true, true, 0,
+                ['n2' => 6, 'n1' => 6, 'current' => 12, 'hangus' => 5, 'maxUsable' => 24],
+            ],
+            'approval tahun sebelumnya mematahkan N-2 tetapi Rule 1 tahun sumber tetap berlaku' => [
+                8, 9, true, false, 0,
+                ['n2' => 0, 'n1' => 6, 'current' => 12, 'hangus' => 11, 'maxUsable' => 18],
+            ],
+            'carry statutory tetap masuk ketika ordinary carry tidak eligible' => [
+                0, 7, false, false, 4,
+                ['n2' => 0, 'n1' => 4, 'current' => 12, 'hangus' => 7, 'maxUsable' => 16],
+            ],
+            'carry statutory dan ordinary berbagi ruang menuju total 24' => [
+                0, 6, true, false, 10,
                 ['n2' => 0, 'n1' => 12, 'current' => 12, 'hangus' => 4, 'maxUsable' => 24],
             ],
-            'dua tahun plus penangguhan dinas: total tetap dibatasi 24' => [
-                6,
-                6,
-                true,
-                5,
+            'Rule 2 plus statutory tetap dibatasi 24' => [
+                6, 6, true, true, 5,
                 ['n2' => 6, 'n1' => 6, 'current' => 12, 'hangus' => 5, 'maxUsable' => 24],
             ],
         ];

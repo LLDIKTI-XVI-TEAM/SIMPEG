@@ -225,9 +225,14 @@ class LeaveBalanceService
                     $buckets = $this->bucketsFromBalance($lockedSource);
                     $postponedByDuty = $this->postponedByDuty($lockedSource->employee_id, $sourceYear);
                     $expiredDutyCarryOver = $this->dutyCarryOverExpiringIn($lockedSource->employee_id, $sourceYear);
+                    $sourceYearNoApprovedAnnualLeave = $this->hasNoApprovedAnnualLeaveInYear(
+                        $lockedSource->employee_id,
+                        $sourceYear,
+                    );
                     $result = $this->calculator->calculateRollover(
                         previousN1: max(0, $buckets['n1'] - $expiredDutyCarryOver),
                         previousCurrent: $buckets['current'],
+                        sourceYearNoApprovedAnnualLeave: $sourceYearNoApprovedAnnualLeave,
                         twoYearsNoAnnualLeave: $this->hasNoAnnualLeaveForTwoYears($lockedSource->employee_id, $sourceYear),
                         postponedByDuty: $postponedByDuty,
                     );
@@ -734,14 +739,28 @@ class LeaveBalanceService
         return Employee::query()->whereKey($employeeId)->lockForUpdate()->firstOrFail();
     }
 
+    /**
+     * Eligibility carry ordinary memakai fakta request tahunan disetujui berdasarkan tanggal mulai.
+     * Rentang setengah terbuka menjaga predicate tetap sargable tanpa fungsi whereYear pada kolom.
+     */
+    private function hasNoApprovedAnnualLeaveInYear(string $employeeId, int $year): bool
+    {
+        $start = Carbon::create($year, 1, 1)->startOfDay();
+        $end = $start->copy()->addYear();
+
+        return ! $this->approvedAnnualLeaveQuery($employeeId)
+            ->where('tanggal_mulai', '>=', $start->toDateString())
+            ->where('tanggal_mulai', '<', $end->toDateString())
+            ->exists();
+    }
+
+    /**
+     * Aging ke N-2 hanya aktif bila tahun sumber dan tahun sebelumnya tanpa approval tahunan.
+     */
     private function hasNoAnnualLeaveForTwoYears(string $employeeId, int $sourceYear): bool
     {
-        return ! $this->approvedAnnualLeaveQuery($employeeId)
-            ->where(function (Builder $query) use ($sourceYear): void {
-                $query->whereYear('tanggal_mulai', $sourceYear - 1)
-                    ->orWhereYear('tanggal_mulai', $sourceYear);
-            })
-            ->exists();
+        return $this->hasNoApprovedAnnualLeaveInYear($employeeId, $sourceYear - 1)
+            && $this->hasNoApprovedAnnualLeaveInYear($employeeId, $sourceYear);
     }
 
     private function hasApprovedCutiBesar(string $employeeId, int $year): bool
@@ -1030,9 +1049,14 @@ class LeaveBalanceService
     private function dutyPostponedCarried(LeaveBalance $sourceBalance, int $sourceYear, array $result): int
     {
         $buckets = $this->bucketsFromBalance($sourceBalance);
+        $sourceYearNoApprovedAnnualLeave = $this->hasNoApprovedAnnualLeaveInYear(
+            $sourceBalance->employee_id,
+            $sourceYear,
+        );
         $normal = $this->calculator->calculateRollover(
             previousN1: $buckets['n1'],
             previousCurrent: $buckets['current'],
+            sourceYearNoApprovedAnnualLeave: $sourceYearNoApprovedAnnualLeave,
             twoYearsNoAnnualLeave: $this->hasNoAnnualLeaveForTwoYears($sourceBalance->employee_id, $sourceYear),
             postponedByDuty: 0,
         );

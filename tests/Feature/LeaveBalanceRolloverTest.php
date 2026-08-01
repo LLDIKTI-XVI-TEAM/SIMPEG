@@ -16,6 +16,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Validation\ValidationException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -117,6 +118,7 @@ class LeaveBalanceRolloverTest extends TestCase
     {
         $employee = $this->employeeWithAppointment();
         $jenisTahunan = RefJenisCuti::where('code', 'tahunan')->firstOrFail();
+        $service = app(LeaveBalanceService::class);
         LeaveBalance::create($this->balancePayload($employee, 2026, [
             'sisa_n1' => 6,
             'sisa_tahun_berjalan' => 10,
@@ -135,14 +137,264 @@ class LeaveBalanceRolloverTest extends TestCase
             'status' => 'disetujui',
         ]);
 
-        app(LeaveBalanceService::class)->rolloverYear(2026);
+        $service->rolloverYear(2026);
 
         $balance = LeaveBalance::where('employee_id', $employee->id)->where('tahun', 2027)->firstOrFail();
         $this->assertSame(0, $balance->sisa_n2);
-        $this->assertSame(6, $balance->sisa_n1);
+        $this->assertSame(0, $balance->sisa_n1);
         $this->assertSame(12, $balance->sisa_tahun_berjalan);
-        $this->assertSame(18, $balance->sisa);
-        $this->assertSame(10, $balance->hangus);
+        $this->assertSame(12, $balance->sisa);
+        $this->assertSame(16, $balance->hangus);
+
+        $service->rolloverYear(2026);
+
+        $this->assertSame(1, LeaveBalanceLedger::where('employee_id', $employee->id)
+            ->where('event_type', 'rollover_applied')->count());
+        $this->assertSame(1, LeaveBalanceLedger::where('employee_id', $employee->id)
+            ->where('event_type', 'annual_entitlement_granted')->count());
+        $this->assertSame(1, LeaveBalanceLedger::where('employee_id', $employee->id)
+            ->where('event_type', 'carry_over_expired')->count());
+        $this->assertSame(0, LeaveBalanceLedger::where('employee_id', $employee->id)
+            ->where('event_type', 'carry_over_granted')->count());
+        $this->assertSame(1, AuditLog::where('event', 'LEAVE_ROLLOVER_APPLIED')
+            ->where('auditable_id', $balance->id)->count());
+
+        $expired = LeaveBalanceLedger::where('employee_id', $employee->id)
+            ->where('event_type', 'carry_over_expired')->firstOrFail();
+        $this->assertSame(2026, $expired->source_year);
+        $this->assertSame(16, $expired->metadata['expired_days']);
+        $this->assertSame(2027, $expired->metadata['target_year']);
+
+        $audit = AuditLog::where('event', 'LEAVE_ROLLOVER_APPLIED')
+            ->where('auditable_id', $balance->id)->firstOrFail();
+        $this->assertSame($employee->id, $audit->new_values['employee_id']);
+        $this->assertSame(2027, $audit->new_values['tahun']);
+        $this->assertSame(2026, $audit->new_values['tahun_sumber']);
+        $this->assertSame(0, $audit->new_values['carry_over']);
+        $this->assertSame(16, $audit->new_values['hangus']);
+    }
+
+    /**
+     * @return array<string, array{0:array<int, int>}>
+     */
+    public static function approvedAnnualBucketProvider(): array
+    {
+        return [
+            'N-2' => [[2024]],
+            'N-1' => [[2025]],
+            'current' => [[2026]],
+            'kombinasi N-2, N-1, dan current' => [[2024, 2025, 2026]],
+        ];
+    }
+
+    #[DataProvider('approvedAnnualBucketProvider')]
+    public function test_approval_dari_bucket_mana_pun_menggagalkan_carry_ordinary(array $deductionSourceYears): void
+    {
+        $employee = $this->employeeWithAppointment();
+        $jenisTahunan = RefJenisCuti::where('code', 'tahunan')->firstOrFail();
+        $sourceBalance = LeaveBalance::create($this->balancePayload($employee, 2026, [
+            'sisa_n1' => 6,
+            'sisa_tahun_berjalan' => 7,
+            'carry_over' => 6,
+            'sisa' => 13,
+        ]));
+        $request = LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $jenisTahunan->id,
+            'tanggal_mulai' => '2026-06-15',
+            'tanggal_selesai' => '2026-06-15',
+            'jumlah_hari_kerja' => count($deductionSourceYears),
+            'alasan' => 'Cuti tahunan memakai bucket sumber teruji.',
+            'status' => 'disetujui',
+        ]);
+
+        foreach ($deductionSourceYears as $deductionSourceYear) {
+            LeaveBalanceLedger::create([
+                'employee_id' => $employee->id,
+                'leave_request_id' => $request->id,
+                'leave_balance_id' => $sourceBalance->id,
+                'tahun' => 2026,
+                'event_type' => 'leave_deducted',
+                'amount' => -1,
+                'source_year' => $deductionSourceYear,
+                'reason' => 'Fixture pemotongan dari bucket sumber.',
+                'dedup_key' => "leave_deducted:rule1:{$request->id}:{$deductionSourceYear}",
+                'metadata' => ['bucket' => $deductionSourceYear === 2026 ? 'current' : ($deductionSourceYear === 2025 ? 'n1' : 'n2')],
+                'occurred_at' => Carbon::parse('2026-06-15 17:00:00'),
+            ]);
+        }
+
+        app(LeaveBalanceService::class)->rolloverYear(2026);
+
+        $target = LeaveBalance::where('employee_id', $employee->id)->where('tahun', 2027)->firstOrFail();
+        $this->assertSame(0, $target->sisa_n2);
+        $this->assertSame(0, $target->sisa_n1);
+        $this->assertSame(12, $target->sisa);
+        $this->assertSame(13, $target->hangus);
+        $this->assertDatabaseMissing('leave_balance_ledger', [
+            'employee_id' => $employee->id,
+            'tahun' => 2027,
+            'event_type' => 'carry_over_granted',
+        ]);
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    public static function nonApprovedAnnualStatusProvider(): array
+    {
+        return [
+            'pending approval' => ['menunggu_approval'],
+            'generic postpone' => ['ditangguhkan'],
+            'needs changes' => ['perlu_perubahan'],
+            'not approved' => ['tidak_disetujui'],
+        ];
+    }
+
+    #[DataProvider('nonApprovedAnnualStatusProvider')]
+    public function test_status_selain_disetujui_tidak_menggagalkan_carry_ordinary(string $status): void
+    {
+        $employee = $this->employeeWithAppointment();
+        $jenisTahunan = RefJenisCuti::where('code', 'tahunan')->firstOrFail();
+        LeaveBalance::create($this->balancePayload($employee, 2026, [
+            'sisa_tahun_berjalan' => 7,
+            'sisa' => 7,
+        ]));
+        LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $jenisTahunan->id,
+            'tanggal_mulai' => '2026-09-14',
+            'tanggal_selesai' => '2026-09-14',
+            'jumlah_hari_kerja' => 1,
+            'alasan' => 'Fixture status non-final Rule 1.',
+            'status' => $status,
+        ]);
+
+        app(LeaveBalanceService::class)->rolloverYear(2026);
+
+        $target = LeaveBalance::where('employee_id', $employee->id)->where('tahun', 2027)->firstOrFail();
+        $this->assertSame(6, $target->sisa_n1);
+        $this->assertSame(18, $target->sisa);
+        $this->assertSame(1, $target->hangus);
+    }
+
+    public function test_approval_di_luar_half_open_source_year_tidak_menggagalkan_rule_satu(): void
+    {
+        $employee = $this->employeeWithAppointment();
+        $jenisTahunan = RefJenisCuti::where('code', 'tahunan')->firstOrFail();
+        LeaveBalance::create($this->balancePayload($employee, 2026, [
+            'sisa_tahun_berjalan' => 6,
+            'sisa' => 6,
+        ]));
+
+        foreach (['2025-12-31', '2027-01-01'] as $tanggalMulai) {
+            LeaveRequest::create([
+                'employee_id' => $employee->id,
+                'jenis_cuti_id' => $jenisTahunan->id,
+                'tanggal_mulai' => $tanggalMulai,
+                'tanggal_selesai' => $tanggalMulai,
+                'jumlah_hari_kerja' => 1,
+                'alasan' => 'Fixture batas tahun Rule 1.',
+                'status' => 'disetujui',
+            ]);
+        }
+
+        app(LeaveBalanceService::class)->rolloverYear(2026);
+
+        $target = LeaveBalance::where('employee_id', $employee->id)->where('tahun', 2027)->firstOrFail();
+        $this->assertSame(6, $target->sisa_n1);
+        $this->assertSame(18, $target->sisa);
+        $this->assertSame(0, $target->hangus);
+    }
+
+    public function test_tahun_rule_satu_ditentukan_oleh_tanggal_mulai(): void
+    {
+        $employee = $this->employeeWithAppointment();
+        $jenisTahunan = RefJenisCuti::where('code', 'tahunan')->firstOrFail();
+        LeaveBalance::create($this->balancePayload($employee, 2026, [
+            'sisa_tahun_berjalan' => 6,
+            'sisa' => 6,
+        ]));
+        LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $jenisTahunan->id,
+            'tanggal_mulai' => '2026-12-31',
+            'tanggal_selesai' => '2026-12-31',
+            'jumlah_hari_kerja' => 1,
+            'alasan' => 'Fixture akhir tahun sumber.',
+            'status' => 'disetujui',
+        ]);
+
+        app(LeaveBalanceService::class)->rolloverYear(2026);
+
+        $target = LeaveBalance::where('employee_id', $employee->id)->where('tahun', 2027)->firstOrFail();
+        $this->assertSame(0, $target->sisa_n1);
+        $this->assertSame(12, $target->sisa);
+        $this->assertSame(6, $target->hangus);
+    }
+
+    public function test_approval_tahun_sebelumnya_mematahkan_rule_dua_tetapi_rule_satu_tahun_sumber_tetap_berlaku(): void
+    {
+        $employee = $this->employeeWithAppointment();
+        $jenisTahunan = RefJenisCuti::where('code', 'tahunan')->firstOrFail();
+        LeaveBalance::create($this->balancePayload($employee, 2026, [
+            'sisa_n1' => 6,
+            'sisa_tahun_berjalan' => 7,
+            'carry_over' => 6,
+            'sisa' => 13,
+        ]));
+        LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $jenisTahunan->id,
+            'tanggal_mulai' => '2025-04-07',
+            'tanggal_selesai' => '2025-04-07',
+            'jumlah_hari_kerja' => 1,
+            'alasan' => 'Approval pada tahun sebelum source year.',
+            'status' => 'disetujui',
+        ]);
+
+        app(LeaveBalanceService::class)->rolloverYear(2026);
+
+        $target = LeaveBalance::where('employee_id', $employee->id)->where('tahun', 2027)->firstOrFail();
+        $this->assertSame(0, $target->sisa_n2);
+        $this->assertSame(6, $target->sisa_n1);
+        $this->assertSame(18, $target->sisa);
+        $this->assertSame(7, $target->hangus);
+    }
+
+    public function test_carry_statutory_tetap_diproses_saat_approval_menggagalkan_ordinary_carry(): void
+    {
+        $employee = $this->employeeWithAppointment();
+        $jenisTahunan = RefJenisCuti::where('code', 'tahunan')->firstOrFail();
+        $service = app(LeaveBalanceService::class);
+        LeaveBalance::create($this->balancePayload($employee, 2026, [
+            'sisa_tahun_berjalan' => 7,
+            'sisa' => 7,
+        ]));
+        LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $jenisTahunan->id,
+            'tanggal_mulai' => '2026-05-11',
+            'tanggal_selesai' => '2026-05-11',
+            'jumlah_hari_kerja' => 1,
+            'alasan' => 'Approval yang mematahkan ordinary carry.',
+            'status' => 'disetujui',
+        ]);
+        $service->recordDutyPostponement($employee, 2026, 4, 'Penugasan mendesak kantor', null);
+
+        $service->rolloverYear(2026);
+
+        $target = LeaveBalance::where('employee_id', $employee->id)->where('tahun', 2027)->firstOrFail();
+        $this->assertSame(0, $target->sisa_n2);
+        $this->assertSame(4, $target->sisa_n1);
+        $this->assertSame(16, $target->sisa);
+        $this->assertSame(7, $target->hangus);
+        $carry = LeaveBalanceLedger::where('employee_id', $employee->id)
+            ->where('tahun', 2027)
+            ->where('event_type', 'carry_over_granted')
+            ->firstOrFail();
+        $this->assertSame(4, $carry->amount);
+        $this->assertSame(4, $carry->metadata['duty_postponed_carried']);
     }
 
     public function test_rollover_memperbarui_ringkasan_target_yang_sudah_ada(): void
