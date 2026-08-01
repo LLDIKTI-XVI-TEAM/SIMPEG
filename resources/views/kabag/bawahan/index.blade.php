@@ -121,9 +121,9 @@
                                     <p class="text-sm text-ink">{{ $position?->tmt_jabatan ? \Carbon\Carbon::parse($position->tmt_jabatan)->translatedFormat('d M Y') : '-' }}</p>
                                 </x-ui.table-td>
                                 <x-ui.table-td padding="comfortable">
-                                    <span class="inline-flex items-center gap-1.5 font-medium font-sans leading-none px-2.5 py-1 text-xs rounded-md {{ $employee->sedang_cuti ? 'bg-warning/10 text-warning' : 'bg-success/10 text-success' }}">
-                                        <span class="h-1.5 w-1.5 rounded-full {{ $employee->sedang_cuti ? 'bg-warning' : 'bg-success' }}"></span>
-                                        {{ $employee->sedang_cuti ? 'Cuti' : 'Aktif' }}
+                                    <span class="inline-flex items-center gap-1.5 font-medium font-sans leading-none px-2.5 py-1 text-xs rounded-md {{ $employee->status_tampilan === 'Cuti' ? 'bg-warning/10 text-warning' : 'bg-success/10 text-success' }}">
+                                        <span class="h-1.5 w-1.5 rounded-full {{ $employee->status_tampilan === 'Cuti' ? 'bg-warning' : 'bg-success' }}"></span>
+                                        {{ $employee->status_tampilan }}
                                     </span>
                                 </x-ui.table-td>
                                 <x-ui.table-td padding="comfortable">

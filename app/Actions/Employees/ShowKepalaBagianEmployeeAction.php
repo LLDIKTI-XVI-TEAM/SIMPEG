@@ -16,10 +16,19 @@ class ShowKepalaBagianEmployeeAction
 
         $today = today();
 
-        return $employee
-            ->load([
+        $employee = $this->scope->directReports($user)
+            ->select([
+                'id',
+                'nama_lengkap',
+                'nip',
+                'jabatan_terakhir',
+                'golongan_terakhir',
+                'jenis_pegawai_id',
+                'foto',
+            ])
+            ->whereKey($employee->getKey())
+            ->with([
                 'jenisPegawai:id,nama',
-                'statusPegawai:id,nama',
                 'positionHistories' => fn ($query) => $query
                     ->with(['jabatan:id,nama', 'unitKerja:id,nama'])
                     ->where('is_latest', true)
@@ -34,11 +43,16 @@ class ShowKepalaBagianEmployeeAction
                     ->orderBy('target_date')
                     ->limit(5),
             ])
-            ->loadExists([
+            ->withExists([
                 'leaveRequests as sedang_cuti' => fn ($query) => $query
                     ->where('status', 'disetujui')
                     ->whereDate('tanggal_mulai', '<=', $today)
                     ->whereDate('tanggal_selesai', '>=', $today),
-            ]);
+            ])
+            ->firstOrFail();
+
+        $employee->setAttribute('status_tampilan', (bool) $employee->getAttribute('sedang_cuti') ? 'Cuti' : 'Aktif');
+
+        return $employee;
     }
 }
