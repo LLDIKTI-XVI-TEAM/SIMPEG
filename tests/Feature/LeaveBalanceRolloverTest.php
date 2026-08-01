@@ -13,6 +13,7 @@ use App\Services\Cuti\LeaveBalanceService;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
@@ -185,6 +186,99 @@ class LeaveBalanceRolloverTest extends TestCase
         $this->assertSame(9, $balance->sisa_tahun_berjalan);
         $this->assertSame(14, $balance->sisa);
         $this->assertSame(3, $balance->terpakai_tahun_berjalan);
+    }
+
+    public function test_rollover_terlambat_melewati_target_yang_sudah_dibuka_admin_tanpa_mutasi(): void
+    {
+        $employee = $this->employeeWithAppointment();
+        $actor = User::factory()->create();
+        $service = app(LeaveBalanceService::class);
+        LeaveBalance::create($this->balancePayload($employee, 2026, [
+            'sisa_tahun_berjalan' => 6,
+            'sisa' => 6,
+        ]));
+        $service->setOpeningBalance($employee, 2027, [
+            'n2' => 1,
+            'n1' => 2,
+            'current' => 10,
+        ], 'Pembukaan admin sebelum rollover terlambat.', $actor);
+        $target = LeaveBalance::where('employee_id', $employee->id)->where('tahun', 2027)->firstOrFail();
+        $summaryBefore = $this->summaryPayload($target);
+        $ledgerCount = LeaveBalanceLedger::count();
+        $auditCount = AuditLog::count();
+
+        $service->rolloverYear(2026);
+
+        $this->assertSame($summaryBefore, $this->summaryPayload($target->fresh()));
+        $this->assertSame($ledgerCount, LeaveBalanceLedger::count());
+        $this->assertSame($auditCount, AuditLog::count());
+        $this->assertDatabaseMissing('leave_balance_ledger', [
+            'employee_id' => $employee->id,
+            'tahun' => 2027,
+            'event_type' => LeaveBalanceLedger::EVENT_ROLLOVER_APPLIED,
+        ]);
+    }
+
+    public function test_rollover_mengecek_marker_setelah_employee_lock_dan_retry_tidak_menulis_ulang(): void
+    {
+        $employee = $this->employeeWithAppointment();
+        $service = app(LeaveBalanceService::class);
+        LeaveBalance::create($this->balancePayload($employee, 2026, [
+            'sisa_tahun_berjalan' => 5,
+            'sisa' => 5,
+        ]));
+        $service->rolloverYear(2026);
+        $target = LeaveBalance::where('employee_id', $employee->id)->where('tahun', 2027)->firstOrFail();
+        $summaryBefore = $this->summaryPayload($target);
+        $ledgerCount = LeaveBalanceLedger::count();
+        $auditCount = AuditLog::count();
+        $queries = [];
+
+        DB::listen(function ($query) use (&$queries): void {
+            $queries[] = strtolower($query->sql);
+        });
+
+        $service->rolloverYear(2026);
+
+        $employeeLockIndex = collect($queries)->search(
+            fn (string $sql): bool => str_contains($sql, 'from "employees"') && str_contains($sql, 'where "employees"."id"'),
+        );
+        $rolloverCheckIndex = collect($queries)->search(
+            fn (string $sql): bool => str_contains($sql, 'from "leave_balance_ledger"') && str_contains($sql, '"dedup_key"'),
+        );
+        $this->assertIsInt($employeeLockIndex);
+        $this->assertIsInt($rolloverCheckIndex);
+        $this->assertLessThan($rolloverCheckIndex, $employeeLockIndex);
+        $this->assertSame($summaryBefore, $this->summaryPayload($target->fresh()));
+        $this->assertSame($ledgerCount, LeaveBalanceLedger::count());
+        $this->assertSame($auditCount, AuditLog::count());
+    }
+
+    public function test_rollover_terlambat_mempertahankan_koreksi_target_yang_diinisialisasi_sistem(): void
+    {
+        $employee = $this->employeeWithAppointment();
+        $actor = User::factory()->create();
+        $service = app(LeaveBalanceService::class);
+        LeaveBalance::create($this->balancePayload($employee, 2026, [
+            'sisa_tahun_berjalan' => 5,
+            'sisa' => 5,
+        ]));
+        $this->assertSame(12, $service->availableFor($employee, 2027, Carbon::parse('2027-01-01')));
+        $service->adjustBalance($employee, 2027, 'current', 3, 'Koreksi sebelum rollover terlambat.', $actor);
+
+        $service->rolloverYear(2026);
+
+        $target = LeaveBalance::where('employee_id', $employee->id)->where('tahun', 2027)->firstOrFail();
+        $this->assertSame(0, $target->sisa_n2);
+        $this->assertSame(5, $target->sisa_n1);
+        $this->assertSame(15, $target->sisa_tahun_berjalan);
+        $this->assertSame(20, $target->sisa);
+        $this->assertDatabaseHas('leave_balance_ledger', [
+            'employee_id' => $employee->id,
+            'tahun' => 2027,
+            'event_type' => LeaveBalanceLedger::EVENT_MANUAL_ADJUSTMENT,
+            'amount' => 3,
+        ]);
     }
 
     public function test_penangguhan_dinas_dibawa_satu_tahun_dan_rollover_idempotent(): void
@@ -424,5 +518,21 @@ class LeaveBalanceRolloverTest extends TestCase
             'terpakai_tahun_berjalan' => 0,
             'hangus' => 0,
         ], $overrides);
+    }
+
+    /** @return array<string, int> */
+    private function summaryPayload(LeaveBalance $balance): array
+    {
+        return $balance->only([
+            'jatah_awal',
+            'carry_over',
+            'terpakai',
+            'sisa',
+            'sisa_n2',
+            'sisa_n1',
+            'sisa_tahun_berjalan',
+            'terpakai_tahun_berjalan',
+            'hangus',
+        ]);
     }
 }
