@@ -190,6 +190,17 @@ class EmployeeReportExportTest extends TestCase
             });
     }
 
+    public function test_pdf_print_is_blocked_when_preview_is_not_current(): void
+    {
+        $admin = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($admin)
+            ->get(route('laporan.pegawai'))
+            ->assertOk()
+            ->assertSee('x-bind:disabled="previewLoading || previewError || pensiunError"', false)
+            ->assertSee('if (this.previewLoading || this.previewError || this.pensiunError)', false);
+    }
+
     public function test_preview_applies_initial_row_range_once_on_backend(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();
