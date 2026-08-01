@@ -110,6 +110,31 @@ class KepalaBagianFrontendTest extends TestCase
             ->assertDontSee('Dinas Luar');
     }
 
+    public function test_current_approved_leave_displays_cuti_in_list_and_detail(): void
+    {
+        [$user, $kepalaBagian] = $this->kepalaBagian();
+        $directReport = Employee::factory()->create([
+            'nama_lengkap' => 'Bawahan Sedang Cuti',
+            'kepala_bagian_id' => $kepalaBagian->id,
+        ]);
+        $leave = $this->leaveWithActiveStep($directReport, $kepalaBagian);
+        $leave->forceFill([
+            'tanggal_mulai' => now()->subDay()->toDateString(),
+            'tanggal_selesai' => now()->addDay()->toDateString(),
+            'status' => 'disetujui',
+        ])->save();
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.bawahan.index'))
+            ->assertOk()
+            ->assertSeeInOrder(['Bawahan Sedang Cuti', 'Cuti']);
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.bawahan.show', $directReport))
+            ->assertOk()
+            ->assertSeeInOrder(['Bawahan Sedang Cuti', 'Cuti']);
+    }
+
     public function test_leave_queue_and_detail_use_real_scoped_data_and_contract(): void
     {
         [$user, $kepalaBagian] = $this->kepalaBagian();
