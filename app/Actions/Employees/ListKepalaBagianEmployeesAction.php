@@ -50,7 +50,6 @@ class ListKepalaBagianEmployeesAction
                 });
             })
             ->when(($filters['status'] ?? '') === 'aktif', fn ($query) => $query
-                ->whereHas('statusPegawai', fn ($statuses) => $statuses->where('nama', 'Aktif'))
                 ->whereDoesntHave('leaveRequests', fn ($leaves) => $leaves
                     ->where('status', 'disetujui')
                     ->whereDate('tanggal_mulai', '<=', $today)

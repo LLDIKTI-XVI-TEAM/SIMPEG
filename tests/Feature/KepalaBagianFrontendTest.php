@@ -108,6 +108,11 @@ class KepalaBagianFrontendTest extends TestCase
             ->assertSee('Aktif')
             ->assertDontSee('Pensiun')
             ->assertDontSee('Dinas Luar');
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.bawahan.index', ['status' => 'aktif']))
+            ->assertOk()
+            ->assertSee('Bawahan Dengan Status Legacy');
     }
 
     public function test_current_approved_leave_displays_cuti_in_list_and_detail(): void
@@ -133,6 +138,11 @@ class KepalaBagianFrontendTest extends TestCase
             ->get(route('kepala-bagian.bawahan.show', $directReport))
             ->assertOk()
             ->assertSeeInOrder(['Bawahan Sedang Cuti', 'Cuti']);
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.bawahan.index', ['status' => 'aktif']))
+            ->assertOk()
+            ->assertDontSee('Bawahan Sedang Cuti');
     }
 
     public function test_leave_queue_and_detail_use_real_scoped_data_and_contract(): void
