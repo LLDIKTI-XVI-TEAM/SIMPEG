@@ -345,6 +345,7 @@ class PegawaiController extends Controller
             'positionHistories.jabatan',
             'positionHistories.unitKerja',
             'salaryHistories',
+            'statusHistories.document',
             'disciplineRecords',
             'educationHistories',
             'documents',

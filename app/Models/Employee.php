@@ -196,6 +196,12 @@ class Employee extends Model
         return $this->hasMany(SalaryHistory::class);
     }
 
+    /** @return HasMany<EmployeeStatusHistory, $this> */
+    public function statusHistories(): HasMany
+    {
+        return $this->hasMany(EmployeeStatusHistory::class);
+    }
+
     /** @return HasMany<DisciplineRecord, $this> */
     public function disciplineRecords(): HasMany
     {

@@ -85,6 +85,7 @@
         pendidikanList: {{ ($p->educationHistories ?? collect())->map(fn($e) => ['id' => $e->id, 'jenjang_id' => $e->jenjang_id, 'tingkat' => $e->jenjang?->urutan ?? $e->tingkat ?? '-', 'institusi' => $e->nama_institusi ?? '-', 'prodi' => $e->jurusan ?? '-', 'lulus' => $e->tahun_lulus ?? '-', 'no_ijazah' => $e->no_ijazah ?? '-'])->toJson() }},
         pendidikanLoading: false,
         showEditPendidikan: false,
+        showRiwayatStatus: false,
         editingPendidikan: null,
         editPendidikanError: '',
         editPendidikanForm: { jenjang_id: '', nama_institusi: '', jurusan: '', tahun_lulus: '', no_ijazah: '' },
@@ -1052,7 +1053,17 @@
                     </div>
 
                     <div class="space-y-4">
-                        <h3 class="text-xs font-bold text-ink uppercase tracking-wider font-sans border-b border-border pb-1.5">Status Kepegawaian</h3>
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-xs font-bold text-ink uppercase tracking-wider font-sans border-b border-border pb-1.5">Status Kepegawaian</h3>
+                            @if($p->statusHistories && $p->statusHistories->count() > 0)
+                            <button type="button" @click="showRiwayatStatus = true" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-white px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/5 shadow-sm cursor-pointer font-sans">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Lihat Riwayat
+                            </button>
+                            @endif
+                        </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                             <div class="space-y-0.5">
                                 <span class="font-semibold text-muted font-sans">Status Saat Ini</span>
@@ -2075,6 +2086,91 @@
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    {{-- Modal: Riwayat Perubahan Status --}}
+    <div
+        x-show="showRiwayatStatus"
+        x-transition.opacity
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        style="display: none;"
+        @keydown.escape.window="showRiwayatStatus = false"
+    >
+        <div
+            @click.outside="showRiwayatStatus = false"
+            class="w-full max-w-5xl rounded-xl bg-surface shadow-2xl overflow-hidden"
+        >
+            {{-- Header --}}
+            <div class="flex items-center justify-between border-b border-border bg-soft/50 px-6 py-4">
+                <h3 class="text-base font-bold text-ink font-sans">Riwayat Perubahan Status Kepegawaian</h3>
+                <button type="button" @click="showRiwayatStatus = false" class="text-muted hover:text-ink transition cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            {{-- Content: Grid 2 Kolom dengan Scroll --}}
+            <div class="px-6 py-5">
+                @if($p->statusHistories && $p->statusHistories->count() > 0)
+                <div class="grid grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-2">
+                    @foreach($p->statusHistories->sortByDesc('tanggal_efektif') as $history)
+                    <div class="rounded-lg border {{ $history->is_latest ? 'border-primary bg-primary/5' : 'border-border bg-soft/30' }} p-4">
+                        <div class="space-y-2">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-ink text-sm font-sans">{{ $history->status_nama }}</span>
+                                @if($history->is_latest)
+                                    <span class="inline-flex items-center rounded-full bg-primary px-2 py-0.5 text-[9px] font-bold text-white uppercase">Aktif</span>
+                                @endif
+                            </div>
+                            <div class="text-xs text-muted font-sans space-y-1">
+                                <p>
+                                    <span class="font-semibold text-ink">Tanggal:</span>
+                                    {{ $history->tanggal_efektif->format('d M Y') }}
+                                </p>
+                                <p>
+                                    <span class="font-semibold text-ink">Alasan:</span>
+                                    {{ $history->alasan }}
+                                </p>
+                                @if($history->deskripsi)
+                                <p class="text-[11px]">
+                                    <span class="font-semibold text-ink">Deskripsi:</span>
+                                    {{ Str::limit($history->deskripsi, 100) }}
+                                </p>
+                                @endif
+                                @php
+                                    $currentFile = $history->document?->file_path ?? $history->file_sk;
+                                @endphp
+                                @if($currentFile)
+                                <p class="pt-1">
+                                    <a href="{{ asset('storage/'.$currentFile) }}" target="_blank" class="inline-flex items-center gap-1 text-primary hover:underline font-semibold text-[11px]">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                        </svg>
+                                        Lihat SK
+                                    </a>
+                                </p>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+                @else
+                <div class="rounded-lg border border-border bg-soft/30 p-8 text-center">
+                    <p class="text-sm text-muted font-sans">Belum ada riwayat perubahan status kepegawaian.</p>
+                </div>
+                @endif
+            </div>
+
+            {{-- Footer --}}
+            <div class="flex justify-end border-t border-border bg-soft/50 px-6 py-4">
+                <button type="button" @click="showRiwayatStatus = false"
+                    class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink hover:bg-soft transition font-sans cursor-pointer">
+                    Tutup
+                </button>
+            </div>
         </div>
     </div>
 
