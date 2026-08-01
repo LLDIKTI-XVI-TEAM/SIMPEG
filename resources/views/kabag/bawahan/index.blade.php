@@ -123,7 +123,7 @@
                                 <x-ui.table-td padding="comfortable">
                                     <span class="inline-flex items-center gap-1.5 font-medium font-sans leading-none px-2.5 py-1 text-xs rounded-md {{ $employee->sedang_cuti ? 'bg-warning/10 text-warning' : 'bg-success/10 text-success' }}">
                                         <span class="h-1.5 w-1.5 rounded-full {{ $employee->sedang_cuti ? 'bg-warning' : 'bg-success' }}"></span>
-                                        {{ $employee->sedang_cuti ? 'Cuti' : ($employee->status_aktif ?: 'Aktif') }}
+                                        {{ $employee->sedang_cuti ? 'Cuti' : 'Aktif' }}
                                     </span>
                                 </x-ui.table-td>
                                 <x-ui.table-td padding="comfortable">
@@ -202,4 +202,3 @@
     </script>
     @endpush
 </x-layouts.app>
-

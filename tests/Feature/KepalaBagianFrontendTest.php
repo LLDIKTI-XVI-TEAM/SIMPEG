@@ -85,6 +85,31 @@ class KepalaBagianFrontendTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_status_bawahan_hanya_menampilkan_aktif_atau_cuti(): void
+    {
+        [$user, $kepalaBagian] = $this->kepalaBagian();
+        $directReport = Employee::factory()->create([
+            'nama_lengkap' => 'Bawahan Dengan Status Legacy',
+            'kepala_bagian_id' => $kepalaBagian->id,
+            'status_aktif' => 'Pensiun',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.bawahan.index'))
+            ->assertOk()
+            ->assertSee('Bawahan Dengan Status Legacy')
+            ->assertSee('Aktif')
+            ->assertDontSee('Pensiun')
+            ->assertDontSee('Dinas Luar');
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.bawahan.show', $directReport))
+            ->assertOk()
+            ->assertSee('Aktif')
+            ->assertDontSee('Pensiun')
+            ->assertDontSee('Dinas Luar');
+    }
+
     public function test_leave_queue_and_detail_use_real_scoped_data_and_contract(): void
     {
         [$user, $kepalaBagian] = $this->kepalaBagian();
