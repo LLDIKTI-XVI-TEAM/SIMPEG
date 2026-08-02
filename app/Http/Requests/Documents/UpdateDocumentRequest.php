@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Documents;
 
+use App\Models\Document;
 use App\Support\Documents\DocumentCategory;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -19,11 +20,24 @@ class UpdateDocumentRequest extends FormRequest
 
     public function rules(): array
     {
+        $param = $this->route('dokuman') ?? $this->route('id') ?? $this->route('document');
+
+        /** @var Document|null $document */
+        $document = $param instanceof Document ? $param : (is_scalar($param) ? Document::find($param) : null);
+
+        $isStatusDoc = $document !== null && $document->jenis_dokumen === 'sk_status_pegawai';
+
+        $editableKeys = DocumentCategory::editableKeys();
+
+        $kategoriRules = $isStatusDoc
+            ? ['required', 'string', Rule::in(['sk_status_pegawai'])]
+            : ['required', 'string', Rule::in(array_filter($editableKeys, fn ($key) => $key !== 'sk_status_pegawai'))];
+
         return [
             'nama_dokumen' => ['required', 'string', 'max:255'],
             'nomor_dokumen' => ['nullable', 'string', 'max:100'],
             'tanggal_terbit' => ['nullable', 'date'],
-            'kategori_dokumen' => ['required', 'string', Rule::in(DocumentCategory::keys())],
+            'kategori_dokumen' => $kategoriRules,
             'deskripsi' => ['nullable', 'string'],
             'berkas' => [
                 'nullable', // Optional when updating

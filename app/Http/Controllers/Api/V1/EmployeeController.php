@@ -12,7 +12,6 @@ use App\Actions\Employees\ShowEmployeeAction;
 use App\Actions\Employees\ShowEmployeeDocumentStatusAction;
 use App\Actions\Employees\ShowMyProfileAction;
 use App\Actions\Employees\UpdateEmployeeAction;
-use App\Actions\Employees\UpdateEmployeeStatusAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Employee\AssignSupervisorRequest;
 use App\Http\Requests\Employee\ListEmployeesRequest;
@@ -45,6 +44,27 @@ class EmployeeController extends Controller
         }
 
         return back()->with('success', 'Data pegawai berhasil ditambahkan.');
+    }
+
+    public function checkIdentity(Request $request): JsonResponse
+    {
+        $request->validate([
+            'type' => ['required', 'string', 'in:nip,nik'],
+            'value' => ['required', 'string'],
+            'except_id' => ['nullable', 'uuid'],
+        ]);
+
+        $query = Employee::where($request->type, $request->value);
+        if ($request->filled('except_id')) {
+            $query->where('id', '!=', $request->except_id);
+        }
+
+        $exists = $query->exists();
+
+        return response()->json([
+            'is_unique' => ! $exists,
+            'message' => $exists ? strtoupper($request->type).' sudah terdaftar.' : strtoupper($request->type).' tersedia.',
+        ]);
     }
 
     public function update(UpdateEmployeeRequest $request, Employee $employee, UpdateEmployeeAction $action): JsonResponse|RedirectResponse
@@ -153,42 +173,6 @@ class EmployeeController extends Controller
         return response()->json([
             'message' => 'Data pegawai berhasil dinonaktifkan.',
         ]);
-    }
-
-    public function updateStatus(Employee $employee, Request $request, UpdateEmployeeStatusAction $action): JsonResponse
-    {
-        $request->validate([
-            'status' => 'required|string',
-        ]);
-
-        try {
-            $updatedEmployee = $action->execute($employee, $request->status, $request);
-
-            $updatedEmployee->load([
-                'jenisPegawai:id,nama',
-                'statusPegawai:id,nama',
-                'rankHistories:id,employee_id,file_sk',
-                'positionHistories' => fn ($query) => $query
-                    ->select(['id', 'employee_id', 'file_sk', 'is_latest', 'tmt_jabatan', 'jabatan_id', 'unit_kerja_id'])
-                    ->with(['jabatan:id,nama', 'unitKerja:id,nama'])
-                    ->orderByDesc('is_latest')
-                    ->orderByDesc('tmt_jabatan'),
-                'salaryHistories:id,employee_id,file_sk',
-                'appointments' => fn ($query) => $query
-                    ->select(['id', 'employee_id', 'file_sk', 'tmt_pengangkatan'])
-                    ->orderByDesc('tmt_pengangkatan'),
-                'documents:id,employee_id,file_path',
-            ]);
-
-            return response()->json([
-                'message' => 'Status pegawai berhasil diperbarui.',
-                'employee' => app(ListEmployeesAction::class)->toTableRow($updatedEmployee),
-            ]);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json([
-                'message' => $e->getMessage(),
-            ], 422);
-        }
     }
 
     public function restore(string $employee, Request $request, RestoreEmployeeAction $action): JsonResponse

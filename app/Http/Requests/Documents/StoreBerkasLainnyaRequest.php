@@ -4,13 +4,16 @@ namespace App\Http\Requests\Documents;
 
 use App\Support\Documents\DocumentCategory;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\File;
 
-class StoreDocumentRequest extends FormRequest
+class StoreBerkasLainnyaRequest extends FormRequest
 {
     public function authorize(): bool
     {
+        if (app()->environment('local') && config('services.simpeg.disable_employee_api_auth')) {
+            return true;
+        }
+
         $user = $this->user();
 
         return $user !== null
@@ -21,15 +24,10 @@ class StoreDocumentRequest extends FormRequest
     {
         return [
             'nama_dokumen' => ['required', 'string', 'max:255'],
+            'kategori_dokumen' => ['required', 'string', 'in:ijazah,ktp_kk,lainnya'],
             'nomor_dokumen' => ['nullable', 'string', 'max:100'],
             'tanggal_terbit' => ['nullable', 'date'],
-            'kategori_dokumen' => [
-                'required',
-                'string',
-                Rule::in(array_filter(DocumentCategory::editableKeys(), fn ($key) => $key !== 'sk_status_pegawai')),
-            ],
-            'pegawai_id' => ['required', 'uuid', 'exists:employees,id'],
-            'deskripsi' => ['nullable', 'string'],
+            'keterangan' => ['nullable', 'string', 'max:500'],
             'berkas' => [
                 'required',
                 File::types(DocumentCategory::ALLOWED_FILE_TYPES)->max('10mb'),
@@ -40,12 +38,9 @@ class StoreDocumentRequest extends FormRequest
     public function attributes(): array
     {
         return [
-            'nama_dokumen' => 'nama dokumen',
-            'nomor_dokumen' => 'nomor dokumen',
-            'tanggal_terbit' => 'tanggal dokumen',
-            'kategori_dokumen' => 'kategori dokumen',
-            'pegawai_id' => 'pegawai',
-            'berkas' => 'berkas dokumen',
+            'nama_dokumen' => 'nama berkas',
+            'kategori_dokumen' => 'kategori',
+            'berkas' => 'berkas',
         ];
     }
 }

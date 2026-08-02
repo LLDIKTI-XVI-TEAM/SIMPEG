@@ -60,11 +60,7 @@ class ListKepalaBagianEmployeesAction
                 ->where('status', 'disetujui')
                 ->whereDate('tanggal_mulai', '<=', $today)
                 ->whereDate('tanggal_selesai', '>=', $today)))
-            ->when(($filters['status'] ?? '') === 'dinas_luar', fn ($query) => $query
-                ->where(function ($q) {
-                    $q->where('status_aktif', 'dinas_luar')
-                        ->orWhereHas('statusPegawai', fn ($statuses) => $statuses->whereRaw('lower(nama) like ?', ['%dinas luar%']));
-                }))
+
             ->when($filters['golongan'] ?? null, fn ($query, $val) => $query
                 ->where('golongan_terakhir', 'LIKE', $val.'/%'))
             ->when($filters['unit_kerja_id'] ?? null, fn ($query, $val) => $query

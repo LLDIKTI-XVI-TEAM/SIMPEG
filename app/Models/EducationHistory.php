@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasUuid;
+use App\Observers\EducationHistoryObserver;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+#[ObservedBy(EducationHistoryObserver::class)]
 class EducationHistory extends Model
 {
     use HasUuid;

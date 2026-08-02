@@ -141,6 +141,12 @@ class DeleteDocumentAction
 
     private function isCurrentStatusSupportingDocument(Document $document): bool
     {
+        // Dokumen dari fitur Status Pegawai (sk_status_pegawai) langsung dirujuk lewat
+        // status_berkas_path pada Employee, jadi diblokir selama masih menjadi berkas status terkini.
+        if ($document->jenis_dokumen === 'sk_status_pegawai') {
+            return $document->employee?->status_berkas_path === $document->file_path;
+        }
+
         $expectedStatus = match ($document->jenis_dokumen) {
             'sk_mutasi' => 'Mutasi',
             'sk_pensiun' => 'Pensiun',

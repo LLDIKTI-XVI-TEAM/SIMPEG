@@ -28,7 +28,7 @@ class EmployeeValidationRules
             'foto' => ['nullable', File::image()->types(['jpg', 'jpeg', 'png'])->max('10mb')],
             'jenis_pegawai_id' => ['nullable', 'uuid', 'exists:ref_jenis_pegawai,id'],
             'status_aktif' => ['nullable', 'in:Aktif,Non-Aktif,Pensiun,Mutasi'],
-            'status_pegawai_id' => ['nullable', 'uuid', 'exists:ref_status_pegawai,id'],
+            'status_pegawai_id' => ['nullable', 'uuid', Rule::exists('ref_status_pegawai', 'id')->where('is_active', true)],
             'status_keterangan' => ['nullable', 'string', 'max:2000'],
             'kepala_bagian_id' => ['nullable', 'uuid', 'exists:employees,id'],
 
@@ -43,11 +43,10 @@ class EmployeeValidationRules
             'kelas_jabatan_terakhir' => ['nullable', 'string', 'max:10'],
 
             // Pendidikan snapshot
-            'pendidikan_terakhir' => ['nullable', 'string', 'max:20'],
+            'pendidikan_terakhir' => ['nullable', 'string', 'max:50'],
             'prodi_pendidikan_terakhir' => ['nullable', 'string', 'max:255'],
 
             // Pensiun
-            'tanggal_pensiun' => ['nullable', 'date'],
 
             // Penanda eksplisit Kepala Lembaga untuk kebutuhan dokumen cuti tanpa inferensi jabatan bebas.
             'is_kepala_lembaga' => ['sometimes', 'boolean'],
@@ -151,7 +150,7 @@ class EmployeeValidationRules
             'kelas_jabatan_terakhir' => 'Kelas Jabatan',
             'pendidikan_terakhir' => 'Pendidikan Terakhir',
             'prodi_pendidikan_terakhir' => 'Prodi Pendidikan Terakhir',
-            'tanggal_pensiun' => 'Tanggal Pensiun',
+
             'is_kepala_lembaga' => 'Penanda Kepala Lembaga',
             'alamat' => 'Alamat',
             'no_hp' => 'Nomor HP',
