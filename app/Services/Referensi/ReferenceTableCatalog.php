@@ -7,7 +7,10 @@ use App\Models\RefGolongan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenjangPendidikan;
 use App\Models\RefStatusPegawai;
+use App\Models\RefUnitKerja;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Katalog dependensi reference table untuk kebijakan hapus hybrid:
@@ -59,6 +62,17 @@ final class ReferenceTableCatalog
             ],
             'cache_keys' => ['ref.jenis_jabatan', 'ref.jabatan_with_jenis'],
         ],
+        RefUnitKerja::class => [
+            // Self-FK parent_id bersifat nullOnDelete: menghapus induk tidak
+            // ditolak database, justru anaknya diam-diam menjadi root dengan
+            // level basi. Karena itu sub-unit didaftarkan sebagai pemakai agar
+            // guard penghapusan generik menolaknya lebih dulu.
+            'usage' => [
+                ['table' => 'position_histories', 'column' => 'unit_kerja_id', 'label' => 'riwayat jabatan'],
+                ['table' => 'ref_unit_kerja', 'column' => 'parent_id', 'label' => 'sub-unit'],
+            ],
+            'cache_keys' => ['ref.unit_kerja'],
+        ],
         RefStatusPegawai::class => [
             // FK employees.status_pegawai_id bersifat nullOnDelete; tanpa
             // guard ini status pegawai bisa terhapus diam-diam dari data
@@ -97,6 +111,28 @@ final class ReferenceTableCatalog
     public static function cacheKeys(string $modelClass): array
     {
         return self::DEFINITIONS[$modelClass]['cache_keys'] ?? [];
+    }
+
+    /**
+     * Menghapus cache setelah transaksi terluar commit agar request paralel
+     * tidak dapat mengisi ulang cache dari snapshot database sebelum commit.
+     * Tanpa transaksi, invalidasi dijalankan langsung.
+     */
+    public static function forgetCachesAfterCommit(string $modelClass): void
+    {
+        $forget = static function () use ($modelClass): void {
+            foreach (self::cacheKeys($modelClass) as $cacheKey) {
+                Cache::forget($cacheKey);
+            }
+        };
+
+        if (DB::transactionLevel() > 0) {
+            DB::afterCommit($forget);
+
+            return;
+        }
+
+        $forget();
     }
 
     /**

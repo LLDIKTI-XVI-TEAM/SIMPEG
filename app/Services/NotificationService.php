@@ -193,7 +193,7 @@ class NotificationService
             ->values();
 
         foreach ($emailRecipients as $recipient) {
-            SendSimpegNotificationEmailJob::dispatch($recipient->id, $title, $body, $data)->afterCommit();
+            SendSimpegNotificationEmailJob::dispatch($recipient->id, $type, $title, $body, $data)->afterCommit();
         }
     }
 
