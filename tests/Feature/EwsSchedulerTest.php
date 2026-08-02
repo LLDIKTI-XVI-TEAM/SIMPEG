@@ -234,9 +234,20 @@ class EwsSchedulerTest extends TestCase
 
     public function test_scheduler_checks_pensiun_trigger(): void
     {
-        // Pensiun H-365 (Tahap 1)
+        // Pensiun H-365 (Tahap 1) - menggunakan BUP calculation
+        $jenisJabatan = RefJenisJabatan::factory()->create(['maks_usia_pensiun' => 58]);
+
         $employee = Employee::factory()->create([
-            'tanggal_pensiun' => now()->addDays(365)->toDateString(),
+            'tanggal_lahir' => now()->subYears(58)->addDays(365)->toDateString(),
+            'status_aktif' => 'Aktif',
+        ]);
+
+        PositionHistory::create([
+            'id' => \Illuminate\Support\Str::uuid(),
+            'employee_id' => $employee->id,
+            'jenis_jabatan_id' => $jenisJabatan->id,
+            'tmt_jabatan' => now()->subYear()->toDateString(),
+            'is_latest' => true,
         ]);
 
         app(EwsEngineService::class)->run();
@@ -251,6 +262,45 @@ class EwsSchedulerTest extends TestCase
             'user_id' => $employee->id,
             'type' => 'ews.pensiun',
         ]);
+    }
+
+    public function test_ews_ignores_manual_pension_date_and_uses_bup(): void
+    {
+        $jenisJabatan = RefJenisJabatan::factory()->create(['maks_usia_pensiun' => 58]);
+
+        // Employee with manual pension date = 365 days from now (1 year)
+        // But BUP calculation = 180 days from now (6 months)
+        $employee = Employee::factory()->create([
+            'tanggal_lahir' => now()->subYears(58)->addDays(180)->toDateString(),
+            'tanggal_pensiun' => now()->addDays(365)->toDateString(), // Manual: 1 year away
+            'status_aktif' => 'Aktif',
+        ]);
+
+        PositionHistory::create([
+            'id' => \Illuminate\Support\Str::uuid(),
+            'employee_id' => $employee->id,
+            'jenis_jabatan_id' => $jenisJabatan->id,
+            'tmt_jabatan' => now()->subYear()->toDateString(),
+            'is_latest' => true,
+        ]);
+
+        EwsConfig::setVal('pensiun_required_age_years', '0'); // Use position BUP
+        EwsConfig::setVal('pensiun_m6', '180'); // H-6 months threshold
+
+        app(EwsEngineService::class)->run();
+
+        // Should create alert at H-180 based on BUP (180 days from now)
+        // NOT at H-365 based on manual date (365 days from now)
+        $alert = EwsAlert::where('employee_id', $employee->id)
+            ->where('type', 'PENSIUN')
+            ->first();
+
+        $this->assertNotNull($alert);
+        $this->assertEquals(180, $alert->interval_days); // H-6 months, not H-1 year
+        $this->assertEquals(
+            now()->addDays(180)->startOfDay()->toDateString(),
+            Carbon::parse($alert->target_date)->toDateString()
+        );
     }
 
     public function test_scheduler_checks_pppk_contract_using_tanggal_akhir_kontrak(): void

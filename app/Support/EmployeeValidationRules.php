@@ -47,6 +47,7 @@ class EmployeeValidationRules
             'prodi_pendidikan_terakhir' => ['nullable', 'string', 'max:255'],
 
             // Pensiun
+            'tanggal_pensiun' => ['nullable', 'date'],
 
             // Penanda eksplisit Kepala Lembaga untuk kebutuhan dokumen cuti tanpa inferensi jabatan bebas.
             'is_kepala_lembaga' => ['sometimes', 'boolean'],

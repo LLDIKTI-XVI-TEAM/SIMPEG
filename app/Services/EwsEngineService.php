@@ -153,10 +153,20 @@ class EwsEngineService
                             }
                         }
 
-                        // 3. Pensiun — usia BUP global mengalahkan snapshot per jabatan bila diatur.
-                        $targetDate = $pensiunRequiredAgeYears > 0 && $employee->tanggal_lahir
-                            ? Carbon::parse($employee->tanggal_lahir)->addYears($pensiunRequiredAgeYears)
-                            : ($employee->tanggal_pensiun ? Carbon::parse($employee->tanggal_pensiun) : null);
+                        // 3. Pensiun — EWS alert menggunakan tanggal pensiun final (manual jika diset, kalkulasi BUP jika kosong)
+                        $targetDate = null;
+
+                        // Prioritaskan tanggal_pensiun manual jika sudah diset
+                        if ($employee->tanggal_pensiun) {
+                            $targetDate = Carbon::parse($employee->tanggal_pensiun);
+                        } else {
+                            // Fallback ke kalkulasi BUP jika tanggal_pensiun kosong
+                            if ($pensiunRequiredAgeYears > 0 && $employee->tanggal_lahir) {
+                                $targetDate = Carbon::parse($employee->tanggal_lahir)->addYears($pensiunRequiredAgeYears);
+                            } else {
+                                $targetDate = $this->calculatePensionFromPositionBup($employee);
+                            }
+                        }
                         if ($targetDate) {
                             $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
 
@@ -315,6 +325,38 @@ class EwsEngineService
         }
 
         return null;
+    }
+
+    /**
+     * Menghitung tanggal pensiun dari BUP jabatan, mengikuti logika TmtCalculatorService.
+     * EWS alert HARUS pakai BUP calculation, bukan tanggal_pensiun manual.
+     */
+    private function calculatePensionFromPositionBup(Employee $employee): ?Carbon
+    {
+        if ($employee->tanggal_lahir === null) {
+            return null;
+        }
+
+        $position = $employee->positionHistories()
+            ->with(['jabatan', 'jenisJabatan'])
+            ->whereNotNull('tmt_jabatan')
+            ->orderByDesc('tmt_jabatan')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($position === null) {
+            return null;
+        }
+
+        $bup = $position->jabatan?->default_bup
+            ?? $position->jenisJabatan?->maks_usia_pensiun;
+
+        if ($bup === null) {
+            return null;
+        }
+
+        return $employee->tanggal_lahir->copy()->addYearsNoOverflow($bup);
     }
 
     /**

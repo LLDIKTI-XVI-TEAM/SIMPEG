@@ -12,29 +12,18 @@
             : '-';
 
         $now = \Carbon\Carbon::now();
-        $bup = max(0, (int) \App\Models\EwsConfig::getVal('pensiun_required_age_years', 0));
-        
-        if ($bup > 0 && $p->tanggal_lahir) {
-            $pensiunDate = $p->tanggal_lahir->copy()->addYears($bup);
-        } else {
-            $pensiunDate = $estimasiTanggalPensiun ?? ($p->tanggal_pensiun ? \Carbon\Carbon::parse($p->tanggal_pensiun) : null);
-        }
 
+        // Gunakan estimasi tanggal pensiun dari controller (sudah prioritaskan manual/BUP)
+        $pensiunDate = $estimasiTanggalPensiun;
         $estimasiPensiun = $pensiunDate ? $pensiunDate->format('d-m-Y') : '-';
 
         $sisaPensiunStr = '-';
         if ($pensiunDate) {
-            if ($bup > 0 && $p->tanggal_lahir) {
-                $umur = $p->tanggal_lahir->age;
-                $sisaTahun = $bup - $umur;
-                $sisaPensiunStr = $sisaTahun > 0 ? $sisaTahun . ' Tahun lagi' : 'Memasuki Usia Pensiun';
+            if ($pensiunDate->isFuture()) {
+                $diff = $now->diff($pensiunDate);
+                $sisaPensiunStr = $diff->y . ' Tahun, ' . $diff->m . ' Bulan lagi';
             } else {
-                if ($pensiunDate->isFuture()) {
-                    $diff = $now->diff($pensiunDate);
-                    $sisaPensiunStr = $diff->y . ' Tahun, ' . $diff->m . ' Bulan lagi';
-                } else {
-                    $sisaPensiunStr = 'Memasuki Usia Pensiun';
-                }
+                $sisaPensiunStr = 'Memasuki Usia Pensiun';
             }
         }
 
