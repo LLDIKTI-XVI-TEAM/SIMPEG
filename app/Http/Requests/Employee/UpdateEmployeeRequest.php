@@ -43,8 +43,8 @@ class UpdateEmployeeRequest extends FormRequest
             $rules['jabatan_history_id'] = ['nullable', 'in:new'];
             $rules['kgb_history_id'] = ['nullable', 'in:new'];
 
-            // Tanggal pensiun dapat diisi manual atau dikosongkan untuk kalkulasi otomatis dari BUP.
-            // unset($rules['tanggal_pensiun']); // Dinonaktifkan agar user dapat input manual via form
+            // Tanggal pensiun tidak lagi dapat diubah via form web - gunakan kalkulasi BUP saja
+            unset($rules['tanggal_pensiun']);
 
             // Pangkat (Rank)
             $rules['pangkat_golongan_id'] = ['nullable', 'uuid', 'exists:ref_golongan,id'];

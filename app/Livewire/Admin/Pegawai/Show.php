@@ -51,14 +51,11 @@ class Show extends Component
         $eselonOptions = RefEselon::all();
         $jenjangOptions = RefJenjangPendidikan::orderBy('urutan')->get();
 
-        // Prioritaskan tanggal_pensiun manual jika diset, fallback ke kalkulasi BUP
-        $estimasiTanggalPensiun = $p->tanggal_pensiun;
-        if ($estimasiTanggalPensiun === null) {
-            $bupPensiunYears = max(0, (int) EwsConfig::getVal('pensiun_required_age_years', 0));
-            $estimasiTanggalPensiun = $bupPensiunYears > 0 && $p->tanggal_lahir
-                ? $p->tanggal_lahir->copy()->addYears($bupPensiunYears)
-                : null;
-        }
+        // Prioritaskan kalkulasi dari tanggal_lahir + BUP, fallback ke tanggal_pensiun manual
+        $bupPensiunYears = max(0, (int) EwsConfig::getVal('pensiun_required_age_years', 0));
+        $estimasiTanggalPensiun = $bupPensiunYears > 0 && $p->tanggal_lahir
+            ? $p->tanggal_lahir->copy()->addYears($bupPensiunYears)
+            : $p->tanggal_pensiun;
 
         $currentSupervisor = $p->supervisorAssignments
             ->filter(fn ($assignment): bool => $assignment->tanggal_mulai->lte(today())

@@ -33,6 +33,7 @@ use App\Models\RefJenjangPendidikan;
 use App\Models\RefStatusPegawai;
 use App\Models\RefStatusPerkawinan;
 use App\Models\RefUnitKerja;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -363,13 +364,45 @@ class PegawaiController extends Controller
         $eselonOptions = RefEselon::all();
         $jenjangOptions = RefJenjangPendidikan::orderBy('urutan')->get();
 
-        // Prioritaskan tanggal_pensiun manual, fallback ke kalkulasi BUP
-        $estimasiTanggalPensiun = $p->tanggal_pensiun;
-        if ($estimasiTanggalPensiun === null) {
-            $bupPensiunYears = max(0, (int) EwsConfig::getVal('pensiun_required_age_years', 0));
-            $estimasiTanggalPensiun = $bupPensiunYears > 0 && $p->tanggal_lahir
-                ? $p->tanggal_lahir->copy()->addYears($bupPensiunYears)
-                : null;
+        // Gunakan kalkulasi BUP SAJA (BUKAN tanggal_pensiun manual)
+        $estimasiTanggalPensiun = null;
+
+        // Prioritas 1: BUP dari config global
+        $bupPensiunYears = max(0, (int) EwsConfig::getVal('pensiun_required_age_years', 0));
+        if ($bupPensiunYears > 0 && $p->tanggal_lahir !== null) {
+            try {
+                $birthDate = $p->tanggal_lahir instanceof Carbon
+                    ? $p->tanggal_lahir
+                    : \Illuminate\Support\Carbon::parse($p->tanggal_lahir);
+                $estimasiTanggalPensiun = $birthDate->copy()->addYears($bupPensiunYears);
+            } catch (\Exception $e) {
+                $estimasiTanggalPensiun = null;
+            }
+        }
+
+        // Prioritas 2: Fallback ke BUP dari position history (seperti di EwsEngineService)
+        if ($estimasiTanggalPensiun === null && $p->tanggal_lahir !== null) {
+            $position = $p->positionHistories()
+                ->with(['jabatan', 'jenisJabatan'])
+                ->whereNotNull('tmt_jabatan')
+                ->orderByDesc('tmt_jabatan')
+                ->orderByDesc('created_at')
+                ->orderByDesc('id')
+                ->first();
+
+            if ($position) {
+                $bup = $position->jabatan?->default_bup ?? $position->jenisJabatan?->maks_usia_pensiun;
+                if ($bup !== null && $bup > 0) {
+                    try {
+                        $birthDate = $p->tanggal_lahir instanceof Carbon
+                            ? $p->tanggal_lahir
+                            : \Illuminate\Support\Carbon::parse($p->tanggal_lahir);
+                        $estimasiTanggalPensiun = $birthDate->copy()->addYearsNoOverflow($bup);
+                    } catch (\Exception $e) {
+                        $estimasiTanggalPensiun = null;
+                    }
+                }
+            }
         }
 
         $currentSupervisor = $p->supervisorAssignments

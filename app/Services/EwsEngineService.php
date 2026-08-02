@@ -153,19 +153,15 @@ class EwsEngineService
                             }
                         }
 
-                        // 3. Pensiun — EWS alert menggunakan tanggal pensiun final (manual jika diset, kalkulasi BUP jika kosong)
+                        // 3. Pensiun — EWS alert HARUS pakai BUP calculation, BUKAN tanggal_pensiun manual
                         $targetDate = null;
 
-                        // Prioritaskan tanggal_pensiun manual jika sudah diset
-                        if ($employee->tanggal_pensiun) {
-                            $targetDate = Carbon::parse($employee->tanggal_pensiun);
+                        // Gunakan BUP dari config global jika diset
+                        if ($pensiunRequiredAgeYears > 0 && $employee->tanggal_lahir) {
+                            $targetDate = Carbon::parse($employee->tanggal_lahir)->addYears($pensiunRequiredAgeYears);
                         } else {
-                            // Fallback ke kalkulasi BUP jika tanggal_pensiun kosong
-                            if ($pensiunRequiredAgeYears > 0 && $employee->tanggal_lahir) {
-                                $targetDate = Carbon::parse($employee->tanggal_lahir)->addYears($pensiunRequiredAgeYears);
-                            } else {
-                                $targetDate = $this->calculatePensionFromPositionBup($employee);
-                            }
+                            // Fallback ke BUP dari position history
+                            $targetDate = $this->calculatePensionFromPositionBup($employee);
                         }
                         if ($targetDate) {
                             $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);

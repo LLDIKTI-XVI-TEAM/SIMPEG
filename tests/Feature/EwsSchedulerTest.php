@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature;
 
 use App\Models\Appointment;
@@ -8,16 +10,20 @@ use App\Models\Employee;
 use App\Models\EwsAlert;
 use App\Models\EwsConfig;
 use App\Models\EwsSchedulerRun;
+use App\Models\PositionHistory;
 use App\Models\RefGolongan;
+use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\SimpegNotification;
 use App\Models\User;
 use App\Services\EwsEngineService;
 use App\Services\Notifications\NotificationRecipientResolver;
 use App\Services\NotificationService;
+use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Mockery\Expectation;
 use Mockery\MockInterface;
 use Tests\TestCase;
@@ -243,7 +249,7 @@ class EwsSchedulerTest extends TestCase
         ]);
 
         PositionHistory::create([
-            'id' => \Illuminate\Support\Str::uuid(),
+            'id' => Str::uuid(),
             'employee_id' => $employee->id,
             'jenis_jabatan_id' => $jenisJabatan->id,
             'tmt_jabatan' => now()->subYear()->toDateString(),
@@ -277,7 +283,7 @@ class EwsSchedulerTest extends TestCase
         ]);
 
         PositionHistory::create([
-            'id' => \Illuminate\Support\Str::uuid(),
+            'id' => Str::uuid(),
             'employee_id' => $employee->id,
             'jenis_jabatan_id' => $jenisJabatan->id,
             'tmt_jabatan' => now()->subYear()->toDateString(),
