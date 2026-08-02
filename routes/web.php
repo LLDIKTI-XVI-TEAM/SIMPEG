@@ -338,6 +338,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('laporan.pegawai');
 
+    Route::get('/laporan/export-pegawai/preview', [LaporanController::class, 'exportPegawaiPreview'])
+        ->middleware(['role:super_admin,admin_kepegawaian'])
+        ->name('laporan.pegawai.preview');
+
     Route::get('/laporan/export-pegawai/excel', [LaporanController::class, 'exportPegawaiExcel'])
         ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('laporan.pegawai.excel');
