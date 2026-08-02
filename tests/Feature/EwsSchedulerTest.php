@@ -8,16 +8,20 @@ use App\Models\Employee;
 use App\Models\EwsAlert;
 use App\Models\EwsConfig;
 use App\Models\EwsSchedulerRun;
+use App\Models\PositionHistory;
 use App\Models\RefGolongan;
+use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\SimpegNotification;
 use App\Models\User;
 use App\Services\EwsEngineService;
 use App\Services\Notifications\NotificationRecipientResolver;
 use App\Services\NotificationService;
+use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Mockery\Expectation;
 use Mockery\MockInterface;
 use Tests\TestCase;
@@ -79,7 +83,7 @@ class EwsSchedulerTest extends TestCase
 
         $pensiunEmployee = Employee::factory()->create([
             'tanggal_lahir' => now()->subYears(55)->addDays(3)->toDateString(),
-            'tanggal_pensiun' => now()->addYears(10)->toDateString(),
+            'tanggal_pensiun' => null,
         ]);
 
         $pppkJenis = RefJenisPegawai::where('nama', 'PPPK')->firstOrFail();
@@ -235,20 +239,24 @@ class EwsSchedulerTest extends TestCase
     public function test_scheduler_checks_pensiun_trigger(): void
     {
         // Pensiun H-365 (Tahap 1) - menggunakan BUP calculation
-        $jenisJabatan = RefJenisJabatan::factory()->create(['maks_usia_pensiun' => 58]);
+        $jenisJabatan = RefJenisJabatan::create(['nama' => 'Test', 'maks_usia_pensiun' => 58]);
 
         $employee = Employee::factory()->create([
             'tanggal_lahir' => now()->subYears(58)->addDays(365)->toDateString(),
+            'tanggal_pensiun' => null,
             'status_aktif' => 'Aktif',
         ]);
 
         PositionHistory::create([
-            'id' => \Illuminate\Support\Str::uuid(),
+            'id' => Str::uuid(),
             'employee_id' => $employee->id,
             'jenis_jabatan_id' => $jenisJabatan->id,
             'tmt_jabatan' => now()->subYear()->toDateString(),
             'is_latest' => true,
         ]);
+
+        EwsConfig::setVal('pensiun_required_age_years', '0'); // Use position BUP
+        EwsConfig::setVal('pensiun_y1', '365');
 
         app(EwsEngineService::class)->run();
 
@@ -264,9 +272,9 @@ class EwsSchedulerTest extends TestCase
         ]);
     }
 
-    public function test_ews_ignores_manual_pension_date_and_uses_bup(): void
+    public function test_ews_prioritizes_manual_pension_date_over_bup(): void
     {
-        $jenisJabatan = RefJenisJabatan::factory()->create(['maks_usia_pensiun' => 58]);
+        $jenisJabatan = RefJenisJabatan::create(['nama' => 'Test', 'maks_usia_pensiun' => 58]);
 
         // Employee with manual pension date = 365 days from now (1 year)
         // But BUP calculation = 180 days from now (6 months)
@@ -277,7 +285,7 @@ class EwsSchedulerTest extends TestCase
         ]);
 
         PositionHistory::create([
-            'id' => \Illuminate\Support\Str::uuid(),
+            'id' => Str::uuid(),
             'employee_id' => $employee->id,
             'jenis_jabatan_id' => $jenisJabatan->id,
             'tmt_jabatan' => now()->subYear()->toDateString(),
@@ -285,20 +293,19 @@ class EwsSchedulerTest extends TestCase
         ]);
 
         EwsConfig::setVal('pensiun_required_age_years', '0'); // Use position BUP
-        EwsConfig::setVal('pensiun_m6', '180'); // H-6 months threshold
+        EwsConfig::setVal('pensiun_y1', '365'); // H-1 year threshold
 
         app(EwsEngineService::class)->run();
 
-        // Should create alert at H-180 based on BUP (180 days from now)
-        // NOT at H-365 based on manual date (365 days from now)
+        // Should create alert at H-365 based on manual date
         $alert = EwsAlert::where('employee_id', $employee->id)
             ->where('type', 'PENSIUN')
             ->first();
 
         $this->assertNotNull($alert);
-        $this->assertEquals(180, $alert->interval_days); // H-6 months, not H-1 year
+        $this->assertEquals(365, $alert->interval_days); // H-1 year, not H-6 months
         $this->assertEquals(
-            now()->addDays(180)->startOfDay()->toDateString(),
+            now()->addDays(365)->startOfDay()->toDateString(),
             Carbon::parse($alert->target_date)->toDateString()
         );
     }
