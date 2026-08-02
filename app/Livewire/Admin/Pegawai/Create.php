@@ -27,7 +27,7 @@ class Create extends Component
         $unitKerja = RefUnitKerja::all();
         $jabatanOptions = RefJabatan::with('jenisJabatan')->orderBy('nama')->get();
         $jenisJabatanOptions = RefJenisJabatan::all();
-        $statusPegawai = RefStatusPegawai::orderByDesc('is_default')->orderBy('nama')->get();
+        $statusPegawai = RefStatusPegawai::where('is_active', true)->orderByDesc('is_default')->orderBy('nama')->get();
         $golonganRefOptions = RefGolongan::orderBy('kode')->get();
         $eselonOptions = RefEselon::orderBy('nama')->get();
 

@@ -39,6 +39,8 @@ use Illuminate\Support\Carbon;
  * @property bool $is_satyalancana_eligible
  * @property string|null $satyalancana_note
  * @property bool $is_kepala_lembaga
+ * @property string|null $foto_url
+ * @property string|null $foto_public_path
  * @property-read RefJenisPegawai|null $jenisPegawai
  * @property-read User|null $user
  * @property-read Employee|null $kepalaBagian
@@ -96,6 +98,11 @@ class Employee extends Model
         'email',
         'email_pribadi',
         'no_telepon_rumah',
+        'status_alasan',
+        'status_deskripsi',
+        'status_tanggal',
+        'status_berkas_path',
+        'status_nomor_berkas',
 
         // Flags
         'is_kinerja_baik',
@@ -119,6 +126,7 @@ class Employee extends Model
             'is_kinerja_baik' => 'boolean',
             'is_satyalancana_eligible' => 'boolean',
             'is_kepala_lembaga' => 'boolean',
+            'status_tanggal' => 'date',
             'nik' => 'encrypted',
             'no_kk' => 'encrypted',
         ];
