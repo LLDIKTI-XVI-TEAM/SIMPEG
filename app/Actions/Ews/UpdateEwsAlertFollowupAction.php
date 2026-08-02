@@ -3,6 +3,7 @@
 namespace App\Actions\Ews;
 
 use App\Models\Employee;
+use App\Models\EmployeeStatusHistory;
 use App\Models\EwsAlert;
 use App\Models\RefStatusPegawai;
 use App\Models\SimpegNotification;
@@ -151,6 +152,25 @@ class UpdateEwsAlertFollowupAction
             'file_path' => $filePath,
             'keterangan' => 'Diunggah saat persetujuan EWS Pensiun.',
         ]);
+
+        // Mark semua history record lama sebagai not latest
+        EmployeeStatusHistory::where('employee_id', $employee->id)
+            ->where('is_latest', true)
+            ->update(['is_latest' => false]);
+
+        // Create status history entry agar muncul di riwayat status pegawai
+        EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_pegawai_id' => $pensionStatus->id,
+            'status_nama' => $pensionStatus->nama,
+            'keterangan' => 'Status diubah menjadi Pensiun melalui persetujuan EWS.',
+            'tanggal_efektif' => (string) $request->input('tanggal_sk'),
+            'nomor_berkas' => (string) $request->input('no_sk'),
+            'file_sk' => $filePath,
+            'changed_by_user_id' => $request->user()?->id,
+            'is_latest' => true,
+        ]);
+
         $employee->update(['status_pegawai_id' => $pensionStatus->id]);
 
         AuditService::log('UPDATE', 'Employee', $employee->id, $oldValues, $employee->fresh()->getAttributes(), $request);
