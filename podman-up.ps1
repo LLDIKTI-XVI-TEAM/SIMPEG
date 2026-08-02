@@ -53,14 +53,16 @@ switch ($action) {
             throw "migrate gagal. Setup Laravel dihentikan."
         }
 
-        # storage:link idempotent; kegagalan karena link sudah ada tidak
-        # boleh menggagalkan setup yang telah selesai.
-        $storageLinkErrorAction = $ErrorActionPreference
-        try {
-            $ErrorActionPreference = "Continue"
-            podman compose exec app php artisan storage:link --force 2>$null
-        } finally {
-            $ErrorActionPreference = $storageLinkErrorAction
+        # --force membuat symlink yang valid dapat dibuat ulang dengan aman.
+        # Hentikan setup jika pembuatan atau validasi link storage gagal.
+        podman compose exec app php artisan storage:link --force
+        if ($LASTEXITCODE -ne 0) {
+            throw "storage:link gagal. Setup Laravel dihentikan."
+        }
+
+        podman compose exec app sh -lc "test -L public/storage -a -e public/storage"
+        if ($LASTEXITCODE -ne 0) {
+            throw "Link public/storage tidak valid atau target storage tidak tersedia. Setup Laravel dihentikan."
         }
 
         Write-Host "`n============================================" -ForegroundColor Green

@@ -2,6 +2,7 @@
 
 namespace App\Actions\Employees;
 
+use App\Models\Employee;
 use App\Models\User;
 use App\Services\Employees\KepalaBagianScopeService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -23,13 +24,10 @@ class ListKepalaBagianEmployeesAction
                 'jabatan_terakhir',
                 'golongan_terakhir',
                 'jenis_pegawai_id',
-                'status_pegawai_id',
-                'status_aktif',
                 'foto',
             ])
             ->with([
                 'jenisPegawai:id,nama',
-                'statusPegawai:id,nama',
                 'positionHistories' => fn ($query) => $query
                     ->with('unitKerja:id,nama')
                     ->where('is_latest', true)
@@ -50,7 +48,6 @@ class ListKepalaBagianEmployeesAction
                 });
             })
             ->when(($filters['status'] ?? '') === 'aktif', fn ($query) => $query
-                ->whereHas('statusPegawai', fn ($statuses) => $statuses->where('nama', 'Aktif'))
                 ->whereDoesntHave('leaveRequests', fn ($leaves) => $leaves
                     ->where('status', 'disetujui')
                     ->whereDate('tanggal_mulai', '<=', $today)
@@ -60,7 +57,6 @@ class ListKepalaBagianEmployeesAction
                 ->where('status', 'disetujui')
                 ->whereDate('tanggal_mulai', '<=', $today)
                 ->whereDate('tanggal_selesai', '>=', $today)))
-
             ->when($filters['golongan'] ?? null, fn ($query, $val) => $query
                 ->where('golongan_terakhir', 'LIKE', $val.'/%'))
             ->when($filters['unit_kerja_id'] ?? null, fn ($query, $val) => $query
@@ -69,6 +65,14 @@ class ListKepalaBagianEmployeesAction
                 ->where('jenis_pegawai_id', $val))
             ->orderBy('nama_lengkap')
             ->paginate(in_array($perPage, [10, 25, 50], true) ? $perPage : 10)
-            ->withQueryString();
+            ->withQueryString()
+            ->through(fn (Employee $employee): Employee => $this->withDisplayStatus($employee));
+    }
+
+    private function withDisplayStatus(Employee $employee): Employee
+    {
+        $employee->setAttribute('status_tampilan', (bool) $employee->getAttribute('sedang_cuti') ? 'Cuti' : 'Aktif');
+
+        return $employee;
     }
 }
