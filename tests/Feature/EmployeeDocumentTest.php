@@ -8,6 +8,7 @@ use App\Models\Appointment;
 use App\Models\DisciplineRecord;
 use App\Models\Document;
 use App\Models\Employee;
+use App\Models\EmployeeStatusHistory;
 use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
@@ -384,8 +385,8 @@ class EmployeeDocumentTest extends TestCase
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create();
 
-        $file = UploadedFile::fake()->create('download-test.pdf', 100);
-        $filePath = $file->store('employees/documents', Document::STORAGE_DISK);
+        $filePath = 'employees/documents/download-test.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($filePath, 'dummy pdf content');
 
         $document = Document::create([
             'employee_id' => $employee->id,
@@ -507,6 +508,13 @@ class EmployeeDocumentTest extends TestCase
         $employee = Employee::factory()->create(['status_aktif' => 'Mutasi']);
         $filePath = 'berkas/'.$employee->id.'/sk-mutasi-lama.pdf';
         Storage::disk(Document::STORAGE_DISK)->put($filePath, 'SK mutasi');
+
+        EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_nama' => 'Mutasi',
+            'tanggal_efektif' => now(),
+            'file_sk' => $filePath,
+        ]);
 
         $document = Document::create([
             'employee_id' => $employee->id,

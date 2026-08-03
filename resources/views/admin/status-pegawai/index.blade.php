@@ -78,18 +78,11 @@
                     </div>
                 </div>
 
-                {{-- Alasan --}}
+                {{-- Keterangan --}}
                 <div>
-                    <label for="alasan" class="mb-1 block text-sm font-semibold text-ink">Alasan <span class="text-error">*</span></label>
-                    <input type="text" name="alasan" id="alasan" value="{{ old('alasan') }}" placeholder="Masukkan alasan singkat perubahan status..." class="mt-1 block w-full rounded-lg border-border bg-page px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary @error('alasan') border-error @enderror">
-                    @error('alasan') <span class="text-xs text-error mt-1">{{ $message }}</span> @enderror
-                </div>
-
-                {{-- Deskripsi --}}
-                <div>
-                    <label for="deskripsi" class="mb-1 block text-sm font-semibold text-ink">Deskripsi Detail</label>
-                    <textarea name="deskripsi" id="deskripsi" rows="3" placeholder="Masukkan penjelasan detail..." class="mt-1 block w-full rounded-lg border-border bg-page px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary @error('deskripsi') border-error @enderror">{{ old('deskripsi') }}</textarea>
-                    @error('deskripsi') <span class="text-xs text-error mt-1">{{ $message }}</span> @enderror
+                    <label for="keterangan" class="mb-1 block text-sm font-semibold text-ink">Keterangan <span class="text-muted">(Opsional)</span></label>
+                    <textarea name="keterangan" id="keterangan" rows="3" placeholder="Masukkan catatan atau keterangan perubahan status..." class="mt-1 block w-full rounded-lg border-border bg-page px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary @error('keterangan') border-error @enderror">{{ old('keterangan') }}</textarea>
+                    @error('keterangan') <span class="text-xs text-error mt-1">{{ $message }}</span> @enderror
                 </div>
 
                 {{-- Upload Berkas --}}

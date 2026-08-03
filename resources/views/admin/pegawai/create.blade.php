@@ -136,7 +136,14 @@
                             label="Tanggal Lahir"
                             id="tanggal_lahir"
                             max="{{ date('Y-m-d') }}"
-                            
+
+                        />
+
+                        {{-- Tanggal Pensiun --}}
+                        <x-form.date
+                            name="tanggal_pensiun"
+                            label="Tanggal Pensiun"
+                            id="tanggal_pensiun"
                         />
 
                         {{-- Pendidikan Terakhir --}}

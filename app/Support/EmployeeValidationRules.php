@@ -17,7 +17,20 @@ class EmployeeValidationRules
             'nama_lengkap' => ['required', 'string', 'max:255'],
             'nama_dengan_gelar' => ['nullable', 'string', 'max:255'],
             'nip' => ['nullable', 'string', 'size:18', 'unique:employees,nip'],
-            'nik' => ['nullable', 'string', 'size:16'],
+            'nik' => [
+                'nullable',
+                'string',
+                'size:16',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    $hash = hash_hmac('sha256', trim((string) $value), config('app.key'));
+                    // withTrashed() agar selaras dengan unique index employees_nik_hash_unique
+                    // yang mencakup soft-deleted rows — NIK pegawai yang dihapus tetap tidak boleh dipakai ulang.
+                    $exists = Employee::withTrashed()->where('nik_hash', $hash)->exists();
+                    if ($exists) {
+                        $fail('NIK sudah terdaftar pada pegawai lain.');
+                    }
+                },
+            ],
             'no_kk' => ['nullable', 'string', 'size:16'],
             'tempat_lahir' => ['nullable', 'string', 'max:100'],
             'tanggal_lahir' => ['nullable', 'date', 'before:today'],
@@ -84,6 +97,24 @@ class EmployeeValidationRules
             'email',
             'max:255',
             Rule::unique('employees', 'email_pribadi')->ignore($employee->id),
+        ];
+
+        $rules['nik'] = [
+            'nullable',
+            'string',
+            'size:16',
+            function (string $attribute, mixed $value, \Closure $fail) use ($employee): void {
+                $hash = hash_hmac('sha256', trim((string) $value), config('app.key'));
+                // withTrashed() agar selaras dengan unique index employees_nik_hash_unique
+                // yang mencakup soft-deleted rows — NIK pegawai yang dihapus tetap tidak boleh dipakai ulang.
+                $exists = Employee::withTrashed()
+                    ->where('nik_hash', $hash)
+                    ->where('id', '!=', $employee->id) // izinkan NIK milik sendiri saat update
+                    ->exists();
+                if ($exists) {
+                    $fail('NIK sudah terdaftar pada pegawai lain.');
+                }
+            },
         ];
 
         return $rules;

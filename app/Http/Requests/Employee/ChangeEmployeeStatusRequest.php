@@ -20,8 +20,7 @@ class ChangeEmployeeStatusRequest extends FormRequest
             'pegawai_id' => ['required', 'uuid', 'exists:employees,id'],
             'status_pegawai_id' => ['required', 'uuid', Rule::exists('ref_status_pegawai', 'id')->where('is_active', true)],
             'tanggal' => ['required', 'date'],
-            'alasan' => ['required', 'string', 'max:255'],
-            'deskripsi' => ['nullable', 'string', 'max:2000'],
+            'keterangan' => ['nullable', 'string', 'max:2000'],
             'berkas' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png'],
         ];
     }
@@ -32,8 +31,7 @@ class ChangeEmployeeStatusRequest extends FormRequest
             'pegawai_id' => 'Pegawai',
             'status_pegawai_id' => 'Status Baru',
             'tanggal' => 'Tanggal Efektif',
-            'alasan' => 'Alasan',
-            'deskripsi' => 'Deskripsi',
+            'keterangan' => 'Keterangan',
             'berkas' => 'Berkas Pendukung',
         ];
     }

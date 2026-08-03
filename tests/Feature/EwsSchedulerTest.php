@@ -8,16 +8,20 @@ use App\Models\Employee;
 use App\Models\EwsAlert;
 use App\Models\EwsConfig;
 use App\Models\EwsSchedulerRun;
+use App\Models\PositionHistory;
 use App\Models\RefGolongan;
+use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\SimpegNotification;
 use App\Models\User;
 use App\Services\EwsEngineService;
 use App\Services\Notifications\NotificationRecipientResolver;
 use App\Services\NotificationService;
+use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Mockery\Expectation;
 use Mockery\MockInterface;
 use Tests\TestCase;
@@ -79,7 +83,7 @@ class EwsSchedulerTest extends TestCase
 
         $pensiunEmployee = Employee::factory()->create([
             'tanggal_lahir' => now()->subYears(55)->addDays(3)->toDateString(),
-            'tanggal_pensiun' => now()->addYears(10)->toDateString(),
+            'tanggal_pensiun' => null,
         ]);
 
         $pppkJenis = RefJenisPegawai::where('nama', 'PPPK')->firstOrFail();
@@ -234,10 +238,25 @@ class EwsSchedulerTest extends TestCase
 
     public function test_scheduler_checks_pensiun_trigger(): void
     {
-        // Pensiun H-365 (Tahap 1)
+        // Pensiun H-365 (Tahap 1) - menggunakan BUP calculation
+        $jenisJabatan = RefJenisJabatan::create(['nama' => 'Test', 'maks_usia_pensiun' => 58]);
+
         $employee = Employee::factory()->create([
-            'tanggal_pensiun' => now()->addDays(365)->toDateString(),
+            'tanggal_lahir' => now()->subYears(58)->addDays(365)->toDateString(),
+            'tanggal_pensiun' => null,
+            'status_aktif' => 'Aktif',
         ]);
+
+        PositionHistory::create([
+            'id' => Str::uuid(),
+            'employee_id' => $employee->id,
+            'jenis_jabatan_id' => $jenisJabatan->id,
+            'tmt_jabatan' => now()->subYear()->toDateString(),
+            'is_latest' => true,
+        ]);
+
+        EwsConfig::setVal('pensiun_required_age_years', '0'); // Use position BUP
+        EwsConfig::setVal('pensiun_y1', '365');
 
         app(EwsEngineService::class)->run();
 
@@ -251,6 +270,44 @@ class EwsSchedulerTest extends TestCase
             'user_id' => $employee->id,
             'type' => 'ews.pensiun',
         ]);
+    }
+
+    public function test_ews_prioritizes_manual_pension_date_over_bup(): void
+    {
+        $jenisJabatan = RefJenisJabatan::create(['nama' => 'Test', 'maks_usia_pensiun' => 58]);
+
+        // Employee with manual pension date = 365 days from now (1 year)
+        // But BUP calculation = 180 days from now (6 months)
+        $employee = Employee::factory()->create([
+            'tanggal_lahir' => now()->subYears(58)->addDays(180)->toDateString(),
+            'tanggal_pensiun' => now()->addDays(365)->toDateString(), // Manual: 1 year away
+            'status_aktif' => 'Aktif',
+        ]);
+
+        PositionHistory::create([
+            'id' => Str::uuid(),
+            'employee_id' => $employee->id,
+            'jenis_jabatan_id' => $jenisJabatan->id,
+            'tmt_jabatan' => now()->subYear()->toDateString(),
+            'is_latest' => true,
+        ]);
+
+        EwsConfig::setVal('pensiun_required_age_years', '0'); // Use position BUP
+        EwsConfig::setVal('pensiun_y1', '365'); // H-1 year threshold
+
+        app(EwsEngineService::class)->run();
+
+        // Should create alert at H-365 based on manual date
+        $alert = EwsAlert::where('employee_id', $employee->id)
+            ->where('type', 'PENSIUN')
+            ->first();
+
+        $this->assertNotNull($alert);
+        $this->assertEquals(365, $alert->interval_days); // H-1 year, not H-6 months
+        $this->assertEquals(
+            now()->addDays(365)->startOfDay()->toDateString(),
+            Carbon::parse($alert->target_date)->toDateString()
+        );
     }
 
     public function test_scheduler_checks_pppk_contract_using_tanggal_akhir_kontrak(): void

@@ -93,6 +93,10 @@ Route::middleware($employeeGroupMiddleware)
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
             ->whereUuid('employee')
             ->name('arsip-dokumen.index');
+        Route::post('/{employee}/berkas-lainnya', [EmployeeDocumentController::class, 'storeBerkasLainnya'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.update'])
+            ->whereUuid('employee')
+            ->name('berkas-lainnya.store');
         Route::get('/{employee}/status-dokumen', [EmployeeController::class, 'documentStatus'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
             ->whereUuid('employee')
