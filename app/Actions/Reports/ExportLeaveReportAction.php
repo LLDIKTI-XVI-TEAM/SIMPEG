@@ -168,6 +168,7 @@ class ExportLeaveReportAction
             'disetujui' => 'Disetujui',
             'perlu_perubahan' => 'Perubahan',
             'ditangguhkan' => 'Ditangguhkan',
+            'ditangguhkan_tugas_dinas' => 'Ditangguhkan karena Tugas Dinas',
             'tidak_disetujui' => 'Tidak Disetujui',
             default => 'Menunggu Persetujuan',
         };

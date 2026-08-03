@@ -177,6 +177,39 @@ class CutiListDisplayTest extends TestCase
         $response->assertDontSee('Perlu Perubahan');
     }
 
+    public function test_list_renders_and_filters_duty_postponement_with_consistent_counter(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $jenis = RefJenisCuti::create([
+            'nama' => 'Cuti Tahunan Rule 3',
+            'code' => 'tahunan-rule-3-list',
+            'mengurangi_saldo_tahunan' => true,
+            'khusus_pns' => false,
+        ]);
+        $this->createLeave(
+            Employee::factory()->create(['nama_lengkap' => 'Pegawai Tugas Dinas']),
+            $jenis,
+            'Penangguhan terminal Rule 3',
+            LeaveRequest::STATUS_DUTY_POSTPONED,
+        );
+        $this->createLeave(
+            Employee::factory()->create(['nama_lengkap' => 'Pegawai Ditangguhkan Biasa']),
+            $jenis,
+            'Penangguhan sementara biasa',
+            'ditangguhkan',
+        );
+
+        $response = $this->actingAs($user)->get(route('cuti', [
+            'status' => LeaveRequest::STATUS_DUTY_POSTPONED,
+        ]));
+
+        $response->assertOk()
+            ->assertSee('Pegawai Tugas Dinas')
+            ->assertSee('Ditangguhkan karena Tugas Dinas')
+            ->assertDontSee('Pegawai Ditangguhkan Biasa')
+            ->assertViewHas('jumlahDitangguhkan', 2);
+    }
+
     public function test_pegawai_only_sees_own_rows_and_counters(): void
     {
         [$user, $employee, $peer, $jenis] = $this->makePegawaiContext();

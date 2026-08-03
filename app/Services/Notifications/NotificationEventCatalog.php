@@ -26,6 +26,11 @@ final class NotificationEventCatalog
             'group' => 'Cuti',
             'allowed_channels' => ['in_app', 'email'],
         ],
+        'cuti.ditangguhkan_tugas_dinas' => [
+            'label' => 'Cuti ditangguhkan karena tugas dinas',
+            'group' => 'Cuti',
+            'allowed_channels' => ['in_app', 'email'],
+        ],
         'cuti.perlu_perubahan' => [
             'label' => 'Cuti perlu perubahan',
             'group' => 'Cuti',

@@ -6,6 +6,7 @@
             'menunggu_approval' => 'info',
             'disetujui' => 'success',
             'ditangguhkan' => 'warning',
+            'ditangguhkan_tugas_dinas' => 'warning',
             'perlu_perubahan' => 'danger',
             'tidak_disetujui' => 'danger',
         ];
@@ -14,6 +15,7 @@
             'menunggu_approval' => 'Menunggu',
             'disetujui' => 'Disetujui',
             'ditangguhkan' => 'Ditangguhkan',
+            'ditangguhkan_tugas_dinas' => 'Ditangguhkan karena Tugas Dinas',
             'perlu_perubahan' => 'Perubahan',
             'tidak_disetujui' => 'Tidak Disetujui',
         ];
@@ -108,6 +110,7 @@
                     <option value="menunggu" @selected($status === 'menunggu' || $status === 'pending')>Menunggu Keputusan</option>
                     <option value="disetujui" @selected($status === 'disetujui')>Disetujui</option>
                     <option value="ditunda" @selected($status === 'ditunda' || $status === 'ditangguhkan')>Ditangguhkan</option>
+                    <option value="ditangguhkan_tugas_dinas" @selected($status === 'ditangguhkan_tugas_dinas')>Ditangguhkan karena Tugas Dinas</option>
                     <option value="perlu_perubahan" @selected($status === 'perlu_perubahan')>Perubahan</option>
                     <option value="tidak_disetujui" @selected($status === 'tidak_disetujui')>Tidak Disetujui</option>
                 </x-form.select>

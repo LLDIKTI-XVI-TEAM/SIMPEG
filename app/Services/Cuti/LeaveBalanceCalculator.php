@@ -103,6 +103,50 @@ class LeaveBalanceCalculator
     }
 
     /**
+     * Mengalokasikan saldo yang dilindungi karena penangguhan dinas dari tahun berjalan ke bucket terlama.
+     * Alokasi bersifat semua-atau-tidak-sama-sekali: hari non-positif atau saldo kurang ditolak tanpa mengubah bucket.
+     *
+     * @param  array{n2:int, n1:int, current:int}  $buckets
+     * @return array{
+     *     success: bool,
+     *     allocations: array{n2:int, n1:int, current:int},
+     *     remaining: array{n2:int, n1:int, current:int}
+     * }
+     */
+    public function allocateDutyPostponement(array $buckets, int $days): array
+    {
+        if ($days <= 0 || ! $this->isSufficient($buckets, $days)) {
+            return [
+                'success' => false,
+                'allocations' => ['n2' => 0, 'n1' => 0, 'current' => 0],
+                'remaining' => $buckets,
+            ];
+        }
+
+        $allocations = ['n2' => 0, 'n1' => 0, 'current' => 0];
+        $remaining = $buckets;
+        $sisaPerlindungan = $days;
+
+        // Urutan reverse mencegah protected overlap dengan deduction biasa selama invariant reservasi dijaga.
+        foreach (['current', 'n1', 'n2'] as $bucket) {
+            if ($sisaPerlindungan <= 0) {
+                break;
+            }
+
+            $ambil = min($remaining[$bucket], $sisaPerlindungan);
+            $allocations[$bucket] = $ambil;
+            $remaining[$bucket] -= $ambil;
+            $sisaPerlindungan -= $ambil;
+        }
+
+        return [
+            'success' => true,
+            'allocations' => $allocations,
+            'remaining' => $remaining,
+        ];
+    }
+
+    /**
      * Menerapkan koreksi saldo bertanda dengan clamp agar saldo tidak pernah negatif.
      *
      * Untuk koreksi debit yang melewati nol, hanya porsi yang benar-benar terpakai yang dicatat

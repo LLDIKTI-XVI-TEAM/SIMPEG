@@ -31,6 +31,8 @@ class LeaveRequest extends Model
 {
     use HasUuid;
 
+    public const STATUS_DUTY_POSTPONED = 'ditangguhkan_tugas_dinas';
+
     protected $fillable = [
         'employee_id',
         'jenis_cuti_id',

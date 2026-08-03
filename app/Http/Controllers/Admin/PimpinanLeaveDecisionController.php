@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Admin;
 use App\Actions\Cuti\ApproveLeaveAction;
 use App\Actions\Cuti\DeclineLeaveAction;
 use App\Actions\Cuti\PostponeLeaveAction;
+use App\Actions\Cuti\RecordDutyPostponementAction;
 use App\Actions\Cuti\RequestChangesLeaveAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Cuti\PimpinanLeaveDecisionRequest;
+use App\Http\Requests\Cuti\RecordDutyPostponementRequest;
 use App\Models\LeaveRequest;
 
 class PimpinanLeaveDecisionController extends Controller
@@ -39,5 +41,21 @@ class PimpinanLeaveDecisionController extends Controller
 
         return redirect()->route('pimpinan.cuti.show', $leave)
             ->with('success', $message);
+    }
+
+    /** Mencatat terminal tugas dinas hanya bagi approver snapshot Pimpinan. */
+    public function recordDutyPostponement(
+        RecordDutyPostponementRequest $request,
+        LeaveRequest $leave,
+        RecordDutyPostponementAction $action,
+    ) {
+        $user = $request->user();
+        $actor = $user?->employee;
+        abort_if($user === null || $actor === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat memutuskan cuti.');
+
+        $action->execute($leave, $actor, $user, $request->validated()['alasan']);
+
+        return redirect()->route('pimpinan.cuti.show', $leave)
+            ->with('success', 'Cuti Tahunan ditangguhkan karena tugas dinas dan hak terkait telah dilindungi untuk satu tahun berikutnya.');
     }
 }

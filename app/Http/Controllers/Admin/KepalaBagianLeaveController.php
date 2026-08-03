@@ -39,7 +39,7 @@ class KepalaBagianLeaveController extends Controller
 
         $leave->load([
             'employee:id,nama_lengkap,nip,jabatan_terakhir,golongan_terakhir',
-            'jenisCuti:id,nama',
+            'jenisCuti:id,nama,code',
             'steps.approver:id,nama_lengkap',
             'approvals.approver:id,nama_lengkap',
         ]);

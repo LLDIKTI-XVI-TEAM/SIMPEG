@@ -14,6 +14,7 @@ class CutiReportStatusFormatter
         $official = [
             'disetujui' => 'Disetujui',
             'ditangguhkan' => 'Ditangguhkan',
+            'ditangguhkan_tugas_dinas' => 'Ditangguhkan karena Tugas Dinas',
             'perlu_perubahan' => 'Perubahan',
             'tidak_disetujui' => 'Tidak Disetujui',
         ];

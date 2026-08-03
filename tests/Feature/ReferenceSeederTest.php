@@ -211,7 +211,7 @@ class ReferenceSeederTest extends TestCase
                 'ref_notification_channels.code',
             ]);
 
-        $this->assertDatabaseCount('notification_event_channels', 27);
+        $this->assertDatabaseCount('notification_event_channels', 29);
         $this->assertCount(1, $policies);
         $this->assertSame('in_app', $policies->sole()->code);
         $this->assertTrue((bool) $policies->sole()->is_enabled);
@@ -240,7 +240,7 @@ class ReferenceSeederTest extends TestCase
 
         $this->seedReferenceData();
 
-        $this->assertDatabaseCount('notification_event_channels', 27);
+        $this->assertDatabaseCount('notification_event_channels', 29);
         $this->assertDatabaseHas('notification_event_channels', [
             'event_key' => 'ews.satyalancana',
             'notification_channel_id' => $emailChannelId,

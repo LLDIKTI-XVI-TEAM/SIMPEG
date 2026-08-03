@@ -4,9 +4,10 @@
             'menunggu_approval' => ['label' => 'Menunggu Keputusan', 'variant' => 'warning'],
             'disetujui' => ['label' => 'Disetujui', 'variant' => 'success'],
             'ditangguhkan' => ['label' => 'Ditangguhkan', 'variant' => 'warning'],
+            'ditangguhkan_tugas_dinas' => ['label' => 'Ditangguhkan karena Tugas Dinas', 'variant' => 'warning'],
             'perlu_perubahan' => ['label' => 'Perubahan', 'variant' => 'info'],
             'tidak_disetujui' => ['label' => 'Tidak Disetujui', 'variant' => 'danger'],
-            default => ['label' => $leave->status, 'variant' => 'muted'],
+            default => ['label' => 'Status tidak tersedia', 'variant' => 'muted'],
         };
         $attachmentAvailable = $leave->lampiran && \Illuminate\Support\Facades\Storage::disk('public')->exists($leave->lampiran);
     @endphp
@@ -165,8 +166,19 @@
 
                         <div x-data="{ 
                             decision: '{{ old('keputusan', 'DISETUJUI') }}', 
-                            confirmOpen: false, 
+                            confirmOpen: false,
+                            dutyPostponementOpen: {{ $errors->dutyPostponement->has('alasan') ? 'true' : 'false' }},
+                            dutyPostponementTrigger: null,
                             submitting: false,
+                            openDutyPostponement(event) {
+                                this.dutyPostponementTrigger = event.currentTarget;
+                                this.dutyPostponementOpen = true;
+                                this.$nextTick(() => document.getElementById('kabag-duty-postponement-reason')?.focus());
+                            },
+                            closeDutyPostponement() {
+                                this.dutyPostponementOpen = false;
+                                this.$nextTick(() => this.dutyPostponementTrigger?.focus());
+                            },
                             submitDecision() {
                                 if (this.decision === 'DISETUJUI') {
                                     this.confirmOpen = true;
@@ -174,7 +186,7 @@
                                     this.$refs.decisionForm.requestSubmit();
                                 }
                             }
-                        }">
+                        }" @if ($errors->dutyPostponement->has('alasan')) x-init="$nextTick(() => document.getElementById('kabag-duty-postponement-reason')?.focus())" @endif>
                             <form x-ref="decisionForm" method="POST"
                                 action="{{ route('kepala-bagian.cuti.decision', $leave) }}" class="space-y-4"
                                 @submit="submitting = true">
@@ -205,7 +217,7 @@
                                                 class="peer sr-only" />
                                             <div
                                                 class="rounded-lg border border-border bg-white px-3 py-2.5 text-center transition-all peer-checked:border-info peer-checked:bg-info/10 peer-checked:text-info-dark">
-                                                <span class="text-sm font-bold font-sans">Ditangguhkan</span>
+                                                <span class="text-sm font-bold font-sans">Tunda Sementara</span>
                                             </div>
                                         </label>
                                         <label class="cursor-pointer relative block">
@@ -227,7 +239,7 @@
                                         class="block text-xs font-bold uppercase tracking-wider text-ink font-sans mb-1.5">Keterangan
                                         / Catatan Tambahan <span class="text-danger">*</span></label>
                                     <textarea rows="3" name="catatan" required minlength="5" maxlength="500"
-                                        placeholder="Wajib diisi jika memilih Perubahan, Ditangguhkan, atau Tidak Disetujui..."
+                                        placeholder="Wajib diisi jika memilih Perubahan, Tunda Sementara, atau Tidak Disetujui..."
                                         class="w-full rounded-lg border border-border bg-white p-3 text-sm font-sans placeholder:text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-sm @error('catatan') border-danger @enderror">{{ old('catatan') }}</textarea>
                                     @error('catatan')<p class="mt-1 text-sm text-danger">{{ $message }}</p>@enderror
                                 </div>
@@ -250,6 +262,30 @@
                                     </x-ui.button>
                                 </div>
                             </form>
+
+                            @if ($leave->jenisCuti?->code === 'tahunan')
+                                <div class="mt-4 border-t border-primary/20 pt-4">
+                                    <p class="text-xs text-muted">Penangguhan karena tugas dinas menutup pengajuan lama dan melindungi hak sesuai ketentuan.</p>
+                                    <x-ui.button type="button" @click="openDutyPostponement($event)" variant="warning" class="mt-3 w-full sm:w-auto">Tangguhkan karena Tugas Dinas</x-ui.button>
+                                </div>
+
+                                <x-ui.modal show="dutyPostponementOpen" close-action="closeDutyPostponement()" title="Tangguhkan karena Tugas Dinas" description-id="kabag-duty-postponement-description">
+                                    <p id="kabag-duty-postponement-description" class="text-sm text-ink">Tindakan ini bersifat terminal: pengajuan lama ditutup, reservasi dilepas, hak dilindungi paling lama satu tahun, dan pegawai membuat pengajuan baru pada tahun berikutnya.</p>
+                                    <form method="POST" action="{{ route('kepala-bagian.cuti.penangguhan-tugas-dinas', $leave) }}" class="mt-4 space-y-4">
+                                        @csrf
+                                        <div>
+                                            <label for="kabag-duty-postponement-reason" class="block text-xs font-bold uppercase tracking-wider text-ink">Alasan Tugas Dinas <span class="text-danger">*</span></label>
+                                            <textarea id="kabag-duty-postponement-reason" name="alasan" rows="3" required minlength="5" maxlength="500" aria-invalid="{{ $errors->dutyPostponement->has('alasan') ? 'true' : 'false' }}" data-error-autofocus="{{ $errors->dutyPostponement->has('alasan') ? 'true' : 'false' }}" aria-describedby="kabag-duty-postponement-description kabag-duty-postponement-help @error('alasan', 'dutyPostponement') kabag-duty-postponement-error @enderror" class="mt-1 w-full resize-y rounded-lg border border-border bg-surface p-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary @error('alasan', 'dutyPostponement') border-danger @enderror">{{ old('alasan') }}</textarea>
+                                            <p id="kabag-duty-postponement-help" class="mt-1 text-xs text-muted">Jelaskan tugas dinas mendesak yang menjadi dasar penangguhan.</p>
+                                            @error('alasan', 'dutyPostponement')<p id="kabag-duty-postponement-error" class="mt-1 text-xs text-danger" role="alert">{{ $message }}</p>@enderror
+                                        </div>
+                                        <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                                            <x-ui.button type="button" @click="closeDutyPostponement()" variant="secondary">Batal</x-ui.button>
+                                            <x-ui.button type="submit" variant="warning">Konfirmasi Penangguhan Tugas Dinas</x-ui.button>
+                                        </div>
+                                    </form>
+                                </x-ui.modal>
+                            @endif
 
                             <x-ui.modal show="confirmOpen" close-action="confirmOpen = false"
                                 title="Konfirmasi Persetujuan">
@@ -288,9 +324,18 @@
                                 $stepStatus = match ($step->status) {
                                     'approved' => ['label' => 'Disetujui', 'variant' => 'success'],
                                     'tidak_disetujui' => ['label' => 'Tidak Disetujui', 'variant' => 'danger'],
-                                    'active' => ['label' => 'Menunggu Keputusan', 'variant' => 'warning'],
-                                    'skipped' => ['label' => 'Dilewati', 'variant' => 'muted'],
-                                    default => ['label' => ucfirst($step->status), 'variant' => 'info'],
+                                     'ditangguhkan_tugas_dinas' => ['label' => 'Ditangguhkan karena Tugas Dinas', 'variant' => 'warning'],
+                                     'active' => ['label' => 'Menunggu Keputusan', 'variant' => 'warning'],
+                                     'pending' => ['label' => "Menunggu {$step->role_label}", 'variant' => 'muted'],
+                                     'skipped' => ['label' => 'Dilewati', 'variant' => 'muted'],
+                                    default => ['label' => 'Status tidak tersedia', 'variant' => 'muted'],
+                                };
+                                $skippedReason = match ($step->skipped_reason) {
+                                    'duty_postponement_terminal' => 'Dilewati karena penangguhan tugas dinas menutup pengajuan.',
+                                    'duplicate_approver' => 'Dilewati karena approver yang sama sudah tercakup pada tahap lain.',
+                                    'request_not_approved' => 'Dilewati karena pengajuan telah diputus tidak disetujui.',
+                                    null => null,
+                                    default => 'Dilewati karena alur persetujuan telah ditutup.',
                                 };
                             @endphp
                             <x-ui.timeline-item
@@ -306,9 +351,9 @@
                                         <p class="text-xs font-medium text-ink/80 font-sans whitespace-pre-line">
                                             {{ $step->decision_note }}</p>
                                     @endif
-                                    @if($step->skipped_reason)
+                                    @if($skippedReason)
                                         <p class="text-xs font-medium text-ink/80 font-sans whitespace-pre-line">
-                                            {{ $step->skipped_reason }}</p>
+                                            {{ $skippedReason }}</p>
                                     @endif
                                 </div>
 
@@ -319,6 +364,34 @@
                             </x-ui.timeline-item>
                         @empty
                             <p class="text-sm text-muted">Timeline approval belum tersedia.</p>
+                        @endforelse
+                    </x-ui.timeline>
+                </x-ui.card>
+
+                <x-ui.card padding="lg">
+                    <h3 class="text-sm font-bold text-ink font-sans border-b border-border pb-3 mb-4">Riwayat Tindakan Resmi</h3>
+                    <x-ui.timeline>
+                        @forelse($leave->approvals->sortBy('acted_at') as $approval)
+                            @php
+                                $action = match ($approval->action) {
+                                    'APPROVE' => ['label' => 'Disetujui', 'variant' => 'success'],
+                                    'REQUEST_CHANGES' => ['label' => 'Perubahan', 'variant' => 'info'],
+                                    'POSTPONE' => ['label' => 'Ditangguhkan', 'variant' => 'warning'],
+                                    'DUTY_POSTPONEMENT' => ['label' => 'Ditangguhkan karena Tugas Dinas', 'variant' => 'warning'],
+                                    'NOT_APPROVED' => ['label' => 'Tidak Disetujui', 'variant' => 'danger'],
+                                    'SKIP' => ['label' => 'Dilewati', 'variant' => 'muted'],
+                                    default => ['label' => 'Tindakan tidak dikenal', 'variant' => 'muted'],
+                                };
+                            @endphp
+                            <x-ui.timeline-item variant="{{ $action['variant'] }}" title="Tahap {{ $approval->stage }} · {{ $approval->approver?->nama_lengkap ?? 'Approver tidak tersedia' }}" description="{{ $action['label'] }}">
+                                @if ($approval->komentar)
+                                    <div class="mt-2 rounded-lg border border-border bg-soft/50 p-3">
+                                        <p class="whitespace-pre-line text-xs font-medium text-ink/80">{{ $approval->komentar }}</p>
+                                    </div>
+                                @endif
+                            </x-ui.timeline-item>
+                        @empty
+                            <p class="text-sm text-muted">Belum ada tindakan resmi.</p>
                         @endforelse
                     </x-ui.timeline>
                 </x-ui.card>

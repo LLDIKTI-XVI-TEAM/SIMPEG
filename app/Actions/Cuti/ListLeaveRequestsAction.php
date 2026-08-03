@@ -63,6 +63,7 @@ class ListLeaveRequestsAction
             'disetujui' => ['disetujui'],
             'ditunda' => ['ditangguhkan'],
             'ditangguhkan' => ['ditangguhkan'],
+            'ditangguhkan_tugas_dinas' => ['ditangguhkan_tugas_dinas'],
             'perlu_perubahan' => ['perlu_perubahan'],
             'tidak_disetujui' => ['tidak_disetujui'],
         ];
@@ -97,7 +98,9 @@ class ListLeaveRequestsAction
             'totalPengajuan' => (clone $baseQuery)->count(),
             'jumlahMenunggu' => (clone $baseQuery)->where('status', 'menunggu_approval')->count(),
             'jumlahDisetujui' => (clone $baseQuery)->where('status', 'disetujui')->count(),
-            'jumlahDitangguhkan' => (clone $baseQuery)->where('status', 'ditangguhkan')->count(),
+            'jumlahDitangguhkan' => (clone $baseQuery)
+                ->whereIn('status', ['ditangguhkan', 'ditangguhkan_tugas_dinas'])
+                ->count(),
             'optJenisCutis' => RefJenisCuti::orderBy('nama')->pluck('nama'),
             'optUnits' => $isPegawai
                 ? collect()

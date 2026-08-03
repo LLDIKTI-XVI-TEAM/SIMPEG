@@ -412,6 +412,51 @@ class LeaveBalanceAdjustmentTest extends TestCase
         $this->assertSame(2, $audit->new_values['diterapkan']);
     }
 
+    public function test_manual_debit_cannot_consume_protected_bucket_and_rolls_back_without_effect(): void
+    {
+        $employee = Employee::factory()->create();
+        $actor = User::factory()->adminKepegawaian()->create();
+        $service = app(LeaveBalanceService::class);
+        $balance = LeaveBalance::create($this->balancePayload($employee, 2027, [
+            'sisa_tahun_berjalan' => 5,
+            'sisa' => 5,
+        ]));
+        $this->createLedgerEvent($employee, $balance, 2027, LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET, 'Baseline debit terlindungi.');
+        $protectedRequestId = (string) str()->uuid();
+        LeaveBalanceLedger::create([
+            'employee_id' => $employee->id,
+            'leave_request_id' => null,
+            'leave_balance_id' => $balance->id,
+            'tahun' => 2027,
+            'event_type' => LeaveBalanceLedger::EVENT_DUTY_POSTPONEMENT_RECORDED,
+            'amount' => 0,
+            'source_year' => 2027,
+            'reason' => 'Hak empat hari dilindungi.',
+            'dedup_key' => "duty_postponement:{$protectedRequestId}",
+            'metadata' => [
+                'request_id' => $protectedRequestId,
+                'protected_days' => 4,
+                'protected_allocations' => ['n2' => 0, 'n1' => 0, 'current' => 4],
+                'expiry_policy' => 'valid_one_year_no_n2_aging',
+            ],
+            'created_by' => $actor->id,
+        ]);
+        $summaryBefore = $balance->only(['sisa_n2', 'sisa_n1', 'sisa_tahun_berjalan', 'sisa']);
+        $ledgerCount = LeaveBalanceLedger::count();
+        $auditCount = AuditLog::count();
+
+        try {
+            $service->adjustBalance($employee, 2027, 'current', -2, 'Debit melebihi satu hari yang tidak terlindungi.', $actor);
+            $this->fail('Debit yang memerlukan hak terlindungi wajib ditolak seluruhnya.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('amount', $exception->errors());
+        }
+
+        $this->assertSame($summaryBefore, $balance->fresh()->only(array_keys($summaryBefore)));
+        $this->assertSame($ledgerCount, LeaveBalanceLedger::count());
+        $this->assertSame($auditCount, AuditLog::count());
+    }
+
     public function test_admin_balance_adjust_route_menolak_role_tanpa_permission(): void
     {
         $employee = Employee::factory()->create();

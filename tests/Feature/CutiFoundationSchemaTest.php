@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\Employee;
+use App\Models\LeaveApproval;
 use App\Models\LeaveApprovalChain;
 use App\Models\LeaveApprovalChainStep;
 use App\Models\LeaveBalance;
@@ -13,7 +15,9 @@ use App\Models\LeaveRequest;
 use App\Models\LeaveRequestCase;
 use App\Models\LeaveRequestStep;
 use App\Models\RefJenisCuti;
+use App\Models\SimpegNotification;
 use App\Models\User;
+use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +26,7 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use RuntimeException;
 use Tests\TestCase;
 
 /**
@@ -30,6 +35,136 @@ use Tests\TestCase;
 class CutiFoundationSchemaTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_duty_postponement_domain_tokens_are_dedicated(): void
+    {
+        $this->assertSame('ditangguhkan_tugas_dinas', LeaveRequest::STATUS_DUTY_POSTPONED);
+        $this->assertSame('ditangguhkan_tugas_dinas', LeaveRequestStep::STATUS_DUTY_POSTPONED);
+        $this->assertSame('duty_postponement_terminal', LeaveRequestStep::SKIPPED_DUTY_POSTPONEMENT_TERMINAL);
+        $this->assertSame('DUTY_POSTPONEMENT', LeaveApproval::ACTION_DUTY_POSTPONEMENT);
+    }
+
+    public function test_duty_postponement_audit_event_is_allowed_and_random_event_is_rejected_by_postgresql(): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('CHECK constraint event audit diverifikasi khusus pada PostgreSQL.');
+        }
+
+        AuditLog::create([
+            'event' => 'DUTY_POSTPONEMENT',
+            'auditable_type' => LeaveRequest::class,
+            'auditable_id' => (string) Str::uuid(),
+        ]);
+
+        $this->assertDatabaseHas('audit_logs', ['event' => 'DUTY_POSTPONEMENT']);
+        $this->assertThrows(
+            fn () => DB::table('audit_logs')->insert([
+                'id' => (string) Str::uuid(),
+                'event' => 'RANDOM_DUTY_POSTPONEMENT_EVENT',
+                'auditable_type' => LeaveRequest::class,
+                'created_at' => now(),
+            ]),
+            QueryException::class,
+        );
+    }
+
+    public function test_duty_postponement_migration_refuses_rollback_when_audit_evidence_exists(): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Rollback constraint audit diverifikasi khusus pada PostgreSQL.');
+        }
+
+        AuditLog::create([
+            'event' => 'DUTY_POSTPONEMENT',
+            'auditable_type' => LeaveRequest::class,
+            'auditable_id' => (string) Str::uuid(),
+        ]);
+
+        $this->assertThrows(
+            fn () => $this->invokeMigrationMethod($this->dutyPostponementMigration(), 'down'),
+            RuntimeException::class,
+        );
+        $this->assertDutyPostponementMigrationSupportRemainsIntact();
+    }
+
+    public function test_duty_postponement_migration_refuses_rollback_when_notification_evidence_exists(): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Rollback notifikasi penangguhan diverifikasi khusus pada PostgreSQL.');
+        }
+
+        $employee = Employee::factory()->create();
+        SimpegNotification::create([
+            'user_id' => $employee->id,
+            'type' => 'cuti.ditangguhkan_tugas_dinas',
+            'title' => 'Uji penangguhan tugas dinas',
+            'body' => 'Notifikasi tanpa data pribadi untuk menguji proteksi rollback.',
+        ]);
+
+        $this->assertThrows(
+            fn () => $this->invokeMigrationMethod($this->dutyPostponementMigration(), 'down'),
+            RuntimeException::class,
+        );
+        $this->assertDutyPostponementMigrationSupportRemainsIntact();
+    }
+
+    public function test_duty_postponement_migration_refuses_rollback_when_ledger_evidence_exists(): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Rollback ledger penangguhan diverifikasi khusus pada PostgreSQL.');
+        }
+
+        $employee = Employee::factory()->create();
+        LeaveBalanceLedger::create([
+            'employee_id' => $employee->id,
+            'tahun' => 2026,
+            'event_type' => LeaveBalanceLedger::EVENT_DUTY_POSTPONEMENT_RECORDED,
+            'amount' => 0,
+        ]);
+
+        $this->assertThrows(
+            fn () => $this->invokeMigrationMethod($this->dutyPostponementMigration(), 'down'),
+            RuntimeException::class,
+        );
+        $this->assertDutyPostponementMigrationSupportRemainsIntact();
+    }
+
+    public function test_duty_postponement_migration_clean_rollback_removes_policies_and_restores_prior_audit_allowlist(): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Rollback bersih constraint audit diverifikasi khusus pada PostgreSQL.');
+        }
+
+        $migration = $this->dutyPostponementMigration();
+
+        try {
+            $this->invokeMigrationMethod($migration, 'down');
+
+            $this->assertSame(0, DB::table('notification_event_channels')
+                ->where('event_key', 'cuti.ditangguhkan_tugas_dinas')
+                ->count());
+
+            AuditLog::create([
+                'event' => 'POSTPONE',
+                'auditable_type' => LeaveRequest::class,
+                'auditable_id' => (string) Str::uuid(),
+            ]);
+            $this->assertDatabaseHas('audit_logs', ['event' => 'POSTPONE']);
+
+            $this->assertThrows(
+                fn () => DB::transaction(fn () => AuditLog::create([
+                    'event' => 'DUTY_POSTPONEMENT',
+                    'auditable_type' => LeaveRequest::class,
+                    'auditable_id' => (string) Str::uuid(),
+                ])),
+                QueryException::class,
+            );
+        } finally {
+            $this->invokeMigrationMethod($migration, 'up');
+        }
+
+        $this->assertDutyPostponementMigrationSupportRemainsIntact();
+    }
 
     public function test_schema_fondasi_revisi_cuti_tersedia(): void
     {
@@ -557,5 +692,35 @@ class CutiFoundationSchemaTest extends TestCase
             'created_at' => $ledger->created_at?->toIso8601String(),
             'updated_at' => $ledger->updated_at?->toIso8601String(),
         ];
+    }
+
+    private function dutyPostponementMigration(): Migration
+    {
+        return require database_path('migrations/2026_07_31_000001_add_duty_postponement_workflow_support.php');
+    }
+
+    private function invokeMigrationMethod(Migration $migration, string $method): void
+    {
+        $callback = [$migration, $method];
+        $this->assertIsCallable($callback);
+        call_user_func($callback);
+    }
+
+    private function assertDutyPostponementMigrationSupportRemainsIntact(): void
+    {
+        $enabledChannels = DB::table('notification_event_channels')
+            ->join('ref_notification_channels', 'ref_notification_channels.id', '=', 'notification_event_channels.notification_channel_id')
+            ->where('notification_event_channels.event_key', 'cuti.ditangguhkan_tugas_dinas')
+            ->where('notification_event_channels.is_enabled', true)
+            ->orderBy('ref_notification_channels.code')
+            ->pluck('ref_notification_channels.code')
+            ->all();
+        $constraintDefinition = DB::table('pg_constraint')
+            ->where('conname', 'audit_logs_event_check')
+            ->value(DB::raw('pg_get_constraintdef(oid)'));
+
+        $this->assertSame(['email', 'in_app'], $enabledChannels);
+        $this->assertIsString($constraintDefinition);
+        $this->assertStringContainsString('DUTY_POSTPONEMENT', $constraintDefinition);
     }
 }

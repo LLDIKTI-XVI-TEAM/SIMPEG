@@ -98,4 +98,45 @@ class PimpinanLeaveReportTest extends TestCase
             @unlink($temporaryFile);
         }
     }
+
+    public function test_excel_export_uses_human_label_for_duty_postponement(): void
+    {
+        $this->seed(RbacSeeder::class);
+        $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Export Rule 3']);
+        $leaveType = RefJenisCuti::create([
+            'nama' => 'Cuti Tahunan Export Rule 3',
+            'code' => 'tahunan-export-rule-3',
+            'mengurangi_saldo_tahunan' => true,
+            'khusus_pns' => false,
+        ]);
+        LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $leaveType->id,
+            'tanggal_mulai' => '2026-07-06',
+            'tanggal_selesai' => '2026-07-08',
+            'jumlah_hari_kerja' => 3,
+            'alasan' => 'Penangguhan terminal untuk export.',
+            'status' => LeaveRequest::STATUS_DUTY_POSTPONED,
+        ]);
+
+        $response = $this->actingAs(User::factory()->pimpinan()->create())
+            ->get(route('pimpinan.laporan.cuti.excel', ['tahun' => 2026, 'bulan' => 7]));
+        $temporaryFile = tempnam(sys_get_temp_dir(), 'simpeg-pimpinan-rule-3-');
+        file_put_contents($temporaryFile, $response->streamedContent());
+        $spreadsheet = null;
+
+        try {
+            $spreadsheet = IOFactory::load($temporaryFile);
+            $detailSheet = $spreadsheet->getSheetByName('Detail Cuti');
+
+            $this->assertNotNull($detailSheet);
+            $this->assertSame('Ditangguhkan karena Tugas Dinas', $detailSheet->getCell('H2')->getValue());
+        } finally {
+            if ($spreadsheet instanceof Spreadsheet) {
+                $spreadsheet->disconnectWorksheets();
+            }
+
+            @unlink($temporaryFile);
+        }
+    }
 }

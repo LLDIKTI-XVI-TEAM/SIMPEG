@@ -111,6 +111,75 @@ class LeaveBalanceCalculatorTest extends TestCase
         ];
     }
 
+    /**
+     * @param  array{n2:int, n1:int, current:int}  $buckets
+     * @param  array{n2:int, n1:int, current:int}  $allocations
+     * @param  array{n2:int, n1:int, current:int}  $remaining
+     */
+    #[DataProvider('dutyPostponementAllocationProvider')]
+    public function test_duty_postponement_allocates_protected_days_without_overlap(
+        array $buckets,
+        int $days,
+        bool $success,
+        array $allocations,
+        array $remaining,
+    ): void {
+        $this->assertSame(
+            compact('success', 'allocations', 'remaining'),
+            $this->calculator->allocateDutyPostponement($buckets, $days),
+        );
+    }
+
+    /**
+     * @return array<string, array{
+     *     0: array{n2:int, n1:int, current:int},
+     *     1: int,
+     *     2: bool,
+     *     3: array{n2:int, n1:int, current:int},
+     *     4: array{n2:int, n1:int, current:int}
+     * }>
+     */
+    public static function dutyPostponementAllocationProvider(): array
+    {
+        return [
+            'current dilindungi lebih dahulu' => [
+                ['n2' => 3, 'n1' => 4, 'current' => 5],
+                7,
+                true,
+                ['n2' => 0, 'n1' => 2, 'current' => 5],
+                ['n2' => 3, 'n1' => 2, 'current' => 0],
+            ],
+            'seluruh bucket dapat dilindungi' => [
+                ['n2' => 2, 'n1' => 2, 'current' => 2],
+                6,
+                true,
+                ['n2' => 2, 'n1' => 2, 'current' => 2],
+                ['n2' => 0, 'n1' => 0, 'current' => 0],
+            ],
+            'saldo kurang tidak menghasilkan alokasi sebagian' => [
+                ['n2' => 0, 'n1' => 1, 'current' => 2],
+                4,
+                false,
+                ['n2' => 0, 'n1' => 0, 'current' => 0],
+                ['n2' => 0, 'n1' => 1, 'current' => 2],
+            ],
+            'nol hari ditolak tanpa mengubah saldo' => [
+                ['n2' => 1, 'n1' => 2, 'current' => 3],
+                0,
+                false,
+                ['n2' => 0, 'n1' => 0, 'current' => 0],
+                ['n2' => 1, 'n1' => 2, 'current' => 3],
+            ],
+            'hari negatif ditolak tanpa mengubah saldo' => [
+                ['n2' => 1, 'n1' => 2, 'current' => 3],
+                -1,
+                false,
+                ['n2' => 0, 'n1' => 0, 'current' => 0],
+                ['n2' => 1, 'n1' => 2, 'current' => 3],
+            ],
+        ];
+    }
+
     public function test_debit_correction_is_clamped_to_zero_and_records_applied_portion(): void
     {
         $result = $this->calculator->clampCorrection(2, -10);

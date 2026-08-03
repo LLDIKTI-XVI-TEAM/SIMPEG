@@ -2,20 +2,24 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Cuti\PostponeLeaveAction;
 use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveApprovalChain;
 use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceLedger;
+use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
 use App\Models\RefJenisCuti;
+use App\Models\SimpegNotification;
 use App\Services\Cuti\LeaveBalanceService;
 use App\Services\LeaveApprovalService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
@@ -383,6 +387,71 @@ class LeaveApprovalEngineTest extends TestCase
 
         $this->service()->approve($cuti->fresh(), $pemohon['kepala_bagian']);
         $this->assertDatabaseHas('leave_request_steps', ['leave_request_id' => $cuti->id, 'step_order' => 2, 'status' => 'active']);
+    }
+
+    public function test_generic_postpone_preserves_workflow_and_never_creates_statutory_protection(): void
+    {
+        $pemohon = $this->makePemohon();
+        $jenis = $this->jenisCuti('Cuti Tahunan');
+        $balance = LeaveBalance::create([
+            'employee_id' => $pemohon['employee']->id,
+            'tahun' => 2026,
+            'jatah_awal' => 12,
+            'carry_over' => 0,
+            'terpakai' => 0,
+            'sisa' => 12,
+            'sisa_n2' => 0,
+            'sisa_n1' => 0,
+            'sisa_tahun_berjalan' => 12,
+            'terpakai_tahun_berjalan' => 0,
+            'hangus' => 0,
+        ]);
+        $cuti = $this->makeRequest($pemohon['employee'], $jenis, [$pemohon['kepala_bagian'], $pemohon['pybmc']], 3);
+        $activeStep = $cuti->steps()->where('status', 'active')->sole();
+        LeaveBalanceReservationEvent::create([
+            'employee_id' => $pemohon['employee']->id,
+            'leave_request_id' => $cuti->id,
+            'leave_balance_id' => $balance->id,
+            'tahun' => 2026,
+            'event_type' => 'reserved',
+            'amount' => 3,
+            'dedup_key' => "leave_reservation:{$cuti->id}:reserved",
+        ]);
+
+        app(PostponeLeaveAction::class)->execute(
+            $cuti,
+            $pemohon['kepala_bagian'],
+            'Menunggu pengganti tugas.',
+            Request::create('/cuti/test', 'POST'),
+        );
+
+        $this->assertSame('ditangguhkan', $cuti->fresh()->status);
+        $this->assertSame('active', $activeStep->fresh()->status);
+        $this->assertSame($pemohon['kepala_bagian']->id, $activeStep->fresh()->approver_employee_id);
+        $this->assertSame(3, (int) DB::table('leave_balance_reservation_events')->where('leave_request_id', $cuti->id)->sum('amount'));
+        $this->assertDatabaseMissing('leave_balance_ledger', [
+            'leave_request_id' => $cuti->id,
+            'event_type' => LeaveBalanceLedger::EVENT_DUTY_POSTPONEMENT_RECORDED,
+        ]);
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $pemohon['employee']->id,
+            'type' => 'cuti.ditunda',
+        ]);
+
+        $this->service()->approve($cuti->fresh(), $pemohon['kepala_bagian']);
+        $this->assertDatabaseHas('leave_request_steps', [
+            'leave_request_id' => $cuti->id,
+            'step_order' => 2,
+            'status' => 'active',
+        ]);
+
+        app(LeaveBalanceService::class)->rolloverYear(2026);
+        $carry = LeaveBalanceLedger::query()
+            ->where('employee_id', $pemohon['employee']->id)
+            ->where('event_type', LeaveBalanceLedger::EVENT_CARRY_OVER_GRANTED)
+            ->sole();
+        $this->assertSame(0, $carry->metadata['duty_postponed_carried']);
+        $this->assertSame(1, SimpegNotification::query()->where('type', 'cuti.ditunda')->count());
     }
 
     public function test_approver_salah_step_ditolak(): void

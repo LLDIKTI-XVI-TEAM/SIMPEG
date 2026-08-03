@@ -9,6 +9,7 @@ use App\Actions\Cuti\ListLeaveRequestsAction;
 use App\Actions\Cuti\ListPendingLeaveApprovalsAction;
 use App\Actions\Cuti\PostponeLeaveAction;
 use App\Actions\Cuti\PrepareLeaveRequestFormAction;
+use App\Actions\Cuti\RecordDutyPostponementAction;
 use App\Actions\Cuti\RequestChangesLeaveAction;
 use App\Actions\Cuti\ResubmitLeaveRequestAction;
 use App\Actions\Cuti\ShowCutiRekapAction;
@@ -16,6 +17,7 @@ use App\Actions\Cuti\SubmitLeaveRequestAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Cuti\ApproveLeaveRequest;
 use App\Http\Requests\Cuti\PostponeLeaveRequest;
+use App\Http\Requests\Cuti\RecordDutyPostponementRequest;
 use App\Http\Requests\Cuti\ResubmitLeaveRequestRequest;
 use App\Http\Requests\Cuti\ReviewLeaveDecisionRequest;
 use App\Http\Requests\Cuti\StoreLeaveRequestRequest;
@@ -196,5 +198,21 @@ class CutiController extends Controller
 
         return redirect()->route('cuti.approval')
             ->with('success', 'Pengajuan cuti tidak disetujui dan pemohon telah diberi tahu.');
+    }
+
+    /** Mencatat terminal penangguhan tugas dinas melalui Action yang menegakkan snapshot approver. */
+    public function recordDutyPostponement(
+        RecordDutyPostponementRequest $request,
+        LeaveRequest $leave,
+        RecordDutyPostponementAction $action,
+    ) {
+        $user = $request->user();
+        $actor = $user?->employee;
+        abort_if($user === null || $actor === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat menangguhkan cuti.');
+
+        $action->execute($leave, $actor, $user, $request->validated()['alasan']);
+
+        return redirect()->route('cuti.approval')
+            ->with('success', 'Cuti Tahunan ditangguhkan karena tugas dinas dan hak terkait telah dilindungi untuk satu tahun berikutnya.');
     }
 }

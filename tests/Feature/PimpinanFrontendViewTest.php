@@ -57,7 +57,7 @@ class PimpinanFrontendViewTest extends TestCase
             ->assertSee('Pegawai Cuti Tampilan')
             ->assertSee('Perubahan')
             ->assertDontSee('Disetujui dengan Perubahan')
-            ->assertSee('Wajib diisi jika memilih Perubahan, Ditangguhkan, atau Tidak Disetujui...')
+            ->assertSee('Wajib diisi jika memilih Perubahan, Tunda Sementara, atau Tidak Disetujui...')
             ->assertDontSee('aria-describedby="decision-note-help keputusan-error"', false)
             ->assertDontSee('aria-describedby="decision-note-help catatan-error"', false)
             ->assertSee(route('pimpinan.cuti.decision', $leave), false);

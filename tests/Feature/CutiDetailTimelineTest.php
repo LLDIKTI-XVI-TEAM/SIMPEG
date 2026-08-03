@@ -77,8 +77,8 @@ class CutiDetailTimelineTest extends TestCase
         $response->assertSee('Dilewati: Verifikator', false);
         // Active step shows waiting on the dynamic role label.
         $response->assertSee('Menunggu Verifikator Kedua', false);
-        // Final pending step's role label appears.
-        $response->assertSee('PYBMC', false);
+        // Final pending step tetap menjelaskan pihak yang belum bertindak.
+        $response->assertSee('Menunggu PYBMC', false);
         // No fixed-stage numbering leaked into the timeline.
         $response->assertDontSee('Stage 1', false);
         $response->assertDontSee('Stage 2', false);
@@ -156,7 +156,7 @@ class CutiDetailTimelineTest extends TestCase
         $this->actingAs($approverUser)
             ->get(route('cuti.show', $leaveRequest->id))
             ->assertOk()
-            ->assertSee('flex-wrap justify-end gap-3', false);
+            ->assertSee('flex flex-wrap items-end justify-end gap-3', false);
     }
 
     public function test_detail_timeline_menampilkan_status_tidak_disetujui(): void
