@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasUuid;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use InvalidArgumentException;
+use LogicException;
 
 /**
  * Ledger append-only untuk mutasi saldo cuti tahunan dan koreksi yang diaudit.
@@ -19,6 +21,7 @@ use InvalidArgumentException;
  * @property string|null $dedup_key
  * @property array<string, mixed>|null $metadata
  * @property string|null $created_by
+ * @property CarbonInterface|null $occurred_at
  */
 class LeaveBalanceLedger extends Model
 {
@@ -85,6 +88,14 @@ class LeaveBalanceLedger extends Model
                     "event_type ledger cuti tidak diizinkan: {$ledger->event_type}"
                 );
             }
+        });
+
+        static::updating(function (): void {
+            throw new LogicException('Ledger saldo cuti bersifat append-only dan tidak dapat diubah.');
+        });
+
+        static::deleting(function (): void {
+            throw new LogicException('Ledger saldo cuti bersifat append-only dan tidak dapat dihapus.');
         });
     }
 

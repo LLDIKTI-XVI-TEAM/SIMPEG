@@ -115,6 +115,49 @@ class KepalaBagianFrontendTest extends TestCase
             ->assertSee('Bawahan Dengan Status Legacy');
     }
 
+    public function test_dinas_luar_filter_is_rejected_for_kepala_bagian(): void
+    {
+        [$user] = $this->kepalaBagian();
+
+        $this->actingAs($user)
+            ->getJson(route('kepala-bagian.bawahan.index', ['status' => 'dinas_luar']))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('status');
+    }
+
+    public function test_legacy_status_employee_is_presented_as_active_without_raw_status_payload(): void
+    {
+        [$user, $kepalaBagian] = $this->kepalaBagian();
+        $directReport = Employee::factory()->create([
+            'nama_lengkap' => 'Bawahan Dengan Status Legacy',
+            'kepala_bagian_id' => $kepalaBagian->id,
+            'status_aktif' => 'Pensiun',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.bawahan.index'))
+            ->assertOk()
+            ->assertViewHas('employees', function ($employees): bool {
+                $employee = $employees->firstWhere('nama_lengkap', 'Bawahan Dengan Status Legacy');
+
+                return $employee !== null
+                    && $employee->getAttribute('status_tampilan') === 'Aktif'
+                    && ! array_key_exists('status_aktif', $employee->getAttributes())
+                    && ! array_key_exists('status_pegawai_id', $employee->getAttributes())
+                    && ! $employee->relationLoaded('statusPegawai');
+            });
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.bawahan.show', $directReport))
+            ->assertOk()
+            ->assertViewHas('employee', function (Employee $employee): bool {
+                return $employee->getAttribute('status_tampilan') === 'Aktif'
+                    && ! array_key_exists('status_aktif', $employee->getAttributes())
+                    && ! array_key_exists('status_pegawai_id', $employee->getAttributes())
+                    && ! $employee->relationLoaded('statusPegawai');
+            });
+    }
+
     public function test_current_approved_leave_displays_cuti_in_list_and_detail(): void
     {
         [$user, $kepalaBagian] = $this->kepalaBagian();

@@ -21,6 +21,11 @@
         {{-- Validation Errors --}}
         @if ($errors->any())
             <x-ui.alert variant="danger" title="Terdapat kesalahan pengisian form">
+                <ul class="list-disc pl-5 mt-2 space-y-1 text-sm">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
             </x-ui.alert>
         @endif
 
@@ -93,6 +98,7 @@
                             
                         >
                             <p x-show="nipError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="nipError"></p>
+                            <p x-show="!nipError" class="text-[11px] text-muted mt-1 font-sans">Format: 18 digit angka.</p>
                         </x-form.input>
 
                         {{-- Jenis Pegawai --}}
@@ -141,6 +147,7 @@
                             id="pendidikan_terakhir"
                             
                         >
+                            <option value="">-- Kosong --</option>
                             <option value="Diploma III (D3)">Diploma III (D3)</option>
                             <option value="Sarjana (S1)">Sarjana (S1)</option>
                             <option value="Magister (S2)">Magister (S2)</option>
@@ -161,12 +168,6 @@
 
                         
 
-                        {{-- Tanggal Pensiun --}}
-                        <x-form.date
-                            name="tanggal_pensiun"
-                            label="Tanggal Pensiun"
-                            id="tanggal_pensiun"
-                        />
 
                         {{-- Penanda ini dipakai cuti untuk membedakan Kepala Lembaga dari jabatan biasa. --}}
                         <div class="space-y-1 rounded-lg border border-border bg-soft/40 p-4 sm:col-span-2">
@@ -198,6 +199,7 @@
                             
                         >
                             <p x-show="nikError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="nikError"></p>
+                            <p x-show="!nikError" class="text-[11px] text-muted mt-1 font-sans">Format: 16 digit angka.</p>
                         </x-form.input>
 
                         {{-- KK --}}
@@ -212,6 +214,7 @@
                             x-on:input="validateKk"
                         >
                             <p x-show="kkError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="kkError"></p>
+                            <p x-show="!kkError" class="text-[11px] text-muted mt-1 font-sans">Format: 16 digit angka.</p>
                         </x-form.input>
 
                         {{-- Tempat Lahir --}}
@@ -571,21 +574,7 @@
                                         <p x-show="skJabatanError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skJabatanError"></p>
                                     </div>
                                 </div>
-                                <div x-show="skJabatanMode === 'arsip'" class="mt-1 space-y-2">
-                                    <input type="hidden" name="existing_document_id_jabatan" :value="selectedArsipJabatanId">
-                                    <div class="relative">
-                                        <select x-model="selectedArsipJabatanId" @change="onSelectArsipJabatan()" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                            <option value="">-- Pilih dokumen dari arsip --</option>
-                                            <template x-for="doc in arsipJabatanList" :key="doc.id">
-                                                <option :value="doc.id" x-text="doc.label"></option>
-                                            </template>
-                                        </select>
-                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></div>
-                                    </div>
-                                    <template x-if="selectedArsipJabatanId">
-                                        <p class="text-xs text-success font-semibold font-sans">✓ Dokumen arsip dipilih. No. SK dan Tanggal SK telah terisi otomatis.</p>
-                                    </template>
-                                </div>
+
                             </div>
                         </div>
                     </div>
@@ -648,21 +637,7 @@
                                         <p x-show="skKgbError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skKgbError"></p>
                                     </div>
                                 </div>
-                                <div x-show="skKgbMode === 'arsip'" class="mt-1 space-y-2">
-                                    <input type="hidden" name="existing_document_id_kgb" :value="selectedArsipKgbId">
-                                    <div class="relative">
-                                        <select x-model="selectedArsipKgbId" @change="onSelectArsipKgb()" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                            <option value="">-- Pilih dokumen dari arsip --</option>
-                                            <template x-for="doc in arsipKgbList" :key="doc.id">
-                                                <option :value="doc.id" x-text="doc.label"></option>
-                                            </template>
-                                        </select>
-                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></div>
-                                    </div>
-                                    <template x-if="selectedArsipKgbId">
-                                        <p class="text-xs text-success font-semibold font-sans">✓ Dokumen arsip dipilih. No. SK dan Tanggal SK telah terisi otomatis.</p>
-                                    </template>
-                                </div>
+
                             </div>
                         </div>
                     </div>
@@ -728,21 +703,7 @@
                                         <p x-show="skPengangkatanError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skPengangkatanError"></p>
                                     </div>
                                 </div>
-                                <div x-show="skPengangkatanMode === 'arsip'" class="mt-1 space-y-2">
-                                    <input type="hidden" name="existing_document_id_pengangkatan" :value="selectedArsipPengangkatanId">
-                                    <div class="relative">
-                                        <select x-model="selectedArsipPengangkatanId" @change="onSelectArsipPengangkatan()" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                            <option value="">-- Pilih dokumen dari arsip --</option>
-                                            <template x-for="doc in arsipPengangkatanList" :key="doc.id">
-                                                <option :value="doc.id" x-text="doc.label"></option>
-                                            </template>
-                                        </select>
-                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></div>
-                                    </div>
-                                    <template x-if="selectedArsipPengangkatanId">
-                                        <p class="text-xs text-success font-semibold font-sans">✓ Dokumen arsip dipilih. No. SK dan Tanggal SK telah terisi otomatis.</p>
-                                    </template>
-                                </div>
+
                             </div>
                         </div>
                     </div>
@@ -762,8 +723,6 @@
                                         <option value="" disabled>Pilih Jenis Berkas</option>
                                         <option value="KTP">KTP</option>
                                         <option value="KK">Kartu Keluarga (KK)</option>
-                                        <option value="SK Mutasi">SK Mutasi</option>
-                                        <option value="SK Pensiun">SK Pensiun</option>
                                         <option value="Lainnya">Lainnya...</option>
                                     </select>
                                     <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
@@ -887,8 +846,7 @@
 
     @push('scripts')
     <script>
-        document.addEventListener('alpine:init', () => {
-            Alpine.data('createPegawai', () => ({
+        window.createPegawai = () => ({
                 isSubmitting: false,
                 activeTab: 'utama',
                 subTab: 'pangkat',
@@ -1118,8 +1076,7 @@
                     this.berkasLainnyaError = res.error;
                     if (res.error) e.target.value = '';
                 }
-            }));
-        });
+            });
         document.addEventListener('DOMContentLoaded', function() {
             const requiredElements = document.querySelectorAll('input[required], select[required], textarea[required]');
             requiredElements.forEach(el => {

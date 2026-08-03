@@ -13,7 +13,7 @@ return new class extends Migration
 
             // --- Data Pribadi (PRD §7.3) ---
             $table->string('nama_lengkap', 255);
-            $table->string('nip', 18)->unique();
+            $table->string('nip')->unique();
             $table->text('nik')->nullable()->comment('Encrypted NIK KTP');
             $table->text('no_kk')->nullable()->comment('Encrypted No. KK');
             $table->string('tempat_lahir', 100)->nullable();

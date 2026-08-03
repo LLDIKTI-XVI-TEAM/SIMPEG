@@ -56,7 +56,16 @@ class NotificationEventChannelMigrationTest extends TestCase
         $this->assertCount(1, $schedulerPolicies);
         $this->assertSame('in_app', $schedulerPolicies->sole()->code);
         $this->assertTrue((bool) $schedulerPolicies->sole()->is_enabled);
-        $this->assertDatabaseCount('notification_event_channels', 25);
+
+        $statusPegawaiPolicies = DB::table('notification_event_channels')
+            ->join('ref_notification_channels', 'ref_notification_channels.id', '=', 'notification_event_channels.notification_channel_id')
+            ->where('notification_event_channels.event_key', 'status_pegawai.diubah')
+            ->get(['notification_event_channels.is_enabled', 'ref_notification_channels.code']);
+
+        $this->assertCount(2, $statusPegawaiPolicies);
+        $this->assertTrue($statusPegawaiPolicies->every(fn (object $policy): bool => (bool) $policy->is_enabled));
+
+        $this->assertDatabaseCount('notification_event_channels', 27);
 
         $orphanCount = DB::table('notification_event_channels')
             ->leftJoin('ref_notification_channels', 'ref_notification_channels.id', '=', 'notification_event_channels.notification_channel_id')

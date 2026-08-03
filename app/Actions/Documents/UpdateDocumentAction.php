@@ -5,6 +5,7 @@ namespace App\Actions\Documents;
 use App\Models\Appointment;
 use App\Models\DisciplineRecord;
 use App\Models\Document;
+use App\Models\Employee;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\SalaryHistory;
@@ -104,6 +105,20 @@ class UpdateDocumentAction
         $this->matchingHistoryRecords(SalaryHistory::query(), $document, $oldFilePath, $oldNomorSk, $oldCategory, 'sk_kgb')->update($updates);
         $this->matchingHistoryRecords(DisciplineRecord::query(), $document, $oldFilePath, $oldNomorSk, $oldCategory, 'sk_hukuman_disiplin')->update($updates);
         $this->matchingHistoryRecords(Appointment::query(), $document, $oldFilePath, $oldNomorSk, $oldCategory, 'sk_pengangkatan')->update($updates);
+
+        Employee::query()
+            ->where('id', $document->employee_id)
+            ->where(function (Builder $query) use ($oldFilePath, $oldNomorSk, $oldCategory): void {
+                $query->where('status_berkas_path', $oldFilePath);
+
+                if ($oldCategory === 'sk_status_pegawai' && filled($oldNomorSk)) {
+                    $query->orWhere('status_nomor_berkas', $oldNomorSk);
+                }
+            })
+            ->update([
+                'status_nomor_berkas' => $document->nomor_dokumen,
+                'status_berkas_path' => $document->file_path,
+            ]);
     }
 
     /**
@@ -135,6 +150,7 @@ class UpdateDocumentAction
     private function fileIsStillReferenced(string $filePath): bool
     {
         return Document::query()->where('file_path', $filePath)->exists()
+            || Employee::query()->where('status_berkas_path', $filePath)->exists()
             || RankHistory::query()->where('file_sk', $filePath)->exists()
             || PositionHistory::query()->where('file_sk', $filePath)->exists()
             || SalaryHistory::query()->where('file_sk', $filePath)->exists()
