@@ -45,8 +45,6 @@ class EmployeeExportDataService
                 'status_aktif',
                 'tanggal_lahir',
                 'tanggal_pensiun',
-                'email_pribadi',
-                'no_hp',
             ])
             ->with([
                 'jenisPegawai:id,nama',

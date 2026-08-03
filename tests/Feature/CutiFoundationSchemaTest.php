@@ -13,6 +13,7 @@ use App\Models\LeaveRequest;
 use App\Models\LeaveRequestCase;
 use App\Models\LeaveRequestStep;
 use App\Models\RefJenisCuti;
+use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -390,6 +391,50 @@ class CutiFoundationSchemaTest extends TestCase
         ]);
     }
 
+    public function test_semua_event_ledger_tidak_dapat_diubah_atau_dihapus(): void
+    {
+        $employee = Employee::factory()->create();
+        $actorId = User::factory()->create()->id;
+
+        foreach (LeaveBalanceLedger::eventTypes() as $index => $eventType) {
+            $ledger = LeaveBalanceLedger::create([
+                'employee_id' => $employee->id,
+                'tahun' => 2026,
+                'event_type' => $eventType,
+                'amount' => $index,
+                'source_year' => 2026,
+                'reason' => "Event immutable {$eventType}.",
+                'dedup_key' => "immutable:{$eventType}:{$index}",
+                'metadata' => ['sequence' => $index],
+                'created_by' => $actorId,
+                'occurred_at' => now()->subHour(),
+            ]);
+            $persisted = $this->openingLedgerPayload($ledger);
+
+            try {
+                $ledger->forceFill([
+                    'event_type' => LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET,
+                    'amount' => 99,
+                    'reason' => 'Percobaan ubah ledger.',
+                ])->save();
+                $this->fail("Update {$eventType} harus ditolak.");
+            } catch (LogicException $exception) {
+                $this->assertSame('Ledger saldo cuti bersifat append-only dan tidak dapat diubah.', $exception->getMessage());
+            }
+
+            $this->assertSame($persisted, $this->openingLedgerPayload($ledger->fresh()));
+
+            try {
+                $ledger->fresh()->delete();
+                $this->fail("Delete {$eventType} harus ditolak.");
+            } catch (LogicException $exception) {
+                $this->assertSame('Ledger saldo cuti bersifat append-only dan tidak dapat dihapus.', $exception->getMessage());
+            }
+
+            $this->assertSame($persisted, $this->openingLedgerPayload(LeaveBalanceLedger::findOrFail($ledger->id)));
+        }
+    }
+
     public function test_reservation_event_menolak_mutasi_dan_event_type_tidak_dikenal(): void
     {
         $employee = Employee::factory()->create();
@@ -497,5 +542,20 @@ class CutiFoundationSchemaTest extends TestCase
             ]),
             QueryException::class,
         );
+    }
+
+    /** @return array<string, mixed> */
+    private function openingLedgerPayload(LeaveBalanceLedger $ledger): array
+    {
+        return [
+            'event_type' => $ledger->event_type,
+            'amount' => $ledger->amount,
+            'reason' => $ledger->reason,
+            'metadata' => $ledger->metadata,
+            'created_by' => $ledger->created_by,
+            'occurred_at' => $ledger->occurred_at?->toIso8601String(),
+            'created_at' => $ledger->created_at?->toIso8601String(),
+            'updated_at' => $ledger->updated_at?->toIso8601String(),
+        ];
     }
 }

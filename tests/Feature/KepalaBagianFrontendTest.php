@@ -85,6 +85,109 @@ class KepalaBagianFrontendTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_status_bawahan_hanya_menampilkan_aktif_atau_cuti(): void
+    {
+        [$user, $kepalaBagian] = $this->kepalaBagian();
+        $directReport = Employee::factory()->create([
+            'nama_lengkap' => 'Bawahan Dengan Status Legacy',
+            'kepala_bagian_id' => $kepalaBagian->id,
+            'status_aktif' => 'Pensiun',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.bawahan.index'))
+            ->assertOk()
+            ->assertSee('Bawahan Dengan Status Legacy')
+            ->assertSee('Aktif')
+            ->assertDontSee('Pensiun')
+            ->assertDontSee('Dinas Luar');
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.bawahan.show', $directReport))
+            ->assertOk()
+            ->assertSee('Aktif')
+            ->assertDontSee('Pensiun')
+            ->assertDontSee('Dinas Luar');
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.bawahan.index', ['status' => 'aktif']))
+            ->assertOk()
+            ->assertSee('Bawahan Dengan Status Legacy');
+    }
+
+    public function test_dinas_luar_filter_is_rejected_for_kepala_bagian(): void
+    {
+        [$user] = $this->kepalaBagian();
+
+        $this->actingAs($user)
+            ->getJson(route('kepala-bagian.bawahan.index', ['status' => 'dinas_luar']))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('status');
+    }
+
+    public function test_legacy_status_employee_is_presented_as_active_without_raw_status_payload(): void
+    {
+        [$user, $kepalaBagian] = $this->kepalaBagian();
+        $directReport = Employee::factory()->create([
+            'nama_lengkap' => 'Bawahan Dengan Status Legacy',
+            'kepala_bagian_id' => $kepalaBagian->id,
+            'status_aktif' => 'Pensiun',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.bawahan.index'))
+            ->assertOk()
+            ->assertViewHas('employees', function ($employees): bool {
+                $employee = $employees->firstWhere('nama_lengkap', 'Bawahan Dengan Status Legacy');
+
+                return $employee !== null
+                    && $employee->getAttribute('status_tampilan') === 'Aktif'
+                    && ! array_key_exists('status_aktif', $employee->getAttributes())
+                    && ! array_key_exists('status_pegawai_id', $employee->getAttributes())
+                    && ! $employee->relationLoaded('statusPegawai');
+            });
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.bawahan.show', $directReport))
+            ->assertOk()
+            ->assertViewHas('employee', function (Employee $employee): bool {
+                return $employee->getAttribute('status_tampilan') === 'Aktif'
+                    && ! array_key_exists('status_aktif', $employee->getAttributes())
+                    && ! array_key_exists('status_pegawai_id', $employee->getAttributes())
+                    && ! $employee->relationLoaded('statusPegawai');
+            });
+    }
+
+    public function test_current_approved_leave_displays_cuti_in_list_and_detail(): void
+    {
+        [$user, $kepalaBagian] = $this->kepalaBagian();
+        $directReport = Employee::factory()->create([
+            'nama_lengkap' => 'Bawahan Sedang Cuti',
+            'kepala_bagian_id' => $kepalaBagian->id,
+        ]);
+        $leave = $this->leaveWithActiveStep($directReport, $kepalaBagian);
+        $leave->forceFill([
+            'tanggal_mulai' => now()->subDay()->toDateString(),
+            'tanggal_selesai' => now()->addDay()->toDateString(),
+            'status' => 'disetujui',
+        ])->save();
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.bawahan.index'))
+            ->assertOk()
+            ->assertSeeInOrder(['Bawahan Sedang Cuti', 'Cuti']);
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.bawahan.show', $directReport))
+            ->assertOk()
+            ->assertSeeInOrder(['Bawahan Sedang Cuti', 'Cuti']);
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.bawahan.index', ['status' => 'aktif']))
+            ->assertOk()
+            ->assertDontSee('Bawahan Sedang Cuti');
+    }
+
     public function test_leave_queue_and_detail_use_real_scoped_data_and_contract(): void
     {
         [$user, $kepalaBagian] = $this->kepalaBagian();

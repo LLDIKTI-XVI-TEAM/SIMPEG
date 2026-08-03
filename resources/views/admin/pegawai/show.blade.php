@@ -23,7 +23,12 @@
                 $diff = $now->diff($pensiunDate);
                 $sisaPensiunStr = $diff->y . ' Tahun, ' . $diff->m . ' Bulan lagi';
             } else {
-                $sisaPensiunStr = 'Memasuki Usia Pensiun';
+                if ($pensiunDate->isFuture()) {
+                    $diff = $now->diff($pensiunDate);
+                    $sisaPensiunStr = $diff->y . ' Tahun, ' . $diff->m . ' Bulan lagi';
+                } else {
+                    $sisaPensiunStr = 'Memasuki Usia Pensiun';
+                }
             }
         }
 
