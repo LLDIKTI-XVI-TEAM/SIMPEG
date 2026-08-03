@@ -141,38 +141,6 @@ class DeleteDocumentAction
             });
     }
 
-<<<<<<< fix/tanggal-pensiun
-=======
-    private function isCurrentStatusSupportingDocument(Document $document): bool
-    {
-        // Dokumen dari fitur Status Pegawai (sk_status_pegawai) langsung dirujuk lewat
-        // status_berkas_path pada Employee, jadi diblokir selama masih menjadi berkas status terkini.
-        if ($document->jenis_dokumen === 'sk_status_pegawai') {
-            return $document->employee?->status_berkas_path === $document->file_path;
-        }
-
-        $expectedStatus = match ($document->jenis_dokumen) {
-            'sk_mutasi' => 'Mutasi',
-            'sk_pensiun' => 'Pensiun',
-            // Dukungan arsip legacy yang sebelumnya disimpan sebagai kategori "lainnya".
-            'lainnya' => match (mb_strtolower(trim($document->nama_dokumen))) {
-                'sk mutasi' => 'Mutasi',
-                'sk pensiun' => 'Pensiun',
-                default => null,
-            },
-            default => null,
-        };
-
-        if ($expectedStatus === null) {
-            return false;
-        }
-
-        $currentStatus = $document->employee?->statusPegawai?->nama ?? $document->employee?->status_aktif;
-
-        return $currentStatus === $expectedStatus;
-    }
-
->>>>>>> development
     private function fileIsStillReferenced(string $filePath): bool
     {
         return Document::query()->where('file_path', $filePath)->exists()
