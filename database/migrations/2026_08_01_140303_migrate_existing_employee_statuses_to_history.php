@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 return new class extends Migration
 {
@@ -29,7 +30,7 @@ return new class extends Migration
 
         foreach ($employees as $employee) {
             DB::table('employee_status_histories')->insert([
-                'id' => DB::raw('gen_random_uuid()'),
+                'id' => Str::uuid()->toString(),
                 'employee_id' => $employee->employee_id,
                 'status_pegawai_id' => $employee->status_pegawai_id,
                 'status_nama' => $employee->status_nama ?? 'Aktif',
