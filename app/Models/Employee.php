@@ -40,6 +40,8 @@ use Illuminate\Support\Carbon;
  * @property string|null $satyalancana_note
  * @property bool $is_kepala_lembaga
  * @property string|null $foto_url
+ * @property string|null $nik
+ * @property string|null $no_kk
  * @property string|null $nik_hash
  * @property string|null $foto_public_path
  * @property-read RefJenisPegawai|null $jenisPegawai
@@ -426,25 +428,22 @@ class Employee extends Model
     }
 
     /**
-     * Setiap kali NIK di-assign, hitung dan simpan HMAC-SHA256 blind index di nik_hash
+     * Setiap kali model disimpan dan NIK berubah, hitung dan simpan HMAC-SHA256 blind index di nik_hash
      * agar query uniqueness dapat bekerja meskipun kolom nik dienkripsi AES-256.
-     *
-     * Hanya sisi set yang di-override. Sisi get ditangani oleh 'encrypted' cast
-     * dan TIDAK boleh di-override di sini (akan mengembalikan ciphertext mentah).
      */
-    protected function nik(): Attribute
+    protected static function booted(): void
     {
-        return Attribute::make(
-            set: function (mixed $value): array {
-                $trimmed = ($value !== null) ? trim((string) $value) : null;
+        static::saving(function (Employee $employee) {
+            if ($employee->isDirty('nik')) {
+                $plainNik = $employee->nik;
+                $trimmed = ($plainNik !== null) ? trim((string) $plainNik) : null;
 
-                return [
-                    'nik' => $trimmed,   // 'encrypted' cast akan mengenkripsi ini
-                    'nik_hash' => ($trimmed !== null && $trimmed !== '')
-                        ? hash_hmac('sha256', $trimmed, config('app.key'))
-                        : null,
-                ];
-            },
-        );
+                if ($trimmed !== null && $trimmed !== '') {
+                    $employee->nik_hash = hash_hmac('sha256', $trimmed, config('app.key'));
+                } else {
+                    $employee->nik_hash = null;
+                }
+            }
+        });
     }
 }
