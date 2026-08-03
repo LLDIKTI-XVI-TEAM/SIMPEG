@@ -40,6 +40,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $satyalancana_note
  * @property bool $is_kepala_lembaga
  * @property string|null $foto_url
+ * @property string|null $nik_hash
  * @property string|null $foto_public_path
  * @property-read RefJenisPegawai|null $jenisPegawai
  * @property-read User|null $user
@@ -58,6 +59,7 @@ class Employee extends Model
         'nama_dengan_gelar',
         'nip',
         'nik',
+        'nik_hash',
         'no_kk',
         'tempat_lahir',
         'tanggal_lahir',
@@ -420,6 +422,29 @@ class Employee extends Model
                 'kelas_jabatan_terakhir' => $value,
                 'kelas_jabatan' => $value,
             ],
+        );
+    }
+
+    /**
+     * Setiap kali NIK di-assign, hitung dan simpan HMAC-SHA256 blind index di nik_hash
+     * agar query uniqueness dapat bekerja meskipun kolom nik dienkripsi AES-256.
+     *
+     * Hanya sisi set yang di-override. Sisi get ditangani oleh 'encrypted' cast
+     * dan TIDAK boleh di-override di sini (akan mengembalikan ciphertext mentah).
+     */
+    protected function nik(): Attribute
+    {
+        return Attribute::make(
+            set: function (mixed $value): array {
+                $trimmed = ($value !== null) ? trim((string) $value) : null;
+
+                return [
+                    'nik'      => $trimmed,   // 'encrypted' cast akan mengenkripsi ini
+                    'nik_hash' => ($trimmed !== null && $trimmed !== '')
+                        ? hash_hmac('sha256', $trimmed, config('app.key'))
+                        : null,
+                ];
+            },
         );
     }
 }

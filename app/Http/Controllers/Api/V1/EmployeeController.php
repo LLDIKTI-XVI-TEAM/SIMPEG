@@ -49,12 +49,21 @@ class EmployeeController extends Controller
     public function checkIdentity(Request $request): JsonResponse
     {
         $request->validate([
-            'type' => ['required', 'string', 'in:nip,nik'],
-            'value' => ['required', 'string'],
+            'type'      => ['required', 'string', 'in:nip,nik'],
+            'value'     => ['required', 'string'],
             'except_id' => ['nullable', 'uuid'],
         ]);
 
-        $query = Employee::where($request->type, $request->value);
+        // NIK dienkripsi AES-256 — WHERE nik = plaintext tidak pernah cocok.
+        // Gunakan HMAC-SHA256 blind index (nik_hash) sebagai gantinya.
+        if ($request->type === 'nik') {
+            $hash  = hash_hmac('sha256', trim($request->value), config('app.key'));
+            $query = Employee::where('nik_hash', $hash);
+        } else {
+            // NIP disimpan plaintext — perbandingan langsung berfungsi.
+            $query = Employee::where($request->type, $request->value);
+        }
+
         if ($request->filled('except_id')) {
             $query->where('id', '!=', $request->except_id);
         }
