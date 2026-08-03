@@ -439,7 +439,7 @@ class Employee extends Model
                 $trimmed = ($value !== null) ? trim((string) $value) : null;
 
                 return [
-                    'nik'      => $trimmed,   // 'encrypted' cast akan mengenkripsi ini
+                    'nik' => $trimmed,   // 'encrypted' cast akan mengenkripsi ini
                     'nik_hash' => ($trimmed !== null && $trimmed !== '')
                         ? hash_hmac('sha256', $trimmed, config('app.key'))
                         : null,

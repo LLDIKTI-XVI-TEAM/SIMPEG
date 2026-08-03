@@ -22,8 +22,8 @@ class EmployeeValidationRules
                 'string',
                 'size:16',
                 function (string $attribute, mixed $value, \Closure $fail): void {
-                    $hash   = hash_hmac('sha256', trim((string) $value), config('app.key'));
-                    $exists = \App\Models\Employee::where('nik_hash', $hash)->exists();
+                    $hash = hash_hmac('sha256', trim((string) $value), config('app.key'));
+                    $exists = Employee::where('nik_hash', $hash)->exists();
                     if ($exists) {
                         $fail('NIK sudah terdaftar pada pegawai lain.');
                     }
@@ -103,8 +103,8 @@ class EmployeeValidationRules
             'string',
             'size:16',
             function (string $attribute, mixed $value, \Closure $fail) use ($employee): void {
-                $hash   = hash_hmac('sha256', trim((string) $value), config('app.key'));
-                $exists = \App\Models\Employee::where('nik_hash', $hash)
+                $hash = hash_hmac('sha256', trim((string) $value), config('app.key'));
+                $exists = Employee::where('nik_hash', $hash)
                     ->where('id', '!=', $employee->id) // izinkan NIK milik sendiri saat update
                     ->exists();
                 if ($exists) {

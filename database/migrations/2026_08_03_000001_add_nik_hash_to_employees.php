@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Employee;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -21,11 +22,11 @@ return new class extends Migration
         // 'encrypted' cast mendekripsi saat read — harus iterasi di PHP, tidak bisa pakai SQL langsung.
         $appKey = config('app.key');
 
-        \App\Models\Employee::withTrashed()
+        Employee::withTrashed()
             ->whereNotNull('nik')
             ->chunkById(200, function ($employees) use ($appKey): void {
                 foreach ($employees as $employee) {
-                    /** @var \App\Models\Employee $employee */
+                    /** @var Employee $employee */
                     $plainNik = $employee->nik; // didekripsi oleh 'encrypted' cast
 
                     if ($plainNik === null || trim((string) $plainNik) === '') {

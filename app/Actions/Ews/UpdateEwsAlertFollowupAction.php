@@ -171,7 +171,13 @@ class UpdateEwsAlertFollowupAction
             'is_latest' => true,
         ]);
 
-        $employee->update(['status_pegawai_id' => $pensionStatus->id]);
+        $employee->update([
+            'status_pegawai_id' => $pensionStatus->id,
+            'status_keterangan' => 'Status diubah menjadi Pensiun melalui persetujuan EWS.',
+            'status_tanggal' => (string) $request->input('tanggal_sk'),
+            'status_berkas_path' => $filePath,
+            'status_nomor_berkas' => (string) $request->input('no_sk'),
+        ]);
 
         AuditService::log('UPDATE', 'Employee', $employee->id, $oldValues, $employee->fresh()->getAttributes(), $request);
     }
