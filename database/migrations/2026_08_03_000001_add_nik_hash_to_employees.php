@@ -75,8 +75,8 @@ return new class extends Migration
                     '[Migration] Duplikat NIK ditemukan: nik_hash dinullifikasi untuk rekonsiliasi. Lakukan verifikasi manual pada record ini.',
                     [
                         'employee_id' => $loser->id,
-                        'nik_hash'    => $hash,
-                        'deleted_at'  => $loser->deleted_at,
+                        'nik_hash' => $hash,
+                        'deleted_at' => $loser->deleted_at,
                     ]
                 );
             }
