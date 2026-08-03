@@ -58,10 +58,13 @@ class EmployeeController extends Controller
         // Gunakan HMAC-SHA256 blind index (nik_hash) sebagai gantinya.
         if ($request->type === 'nik') {
             $hash = hash_hmac('sha256', trim($request->value), config('app.key'));
-            $query = Employee::where('nik_hash', $hash);
+            // withTrashed() agar selaras dengan unique index employees_nik_hash_unique
+            // yang mencakup soft-deleted rows — NIK pegawai yang dihapus tetap tidak boleh dipakai ulang.
+            $query = Employee::withTrashed()->where('nik_hash', $hash);
         } else {
             // NIP disimpan plaintext — perbandingan langsung berfungsi.
-            $query = Employee::where($request->type, $request->value);
+            // withTrashed() konsisten: NIP pegawai terhapus juga dianggap sudah terpakai.
+            $query = Employee::withTrashed()->where($request->type, $request->value);
         }
 
         if ($request->filled('except_id')) {
