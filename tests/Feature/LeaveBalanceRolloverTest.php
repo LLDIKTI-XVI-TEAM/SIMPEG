@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Cuti\ListPendingLeaveApprovalsAction;
 use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
@@ -9,6 +10,7 @@ use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
+use App\Models\SimpegNotification;
 use App\Models\User;
 use App\Services\Cuti\LeaveBalanceService;
 use Database\Seeders\ReferenceSeeder;
@@ -93,6 +95,162 @@ class LeaveBalanceRolloverTest extends TestCase
         $this->assertSame(10, $audit->old_values['old_balance']);
         $this->assertSame(18, $audit->new_values['new_balance']);
         $this->assertSame(8, $audit->new_values['delta']);
+    }
+
+    #[DataProvider('activeAnnualLeaveStatusProvider')]
+    public function test_rollover_returns_active_annual_requests_and_releases_reservation_once(string $status): void
+    {
+        $employee = $this->employeeWithAppointment();
+        $actor = User::factory()->create(['employee_id' => $employee->id]);
+        $approver = Employee::factory()->create();
+        $sourceBalance = LeaveBalance::create($this->balancePayload($employee, 2026));
+        $request = $this->activeAnnualLeaveRequest($employee, 2026, 3, '2026-12-21');
+        $request->forceFill(['status' => $status])->save();
+        $request->steps()->create([
+            'step_order' => 1,
+            'step_type' => 'kepala_bagian',
+            'role_label' => 'Kepala Bagian',
+            'approver_employee_id' => $approver->id,
+            'status' => 'active',
+            'is_final' => true,
+        ]);
+        $stepId = $request->steps()->value('id');
+        $this->reserveRequest($request, $sourceBalance, 3, $actor);
+
+        $service = app(LeaveBalanceService::class);
+        $service->rolloverYear(2026);
+
+        $request->refresh();
+        $this->assertSame('dikembalikan_karena_rollover', $request->status);
+        $this->assertSame(2026, $request->rollover_source_year);
+        $this->assertSame(2027, $request->rollover_target_year);
+        $this->assertSame(0, (int) LeaveBalanceReservationEvent::query()
+            ->where('leave_request_id', $request->id)
+            ->sum('amount'));
+        $this->assertDatabaseHas('leave_balance_reservation_events', [
+            'leave_request_id' => $request->id,
+            'event_type' => LeaveBalanceReservationEvent::EVENT_RELEASED,
+            'amount' => -3,
+            'dedup_key' => "leave_reservation:{$request->id}:released:rollover:2026",
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'event' => 'UPDATE',
+            'auditable_type' => 'LeaveRequest',
+            'auditable_id' => $request->id,
+        ]);
+        $this->assertSame($stepId, $request->steps()->value('id'));
+        $this->assertSame('active', $request->steps()->value('status'));
+        $this->assertSame(0, app(ListPendingLeaveApprovalsAction::class)->execute($approver->id)->total());
+
+        $notification = SimpegNotification::query()
+            ->where('user_id', $employee->id)
+            ->where('type', 'cuti.dikembalikan_karena_rollover')
+            ->sole();
+        $this->assertSame($request->id, $notification->data['leave_request_id']);
+        $this->assertSame('Pengajuan dikembalikan karena rollover saldo cuti tahunan.', $notification->data['reason']);
+        $this->assertSame(2026, $notification->data['source_year']);
+        $this->assertSame(2027, $notification->data['target_year']);
+        $this->assertSame(route('cuti.show', ['id' => $request->id], false), $notification->data['url']);
+
+        $service->rolloverYear(2026);
+
+        $this->assertSame(1, LeaveBalanceReservationEvent::query()
+            ->where('leave_request_id', $request->id)
+            ->where('dedup_key', "leave_reservation:{$request->id}:released:rollover:2026")
+            ->count());
+        $this->assertSame(1, AuditLog::query()
+            ->where('auditable_type', 'LeaveRequest')
+            ->where('auditable_id', $request->id)
+            ->where('event', 'UPDATE')
+            ->count());
+        $this->assertSame(1, SimpegNotification::query()
+            ->where('user_id', $employee->id)
+            ->where('type', 'cuti.dikembalikan_karena_rollover')
+            ->count());
+    }
+
+    public function test_rollover_leaves_non_annual_and_terminal_requests_untouched(): void
+    {
+        $employee = $this->employeeWithAppointment();
+        LeaveBalance::create($this->balancePayload($employee, 2026));
+        $annual = RefJenisCuti::where('code', 'tahunan')->firstOrFail();
+        $nonAnnual = RefJenisCuti::where('code', 'sakit')->firstOrFail();
+        $terminal = LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $annual->id,
+            'tanggal_mulai' => '2026-12-22',
+            'tanggal_selesai' => '2026-12-22',
+            'jumlah_hari_kerja' => 1,
+            'alasan' => 'Pengajuan final tidak boleh berubah.',
+            'status' => 'disetujui',
+        ]);
+        $nonAnnualRequest = LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $nonAnnual->id,
+            'tanggal_mulai' => '2026-12-23',
+            'tanggal_selesai' => '2026-12-23',
+            'jumlah_hari_kerja' => 1,
+            'alasan' => 'Cuti non-tahunan tidak boleh berubah.',
+            'status' => 'menunggu_approval',
+        ]);
+        $saldoReducingNonAnnual = RefJenisCuti::create([
+            'nama' => 'Cuti Pengurang Saldo Selain Tahunan',
+            'code' => 'pengurang_saldo_lain',
+            'mengurangi_saldo_tahunan' => true,
+            'khusus_pns' => false,
+        ]);
+        $saldoReducingNonAnnualRequest = LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $saldoReducingNonAnnual->id,
+            'tanggal_mulai' => '2026-12-24',
+            'tanggal_selesai' => '2026-12-24',
+            'jumlah_hari_kerja' => 1,
+            'alasan' => 'Jenis selain Tahunan tidak masuk workflow rollover.',
+            'status' => 'menunggu_approval',
+        ]);
+
+        app(LeaveBalanceService::class)->rolloverYear(2026);
+
+        $this->assertSame('disetujui', $terminal->fresh()->status);
+        $this->assertNull($terminal->fresh()->rollover_source_year);
+        $this->assertSame('menunggu_approval', $nonAnnualRequest->fresh()->status);
+        $this->assertNull($nonAnnualRequest->fresh()->rollover_source_year);
+        $this->assertSame('menunggu_approval', $saldoReducingNonAnnualRequest->fresh()->status);
+        $this->assertNull($saldoReducingNonAnnualRequest->fresh()->rollover_source_year);
+    }
+
+    public function test_rollover_notifies_affected_employee_once_when_multiple_active_requests_are_returned(): void
+    {
+        $employee = $this->employeeWithAppointment();
+        $actor = User::factory()->create(['employee_id' => $employee->id]);
+        $sourceBalance = LeaveBalance::create($this->balancePayload($employee, 2026));
+        $firstRequest = $this->activeAnnualLeaveRequest($employee, 2026, 2, '2026-12-21');
+        $secondRequest = $this->activeAnnualLeaveRequest($employee, 2026, 3, '2026-12-22');
+        $this->reserveRequest($firstRequest, $sourceBalance, 2, $actor);
+        $this->reserveRequest($secondRequest, $sourceBalance, 3, $actor);
+
+        app(LeaveBalanceService::class)->rolloverYear(2026);
+
+        $notification = SimpegNotification::query()
+            ->where('user_id', $employee->id)
+            ->where('type', 'cuti.dikembalikan_karena_rollover')
+            ->sole();
+        $this->assertContains($notification->data['leave_request_id'], [$firstRequest->id, $secondRequest->id]);
+        $this->assertEqualsCanonicalizing([$firstRequest->id, $secondRequest->id], $notification->data['leave_request_ids']);
+        $this->assertSame(
+            route('cuti.show', ['id' => $notification->data['leave_request_id']], false),
+            $notification->data['url'],
+        );
+    }
+
+    /** @return array<string, array{string}> */
+    public static function activeAnnualLeaveStatusProvider(): array
+    {
+        return [
+            'menunggu approval' => ['menunggu_approval'],
+            'ditangguhkan' => ['ditangguhkan'],
+            'perlu perubahan' => ['perlu_perubahan'],
+        ];
     }
 
     public function test_rollover_dua_tahun_tanpa_cuti_tahunan_mengizinkan_total_dua_puluh_empat_hari(): void
@@ -474,19 +632,21 @@ class LeaveBalanceRolloverTest extends TestCase
         ]);
     }
 
-    public function test_rollover_mengecek_marker_setelah_employee_lock_dan_retry_tidak_menulis_ulang(): void
+    public function test_rollover_mengunci_request_lalu_pegawai_sebelum_saldo_dan_retry_tidak_menulis_ulang(): void
     {
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Urutan row lock rollover diverifikasi dengan SQL PostgreSQL.');
+        }
+
         $employee = $this->employeeWithAppointment();
+        $actor = User::factory()->create(['employee_id' => $employee->id]);
         $service = app(LeaveBalanceService::class);
-        LeaveBalance::create($this->balancePayload($employee, 2026, [
+        $sourceBalance = LeaveBalance::create($this->balancePayload($employee, 2026, [
             'sisa_tahun_berjalan' => 5,
             'sisa' => 5,
         ]));
-        $service->rolloverYear(2026);
-        $target = LeaveBalance::where('employee_id', $employee->id)->where('tahun', 2027)->firstOrFail();
-        $summaryBefore = $this->summaryPayload($target);
-        $ledgerCount = LeaveBalanceLedger::count();
-        $auditCount = AuditLog::count();
+        $request = $this->activeAnnualLeaveRequest($employee, 2026, 1, '2026-12-22');
+        $this->reserveRequest($request, $sourceBalance, 1, $actor);
         $queries = [];
 
         DB::listen(function ($query) use (&$queries): void {
@@ -495,15 +655,26 @@ class LeaveBalanceRolloverTest extends TestCase
 
         $service->rolloverYear(2026);
 
+        $requestLockIndex = collect($queries)->search(
+            fn (string $sql): bool => str_contains($sql, 'from "leave_requests"') && str_contains($sql, 'for update'),
+        );
         $employeeLockIndex = collect($queries)->search(
-            fn (string $sql): bool => str_contains($sql, 'from "employees"') && str_contains($sql, 'where "employees"."id"'),
+            fn (string $sql): bool => str_contains($sql, 'from "employees"') && str_contains($sql, 'for update'),
         );
-        $rolloverCheckIndex = collect($queries)->search(
-            fn (string $sql): bool => str_contains($sql, 'from "leave_balance_ledger"') && str_contains($sql, '"dedup_key"'),
+        $balanceLockIndex = collect($queries)->search(
+            fn (string $sql): bool => str_contains($sql, 'from "leave_balances"') && str_contains($sql, 'for update'),
         );
+        $this->assertIsInt($requestLockIndex);
         $this->assertIsInt($employeeLockIndex);
-        $this->assertIsInt($rolloverCheckIndex);
-        $this->assertLessThan($rolloverCheckIndex, $employeeLockIndex);
+        $this->assertIsInt($balanceLockIndex);
+        $this->assertLessThan($employeeLockIndex, $requestLockIndex);
+        $this->assertLessThan($balanceLockIndex, $employeeLockIndex);
+
+        $target = LeaveBalance::where('employee_id', $employee->id)->where('tahun', 2027)->firstOrFail();
+        $summaryBefore = $this->summaryPayload($target);
+        $ledgerCount = LeaveBalanceLedger::count();
+        $auditCount = AuditLog::count();
+        $service->rolloverYear(2026);
         $this->assertSame($summaryBefore, $this->summaryPayload($target->fresh()));
         $this->assertSame($ledgerCount, LeaveBalanceLedger::count());
         $this->assertSame($auditCount, AuditLog::count());

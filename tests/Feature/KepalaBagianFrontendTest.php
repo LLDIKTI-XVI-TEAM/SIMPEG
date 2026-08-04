@@ -278,6 +278,39 @@ class KepalaBagianFrontendTest extends TestCase
             ->assertSee('value="'.LeaveRequest::STATUS_DUTY_POSTPONED.'"', false);
     }
 
+    public function test_leave_surfaces_label_returned_rollover_without_offering_a_decision(): void
+    {
+        [$user, $kepalaBagian] = $this->kepalaBagian();
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Pemohon Rollover Kepala Bagian',
+            'kepala_bagian_id' => $kepalaBagian->id,
+        ]);
+        $leave = $this->leaveWithActiveStep($employee, $kepalaBagian);
+        $leave->forceFill([
+            'status' => LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER,
+            'rollover_source_year' => 2026,
+            'rollover_target_year' => 2027,
+        ])->save();
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.cuti.index', ['status' => LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER]))
+            ->assertOk()
+            ->assertSee('Pemohon Rollover Kepala Bagian')
+            ->assertSee('Dikembalikan karena Rollover')
+            ->assertSee('value="'.LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER.'"', false);
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.cuti.show', $leave))
+            ->assertOk()
+            ->assertSee('Dikembalikan karena Rollover')
+            ->assertDontSee(route('kepala-bagian.cuti.decision', $leave), false);
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.bawahan.show', $employee))
+            ->assertOk()
+            ->assertSee('Dikembalikan karena Rollover');
+    }
+
     public function test_detail_pending_step_explains_waiting_role(): void
     {
         $fixture = $this->dutyPostponementFixture();

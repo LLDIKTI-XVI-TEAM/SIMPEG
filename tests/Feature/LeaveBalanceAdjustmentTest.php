@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceLedger;
+use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
 use App\Models\User;
@@ -457,6 +458,85 @@ class LeaveBalanceAdjustmentTest extends TestCase
         $this->assertSame($summaryBefore, $balance->fresh()->only(array_keys($summaryBefore)));
         $this->assertSame($ledgerCount, LeaveBalanceLedger::count());
         $this->assertSame($auditCount, AuditLog::count());
+    }
+
+    public function test_manual_debit_cannot_remove_capacity_reserved_by_another_active_request(): void
+    {
+        $employee = Employee::factory()->create();
+        $actor = User::factory()->adminKepegawaian()->create();
+        $balance = LeaveBalance::create($this->balancePayload($employee, 2027, [
+            'sisa_n2' => 3,
+            'sisa_n1' => 2,
+            'sisa_tahun_berjalan' => 5,
+            'sisa' => 10,
+        ]));
+        $this->createLedgerEvent($employee, $balance, 2027, LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET, 'Baseline debit dengan reservasi aktif.');
+
+        $annualType = RefJenisCuti::create([
+            'nama' => 'Cuti Tahunan',
+            'code' => 'tahunan',
+            'mengurangi_saldo_tahunan' => true,
+            'khusus_pns' => false,
+        ]);
+        $activeRequest = LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $annualType->id,
+            'tanggal_mulai' => '2027-03-01',
+            'tanggal_selesai' => '2027-03-05',
+            'jumlah_hari_kerja' => 5,
+            'alasan' => 'Reservasi aktif memakai bucket tertua lebih dahulu.',
+            'status' => 'menunggu_approval',
+        ]);
+        LeaveBalanceReservationEvent::create([
+            'employee_id' => $employee->id,
+            'leave_request_id' => $activeRequest->id,
+            'leave_balance_id' => $balance->id,
+            'tahun' => 2027,
+            'event_type' => LeaveBalanceReservationEvent::EVENT_RESERVED,
+            'amount' => 5,
+            'reason' => 'Fixture reservasi aktif.',
+            'dedup_key' => "leave_reservation:{$activeRequest->id}:reserved",
+            'occurred_at' => Carbon::now(),
+        ]);
+        LeaveBalanceLedger::create([
+            'employee_id' => $employee->id,
+            'leave_balance_id' => $balance->id,
+            'tahun' => 2027,
+            'event_type' => LeaveBalanceLedger::EVENT_DUTY_POSTPONEMENT_RECORDED,
+            'amount' => 0,
+            'source_year' => 2027,
+            'reason' => 'Empat hari current dilindungi.',
+            'dedup_key' => 'duty_postponement:reservation-capacity-test',
+            'metadata' => [
+                'request_id' => (string) str()->uuid(),
+                'protected_days' => 4,
+                'protected_allocations' => ['n2' => 0, 'n1' => 0, 'current' => 4],
+            ],
+        ]);
+        $summaryBefore = $balance->only(['sisa_n2', 'sisa_n1', 'sisa_tahun_berjalan', 'sisa']);
+        $ledgerCount = LeaveBalanceLedger::count();
+        $auditCount = AuditLog::count();
+
+        try {
+            app(LeaveBalanceService::class)->adjustBalance(
+                $employee,
+                2027,
+                'n2',
+                -3,
+                'Debit yang menghapus kapasitas reservasi aktif.',
+                $actor,
+            );
+            $this->fail('Debit yang menghapus kapasitas reservasi aktif wajib ditolak seluruhnya.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('amount', $exception->errors());
+        }
+
+        $this->assertSame($summaryBefore, $balance->fresh()->only(array_keys($summaryBefore)));
+        $this->assertSame($ledgerCount, LeaveBalanceLedger::count());
+        $this->assertSame($auditCount, AuditLog::count());
+        $this->assertSame(5, (int) LeaveBalanceReservationEvent::query()
+            ->where('leave_request_id', $activeRequest->id)
+            ->sum('amount'));
     }
 
     public function test_admin_balance_adjust_route_menolak_role_tanpa_permission(): void

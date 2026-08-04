@@ -196,12 +196,18 @@
                             @forelse($cutiAktif as $cuti)
                                 @php
                                     $statusVariant = match ($cuti->status) {
-                                        'menunggu_approval' => 'info',
-                                        'ditangguhkan' => 'warning',
-                                        'perlu_perubahan' => 'danger',
-                                        default => 'primary',
-                                    };
-                                    $statusLabel = ucwords(str_replace('_', ' ', $cuti->status));
+                                         'menunggu_approval' => 'info',
+                                         'ditangguhkan' => 'warning',
+                                         'dikembalikan_karena_rollover' => 'warning',
+                                         'perlu_perubahan' => 'danger',
+                                         default => 'primary',
+                                     };
+                                     $statusLabel = match ($cuti->status) {
+                                         'menunggu_approval' => 'Menunggu Keputusan',
+                                         'dikembalikan_karena_rollover' => 'Dikembalikan karena Rollover',
+                                         'perlu_perubahan' => 'Perubahan',
+                                         default => ucwords(str_replace('_', ' ', $cuti->status)),
+                                     };
                                 @endphp
                                 <x-ui.table-row>
                                     <x-ui.table-td class="px-6 py-3.5">

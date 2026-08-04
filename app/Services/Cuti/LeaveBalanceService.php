@@ -2,6 +2,7 @@
 
 namespace App\Services\Cuti;
 
+use App\Actions\Cuti\RolloverLeaveBalanceAction;
 use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
@@ -24,7 +25,10 @@ use Illuminate\Validation\ValidationException;
  */
 class LeaveBalanceService
 {
-    public function __construct(private readonly LeaveBalanceCalculator $calculator) {}
+    public function __construct(
+        private readonly LeaveBalanceCalculator $calculator,
+        private readonly RolloverLeaveBalanceAction $rollover,
+    ) {}
 
     /**
      * Mengecek saldo tersedia tanpa mengunci baris dan tanpa reservasi.
@@ -244,144 +248,143 @@ class LeaveBalanceService
      */
     public function rolloverYear(int $sourceYear): void
     {
-        $targetYear = $sourceYear + 1;
+        $this->rollover->execute($sourceYear, fn (
+            Employee $employee,
+            LeaveBalance $sourceBalance,
+            ?LeaveBalance $targetBalance,
+            int $lockedSourceYear,
+            int $targetYear,
+        ) => $this->rolloverLockedEmployee($employee, $sourceBalance, $targetBalance, $lockedSourceYear, $targetYear));
+    }
 
-        LeaveBalance::query()
-            ->where('tahun', $sourceYear)
-            ->orderBy('employee_id')
-            ->each(function (LeaveBalance $sourceBalance) use ($sourceYear, $targetYear): void {
-                $dedupKey = "{$sourceBalance->employee_id}:{$targetYear}:rollover_applied";
+    /** Menulis rollover setelah orkestrator mengunci request, pegawai, dan kedua saldo. */
+    public function rolloverLockedEmployee(
+        Employee $employee,
+        LeaveBalance $lockedSource,
+        ?LeaveBalance $targetBalance,
+        int $sourceYear,
+        int $targetYear,
+    ): void {
+        $dedupKey = "{$employee->id}:{$targetYear}:rollover_applied";
 
-                DB::transaction(function () use ($sourceBalance, $sourceYear, $targetYear, $dedupKey): void {
-                    // Urutan employee lalu balance sama dengan reservasi dan administrasi untuk mencegah deadlock.
-                    $this->lockEmployee($sourceBalance->employee_id);
+        // Guard authoritative berjalan setelah seluruh lock agar retry paralel tidak menulis ulang target.
+        if (LeaveBalanceLedger::query()->where('dedup_key', $dedupKey)->exists()) {
+            return;
+        }
 
-                    // Guard authoritative wajib berada setelah mutex pegawai agar retry paralel tidak menulis ulang target.
-                    if (LeaveBalanceLedger::query()->where('dedup_key', $dedupKey)->exists()) {
-                        return;
-                    }
+        // Pembukaan admin adalah baseline final untuk tahun target dan tidak boleh dicampur dengan rollover terlambat.
+        if (LeaveBalanceLedger::query()
+            ->where('employee_id', $employee->id)
+            ->where('tahun', $targetYear)
+            ->where('event_type', LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET)
+            ->exists()) {
+            return;
+        }
 
-                    // Pembukaan admin adalah baseline final untuk tahun target dan tidak boleh dicampur dengan rollover terlambat.
-                    if (LeaveBalanceLedger::query()
-                        ->where('employee_id', $sourceBalance->employee_id)
-                        ->where('tahun', $targetYear)
-                        ->where('event_type', LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET)
-                        ->exists()) {
-                        return;
-                    }
+        $buckets = $this->bucketsFromBalance($lockedSource);
+        $protected = $this->protectedAllocations($lockedSource->employee_id, $sourceYear);
+        $ordinary = $this->subtractProtectedBuckets($buckets, $protected);
+        $protectedTotal = $this->calculator->availableTotal($protected);
+        $expiredDutyCarryOver = $this->remainingDutyCarryOverExpiringIn(
+            $lockedSource->employee_id,
+            $sourceYear,
+            $ordinary['n1'],
+        );
+        $ordinary = $this->subtractProtectedBuckets($ordinary, [
+            'n2' => 0,
+            'n1' => $expiredDutyCarryOver,
+            'current' => 0,
+        ]);
+        $sourceYearNoApprovedAnnualLeave = $this->hasNoApprovedAnnualLeaveInYear(
+            $lockedSource->employee_id,
+            $sourceYear,
+        );
+        $twoYearsNoAnnualLeave = $this->hasNoAnnualLeaveForTwoYears(
+            $lockedSource->employee_id,
+            $sourceYear,
+        );
+        $rule5Active = $this->hasApprovedCutiBesar($lockedSource->employee_id, $sourceYear);
+        // Hak statutory yang telah ditunda dinas tetap memakai jalur Rule 3; hanya current ordinary yang disupresi.
+        $sourceCurrent = $rule5Active ? 0 : $ordinary['current'];
+        $rule5ExpiredCurrent = $rule5Active ? $ordinary['current'] : 0;
+        $result = $this->calculator->calculateRollover(
+            previousN1: $ordinary['n1'],
+            previousCurrent: $sourceCurrent,
+            sourceYearNoApprovedAnnualLeave: $sourceYearNoApprovedAnnualLeave,
+            twoYearsNoAnnualLeave: $twoYearsNoAnnualLeave,
+            postponedByDuty: $protectedTotal,
+        );
+        $ordinaryResult = $this->calculator->calculateRollover(
+            previousN1: $ordinary['n1'],
+            previousCurrent: $sourceCurrent,
+            sourceYearNoApprovedAnnualLeave: $sourceYearNoApprovedAnnualLeave,
+            twoYearsNoAnnualLeave: $twoYearsNoAnnualLeave,
+            postponedByDuty: 0,
+        );
+        $dutyPostponedCarried = max(
+            0,
+            ($result['n2'] + $result['n1']) - ($ordinaryResult['n2'] + $ordinaryResult['n1']),
+        );
+        // Carry-over dari penangguhan dinas hanya hidup satu tahun dan tidak boleh naik menjadi bucket N-2.
+        $result['hangus'] += $expiredDutyCarryOver + $rule5ExpiredCurrent;
+        $result['rule_5_current_excluded'] = $rule5ExpiredCurrent;
 
-                    $lockedSource = LeaveBalance::query()->whereKey($sourceBalance->id)->lockForUpdate()->firstOrFail();
-                    $buckets = $this->bucketsFromBalance($lockedSource);
-                    $protected = $this->protectedAllocations($lockedSource->employee_id, $sourceYear);
-                    $ordinary = $this->subtractProtectedBuckets($buckets, $protected);
-                    $protectedTotal = $this->calculator->availableTotal($protected);
-                    $expiredDutyCarryOver = $this->remainingDutyCarryOverExpiringIn(
-                        $lockedSource->employee_id,
-                        $sourceYear,
-                        $ordinary['n1'],
-                    );
-                    $ordinary = $this->subtractProtectedBuckets($ordinary, [
-                        'n2' => 0,
-                        'n1' => $expiredDutyCarryOver,
-                        'current' => 0,
-                    ]);
-                    $sourceYearNoApprovedAnnualLeave = $this->hasNoApprovedAnnualLeaveInYear(
-                        $lockedSource->employee_id,
-                        $sourceYear,
-                    );
-                    $twoYearsNoAnnualLeave = $this->hasNoAnnualLeaveForTwoYears(
-                        $lockedSource->employee_id,
-                        $sourceYear,
-                    );
-                    $rule5Active = $this->hasApprovedCutiBesar($lockedSource->employee_id, $sourceYear);
-                    // Hak statutory yang telah ditunda dinas tetap memakai jalur Rule 3; hanya current ordinary yang disupresi.
-                    $sourceCurrent = $rule5Active ? 0 : $ordinary['current'];
-                    $rule5ExpiredCurrent = $rule5Active ? $ordinary['current'] : 0;
-                    $result = $this->calculator->calculateRollover(
-                        previousN1: $ordinary['n1'],
-                        previousCurrent: $sourceCurrent,
-                        sourceYearNoApprovedAnnualLeave: $sourceYearNoApprovedAnnualLeave,
-                        twoYearsNoAnnualLeave: $twoYearsNoAnnualLeave,
-                        postponedByDuty: $protectedTotal,
-                    );
-                    $ordinaryResult = $this->calculator->calculateRollover(
-                        previousN1: $ordinary['n1'],
-                        previousCurrent: $sourceCurrent,
-                        sourceYearNoApprovedAnnualLeave: $sourceYearNoApprovedAnnualLeave,
-                        twoYearsNoAnnualLeave: $twoYearsNoAnnualLeave,
-                        postponedByDuty: 0,
-                    );
-                    $dutyPostponedCarried = max(
-                        0,
-                        ($result['n2'] + $result['n1']) - ($ordinaryResult['n2'] + $ordinaryResult['n1']),
-                    );
-                    // Carry-over dari penangguhan dinas hanya hidup satu tahun dan tidak boleh naik menjadi bucket N-2.
-                    $result['hangus'] += $expiredDutyCarryOver + $rule5ExpiredCurrent;
-                    $result['rule_5_current_excluded'] = $rule5ExpiredCurrent;
+        $systemInitialized = LeaveBalanceLedger::query()
+            ->where('employee_id', $lockedSource->employee_id)
+            ->where('tahun', $targetYear)
+            ->where('event_type', LeaveBalanceLedger::EVENT_ANNUAL_ENTITLEMENT_GRANTED)
+            ->exists();
 
-                    $targetBalance = LeaveBalance::query()
-                        ->where('employee_id', $lockedSource->employee_id)
-                        ->where('tahun', $targetYear)
-                        ->lockForUpdate()
-                        ->first();
-                    $systemInitialized = LeaveBalanceLedger::query()
-                        ->where('employee_id', $lockedSource->employee_id)
-                        ->where('tahun', $targetYear)
-                        ->where('event_type', LeaveBalanceLedger::EVENT_ANNUAL_ENTITLEMENT_GRANTED)
-                        ->exists();
+        if ($targetBalance === null) {
+            $targetBalance = LeaveBalance::create([
+                'employee_id' => $lockedSource->employee_id,
+                'tahun' => $targetYear,
+                'jatah_awal' => $this->calculator->annualEntitlement(),
+                'carry_over' => $result['n2'] + $result['n1'],
+                'terpakai' => 0,
+                'sisa' => $result['maxUsable'],
+                'sisa_n2' => $result['n2'],
+                'sisa_n1' => $result['n1'],
+                'sisa_tahun_berjalan' => $result['current'],
+                'terpakai_tahun_berjalan' => 0,
+                'hangus' => $result['hangus'],
+            ]);
+        } elseif ($systemInitialized) {
+            // Entitlement/koreksi/pemotongan target sudah menjadi fakta; rollover hanya menambahkan carry-over sekali.
+            $targetN2 = (int) $targetBalance->sisa_n2 + $result['n2'];
+            $targetN1 = (int) $targetBalance->sisa_n1 + $result['n1'];
+            $targetCurrent = (int) $targetBalance->sisa_tahun_berjalan;
+            $targetBalance->forceFill([
+                'carry_over' => $targetN2 + $targetN1,
+                'sisa' => $targetN2 + $targetN1 + $targetCurrent,
+                'sisa_n2' => $targetN2,
+                'sisa_n1' => $targetN1,
+                'hangus' => $result['hangus'],
+            ])->save();
+        } else {
+            // Baris legacy tanpa event inisialisasi tetap mengikuti perilaku sinkronisasi lama.
+            $targetCurrent = max(0, $this->calculator->annualEntitlement() - $targetBalance->terpakai_tahun_berjalan);
+            $targetAvailable = $result['n2'] + $result['n1'] + $targetCurrent;
+            $targetBalance->forceFill([
+                'jatah_awal' => $this->calculator->annualEntitlement(),
+                'carry_over' => $result['n2'] + $result['n1'],
+                'sisa' => $targetAvailable,
+                'sisa_n2' => $result['n2'],
+                'sisa_n1' => $result['n1'],
+                'sisa_tahun_berjalan' => $targetCurrent,
+                'hangus' => $result['hangus'],
+            ])->save();
+        }
 
-                    if ($targetBalance === null) {
-                        $targetBalance = LeaveBalance::create([
-                            'employee_id' => $lockedSource->employee_id,
-                            'tahun' => $targetYear,
-                            'jatah_awal' => $this->calculator->annualEntitlement(),
-                            'carry_over' => $result['n2'] + $result['n1'],
-                            'terpakai' => 0,
-                            'sisa' => $result['maxUsable'],
-                            'sisa_n2' => $result['n2'],
-                            'sisa_n1' => $result['n1'],
-                            'sisa_tahun_berjalan' => $result['current'],
-                            'terpakai_tahun_berjalan' => 0,
-                            'hangus' => $result['hangus'],
-                        ]);
-                    } elseif ($systemInitialized) {
-                        // Entitlement/koreksi/pemotongan target sudah menjadi fakta; rollover hanya menambahkan carry-over sekali.
-                        $targetN2 = (int) $targetBalance->sisa_n2 + $result['n2'];
-                        $targetN1 = (int) $targetBalance->sisa_n1 + $result['n1'];
-                        $targetCurrent = (int) $targetBalance->sisa_tahun_berjalan;
-                        $targetBalance->forceFill([
-                            'carry_over' => $targetN2 + $targetN1,
-                            'sisa' => $targetN2 + $targetN1 + $targetCurrent,
-                            'sisa_n2' => $targetN2,
-                            'sisa_n1' => $targetN1,
-                            'hangus' => $result['hangus'],
-                        ])->save();
-                    } else {
-                        // Baris legacy tanpa event inisialisasi tetap mengikuti perilaku sinkronisasi lama.
-                        $targetCurrent = max(0, $this->calculator->annualEntitlement() - $targetBalance->terpakai_tahun_berjalan);
-                        $targetAvailable = $result['n2'] + $result['n1'] + $targetCurrent;
-                        $targetBalance->forceFill([
-                            'jatah_awal' => $this->calculator->annualEntitlement(),
-                            'carry_over' => $result['n2'] + $result['n1'],
-                            'sisa' => $targetAvailable,
-                            'sisa_n2' => $result['n2'],
-                            'sisa_n1' => $result['n1'],
-                            'sisa_tahun_berjalan' => $targetCurrent,
-                            'hangus' => $result['hangus'],
-                        ])->save();
-                    }
-
-                    $this->writeRolloverLedger(
-                        $lockedSource,
-                        $targetBalance,
-                        $sourceYear,
-                        $targetYear,
-                        $result,
-                        $dedupKey,
-                        $dutyPostponedCarried,
-                    );
-                });
-            });
+        $this->writeRolloverLedger(
+            $lockedSource,
+            $targetBalance,
+            $sourceYear,
+            $targetYear,
+            $result,
+            $dedupKey,
+            $dutyPostponedCarried,
+        );
     }
 
     /**
@@ -528,6 +531,23 @@ class LeaveBalanceService
             $applied = $amount < 0 ? -min(abs($amount), $currentBucketValue) : $amount;
 
             $remaining = $this->applyBucketDelta($buckets, $bucket, $applied);
+
+            if ($amount < 0) {
+                // Koreksi debit juga harus menyisakan kapasitas untuk reservasi aktif yang akan
+                // dipotong tertua-dahulu saat approval final, setelah hak penangguhan dilindungi.
+                $unprotectedRemaining = $this->subtractProtectedBuckets(
+                    $remaining,
+                    $protectedBuckets,
+                );
+                $activeReserved = $this->activeReservedDays($employeeModel->id, $tahun);
+
+                if ($this->calculator->availableTotal($unprotectedRemaining) < $activeReserved) {
+                    throw ValidationException::withMessages([
+                        'amount' => 'Pengurangan saldo menghapus kapasitas yang sudah dialokasikan untuk pengajuan cuti aktif.',
+                    ]);
+                }
+            }
+
             $newTotal = $this->calculator->availableTotal($remaining);
             $sourceYear = $this->sourceYearForBucket($tahun, $bucket);
             $metadata = [
@@ -848,6 +868,16 @@ class LeaveBalanceService
             ->where('employee_id', $employeeId)
             ->where('tahun', $year)
             ->where('leave_request_id', '!=', $leaveRequestId)
+            ->sum('amount'));
+    }
+
+    /** Menghitung net reservasi aktif untuk menjaga koreksi admin tidak mengambil hak yang sudah dialokasikan. */
+    private function activeReservedDays(string $employeeId, int $year): int
+    {
+        return max(0, (int) LeaveBalanceReservationEvent::query()
+            ->forActiveRequests()
+            ->where('employee_id', $employeeId)
+            ->where('tahun', $year)
             ->sum('amount'));
     }
 

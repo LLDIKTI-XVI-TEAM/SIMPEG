@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Cuti;
 
+use App\Models\LeaveRequest;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -28,7 +29,7 @@ class PimpinanLeaveFilterRequest extends FormRequest
             'unit_kerja_id' => ['nullable', 'uuid'],
             'periode' => ['nullable', 'string', 'regex:/^\d{4}-\d{2}$/'],
             'jenis_cuti_id' => ['nullable', 'uuid'],
-            'status' => ['nullable', Rule::in(['all', 'menunggu_saya', 'menunggu', 'disetujui', 'perubahan', 'ditangguhkan', 'ditangguhkan_tugas_dinas', 'tidak_disetujui'])],
+            'status' => ['nullable', Rule::in(['all', 'menunggu_saya', 'menunggu', 'disetujui', 'perubahan', 'ditangguhkan', 'ditangguhkan_tugas_dinas', LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER, 'tidak_disetujui'])],
         ];
     }
 }

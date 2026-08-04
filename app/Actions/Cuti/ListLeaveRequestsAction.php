@@ -64,6 +64,7 @@ class ListLeaveRequestsAction
             'ditunda' => ['ditangguhkan'],
             'ditangguhkan' => ['ditangguhkan'],
             'ditangguhkan_tugas_dinas' => ['ditangguhkan_tugas_dinas'],
+            LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER => [LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER],
             'perlu_perubahan' => ['perlu_perubahan'],
             'tidak_disetujui' => ['tidak_disetujui'],
         ];
@@ -140,7 +141,7 @@ class ListLeaveRequestsAction
             'selesai' => optional($r->tanggal_selesai)->toDateString(),
             'hari' => $r->jumlah_hari_kerja,
             'alasan' => $r->alasan,
-            // Status runtime MENTAH (menunggu_approval|disetujui|ditangguhkan|perlu_perubahan|tidak_disetujui).
+            // Status runtime mentah dipertahankan agar Blade dapat memetakan lifecycle tanpa mengubah kontrak list.
             'status' => $r->status,
             // Label berasal dari snapshot agar perubahan konfigurasi tidak mengubah riwayat pengajuan.
             'current_step_label' => $activeStep?->role_label,

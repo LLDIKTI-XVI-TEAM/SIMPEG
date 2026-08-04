@@ -199,6 +199,74 @@ class CutiDetailTimelineTest extends TestCase
             ->assertDontSee('Ditolak');
     }
 
+    public function test_employee_detail_explains_rollover_return_and_offers_target_year_resubmission(): void
+    {
+        $jenis = RefJenisCuti::create([
+            'nama' => 'Cuti Tahunan Rollover Detail',
+            'code' => 'tahunan',
+            'mengurangi_saldo_tahunan' => true,
+            'khusus_pns' => false,
+        ]);
+        $employee = Employee::factory()->create();
+        $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+        $leaveRequest = LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $jenis->id,
+            'tanggal_mulai' => '2026-12-28',
+            'tanggal_selesai' => '2026-12-30',
+            'jumlah_hari_kerja' => 3,
+            'alasan' => 'Pengajuan yang harus dipindahkan.',
+            'alamat_selama_cuti' => 'Jl. Tahun Sumber',
+            'nomor_telepon' => '+62 431 123456',
+            'status' => LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER,
+            'rollover_source_year' => 2026,
+            'rollover_target_year' => 2027,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('cuti.show', $leaveRequest->id))
+            ->assertOk()
+            ->assertSee('Pengajuan Dikembalikan karena Rollover')
+            ->assertSee('Tahun Sumber')
+            ->assertSee('Tahun Target')
+            ->assertSee('Perbaiki dan Ajukan Kembali')
+            ->assertSee('min="2027-01-01"', false)
+            ->assertSee('aria-labelledby="rollover-return-title"', false)
+            ->assertDontSee('role="status"', false)
+            ->assertSee('aria-describedby="rollover-target-year-hint"', false)
+            ->assertSee('Saldo Target Dapat Diajukan')
+            ->assertDontSee('value="2026-12-28"', false);
+    }
+
+    public function test_employee_detail_marks_target_balance_unavailable_when_preview_is_null(): void
+    {
+        $jenis = RefJenisCuti::create([
+            'nama' => 'Cuti Tahunan Rollover Tanpa Target',
+            'code' => 'tahunan_tanpa_target',
+            'mengurangi_saldo_tahunan' => true,
+            'khusus_pns' => false,
+        ]);
+        $employee = Employee::factory()->create();
+        $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+        $leaveRequest = LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $jenis->id,
+            'tanggal_mulai' => '2026-12-28',
+            'tanggal_selesai' => '2026-12-30',
+            'jumlah_hari_kerja' => 3,
+            'alasan' => 'Metadata target belum tersedia.',
+            'status' => LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER,
+            'rollover_source_year' => null,
+            'rollover_target_year' => null,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('cuti.show', $leaveRequest->id))
+            ->assertOk()
+            ->assertSee('Saldo target belum tersedia')
+            ->assertDontSee('Saldo Target Dapat Diajukan</dt><dd class="mt-1 font-semibold text-ink">0 hari', false);
+    }
+
     public function test_file_domain_cuti_tidak_memuat_token_keputusan_legacy(): void
     {
         // Literal berkutip mencegah false positive dari method, identifier, dan prosa.

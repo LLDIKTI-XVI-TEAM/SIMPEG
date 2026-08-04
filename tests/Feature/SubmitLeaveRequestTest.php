@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveApprovalChain;
 use App\Models\LeaveBalance;
+use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisPegawai;
@@ -710,7 +711,7 @@ class SubmitLeaveRequestTest extends TestCase
         $leave = LeaveRequest::query()->first();
         $this->assertNotNull($leave);
         $this->assertNotNull($leave->lampiran_path);
-        Storage::disk('public')->assertExists($leave->lampiran_path);
+        $this->assertTrue(Storage::disk('public')->exists($leave->lampiran_path));
     }
 
     public function test_submit_gagal_setelah_upload_membersihkan_lampiran_baru(): void
@@ -1083,7 +1084,7 @@ class SubmitLeaveRequestTest extends TestCase
         $this->assertDatabaseCount('leave_request_steps', 0);
         $this->assertSame(0, SimpegNotification::count());
         $this->assertDatabaseCount('audit_logs', 0);
-        $this->assertSame([], Storage::disk('public')->allFiles());
+        $this->assertSame([], Storage::disk('public')->allFiles('cuti'));
     }
 
     public function test_pemohon_bisa_mengirim_ulang_pengajuan_perlu_perubahan_dengan_snapshot_yang_sama(): void
@@ -1121,6 +1122,189 @@ class SubmitLeaveRequestTest extends TestCase
         ]);
     }
 
+    public function test_resubmit_rollover_hanya_menerima_tahun_target_memindahkan_reservasi_dan_memberi_tahu_approver_snapshot(): void
+    {
+        $aktor = $this->makePemohon();
+        $jenis = RefJenisCuti::create([
+            'nama' => 'Cuti Tahunan Rollover',
+            'code' => 'tahunan',
+            'mengurangi_saldo_tahunan' => true,
+            'khusus_pns' => false,
+        ]);
+        LeaveBalance::create([
+            'employee_id' => $aktor['employee']->id,
+            'tahun' => 2027,
+            'jatah_awal' => 12,
+            'carry_over' => 0,
+            'terpakai' => 0,
+            'sisa' => 12,
+            'sisa_n2' => 0,
+            'sisa_n1' => 0,
+            'sisa_tahun_berjalan' => 12,
+            'terpakai_tahun_berjalan' => 0,
+            'hangus' => 0,
+        ]);
+        $leave = LeaveRequest::create([
+            'employee_id' => $aktor['employee']->id,
+            'jenis_cuti_id' => $jenis->id,
+            'tanggal_mulai' => '2026-12-28',
+            'tanggal_selesai' => '2026-12-30',
+            'jumlah_hari_kerja' => 3,
+            'alasan' => 'Pengajuan yang dikembalikan saat rollover.',
+            'alamat_selama_cuti' => 'Jl. Sumber Tahun 2026',
+            'nomor_telepon' => '+62 431 123456',
+            'status' => 'dikembalikan_karena_rollover',
+            'rollover_source_year' => 2026,
+            'rollover_target_year' => 2027,
+        ]);
+        $leave->steps()->createMany([
+            [
+                'step_order' => 1,
+                'step_type' => 'kepala_bagian',
+                'role_label' => 'Kepala Bagian',
+                'approver_employee_id' => $aktor['supervisor']->id,
+                'status' => 'active',
+                'is_final' => false,
+            ],
+            [
+                'step_order' => 2,
+                'step_type' => 'pybmc',
+                'role_label' => 'PYBMC',
+                'approver_employee_id' => $aktor['pybmc']->id,
+                'status' => 'pending',
+                'is_final' => true,
+            ],
+        ]);
+        $stepIdsBefore = $leave->steps()->orderBy('step_order')->pluck('id')->all();
+
+        $this->actingAs($aktor['user'])
+            ->patchJson(route('cuti.resubmit', $leave), [
+                'tanggal_mulai' => '2026-12-28',
+                'tanggal_selesai' => '2026-12-30',
+                'alasan' => 'Tidak boleh kembali ke tahun sumber.',
+                'alamat_selama_cuti' => 'Jl. Ditolak',
+                'nomor_telepon' => '+62 431 123457',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['tanggal_mulai']);
+
+        $this->assertSame('dikembalikan_karena_rollover', $leave->fresh()->status);
+        $this->assertSame(0, LeaveBalanceReservationEvent::query()
+            ->where('leave_request_id', $leave->id)
+            ->count());
+
+        $response = $this->actingAs($aktor['user'])
+            ->patch(route('cuti.resubmit', $leave), [
+                'tanggal_mulai' => '2027-01-11',
+                'tanggal_selesai' => '2027-01-13',
+                'alasan' => 'Tanggal dipindahkan ke tahun target.',
+                'alamat_selama_cuti' => 'Jl. Tahun Target',
+                'nomor_telepon' => '+62 431 123458',
+            ]);
+
+        $response->assertRedirect(route('cuti.show', $leave));
+        $leave->refresh();
+        $this->assertSame('menunggu_approval', $leave->status);
+        $this->assertSame('2027-01-11', $leave->tanggal_mulai->toDateString());
+        $this->assertNull($leave->rollover_source_year);
+        $this->assertNull($leave->rollover_target_year);
+        $this->assertSame($stepIdsBefore, $leave->steps()->orderBy('step_order')->pluck('id')->all());
+        $this->assertSame('active', $leave->steps()->orderBy('step_order')->value('status'));
+        $this->assertSame(3, (int) LeaveBalanceReservationEvent::query()
+            ->where('leave_request_id', $leave->id)
+            ->where('tahun', 2027)
+            ->sum('amount'));
+        $this->assertSame(0, (int) LeaveBalanceReservationEvent::query()
+            ->where('leave_request_id', $leave->id)
+            ->where('tahun', 2026)
+            ->sum('amount'));
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $aktor['supervisor']->id,
+            'type' => 'cuti.pengajuan_baru',
+        ]);
+        $this->assertDatabaseMissing('notifications', [
+            'user_id' => $aktor['pybmc']->id,
+            'type' => 'cuti.pengajuan_baru',
+        ]);
+    }
+
+    public function test_resubmit_rollover_rolls_back_request_and_reservation_when_approver_notification_fails(): void
+    {
+        $aktor = $this->makePemohon();
+        $jenis = RefJenisCuti::create([
+            'nama' => 'Cuti Tahunan Rollover Notifikasi Gagal',
+            'code' => 'tahunan',
+            'mengurangi_saldo_tahunan' => true,
+            'khusus_pns' => false,
+        ]);
+        LeaveBalance::create([
+            'employee_id' => $aktor['employee']->id,
+            'tahun' => 2027,
+            'jatah_awal' => 12,
+            'carry_over' => 0,
+            'terpakai' => 0,
+            'sisa' => 12,
+            'sisa_n2' => 0,
+            'sisa_n1' => 0,
+            'sisa_tahun_berjalan' => 12,
+            'terpakai_tahun_berjalan' => 0,
+            'hangus' => 0,
+        ]);
+        $leave = LeaveRequest::create([
+            'employee_id' => $aktor['employee']->id,
+            'jenis_cuti_id' => $jenis->id,
+            'tanggal_mulai' => '2026-12-28',
+            'tanggal_selesai' => '2026-12-30',
+            'jumlah_hari_kerja' => 3,
+            'alasan' => 'Pengajuan rollover yang notifikasinya gagal.',
+            'alamat_selama_cuti' => 'Jl. Sumber Tahun 2026',
+            'nomor_telepon' => '+62 431 123456',
+            'status' => LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER,
+            'rollover_source_year' => 2026,
+            'rollover_target_year' => 2027,
+        ]);
+        $leave->steps()->create([
+            'step_order' => 1,
+            'step_type' => 'kepala_bagian',
+            'role_label' => 'Kepala Bagian',
+            'approver_employee_id' => $aktor['supervisor']->id,
+            'status' => 'active',
+            'is_final' => true,
+        ]);
+        $this->mock(NotificationService::class, function (MockInterface $mock): void {
+            /** @var Expectation $expectation */
+            $expectation = $mock->shouldReceive('createForEmployee');
+            $expectation->once()->andThrow(new \RuntimeException('Simulasi kegagalan notifikasi resubmit.'));
+        });
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->actingAs($aktor['user'])->patch(route('cuti.resubmit', $leave), [
+                'tanggal_mulai' => '2027-01-11',
+                'tanggal_selesai' => '2027-01-13',
+                'alasan' => 'Resubmit yang harus rollback.',
+                'alamat_selama_cuti' => 'Jl. Tahun Target',
+                'nomor_telepon' => '+62 431 123458',
+            ]);
+            $this->fail('Kegagalan notifikasi approver harus membatalkan resubmit rollover.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Simulasi kegagalan notifikasi resubmit.', $exception->getMessage());
+        }
+
+        $leave->refresh();
+        $this->assertSame(LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER, $leave->status);
+        $this->assertSame('2026-12-28', $leave->tanggal_mulai->toDateString());
+        $this->assertSame(2026, $leave->rollover_source_year);
+        $this->assertSame(2027, $leave->rollover_target_year);
+        $this->assertSame(0, LeaveBalanceReservationEvent::query()
+            ->where('leave_request_id', $leave->id)
+            ->sum('amount'));
+        $this->assertDatabaseMissing('notifications', [
+            'user_id' => $aktor['supervisor']->id,
+            'type' => 'cuti.pengajuan_baru',
+        ]);
+    }
+
     public function test_resubmit_gagal_setelah_upload_mempertahankan_lampiran_lama_dan_membersihkan_yang_baru(): void
     {
         Storage::fake('public');
@@ -1155,7 +1339,7 @@ class SubmitLeaveRequestTest extends TestCase
         }
 
         $this->assertEquals($oldValues, $leave->fresh()->only(array_keys($oldValues)));
-        Storage::disk('public')->assertExists($oldPath);
+        $this->assertTrue(Storage::disk('public')->exists($oldPath));
         $this->assertSame([$oldPath], Storage::disk('public')->allFiles('cuti'));
     }
 
@@ -1183,8 +1367,8 @@ class SubmitLeaveRequestTest extends TestCase
         $response->assertRedirect(route('cuti.show', $leave));
         $newPath = $leave->fresh()->lampiran_path;
         $this->assertNotSame($oldPath, $newPath);
-        Storage::disk('public')->assertExists($newPath);
-        Storage::disk('public')->assertMissing($oldPath);
+        $this->assertTrue(Storage::disk('public')->exists($newPath));
+        $this->assertFalse(Storage::disk('public')->exists($oldPath));
     }
 
     public function test_resubmit_ditolak_jika_pemohon_sekarang_kepala_lembaga_tanpa_mutasi(): void
@@ -1227,7 +1411,7 @@ class SubmitLeaveRequestTest extends TestCase
         ]);
         $this->assertSame($stepsBefore, $leave->steps()->orderBy('step_order')->get()->map->only(['id', 'status', 'step_order'])->all());
         $this->assertSame($auditCount, AuditLog::count());
-        $this->assertSame([], Storage::disk('public')->allFiles());
+        $this->assertSame([], Storage::disk('public')->allFiles('cuti'));
     }
 
     public function test_post_pengajuan_gagal_tertutup_tanpa_chain_approval_dan_tidak_menyimpan_apa_pun(): void

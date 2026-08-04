@@ -210,6 +210,43 @@ class CutiListDisplayTest extends TestCase
             ->assertViewHas('jumlahDitangguhkan', 2);
     }
 
+    public function test_list_renders_and_filters_rollover_return_as_a_non_approval_status(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $jenis = RefJenisCuti::create([
+            'nama' => 'Cuti Tahunan Rollover',
+            'code' => 'tahunan_rollover_list',
+            'mengurangi_saldo_tahunan' => true,
+            'khusus_pns' => false,
+        ]);
+        $returned = $this->createLeave(
+            Employee::factory()->create(['nama_lengkap' => 'Pegawai Rollover']),
+            $jenis,
+            'Pengajuan harus dipindahkan ke tahun target.',
+            'dikembalikan_karena_rollover',
+        );
+        $returned->forceFill([
+            'rollover_source_year' => 2026,
+            'rollover_target_year' => 2027,
+        ])->save();
+        $this->createLeave(
+            Employee::factory()->create(['nama_lengkap' => 'Pegawai Menunggu']),
+            $jenis,
+            'Pengajuan reguler.',
+            'menunggu_approval',
+        );
+
+        $response = $this->actingAs($user)->get(route('cuti', [
+            'status' => 'dikembalikan_karena_rollover',
+        ]));
+
+        $response->assertOk()
+            ->assertSee('Pegawai Rollover')
+            ->assertSee('Dikembalikan karena Rollover')
+            ->assertDontSee('Pegawai Menunggu');
+        $this->assertSame(1, $response->viewData('jumlahMenunggu'));
+    }
+
     public function test_pegawai_only_sees_own_rows_and_counters(): void
     {
         [$user, $employee, $peer, $jenis] = $this->makePegawaiContext();

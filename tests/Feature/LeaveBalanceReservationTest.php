@@ -206,6 +206,36 @@ class LeaveBalanceReservationTest extends TestCase
         ]);
     }
 
+    public function test_rollover_return_releases_source_reservation_once_with_dedicated_metadata_and_audit(): void
+    {
+        $fixture = $this->makeReservedRequest();
+        $service = app(LeaveBalanceReservationService::class);
+
+        $first = $service->releaseForRollover($fixture['request'], 2026, 2027);
+        $second = $service->releaseForRollover($fixture['request'], 2026, 2027);
+
+        $this->assertTrue($first->is($second));
+        $this->assertSame(LeaveBalanceReservationEvent::EVENT_RELEASED, $first->event_type);
+        $this->assertSame(-5, $first->amount);
+        $this->assertSame("leave_reservation:{$fixture['request']->id}:released:rollover:2026", $first->dedup_key);
+        $this->assertSame([
+            'release_context' => 'rollover_return',
+            'source_year' => 2026,
+            'target_year' => 2027,
+        ], $first->metadata);
+        $this->assertSame(0, (int) LeaveBalanceReservationEvent::query()
+            ->where('leave_request_id', $fixture['request']->id)
+            ->sum('amount'));
+        $this->assertSame(1, LeaveBalanceReservationEvent::query()
+            ->where('dedup_key', $first->dedup_key)
+            ->count());
+        $this->assertDatabaseHas('audit_logs', [
+            'event' => 'LEAVE_BALANCE_RESERVATION_RELEASED',
+            'auditable_type' => 'LeaveBalanceReservationEvent',
+            'auditable_id' => $first->id,
+        ]);
+    }
+
     public function test_duty_postponement_release_rejects_non_annual_request(): void
     {
         $fixture = $this->makeReservedRequest(jenis: $this->sickLeaveType());

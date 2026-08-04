@@ -63,6 +63,51 @@ class PimpinanFrontendViewTest extends TestCase
             ->assertSee(route('pimpinan.cuti.decision', $leave), false);
     }
 
+    public function test_leave_surfaces_label_returned_rollover_without_offering_a_decision(): void
+    {
+        $applicant = Employee::factory()->create(['nama_lengkap' => 'Pegawai Rollover Pimpinan']);
+        $approver = Employee::factory()->create();
+        $leave = LeaveRequest::create([
+            'employee_id' => $applicant->id,
+            'jenis_cuti_id' => RefJenisCuti::create([
+                'nama' => 'Cuti Tahunan Rollover Pimpinan',
+                'code' => 'tahunan_rollover_pimpinan',
+                'mengurangi_saldo_tahunan' => true,
+                'khusus_pns' => false,
+            ])->id,
+            'tanggal_mulai' => '2026-12-28',
+            'tanggal_selesai' => '2026-12-30',
+            'jumlah_hari_kerja' => 3,
+            'alasan' => 'Pengajuan rollover untuk tampilan pimpinan.',
+            'status' => LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER,
+            'rollover_source_year' => 2026,
+            'rollover_target_year' => 2027,
+        ]);
+        LeaveRequestStep::create([
+            'leave_request_id' => $leave->id,
+            'step_order' => 1,
+            'step_type' => 'pybmc',
+            'role_label' => 'PYBMC',
+            'approver_employee_id' => $approver->id,
+            'status' => 'active',
+            'is_final' => true,
+        ]);
+        $user = $this->pimpinan(['employee_id' => $approver->id]);
+
+        $this->actingAs($user)
+            ->get(route('pimpinan.cuti.index', ['status' => LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER]))
+            ->assertOk()
+            ->assertSee('Pegawai Rollover Pimpinan')
+            ->assertSee('Dikembalikan karena Rollover')
+            ->assertSee('value="'.LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER.'"', false);
+
+        $this->actingAs($user)
+            ->get(route('pimpinan.cuti.show', $leave))
+            ->assertOk()
+            ->assertSee('Dikembalikan karena Rollover')
+            ->assertDontSee(route('pimpinan.cuti.decision', $leave), false);
+    }
+
     public function test_employee_detail_exposes_an_accessible_info_tab_without_a_dummy_export_submission(): void
     {
         $employee = Employee::factory()->lengkap()->create(['nama_lengkap' => 'Pegawai Detail Tampilan']);

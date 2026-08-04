@@ -5,6 +5,7 @@
             'disetujui' => ['label' => 'Disetujui', 'variant' => 'success'],
             'ditangguhkan' => ['label' => 'Ditangguhkan', 'variant' => 'warning'],
             'ditangguhkan_tugas_dinas' => ['label' => 'Ditangguhkan karena Tugas Dinas', 'variant' => 'warning'],
+            'dikembalikan_karena_rollover' => ['label' => 'Dikembalikan karena Rollover', 'variant' => 'warning'],
             'perlu_perubahan' => ['label' => 'Perubahan', 'variant' => 'info'],
             'tidak_disetujui' => ['label' => 'Tidak Disetujui', 'variant' => 'danger'],
             default => ['label' => 'Status tidak tersedia', 'variant' => 'muted'],

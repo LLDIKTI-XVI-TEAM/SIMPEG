@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Database\Migrations\Migration;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -72,7 +73,14 @@ class NotificationEventChannelMigrationTest extends TestCase
 
         $this->assertSame(['email', 'in_app'], $dutyPostponementPolicies->pluck('code')->sort()->values()->all());
         $this->assertTrue($dutyPostponementPolicies->every(fn (object $policy): bool => (bool) $policy->is_enabled));
-        $this->assertDatabaseCount('notification_event_channels', 29);
+        $rolloverReturnPolicies = DB::table('notification_event_channels')
+            ->join('ref_notification_channels', 'ref_notification_channels.id', '=', 'notification_event_channels.notification_channel_id')
+            ->where('notification_event_channels.event_key', 'cuti.dikembalikan_karena_rollover')
+            ->get(['notification_event_channels.is_enabled', 'ref_notification_channels.code']);
+
+        $this->assertSame(['email', 'in_app'], $rolloverReturnPolicies->pluck('code')->sort()->values()->all());
+        $this->assertTrue($rolloverReturnPolicies->every(fn (object $policy): bool => (bool) $policy->is_enabled));
+        $this->assertDatabaseCount('notification_event_channels', 31);
 
         $orphanCount = DB::table('notification_event_channels')
             ->leftJoin('ref_notification_channels', 'ref_notification_channels.id', '=', 'notification_event_channels.notification_channel_id')
@@ -83,5 +91,46 @@ class NotificationEventChannelMigrationTest extends TestCase
         $this->assertDatabaseHas('ref_notification_channels', ['code' => 'in_app', 'is_enabled' => true]);
         $this->assertDatabaseHas('ref_notification_channels', ['code' => 'email', 'is_enabled' => true]);
         $this->assertDatabaseHas('ref_notification_channels', ['code' => 'whatsapp_business', 'is_enabled' => false]);
+    }
+
+    public function test_rollover_return_migration_removes_only_its_own_notification_policies_on_rollback(): void
+    {
+        $migration = $this->rolloverReturnMigration();
+        $rolloverPolicyCount = DB::table('notification_event_channels')
+            ->where('event_key', 'cuti.dikembalikan_karena_rollover')
+            ->count();
+        $dutyPostponementPolicyCount = DB::table('notification_event_channels')
+            ->where('event_key', 'cuti.ditangguhkan_tugas_dinas')
+            ->count();
+
+        $this->assertSame(2, $rolloverPolicyCount);
+        $this->assertSame(2, $dutyPostponementPolicyCount);
+
+        $this->invokeMigrationMethod($migration, 'down');
+
+        $this->assertDatabaseMissing('notification_event_channels', [
+            'event_key' => 'cuti.dikembalikan_karena_rollover',
+        ]);
+        $this->assertSame(2, DB::table('notification_event_channels')
+            ->where('event_key', 'cuti.ditangguhkan_tugas_dinas')
+            ->count());
+
+        $this->invokeMigrationMethod($migration, 'up');
+
+        $this->assertSame(2, DB::table('notification_event_channels')
+            ->where('event_key', 'cuti.dikembalikan_karena_rollover')
+            ->count());
+    }
+
+    private function rolloverReturnMigration(): Migration
+    {
+        return require database_path('migrations/2026_08_04_000001_add_rollover_return_support_to_leave_requests.php');
+    }
+
+    private function invokeMigrationMethod(Migration $migration, string $method): void
+    {
+        $callback = [$migration, $method];
+        $this->assertIsCallable($callback);
+        call_user_func($callback);
     }
 }

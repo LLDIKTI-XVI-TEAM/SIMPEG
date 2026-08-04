@@ -9,6 +9,7 @@ use App\Actions\Cuti\ListLeaveRequestsAction;
 use App\Actions\Cuti\ListPendingLeaveApprovalsAction;
 use App\Actions\Cuti\PostponeLeaveAction;
 use App\Actions\Cuti\PrepareLeaveRequestFormAction;
+use App\Actions\Cuti\PreviewLeaveBalanceAction;
 use App\Actions\Cuti\RecordDutyPostponementAction;
 use App\Actions\Cuti\RequestChangesLeaveAction;
 use App\Actions\Cuti\ResubmitLeaveRequestAction;
@@ -24,6 +25,7 @@ use App\Http\Requests\Cuti\StoreLeaveRequestRequest;
 use App\Models\LeaveRequest;
 use App\Services\LeaveApprovalService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Symfony\Component\HttpFoundation\Response;
 
 class CutiController extends Controller
@@ -70,7 +72,7 @@ class CutiController extends Controller
      * Menampilkan detail satu pengajuan cuti.
      * Pegawai tanpa hak memantau hanya boleh membuka pengajuan miliknya sendiri (cegah akses lintas pegawai).
      */
-    public function show($id, LeaveApprovalService $approvals, DownloadOfficialLeavePdfAction $pdfAction)
+    public function show($id, LeaveApprovalService $approvals, DownloadOfficialLeavePdfAction $pdfAction, PreviewLeaveBalanceAction $balancePreview)
     {
         $user = request()->user();
 
@@ -89,11 +91,19 @@ class CutiController extends Controller
             abort(403);
         }
 
+        $isRolloverReturn = $cuti->status === LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER;
+        $targetBalance = $isRolloverReturn && $cuti->employee !== null && $cuti->rollover_target_year !== null
+            ? $balancePreview->execute($cuti->employee, Carbon::create($cuti->rollover_target_year, 1, 1)->startOfDay())
+            : null;
+
         return view('admin.cuti.show', [
             'cuti' => $cuti,
             'canAct' => $canAct,
             'canDownloadFormulir' => $canDownloadFormulir,
-            'canResubmit' => $cuti->status === 'perlu_perubahan' && $cuti->employee_id === $user->employee_id,
+            'canResubmit' => in_array($cuti->status, ['perlu_perubahan', LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER], true)
+                && $cuti->employee_id === $user->employee_id,
+            'isRolloverReturn' => $isRolloverReturn,
+            'targetBalance' => $targetBalance,
             'activeStep' => $stage === null ? null : $cuti->steps->firstWhere('step_order', $stage),
         ]);
     }

@@ -33,6 +33,8 @@ class LeaveRequest extends Model
 
     public const STATUS_DUTY_POSTPONED = 'ditangguhkan_tugas_dinas';
 
+    public const STATUS_RETURNED_FOR_ROLLOVER = 'dikembalikan_karena_rollover';
+
     protected $fillable = [
         'employee_id',
         'jenis_cuti_id',
@@ -45,6 +47,8 @@ class LeaveRequest extends Model
         'nomor_telepon',
         'lampiran_path',
         'status',
+        'rollover_source_year',
+        'rollover_target_year',
     ];
 
     protected function casts(): array
@@ -53,6 +57,8 @@ class LeaveRequest extends Model
             'tanggal_mulai' => 'date',
             'tanggal_selesai' => 'date',
             'jumlah_hari_kerja' => 'integer',
+            'rollover_source_year' => 'integer',
+            'rollover_target_year' => 'integer',
         ];
     }
 

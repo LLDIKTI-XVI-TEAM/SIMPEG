@@ -7,6 +7,7 @@
             'disetujui' => 'success',
             'ditangguhkan' => 'warning',
             'ditangguhkan_tugas_dinas' => 'warning',
+            'dikembalikan_karena_rollover' => 'warning',
             'perlu_perubahan' => 'danger',
             'tidak_disetujui' => 'danger',
         ];
@@ -16,6 +17,7 @@
             'disetujui' => 'Disetujui',
             'ditangguhkan' => 'Ditangguhkan',
             'ditangguhkan_tugas_dinas' => 'Ditangguhkan karena Tugas Dinas',
+            'dikembalikan_karena_rollover' => 'Dikembalikan karena Rollover',
             'perlu_perubahan' => 'Perubahan',
             'tidak_disetujui' => 'Tidak Disetujui',
         ];
@@ -111,6 +113,7 @@
                     <option value="disetujui" @selected($status === 'disetujui')>Disetujui</option>
                     <option value="ditunda" @selected($status === 'ditunda' || $status === 'ditangguhkan')>Ditangguhkan</option>
                     <option value="ditangguhkan_tugas_dinas" @selected($status === 'ditangguhkan_tugas_dinas')>Ditangguhkan karena Tugas Dinas</option>
+                    <option value="dikembalikan_karena_rollover" @selected($status === 'dikembalikan_karena_rollover')>Dikembalikan karena Rollover</option>
                     <option value="perlu_perubahan" @selected($status === 'perlu_perubahan')>Perubahan</option>
                     <option value="tidak_disetujui" @selected($status === 'tidak_disetujui')>Tidak Disetujui</option>
                 </x-form.select>

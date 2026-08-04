@@ -169,6 +169,7 @@ class ExportLeaveReportAction
             'perlu_perubahan' => 'Perubahan',
             'ditangguhkan' => 'Ditangguhkan',
             'ditangguhkan_tugas_dinas' => 'Ditangguhkan karena Tugas Dinas',
+            LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER => 'Dikembalikan karena Rollover',
             'tidak_disetujui' => 'Tidak Disetujui',
             default => 'Menunggu Persetujuan',
         };

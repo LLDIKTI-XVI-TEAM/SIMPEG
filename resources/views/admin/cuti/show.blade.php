@@ -7,6 +7,7 @@
             $statusVariant = match ($status) {
                 'disetujui' => 'success',
                 'ditangguhkan', 'ditangguhkan_tugas_dinas' => 'warning',
+                'dikembalikan_karena_rollover' => 'warning',
                 'tidak_disetujui' => 'danger',
                 'perlu_perubahan' => 'danger',
                 default => 'warning',
@@ -15,6 +16,7 @@
                 'menunggu_approval' => 'Menunggu Keputusan',
                 'ditangguhkan' => 'Ditangguhkan',
                 'ditangguhkan_tugas_dinas' => 'Ditangguhkan karena Tugas Dinas',
+                'dikembalikan_karena_rollover' => 'Dikembalikan karena Rollover',
                 'perlu_perubahan' => 'Perubahan',
                 'disetujui' => 'Disetujui',
                 'tidak_disetujui' => 'Tidak Disetujui',
@@ -65,6 +67,17 @@
             </div>
 
             {{-- Metadata Grid --}}
+            @if ($isRolloverReturn)
+                <section class="rounded-lg border border-warning/25 bg-warning/5 p-4" aria-labelledby="rollover-return-title">
+                    <h4 id="rollover-return-title" class="text-sm font-bold text-ink font-sans">Pengajuan Dikembalikan karena Rollover</h4>
+                    <p class="mt-1 text-sm text-muted font-sans">Tanggal pengajuan tahun {{ $cuti->rollover_source_year }} sudah tidak dapat diproses. Perbaiki tanggal dan ajukan kembali pada tahun {{ $cuti->rollover_target_year }}.</p>
+                    <dl class="mt-3 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+                        <div><dt class="text-xs font-bold uppercase tracking-wider text-muted">Tahun Sumber</dt><dd class="mt-1 font-semibold text-ink">{{ $cuti->rollover_source_year }}</dd></div>
+                        <div><dt class="text-xs font-bold uppercase tracking-wider text-muted">Tahun Target</dt><dd class="mt-1 font-semibold text-ink">{{ $cuti->rollover_target_year }}</dd></div>
+                        <div><dt class="text-xs font-bold uppercase tracking-wider text-muted">Saldo Target Dapat Diajukan</dt><dd class="mt-1 font-semibold text-ink">{{ isset($targetBalance['saldo_dapat_diajukan']) ? $targetBalance['saldo_dapat_diajukan'].' hari' : 'Saldo target belum tersedia' }}</dd></div>
+                    </dl>
+                </section>
+            @endif
             <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 <div class="space-y-1">
                     <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Jenis Cuti</span>
@@ -226,19 +239,19 @@
 
                 @if ($canResubmit)
                     <div class="rounded-lg border border-warning/25 bg-warning/5 p-4">
-                        <h4 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Kirim Ulang Perubahan</h4>
-                        <p class="mt-1 text-xs text-muted font-sans">Perbaiki tanggal, alasan, atau lampiran. Jenis cuti tetap terkunci agar snapshot approval tidak berubah.</p>
+                        <h4 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">{{ $isRolloverReturn ? 'Perbaiki dan Ajukan Kembali' : 'Kirim Ulang Perubahan' }}</h4>
+                        <p id="rollover-target-year-hint" class="mt-1 text-xs text-muted font-sans">{{ $isRolloverReturn ? "Pilih tanggal dalam tahun target {$cuti->rollover_target_year}." : 'Perbaiki tanggal, alasan, atau lampiran.' }} Jenis cuti tetap terkunci agar snapshot approval tidak berubah.</p>
                         <form action="{{ route('cuti.resubmit', $cuti->id) }}" method="POST" enctype="multipart/form-data" class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                             @csrf
                             @method('PATCH')
                             <div>
                                 <label for="tanggal_mulai" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Mulai</label>
-                                <input id="tanggal_mulai" name="tanggal_mulai" type="date" value="{{ old('tanggal_mulai', $cuti->tanggal_mulai?->toDateString()) }}" class="mt-1 w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink" required>
+                                <input id="tanggal_mulai" name="tanggal_mulai" type="date" value="{{ old('tanggal_mulai', $isRolloverReturn ? null : $cuti->tanggal_mulai?->toDateString()) }}" @if ($isRolloverReturn) min="{{ $cuti->rollover_target_year }}-01-01" max="{{ $cuti->rollover_target_year }}-12-31" aria-describedby="rollover-target-year-hint" @endif class="mt-1 w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink" required>
                                 @error('tanggal_mulai')<p class="mt-1 text-xs text-danger">{{ $message }}</p>@enderror
                             </div>
                             <div>
                                 <label for="tanggal_selesai" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Selesai</label>
-                                <input id="tanggal_selesai" name="tanggal_selesai" type="date" value="{{ old('tanggal_selesai', $cuti->tanggal_selesai?->toDateString()) }}" class="mt-1 w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink" required>
+                                <input id="tanggal_selesai" name="tanggal_selesai" type="date" value="{{ old('tanggal_selesai', $isRolloverReturn ? null : $cuti->tanggal_selesai?->toDateString()) }}" @if ($isRolloverReturn) min="{{ $cuti->rollover_target_year }}-01-01" max="{{ $cuti->rollover_target_year }}-12-31" aria-describedby="rollover-target-year-hint" @endif class="mt-1 w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink" required>
                                 @error('tanggal_selesai')<p class="mt-1 text-xs text-danger">{{ $message }}</p>@enderror
                             </div>
                             <div class="md:col-span-2">
@@ -264,7 +277,7 @@
                                 @error('lampiran')<p class="mt-1 text-xs text-danger">{{ $message }}</p>@enderror
                             </div>
                             <div class="md:col-span-2 flex justify-end">
-                                <button type="submit" class="{{ $buttonStyles['success'] }}">Kirim Ulang Pengajuan</button>
+                                <button type="submit" class="{{ $buttonStyles['success'] }}">{{ $isRolloverReturn ? 'Perbaiki dan Ajukan Kembali' : 'Kirim Ulang Pengajuan' }}</button>
                             </div>
                         </form>
                     </div>

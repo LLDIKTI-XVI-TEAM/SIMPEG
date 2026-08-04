@@ -31,6 +31,11 @@ final class NotificationEventCatalog
             'group' => 'Cuti',
             'allowed_channels' => ['in_app', 'email'],
         ],
+        'cuti.dikembalikan_karena_rollover' => [
+            'label' => 'Cuti dikembalikan karena rollover',
+            'group' => 'Cuti',
+            'allowed_channels' => ['in_app', 'email'],
+        ],
         'cuti.perlu_perubahan' => [
             'label' => 'Cuti perlu perubahan',
             'group' => 'Cuti',
