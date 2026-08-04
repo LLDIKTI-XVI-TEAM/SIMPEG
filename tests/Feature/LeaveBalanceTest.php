@@ -56,12 +56,14 @@ class LeaveBalanceTest extends TestCase
                 'carry_over',
                 'terpakai',
                 'sisa',
+                'sisa_efektif',
                 'tahun',
             ],
             'history',
         ]);
 
         $response->assertJsonPath('balance.sisa', 10);
+        $response->assertJsonPath('balance.sisa_efektif', 10);
     }
 
     public function test_employee_can_view_leave_history_via_api(): void
@@ -124,5 +126,85 @@ class LeaveBalanceTest extends TestCase
             'employee_id' => $employee->id,
             'tahun' => now()->year,
         ]);
+    }
+
+    public function test_saldo_pribadi_rule_5_menampilkan_sisa_efektif_tanpa_mengubah_saldo_tercatat(): void
+    {
+        $employee = Employee::factory()->create();
+        $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+        $balance = LeaveBalance::create([
+            'employee_id' => $employee->id,
+            'tahun' => now()->year,
+            'jatah_awal' => 12,
+            'carry_over' => 6,
+            'terpakai' => 0,
+            'sisa' => 18,
+            'sisa_n2' => 0,
+            'sisa_n1' => 6,
+            'sisa_tahun_berjalan' => 12,
+            'terpakai_tahun_berjalan' => 0,
+            'hangus' => 0,
+        ]);
+        LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => RefJenisCuti::query()->where('code', 'besar')->firstOrFail()->id,
+            'tanggal_mulai' => now()->startOfYear()->addMonths(2)->toDateString(),
+            'tanggal_selesai' => now()->startOfYear()->addMonths(2)->addDays(30)->toDateString(),
+            'jumlah_hari_kerja' => 20,
+            'alasan' => 'Cuti Besar final.',
+            'status' => 'disetujui',
+        ]);
+
+        $this->actingAs($user)
+            ->getJson('/api/v1/profil-saya/saldo-cuti')
+            ->assertOk()
+            ->assertJsonStructure(['balance' => ['jatah_awal', 'carry_over', 'terpakai', 'sisa', 'sisa_efektif', 'tahun'], 'history'])
+            ->assertJsonPath('balance.sisa', 18)
+            ->assertJsonPath('balance.sisa_efektif', 0);
+
+        $this->actingAs($user)
+            ->get('/dashboard/cuti/saldo')
+            ->assertOk()
+            ->assertSee('Saldo tercatat, tidak dapat digunakan pada tahun Cuti Besar', false)
+            ->assertSee('Hak efektif tahun ini adalah 0 karena Cuti Besar telah disetujui.', false)
+            ->assertSee('Saldo Tercatat', false)
+            ->assertSee('18', false);
+
+        $this->assertSame(18, $balance->fresh()->sisa);
+    }
+
+    public function test_saldo_pribadi_cuti_besar_non_final_tidak_menampilkan_peringatan_rule_5(): void
+    {
+        $employee = Employee::factory()->create();
+        $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+        LeaveBalance::create([
+            'employee_id' => $employee->id,
+            'tahun' => now()->year,
+            'jatah_awal' => 12,
+            'carry_over' => 6,
+            'terpakai' => 0,
+            'sisa' => 18,
+            'sisa_n2' => 0,
+            'sisa_n1' => 6,
+            'sisa_tahun_berjalan' => 12,
+            'terpakai_tahun_berjalan' => 0,
+            'hangus' => 0,
+        ]);
+        LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => RefJenisCuti::query()->where('code', 'besar')->firstOrFail()->id,
+            'tanggal_mulai' => now()->startOfYear()->addMonths(2)->toDateString(),
+            'tanggal_selesai' => now()->startOfYear()->addMonths(2)->addDays(30)->toDateString(),
+            'jumlah_hari_kerja' => 20,
+            'alasan' => 'Cuti Besar belum final.',
+            'status' => 'menunggu_approval',
+        ]);
+
+        $this->actingAs($user)
+            ->get('/dashboard/cuti/saldo')
+            ->assertOk()
+            ->assertDontSee('Saldo tercatat, tidak dapat digunakan pada tahun Cuti Besar', false)
+            ->assertSee('Saldo Tercatat', false)
+            ->assertSee('18', false);
     }
 }

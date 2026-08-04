@@ -315,7 +315,7 @@
                 <x-ui.card>
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div>
-                            <h3 class="text-sm font-semibold text-ink">Ringkasan Saldo Pegawai</h3>
+                            <h3 class="text-sm font-semibold text-ink">Ringkasan Saldo Tercatat Pegawai</h3>
                             <p class="mt-1 text-xs text-muted">Tahun acuan: {{ $tahunAcuan }}</p>
                             <p class="mt-1 max-w-2xl text-xs leading-relaxed text-muted">
                                 Saldo ini adalah nilai berjalan dan dapat berubah melalui koreksi atau pemotongan cuti.
@@ -326,6 +326,13 @@
                             <p class="mt-1 text-xs text-muted">NIP {{ $selectedEmployee->nip }}</p>
                         </div>
                     </div>
+
+                    @if ($rule5Active)
+                        <x-ui.alert variant="warning" class="mt-4">
+                            <p class="font-semibold">Bucket saldo tercatat untuk riwayat administratif</p>
+                            <p>Hak efektif Cuti Tahunan tahun ini adalah 0 karena Cuti Besar telah disetujui.</p>
+                        </x-ui.alert>
+                    @endif
 
                     @if ($selectedBalance)
                         <div class="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-5">

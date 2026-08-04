@@ -5,13 +5,12 @@ namespace App\Http\Controllers\Admin;
 use App\Actions\Cuti\AdjustLeaveBalanceAction;
 use App\Actions\Cuti\SetOpeningLeaveBalanceAction;
 use App\Actions\Cuti\ShowLeaveBalanceAdminAction;
+use App\Actions\Cuti\ShowMyLeaveBalanceAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Cuti\AdjustLeaveBalanceRequest;
 use App\Http\Requests\Cuti\LeaveBalanceAdminPageRequest;
 use App\Http\Requests\Cuti\OpeningLeaveBalanceRequest;
 use App\Models\Employee;
-use App\Models\LeaveBalance;
-use App\Models\LeaveRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
 
@@ -26,7 +25,7 @@ class LeaveBalanceController extends Controller
     /**
      * Web: Menampilkan halaman saldo cuti pribadi untuk pengguna login.
      */
-    public function showMyBalanceWeb(Request $request)
+    public function showMyBalanceWeb(Request $request, ShowMyLeaveBalanceAction $action)
     {
         $employee = $request->user()?->employee;
 
@@ -35,18 +34,7 @@ class LeaveBalanceController extends Controller
                 ->with('error', 'Akun Anda belum ter-mapping ke data pegawai.');
         }
 
-        $tahun = (int) now()->year;
-        $balance = LeaveBalance::query()
-            ->where('employee_id', $employee->id)
-            ->where('tahun', $tahun)
-            ->first();
-
-        $history = LeaveRequest::where('employee_id', $employee->id)
-            ->with(['jenisCuti'])
-            ->orderByDesc('created_at')
-            ->paginate(10);
-
-        return view('admin.cuti.personal-saldo', compact('balance', 'history'));
+        return view('admin.cuti.personal-saldo', $action->forWeb($employee, now()));
     }
 
     /**

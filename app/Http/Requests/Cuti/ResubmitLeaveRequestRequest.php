@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Cuti;
 
 use App\Services\Cuti\LeaveBalanceReservationService;
+use App\Services\Cuti\LeaveBalanceService;
 use App\Services\Cuti\LeaveEligibilityService;
 use App\Services\WorkdayCalculator;
 use Illuminate\Contracts\Validation\Validator;
@@ -127,6 +128,20 @@ class ResubmitLeaveRequestRequest extends FormRequest
             }
 
             if (! $leaveRequest?->jenisCuti?->mengurangi_saldo_tahunan) {
+                return;
+            }
+
+            try {
+                // Validasi awal memberi pesan Rule 5 yang spesifik; Action/reservasi tetap
+                // mengulang guard ini dalam lock transaksi untuk keamanan submit paralel.
+                app(LeaveBalanceService::class)->assertAnnualLeaveAllowed($employee, $mulai->year);
+            } catch (ValidationException $exception) {
+                foreach ($exception->errors() as $field => $messages) {
+                    foreach ($messages as $message) {
+                        $validator->errors()->add($field, $message);
+                    }
+                }
+
                 return;
             }
 

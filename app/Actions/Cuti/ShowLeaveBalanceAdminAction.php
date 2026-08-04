@@ -6,12 +6,14 @@ use App\Models\Employee;
 use App\Models\LeaveBalanceLedger;
 use App\Queries\Cuti\CutiRekapQuery;
 use App\Queries\Cuti\LeaveBalanceAdminEmployeeQuery;
+use Illuminate\Support\Carbon;
 
 class ShowLeaveBalanceAdminAction
 {
     public function __construct(
         private readonly CutiRekapQuery $rekapQuery,
         private readonly LeaveBalanceAdminEmployeeQuery $employeeQuery,
+        private readonly PreviewLeaveBalanceAction $preview,
     ) {}
 
     /**
@@ -38,6 +40,9 @@ class ShowLeaveBalanceAdminAction
         $selectedBalance = $selectedEmployee === null
             ? null
             : $this->rekapQuery->balanceRows($filters)->first();
+        $rule5Active = $selectedEmployee === null
+            ? false
+            : $this->preview->execute($selectedEmployee, Carbon::create((int) $periode, 1, 1)->startOfDay())['rule_5_active'];
         $balanceInitialization = $this->balanceInitialization(
             $selectedEmployee?->id,
             (int) $periode,
@@ -77,6 +82,7 @@ class ShowLeaveBalanceAdminAction
             'statusCounts',
             'selectedEmployee',
             'selectedBalance',
+            'rule5Active',
             'balanceInitialization',
             'ledgerRows',
             'rolloverRows',

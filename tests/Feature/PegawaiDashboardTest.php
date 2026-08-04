@@ -77,9 +77,9 @@ class PegawaiDashboardTest extends TestCase
             ->assertOk();
 
         $response->assertViewHas('saldoCuti', fn ($saldo): bool => $saldo !== null
-            && (int) $saldo->jatah_awal === 18
-            && (int) $saldo->carry_over === 3
-            && (int) $saldo->sisa === 17);
+            && $saldo['jatah_dasar'] === 18
+            && $saldo['carry_over'] === 3
+            && $saldo['saldo_dapat_diajukan'] === 17);
     }
 
     public function test_dashboard_pegawai_tanpa_saldo_mengirim_saldo_null_ke_view(): void
@@ -91,7 +91,10 @@ class PegawaiDashboardTest extends TestCase
         $this->actingAs($user)
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertViewHas('saldoCuti', null);
+            ->assertViewHas('saldoCuti', fn (mixed $saldo): bool => is_array($saldo)
+                && $saldo['eligible'] === false
+                && $saldo['saldo_dapat_diajukan'] === 0
+                && $saldo['rule_5_active'] === false);
     }
 
     public function test_dashboard_pegawai_menampilkan_cuti_aktif_tanpa_cuti_yang_sudah_diputuskan(): void
@@ -142,6 +145,50 @@ class PegawaiDashboardTest extends TestCase
             ->assertOk()
             ->assertViewHas('saldoCuti', null)
             ->assertSee('Belum ada notifikasi', false);
+    }
+
+    public function test_dashboard_pegawai_rule_5_menampilkan_sisa_efektif_nol_tanpa_mengubah_saldo_tercatat(): void
+    {
+        [$user, $employee] = $this->pegawaiWithEmployee();
+        $balance = LeaveBalance::create([
+            'employee_id' => $employee->id,
+            'tahun' => now()->year,
+            'jatah_awal' => 12,
+            'carry_over' => 6,
+            'terpakai' => 0,
+            'sisa' => 18,
+            'sisa_n2' => 0,
+            'sisa_n1' => 6,
+            'sisa_tahun_berjalan' => 12,
+            'terpakai_tahun_berjalan' => 0,
+            'hangus' => 0,
+        ]);
+        $large = RefJenisCuti::create([
+            'nama' => 'Cuti Besar',
+            'code' => 'besar',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => true,
+        ]);
+        LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $large->id,
+            'tanggal_mulai' => now()->startOfYear()->addMonths(2)->toDateString(),
+            'tanggal_selesai' => now()->startOfYear()->addMonths(2)->addDays(30)->toDateString(),
+            'jumlah_hari_kerja' => 20,
+            'alasan' => 'Cuti Besar final.',
+            'status' => 'disetujui',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('dashboard'));
+
+        $response->assertOk()
+            ->assertViewHas('rule5Active', true)
+            ->assertViewHas('saldoCuti', fn (mixed $saldo): bool => is_array($saldo)
+                && $saldo['rule_5_active'] === true
+                && $saldo['saldo_dapat_diajukan'] === 0)
+            ->assertSee('Hak Efektif Tahun Ini', false)
+            ->assertSee('tidak dapat digunakan pada tahun Cuti Besar', false);
+        $this->assertSame(18, $balance->fresh()->sisa);
     }
 
     /**

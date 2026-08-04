@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Actions\Cuti\PostponeLeaveAction;
+use App\Models\Appointment;
 use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveApprovalChain;
@@ -12,6 +13,7 @@ use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
 use App\Models\RefJenisCuti;
+use App\Models\RefJenisPegawai;
 use App\Models\SimpegNotification;
 use App\Services\Cuti\LeaveBalanceService;
 use App\Services\LeaveApprovalService;
@@ -520,6 +522,15 @@ class LeaveApprovalEngineTest extends TestCase
     public function test_final_cuti_besar_gagal_jika_cuti_tahunan_tahun_sama_sudah_dipakai(): void
     {
         $pemohon = $this->makePemohon();
+        $jenisPns = RefJenisPegawai::firstOrCreate(['nama' => 'PNS']);
+        $pemohon['employee']->forceFill(['jenis_pegawai_id' => $jenisPns->id])->save();
+        Appointment::create([
+            'employee_id' => $pemohon['employee']->id,
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2018-01-01',
+            'no_sk' => 'SK-APPROVAL-RULE-5',
+            'tanggal_sk' => '2018-01-01',
+        ]);
         $jenisBesar = RefJenisCuti::firstOrCreate(
             ['code' => 'besar'],
             ['nama' => 'Cuti Besar', 'mengurangi_saldo_tahunan' => false, 'khusus_pns' => true],
@@ -553,6 +564,11 @@ class LeaveApprovalEngineTest extends TestCase
             $this->service()->approve($cuti->fresh(), $pemohon['pybmc']);
             $this->fail('Persetujuan final cuti besar seharusnya gagal setelah cuti tahunan dipakai di tahun yang sama.');
         } catch (ValidationException $e) {
+            $this->assertArrayHasKey('status', $e->errors());
+            $this->assertSame(
+                'Cuti Besar tidak dapat disetujui karena Cuti Tahunan tahun yang sama sudah digunakan.',
+                $e->errors()['status'][0],
+            );
             $this->assertSame('menunggu_approval', $cuti->fresh()->status);
             $this->assertDatabaseHas('leave_request_steps', ['leave_request_id' => $cuti->id, 'step_order' => 2, 'status' => 'active']);
         }

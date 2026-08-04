@@ -6,6 +6,8 @@ use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceLedger;
+use App\Models\LeaveRequest;
+use App\Models\RefJenisCuti;
 use App\Models\User;
 use App\Services\Cuti\LeaveBalanceService;
 use Database\Seeders\RbacSeeder;
@@ -1021,6 +1023,42 @@ class LeaveBalanceAdjustmentTest extends TestCase
         $response->assertDontSee('>Sakit<', false);
     }
 
+    public function test_administrasi_saldo_rule_5_membedakan_bucket_tercatat_dari_hak_efektif(): void
+    {
+        $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Cuti Besar Final']);
+        $user = User::factory()->adminKepegawaian()->create();
+        app(LeaveBalanceService::class)->setOpeningBalance($employee, 2027, [
+            'n2' => 0,
+            'n1' => 6,
+            'current' => 12,
+        ], 'Baseline saldo tercatat untuk Rule 5.', $user);
+        $large = RefJenisCuti::create([
+            'nama' => 'Cuti Besar',
+            'code' => 'besar',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => true,
+        ]);
+        LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $large->id,
+            'tanggal_mulai' => '2027-03-01',
+            'tanggal_selesai' => '2027-03-31',
+            'jumlah_hari_kerja' => 20,
+            'alasan' => 'Cuti Besar final.',
+            'status' => 'disetujui',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('cuti.saldo.administrasi', [
+            'pegawai' => $employee->id,
+        ]));
+
+        $response->assertOk()
+            ->assertViewHas('rule5Active', true)
+            ->assertSee('Bucket saldo tercatat untuk riwayat administratif', false)
+            ->assertSee('Hak efektif Cuti Tahunan tahun ini adalah 0 karena Cuti Besar telah disetujui.', false)
+            ->assertSee(route('cuti.saldo.adjust', $employee), false);
+    }
+
     public function test_administrasi_saldo_inisialisasi_rollover_menampilkan_baseline_sistem_read_only(): void
     {
         $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Rollover']);
@@ -1228,7 +1266,7 @@ class LeaveBalanceAdjustmentTest extends TestCase
         $response->assertSee('Kembali ke antrian pegawai', false);
         $response->assertSee('Pegawai Workspace Terpilih', false);
         $response->assertSee('198801010001', false);
-        $response->assertSee('Ringkasan Saldo Pegawai', false);
+        $response->assertSee('Ringkasan Saldo Tercatat Pegawai', false);
         $response->assertSee('Riwayat workspace dua state.', false);
         $response->assertDontSee(route('cuti.saldo.opening-balance', $selectedEmployee), false);
         $response->assertSee(route('cuti.saldo.adjust', $selectedEmployee), false);

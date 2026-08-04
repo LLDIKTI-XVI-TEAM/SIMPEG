@@ -38,6 +38,8 @@ class ResubmitLeaveRequestAction
 
         $mulai = Carbon::createFromFormat('Y-m-d', (string) $data['tanggal_mulai'])->startOfDay();
         $selesai = Carbon::createFromFormat('Y-m-d', (string) $data['tanggal_selesai'])->startOfDay();
+        // Boundary Action menolak bypass FormRequest sebelum file maupun data pengajuan ditulis.
+        $this->eligibility->assertSingleCalendarYear($mulai, $selesai);
         $oldLampiranPath = $leaveRequest->lampiran_path;
         $newLampiranPath = null;
 

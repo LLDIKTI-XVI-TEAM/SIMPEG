@@ -1007,8 +1007,16 @@ class LeaveBalanceRolloverTest extends TestCase
             'occurred_at' => Carbon::parse('2026-07-01'),
         ]);
 
-        $this->expectException(ValidationException::class);
-        app(LeaveBalanceService::class)->assertCutiBesarCanBeFinallyApproved($employee->id, 2026);
+        try {
+            app(LeaveBalanceService::class)->assertCutiBesarCanBeFinallyApproved($employee->id, 2026);
+            $this->fail('Cuti Besar harus ditolak setelah pemotongan Cuti Tahunan tahun yang sama.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('status', $exception->errors());
+            $this->assertSame(
+                'Cuti Besar tidak dapat disetujui karena Cuti Tahunan tahun yang sama sudah digunakan.',
+                $exception->errors()['status'][0],
+            );
+        }
     }
 
     public function test_final_cuti_besar_gagal_jika_cuti_tahunan_tahun_sama_memakai_carry_over(): void
@@ -1034,8 +1042,170 @@ class LeaveBalanceRolloverTest extends TestCase
             'occurred_at' => Carbon::parse('2026-02-01'),
         ]);
 
-        $this->expectException(ValidationException::class);
-        app(LeaveBalanceService::class)->assertCutiBesarCanBeFinallyApproved($employee->id, 2026);
+        try {
+            app(LeaveBalanceService::class)->assertCutiBesarCanBeFinallyApproved($employee->id, 2026);
+            $this->fail('Cuti Besar harus ditolak setelah pemotongan carry-over pada tahun penggunaan yang sama.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('status', $exception->errors());
+            $this->assertSame(
+                'Cuti Besar tidak dapat disetujui karena Cuti Tahunan tahun yang sama sudah digunakan.',
+                $exception->errors()['status'][0],
+            );
+        }
+    }
+
+    public function test_rollover_tahun_cuti_besar_tidak_membawa_current_ke_n_minus_one(): void
+    {
+        $employee = $this->employeeWithAppointment();
+        $source = LeaveBalance::create($this->balancePayload($employee, 2026, [
+            'sisa_tahun_berjalan' => 12,
+            'sisa' => 12,
+        ]));
+        LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => RefJenisCuti::where('code', 'besar')->firstOrFail()->id,
+            'tanggal_mulai' => '2026-08-03',
+            'tanggal_selesai' => '2026-08-31',
+            'jumlah_hari_kerja' => 20,
+            'alasan' => 'Cuti Besar final.',
+            'status' => 'disetujui',
+        ]);
+
+        $service = app(LeaveBalanceService::class);
+        $service->rolloverYear(2026);
+
+        $target = LeaveBalance::query()
+            ->where('employee_id', $employee->id)
+            ->where('tahun', 2027)
+            ->firstOrFail();
+        $this->assertSame(0, $target->sisa_n1);
+        $this->assertSame(12, $target->sisa_tahun_berjalan);
+        $this->assertSame(12, $target->sisa);
+        $this->assertSame(12, $target->hangus);
+        $this->assertSame(12, $source->fresh()->sisa_tahun_berjalan);
+        $this->assertSame(12, $source->fresh()->sisa);
+        $this->assertDatabaseMissing('leave_balance_ledger', [
+            'employee_id' => $employee->id,
+            'tahun' => 2027,
+            'event_type' => LeaveBalanceLedger::EVENT_CARRY_OVER_GRANTED,
+            'source_year' => 2026,
+        ]);
+        $this->assertDatabaseHas('leave_balance_ledger', [
+            'employee_id' => $employee->id,
+            'tahun' => 2027,
+            'event_type' => LeaveBalanceLedger::EVENT_ANNUAL_ENTITLEMENT_GRANTED,
+            'amount' => 12,
+        ]);
+
+        $rollover = LeaveBalanceLedger::query()
+            ->where('employee_id', $employee->id)
+            ->where('tahun', 2027)
+            ->where('event_type', LeaveBalanceLedger::EVENT_ROLLOVER_APPLIED)
+            ->firstOrFail();
+        $expired = LeaveBalanceLedger::query()
+            ->where('employee_id', $employee->id)
+            ->where('tahun', 2027)
+            ->where('event_type', LeaveBalanceLedger::EVENT_CARRY_OVER_EXPIRED)
+            ->firstOrFail();
+        $this->assertSame(12, $rollover->metadata['rule_5_current_excluded']);
+        $this->assertSame(12, $expired->metadata['expired_days']);
+
+        $service->rolloverYear(2026);
+
+        $this->assertSame(1, LeaveBalanceLedger::query()
+            ->where('employee_id', $employee->id)
+            ->where('event_type', LeaveBalanceLedger::EVENT_ROLLOVER_APPLIED)
+            ->count());
+        $this->assertSame(1, LeaveBalanceLedger::query()
+            ->where('employee_id', $employee->id)
+            ->where('event_type', LeaveBalanceLedger::EVENT_CARRY_OVER_EXPIRED)
+            ->count());
+    }
+
+    public function test_rollover_tahun_cuti_besar_hanya_mengecualikan_current_dan_tidak_memperpanjang_carry_lama(): void
+    {
+        $employee = $this->employeeWithAppointment();
+        $source = LeaveBalance::create($this->balancePayload($employee, 2026, [
+            'sisa_n2' => 4,
+            'sisa_n1' => 6,
+            'sisa_tahun_berjalan' => 12,
+            'carry_over' => 10,
+            'sisa' => 22,
+        ]));
+        LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => RefJenisCuti::where('code', 'besar')->firstOrFail()->id,
+            'tanggal_mulai' => '2026-08-03',
+            'tanggal_selesai' => '2026-08-31',
+            'jumlah_hari_kerja' => 20,
+            'alasan' => 'Cuti Besar final.',
+            'status' => 'disetujui',
+        ]);
+
+        app(LeaveBalanceService::class)->rolloverYear(2026);
+
+        $target = LeaveBalance::query()
+            ->where('employee_id', $employee->id)
+            ->where('tahun', 2027)
+            ->firstOrFail();
+        $this->assertSame(4, $source->fresh()->sisa_n2);
+        $this->assertSame(6, $source->fresh()->sisa_n1);
+        $this->assertSame(12, $source->fresh()->sisa_tahun_berjalan);
+        $this->assertSame(6, $target->sisa_n2);
+        $this->assertSame(0, $target->sisa_n1);
+        $this->assertSame(12, $target->sisa_tahun_berjalan);
+        $this->assertSame(18, $target->sisa);
+        $this->assertSame(12, $target->hangus);
+        $this->assertDatabaseHas('leave_balance_ledger', [
+            'employee_id' => $employee->id,
+            'tahun' => 2027,
+            'event_type' => LeaveBalanceLedger::EVENT_CARRY_OVER_GRANTED,
+            'amount' => 6,
+            'source_year' => 2026,
+        ]);
+        $this->assertDatabaseHas('leave_balance_ledger', [
+            'employee_id' => $employee->id,
+            'tahun' => 2027,
+            'event_type' => LeaveBalanceLedger::EVENT_CARRY_OVER_EXPIRED,
+            'source_year' => 2026,
+            'metadata->expired_days' => 12,
+        ]);
+    }
+
+    public function test_rollover_cuti_besar_non_final_tidak_mengubah_carry_ordinary(): void
+    {
+        $employee = $this->employeeWithAppointment();
+        LeaveBalance::create($this->balancePayload($employee, 2026, [
+            'sisa_tahun_berjalan' => 12,
+            'sisa' => 12,
+        ]));
+        LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => RefJenisCuti::where('code', 'besar')->firstOrFail()->id,
+            'tanggal_mulai' => '2026-08-03',
+            'tanggal_selesai' => '2026-08-31',
+            'jumlah_hari_kerja' => 20,
+            'alasan' => 'Cuti Besar belum final.',
+            'status' => 'menunggu_approval',
+        ]);
+
+        app(LeaveBalanceService::class)->rolloverYear(2026);
+
+        $target = LeaveBalance::query()
+            ->where('employee_id', $employee->id)
+            ->where('tahun', 2027)
+            ->firstOrFail();
+        $this->assertSame(6, $target->sisa_n1);
+        $this->assertSame(12, $target->sisa_tahun_berjalan);
+        $this->assertSame(18, $target->sisa);
+        $this->assertSame(6, $target->hangus);
+        $this->assertDatabaseHas('leave_balance_ledger', [
+            'employee_id' => $employee->id,
+            'tahun' => 2027,
+            'event_type' => LeaveBalanceLedger::EVENT_CARRY_OVER_GRANTED,
+            'amount' => 6,
+            'source_year' => 2026,
+        ]);
     }
 
     public function test_command_rollover_memakai_tahun_sumber_dan_scheduler_berjalan_jam_nol_nol_lima(): void

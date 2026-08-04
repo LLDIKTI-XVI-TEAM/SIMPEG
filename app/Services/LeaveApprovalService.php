@@ -9,6 +9,7 @@ use App\Models\LeaveRequestStep;
 use App\Models\User;
 use App\Services\Cuti\LeaveBalanceReservationService;
 use App\Services\Cuti\LeaveBalanceService;
+use App\Services\Cuti\LeaveEligibilityService;
 use App\Services\Cuti\LeaveProofService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Carbon;
@@ -39,6 +40,7 @@ class LeaveApprovalService
         private readonly LeaveProofService $proofs,
         private readonly LeaveBalanceService $balances,
         private readonly LeaveBalanceReservationService $reservations,
+        private readonly LeaveEligibilityService $eligibility,
     ) {}
 
     /**
@@ -91,8 +93,27 @@ class LeaveApprovalService
             // Konversi dan pemotongan berada dalam transaksi yang sama. Konversi
             // dilakukan lebih dulu agar seluruh mutasi memakai urutan kunci yang sama:
             // request, pegawai, lalu saldo. Jika deduction gagal, event konversi ikut rollback.
+            $employee = Employee::query()
+                ->whereKey($locked->employee_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $isCutiBesar = $locked->jenisCuti()->where('code', 'besar')->exists();
+
+            if ($isCutiBesar) {
+                // Kelayakan persisted dan konflik saldo dicek setelah mutex pegawai agar final approval
+                // tidak dapat berlomba dengan submit atau resubmit Cuti Tahunan pada tahun yang sama.
+                $this->eligibility->assertCutiBesarCanBeFinallyApproved($locked, $employee);
+                $this->balances->assertCutiBesarCanBeFinallyApproved(
+                    $employee,
+                    $locked->tanggal_mulai->year,
+                );
+            }
+
             $this->reservations->convertForFinalApproval($locked, $actingUser);
-            $this->deductBalanceIfRequired($locked);
+            if (! $isCutiBesar) {
+                $this->deductBalanceIfRequired($locked);
+            }
             $locked->forceFill(['status' => self::STATUS_DISETUJUI])->save();
             $this->proofs->generateForApprovedRequest($locked->refresh(), $actor, $actingUser);
 

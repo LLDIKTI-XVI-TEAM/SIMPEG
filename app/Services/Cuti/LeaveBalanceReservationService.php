@@ -63,6 +63,7 @@ class LeaveBalanceReservationService
         DB::transaction(function () use ($leaveRequest, $actor): void {
             $employee = $this->lockEmployee($leaveRequest->employee_id);
             $tahun = $leaveRequest->tanggal_mulai->year;
+            $this->balances->assertAnnualLeaveAllowed($employee, $tahun);
             $balance = $this->lockBalances($employee, [$tahun => $leaveRequest->tanggal_mulai])[$tahun] ?? null;
 
             if ($balance === null) {
@@ -116,6 +117,7 @@ class LeaveBalanceReservationService
             $employee = $this->lockEmployee($leaveRequest->employee_id);
             $existingByYear = $this->reservedByYearForRequest($leaveRequest->id);
             $newYear = $newStartDate->year;
+            $this->balances->assertAnnualLeaveAllowed($employee, $newYear);
             $datesByYear = [$newYear => $newStartDate];
 
             foreach (array_keys($existingByYear) as $year) {
