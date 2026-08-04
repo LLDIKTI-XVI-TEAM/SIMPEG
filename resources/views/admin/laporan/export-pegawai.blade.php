@@ -36,13 +36,13 @@
             </div>
             <div class="flex w-full flex-wrap items-center gap-3 sm:w-auto sm:justify-end">
                 {{-- Cetak PDF --}}
-                <x-ui.button @click="printReport()" x-bind:disabled="previewLoading || !!pensiunError" variant="secondary">
+                <x-ui.button @click="printReport()" x-bind:disabled="previewLoading || !!previewError || !!pensiunError" variant="secondary">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.617 0-1.11-.476-1.12-1.09l-.23-2.523M19.5 10.5v.375c0 .621-.504 1.125-1.125 1.125H5.625A1.125 1.125 0 0 1 4.5 11.25v-.375m15 0V9a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 9v1.5m15 0A1.5 1.5 0 0 0 18 9h-3V6a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3H6a1.5 1.5 0 0 0-1.5 1.5" />
                     </svg>
                     Cetak PDF
                 </x-ui.button>
-                <x-ui.button type="submit" form="custom-export-form" x-bind:disabled="previewLoading" variant="secondary">
+                <x-ui.button type="submit" form="custom-export-form" x-bind:disabled="previewLoading || !!previewError || !!pensiunError" variant="secondary">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
                     </svg>
