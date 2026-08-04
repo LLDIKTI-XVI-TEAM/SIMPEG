@@ -131,7 +131,11 @@ return new class extends Migration
         DB::statement('ALTER TABLE leave_requests DROP CONSTRAINT IF EXISTS leave_requests_status_check');
         DB::statement("ALTER TABLE leave_requests ADD CONSTRAINT leave_requests_status_check CHECK (status IN ({$statuses}))");
         DB::statement('ALTER TABLE leave_requests DROP CONSTRAINT IF EXISTS leave_requests_rollover_target_year_check');
-        DB::statement('ALTER TABLE leave_requests ADD CONSTRAINT leave_requests_rollover_target_year_check CHECK (rollover_source_year IS NULL OR rollover_target_year IS NULL OR rollover_target_year = rollover_source_year + 1)');
+
+        // Metadata rollover wajib lengkap atau kosong sepenuhnya. Baris parsial tidak boleh ada
+        // karena resubmit mewajibkan tahun target: pengajuan yang dikembalikan tanpa tahun target
+        // akan mentok dan tidak dapat diajukan kembali oleh pegawai.
+        DB::statement('ALTER TABLE leave_requests ADD CONSTRAINT leave_requests_rollover_target_year_check CHECK ((rollover_source_year IS NULL AND rollover_target_year IS NULL) OR (rollover_source_year IS NOT NULL AND rollover_target_year IS NOT NULL AND rollover_target_year = rollover_source_year + 1))');
     }
 
     /** Migration menyediakan policy default tanpa mengandalkan ReferenceSeeder saat upgrade aplikasi. */

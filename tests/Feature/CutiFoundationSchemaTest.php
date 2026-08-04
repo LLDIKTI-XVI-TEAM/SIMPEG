@@ -115,6 +115,83 @@ class CutiFoundationSchemaTest extends TestCase
         );
     }
 
+    /**
+     * Metadata rollover harus lengkap atau kosong sepenuhnya. Baris parsial berbahaya karena
+     * resubmit mewajibkan tahun target: pengajuan yang dikembalikan tanpa tahun target akan
+     * mentok dan tidak dapat diajukan kembali oleh pegawai.
+     */
+    public function test_rollover_metadata_must_be_complete_or_absent_on_postgresql(): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('CHECK constraint metadata rollover diverifikasi khusus pada PostgreSQL.');
+        }
+
+        $employee = Employee::factory()->create();
+        $jenisCuti = RefJenisCuti::create([
+            'nama' => 'Cuti Kontrak Metadata Rollover',
+            'code' => 'kontrak_metadata_rollover',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+
+        $partialMetadata = [
+            'tahun sumber tanpa tahun target' => [
+                'rollover_source_year' => 2026,
+                'rollover_target_year' => null,
+            ],
+            'tahun target tanpa tahun sumber' => [
+                'rollover_source_year' => null,
+                'rollover_target_year' => 2027,
+            ],
+        ];
+
+        foreach ($partialMetadata as $label => $metadata) {
+            // Savepoint per percobaan agar transaksi test tidak ikut abort dan pesan
+            // constraint asli tetap terbaca, bukan galat transaksi lanjutan.
+            DB::beginTransaction();
+
+            try {
+                LeaveRequest::create([
+                    'employee_id' => $employee->id,
+                    'jenis_cuti_id' => $jenisCuti->id,
+                    'tanggal_mulai' => '2026-12-23',
+                    'tanggal_selesai' => '2026-12-23',
+                    'jumlah_hari_kerja' => 1,
+                    'alasan' => "Metadata rollover parsial: {$label}.",
+                    'status' => LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER,
+                    ...$metadata,
+                ]);
+
+                $rejected = false;
+            } catch (QueryException $exception) {
+                $rejected = true;
+
+                $this->assertStringContainsString(
+                    'leave_requests_rollover_target_year_check',
+                    $exception->getMessage(),
+                    "Penolakan metadata rollover parsial {$label} harus berasal dari CHECK metadata rollover.",
+                );
+            } finally {
+                DB::rollBack();
+            }
+
+            $this->assertTrue($rejected, "Metadata rollover parsial {$label} seharusnya ditolak database.");
+        }
+
+        $tanpaMetadata = LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $jenisCuti->id,
+            'tanggal_mulai' => '2026-12-24',
+            'tanggal_selesai' => '2026-12-24',
+            'jumlah_hari_kerja' => 1,
+            'alasan' => 'Pengajuan normal tanpa metadata rollover.',
+            'status' => 'menunggu_approval',
+        ]);
+
+        $this->assertNull($tanpaMetadata->rollover_source_year);
+        $this->assertNull($tanpaMetadata->rollover_target_year);
+    }
+
     public function test_rollover_return_migration_normalizes_known_original_enum_statuses_before_check_postgresql(): void
     {
         if (DB::getDriverName() !== 'pgsql') {
