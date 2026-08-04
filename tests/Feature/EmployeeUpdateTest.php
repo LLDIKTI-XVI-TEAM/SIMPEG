@@ -213,7 +213,7 @@ class EmployeeUpdateTest extends TestCase
         $response->assertJsonValidationErrors('tanggal_lahir');
     }
 
-    public function test_web_edit_omits_and_ignores_manual_retirement_date(): void
+    public function test_web_edit_shows_and_ignores_manual_retirement_date(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create(['tanggal_pensiun' => '2042-05-15']);
@@ -221,7 +221,7 @@ class EmployeeUpdateTest extends TestCase
         $this->actingAs($user)
             ->get(route('pegawai.edit', $employee->id))
             ->assertOk()
-            ->assertDontSee('name="tanggal_pensiun"', false);
+            ->assertSee('name="tanggal_pensiun"', false);
 
         $response = $this->actingAs($user)->post(
             route('pegawai.update', $employee->id),

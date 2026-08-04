@@ -40,6 +40,9 @@ use Illuminate\Support\Carbon;
  * @property string|null $satyalancana_note
  * @property bool $is_kepala_lembaga
  * @property string|null $foto_url
+ * @property string|null $nik
+ * @property string|null $no_kk
+ * @property string|null $nik_hash
  * @property string|null $foto_public_path
  * @property-read RefJenisPegawai|null $jenisPegawai
  * @property-read User|null $user
@@ -58,6 +61,7 @@ class Employee extends Model
         'nama_dengan_gelar',
         'nip',
         'nik',
+        'nik_hash',
         'no_kk',
         'tempat_lahir',
         'tanggal_lahir',
@@ -194,6 +198,12 @@ class Employee extends Model
     public function salaryHistories(): HasMany
     {
         return $this->hasMany(SalaryHistory::class);
+    }
+
+    /** @return HasMany<EmployeeStatusHistory, $this> */
+    public function statusHistories(): HasMany
+    {
+        return $this->hasMany(EmployeeStatusHistory::class);
     }
 
     /** @return HasMany<DisciplineRecord, $this> */
@@ -415,5 +425,25 @@ class Employee extends Model
                 'kelas_jabatan' => $value,
             ],
         );
+    }
+
+    /**
+     * Setiap kali model disimpan dan NIK berubah, hitung dan simpan HMAC-SHA256 blind index di nik_hash
+     * agar query uniqueness dapat bekerja meskipun kolom nik dienkripsi AES-256.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (Employee $employee) {
+            if ($employee->isDirty('nik')) {
+                $plainNik = $employee->nik;
+                $trimmed = ($plainNik !== null) ? trim((string) $plainNik) : null;
+
+                if ($trimmed !== null && $trimmed !== '') {
+                    $employee->nik_hash = hash_hmac('sha256', $trimmed, config('app.key'));
+                } else {
+                    $employee->nik_hash = null;
+                }
+            }
+        });
     }
 }

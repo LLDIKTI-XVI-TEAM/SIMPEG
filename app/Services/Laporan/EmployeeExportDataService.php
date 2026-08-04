@@ -127,8 +127,9 @@ class EmployeeExportDataService
                 'jabatan' => $employee->jabatan_terakhir ?: ($currentPosition?->nama_jabatan ?: '-'),
                 'unit' => $currentPosition?->unitKerja?->nama ?: '-',
                 'jenis' => $employee->jenisPegawai?->nama ?: '-',
-                'pendidikan' => $employee->pendidikan_terakhir ?: '-',
-                'tanggal_pensiun' => $employee->tanggal_pensiun?->format('Y-m-d') ?: '-',
+                'status' => $employee->statusPegawai?->nama ?: ($employee->status_aktif ?: '-'),
+                'pendidikan' => $employee->pendidikan_terakhir ?: '',
+                'tanggal_pensiun' => $pensiunDate?->format('Y-m-d') ?: '-',
                 'email' => $employee->getRawOriginal('email_pribadi') ?: '-',
                 'no_hp' => $employee->no_hp ?: '-',
             ];

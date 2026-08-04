@@ -6,6 +6,7 @@ use App\Models\Appointment;
 use App\Models\DisciplineRecord;
 use App\Models\Document;
 use App\Models\Employee;
+use App\Models\EmployeeStatusHistory;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\SalaryHistory;
@@ -106,6 +107,11 @@ class UpdateDocumentAction
         $this->matchingHistoryRecords(DisciplineRecord::query(), $document, $oldFilePath, $oldNomorSk, $oldCategory, 'sk_hukuman_disiplin')->update($updates);
         $this->matchingHistoryRecords(Appointment::query(), $document, $oldFilePath, $oldNomorSk, $oldCategory, 'sk_pengangkatan')->update($updates);
 
+        $this->matchingHistoryRecords(EmployeeStatusHistory::query(), $document, $oldFilePath, $oldNomorSk, $oldCategory, 'sk_status_pegawai', 'nomor_berkas')->update([
+            'nomor_berkas' => $document->nomor_dokumen,
+            'file_sk' => $document->file_path,
+        ]);
+
         Employee::query()
             ->where('id', $document->employee_id)
             ->where(function (Builder $query) use ($oldFilePath, $oldNomorSk, $oldCategory): void {
@@ -135,14 +141,15 @@ class UpdateDocumentAction
         ?string $oldNomorSk,
         string $oldCategory,
         string $expectedCategory,
+        string $numberColumn = 'no_sk',
     ): Builder {
         return $query
             ->where('employee_id', $document->employee_id)
-            ->where(function (Builder $query) use ($oldFilePath, $oldNomorSk, $oldCategory, $expectedCategory): void {
+            ->where(function (Builder $query) use ($oldFilePath, $oldNomorSk, $oldCategory, $expectedCategory, $numberColumn): void {
                 $query->where('file_sk', $oldFilePath);
 
                 if ($oldCategory === $expectedCategory && filled($oldNomorSk)) {
-                    $query->orWhere('no_sk', $oldNomorSk);
+                    $query->orWhere($numberColumn, $oldNomorSk);
                 }
             });
     }
@@ -151,6 +158,7 @@ class UpdateDocumentAction
     {
         return Document::query()->where('file_path', $filePath)->exists()
             || Employee::query()->where('status_berkas_path', $filePath)->exists()
+            || EmployeeStatusHistory::query()->where('file_sk', $filePath)->exists()
             || RankHistory::query()->where('file_sk', $filePath)->exists()
             || PositionHistory::query()->where('file_sk', $filePath)->exists()
             || SalaryHistory::query()->where('file_sk', $filePath)->exists()

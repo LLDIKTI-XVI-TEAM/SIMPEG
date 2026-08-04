@@ -75,20 +75,33 @@ class EmployeeShowTest extends TestCase
             ->assertJsonPath('employee.id', $employee->id);
     }
 
-    public function test_employee_detail_page_calculates_retirement_estimate_from_birth_date_and_bup(): void
+    public function test_employee_detail_page_prioritizes_manual_retirement_date_and_falls_back_to_bup(): void
     {
         EwsConfig::setVal('pensiun_required_age_years', '60');
         $user = User::factory()->adminKepegawaian()->create();
-        $employee = $this->employeeWithReferences([
+
+        // 1. Employee with manual date
+        $employeeWithManual = $this->employeeWithReferences([
             'tanggal_lahir' => '1970-01-01',
             'tanggal_pensiun' => '2042-05-15',
         ]);
 
         $this->actingAs($user)
-            ->get(route('pegawai.show', $employee->id))
+            ->get(route('pegawai.show', $employeeWithManual->id))
             ->assertOk()
-            ->assertSee('01-01-2030', false)
-            ->assertDontSee('15-05-2042', false);
+            ->assertSee('15-05-2042', false)
+            ->assertDontSee('01-01-2030', false);
+
+        // 2. Employee without manual date (falls back to BUP)
+        $employeeWithBup = $this->employeeWithReferences([
+            'tanggal_lahir' => '1970-01-01',
+            'tanggal_pensiun' => null,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('pegawai.show', $employeeWithBup->id))
+            ->assertOk()
+            ->assertSee('01-01-2030', false);
     }
 
     public function test_employee_detail_page_uses_persisted_promotion_and_kgb_snapshots(): void

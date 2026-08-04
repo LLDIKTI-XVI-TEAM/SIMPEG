@@ -6,6 +6,7 @@ use App\Models\Appointment;
 use App\Models\DisciplineRecord;
 use App\Models\Document;
 use App\Models\EducationHistory;
+use App\Models\EmployeeStatusHistory;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\SalaryHistory;
@@ -65,12 +66,13 @@ class DeleteDocumentAction
             ])->values()->all();
         }
 
-        if ($this->isCurrentStatusSupportingDocument($document)) {
-            $status = $document->employee?->statusPegawai?->nama ?? $document->employee?->status_aktif ?? '-';
-            $blocked['Status Pegawai'] = [[
-                'id' => $document->employee_id,
-                'label' => 'Status pegawai saat ini: '.$status,
-            ]];
+        $statusHistories = $this->matchingSkRecords(EmployeeStatusHistory::query(), $document, 'file_sk', 'sk_status_pegawai', 'nomor_berkas')
+            ->get(['id', 'nomor_berkas', 'status_nama', 'tanggal_efektif']);
+        if ($statusHistories->isNotEmpty()) {
+            $blocked['Status Pegawai'] = $statusHistories->map(fn (EmployeeStatusHistory $record): array => [
+                'id' => $record->id,
+                'label' => 'Status: '.$record->status_nama.' — No. SK: '.($record->nomor_berkas ?: '-').' — Berlaku: '.($record->tanggal_efektif?->format('d/m/Y') ?? '-'),
+            ])->values()->all();
         }
 
         $disciplineRecords = $this->matchingSkRecords(DisciplineRecord::query(), $document, 'file_sk', 'sk_hukuman_disiplin')
@@ -126,51 +128,23 @@ class DeleteDocumentAction
      * @param  Builder<Model>  $query
      * @return Builder<Model>
      */
-    private function matchingSkRecords(Builder $query, Document $document, string $fileColumn, string $category): Builder
+    private function matchingSkRecords(Builder $query, Document $document, string $fileColumn, string $category, string $numberColumn = 'no_sk'): Builder
     {
         return $query
             ->where('employee_id', $document->employee_id)
-            ->where(function (Builder $query) use ($document, $fileColumn, $category): void {
+            ->where(function (Builder $query) use ($document, $fileColumn, $category, $numberColumn): void {
                 $query->where($fileColumn, $document->file_path);
 
                 if ($document->jenis_dokumen === $category && filled($document->nomor_dokumen)) {
-                    $query->orWhere('no_sk', $document->nomor_dokumen);
+                    $query->orWhere($numberColumn, $document->nomor_dokumen);
                 }
             });
-    }
-
-    private function isCurrentStatusSupportingDocument(Document $document): bool
-    {
-        // Dokumen dari fitur Status Pegawai (sk_status_pegawai) langsung dirujuk lewat
-        // status_berkas_path pada Employee, jadi diblokir selama masih menjadi berkas status terkini.
-        if ($document->jenis_dokumen === 'sk_status_pegawai') {
-            return $document->employee?->status_berkas_path === $document->file_path;
-        }
-
-        $expectedStatus = match ($document->jenis_dokumen) {
-            'sk_mutasi' => 'Mutasi',
-            'sk_pensiun' => 'Pensiun',
-            // Dukungan arsip legacy yang sebelumnya disimpan sebagai kategori "lainnya".
-            'lainnya' => match (mb_strtolower(trim($document->nama_dokumen))) {
-                'sk mutasi' => 'Mutasi',
-                'sk pensiun' => 'Pensiun',
-                default => null,
-            },
-            default => null,
-        };
-
-        if ($expectedStatus === null) {
-            return false;
-        }
-
-        $currentStatus = $document->employee?->statusPegawai?->nama ?? $document->employee?->status_aktif;
-
-        return $currentStatus === $expectedStatus;
     }
 
     private function fileIsStillReferenced(string $filePath): bool
     {
         return Document::query()->where('file_path', $filePath)->exists()
+            || EmployeeStatusHistory::query()->where('file_sk', $filePath)->exists()
             || RankHistory::query()->where('file_sk', $filePath)->exists()
             || PositionHistory::query()->where('file_sk', $filePath)->exists()
             || SalaryHistory::query()->where('file_sk', $filePath)->exists()
