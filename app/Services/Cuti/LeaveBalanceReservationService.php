@@ -304,6 +304,16 @@ class LeaveBalanceReservationService
     }
 
     /**
+     * Kunci dedup release penangguhan dinas dipakai bersama oleh service dan orkestrasi terminal.
+     * Satu pengajuan dapat memiliki lebih dari satu event released, misalnya release rollover lama,
+     * sehingga bukti terminal harus diidentifikasi lewat kunci ini, bukan lewat event type saja.
+     */
+    public static function dutyPostponementReleaseDedupKey(string $leaveRequestId, int $tahun): string
+    {
+        return "leave_reservation:{$leaveRequestId}:released:duty_postponement:{$tahun}";
+    }
+
+    /**
      * Melepas seluruh reservasi setelah hak cuti dicatat sebagai penangguhan dinas terminal.
      * Audit reservasi sengaja tidak ditulis karena orkestrasi terminal menulis satu audit domain terpadu.
      */
@@ -349,7 +359,7 @@ class LeaveBalanceReservationService
                 ->orderBy('id')
                 ->lockForUpdate()
                 ->get();
-            $dedupKey = "leave_reservation:{$leaveRequest->id}:released:duty_postponement:{$tahun}";
+            $dedupKey = self::dutyPostponementReleaseDedupKey($leaveRequest->id, $tahun);
             $existing = $events->firstWhere('dedup_key', $dedupKey);
 
             if ($existing instanceof LeaveBalanceReservationEvent) {

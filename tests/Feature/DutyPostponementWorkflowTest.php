@@ -16,6 +16,7 @@ use App\Models\RefJenisCuti;
 use App\Models\RefNotificationChannel;
 use App\Models\SimpegNotification;
 use App\Models\User;
+use App\Services\Cuti\LeaveBalanceReservationService;
 use App\Services\LeaveApprovalService;
 use App\Support\Cuti\CutiReportStatusFormatter;
 use Database\Seeders\RbacSeeder;
@@ -620,6 +621,89 @@ class DutyPostponementWorkflowTest extends TestCase
         $this->assertSame(LeaveRequest::STATUS_DUTY_POSTPONED, $second->status);
         $this->assertSame($counts, $this->effectCounts($first->id));
         $this->assertSame([1, 1, 1, 1, 1], array_values($counts));
+    }
+
+    /**
+     * Setelah pengajuan dikembalikan saat rollover lalu diajukan kembali pada tahun target,
+     * request yang sama sudah memiliki release rollover lama. Bukti terminal penangguhan dinas
+     * harus dibaca dari release miliknya sendiri agar retry tetap idempoten, bukan dituduh korup.
+     */
+    public function test_retry_stays_idempotent_when_request_already_has_rollover_return_release(): void
+    {
+        $fixture = $this->makeWorkflowFixture();
+        $targetBalance = LeaveBalance::create([
+            'employee_id' => $fixture['applicant']->id,
+            'tahun' => 2027,
+            'jatah_awal' => 12,
+            'carry_over' => 0,
+            'terpakai' => 0,
+            'sisa' => 12,
+            'sisa_n2' => 0,
+            'sisa_n1' => 0,
+            'sisa_tahun_berjalan' => 12,
+            'terpakai_tahun_berjalan' => 0,
+            'hangus' => 0,
+        ]);
+        $reservations = app(LeaveBalanceReservationService::class);
+
+        // Rollover mengembalikan pengajuan tahun sumber dan melepas reservasinya.
+        $rolloverRelease = $reservations->releaseForRollover($fixture['request'], 2026, 2027);
+        $this->assertNotNull($rolloverRelease);
+        $fixture['request']->forceFill([
+            'status' => LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER,
+            'rollover_source_year' => 2026,
+            'rollover_target_year' => 2027,
+        ])->save();
+        LeaveBalanceLedger::create([
+            'employee_id' => $fixture['applicant']->id,
+            'leave_balance_id' => $targetBalance->id,
+            'tahun' => 2027,
+            'event_type' => LeaveBalanceLedger::EVENT_ROLLOVER_APPLIED,
+            'amount' => 0,
+            'source_year' => 2026,
+            'dedup_key' => "{$fixture['applicant']->id}:2027:rollover_applied",
+        ]);
+
+        // Pegawai memperbaiki tanggal ke tahun target lalu mengajukan kembali.
+        $fixture['request']->forceFill([
+            'tanggal_mulai' => '2027-08-02',
+            'tanggal_selesai' => '2027-08-06',
+            'status' => 'menunggu_approval',
+            'rollover_source_year' => null,
+            'rollover_target_year' => null,
+        ])->save();
+        $resubmitted = $fixture['request']->fresh();
+        $reservations->adjustForResubmission(
+            $resubmitted,
+            Carbon::parse('2027-08-02'),
+            5,
+            $fixture['applicant']->user,
+        );
+
+        $terminal = $this->action()->execute(
+            $resubmitted,
+            $fixture['actor'],
+            $fixture['actingUser'],
+            self::REASON,
+        );
+
+        $this->assertSame(LeaveRequest::STATUS_DUTY_POSTPONED, $terminal->status);
+        $this->assertSame(2, LeaveBalanceReservationEvent::query()
+            ->where('leave_request_id', $terminal->id)
+            ->where('event_type', LeaveBalanceReservationEvent::EVENT_RELEASED)
+            ->count());
+
+        $before = $this->workflowState($terminal->id, $targetBalance->fresh());
+        $retried = $this->action()->execute(
+            $terminal,
+            $fixture['actor'],
+            $fixture['actingUser'],
+            self::REASON,
+        );
+
+        $this->assertTrue($terminal->is($retried));
+        $this->assertSame(LeaveRequest::STATUS_DUTY_POSTPONED, $retried->status);
+        $this->assertSame($before, $this->workflowState($terminal->id, $targetBalance->fresh()));
     }
 
     public function test_disabled_notification_channels_allow_terminal_commit_and_idempotent_retry_without_delivery(): void

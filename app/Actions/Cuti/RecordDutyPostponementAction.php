@@ -191,9 +191,16 @@ class RecordDutyPostponementAction
             ->where('event_type', LeaveBalanceLedger::EVENT_DUTY_POSTPONEMENT_RECORDED)
             ->lockForUpdate()
             ->get();
+        // Satu pengajuan dapat menyimpan release lain yang sah, misalnya release rollover sebelum
+        // diajukan kembali pada tahun target. Bukti terminal dibatasi ke dedup key miliknya sendiri
+        // agar retry tetap idempoten dan state yang konsisten tidak dituduh korup.
         $releaseRows = LeaveBalanceReservationEvent::query()
             ->where('leave_request_id', $request->id)
             ->where('event_type', LeaveBalanceReservationEvent::EVENT_RELEASED)
+            ->where('dedup_key', LeaveBalanceReservationService::dutyPostponementReleaseDedupKey(
+                $request->id,
+                $request->tanggal_mulai->year,
+            ))
             ->lockForUpdate()
             ->get();
         $approvalRows = LeaveApproval::query()
