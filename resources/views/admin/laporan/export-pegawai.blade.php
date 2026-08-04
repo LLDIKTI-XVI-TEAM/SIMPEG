@@ -691,7 +691,24 @@
                     return;
                 }
 
-                window.print();
+                // Bangun URL PDF dengan filter aktif saat ini agar output PDF
+                // mencerminkan data yang sedang ditampilkan di preview.
+                const params = new URLSearchParams();
+                if (this.searchQuery)   params.set('search',        this.searchQuery);
+                if (this.activeUnit)    params.set('unit',          this.activeUnit);
+                if (this.activeGolongan) params.set('golongan',     this.activeGolongan);
+                if (this.activeJenis)   params.set('jenis',         this.activeJenis);
+                if (this.activeStatus)  params.set('status',        this.activeStatus);
+                if (this.activeJabatan) params.set('jabatan',       this.activeJabatan);
+                if (this.pensiunDari)   params.set('pensiun_dari',  this.pensiunDari);
+                if (this.pensiunSampai) params.set('pensiun_sampai', this.pensiunSampai);
+                if (this.sortBy)        params.set('sort',          this.sortBy);
+                if (this.sortDir)       params.set('sort_dir',      this.sortDir);
+                if (this.rowStart > 1)  params.set('row_start',     this.rowStart);
+                if (this.rowEnd)        params.set('row_end',       this.rowEnd);
+
+                const base = @js(route('laporan.pegawai.pdf'));
+                window.open(base + (params.toString() ? '?' + params.toString() : ''), '_blank');
             }
             }));
         };

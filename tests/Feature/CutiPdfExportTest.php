@@ -59,7 +59,7 @@ class CutiPdfExportTest extends TestCase
         $response->assertOk();
         $this->assertSame('application/pdf', $response->headers->get('Content-Type'));
         $this->assertMatchesRegularExpression(
-            '/attachment; filename=Laporan_Cuti_\d{8}_\d{6}\.pdf/',
+            '/attachment; filename=Rekap_Cuti_[\w\-]+_\d{8}\.pdf/',
             (string) $response->headers->get('Content-Disposition'),
         );
         $content = $response->getContent();
@@ -109,14 +109,14 @@ class CutiPdfExportTest extends TestCase
         foreach ([
             'LEMBAGA LAYANAN PENDIDIKAN TINGGI WILAYAH XVI',
             'Rekap Cuti Pegawai',
-            'Periode: Juni 2026',
+            'Periode: 2026-06',
             '<th>No</th>',
             '<th>NIP</th>',
-            '<th>Nama</th>',
-            '<th>Jenis</th>',
+            '<th>Nama Pegawai</th>',
+            '<th>Jenis Cuti</th>',
             '<th>Mulai</th>',
             '<th>Selesai</th>',
-            '<th>Hari Kerja</th>',
+            'Hari Kerja',
             '<th>Status</th>',
             'Pembuat Laporan',
             'Mengetahui',
