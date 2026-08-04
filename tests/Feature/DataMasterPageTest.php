@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Employee;
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
+use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenjangPendidikan;
 use App\Models\RefUnitKerja;
@@ -43,6 +44,8 @@ class DataMasterPageTest extends TestCase
             ->assertSee('Fungsional Kekhususan')
             ->assertSee('Eselon Uji IV.a')
             ->assertSee('S3 Terapan Uji')
+            ->assertSee('Jabatan')
+            ->assertSee('Data jabatan belum dimuat oleh backend.')
             // Baris status pegawai bawaan migration ikut tampil, lengkap
             // dengan penanda baris yang dikunci logika sistem.
             ->assertSee('PERPANJANGAN_CLTN')
@@ -67,6 +70,42 @@ class DataMasterPageTest extends TestCase
             ->assertDontSee('Kelompok Kerja Akademik dan Kemahasiswaan')
             ->assertDontSee('Kelompok Kerja Kelembagaan dan Sistem Informasi')
             ->assertSee('Belum ada data unit kerja.');
+    }
+
+    public function test_tab_jabatan_merender_kontrak_frontend_tanpa_route_crud_palsu(): void
+    {
+        $jenis = RefJenisJabatan::create([
+            'nama' => 'Fungsional Jabatan Uji',
+            'maks_usia_pensiun' => 60,
+        ]);
+        $eselon = RefEselon::create([
+            'kode' => 'IV.a',
+            'nama' => 'Eselon Jabatan Uji',
+        ]);
+        $jabatan = RefJabatan::create([
+            'nama' => 'Analis Jabatan Uji',
+            'jenis_jabatan_id' => $jenis->id,
+            'eselon_id' => $eselon->id,
+            'default_bup' => 60,
+            'is_active' => false,
+            'keterangan' => 'Referensi uji untuk tab Jabatan.',
+        ]);
+
+        $html = view('admin.data-master.partials.tab-jabatan', [
+            'jabatan' => collect([$jabatan]),
+            'jabatanUsage' => [$jabatan->id => 2],
+            'jenisJabatan' => collect([$jenis]),
+            'eselon' => collect([$eselon]),
+        ])->render();
+
+        $this->assertStringContainsString('Analis Jabatan Uji', $html);
+        $this->assertStringContainsString('Fungsional Jabatan Uji', $html);
+        $this->assertStringContainsString('IV.a — Eselon Jabatan Uji', $html);
+        $this->assertStringContainsString('60 tahun', $html);
+        $this->assertStringContainsString('Nonaktif', $html);
+        $this->assertStringContainsString('2 pemakai', $html);
+        $this->assertStringNotContainsString('href="#"', $html);
+        $this->assertStringNotContainsString('action="#"', $html);
     }
 
     public function test_unit_kerja_ditampilkan_berjenjang_dari_database(): void
