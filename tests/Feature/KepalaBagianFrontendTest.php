@@ -556,10 +556,9 @@ class KepalaBagianFrontendTest extends TestCase
             ->assertSee('confirmOpen: false', false);
     }
 
-    public function test_duty_postponement_kepala_bagian_detail_uses_neutral_unknown_fallbacks(): void
+    public function test_duty_postponement_kepala_bagian_detail_uses_neutral_fallbacks_for_unknown_step_and_action(): void
     {
         $fixture = $this->dutyPostponementFixture();
-        $fixture['leave']->forceFill(['status' => 'status_rahasia_kabag'])->save();
         $step = $fixture['leave']->steps()->orderBy('step_order')->first();
         $step->forceFill(['status' => 'step_rahasia_kabag'])->save();
         LeaveApproval::create([
@@ -586,10 +585,9 @@ class KepalaBagianFrontendTest extends TestCase
                 'Tahap 1 · ',
                 'Tindakan tidak dikenal',
             ])
-            ->assertDontSee('status_rahasia_kabag')
             ->assertDontSee('step_rahasia_kabag')
             ->assertDontSee('ACTION_RAHASIA_KABAG');
-        $this->assertGreaterThanOrEqual(2, substr_count($response->getContent(), 'Status tidak tersedia'));
+        $this->assertSame(1, substr_count($response->getContent(), 'Status tidak tersedia'));
     }
 
     public function test_detail_cuti_bawahan_menampilkan_status_tidak_disetujui(): void

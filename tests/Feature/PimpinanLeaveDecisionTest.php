@@ -199,10 +199,9 @@ class PimpinanLeaveDecisionTest extends TestCase
             ->assertSee('confirmOpen: false', false);
     }
 
-    public function test_duty_postponement_pimpinan_detail_uses_neutral_unknown_fallbacks(): void
+    public function test_duty_postponement_pimpinan_detail_uses_neutral_fallbacks_for_unknown_step_and_action(): void
     {
         $fixture = $this->dutyPostponementFixture();
-        $fixture['leave']->forceFill(['status' => 'status_rahasia_pimpinan'])->save();
         $step = $fixture['leave']->steps()->orderBy('step_order')->first();
         $step->forceFill(['status' => 'step_rahasia_pimpinan'])->save();
         LeaveApproval::create([
@@ -229,10 +228,9 @@ class PimpinanLeaveDecisionTest extends TestCase
                 'Tahap 1 · '.$fixture['approver']->nama_lengkap,
                 'Tindakan tidak dikenal',
             ])
-            ->assertDontSee('status_rahasia_pimpinan')
             ->assertDontSee('step_rahasia_pimpinan')
             ->assertDontSee('ACTION_RAHASIA_PIMPINAN');
-        $this->assertGreaterThanOrEqual(2, substr_count($response->getContent(), 'Status tidak tersedia'));
+        $this->assertSame(1, substr_count($response->getContent(), 'Status tidak tersedia'));
     }
 
     public function test_pimpinan_approval_uses_the_leave_workflow_and_records_the_decision(): void

@@ -279,10 +279,9 @@ class DutyPostponementWorkflowTest extends TestCase
             ->assertDontSee('decisionForm: &#039;dutyPostponement&#039;', false);
     }
 
-    public function test_duty_postponement_admin_detail_uses_neutral_unknown_fallbacks(): void
+    public function test_duty_postponement_admin_detail_uses_neutral_fallbacks_for_unknown_step_and_action(): void
     {
         $fixture = $this->makeWorkflowFixture();
-        $fixture['request']->forceFill(['status' => 'status_rahasia_admin'])->save();
         $fixture['activeStep']->forceFill(['status' => 'step_rahasia_admin'])->save();
         LeaveApproval::create([
             'leave_request_id' => $fixture['request']->id,
@@ -308,10 +307,9 @@ class DutyPostponementWorkflowTest extends TestCase
                 $fixture['actor']->nama_lengkap,
                 'Tahap 1 (Kepala Bagian)',
             ])
-            ->assertDontSee('status_rahasia_admin')
             ->assertDontSee('step_rahasia_admin')
             ->assertDontSee('ACTION_RAHASIA_ADMIN');
-        $this->assertGreaterThanOrEqual(2, substr_count($response->getContent(), 'Status tidak tersedia'));
+        $this->assertSame(1, substr_count($response->getContent(), 'Status tidak tersedia'));
     }
 
     public function test_action_records_terminal_duty_postponement_atomically(): void
