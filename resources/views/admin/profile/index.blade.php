@@ -333,7 +333,7 @@
                         <div class="rounded-lg border border-border bg-surface p-4 shadow-sm text-center">
                             <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans block">Sisa Saldo</span>
                             <span class="text-3xl font-bold text-primary block mt-2">
-                                {{ $saldoCuti?->sisa ?? ($saldoCuti?->jatah_awal ?? 12) }} <span class="text-sm font-normal text-muted">Hari</span>
+                                {{ $saldoCuti?->sisa ?? ($saldoCuti?->jatah_awal ?? '-') }} <span class="text-sm font-normal text-muted">Hari</span>
                             </span>
                         </div>
                     </div>
