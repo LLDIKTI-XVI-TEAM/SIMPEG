@@ -30,6 +30,7 @@
             ->unique()
             ->values();
         $compositionTotal = $compositionCounts->sum();
+        $compositionDisplayTotal = $totalPegawaiAktif ?? $compositionTotal;
         $compositionOffset = 0;
         $compositionTones = [
             ['stroke' => 'text-primary', 'dot' => 'bg-primary', 'text' => 'text-ink'],
@@ -206,7 +207,7 @@
     </div>
 
     <section aria-label="Ringkasan utama" class="mb-6 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
-        <x-ui.stat-card href="{{ route('data-pegawai') }}" label="Total Pegawai Aktif" value="{{ $totalPegawaiAktif === null ? '—' : $formatNumber($totalPegawaiAktif) }}" variant="primary" size="lg" accent>
+        <x-ui.stat-card data-k3-metric="pegawai-aktif" href="{{ route('data-pegawai') }}" label="Total Pegawai Aktif" value="{{ $totalPegawaiAktif === null ? '—' : $formatNumber($totalPegawaiAktif) }}" variant="primary" size="lg" accent>
             <x-slot:icon>
                 <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
@@ -225,7 +226,7 @@
             </x-slot:meta>
         </x-ui.stat-card>
 
-        <x-ui.stat-card href="{{ route('data-pegawai') }}" label="Kenaikan Pangkat" value="{{ $kenaikanPangkatBulanIni === null ? '—' : $formatNumber($kenaikanPangkatBulanIni) }}" variant="success" size="lg" accent>
+        <x-ui.stat-card data-k3-metric="kenaikan-pangkat" href="{{ route('data-pegawai') }}" label="Kenaikan Pangkat" value="{{ $kenaikanPangkatBulanIni === null ? '—' : $formatNumber($kenaikanPangkatBulanIni) }}" variant="success" size="lg" accent>
             <x-slot:icon>
                 <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m2.25 18 9-6.75 4.306 4.307a11.95 11.95 0 0 1 5.814-5.519l.38-.169m0 0-5.94-2.28m5.94 2.28-2.28 5.94" />
@@ -241,7 +242,7 @@
             </x-slot:meta>
         </x-ui.stat-card>
 
-        <x-ui.stat-card href="{{ route('cuti') }}" label="Cuti Menunggu" value="{{ $cutiMenunggu === null ? '—' : $formatNumber($cutiMenunggu) }}" variant="warning" size="lg" accent>
+        <x-ui.stat-card data-k3-metric="cuti-menunggu" href="{{ route('cuti') }}" label="Cuti Menunggu" value="{{ $cutiMenunggu === null ? '—' : $formatNumber($cutiMenunggu) }}" variant="warning" size="lg" accent>
             <x-slot:icon>
                 <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
@@ -340,8 +341,10 @@
                 <p class="text-[10px] text-muted">Rasio pegawai aktif per jenis.</p>
             </div>
 
-            @if ($komposisiPegawai === null || $compositionTotal === 0)
+            @if ($komposisiPegawai === null)
                 <x-ui.empty-state icon="none" title="Komposisi pegawai belum tersedia." />
+            @elseif ($compositionTotal === 0)
+                <x-ui.empty-state icon="none" title="Belum ada pegawai aktif untuk ditampilkan." />
             @else
                 <div class="mt-5 flex justify-center">
                     <div class="relative h-40 w-40">
@@ -368,7 +371,7 @@
                             @endforeach
                         </svg>
                         <div class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-                            <span class="text-2xl font-semibold text-ink">{{ $formatNumber($totalPegawaiAktif) }}</span>
+                            <span class="text-2xl font-semibold text-ink">{{ $formatNumber($compositionDisplayTotal) }}</span>
                             <span class="mt-1 text-xs text-muted">pegawai aktif</span>
                         </div>
                     </div>
@@ -441,8 +444,10 @@
                 @endif
             </div>
 
-            @if ($distribusiGolongan === null || $rankTotal === 0)
+            @if ($distribusiGolongan === null)
                 <x-ui.empty-state icon="none" title="Distribusi golongan belum tersedia." />
+            @elseif ($rankTotal === 0)
+                <x-ui.empty-state icon="none" title="Belum ada distribusi golongan untuk ditampilkan." />
             @else
                 <div class="mt-6 overflow-x-auto pb-1">
                     <div class="flex h-56 min-w-[760px] items-end gap-2" role="img" aria-label="Grafik distribusi golongan pegawai aktif">
@@ -576,8 +581,10 @@
                 <p class="text-[10px] text-muted">Grafik jumlah pegawai aktif bulanan dalam 12 bulan terakhir.</p>
             </div>
 
-            @if ($trenPegawai === null || $trendRows->isEmpty())
+            @if ($trenPegawai === null)
                 <x-ui.empty-state icon="none" title="Tren pegawai belum tersedia." />
+            @elseif ($trendRows->isEmpty())
+                <x-ui.empty-state icon="none" title="Belum ada data tren pegawai aktif." />
             @else
                 <div class="mt-6 h-64 w-full">
                     <svg class="h-full w-full overflow-visible" viewBox="0 0 {{ $trendChart['width'] }} {{ $trendChart['height'] }}" role="img" aria-labelledby="trend-chart-title trend-chart-description">
