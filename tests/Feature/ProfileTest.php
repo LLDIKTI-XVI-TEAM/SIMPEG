@@ -62,7 +62,7 @@ class ProfileTest extends TestCase
 
         $response->assertOk();
         $response->assertDontSee('Belum tersedia', false);
-        $response->assertSee('12 <span class="text-sm font-normal text-muted">Hari</span>', false);
+        $response->assertSee('- <span class="text-sm font-normal text-muted">Hari</span>', false);
     }
 
     public function test_profile_ews_section_uses_real_alerts_not_mock(): void

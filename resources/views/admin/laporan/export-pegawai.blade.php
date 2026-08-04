@@ -36,7 +36,7 @@
             </div>
             <div class="flex w-full flex-wrap items-center gap-3 sm:w-auto sm:justify-end">
                 {{-- Cetak PDF --}}
-                <x-ui.button @click="printReport()" x-bind:disabled="previewLoading || previewError || pensiunError" variant="secondary">
+                <x-ui.button @click="printReport()" x-bind:disabled="previewLoading || !!pensiunError" variant="secondary">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.617 0-1.11-.476-1.12-1.09l-.23-2.523M19.5 10.5v.375c0 .621-.504 1.125-1.125 1.125H5.625A1.125 1.125 0 0 1 4.5 11.25v-.375m15 0V9a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 9v1.5m15 0A1.5 1.5 0 0 0 18 9h-3V6a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3H6a1.5 1.5 0 0 0-1.5 1.5" />
                     </svg>
@@ -442,13 +442,62 @@
     <style>
         @media print {
             aside, header, nav, button, select, input, .table-footer, .print\:hidden { display: none !important; }
-            body, main, div { background: transparent !important; box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; }
+            html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; height: auto !important; overflow: visible !important; }
+            main, div, section, article { 
+                background: transparent !important; 
+                box-shadow: none !important; 
+                border: none !important; 
+                margin: 0 !important; 
+                padding: 0 !important; 
+                overflow: visible !important; 
+                border-radius: 0 !important; 
+            }
+            .space-y-6 > * + * { margin-top: 0 !important; }
             .print\:block      { display: block !important; }
             .print\:table-row  { display: table-row !important; }
-            @page { size: landscape; margin: 1.5cm; }
-            table { width: 100% !important; border-collapse: collapse !important; }
-            th, td { border: 1px solid #000 !important; padding: 6px 8px !important; color: #000 !important; font-size: 10px !important; background-color: transparent !important; }
-            #print-footer { position: fixed; bottom: -0.5cm; left: 0; right: 0; border-top: 1px solid #000; text-align: right; font-size: 10px; font-family: 'Poppins', sans-serif; color: #6B7280; padding-top: 5px; }
+            @page { size: landscape; margin: 1.2cm 1.2cm 1cm 1.2cm; }
+
+            table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+                border-spacing: 0 !important;
+                border: 1px solid #000000 !important;
+                margin-top: 8px !important;
+                margin-bottom: 0 !important;
+                box-sizing: border-box !important;
+            }
+
+            table th, table td {
+                border: 1px solid #000000 !important;
+                padding: 4px 6px !important;
+                color: #000000 !important;
+                font-size: 9.5px !important;
+                background-color: #ffffff !important;
+                box-sizing: border-box !important;
+            }
+
+            table th {
+                font-weight: bold !important;
+                text-transform: uppercase !important;
+            }
+
+            table tr {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+
+            #print-footer {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                border-top: 1px solid #000;
+                text-align: right;
+                font-size: 9px;
+                font-family: 'Poppins', sans-serif;
+                color: #000;
+                padding-top: 3px;
+            }
             #print-footer::after { content: "Halaman " counter(page) " dari " counter(pages); }
         }
     </style>
@@ -687,7 +736,7 @@
             },
 
             printReport() {
-                if (this.previewLoading || this.previewError || this.pensiunError) {
+                if (this.previewLoading || this.pensiunError) {
                     return;
                 }
 
