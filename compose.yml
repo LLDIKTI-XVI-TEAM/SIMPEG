@@ -1,8 +1,6 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: docker/php/Dockerfile
+    image: simpeg_app
     container_name: simpeg_app
     working_dir: /var/www/html
     volumes:
@@ -14,9 +12,7 @@ services:
       - simpeg_net
 
   queue:
-    build:
-      context: .
-      dockerfile: docker/php/Dockerfile
+    image: simpeg_app
     container_name: simpeg_queue
     working_dir: /var/www/html
     command: php artisan queue:work --sleep=3 --tries=3 --timeout=120
@@ -32,9 +28,7 @@ services:
       - simpeg_net
 
   scheduler:
-    build:
-      context: .
-      dockerfile: docker/php/Dockerfile
+    image: simpeg_app
     container_name: simpeg_scheduler
     working_dir: /var/www/html
     command: php artisan schedule:work
