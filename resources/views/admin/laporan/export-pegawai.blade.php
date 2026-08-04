@@ -736,7 +736,7 @@
             },
 
             printReport() {
-                if (this.previewLoading || this.pensiunError) {
+                if (this.previewLoading || this.previewError || this.pensiunError) {
                     return;
                 }
 
