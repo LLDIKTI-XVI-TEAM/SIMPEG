@@ -22,7 +22,11 @@
         .signatures { margin-top: 36px; width: 100%; }
         .signature { display: inline-block; text-align: center; vertical-align: top; width: 48%; }
         .signature-space { height: 54px; }
-        footer { bottom: -24px; color: #6b7280; font-size: 8px; left: 0; position: fixed; right: 0; text-align: center; }
+        /* Footer tetap di bawah setiap halaman — didukung Dompdf lewat position:fixed. */
+        footer { bottom: 0; color: #6b7280; font-size: 8px; left: 0; position: fixed; right: 0; text-align: center; }
+        /* Dompdf mengisi counter(page) dan counter(pages) secara native pada elemen fixed. */
+        .page-number::after  { content: counter(page); }
+        .total-pages::after  { content: counter(pages); }
     </style>
 </head>
 <body>
@@ -99,7 +103,7 @@
 
     <footer>
         Dokumen dibuat pada {{ $generatedAt->format('d-m-Y H:i:s') }}
-        <span style="float:right">Halaman <span class="pageNumber"></span> dari <span class="totalPages"></span></span>
+        <span style="float:right">Halaman <span class="page-number"></span> dari <span class="total-pages"></span></span>
     </footer>
 </body>
 </html>
