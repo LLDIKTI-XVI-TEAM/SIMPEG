@@ -48,6 +48,7 @@ class EmployeeCreationTest extends TestCase
             'nama_lengkap' => 'Budi Santoso',
             'email_pribadi' => 'budi@example.com',
             'nip' => '198001012006041001',
+            'tanggal_pensiun' => '2038-01-01 00:00:00',
             'jenis_pegawai_id' => RefJenisPegawai::where('nama', 'PNS')->firstOrFail()->id,
         ]);
     }
