@@ -12,6 +12,7 @@ use App\Models\RefUnitKerja;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\MessageBag;
 use Illuminate\Support\ViewErrorBag;
@@ -130,7 +131,7 @@ class DataMasterPageTest extends TestCase
 
         $this->daftarkanRouteJabatanUntukRenderTab();
 
-        $errors = (new ViewErrorBag())->put('default', new MessageBag([
+        $errors = (new ViewErrorBag)->put('default', new MessageBag([
             'nama' => ['Nama jabatan wajib diisi.'],
         ]));
 
@@ -145,7 +146,7 @@ class DataMasterPageTest extends TestCase
             'keterangan' => 'Keterangan draf edit.',
         ]);
 
-        $request = \Illuminate\Http\Request::create('/admin/data-master', 'GET');
+        $request = Request::create('/admin/data-master', 'GET');
         $request->setLaravelSession($session);
         app()->instance('request', $request);
         view()->share('errors', $errors);
