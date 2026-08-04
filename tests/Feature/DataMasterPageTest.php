@@ -162,6 +162,8 @@ class DataMasterPageTest extends TestCase
         $this->assertStringContainsString("showTambah: false, editId: '{$jabatan->id}'", $editHtml);
         $this->assertSame(1, substr_count($editHtml, 'value="Draf edit Jabatan"'));
         $this->assertStringContainsString('name="form_context" value="'.$jabatan->id.'"', $editHtml);
+        $this->assertSame(2, substr_count($editHtml, 'maxlength="255"'));
+        $this->assertStringNotContainsString('maxlength="1000"', $editHtml);
 
         $session->put('_old_input', [
             'tab' => 'jabatan',

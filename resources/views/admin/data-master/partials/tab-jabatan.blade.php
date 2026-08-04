@@ -99,7 +99,7 @@
 
             <div>
                 <label for="jabatan-keterangan" class="mb-1 block text-sm font-semibold text-ink">Keterangan</label>
-                <input id="jabatan-keterangan" name="keterangan" type="text" maxlength="1000" placeholder="Opsional"
+                <input id="jabatan-keterangan" name="keterangan" type="text" maxlength="255" placeholder="Opsional"
                     value="{{ $jabatanCreateFailed ? old('keterangan') : '' }}"
                     class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
             </div>
@@ -213,7 +213,7 @@
 
                                     <div>
                                         <label for="jabatan-keterangan-{{ $item->id }}" class="mb-1 block text-sm font-semibold text-ink">Keterangan</label>
-                                        <input id="jabatan-keterangan-{{ $item->id }}" name="keterangan" type="text" maxlength="1000"
+                                        <input id="jabatan-keterangan-{{ $item->id }}" name="keterangan" type="text" maxlength="255"
                                             value="{{ $jabatanEditId === $item->id ? old('keterangan', $item->keterangan) : $item->keterangan }}"
                                             class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                                     </div>
