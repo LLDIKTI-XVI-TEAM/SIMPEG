@@ -14,6 +14,7 @@ class ExportPegawaiPreviewAction
     public function execute(array $filters): View
     {
         return view('admin.laporan.export-pegawai', [
+            // Field PII (email, no_hp) tidak dikirim ke DOM; hanya tersedia di unduhan Excel/PDF.
             'pegawai' => $this->previewRows($filters)->all(),
             'filterOptions' => $this->employeeExportData->filterOptions(),
             'initialFilters' => [
@@ -37,6 +38,10 @@ class ExportPegawaiPreviewAction
     }
 
     /**
+     * Baris untuk pratinjau layar — field PII (email, no_hp) dihapus agar tidak
+     * bocor ke DOM JavaScript. Kolom PII hanya ada di output Excel/PDF yang
+     * diunduh langsung, bukan pada respons JSON/HTML halaman preview.
+     *
      * @param  array<string, mixed>  $filters
      * @return Collection<int, array<string, string>>
      */
@@ -46,6 +51,7 @@ class ExportPegawaiPreviewAction
             $filters['status'] = 'Aktif';
         }
 
-        return $this->employeeExportData->rows($filters, defaultToActive: false);
+        return $this->employeeExportData->rows($filters, defaultToActive: false)
+            ->map(fn (array $row): array => array_diff_key($row, array_flip(['email', 'no_hp'])));
     }
 }
