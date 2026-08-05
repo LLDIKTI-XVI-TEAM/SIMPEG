@@ -735,6 +735,13 @@ class LeaveBalanceService
     public function assertCutiBesarCanBeFinallyApproved(Employee|string $employee, int $year): void
     {
         $employeeModel = $this->resolveEmployee($employee);
+
+        // Rule 5 dihitung dari fakta Cuti Besar final saat rollover berjalan. Bila Cuti Besar tahun
+        // sumber baru final setelah rollover, saldo tahun berjalan sumber sudah terbawa sebagai
+        // carry-over dan rollover tidak akan menghitung ulang karena sudah ter-dedup, sehingga
+        // persetujuan terlambat harus ditolak agar hak cuti tidak bertambah tanpa dasar.
+        $this->assertSourceYearNotRolledOver($employeeModel->id, $year);
+
         $yearStart = Carbon::create($year, 1, 1)->startOfDay();
         $yearEnd = $yearStart->copy()->addYear();
         $annualQuery = LeaveRequest::query()
@@ -793,13 +800,17 @@ class LeaveBalanceService
     }
 
     /**
-     * Menolak pemotongan saldo pada tahun yang saldonya sudah ditutup oleh rollover.
+     * Menolak mutasi dan persetujuan final pada tahun yang saldonya sudah ditutup oleh rollover.
      *
      * Setelah rollover berjalan, sisa hari tahun sumber sudah terbawa sebagai carry-over ke tahun
      * target. Memotong saldo tahun sumber sesudah itu membuat hari yang sama terpakai dua kali dan
      * menambah hak cuti pegawai secara tidak sah. Rollover hanya mengembalikan pengajuan Cuti
      * Tahunan resmi, sehingga jenis pengurang saldo lain yang belum punya jalur pengembalian
      * dihentikan di sini alih-alih dibiarkan memotong saldo yang sudah ditutup.
+     *
+     * Cuti Besar ikut dijaga di sini karena Rule 5 dievaluasi saat rollover: persetujuan final yang
+     * datang belakangan tidak dapat lagi menghanguskan saldo tahun berjalan sumber yang sudah
+     * berpindah ke tahun target.
      */
     private function assertSourceYearNotRolledOver(string $employeeId, int $tahun): void
     {

@@ -1343,6 +1343,65 @@ class LeaveBalanceRolloverTest extends TestCase
             ->count());
     }
 
+    /**
+     * Cuti Besar yang masih menunggu saat rollover berjalan membuat Rule 5 belum aktif, sehingga
+     * saldo tahun berjalan sumber telanjur terbawa sebagai carry-over. Persetujuan final yang
+     * datang setelah marker rollover ada harus ditolak, karena rollover sudah ter-dedup dan
+     * carry-over yang seharusnya hangus tidak akan dihitung ulang.
+     */
+    public function test_final_cuti_besar_gagal_pada_tahun_sumber_yang_sudah_di_rollover(): void
+    {
+        $employee = $this->employeeWithAppointment();
+        LeaveBalance::create($this->balancePayload($employee, 2026, [
+            'sisa_tahun_berjalan' => 12,
+            'sisa' => 12,
+        ]));
+        $cutiBesar = LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => RefJenisCuti::where('code', 'besar')->firstOrFail()->id,
+            'tanggal_mulai' => '2026-08-03',
+            'tanggal_selesai' => '2026-08-31',
+            'jumlah_hari_kerja' => 20,
+            'alasan' => 'Cuti Besar masih menunggu keputusan saat rollover berjalan.',
+            'status' => 'menunggu_approval',
+        ]);
+
+        $service = app(LeaveBalanceService::class);
+        $service->rolloverYear(2026);
+
+        // Bukti keterlambatan Rule 5: carry-over (dibatasi 6 hari) sudah masuk ke tahun target.
+        $target = LeaveBalance::query()
+            ->where('employee_id', $employee->id)
+            ->where('tahun', 2027)
+            ->firstOrFail();
+        $this->assertSame(6, $target->sisa_n1);
+
+        try {
+            $service->deductForFinalApproval($cutiBesar);
+            $this->fail('Cuti Besar pada tahun sumber yang sudah di-rollover wajib ditolak.');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString(
+                'sudah ditutup oleh rollover',
+                $exception->errors()['status'][0],
+            );
+        }
+
+        // Alur approval nyata memanggil gate ini langsung, bukan lewat pemotongan saldo,
+        // sehingga penolakan harus terjadi di titik yang sama.
+        try {
+            $service->assertCutiBesarCanBeFinallyApproved($employee->id, 2026);
+            $this->fail('Gate Cuti Besar wajib menolak tahun sumber yang sudah di-rollover.');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString(
+                'sudah ditutup oleh rollover',
+                $exception->errors()['status'][0],
+            );
+        }
+
+        // Saldo target tidak boleh berubah akibat percobaan persetujuan yang ditolak.
+        $this->assertSame(6, $target->fresh()->sisa_n1);
+    }
+
     public function test_rollover_tahun_cuti_besar_hanya_mengecualikan_current_dan_tidak_memperpanjang_carry_lama(): void
     {
         $employee = $this->employeeWithAppointment();
