@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Employee;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -30,8 +31,9 @@ return new class extends Migration
                     /** @var Employee $employee */
                     try {
                         $plainNik = $employee->nik; // didekripsi oleh 'encrypted' cast
-                    } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+                    } catch (DecryptException $e) {
                         Log::warning("[Migration] Gagal mendekripsi NIK untuk pegawai ID: {$employee->id} karena APP_KEY berubah. Melewati hash.");
+
                         continue;
                     }
 

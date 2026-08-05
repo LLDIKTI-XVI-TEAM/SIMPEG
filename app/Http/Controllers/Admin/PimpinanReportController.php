@@ -4,12 +4,10 @@ namespace App\Http\Controllers\Admin;
 
 use App\Actions\Laporan\ExportCustomPegawaiExcelAction;
 use App\Actions\Reports\ExportFixedEmployeePdfAction;
-use App\Actions\Reports\ExportLeaveReportAction;
 use App\Actions\Reports\ExportRankHistoryPdfAction;
 use App\Actions\Reports\ExportRankHistoryReportAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Laporan\ExportPegawaiRequest;
-use App\Http\Requests\Reports\LeaveReportFilterRequest;
 use App\Http\Requests\Reports\RankHistoryReportFilterRequest;
 use App\Models\RefJabatan;
 use App\Models\RefJenisPegawai;
@@ -23,7 +21,6 @@ class PimpinanReportController extends Controller
     {
         return redirect()->route('laporan.pegawai');
     }
-
 
     public function rankHistories(RankHistoryReportFilterRequest $request, ExportRankHistoryReportAction $action)
     {
