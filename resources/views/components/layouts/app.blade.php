@@ -219,7 +219,7 @@
                         'items' => [
                             ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'clipboard-document-list'],
                             ['label' => 'Nominatif Pegawai', 'route' => 'pimpinan.laporan.nominatif', 'icon' => 'document-text'],
-                            ['label' => 'Rekapitulasi Cuti', 'route' => 'pimpinan.laporan.cuti', 'icon' => 'calendar-days'],
+                            ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down'],
                             ['label' => 'Riwayat Kepangkatan', 'route' => 'pimpinan.laporan.kepangkatan', 'icon' => 'document-chart-bar'],
                         ]
                     ]
