@@ -215,21 +215,31 @@ class LeaveBalanceService
         $buckets = $balance === null
             ? ['n2' => 0, 'n1' => 0, 'current' => 0]
             : $this->bucketsFromBalance($balance);
-        $allocation = $this->calculator->allocateDeduction($buckets, $requested);
+        // Hari yang dilindungi penangguhan dinas tetap tersimpan di summary, tetapi tidak boleh
+        // ikut dialokasikan. Perlindungan memakai urutan termuda-dahulu sedangkan pemotongan
+        // memakai urutan tertua-dahulu, sehingga tanpa penyisihan ini pemotongan dapat mengambil
+        // bucket lama yang sudah dilindungi dan membuat summary tidak konsisten dengan ledger.
+        $protected = $balance === null
+            ? ['n2' => 0, 'n1' => 0, 'current' => 0]
+            : $this->protectedAllocations($leaveRequest->employee_id, $tahun);
+        $unprotected = $this->subtractProtectedBuckets($buckets, $protected);
+        $allocation = $this->calculator->allocateDeduction($unprotected, $requested);
 
         if (! $allocation['success'] || $balance === null) {
-            $available = $this->calculator->availableTotal($buckets);
+            $available = $this->calculator->availableTotal($unprotected);
 
             throw ValidationException::withMessages([
                 'status' => "Saldo cuti tahunan tidak mencukupi saat persetujuan final. Sisa {$available} hari, dibutuhkan {$requested} hari.",
             ]);
         }
 
+        // Hari terlindungi digabungkan kembali agar summary tetap mencerminkan seluruh hak tersimpan.
+        $remaining = $this->mergeProtectedBuckets($allocation['remaining'], $protected);
         $oldBalance = $this->calculator->availableTotal($buckets);
-        $newBalance = $this->calculator->availableTotal($allocation['remaining']);
+        $newBalance = $this->calculator->availableTotal($remaining);
 
         $this->writeDeductionLedger($leaveRequest, $balance, $allocation['allocations']);
-        $this->updateSummaryAfterDeduction($balance, $allocation['remaining'], $allocation['allocations'], $requested);
+        $this->updateSummaryAfterDeduction($balance, $remaining, $allocation['allocations'], $requested);
 
         // Audit pemotongan harus gagal bersama ledger/ringkasan agar mutasi saldo tetap dapat ditelusuri utuh.
         $this->auditDeductionOrFail(
@@ -939,6 +949,25 @@ class LeaveBalanceService
         }
 
         return $remaining;
+    }
+
+    /**
+     * Menggabungkan kembali hari terlindungi ke bucket sisa setelah alokasi non-terlindungi.
+     *
+     * Perlindungan penangguhan dinas tidak memutasi summary, sehingga hari tersebut harus utuh
+     * kembali di ringkasan agar `protectedAllocations()` tetap konsisten dengan saldo tersimpan.
+     *
+     * @param  array{n2:int, n1:int, current:int}  $remaining
+     * @param  array{n2:int, n1:int, current:int}  $protected
+     * @return array{n2:int, n1:int, current:int}
+     */
+    private function mergeProtectedBuckets(array $remaining, array $protected): array
+    {
+        return [
+            'n2' => $remaining['n2'] + $protected['n2'],
+            'n1' => $remaining['n1'] + $protected['n1'],
+            'current' => $remaining['current'] + $protected['current'],
+        ];
     }
 
     /**

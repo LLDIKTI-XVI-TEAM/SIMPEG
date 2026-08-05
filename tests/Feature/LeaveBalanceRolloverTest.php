@@ -1349,6 +1349,62 @@ class LeaveBalanceRolloverTest extends TestCase
      * datang setelah marker rollover ada harus ditolak, karena rollover sudah ter-dedup dan
      * carry-over yang seharusnya hangus tidak akan dihitung ulang.
      */
+    /**
+     * Hari yang sudah dilindungi penangguhan dinas tidak boleh dipakai pemotongan final pengajuan
+     * lain. Alokasi perlindungan memakai urutan termuda-dahulu, sehingga ketika perlindungan
+     * merambat ke N-1 dan tahun berjalan kemudian dikredit ulang oleh koreksi administratif,
+     * pemotongan tertua-dahulu harus berjalan pada bucket yang sudah dikurangi hari terlindungi.
+     */
+    public function test_pemotongan_final_tidak_mengambil_bucket_yang_dilindungi_penangguhan_dinas(): void
+    {
+        $employee = $this->employeeWithAppointment();
+        $actor = User::factory()->adminKepegawaian()->create();
+        $service = app(LeaveBalanceService::class);
+        $balance = LeaveBalance::create($this->balancePayload($employee, 2026, [
+            'sisa_n1' => 2,
+            'sisa_tahun_berjalan' => 0,
+            'carry_over' => 2,
+            'sisa' => 2,
+        ]));
+        LeaveBalanceLedger::create([
+            'employee_id' => $employee->id,
+            'leave_balance_id' => $balance->id,
+            'tahun' => 2026,
+            'event_type' => LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET,
+            'amount' => 2,
+            'source_year' => 2026,
+            'reason' => 'Baseline saldo awal.',
+            'dedup_key' => "opening_balance:{$employee->id}:2026",
+            'created_by' => $actor->id,
+        ]);
+
+        // Tahun berjalan habis, sehingga perlindungan penangguhan dinas merambat ke N-1.
+        $postponed = $this->annualLeaveRequest($employee, 2026, 2);
+        $ledger = $service->recordDutyPostponement($postponed, $actor, 'Penugasan mendesak kantor');
+        $this->assertSame(['n2' => 0, 'n1' => 2, 'current' => 0], $ledger->metadata['protected_allocations']);
+
+        // Koreksi administratif mengisi kembali tahun berjalan.
+        $service->adjustBalance($employee, 2026, 'current', 6, 'Kredit koreksi tahun berjalan.', $actor);
+
+        $approved = $this->annualLeaveRequest($employee, 2026, 3);
+        $service->deductForFinalApproval($approved);
+
+        // Pemotongan wajib mengambil dari tahun berjalan, bukan dari N-1 yang dilindungi.
+        $balance->refresh();
+        $this->assertSame(2, $balance->sisa_n1);
+        $this->assertSame(3, $balance->sisa_tahun_berjalan);
+
+        // Saldo tetap konsisten: eligibility dan rollover tidak boleh gagal setelah pemotongan.
+        $this->assertSame(3, $service->availableFor($employee, 2026));
+        $service->rolloverYear(2026);
+        $this->assertDatabaseHas('leave_balance_ledger', [
+            'employee_id' => $employee->id,
+            'tahun' => 2027,
+            'event_type' => LeaveBalanceLedger::EVENT_ROLLOVER_APPLIED,
+            'source_year' => 2026,
+        ]);
+    }
+
     public function test_final_cuti_besar_gagal_pada_tahun_sumber_yang_sudah_di_rollover(): void
     {
         $employee = $this->employeeWithAppointment();
