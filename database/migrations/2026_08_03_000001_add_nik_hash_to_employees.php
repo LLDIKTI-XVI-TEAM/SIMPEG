@@ -28,7 +28,12 @@ return new class extends Migration
             ->chunkById(200, function ($employees) use ($appKey): void {
                 foreach ($employees as $employee) {
                     /** @var Employee $employee */
-                    $plainNik = $employee->nik; // didekripsi oleh 'encrypted' cast
+                    try {
+                        $plainNik = $employee->nik; // didekripsi oleh 'encrypted' cast
+                    } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+                        Log::warning("[Migration] Gagal mendekripsi NIK untuk pegawai ID: {$employee->id} karena APP_KEY berubah. Melewati hash.");
+                        continue;
+                    }
 
                     if ($plainNik === null || trim((string) $plainNik) === '') {
                         continue;
