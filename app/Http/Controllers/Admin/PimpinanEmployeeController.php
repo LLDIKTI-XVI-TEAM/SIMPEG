@@ -165,46 +165,4 @@ class PimpinanEmployeeController extends Controller
         ));
     }
 
-    public function reportPage(ExportPegawaiRequest $request, EmployeeExportDataService $exportData): mixed
-    {
-        $filters = $request->validated();
-        $selectedColumns = (array) $request->query('columns', []);
-
-        if (empty($selectedColumns)) {
-            $selectedColumns = array_keys(PimpinanCustomEmployeeExportAction::ALLOWED_COLUMNS);
-        }
-
-        $unitKerjaOptions = RefUnitKerja::query()->orderBy('nama')->get(['id', 'nama']);
-        $jenisPegawaiOptions = RefJenisPegawai::query()->orderBy('nama')->get(['id', 'nama']);
-        $jabatanOptions = RefJabatan::query()->orderBy('nama')->get(['id', 'nama']);
-
-        $perPage = (int) $request->query('per_page', 10);
-        $perPage = in_array($perPage, [10, 25, 50], true) ? $perPage : 10;
-        $page = max(1, (int) $request->query('page', 1));
-
-        $allRows = $exportData->rows($filters);
-        $previewData = new LengthAwarePaginator(
-            $allRows->forPage($page, $perPage)->values(),
-            $allRows->count(),
-            $perPage,
-            $page,
-            ['path' => $request->url(), 'query' => $request->query()]
-        );
-
-        return view('pimpinan.laporan.pegawai', [
-            'filters' => $filters,
-            'selectedColumns' => $selectedColumns,
-            'allowedColumns' => PimpinanCustomEmployeeExportAction::ALLOWED_COLUMNS,
-            'unitKerjaOptions' => $unitKerjaOptions,
-            'jenisPegawaiOptions' => $jenisPegawaiOptions,
-            'jabatanOptions' => $jabatanOptions,
-            'pegawai' => $allRows->toArray(),
-            'previewData' => $previewData,
-        ]);
-    }
-
-    public function reportCustom(CustomEmployeeExportRequest $request, PimpinanCustomEmployeeExportAction $action): StreamedResponse
-    {
-        return $action->execute($request->validated());
-    }
 }
