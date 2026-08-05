@@ -256,6 +256,41 @@ class EmployeeTrendQueryTest extends TestCase
         $this->assertSame(0, $titik[5]['jumlah']);
     }
 
+    public function test_batasan_bulan_jeda_nonaktif_masih_dihitung_karena_memakai_status_terakhir(): void
+    {
+        // Test ini mengunci batasan yang diketahui, bukan perilaku yang diinginkan. Karena tanggal
+        // keluar ditentukan dari status terakhir, pegawai yang sempat nonaktif lalu kembali aktif
+        // tetap terhitung pada bulan-bulan jedanya. Memperbaikinya menuntut evaluasi status per
+        // titik bulan, dan itu hanya benar setelah definisi pegawai aktif diputuskan memakai
+        // kelompok pada referensi status pegawai, karena Tugas Belajar termasuk kelompok aktif
+        // meskipun namanya bukan Aktif. Bila perilaku ini kelak diperbaiki, test ini harus gagal
+        // lebih dulu agar perubahannya dilakukan secara sadar.
+        $employee = Employee::factory()->create([
+            'status_aktif' => 'Aktif',
+            'tanggal_pensiun' => null,
+            'created_at' => now()->subMonths(11),
+        ]);
+        EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_nama' => 'Cuti Luar Tanggungan Negara',
+            'keterangan' => 'CLTN empat bulan.',
+            'tanggal_efektif' => now()->subMonths(6)->startOfMonth()->toDateString(),
+            'is_latest' => false,
+        ]);
+        EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_nama' => 'Aktif',
+            'keterangan' => 'Kembali bertugas.',
+            'tanggal_efektif' => now()->subMonths(2)->startOfMonth()->toDateString(),
+            'is_latest' => true,
+        ]);
+
+        $titik = app(EmployeeTrendQuery::class)->monthlyActiveCounts();
+
+        $this->assertSame(1, $titik[6]['jumlah']);
+        $this->assertSame(1, $titik[8]['jumlah']);
+    }
+
     public function test_dashboard_admin_dan_pimpinan_menghasilkan_tren_yang_sama(): void
     {
         // Kontrak dashboard mewajibkan kedua surface memakai metode yang sama, sehingga
