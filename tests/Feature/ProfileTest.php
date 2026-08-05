@@ -7,8 +7,10 @@ use App\Models\Employee;
 use App\Models\EmployeeFamily;
 use App\Models\EwsAlert;
 use App\Models\LeaveBalance;
+use App\Models\LeaveRequest;
 use App\Models\RankHistory;
 use App\Models\RefGolongan;
+use App\Models\RefJenisCuti;
 use App\Models\RefJenjangPendidikan;
 use App\Models\SalaryHistory;
 use App\Models\User;
@@ -62,7 +64,47 @@ class ProfileTest extends TestCase
 
         $response->assertOk();
         $response->assertDontSee('Belum tersedia', false);
-        $response->assertSee('- <span class="text-sm font-normal text-muted">Hari</span>', false);
+        $response->assertSee('Hak Efektif Tahun Ini', false);
+        $response->assertSee('-', false);
+    }
+
+    public function test_profile_rule_5_menampilkan_sisa_efektif_nol_tanpa_mengubah_saldo_tercatat(): void
+    {
+        $employee = Employee::factory()->create();
+        $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+        $balance = LeaveBalance::create([
+            'employee_id' => $employee->id,
+            'tahun' => now()->year,
+            'jatah_awal' => 12,
+            'carry_over' => 6,
+            'terpakai' => 0,
+            'sisa' => 18,
+            'sisa_n2' => 0,
+            'sisa_n1' => 6,
+            'sisa_tahun_berjalan' => 12,
+            'terpakai_tahun_berjalan' => 0,
+            'hangus' => 0,
+        ]);
+        LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => RefJenisCuti::query()->where('code', 'besar')->firstOrFail()->id,
+            'tanggal_mulai' => now()->startOfYear()->addMonths(2)->toDateString(),
+            'tanggal_selesai' => now()->startOfYear()->addMonths(2)->addDays(30)->toDateString(),
+            'jumlah_hari_kerja' => 20,
+            'alasan' => 'Cuti Besar final.',
+            'status' => 'disetujui',
+        ]);
+
+        $response = $this->actingAs($user)->get('/dashboard/profil?tab=cuti');
+
+        $response->assertOk()
+            ->assertViewHas('rule5Active', true)
+            ->assertViewHas('saldoCuti', fn (mixed $saldo): bool => is_array($saldo)
+                && $saldo['rule_5_active'] === true
+                && $saldo['saldo_dapat_diajukan'] === 0)
+            ->assertSee('Hak Efektif Tahun Ini', false)
+            ->assertSee('tidak dapat digunakan pada tahun Cuti Besar', false);
+        $this->assertSame(18, $balance->fresh()->sisa);
     }
 
     public function test_profile_ews_section_uses_real_alerts_not_mock(): void

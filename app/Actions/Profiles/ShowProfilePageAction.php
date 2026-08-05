@@ -2,15 +2,18 @@
 
 namespace App\Actions\Profiles;
 
+use App\Actions\Cuti\PreviewLeaveBalanceAction;
 use App\Actions\Ews\ListActiveEwsAlertsAction;
-use App\Models\LeaveBalance;
 use App\Models\User;
 use App\Support\Documents\DocumentCategory;
 use Illuminate\Support\Carbon;
 
 class ShowProfilePageAction
 {
-    public function __construct(private readonly ListActiveEwsAlertsAction $ewsAlerts) {}
+    public function __construct(
+        private readonly ListActiveEwsAlertsAction $ewsAlerts,
+        private readonly PreviewLeaveBalanceAction $balancePreview,
+    ) {}
 
     public function execute(User $user): array
     {
@@ -27,17 +30,17 @@ class ShowProfilePageAction
 
         $year = (int) now()->year;
         $leaveBalance = null;
+        $rule5Active = false;
 
         if ($employee !== null) {
-            $leaveBalance = LeaveBalance::query()
-                ->where('employee_id', $employee->id)
-                ->where('tahun', $year)
-                ->first();
+            $leaveBalance = $this->balancePreview->execute($employee, Carbon::now());
+            $rule5Active = $leaveBalance['rule_5_active'];
         }
 
         return [
             'p' => $employee,
             'saldoCuti' => $leaveBalance,
+            'rule5Active' => $rule5Active,
             'tahun' => $year,
             'riwayatDokumen' => $employee?->documents?->map(fn ($document) => [
                 'extension' => $document->fileExtension(),

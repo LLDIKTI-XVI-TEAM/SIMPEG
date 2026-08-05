@@ -9,16 +9,24 @@
         header { border-bottom: 2px solid #1e3a8a; margin-bottom: 16px; padding-bottom: 10px; text-align: center; }
         header p, header h1 { margin: 2px 0; }
         h1 { font-size: 16px; text-transform: uppercase; }
+        h2 { font-size: 12px; margin: 14px 0 6px; }
         .meta { margin-bottom: 12px; }
-        table { border-collapse: collapse; width: 100%; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 18px; }
         th, td { border: 1px solid #9ca3af; padding: 5px 4px; vertical-align: top; }
         th { background: #dbeafe; font-size: 8px; text-align: left; }
         .number { text-align: right; }
+        .center { text-align: center; }
         .empty { padding: 18px; text-align: center; }
+        .section-title { background: #1e3a8a; color: #fff; font-size: 10px; font-weight: bold;
+                         padding: 5px 8px; margin: 20px 0 6px; }
         .signatures { margin-top: 36px; width: 100%; }
         .signature { display: inline-block; text-align: center; vertical-align: top; width: 48%; }
         .signature-space { height: 54px; }
-        footer { bottom: -24px; color: #6b7280; font-size: 8px; left: 0; position: fixed; right: 0; text-align: center; }
+        /* Footer tetap di bawah setiap halaman — didukung Dompdf lewat position:fixed. */
+        footer { bottom: 0; color: #6b7280; font-size: 8px; left: 0; position: fixed; right: 0; text-align: center; }
+        /* Dompdf mengisi counter(page) dan counter(pages) secara native pada elemen fixed. */
+        .page-number::after  { content: counter(page); }
+        .total-pages::after  { content: counter(pages); }
     </style>
 </head>
 <body>
@@ -27,11 +35,47 @@
         <h1>Rekap Cuti Pegawai</h1>
     </header>
 
-    <p class="meta">Periode: {{ $filters['periode'] ?? 'Semua periode' }}</p>
+    <p class="meta">Periode: {{ $periodLabel ?? ($filters['periode'] ?? 'Semua periode') }}</p>
+
+    {{-- ============================================================ --}}
+    {{-- BAGIAN 1: REKAP PER PEGAWAI PER JENIS CUTI                  --}}
+    {{-- ============================================================ --}}
+    <div class="section-title">Ringkasan Cuti Per Pegawai</div>
     <table>
         <thead>
             <tr>
-                <th>No</th><th>NIP</th><th>Nama</th><th>Jenis</th><th>Mulai</th><th>Selesai</th><th>Hari Kerja</th><th>Status</th>
+                <th>No</th>
+                <th>NIP</th>
+                <th>Nama Pegawai</th>
+                <th>Jenis Cuti</th>
+                <th class="center">Total Hari</th>
+                <th class="center">Sisa Saldo {{ isset($summaryRows) && $summaryRows->isNotEmpty() ? $summaryRows->first()['saldo_tahun'] ?? '' : '' }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse($summaryRows ?? [] as $i => $row)
+                <tr>
+                    <td>{{ $i + 1 }}</td>
+                    <td>{{ $row['nip'] }}</td>
+                    <td>{{ $row['nama'] }}</td>
+                    <td>{{ $row['jenis'] }}</td>
+                    <td class="number">{{ $row['total_hari'] }}</td>
+                    <td class="number">{{ $row['sisa_saldo'] === '-' ? '-' : $row['sisa_saldo'] }}</td>
+                </tr>
+            @empty
+                <tr><td class="empty" colspan="6">Tidak ada data rekap cuti sesuai filter.</td></tr>
+            @endforelse
+        </tbody>
+    </table>
+
+    {{-- ============================================================ --}}
+    {{-- BAGIAN 2: DETAIL PENGAJUAN CUTI                              --}}
+    {{-- ============================================================ --}}
+    <div class="section-title">Detail Pengajuan Cuti</div>
+    <table>
+        <thead>
+            <tr>
+                <th>No</th><th>NIP</th><th>Nama</th><th>Jenis</th><th>Mulai</th><th>Selesai</th><th class="center">Hari Kerja</th><th>Status</th>
             </tr>
         </thead>
         <tbody>
@@ -56,6 +100,10 @@
         <div class="signature"><strong>Pembuat Laporan</strong><div class="signature-space"></div><p>(................................)</p></div>
         <div class="signature"><strong>Mengetahui</strong><div class="signature-space"></div><p>(................................)</p></div>
     </div>
-    <footer>Dokumen dibuat pada {{ $generatedAt->format('d-m-Y H:i:s') }}</footer>
+
+    <footer>
+        Dokumen dibuat pada {{ $generatedAt->format('d-m-Y H:i:s') }}
+        <span style="float:right">Halaman <span class="page-number"></span> dari <span class="total-pages"></span></span>
+    </footer>
 </body>
 </html>

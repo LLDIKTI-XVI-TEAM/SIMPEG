@@ -213,7 +213,7 @@ class EmployeeUpdateTest extends TestCase
         $response->assertJsonValidationErrors('tanggal_lahir');
     }
 
-    public function test_web_edit_shows_and_ignores_manual_retirement_date(): void
+    public function test_web_edit_saves_manual_retirement_date(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create(['tanggal_pensiun' => '2042-05-15']);
@@ -229,7 +229,7 @@ class EmployeeUpdateTest extends TestCase
         );
 
         $response->assertRedirect(route('data-pegawai'));
-        $this->assertSame('2042-05-15', $employee->fresh()->tanggal_pensiun?->toDateString());
+        $this->assertSame('2030-01-01', $employee->fresh()->tanggal_pensiun?->toDateString());
     }
 
     public function test_pppk_contract_dates_are_shown_saved_and_reset_active_contract_alerts(): void

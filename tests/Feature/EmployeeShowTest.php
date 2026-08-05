@@ -423,7 +423,7 @@ class EmployeeShowTest extends TestCase
             'tanggal_selesai' => '2026-02-03',
             'jumlah_hari_kerja' => 2,
             'alasan' => 'Keperluan keluarga',
-            'status' => 'Draft',
+            'status' => 'menunggu_approval',
         ]);
 
         EwsAlert::create([

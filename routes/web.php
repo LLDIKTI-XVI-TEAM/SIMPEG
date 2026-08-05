@@ -346,6 +346,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('laporan.pegawai.excel');
 
+    Route::get('/laporan/export-pegawai/pdf', [LaporanController::class, 'exportPegawaiPdf'])
+        ->middleware(['role:super_admin,admin_kepegawaian'])
+        ->name('laporan.pegawai.pdf');
+
     Route::post('/laporan/export-pegawai/custom', [LaporanController::class, 'exportPegawaiCustom'])
         ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('laporan.pegawai.custom');
@@ -475,6 +479,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin,pimpinan,kepala_bagian,admin_kepegawaian,pegawai'])
         ->name('cuti.decline')
         ->whereUuid('id');
+    Route::post('/cuti/{leave}/penangguhan-tugas-dinas', [CutiController::class, 'recordDutyPostponement'])
+        ->middleware(['role:super_admin,pimpinan,kepala_bagian,admin_kepegawaian,pegawai'])
+        ->name('cuti.penangguhan-tugas-dinas')
+        ->whereUuid('leave');
     Route::get('/dashboard/cuti/{id}', [CutiController::class, 'show'])
         ->name('cuti.show')
         ->whereUuid('id');
@@ -609,6 +617,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
             Route::post('/cuti/{leave}/decision', [PimpinanLeaveDecisionController::class, 'store'])
                 ->whereUuid('leave')
                 ->name('cuti.decision');
+            Route::post('/cuti/{leave}/penangguhan-tugas-dinas', [PimpinanLeaveDecisionController::class, 'recordDutyPostponement'])
+                ->whereUuid('leave')
+                ->name('cuti.penangguhan-tugas-dinas');
             Route::get('/cuti/{leave}/dokumen', [PimpinanLeaveDocumentController::class, 'show'])
                 ->whereUuid('leave')
                 ->name('cuti.document.show');
@@ -653,6 +664,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
             Route::post('/cuti/{leave}/keputusan', [KepalaBagianLeaveDecisionController::class, 'store'])
                 ->whereUuid('leave')
                 ->name('cuti.decision');
+            Route::post('/cuti/{leave}/penangguhan-tugas-dinas', [KepalaBagianLeaveDecisionController::class, 'recordDutyPostponement'])
+                ->whereUuid('leave')
+                ->name('cuti.penangguhan-tugas-dinas');
             Route::get('/cuti/{leave}/lampiran', [KepalaBagianLeaveController::class, 'downloadAttachment'])
                 ->whereUuid('leave')
                 ->name('cuti.attachment.download');

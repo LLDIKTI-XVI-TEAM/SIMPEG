@@ -75,7 +75,7 @@ class CutiContactSnapshotTest extends TestCase
             'tanggal_selesai' => '2026-07-06',
             'jumlah_hari_kerja' => 1,
             'alasan' => 'Uji kompatibilitas data cuti legacy.',
-            'status' => 'Draft',
+            'status' => 'menunggu_approval',
         ]);
 
         $this->assertNull($cuti->alamat_selama_cuti);

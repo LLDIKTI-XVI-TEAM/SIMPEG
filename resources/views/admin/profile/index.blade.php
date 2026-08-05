@@ -325,18 +325,19 @@
                     <div class="flex items-center justify-between">
                         <div>
                             <h3 class="text-sm font-bold text-ink font-sans">Informasi Saldo Cuti ({{ $tahun }})</h3>
-                            <p class="text-xs text-muted font-sans mt-0.5">Menampilkan sisa jatah cuti tahunan berjalan Anda.</p>
+                            <p class="text-xs text-muted font-sans mt-0.5">Menampilkan hak efektif cuti tahunan berjalan Anda.</p>
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div class="rounded-lg border border-border bg-surface p-4 shadow-sm text-center">
-                            <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans block">Sisa Saldo</span>
-                            <span class="text-3xl font-bold text-primary block mt-2">
-                                {{ $saldoCuti?->sisa ?? ($saldoCuti?->jatah_awal ?? '-') }} <span class="text-sm font-normal text-muted">Hari</span>
-                            </span>
-                        </div>
+                    <div class="max-w-xs">
+                        <x-ui.stat-card label="Hak Efektif Tahun Ini" value="{{ $saldoCuti['saldo_dapat_diajukan'] ?? '-' }}" unit="Hari" variant="primary" size="lg" center role="group" aria-label="{{ $saldoCuti['saldo_dapat_diajukan'] ?? '-' }} Hari">
+                        </x-ui.stat-card>
                     </div>
+                    @if ($rule5Active)
+                        <x-ui.alert variant="warning" size="sm">
+                            Saldo tercatat, tidak dapat digunakan pada tahun Cuti Besar. Saldo cuti tahunan tetap tercatat sebagai riwayat. Hak efektif tahun ini adalah 0 karena Cuti Besar telah disetujui.
+                        </x-ui.alert>
+                    @endif
                 </div>
 
                 {{-- TAB 2: DATA KELUARGA --}}

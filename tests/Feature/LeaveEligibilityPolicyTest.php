@@ -12,7 +12,9 @@ use App\Models\RefJenisCuti;
 use App\Models\RefJenisPegawai;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
+use App\Services\Cuti\LeaveEligibilityService;
 use App\Services\LeaveApprovalService;
+use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -124,6 +126,59 @@ class LeaveEligibilityPolicyTest extends TestCase
             'employee_id' => $aktor['employee']->id,
             'jenis_cuti_id' => $cutiBesar->id,
         ]);
+    }
+
+    public function test_assert_single_calendar_year_menerima_carbon_immutable_untuk_reuse_lintas_action(): void
+    {
+        app(LeaveEligibilityService::class)->assertSingleCalendarYear(
+            CarbonImmutable::parse('2026-08-03'),
+            CarbonImmutable::parse('2026-11-02'),
+        );
+
+        $this->assertTrue(true);
+    }
+
+    public function test_submit_cuti_besar_menolak_durasi_diatas_tiga_bulan_kalender(): void
+    {
+        $aktor = $this->makePemohon(tmt: '2018-01-01');
+        $cutiBesar = $this->leaveType('besar', 'Cuti Besar', khususPns: true);
+
+        $this->actingAs($aktor['user'])
+            ->postJson(route('cuti.store'), $this->payload($cutiBesar, '2026-08-03', '2026-11-03'))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['tanggal_selesai'])
+            ->assertJsonPath('errors.tanggal_selesai.0', 'Cuti Besar paling lama 3 bulan kalender. Batas akhir pengajuan ini adalah 02-11-2026.');
+
+        $this->assertDatabaseCount('leave_requests', 0);
+    }
+
+    public function test_resubmit_cuti_besar_menolak_durasi_diatas_tiga_bulan_kalender(): void
+    {
+        $aktor = $this->makePemohon(tmt: '2018-01-01');
+        $cutiBesar = $this->leaveType('besar', 'Cuti Besar', khususPns: true);
+
+        $this->actingAs($aktor['user'])
+            ->post(route('cuti.store'), $this->payload($cutiBesar, '2026-08-03', '2026-08-07'))
+            ->assertRedirect(route('cuti'));
+
+        $leaveRequest = LeaveRequest::query()->sole();
+        app(LeaveApprovalService::class)->requestChanges($leaveRequest, $aktor['supervisor'], 'Tanggal cuti perlu diperbaiki.');
+
+        $this->actingAs($aktor['user'])
+            ->patchJson(route('cuti.resubmit', $leaveRequest), [
+                'tanggal_mulai' => '2026-08-03',
+                'tanggal_selesai' => '2026-11-03',
+                'alasan' => 'Periode diperbaiki.',
+                'alamat_selama_cuti' => 'Jl. Sam Ratulangi No. 2, Manado',
+                'nomor_telepon' => '+62 (431) 123-457',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['tanggal_selesai'])
+            ->assertJsonPath('errors.tanggal_selesai.0', 'Cuti Besar paling lama 3 bulan kalender. Batas akhir pengajuan ini adalah 02-11-2026.');
+
+        $leaveRequest->refresh();
+        $this->assertSame('2026-08-07', $leaveRequest->tanggal_selesai->toDateString());
+        $this->assertSame('perlu_perubahan', $leaveRequest->status);
     }
 
     public function test_maternity_leave_creates_an_explicit_case_and_enforces_three_calendar_months(): void

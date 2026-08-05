@@ -7,6 +7,7 @@ use App\Models\LeaveRequest;
 use App\Models\LeaveRequestCase;
 use App\Models\RefJenisCuti;
 use App\Models\User;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
@@ -35,8 +36,10 @@ class LeaveEligibilityService
         ?string $leaveRequestCaseId = null,
         ?LeaveRequest $excludingLeaveRequest = null,
     ): void {
+        $this->assertSingleCalendarYear($startDate, $endDate);
         $this->assertPnsOnlyType($employee, $leaveType);
         $this->assertCutiBesarServiceLength($employee, $leaveType, $startDate);
+        $this->assertCutiBesarDuration($leaveType, $startDate, $endDate);
 
         if (! $this->requiresExplicitCase($leaveType)) {
             if ($leaveRequestCaseId !== null) {
@@ -78,8 +81,10 @@ class LeaveEligibilityService
         ?string $leaveRequestCaseId,
         ?User $actor = null,
     ): array {
+        $this->assertSingleCalendarYear($startDate, $endDate);
         $this->assertPnsOnlyType($employee, $leaveType);
         $this->assertCutiBesarServiceLength($employee, $leaveType, $startDate);
+        $this->assertCutiBesarDuration($leaveType, $startDate, $endDate);
 
         if (! $this->requiresExplicitCase($leaveType)) {
             if ($leaveRequestCaseId !== null) {
@@ -139,7 +144,9 @@ class LeaveEligibilityService
         }
 
         $this->assertPnsOnlyType($employee, $leaveType);
+        $this->assertSingleCalendarYear($startDate, $endDate);
         $this->assertCutiBesarServiceLength($employee, $leaveType, $startDate);
+        $this->assertCutiBesarDuration($leaveType, $startDate, $endDate);
 
         if (! $this->requiresExplicitCase($leaveType)) {
             return;
@@ -196,6 +203,32 @@ class LeaveEligibilityService
         return in_array($leaveType->code, self::CASE_TYPE_CODES, true);
     }
 
+    /**
+     * Memvalidasi ulang fakta Cuti Besar yang sudah tersimpan tepat sebelum
+     * persetujuan final agar perubahan data pegawai atau request tidak membypass aturan statutory.
+     */
+    public function assertCutiBesarCanBeFinallyApproved(LeaveRequest $leaveRequest, Employee $employee): void
+    {
+        $leaveRequest->loadMissing('jenisCuti');
+        $leaveType = $leaveRequest->jenisCuti;
+
+        if ($leaveType === null) {
+            throw $this->validationError('jenis_cuti_id', 'Jenis cuti pengajuan tidak tersedia.');
+        }
+
+        if ($leaveType->code !== 'besar') {
+            return;
+        }
+
+        $startDate = $leaveRequest->tanggal_mulai->copy()->startOfDay();
+        $endDate = $leaveRequest->tanggal_selesai->copy()->startOfDay();
+
+        $this->assertSingleCalendarYear($startDate, $endDate);
+        $this->assertPnsOnlyType($employee->loadMissing('jenisPegawai'), $leaveType);
+        $this->assertCutiBesarServiceLength($employee, $leaveType, $startDate);
+        $this->assertCutiBesarDuration($leaveType, $startDate, $endDate);
+    }
+
     private function assertPnsOnlyType(Employee $employee, RefJenisCuti $leaveType): void
     {
         if ($leaveType->khusus_pns && $employee->jenisPegawai?->nama !== 'PNS') {
@@ -229,6 +262,41 @@ class LeaveEligibilityService
                 "Cuti Besar hanya dapat diajukan setelah masa kerja minimal 5 tahun kalender sejak TMT pengangkatan ({$eligibleFrom->format('d-m-Y')}).",
             );
         }
+    }
+
+    /** Cuti Besar dibatasi tiga bulan kalender dari tanggal mulai yang telah tersimpan. */
+    private function assertCutiBesarDuration(RefJenisCuti $leaveType, Carbon $startDate, Carbon $endDate): void
+    {
+        if ($leaveType->code !== 'besar') {
+            return;
+        }
+
+        $latestAllowedDate = $startDate->copy()->addMonthsNoOverflow(3)->subDay();
+
+        if (! $endDate->gt($latestAllowedDate)) {
+            return;
+        }
+
+        throw $this->validationError(
+            'tanggal_selesai',
+            "Cuti Besar paling lama 3 bulan kalender. Batas akhir pengajuan ini adalah {$latestAllowedDate->format('d-m-Y')}.",
+        );
+    }
+
+    /**
+     * Menjaga satu pengajuan berada dalam satu tahun kalender pada FormRequest,
+     * service, dan kelak Action langsung agar tidak ada jalur bypass lintas tahun.
+     */
+    public function assertSingleCalendarYear(CarbonInterface $startDate, CarbonInterface $endDate): void
+    {
+        if ($startDate->year === $endDate->year) {
+            return;
+        }
+
+        throw $this->validationError(
+            'tanggal_selesai',
+            'Pengajuan cuti tidak boleh melewati tahun kalender. Pisahkan menjadi dua pengajuan terpisah untuk tiap tahun.',
+        );
     }
 
     private function assertCaseMatches(LeaveRequestCase $leaveCase, Employee $employee, RefJenisCuti $leaveType): void

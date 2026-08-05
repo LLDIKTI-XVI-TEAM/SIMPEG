@@ -9,6 +9,7 @@ use App\Models\LeaveRequestStep;
 use App\Models\User;
 use App\Services\Cuti\LeaveBalanceReservationService;
 use App\Services\Cuti\LeaveBalanceService;
+use App\Services\Cuti\LeaveEligibilityService;
 use App\Services\Cuti\LeaveProofService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Carbon;
@@ -32,6 +33,17 @@ class LeaveApprovalService
     private const STATUS_TIDAK_DISETUJUI = 'tidak_disetujui';
 
     /**
+     * Status yang masih boleh diputus approver.
+     *
+     * Dipakai bersama oleh gate service, indikator tombol keputusan, dan counter antrean supaya
+     * ketiganya tidak berbeda. Keberadaan step aktif saja tidak cukup: rollover mempertahankan step
+     * aktif sebagai snapshot pada pengajuan yang sudah dikembalikan ke pemohon.
+     *
+     * @var list<string>
+     */
+    public const ACTIONABLE_STATUSES = [self::STATUS_MENUNGGU, self::STATUS_DITANGGUHKAN];
+
+    /**
      * LeaveProofService di-inject agar penerbitan bukti final ikut dalam transaksi persetujuan.
      * Injeksi konstruktor dipilih ketimbang service locator agar dependensi eksplisit dan mudah diuji.
      */
@@ -39,6 +51,7 @@ class LeaveApprovalService
         private readonly LeaveProofService $proofs,
         private readonly LeaveBalanceService $balances,
         private readonly LeaveBalanceReservationService $reservations,
+        private readonly LeaveEligibilityService $eligibility,
     ) {}
 
     /**
@@ -91,8 +104,27 @@ class LeaveApprovalService
             // Konversi dan pemotongan berada dalam transaksi yang sama. Konversi
             // dilakukan lebih dulu agar seluruh mutasi memakai urutan kunci yang sama:
             // request, pegawai, lalu saldo. Jika deduction gagal, event konversi ikut rollback.
+            $employee = Employee::query()
+                ->whereKey($locked->employee_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $isCutiBesar = $locked->jenisCuti()->where('code', 'besar')->exists();
+
+            if ($isCutiBesar) {
+                // Kelayakan persisted dan konflik saldo dicek setelah mutex pegawai agar final approval
+                // tidak dapat berlomba dengan submit atau resubmit Cuti Tahunan pada tahun yang sama.
+                $this->eligibility->assertCutiBesarCanBeFinallyApproved($locked, $employee);
+                $this->balances->assertCutiBesarCanBeFinallyApproved(
+                    $employee,
+                    $locked->tanggal_mulai->year,
+                );
+            }
+
             $this->reservations->convertForFinalApproval($locked, $actingUser);
-            $this->deductBalanceIfRequired($locked);
+            if (! $isCutiBesar) {
+                $this->deductBalanceIfRequired($locked);
+            }
             $locked->forceFill(['status' => self::STATUS_DISETUJUI])->save();
             $this->proofs->generateForApprovedRequest($locked->refresh(), $actor, $actingUser);
 
@@ -217,7 +249,7 @@ class LeaveApprovalService
 
     private function assertApprovalActionable(LeaveRequest $leaveRequest): void
     {
-        if (! in_array($leaveRequest->status, [self::STATUS_MENUNGGU, self::STATUS_DITANGGUHKAN], true)) {
+        if (! in_array($leaveRequest->status, self::ACTIONABLE_STATUSES, true)) {
             throw ValidationException::withMessages([
                 'status' => 'Pengajuan cuti ini belum dapat diproses oleh approver.',
             ]);

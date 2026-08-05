@@ -9,6 +9,8 @@ use App\Actions\Cuti\ListLeaveRequestsAction;
 use App\Actions\Cuti\ListPendingLeaveApprovalsAction;
 use App\Actions\Cuti\PostponeLeaveAction;
 use App\Actions\Cuti\PrepareLeaveRequestFormAction;
+use App\Actions\Cuti\PreviewLeaveBalanceAction;
+use App\Actions\Cuti\RecordDutyPostponementAction;
 use App\Actions\Cuti\RequestChangesLeaveAction;
 use App\Actions\Cuti\ResubmitLeaveRequestAction;
 use App\Actions\Cuti\ShowCutiRekapAction;
@@ -16,12 +18,14 @@ use App\Actions\Cuti\SubmitLeaveRequestAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Cuti\ApproveLeaveRequest;
 use App\Http\Requests\Cuti\PostponeLeaveRequest;
+use App\Http\Requests\Cuti\RecordDutyPostponementRequest;
 use App\Http\Requests\Cuti\ResubmitLeaveRequestRequest;
 use App\Http\Requests\Cuti\ReviewLeaveDecisionRequest;
 use App\Http\Requests\Cuti\StoreLeaveRequestRequest;
 use App\Models\LeaveRequest;
 use App\Services\LeaveApprovalService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Symfony\Component\HttpFoundation\Response;
 
 class CutiController extends Controller
@@ -68,7 +72,7 @@ class CutiController extends Controller
      * Menampilkan detail satu pengajuan cuti.
      * Pegawai tanpa hak memantau hanya boleh membuka pengajuan miliknya sendiri (cegah akses lintas pegawai).
      */
-    public function show($id, LeaveApprovalService $approvals, DownloadOfficialLeavePdfAction $pdfAction)
+    public function show($id, LeaveApprovalService $approvals, DownloadOfficialLeavePdfAction $pdfAction, PreviewLeaveBalanceAction $balancePreview)
     {
         $user = request()->user();
 
@@ -76,22 +80,35 @@ class CutiController extends Controller
             ->with(['employee', 'jenisCuti', 'proof', 'approvals.approver', 'steps.approver'])
             ->findOrFail($id);
 
-        // Tombol setujui/tunda hanya muncul bila pengguna ini adalah approver tahap yang sedang menunggu;
-        // otorisasi sebenarnya tetap ditegakkan ulang di service saat aksi dijalankan.
+        // Tombol setujui/tunda hanya muncul bila pengguna ini adalah approver tahap yang sedang menunggu
+        // DAN status pengajuan memang masih dapat diputus; otorisasi sebenarnya tetap ditegakkan ulang
+        // di service saat aksi dijalankan.
         $stage = $approvals->pendingStage($cuti);
-        $canAct = $stage !== null
+        $isSnapshotApprover = $stage !== null
             && $approvals->approverEmployeeIdForStage($cuti, $stage) === $user->employee_id;
+        $canAct = $isSnapshotApprover
+            && in_array($cuti->status, LeaveApprovalService::ACTIONABLE_STATUSES, true);
         $canDownloadFormulir = $pdfAction->canDownload($cuti, $user);
 
-        if (! $user->hasPermission('cuti.read_all') && $cuti->employee_id !== $user->employee_id && ! $canAct && ! $canDownloadFormulir) {
+        // Akses baca memakai keberadaan snapshot approver, bukan izin bertindak, agar approver lama
+        // tetap dapat menelusuri pengajuan yang sudah dikembalikan ke pemohon.
+        if (! $user->hasPermission('cuti.read_all') && $cuti->employee_id !== $user->employee_id && ! $isSnapshotApprover && ! $canDownloadFormulir) {
             abort(403);
         }
+
+        $isRolloverReturn = $cuti->status === LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER;
+        $targetBalance = $isRolloverReturn && $cuti->employee !== null && $cuti->rollover_target_year !== null
+            ? $balancePreview->execute($cuti->employee, Carbon::create($cuti->rollover_target_year, 1, 1)->startOfDay())
+            : null;
 
         return view('admin.cuti.show', [
             'cuti' => $cuti,
             'canAct' => $canAct,
             'canDownloadFormulir' => $canDownloadFormulir,
-            'canResubmit' => $cuti->status === 'perlu_perubahan' && $cuti->employee_id === $user->employee_id,
+            'canResubmit' => in_array($cuti->status, ['perlu_perubahan', LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER], true)
+                && $cuti->employee_id === $user->employee_id,
+            'isRolloverReturn' => $isRolloverReturn,
+            'targetBalance' => $targetBalance,
             'activeStep' => $stage === null ? null : $cuti->steps->firstWhere('step_order', $stage),
         ]);
     }
@@ -196,5 +213,21 @@ class CutiController extends Controller
 
         return redirect()->route('cuti.approval')
             ->with('success', 'Pengajuan cuti tidak disetujui dan pemohon telah diberi tahu.');
+    }
+
+    /** Mencatat terminal penangguhan tugas dinas melalui Action yang menegakkan snapshot approver. */
+    public function recordDutyPostponement(
+        RecordDutyPostponementRequest $request,
+        LeaveRequest $leave,
+        RecordDutyPostponementAction $action,
+    ) {
+        $user = $request->user();
+        $actor = $user?->employee;
+        abort_if($user === null || $actor === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat menangguhkan cuti.');
+
+        $action->execute($leave, $actor, $user, $request->validated()['alasan']);
+
+        return redirect()->route('cuti.approval')
+            ->with('success', 'Cuti Tahunan ditangguhkan karena tugas dinas dan hak terkait telah dilindungi untuk satu tahun berikutnya.');
     }
 }
