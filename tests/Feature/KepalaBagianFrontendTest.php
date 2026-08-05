@@ -4,12 +4,16 @@ namespace Tests\Feature;
 
 use App\Models\Employee;
 use App\Models\EwsAlert;
+use App\Models\LeaveApproval;
+use App\Models\LeaveBalance;
+use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
 use App\Models\RefJenisCuti;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class KepalaBagianFrontendTest extends TestCase
@@ -256,6 +260,67 @@ class KepalaBagianFrontendTest extends TestCase
             ->assertSee('Pemohon Disetujui');
     }
 
+    public function test_leave_index_accepts_and_labels_duty_postponement_status(): void
+    {
+        [$user, $kepalaBagian] = $this->kepalaBagian();
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Pemohon Terminal Kepala Bagian',
+            'kepala_bagian_id' => $kepalaBagian->id,
+        ]);
+        $leave = $this->leaveWithActiveStep($employee, $kepalaBagian);
+        $leave->forceFill(['status' => LeaveRequest::STATUS_DUTY_POSTPONED])->save();
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.cuti.index', ['status' => LeaveRequest::STATUS_DUTY_POSTPONED]))
+            ->assertOk()
+            ->assertSee('Pemohon Terminal Kepala Bagian')
+            ->assertSee('Ditangguhkan karena Tugas Dinas')
+            ->assertSee('value="'.LeaveRequest::STATUS_DUTY_POSTPONED.'"', false);
+    }
+
+    public function test_leave_surfaces_label_returned_rollover_without_offering_a_decision(): void
+    {
+        [$user, $kepalaBagian] = $this->kepalaBagian();
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Pemohon Rollover Kepala Bagian',
+            'kepala_bagian_id' => $kepalaBagian->id,
+        ]);
+        $leave = $this->leaveWithActiveStep($employee, $kepalaBagian);
+        $leave->forceFill([
+            'status' => LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER,
+            'rollover_source_year' => 2026,
+            'rollover_target_year' => 2027,
+        ])->save();
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.cuti.index', ['status' => LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER]))
+            ->assertOk()
+            ->assertSee('Pemohon Rollover Kepala Bagian')
+            ->assertSee('Dikembalikan karena Rollover')
+            ->assertSee('value="'.LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER.'"', false);
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.cuti.show', $leave))
+            ->assertOk()
+            ->assertSee('Dikembalikan karena Rollover')
+            ->assertDontSee(route('kepala-bagian.cuti.decision', $leave), false);
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.bawahan.show', $employee))
+            ->assertOk()
+            ->assertSee('Dikembalikan karena Rollover');
+    }
+
+    public function test_detail_pending_step_explains_waiting_role(): void
+    {
+        $fixture = $this->dutyPostponementFixture();
+
+        $this->actingAs($fixture['user'])
+            ->get(route('kepala-bagian.cuti.show', $fixture['leave']))
+            ->assertOk()
+            ->assertSeeInOrder(['Tahap 2 · PYBMC', 'Menunggu PYBMC']);
+    }
+
     public function test_kepala_bagian_decision_uses_leave_workflow_and_requires_note_when_needed(): void
     {
         [$user, $kepalaBagian] = $this->kepalaBagian();
@@ -291,6 +356,238 @@ class KepalaBagianFrontendTest extends TestCase
             'auditable_type' => 'LeaveRequest',
             'auditable_id' => $leave->id,
         ]);
+    }
+
+    public function test_duty_postponement_kepala_bagian_route_records_terminal_workflow(): void
+    {
+        $fixture = $this->dutyPostponementFixture();
+
+        $this->actingAs($fixture['user'])
+            ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), ['alasan' => 'Penugasan mendesak mewakili instansi.'])
+            ->assertRedirect(route('kepala-bagian.cuti.show', $fixture['leave']))
+            ->assertSessionHas('success', 'Cuti Tahunan ditangguhkan karena tugas dinas dan hak terkait telah dilindungi untuk satu tahun berikutnya.');
+
+        $this->assertDatabaseHas('leave_requests', ['id' => $fixture['leave']->id, 'status' => LeaveRequest::STATUS_DUTY_POSTPONED]);
+        $this->assertDatabaseHas('leave_approvals', [
+            'leave_request_id' => $fixture['leave']->id,
+            'approver_id' => $fixture['approver']->id,
+            'action' => LeaveApproval::ACTION_DUTY_POSTPONEMENT,
+        ]);
+        $this->assertDatabaseHas('leave_request_steps', [
+            'leave_request_id' => $fixture['leave']->id,
+            'step_order' => 2,
+            'status' => 'skipped',
+            'skipped_reason' => LeaveRequestStep::SKIPPED_DUTY_POSTPONEMENT_TERMINAL,
+        ]);
+    }
+
+    public function test_duty_postponement_kepala_bagian_route_validates_reason_without_mutation(): void
+    {
+        foreach ([
+            '' => 'Alasan tugas dinas mendesak wajib diisi.',
+            'abcd' => 'Alasan tugas dinas minimal berisi 5 karakter.',
+            str_repeat('a', 501) => 'Alasan tugas dinas maksimal berisi 500 karakter.',
+        ] as $reason => $message) {
+            $fixture = $this->dutyPostponementFixture();
+            $this->actingAs($fixture['user'])
+                ->from(route('kepala-bagian.cuti.show', $fixture['leave']))
+                ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), ['alasan' => $reason])
+                ->assertRedirect(route('kepala-bagian.cuti.show', $fixture['leave']))
+                ->assertSessionHasErrorsIn('dutyPostponement', ['alasan' => $message]);
+            $this->assertSame('menunggu_approval', $fixture['leave']->fresh()->status);
+            $this->assertDatabaseMissing('leave_approvals', ['leave_request_id' => $fixture['leave']->id]);
+        }
+    }
+
+    public function test_duty_postponement_kepala_bagian_route_rejects_malformed_uuid(): void
+    {
+        [$user] = $this->kepalaBagian();
+        $this->actingAs($user)
+            ->post('/kepala-bagian/cuti/bukan-uuid/penangguhan-tugas-dinas', ['alasan' => 'Penugasan mendesak mewakili instansi.'])
+            ->assertNotFound();
+    }
+
+    public function test_duty_postponement_kepala_bagian_route_rejects_non_snapshot_actor_without_mutation(): void
+    {
+        $fixture = $this->dutyPostponementFixture();
+        $other = Employee::factory()->create();
+        $fixture['leave']->employee->forceFill(['kepala_bagian_id' => $other->id])->save();
+        $user = User::factory()->kepalaBagian()->create(['employee_id' => $other->id]);
+
+        $this->actingAs($user)
+            ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), ['alasan' => 'Penugasan mendesak mewakili instansi.'])
+            ->assertForbidden();
+        $this->assertSame('menunggu_approval', $fixture['leave']->fresh()->status);
+    }
+
+    public function test_duty_postponement_kepala_bagian_route_rejects_request_outside_direct_report_scope(): void
+    {
+        $fixture = $this->dutyPostponementFixture();
+        $fixture['leave']->employee->forceFill(['kepala_bagian_id' => Employee::factory()->create()->id])->save();
+
+        $this->actingAs($fixture['user'])
+            ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), ['alasan' => 'Penugasan mendesak mewakili instansi.'])
+            ->assertForbidden();
+        $this->assertSame('menunggu_approval', $fixture['leave']->fresh()->status);
+    }
+
+    public function test_duty_postponement_kepala_bagian_detail_shows_distinct_actions_only_for_eligible_actor(): void
+    {
+        $fixture = $this->dutyPostponementFixture();
+
+        $this->actingAs($fixture['user'])
+            ->get(route('kepala-bagian.cuti.show', $fixture['leave']))
+            ->assertOk()
+            ->assertSee('Tunda Sementara')
+            ->assertSee('Tangguhkan karena Tugas Dinas')
+            ->assertSee(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), false)
+            ->assertSee('name="alasan"', false)
+            ->assertSee('minlength="5"', false)
+            ->assertSee('maxlength="500"', false)
+            ->assertSee('Konfirmasi Penangguhan Tugas Dinas')
+            ->assertSee('openDutyPostponement($event)', false)
+            ->assertSee('closeDutyPostponement()', false)
+            ->assertSee("document.getElementById('kabag-duty-postponement-reason')?.focus()", false)
+            ->assertSee('dutyPostponementTrigger?.focus()', false)
+            ->assertSee('aria-describedby="kabag-duty-postponement-description"', false);
+
+        $other = Employee::factory()->create();
+        $fixture['leave']->employee->forceFill(['kepala_bagian_id' => $other->id])->save();
+        $otherUser = User::factory()->kepalaBagian()->create(['employee_id' => $other->id]);
+        $this->actingAs($otherUser)
+            ->get(route('kepala-bagian.cuti.show', $fixture['leave']))
+            ->assertOk()
+            ->assertDontSee(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), false);
+    }
+
+    public function test_duty_postponement_kepala_bagian_detail_hides_action_for_non_annual_and_renders_terminal_history(): void
+    {
+        $fixture = $this->dutyPostponementFixture();
+        $annualTypeId = $fixture['leave']->jenis_cuti_id;
+        $sickType = RefJenisCuti::create([
+            'nama' => 'Cuti Sakit UI Kepala Bagian',
+            'code' => 'sakit_ui_kepala_bagian',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+        $fixture['leave']->forceFill(['jenis_cuti_id' => $sickType->id])->save();
+
+        $this->actingAs($fixture['user'])
+            ->get(route('kepala-bagian.cuti.show', $fixture['leave']))
+            ->assertOk()
+            ->assertSee('Tunda Sementara')
+            ->assertDontSee(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), false);
+
+        $fixture['leave']->forceFill(['jenis_cuti_id' => $annualTypeId])->save();
+        $this->actingAs($fixture['user'])
+            ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), ['alasan' => 'Penugasan mendesak mewakili instansi.']);
+
+        $persistedSteps = $fixture['leave']->steps()->with('approver')->orderBy('step_order')->get();
+        $persistedSteps[0]->approver->forceFill(['nama_lengkap' => 'Approver Tugas Dinas Kepala Bagian'])->save();
+        $persistedSteps[1]->approver->forceFill(['nama_lengkap' => 'Approver Tahap Lanjutan Kepala Bagian'])->save();
+
+        $response = $this->actingAs($fixture['user'])
+            ->get(route('kepala-bagian.cuti.show', $fixture['leave']))
+            ->assertOk();
+
+        $response
+            ->assertSeeInOrder([
+                'Timeline',
+                'Persetujuan',
+                'Tahap 1 · Kepala Bagian',
+                'Approver Tugas Dinas Kepala Bagian',
+                'Ditangguhkan karena Tugas Dinas',
+            ])
+            ->assertSeeInOrder([
+                'Timeline',
+                'Persetujuan',
+                'Tahap 2 · PYBMC',
+                'Approver Tahap Lanjutan Kepala Bagian',
+                'Dilewati',
+                'Dilewati karena penangguhan tugas dinas menutup pengajuan.',
+            ])
+            ->assertSeeInOrder([
+                'Riwayat Tindakan Resmi',
+                'Tahap 1 · Approver Tugas Dinas Kepala Bagian',
+                'Ditangguhkan karena Tugas Dinas',
+            ])
+            ->assertDontSee('ditangguhkan_tugas_dinas')
+            ->assertDontSee('duty_postponement_terminal')
+            ->assertDontSee(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), false);
+    }
+
+    public function test_duty_postponement_kepala_bagian_detail_localizes_other_skipped_reasons(): void
+    {
+        $fixture = $this->dutyPostponementFixture();
+        $steps = $fixture['leave']->steps()->orderBy('step_order')->get();
+        $steps[0]->forceFill(['status' => 'skipped', 'skipped_reason' => 'duplicate_approver'])->save();
+        $steps[1]->forceFill(['status' => 'skipped', 'skipped_reason' => 'request_not_approved'])->save();
+        $fixture['leave']->forceFill(['status' => 'tidak_disetujui'])->save();
+
+        $this->actingAs($fixture['user'])
+            ->get(route('kepala-bagian.cuti.show', $fixture['leave']))
+            ->assertOk()
+            ->assertSeeInOrder([
+                'Timeline',
+                'Persetujuan',
+                'Tahap 1 · Kepala Bagian',
+                'Dilewati karena approver yang sama sudah tercakup pada tahap lain.',
+                'Tahap 2 · PYBMC',
+                'Dilewati karena pengajuan telah diputus tidak disetujui.',
+            ])
+            ->assertDontSee('duplicate_approver')
+            ->assertDontSee('request_not_approved');
+    }
+
+    public function test_duty_postponement_kepala_bagian_invalid_reason_reopens_dedicated_modal_and_focuses_error(): void
+    {
+        $fixture = $this->dutyPostponementFixture();
+
+        $this->actingAs($fixture['user'])
+            ->from(route('kepala-bagian.cuti.show', $fixture['leave']))
+            ->followingRedirects()
+            ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), ['alasan' => 'abcd'])
+            ->assertOk()
+            ->assertSee('dutyPostponementOpen: true', false)
+            ->assertSee('Alasan tugas dinas minimal berisi 5 karakter.')
+            ->assertSee('aria-invalid="true"', false)
+            ->assertSee('data-error-autofocus="true"', false)
+            ->assertSee("document.getElementById('kabag-duty-postponement-reason')?.focus()", false)
+            ->assertSee('confirmOpen: false', false);
+    }
+
+    public function test_duty_postponement_kepala_bagian_detail_uses_neutral_fallbacks_for_unknown_step_and_action(): void
+    {
+        $fixture = $this->dutyPostponementFixture();
+        $step = $fixture['leave']->steps()->orderBy('step_order')->first();
+        $step->forceFill(['status' => 'step_rahasia_kabag'])->save();
+        LeaveApproval::create([
+            'leave_request_id' => $fixture['leave']->id,
+            'approver_id' => $fixture['approver']->id,
+            'stage' => 1,
+            'action' => 'ACTION_RAHASIA_KABAG',
+            'komentar' => 'Fallback action kepala bagian.',
+            'acted_at' => now(),
+        ]);
+
+        $response = $this->actingAs($fixture['user'])
+            ->get(route('kepala-bagian.cuti.show', $fixture['leave']));
+
+        $response->assertOk()
+            ->assertSeeInOrder([
+                'Timeline',
+                'Persetujuan',
+                'Tahap 1 · Kepala Bagian',
+                'Status tidak tersedia',
+            ])
+            ->assertSeeInOrder([
+                'Riwayat Tindakan Resmi',
+                'Tahap 1 · ',
+                'Tindakan tidak dikenal',
+            ])
+            ->assertDontSee('step_rahasia_kabag')
+            ->assertDontSee('ACTION_RAHASIA_KABAG');
+        $this->assertSame(1, substr_count($response->getContent(), 'Status tidak tersedia'));
     }
 
     public function test_detail_cuti_bawahan_menampilkan_status_tidak_disetujui(): void
@@ -394,5 +691,43 @@ class KepalaBagianFrontendTest extends TestCase
         ]);
 
         return $leave;
+    }
+
+    /** @return array{user: User, approver: Employee, leave: LeaveRequest} */
+    private function dutyPostponementFixture(): array
+    {
+        [$user, $approver] = $this->kepalaBagian();
+        $applicant = Employee::factory()->create(['kepala_bagian_id' => $approver->id]);
+        $applicantUser = User::factory()->pegawai()->create(['employee_id' => $applicant->id]);
+        $type = RefJenisCuti::firstOrCreate(['code' => 'tahunan'], [
+            'nama' => 'Cuti Tahunan', 'mengurangi_saldo_tahunan' => true, 'khusus_pns' => false,
+        ]);
+        $balance = LeaveBalance::create([
+            'employee_id' => $applicant->id, 'tahun' => 2026, 'jatah_awal' => 12, 'carry_over' => 0,
+            'terpakai' => 0, 'sisa' => 12, 'sisa_n2' => 0, 'sisa_n1' => 0,
+            'sisa_tahun_berjalan' => 12, 'terpakai_tahun_berjalan' => 0, 'hangus' => 0,
+        ]);
+        $leave = LeaveRequest::create([
+            'employee_id' => $applicant->id, 'jenis_cuti_id' => $type->id,
+            'tanggal_mulai' => '2026-08-03', 'tanggal_selesai' => '2026-08-07',
+            'jumlah_hari_kerja' => 5, 'alasan' => 'Cuti tahunan keluarga.', 'status' => 'menunggu_approval',
+        ]);
+        LeaveRequestStep::create([
+            'leave_request_id' => $leave->id, 'step_order' => 1, 'step_type' => 'kepala_bagian',
+            'role_label' => 'Kepala Bagian', 'approver_employee_id' => $approver->id, 'status' => 'active', 'is_final' => false,
+        ]);
+        LeaveRequestStep::create([
+            'leave_request_id' => $leave->id, 'step_order' => 2, 'step_type' => 'pybmc',
+            'role_label' => 'PYBMC', 'approver_employee_id' => Employee::factory()->create()->id,
+            'status' => 'pending', 'is_final' => true,
+        ]);
+        LeaveBalanceReservationEvent::create([
+            'employee_id' => $applicant->id, 'leave_request_id' => $leave->id, 'leave_balance_id' => $balance->id,
+            'tahun' => 2026, 'event_type' => LeaveBalanceReservationEvent::EVENT_RESERVED, 'amount' => 5,
+            'dedup_key' => "leave_reservation:{$leave->id}:reserved", 'created_by' => $applicantUser->id,
+            'occurred_at' => Carbon::parse('2026-08-01 08:00:00'),
+        ]);
+
+        return compact('user', 'approver', 'leave');
     }
 }

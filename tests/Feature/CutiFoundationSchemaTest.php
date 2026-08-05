@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\Employee;
+use App\Models\LeaveApproval;
 use App\Models\LeaveApprovalChain;
 use App\Models\LeaveApprovalChainStep;
 use App\Models\LeaveBalance;
@@ -13,7 +15,9 @@ use App\Models\LeaveRequest;
 use App\Models\LeaveRequestCase;
 use App\Models\LeaveRequestStep;
 use App\Models\RefJenisCuti;
+use App\Models\SimpegNotification;
 use App\Models\User;
+use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +26,7 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use RuntimeException;
 use Tests\TestCase;
 
 /**
@@ -30,6 +35,477 @@ use Tests\TestCase;
 class CutiFoundationSchemaTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_duty_postponement_domain_tokens_are_dedicated(): void
+    {
+        $this->assertSame('ditangguhkan_tugas_dinas', LeaveRequest::STATUS_DUTY_POSTPONED);
+        $this->assertSame('ditangguhkan_tugas_dinas', LeaveRequestStep::STATUS_DUTY_POSTPONED);
+        $this->assertSame('duty_postponement_terminal', LeaveRequestStep::SKIPPED_DUTY_POSTPONEMENT_TERMINAL);
+        $this->assertSame('DUTY_POSTPONEMENT', LeaveApproval::ACTION_DUTY_POSTPONEMENT);
+    }
+
+    public function test_rollover_return_schema_accepts_supported_statuses_and_enforces_target_year_contract_on_postgresql(): void
+    {
+        $this->assertTrue(Schema::hasColumns('leave_requests', [
+            'rollover_source_year',
+            'rollover_target_year',
+        ]));
+
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('CHECK constraint rollover return diverifikasi khusus pada PostgreSQL.');
+        }
+
+        $employee = Employee::factory()->create();
+        $jenisCuti = RefJenisCuti::create([
+            'nama' => 'Cuti Kontrak Status Rollover',
+            'code' => 'kontrak_status_rollover',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+
+        foreach ([
+            'menunggu_approval',
+            'ditangguhkan',
+            'ditangguhkan_tugas_dinas',
+            'perlu_perubahan',
+            'disetujui',
+            'tidak_disetujui',
+            'dikembalikan_karena_rollover',
+        ] as $status) {
+            $request = LeaveRequest::create([
+                'employee_id' => $employee->id,
+                'jenis_cuti_id' => $jenisCuti->id,
+                'tanggal_mulai' => '2026-12-20',
+                'tanggal_selesai' => '2026-12-20',
+                'jumlah_hari_kerja' => 1,
+                'alasan' => "Fixture status {$status}.",
+                'status' => $status,
+                'rollover_source_year' => 2026,
+                'rollover_target_year' => 2027,
+            ]);
+
+            $this->assertSame($status, $request->status);
+        }
+
+        $this->assertThrows(
+            fn () => LeaveRequest::create([
+                'employee_id' => $employee->id,
+                'jenis_cuti_id' => $jenisCuti->id,
+                'tanggal_mulai' => '2026-12-21',
+                'tanggal_selesai' => '2026-12-21',
+                'jumlah_hari_kerja' => 1,
+                'alasan' => 'Tahun target tidak valid.',
+                'status' => 'dikembalikan_karena_rollover',
+                'rollover_source_year' => 2026,
+                'rollover_target_year' => 2028,
+            ]),
+            QueryException::class,
+        );
+        $this->assertThrows(
+            fn () => LeaveRequest::create([
+                'employee_id' => $employee->id,
+                'jenis_cuti_id' => $jenisCuti->id,
+                'tanggal_mulai' => '2026-12-22',
+                'tanggal_selesai' => '2026-12-22',
+                'jumlah_hari_kerja' => 1,
+                'alasan' => 'Status acak tidak boleh lolos constraint.',
+                'status' => 'status_sembarang',
+            ]),
+            QueryException::class,
+        );
+    }
+
+    /**
+     * Metadata rollover harus lengkap atau kosong sepenuhnya. Baris parsial berbahaya karena
+     * resubmit mewajibkan tahun target: pengajuan yang dikembalikan tanpa tahun target akan
+     * mentok dan tidak dapat diajukan kembali oleh pegawai.
+     */
+    public function test_rollover_metadata_must_be_complete_or_absent_on_postgresql(): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('CHECK constraint metadata rollover diverifikasi khusus pada PostgreSQL.');
+        }
+
+        $employee = Employee::factory()->create();
+        $jenisCuti = RefJenisCuti::create([
+            'nama' => 'Cuti Kontrak Metadata Rollover',
+            'code' => 'kontrak_metadata_rollover',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+
+        $partialMetadata = [
+            'tahun sumber tanpa tahun target' => [
+                'rollover_source_year' => 2026,
+                'rollover_target_year' => null,
+            ],
+            'tahun target tanpa tahun sumber' => [
+                'rollover_source_year' => null,
+                'rollover_target_year' => 2027,
+            ],
+        ];
+
+        foreach ($partialMetadata as $label => $metadata) {
+            // Savepoint per percobaan agar transaksi test tidak ikut abort dan pesan
+            // constraint asli tetap terbaca, bukan galat transaksi lanjutan.
+            DB::beginTransaction();
+
+            try {
+                LeaveRequest::create([
+                    'employee_id' => $employee->id,
+                    'jenis_cuti_id' => $jenisCuti->id,
+                    'tanggal_mulai' => '2026-12-23',
+                    'tanggal_selesai' => '2026-12-23',
+                    'jumlah_hari_kerja' => 1,
+                    'alasan' => "Metadata rollover parsial: {$label}.",
+                    'status' => LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER,
+                    ...$metadata,
+                ]);
+
+                $rejected = false;
+            } catch (QueryException $exception) {
+                $rejected = true;
+
+                $this->assertStringContainsString(
+                    'leave_requests_rollover_target_year_check',
+                    $exception->getMessage(),
+                    "Penolakan metadata rollover parsial {$label} harus berasal dari CHECK metadata rollover.",
+                );
+            } finally {
+                DB::rollBack();
+            }
+
+            $this->assertTrue($rejected, "Metadata rollover parsial {$label} seharusnya ditolak database.");
+        }
+
+        $tanpaMetadata = LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $jenisCuti->id,
+            'tanggal_mulai' => '2026-12-24',
+            'tanggal_selesai' => '2026-12-24',
+            'jumlah_hari_kerja' => 1,
+            'alasan' => 'Pengajuan normal tanpa metadata rollover.',
+            'status' => 'menunggu_approval',
+        ]);
+
+        $this->assertNull($tanpaMetadata->rollover_source_year);
+        $this->assertNull($tanpaMetadata->rollover_target_year);
+    }
+
+    public function test_rollover_return_migration_normalizes_known_original_enum_statuses_before_check_postgresql(): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Normalisasi status legacy rollover diverifikasi khusus pada PostgreSQL.');
+        }
+
+        $migration = $this->rolloverReturnMigration();
+        $employee = Employee::factory()->create();
+        $jenisCuti = RefJenisCuti::create([
+            'nama' => 'Cuti Status Legacy Rollover',
+            'code' => 'status_legacy_rollover',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+        $this->invokeMigrationMethod($migration, 'down');
+
+        try {
+            $expectedStatuses = [
+                'Draft' => 'menunggu_approval',
+                'Disetujui' => 'disetujui',
+                'Tidak Disetujui' => 'tidak_disetujui',
+            ];
+
+            foreach ($expectedStatuses as $legacyStatus => $canonicalStatus) {
+                DB::table('leave_requests')->insert([
+                    'id' => (string) Str::uuid(),
+                    'employee_id' => $employee->id,
+                    'jenis_cuti_id' => $jenisCuti->id,
+                    'tanggal_mulai' => '2026-12-20',
+                    'tanggal_selesai' => '2026-12-20',
+                    'jumlah_hari_kerja' => 1,
+                    'alasan' => "Fixture {$legacyStatus}.",
+                    'status' => $legacyStatus,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            $this->invokeMigrationMethod($migration, 'up');
+
+            foreach ($expectedStatuses as $legacyStatus => $canonicalStatus) {
+                $this->assertDatabaseHas('leave_requests', [
+                    'alasan' => "Fixture {$legacyStatus}.",
+                    'status' => $canonicalStatus,
+                ]);
+            }
+        } finally {
+            if (! Schema::hasColumn('leave_requests', 'rollover_source_year')) {
+                $this->invokeMigrationMethod($migration, 'up');
+            }
+        }
+    }
+
+    public function test_rollover_return_migration_rejects_unknown_legacy_status_before_adding_check_postgresql(): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Penolakan token legacy tak dikenal diverifikasi khusus pada PostgreSQL.');
+        }
+
+        $migration = $this->rolloverReturnMigration();
+        $employee = Employee::factory()->create();
+        $jenisCuti = RefJenisCuti::create([
+            'nama' => 'Cuti Status Legacy Tidak Dikenal',
+            'code' => 'status_legacy_tidak_dikenal',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+        $this->invokeMigrationMethod($migration, 'down');
+
+        try {
+            DB::table('leave_requests')->insert([
+                'id' => (string) Str::uuid(),
+                'employee_id' => $employee->id,
+                'jenis_cuti_id' => $jenisCuti->id,
+                'tanggal_mulai' => '2026-12-20',
+                'tanggal_selesai' => '2026-12-20',
+                'jumlah_hari_kerja' => 1,
+                'alasan' => 'Fixture token status legacy tidak dikenal.',
+                'status' => 'token_legacy_tidak_dikenal',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $this->expectException(RuntimeException::class);
+            $this->expectExceptionMessage('token_legacy_tidak_dikenal');
+            $this->invokeMigrationMethod($migration, 'up');
+        } finally {
+            DB::table('leave_requests')->where('status', 'token_legacy_tidak_dikenal')->delete();
+
+            if (Schema::hasColumn('leave_requests', 'rollover_source_year')) {
+                $this->invokeMigrationMethod($migration, 'down');
+            }
+
+            $this->invokeMigrationMethod($migration, 'up');
+        }
+    }
+
+    #[DataProvider('rolloverReturnEvidenceProvider')]
+    public function test_rollover_return_migration_down_refuses_when_return_evidence_exists_postgresql(string $evidence): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Proteksi rollback rollover diverifikasi khusus pada PostgreSQL.');
+        }
+
+        $employee = Employee::factory()->create();
+        $jenisCuti = RefJenisCuti::create([
+            'nama' => 'Cuti Bukti Rollover',
+            'code' => 'bukti_rollover',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+        $request = LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $jenisCuti->id,
+            'tanggal_mulai' => '2026-12-20',
+            'tanggal_selesai' => '2026-12-20',
+            'jumlah_hari_kerja' => 1,
+            'alasan' => 'Bukti pengembalian rollover tidak boleh kehilangan metadata.',
+            'status' => $evidence === 'request' ? LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER : 'menunggu_approval',
+            'rollover_source_year' => $evidence === 'request' ? 2026 : null,
+            'rollover_target_year' => $evidence === 'request' ? 2027 : null,
+        ]);
+
+        if ($evidence === 'release_event') {
+            $balance = LeaveBalance::create([
+                'employee_id' => $employee->id,
+                'tahun' => 2026,
+                'jatah_awal' => 12,
+                'carry_over' => 0,
+                'terpakai' => 0,
+                'sisa' => 12,
+            ]);
+            LeaveBalanceReservationEvent::create([
+                'employee_id' => $employee->id,
+                'leave_request_id' => $request->id,
+                'leave_balance_id' => $balance->id,
+                'tahun' => 2026,
+                'event_type' => LeaveBalanceReservationEvent::EVENT_RELEASED,
+                'amount' => -1,
+                'dedup_key' => "rollover-release:{$request->id}",
+                'metadata' => ['release_context' => 'rollover_return'],
+            ]);
+        }
+
+        if ($evidence === 'notification') {
+            SimpegNotification::create([
+                'user_id' => $employee->id,
+                'type' => 'cuti.dikembalikan_karena_rollover',
+                'title' => 'Pengajuan Cuti Dikembalikan karena Rollover',
+                'body' => 'Notifikasi rollover untuk proteksi rollback.',
+            ]);
+        }
+
+        if ($evidence === 'audit') {
+            AuditLog::create([
+                'event' => 'UPDATE',
+                'auditable_type' => LeaveRequest::class,
+                'auditable_id' => $request->id,
+                'new_values' => ['status' => LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER],
+            ]);
+        }
+
+        if ($evidence === 'release_audit') {
+            AuditLog::create([
+                'event' => 'LEAVE_BALANCE_RESERVATION_RELEASED',
+                'auditable_type' => 'LeaveBalanceReservationEvent',
+                'auditable_id' => (string) Str::uuid(),
+                'new_values' => ['release_context' => 'rollover_return'],
+            ]);
+        }
+
+        $this->assertThrows(
+            fn () => $this->invokeMigrationMethod($this->rolloverReturnMigration(), 'down'),
+            RuntimeException::class,
+        );
+        $this->assertTrue(Schema::hasColumns('leave_requests', [
+            'rollover_source_year',
+            'rollover_target_year',
+        ]));
+    }
+
+    /** @return array<string, array{string}> */
+    public static function rolloverReturnEvidenceProvider(): array
+    {
+        return [
+            'status dan metadata request' => ['request'],
+            'event pelepasan reservasi rollover' => ['release_event'],
+            'notifikasi rollover' => ['notification'],
+            'audit pengembalian rollover' => ['audit'],
+            'audit pelepasan reservasi rollover' => ['release_audit'],
+        ];
+    }
+
+    public function test_duty_postponement_audit_event_is_allowed_and_random_event_is_rejected_by_postgresql(): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('CHECK constraint event audit diverifikasi khusus pada PostgreSQL.');
+        }
+
+        AuditLog::create([
+            'event' => 'DUTY_POSTPONEMENT',
+            'auditable_type' => LeaveRequest::class,
+            'auditable_id' => (string) Str::uuid(),
+        ]);
+
+        $this->assertDatabaseHas('audit_logs', ['event' => 'DUTY_POSTPONEMENT']);
+        $this->assertThrows(
+            fn () => DB::table('audit_logs')->insert([
+                'id' => (string) Str::uuid(),
+                'event' => 'RANDOM_DUTY_POSTPONEMENT_EVENT',
+                'auditable_type' => LeaveRequest::class,
+                'created_at' => now(),
+            ]),
+            QueryException::class,
+        );
+    }
+
+    public function test_duty_postponement_migration_refuses_rollback_when_audit_evidence_exists(): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Rollback constraint audit diverifikasi khusus pada PostgreSQL.');
+        }
+
+        AuditLog::create([
+            'event' => 'DUTY_POSTPONEMENT',
+            'auditable_type' => LeaveRequest::class,
+            'auditable_id' => (string) Str::uuid(),
+        ]);
+
+        $this->assertThrows(
+            fn () => $this->invokeMigrationMethod($this->dutyPostponementMigration(), 'down'),
+            RuntimeException::class,
+        );
+        $this->assertDutyPostponementMigrationSupportRemainsIntact();
+    }
+
+    public function test_duty_postponement_migration_refuses_rollback_when_notification_evidence_exists(): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Rollback notifikasi penangguhan diverifikasi khusus pada PostgreSQL.');
+        }
+
+        $employee = Employee::factory()->create();
+        SimpegNotification::create([
+            'user_id' => $employee->id,
+            'type' => 'cuti.ditangguhkan_tugas_dinas',
+            'title' => 'Uji penangguhan tugas dinas',
+            'body' => 'Notifikasi tanpa data pribadi untuk menguji proteksi rollback.',
+        ]);
+
+        $this->assertThrows(
+            fn () => $this->invokeMigrationMethod($this->dutyPostponementMigration(), 'down'),
+            RuntimeException::class,
+        );
+        $this->assertDutyPostponementMigrationSupportRemainsIntact();
+    }
+
+    public function test_duty_postponement_migration_refuses_rollback_when_ledger_evidence_exists(): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Rollback ledger penangguhan diverifikasi khusus pada PostgreSQL.');
+        }
+
+        $employee = Employee::factory()->create();
+        LeaveBalanceLedger::create([
+            'employee_id' => $employee->id,
+            'tahun' => 2026,
+            'event_type' => LeaveBalanceLedger::EVENT_DUTY_POSTPONEMENT_RECORDED,
+            'amount' => 0,
+        ]);
+
+        $this->assertThrows(
+            fn () => $this->invokeMigrationMethod($this->dutyPostponementMigration(), 'down'),
+            RuntimeException::class,
+        );
+        $this->assertDutyPostponementMigrationSupportRemainsIntact();
+    }
+
+    public function test_duty_postponement_migration_clean_rollback_removes_policies_and_restores_prior_audit_allowlist(): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Rollback bersih constraint audit diverifikasi khusus pada PostgreSQL.');
+        }
+
+        $migration = $this->dutyPostponementMigration();
+
+        try {
+            $this->invokeMigrationMethod($migration, 'down');
+
+            $this->assertSame(0, DB::table('notification_event_channels')
+                ->where('event_key', 'cuti.ditangguhkan_tugas_dinas')
+                ->count());
+
+            AuditLog::create([
+                'event' => 'POSTPONE',
+                'auditable_type' => LeaveRequest::class,
+                'auditable_id' => (string) Str::uuid(),
+            ]);
+            $this->assertDatabaseHas('audit_logs', ['event' => 'POSTPONE']);
+
+            $this->assertThrows(
+                fn () => DB::transaction(fn () => AuditLog::create([
+                    'event' => 'DUTY_POSTPONEMENT',
+                    'auditable_type' => LeaveRequest::class,
+                    'auditable_id' => (string) Str::uuid(),
+                ])),
+                QueryException::class,
+            );
+        } finally {
+            $this->invokeMigrationMethod($migration, 'up');
+        }
+
+        $this->assertDutyPostponementMigrationSupportRemainsIntact();
+    }
 
     public function test_schema_fondasi_revisi_cuti_tersedia(): void
     {
@@ -156,7 +632,7 @@ class CutiFoundationSchemaTest extends TestCase
             'tanggal_selesai' => '2026-07-06',
             'jumlah_hari_kerja' => 1,
             'alasan' => 'Uji fondasi revisi cuti.',
-            'status' => 'Draft',
+            'status' => 'menunggu_approval',
         ]);
         $leaveCase = LeaveRequestCase::create([
             'employee_id' => $pemohon->id,
@@ -254,7 +730,7 @@ class CutiFoundationSchemaTest extends TestCase
             'tanggal_selesai' => '2026-07-06',
             'jumlah_hari_kerja' => 1,
             'alasan' => 'Uji constraint fondasi revisi cuti.',
-            'status' => 'Draft',
+            'status' => 'menunggu_approval',
         ]);
         $chain = LeaveApprovalChain::create([
             'employee_id' => $pemohon->id,
@@ -304,7 +780,7 @@ class CutiFoundationSchemaTest extends TestCase
             'tanggal_selesai' => '2026-07-06',
             'jumlah_hari_kerja' => 1,
             'alasan' => 'Uji token proof.',
-            'status' => 'Draft',
+            'status' => 'menunggu_approval',
         ]);
         $cutiLain = LeaveRequest::create([
             'employee_id' => $pemohon->id,
@@ -313,7 +789,7 @@ class CutiFoundationSchemaTest extends TestCase
             'tanggal_selesai' => '2026-07-07',
             'jumlah_hari_kerja' => 1,
             'alasan' => 'Uji token proof lain.',
-            'status' => 'Draft',
+            'status' => 'menunggu_approval',
         ]);
 
         LeaveProof::create(['leave_request_id' => $cuti->id, 'token' => 'token-duplikat']);
@@ -557,5 +1033,40 @@ class CutiFoundationSchemaTest extends TestCase
             'created_at' => $ledger->created_at?->toIso8601String(),
             'updated_at' => $ledger->updated_at?->toIso8601String(),
         ];
+    }
+
+    private function dutyPostponementMigration(): Migration
+    {
+        return require database_path('migrations/2026_07_31_000001_add_duty_postponement_workflow_support.php');
+    }
+
+    private function rolloverReturnMigration(): Migration
+    {
+        return require database_path('migrations/2026_08_04_000001_add_rollover_return_support_to_leave_requests.php');
+    }
+
+    private function invokeMigrationMethod(Migration $migration, string $method): void
+    {
+        $callback = [$migration, $method];
+        $this->assertIsCallable($callback);
+        call_user_func($callback);
+    }
+
+    private function assertDutyPostponementMigrationSupportRemainsIntact(): void
+    {
+        $enabledChannels = DB::table('notification_event_channels')
+            ->join('ref_notification_channels', 'ref_notification_channels.id', '=', 'notification_event_channels.notification_channel_id')
+            ->where('notification_event_channels.event_key', 'cuti.ditangguhkan_tugas_dinas')
+            ->where('notification_event_channels.is_enabled', true)
+            ->orderBy('ref_notification_channels.code')
+            ->pluck('ref_notification_channels.code')
+            ->all();
+        $constraintDefinition = DB::table('pg_constraint')
+            ->where('conname', 'audit_logs_event_check')
+            ->value(DB::raw('pg_get_constraintdef(oid)'));
+
+        $this->assertSame(['email', 'in_app'], $enabledChannels);
+        $this->assertIsString($constraintDefinition);
+        $this->assertStringContainsString('DUTY_POSTPONEMENT', $constraintDefinition);
     }
 }

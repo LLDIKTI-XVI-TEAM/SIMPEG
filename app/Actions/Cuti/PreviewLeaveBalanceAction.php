@@ -25,7 +25,9 @@ class PreviewLeaveBalanceAction
      *     koreksi_administratif:int,
      *     saldo_aktual:int,
      *     dialokasikan_aktif:int,
+     *     dilindungi_penangguhan_dinas:int,
      *     saldo_dapat_diajukan:int,
+     *     rule_5_active:bool,
      *     bucket:array{n2:int,n1:int,current:int}
      * }
      */

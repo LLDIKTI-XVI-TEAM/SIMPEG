@@ -24,6 +24,10 @@ class LeaveRequestStep extends Model
 {
     use HasUuid;
 
+    public const SKIPPED_DUTY_POSTPONEMENT_TERMINAL = 'duty_postponement_terminal';
+
+    public const STATUS_DUTY_POSTPONED = 'ditangguhkan_tugas_dinas';
+
     protected $fillable = [
         'leave_request_id',
         'step_order',

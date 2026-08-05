@@ -63,6 +63,7 @@ class LeaveBalanceReservationService
         DB::transaction(function () use ($leaveRequest, $actor): void {
             $employee = $this->lockEmployee($leaveRequest->employee_id);
             $tahun = $leaveRequest->tanggal_mulai->year;
+            $this->balances->assertAnnualLeaveAllowed($employee, $tahun);
             $balance = $this->lockBalances($employee, [$tahun => $leaveRequest->tanggal_mulai])[$tahun] ?? null;
 
             if ($balance === null) {
@@ -116,6 +117,7 @@ class LeaveBalanceReservationService
             $employee = $this->lockEmployee($leaveRequest->employee_id);
             $existingByYear = $this->reservedByYearForRequest($leaveRequest->id);
             $newYear = $newStartDate->year;
+            $this->balances->assertAnnualLeaveAllowed($employee, $newYear);
             $datesByYear = [$newYear => $newStartDate];
 
             foreach (array_keys($existingByYear) as $year) {
@@ -207,6 +209,206 @@ class LeaveBalanceReservationService
     public function releaseForNotApproved(LeaveRequest $leaveRequest, ?User $actor = null): void
     {
         $this->releaseReservation($leaveRequest, $actor, LeaveBalanceReservationEvent::EVENT_RELEASED);
+    }
+
+    /**
+     * Melepas reservasi rollover untuk pemanggil legacy dengan urutan lock rollover baku.
+     *
+     * Request dikunci lebih dulu agar resubmit tidak dapat mengubah tahun sumber, lalu
+     * employee dan saldo sumber dikunci sebelum event append-only dibuat.
+     */
+    public function releaseForRollover(
+        LeaveRequest $leaveRequest,
+        int $sourceYear,
+        int $targetYear,
+    ): ?LeaveBalanceReservationEvent {
+        if ($targetYear !== $sourceYear + 1) {
+            throw ValidationException::withMessages([
+                'rollover' => 'Tahun target rollover harus tepat satu tahun setelah tahun sumber.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($leaveRequest, $sourceYear, $targetYear): ?LeaveBalanceReservationEvent {
+            $lockedRequest = LeaveRequest::query()
+                ->with('jenisCuti')
+                ->whereKey($leaveRequest->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedRequest->jenisCuti?->code !== 'tahunan') {
+                throw ValidationException::withMessages([
+                    'jenis_cuti' => 'Reservasi rollover hanya dapat dilepas untuk Cuti Tahunan.',
+                ]);
+            }
+
+            if ($lockedRequest->tanggal_mulai->year !== $sourceYear) {
+                throw ValidationException::withMessages([
+                    'rollover' => 'Tahun sumber rollover pengajuan tidak sesuai tanggal mulai.',
+                ]);
+            }
+
+            $employee = $this->lockEmployee($lockedRequest->employee_id);
+            $balance = LeaveBalance::query()
+                ->where('employee_id', $employee->id)
+                ->where('tahun', $sourceYear)
+                ->lockForUpdate()
+                ->first();
+
+            if ($balance === null) {
+                throw ValidationException::withMessages([
+                    'saldo' => 'Saldo tahun sumber tidak ditemukan untuk pelepasan reservasi rollover.',
+                ]);
+            }
+
+            $events = LeaveBalanceReservationEvent::query()
+                ->where('leave_request_id', $lockedRequest->id)
+                ->where('tahun', $sourceYear)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+            $dedupKey = "leave_reservation:{$lockedRequest->id}:released:rollover:{$sourceYear}";
+            $existing = $events->firstWhere('dedup_key', $dedupKey);
+
+            if ($existing instanceof LeaveBalanceReservationEvent) {
+                $this->assertRolloverReleaseContract($existing, $lockedRequest, $balance, $sourceYear, $targetYear);
+
+                return $existing;
+            }
+
+            $reserved = (int) $events->sum('amount');
+
+            if ($reserved <= 0) {
+                return null;
+            }
+
+            $this->appendEvent(
+                leaveRequest: $lockedRequest,
+                balance: $balance,
+                tahun: $sourceYear,
+                eventType: LeaveBalanceReservationEvent::EVENT_RELEASED,
+                amount: -$reserved,
+                reservationBefore: $reserved,
+                reservationAfter: 0,
+                actor: null,
+                dedupKey: $dedupKey,
+                reason: 'Reservasi cuti tahunan tahun sumber dilepas karena pengajuan dikembalikan saat rollover.',
+                metadata: [
+                    'release_context' => 'rollover_return',
+                    'source_year' => $sourceYear,
+                    'target_year' => $targetYear,
+                ],
+            );
+
+            return LeaveBalanceReservationEvent::query()->where('dedup_key', $dedupKey)->firstOrFail();
+        });
+    }
+
+    /**
+     * Kunci dedup release penangguhan dinas dipakai bersama oleh service dan orkestrasi terminal.
+     * Satu pengajuan dapat memiliki lebih dari satu event released, misalnya release rollover lama,
+     * sehingga bukti terminal harus diidentifikasi lewat kunci ini, bukan lewat event type saja.
+     */
+    public static function dutyPostponementReleaseDedupKey(string $leaveRequestId, int $tahun): string
+    {
+        return "leave_reservation:{$leaveRequestId}:released:duty_postponement:{$tahun}";
+    }
+
+    /**
+     * Melepas seluruh reservasi setelah hak cuti dicatat sebagai penangguhan dinas terminal.
+     * Audit reservasi sengaja tidak ditulis karena orkestrasi terminal menulis satu audit domain terpadu.
+     */
+    public function releaseForDutyPostponement(
+        LeaveRequest $leaveRequest,
+        User $actor,
+    ): ?LeaveBalanceReservationEvent {
+        $this->loadLeaveRelations($leaveRequest);
+        $tahun = $leaveRequest->tanggal_mulai->year;
+        $requestedDays = (int) $leaveRequest->jumlah_hari_kerja;
+
+        if ($leaveRequest->jenisCuti?->code !== 'tahunan') {
+            throw ValidationException::withMessages([
+                'jenis_cuti' => 'Reservasi penangguhan dinas hanya dapat dilepas untuk cuti tahunan.',
+            ]);
+        }
+
+        if ($requestedDays <= 0) {
+            throw ValidationException::withMessages([
+                'jumlah_hari' => 'Jumlah hari kerja penangguhan dinas harus lebih dari nol.',
+            ]);
+        }
+
+        if ($leaveRequest->tanggal_selesai->year !== $tahun) {
+            throw ValidationException::withMessages([
+                'tanggal_selesai' => 'Reservasi penangguhan dinas lintas tahun tidak dapat dilepas dalam satu event.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($leaveRequest, $actor, $tahun, $requestedDays): LeaveBalanceReservationEvent {
+            $employee = $this->lockEmployee($leaveRequest->employee_id);
+            $balance = $this->lockBalances($employee, [$tahun => $leaveRequest->tanggal_mulai])[$tahun] ?? null;
+
+            if ($balance === null) {
+                throw ValidationException::withMessages([
+                    'saldo' => 'Saldo tahun sumber tidak ditemukan untuk pelepasan reservasi penangguhan dinas.',
+                ]);
+            }
+
+            // Lock seluruh event request setelah saldo agar retry dan net reservasi dibaca dari snapshot yang sama.
+            $events = LeaveBalanceReservationEvent::query()
+                ->where('leave_request_id', $leaveRequest->id)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+            $dedupKey = self::dutyPostponementReleaseDedupKey($leaveRequest->id, $tahun);
+            $existing = $events->firstWhere('dedup_key', $dedupKey);
+
+            if ($existing instanceof LeaveBalanceReservationEvent) {
+                $this->assertDutyPostponementReleaseContract(
+                    $existing,
+                    $leaveRequest,
+                    $balance,
+                    $actor,
+                    $tahun,
+                    $requestedDays,
+                );
+
+                return $existing;
+            }
+
+            $activeReserved = (int) $events->sum('amount');
+
+            if ($activeReserved !== $requestedDays) {
+                throw ValidationException::withMessages([
+                    'saldo' => "Reservasi aktif harus tepat {$requestedDays} hari sebelum penangguhan dinas, ditemukan {$activeReserved} hari.",
+                ]);
+            }
+
+            $event = LeaveBalanceReservationEvent::query()->firstOrCreate(
+                ['dedup_key' => $dedupKey],
+                [
+                    'employee_id' => $leaveRequest->employee_id,
+                    'leave_request_id' => $leaveRequest->id,
+                    'leave_balance_id' => $balance->id,
+                    'tahun' => $tahun,
+                    'event_type' => LeaveBalanceReservationEvent::EVENT_RELEASED,
+                    'amount' => -$activeReserved,
+                    'reason' => 'Reservasi cuti tahunan dilepas setelah penangguhan dinas terminal dicatat.',
+                    'metadata' => ['release_context' => 'duty_postponement_terminal'],
+                    'created_by' => $actor->id,
+                    'occurred_at' => Carbon::now(),
+                ],
+            );
+            $this->assertDutyPostponementReleaseContract(
+                $event,
+                $leaveRequest,
+                $balance,
+                $actor,
+                $tahun,
+                $requestedDays,
+            );
+
+            return $event;
+        });
     }
 
     private function releaseReservation(LeaveRequest $leaveRequest, ?User $actor, string $eventType): void
@@ -390,6 +592,56 @@ class LeaveBalanceReservationService
             LeaveBalanceReservationEvent::EVENT_CONVERTED => 'LEAVE_BALANCE_RESERVATION_CONVERTED',
             LeaveBalanceReservationEvent::EVENT_RELEASED => 'LEAVE_BALANCE_RESERVATION_RELEASED',
         };
+    }
+
+    /** Retry hanya idempoten bila event existing masih memenuhi kontrak release terminal. */
+    private function assertDutyPostponementReleaseContract(
+        LeaveBalanceReservationEvent $event,
+        LeaveRequest $leaveRequest,
+        LeaveBalance $balance,
+        User $actor,
+        int $tahun,
+        int $requestedDays,
+    ): void {
+        $matches = $event->event_type === LeaveBalanceReservationEvent::EVENT_RELEASED
+            && $event->employee_id === $leaveRequest->employee_id
+            && $event->leave_request_id === $leaveRequest->id
+            && $event->leave_balance_id === $balance->id
+            && $event->tahun === $tahun
+            && $event->amount === -$requestedDays
+            && $event->created_by === $actor->id
+            && ($event->metadata['release_context'] ?? null) === 'duty_postponement_terminal';
+
+        if (! $matches) {
+            throw ValidationException::withMessages([
+                'leave_request' => 'Event pelepasan reservasi penangguhan dinas existing tidak sesuai kontrak pengajuan.',
+            ]);
+        }
+    }
+
+    /** Retry rollover hanya valid bila event existing masih menyatakan sumber dan target yang sama. */
+    private function assertRolloverReleaseContract(
+        LeaveBalanceReservationEvent $event,
+        LeaveRequest $leaveRequest,
+        LeaveBalance $balance,
+        int $sourceYear,
+        int $targetYear,
+    ): void {
+        $matches = $event->event_type === LeaveBalanceReservationEvent::EVENT_RELEASED
+            && $event->employee_id === $leaveRequest->employee_id
+            && $event->leave_request_id === $leaveRequest->id
+            && $event->leave_balance_id === $balance->id
+            && $event->tahun === $sourceYear
+            && $event->amount < 0
+            && ($event->metadata['release_context'] ?? null) === 'rollover_return'
+            && (int) ($event->metadata['source_year'] ?? 0) === $sourceYear
+            && (int) ($event->metadata['target_year'] ?? 0) === $targetYear;
+
+        if (! $matches) {
+            throw ValidationException::withMessages([
+                'leave_request' => 'Event pelepasan reservasi rollover existing tidak sesuai kontrak pengajuan.',
+            ]);
+        }
     }
 
     private function insufficientBalance(int $requested, int $available): ValidationException

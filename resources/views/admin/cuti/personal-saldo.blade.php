@@ -12,6 +12,12 @@
             </div>
         </div>
 
+        @if ($rule5Active)
+            <x-ui.alert variant="warning">
+                Saldo tercatat, tidak dapat digunakan pada tahun Cuti Besar. Saldo cuti tahunan tetap tercatat sebagai riwayat. Hak efektif tahun ini adalah 0 karena Cuti Besar telah disetujui.
+            </x-ui.alert>
+        @endif
+
         <!-- Metrics Grid -->
         @if($balance)
             <div class="grid gap-5 md:grid-cols-4">
@@ -46,13 +52,12 @@
                 </x-ui.stat-card>
 
                 <!-- Sisa -->
-                <x-ui.stat-card label="Sisa Saldo Cuti" value="{{ $balance->sisa }}" variant="primary" size="lg" surface="soft" label-class="normal-case tracking-normal text-sm font-semibold text-primary">
+                <x-ui.stat-card label="Saldo Tercatat" value="{{ $balance->sisa }}" unit="hari tercatat" variant="primary" size="lg" surface="soft" label-class="normal-case tracking-normal text-sm font-semibold text-primary" role="group" aria-label="{{ $balance->sisa }} hari tercatat">
                 <x-slot:icon>
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </x-slot:icon>
-                <span class="text-sm font-semibold text-primary/80 normal-case tracking-normal">hari</span>
                 </x-ui.stat-card>
             </div>
         @else
@@ -95,6 +100,8 @@
                                         :variant="match ($r->status) {
                                             'disetujui' => 'success',
                                             'ditangguhkan' => 'warning',
+                                            'ditangguhkan_tugas_dinas' => 'warning',
+                                            'dikembalikan_karena_rollover' => 'warning',
                                             'perlu_perubahan', 'tidak_disetujui' => 'danger',
                                             default => 'primary',
                                         }"
@@ -104,6 +111,8 @@
                                         {{ match ($r->status) {
                                             'menunggu_approval' => 'Menunggu Keputusan',
                                             'ditangguhkan' => 'Ditangguhkan',
+                                            'ditangguhkan_tugas_dinas' => 'Ditangguhkan karena Tugas Dinas',
+                                            'dikembalikan_karena_rollover' => 'Dikembalikan karena Rollover',
                                             'perlu_perubahan' => 'Perubahan',
                                             'disetujui' => 'Disetujui',
                                             'tidak_disetujui' => 'Tidak Disetujui',

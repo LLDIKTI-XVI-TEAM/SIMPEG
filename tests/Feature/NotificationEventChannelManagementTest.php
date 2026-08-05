@@ -23,11 +23,13 @@ class NotificationEventChannelManagementTest extends TestCase
         $this->seedRbac();
     }
 
-    public function test_katalog_memuat_13_event_dan_hanya_adapter_runtime_yang_tersedia(): void
+    public function test_katalog_memuat_15_event_dan_hanya_adapter_runtime_yang_tersedia(): void
     {
         $catalog = app(NotificationEventCatalog::class);
 
-        $this->assertCount(13, $catalog->events());
+        $this->assertCount(15, $catalog->events());
+        $this->assertTrue($catalog->hasEvent('cuti.ditangguhkan_tugas_dinas'));
+        $this->assertTrue($catalog->hasEvent('cuti.dikembalikan_karena_rollover'));
         $this->assertTrue($catalog->hasEvent('cuti.pengajuan_baru'));
         $this->assertTrue($catalog->hasEvent('ews.tidak_perlu'));
         $this->assertTrue($catalog->hasEvent('ews.scheduler_failed'));
