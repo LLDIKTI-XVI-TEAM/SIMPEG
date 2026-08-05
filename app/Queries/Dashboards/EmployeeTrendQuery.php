@@ -72,6 +72,11 @@ class EmployeeTrendQuery
      *   dan mengecualikan mereka membuat grafik jauh di bawah jumlah pegawai sebenarnya.
      * - keluar mengikuti riwayat status terakhir bila status itu bukan aktif, sehingga pegawai
      *   yang pernah nonaktif lalu kembali bertugas tidak dianggap keluar permanen.
+     * - di antara riwayat status dan tanggal pensiun dipilih tanggal yang paling awal. Migrasi
+     *   riwayat status mengisi tanggal efektif dengan waktu migrasi ketika pegawai tidak punya
+     *   tanggal status, sehingga pegawai yang sudah lama pensiun bisa memiliki riwayat bertanggal
+     *   jauh lebih baru daripada tanggal pensiunnya. Mempercayai riwayat itu akan membuat grafik
+     *   mengklaim pegawai tersebut masih aktif sampai hari migrasi.
      * - pegawai yang statusnya bukan aktif tetapi tidak punya satu pun jejak tanggal diberi
      *   tanggal keluar sebelum rentang, agar sistem tidak mengklaim seseorang aktif di masa
      *   lalu tanpa bukti tanggal apa pun.
@@ -99,12 +104,28 @@ class EmployeeTrendQuery
             ->selectRaw(
                 'case '
                 .'when status_terakhir.status_nama is not null and status_terakhir.status_nama <> ? '
-                .'then status_terakhir.tanggal_efektif '
+                .'then '.$this->tanggalTerawal('status_terakhir.tanggal_efektif', 'employees.tanggal_pensiun').' '
                 .'when employees.status_aktif <> ? '
-                .'then coalesce(employees.status_tanggal, employees.tanggal_pensiun, ?::date) '
+                .'then case '
+                .'when employees.status_tanggal is null and employees.tanggal_pensiun is null then ? '
+                .'else '.$this->tanggalTerawal('employees.status_tanggal', 'employees.tanggal_pensiun').' end '
                 .'else employees.tanggal_pensiun end as keluar',
                 [self::STATUS_AKTIF, self::STATUS_AKTIF, $sebelumRentang],
             )
             ->toBase();
+    }
+
+    /**
+     * Menghasilkan ekspresi tanggal paling awal di antara dua kolom yang boleh kosong.
+     *
+     * Perbandingan ditulis manual alih-alih memakai least() karena fungsi itu tidak tersedia
+     * di SQLite yang masih dipakai suite pengujian standar, sedangkan min() dua argumen
+     * sebaliknya tidak tersedia di PostgreSQL. Bentuk case juga menjaga semantik kosong:
+     * kolom kosong dilewati, dan hasil tetap kosong hanya bila kedua kolom kosong.
+     */
+    private function tanggalTerawal(string $kiri, string $kanan): string
+    {
+        return "case when {$kiri} is not null and ({$kanan} is null or {$kiri} < {$kanan}) "
+            ."then {$kiri} else {$kanan} end";
     }
 }

@@ -193,6 +193,32 @@ class EmployeeTrendQueryTest extends TestCase
         $this->assertSame(0, $titik[11]['jumlah']);
     }
 
+    public function test_riwayat_status_bertanggal_migrasi_tidak_menutupi_tanggal_pensiun(): void
+    {
+        // Migrasi riwayat status mengisi tanggal efektif dengan waktu migrasi ketika pegawai
+        // tidak punya tanggal status, sehingga pegawai yang pensiun jauh sebelumnya bisa punya
+        // riwayat bertanggal hari ini. Tanggal pensiun adalah data domain dan harus menang.
+        $employee = Employee::factory()->create([
+            'status_aktif' => 'Pensiun',
+            'status_tanggal' => null,
+            'tanggal_pensiun' => now()->subMonths(8)->startOfMonth()->toDateString(),
+            'created_at' => now()->subMonths(11),
+        ]);
+        EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_nama' => 'Pensiun',
+            'keterangan' => 'Migrasi data existing',
+            'tanggal_efektif' => now()->toDateString(),
+            'is_latest' => true,
+        ]);
+
+        $titik = app(EmployeeTrendQuery::class)->monthlyActiveCounts();
+
+        $this->assertSame(1, $titik[2]['jumlah']);
+        $this->assertSame(0, $titik[3]['jumlah']);
+        $this->assertSame(0, $titik[11]['jumlah']);
+    }
+
     public function test_dashboard_admin_dan_pimpinan_menghasilkan_tren_yang_sama(): void
     {
         // Kontrak dashboard mewajibkan kedua surface memakai metode yang sama, sehingga
