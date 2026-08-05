@@ -219,6 +219,43 @@ class EmployeeTrendQueryTest extends TestCase
         $this->assertSame(0, $titik[11]['jumlah']);
     }
 
+    public function test_pegawai_yang_mulai_tepat_di_akhir_bulan_dihitung_pada_bulan_itu(): void
+    {
+        // Batas akhir bulan diuji eksplisit karena titik bulanan memakai perbandingan inklusif
+        // pada akhir bulan, dan kekeliruan format tanggal hanya terlihat pada tanggal batas.
+        $employee = Employee::factory()->create([
+            'status_aktif' => 'Aktif',
+            'tanggal_pensiun' => null,
+            'created_at' => now()->subMonths(11),
+        ]);
+        Appointment::create([
+            'employee_id' => $employee->id,
+            'jenis_pengangkatan' => 'CPNS',
+            'tmt_pengangkatan' => now()->subMonths(6)->endOfMonth()->toDateString(),
+        ]);
+
+        $titik = app(EmployeeTrendQuery::class)->monthlyActiveCounts();
+
+        $this->assertSame(0, $titik[4]['jumlah']);
+        $this->assertSame(1, $titik[5]['jumlah']);
+    }
+
+    public function test_pegawai_yang_keluar_tepat_di_akhir_bulan_tidak_dihitung_pada_bulan_itu(): void
+    {
+        Employee::factory()->create([
+            'status_aktif' => 'Pensiun',
+            'status_tanggal' => null,
+            'tanggal_pensiun' => now()->subMonths(6)->endOfMonth()->toDateString(),
+            'created_at' => now()->subMonths(11),
+        ]);
+
+        $titik = app(EmployeeTrendQuery::class)->monthlyActiveCounts();
+
+        // Pegawai masih dihitung pada bulan sebelumnya, tetapi tidak pada bulan tanggal keluarnya.
+        $this->assertSame(1, $titik[4]['jumlah']);
+        $this->assertSame(0, $titik[5]['jumlah']);
+    }
+
     public function test_dashboard_admin_dan_pimpinan_menghasilkan_tren_yang_sama(): void
     {
         // Kontrak dashboard mewajibkan kedua surface memakai metode yang sama, sehingga

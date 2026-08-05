@@ -100,19 +100,35 @@ class EmployeeTrendQuery
         return Employee::query()
             ->leftJoinSub($pengangkatanTerawal, 'pengangkatan', 'pengangkatan.employee_id', '=', 'employees.id')
             ->leftJoinSub($statusTerakhir, 'status_terakhir', 'status_terakhir.employee_id', '=', 'employees.id')
-            ->selectRaw('pengangkatan.tmt_mulai as mulai')
+            ->selectRaw($this->tanggalSaja('pengangkatan.tmt_mulai').' as mulai')
             ->selectRaw(
-                'case '
-                .'when status_terakhir.status_nama is not null and status_terakhir.status_nama <> ? '
-                .'then '.$this->tanggalTerawal('status_terakhir.tanggal_efektif', 'employees.tanggal_pensiun').' '
-                .'when employees.status_aktif <> ? '
-                .'then case '
-                .'when employees.status_tanggal is null and employees.tanggal_pensiun is null then ? '
-                .'else '.$this->tanggalTerawal('employees.status_tanggal', 'employees.tanggal_pensiun').' end '
-                .'else employees.tanggal_pensiun end as keluar',
+                $this->tanggalSaja(
+                    '(case '
+                    .'when status_terakhir.status_nama is not null and status_terakhir.status_nama <> ? '
+                    .'then '.$this->tanggalTerawal('status_terakhir.tanggal_efektif', 'employees.tanggal_pensiun').' '
+                    .'when employees.status_aktif <> ? '
+                    .'then case '
+                    .'when employees.status_tanggal is null and employees.tanggal_pensiun is null then ? '
+                    .'else '.$this->tanggalTerawal('employees.status_tanggal', 'employees.tanggal_pensiun').' end '
+                    .'else employees.tanggal_pensiun end)'
+                ).' as keluar',
                 [self::STATUS_AKTIF, self::STATUS_AKTIF, $sebelumRentang],
             )
             ->toBase();
+    }
+
+    /**
+     * Memangkas nilai tanggal menjadi bagian tanggalnya saja dalam format tahun-bulan-hari.
+     *
+     * Diperlukan karena batas titik bulanan dibandingkan sebagai tanggal, sedangkan penyimpanan
+     * kolom tanggal lewat Eloquent menyertakan komponen waktu pada driver yang tidak memiliki
+     * tipe tanggal asli. Tanpa penyeragaman ini, perbandingan pada tanggal batas menjadi keliru:
+     * pegawai yang mulai tepat di akhir bulan tidak terhitung pada bulan tersebut, dan pegawai
+     * yang keluar tepat di akhir bulan justru masih terhitung.
+     */
+    private function tanggalSaja(string $ekspresi): string
+    {
+        return "substr(cast({$ekspresi} as varchar), 1, 10)";
     }
 
     /**
