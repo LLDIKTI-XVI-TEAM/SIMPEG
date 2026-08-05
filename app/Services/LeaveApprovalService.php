@@ -33,6 +33,17 @@ class LeaveApprovalService
     private const STATUS_TIDAK_DISETUJUI = 'tidak_disetujui';
 
     /**
+     * Status yang masih boleh diputus approver.
+     *
+     * Dipakai bersama oleh gate service, indikator tombol keputusan, dan counter antrean supaya
+     * ketiganya tidak berbeda. Keberadaan step aktif saja tidak cukup: rollover mempertahankan step
+     * aktif sebagai snapshot pada pengajuan yang sudah dikembalikan ke pemohon.
+     *
+     * @var list<string>
+     */
+    public const ACTIONABLE_STATUSES = [self::STATUS_MENUNGGU, self::STATUS_DITANGGUHKAN];
+
+    /**
      * LeaveProofService di-inject agar penerbitan bukti final ikut dalam transaksi persetujuan.
      * Injeksi konstruktor dipilih ketimbang service locator agar dependensi eksplisit dan mudah diuji.
      */
@@ -238,7 +249,7 @@ class LeaveApprovalService
 
     private function assertApprovalActionable(LeaveRequest $leaveRequest): void
     {
-        if (! in_array($leaveRequest->status, [self::STATUS_MENUNGGU, self::STATUS_DITANGGUHKAN], true)) {
+        if (! in_array($leaveRequest->status, self::ACTIONABLE_STATUSES, true)) {
             throw ValidationException::withMessages([
                 'status' => 'Pengajuan cuti ini belum dapat diproses oleh approver.',
             ]);

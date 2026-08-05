@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Employee;
 use App\Models\LeaveRequest;
+use App\Models\LeaveRequestStep;
 use App\Models\RefJenisCuti;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -236,6 +237,54 @@ class CutiDetailTimelineTest extends TestCase
             ->assertSee('aria-describedby="rollover-target-year-hint"', false)
             ->assertSee('Saldo Target Dapat Diajukan')
             ->assertDontSee('value="2026-12-28"', false);
+    }
+
+    /**
+     * Rollover mempertahankan step approval aktif agar snapshot tidak hilang. Approver snapshot
+     * tetap boleh membuka detail sebagai riwayat, tetapi tidak boleh ditawari tombol keputusan
+     * karena pengajuan hanya dapat diperbaiki oleh pemohon pada tahun target.
+     */
+    public function test_snapshot_approver_can_view_rollover_return_detail_without_decision_actions(): void
+    {
+        $jenis = RefJenisCuti::create([
+            'nama' => 'Cuti Tahunan Rollover Approver',
+            'code' => 'tahunan_rollover_approver',
+            'mengurangi_saldo_tahunan' => true,
+            'khusus_pns' => false,
+        ]);
+        $applicant = Employee::factory()->create();
+        $approver = Employee::factory()->create();
+        // Kepala Bagian tidak memiliki cuti.read_all, sehingga aksesnya bergantung pada snapshot approver.
+        $approverUser = User::factory()->kepalaBagian()->create(['employee_id' => $approver->id]);
+        $leaveRequest = LeaveRequest::create([
+            'employee_id' => $applicant->id,
+            'jenis_cuti_id' => $jenis->id,
+            'tanggal_mulai' => '2026-12-28',
+            'tanggal_selesai' => '2026-12-30',
+            'jumlah_hari_kerja' => 3,
+            'alasan' => 'Pengajuan dikembalikan saat rollover.',
+            'status' => LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER,
+            'rollover_source_year' => 2026,
+            'rollover_target_year' => 2027,
+        ]);
+        LeaveRequestStep::create([
+            'leave_request_id' => $leaveRequest->id,
+            'step_order' => 1,
+            'step_type' => 'kepala_bagian',
+            'role_label' => 'Kepala Bagian',
+            'approver_employee_id' => $approver->id,
+            'status' => 'active',
+            'is_final' => false,
+        ]);
+
+        $this->actingAs($approverUser)
+            ->get(route('cuti.show', $leaveRequest->id))
+            ->assertOk()
+            ->assertSee('Dikembalikan karena Rollover')
+            ->assertDontSee(route('cuti.approve', $leaveRequest->id), false)
+            ->assertDontSee(route('cuti.postpone', $leaveRequest->id), false)
+            ->assertDontSee(route('cuti.request-changes', $leaveRequest->id), false)
+            ->assertDontSee(route('cuti.decline', $leaveRequest->id), false);
     }
 
     public function test_employee_detail_marks_target_balance_unavailable_when_preview_is_null(): void

@@ -80,14 +80,19 @@ class CutiController extends Controller
             ->with(['employee', 'jenisCuti', 'proof', 'approvals.approver', 'steps.approver'])
             ->findOrFail($id);
 
-        // Tombol setujui/tunda hanya muncul bila pengguna ini adalah approver tahap yang sedang menunggu;
-        // otorisasi sebenarnya tetap ditegakkan ulang di service saat aksi dijalankan.
+        // Tombol setujui/tunda hanya muncul bila pengguna ini adalah approver tahap yang sedang menunggu
+        // DAN status pengajuan memang masih dapat diputus; otorisasi sebenarnya tetap ditegakkan ulang
+        // di service saat aksi dijalankan.
         $stage = $approvals->pendingStage($cuti);
-        $canAct = $stage !== null
+        $isSnapshotApprover = $stage !== null
             && $approvals->approverEmployeeIdForStage($cuti, $stage) === $user->employee_id;
+        $canAct = $isSnapshotApprover
+            && in_array($cuti->status, LeaveApprovalService::ACTIONABLE_STATUSES, true);
         $canDownloadFormulir = $pdfAction->canDownload($cuti, $user);
 
-        if (! $user->hasPermission('cuti.read_all') && $cuti->employee_id !== $user->employee_id && ! $canAct && ! $canDownloadFormulir) {
+        // Akses baca memakai keberadaan snapshot approver, bukan izin bertindak, agar approver lama
+        // tetap dapat menelusuri pengajuan yang sudah dikembalikan ke pemohon.
+        if (! $user->hasPermission('cuti.read_all') && $cuti->employee_id !== $user->employee_id && ! $isSnapshotApprover && ! $canDownloadFormulir) {
             abort(403);
         }
 

@@ -4,6 +4,7 @@ namespace App\Actions\Cuti;
 
 use App\Models\LeaveRequest;
 use App\Models\User;
+use App\Services\LeaveApprovalService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class ListPimpinanLeavesAction
@@ -50,7 +51,7 @@ class ListPimpinanLeavesAction
         }
         if (filled($filters['status'] ?? null)) {
             if ($filters['status'] === 'menunggu_saya') {
-                $query->whereIn('status', ['menunggu_approval', 'ditangguhkan']);
+                $query->whereIn('status', LeaveApprovalService::ACTIONABLE_STATUSES);
                 if ($user->employee_id) {
                     $query->whereHas('steps', fn ($q) => $q
                         ->where('status', 'active')
@@ -80,10 +81,14 @@ class ListPimpinanLeavesAction
 
         return [
             'leaves' => $paginator,
-            'menungguTindakanSaya' => (clone $baseQuery)->whereHas('steps', fn ($q) => $q
-                ->where('status', 'active')
-                ->where('approver_employee_id', $user->employee_id)
-            )->count(),
+            // Counter memakai predikat actionable yang sama dengan filter menunggu_saya agar angka
+            // tidak menghitung pengajuan yang hanya menyimpan step aktif sebagai snapshot.
+            'menungguTindakanSaya' => (clone $baseQuery)
+                ->whereIn('status', LeaveApprovalService::ACTIONABLE_STATUSES)
+                ->whereHas('steps', fn ($q) => $q
+                    ->where('status', 'active')
+                    ->where('approver_employee_id', $user->employee_id)
+                )->count(),
             'totalMenunggu' => (clone $baseQuery)->where('status', 'menunggu_approval')->count(),
             'totalDisetujui' => (clone $baseQuery)->where('status', 'disetujui')->count(),
             'totalDitangguhkan' => (clone $baseQuery)
