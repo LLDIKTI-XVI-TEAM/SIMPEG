@@ -219,6 +219,56 @@ class LeaveBalanceRolloverTest extends TestCase
         $this->assertNull($saldoReducingNonAnnualRequest->fresh()->rollover_source_year);
     }
 
+    /**
+     * Rollover hanya mengembalikan pengajuan Cuti Tahunan resmi. Jenis pengurang saldo lain yang
+     * tertinggal aktif tidak boleh memotong saldo tahun sumber setelah sisa harinya terbawa sebagai
+     * carry-over, karena hari yang sama akan terpakai dua kali.
+     */
+    public function test_saldo_reducing_request_cannot_deduct_source_year_after_rollover(): void
+    {
+        $employee = $this->employeeWithAppointment();
+        $sourceBalance = LeaveBalance::create($this->balancePayload($employee, 2026));
+        $saldoReducingNonAnnual = RefJenisCuti::create([
+            'nama' => 'Cuti Pengurang Saldo Tanpa Pengembalian Rollover',
+            'code' => 'pengurang_saldo_tanpa_pengembalian',
+            'mengurangi_saldo_tahunan' => true,
+            'khusus_pns' => false,
+        ]);
+        $request = LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $saldoReducingNonAnnual->id,
+            'tanggal_mulai' => '2026-12-24',
+            'tanggal_selesai' => '2026-12-24',
+            'jumlah_hari_kerja' => 1,
+            'alasan' => 'Jenis pengurang saldo selain Tahunan tertinggal aktif saat rollover.',
+            'status' => 'menunggu_approval',
+        ]);
+        $service = app(LeaveBalanceService::class);
+        $service->rolloverYear(2026);
+
+        $summaryBefore = $sourceBalance->fresh()->only([
+            'carry_over', 'terpakai', 'sisa', 'sisa_n2', 'sisa_n1', 'sisa_tahun_berjalan', 'terpakai_tahun_berjalan', 'hangus',
+        ]);
+
+        try {
+            $service->deductForFinalApproval($request->fresh());
+            $this->fail('Pemotongan saldo pada tahun yang sudah di-rollover wajib ditolak.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                'Pengajuan ini tidak dapat disetujui karena saldo tahun pengajuan sudah ditutup oleh rollover. Ajukan kembali pada tahun berjalan agar saldo yang dipakai sesuai.',
+                $exception->validator->errors()->first('status'),
+            );
+        }
+
+        $this->assertSame(0, LeaveBalanceLedger::query()
+            ->where('leave_request_id', $request->id)
+            ->where('event_type', LeaveBalanceLedger::EVENT_LEAVE_DEDUCTED)
+            ->count());
+        $this->assertSame($summaryBefore, $sourceBalance->fresh()->only([
+            'carry_over', 'terpakai', 'sisa', 'sisa_n2', 'sisa_n1', 'sisa_tahun_berjalan', 'terpakai_tahun_berjalan', 'hangus',
+        ]));
+    }
+
     public function test_rollover_notifies_affected_employee_once_when_multiple_active_requests_are_returned(): void
     {
         $employee = $this->employeeWithAppointment();

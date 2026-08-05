@@ -184,6 +184,7 @@ class LeaveBalanceService
             }
 
             $this->assertAnnualLeaveAllowed($employee, $tahun);
+            $this->assertSourceYearNotRolledOver($employee->id, $tahun);
 
             if ($this->alreadyDeducted($leaveRequest)) {
                 return;
@@ -788,6 +789,30 @@ class LeaveBalanceService
 
         throw ValidationException::withMessages([
             'tanggal_mulai' => 'Cuti Tahunan tidak dapat digunakan pada tahun yang sama dengan Cuti Besar yang telah disetujui.',
+        ]);
+    }
+
+    /**
+     * Menolak pemotongan saldo pada tahun yang saldonya sudah ditutup oleh rollover.
+     *
+     * Setelah rollover berjalan, sisa hari tahun sumber sudah terbawa sebagai carry-over ke tahun
+     * target. Memotong saldo tahun sumber sesudah itu membuat hari yang sama terpakai dua kali dan
+     * menambah hak cuti pegawai secara tidak sah. Rollover hanya mengembalikan pengajuan Cuti
+     * Tahunan resmi, sehingga jenis pengurang saldo lain yang belum punya jalur pengembalian
+     * dihentikan di sini alih-alih dibiarkan memotong saldo yang sudah ditutup.
+     */
+    private function assertSourceYearNotRolledOver(string $employeeId, int $tahun): void
+    {
+        if (! LeaveBalanceLedger::query()
+            ->where('employee_id', $employeeId)
+            ->where('source_year', $tahun)
+            ->where('event_type', LeaveBalanceLedger::EVENT_ROLLOVER_APPLIED)
+            ->exists()) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'status' => 'Pengajuan ini tidak dapat disetujui karena saldo tahun pengajuan sudah ditutup oleh rollover. Ajukan kembali pada tahun berjalan agar saldo yang dipakai sesuai.',
         ]);
     }
 
