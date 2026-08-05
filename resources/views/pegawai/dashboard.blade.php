@@ -51,7 +51,7 @@
                 <div>
                     <p class="text-[10px] font-bold uppercase tracking-widest text-white/70 mb-0.5">Selamat datang kembali</p>
                     <h2 class="text-xl sm:text-2xl font-extrabold text-white leading-tight drop-shadow-sm mb-2">
-                        {{ auth()->user()->name }}
+                        {{ preg_replace('/\s*\(.*?\)/', '', auth()->user()->name) }}
                     </h2>
                     
                     <div class="flex flex-wrap items-center gap-2 sm:gap-3 text-[11px] sm:text-xs text-white/90 font-sans">
