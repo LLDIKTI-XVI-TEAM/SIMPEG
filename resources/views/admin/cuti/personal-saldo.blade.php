@@ -100,6 +100,7 @@
                                         :variant="match ($r->status) {
                                             'disetujui' => 'success',
                                             'ditangguhkan' => 'warning',
+                                            'ditangguhkan_tugas_dinas' => 'warning',
                                             'dikembalikan_karena_rollover' => 'warning',
                                             'perlu_perubahan', 'tidak_disetujui' => 'danger',
                                             default => 'primary',
@@ -110,6 +111,7 @@
                                         {{ match ($r->status) {
                                             'menunggu_approval' => 'Menunggu Keputusan',
                                             'ditangguhkan' => 'Ditangguhkan',
+                                            'ditangguhkan_tugas_dinas' => 'Ditangguhkan karena Tugas Dinas',
                                             'dikembalikan_karena_rollover' => 'Dikembalikan karena Rollover',
                                             'perlu_perubahan' => 'Perubahan',
                                             'disetujui' => 'Disetujui',

@@ -111,6 +111,49 @@ class LeaveBalanceTest extends TestCase
         $response->assertViewHas('history');
     }
 
+    /**
+     * Halaman saldo pegawai tidak boleh membocorkan token status internal. Semua status terminal
+     * harus tampil dengan label resmi yang sama seperti daftar, detail, dan laporan.
+     */
+    public function test_personal_saldo_web_labels_terminal_statuses_without_leaking_internal_tokens(): void
+    {
+        $employee = Employee::factory()->create();
+        $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+        LeaveBalance::create([
+            'employee_id' => $employee->id,
+            'tahun' => now()->year,
+            'jatah_awal' => 12,
+            'carry_over' => 0,
+            'terpakai' => 0,
+            'sisa' => 12,
+        ]);
+        $jenisCuti = RefJenisCuti::where('code', 'tahunan')->firstOrFail();
+
+        foreach ([
+            LeaveRequest::STATUS_DUTY_POSTPONED => 'Ditangguhkan karena Tugas Dinas',
+            LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER => 'Dikembalikan karena Rollover',
+        ] as $status => $label) {
+            LeaveRequest::create([
+                'employee_id' => $employee->id,
+                'jenis_cuti_id' => $jenisCuti->id,
+                'tanggal_mulai' => now()->toDateString(),
+                'tanggal_selesai' => now()->toDateString(),
+                'jumlah_hari_kerja' => 1,
+                // Alasan sengaja tidak memuat token status agar assertion badge tidak tertukar dengan teks alasan.
+                'alasan' => "Riwayat pengajuan berlabel {$label}.",
+                'status' => $status,
+            ]);
+        }
+
+        $this->actingAs($user)
+            ->get('/dashboard/cuti/saldo')
+            ->assertOk()
+            ->assertSee('Ditangguhkan karena Tugas Dinas')
+            ->assertSee('Dikembalikan karena Rollover')
+            ->assertDontSee(LeaveRequest::STATUS_DUTY_POSTPONED)
+            ->assertDontSee(LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER);
+    }
+
     public function test_personal_saldo_web_tidak_membuat_saldo_saat_dibuka(): void
     {
         $employee = Employee::factory()->create();
