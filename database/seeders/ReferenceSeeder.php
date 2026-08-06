@@ -257,6 +257,8 @@ class ReferenceSeeder extends Seeder
             'cuti.menunggu_persetujuan',
             'cuti.disetujui',
             'cuti.ditunda',
+            'cuti.ditangguhkan_tugas_dinas',
+            'cuti.dikembalikan_karena_rollover',
             'cuti.perlu_perubahan',
             'cuti.tidak_disetujui',
             'ews.kenaikan_pangkat',

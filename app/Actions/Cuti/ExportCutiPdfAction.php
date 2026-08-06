@@ -47,6 +47,8 @@ class ExportCutiPdfAction
             'generatedAt' => now(),
         ])->setPaper('a4', 'portrait');
 
-        return $pdf->download('Laporan_Cuti_'.now()->format('Ymd_His').'.pdf');
+        $periodLabel = $this->rekapQuery->periodLabel($filters);
+
+        return $pdf->download('Rekap_Cuti_'.$periodLabel.'_'.now()->format('Ymd').'.pdf');
     }
 }

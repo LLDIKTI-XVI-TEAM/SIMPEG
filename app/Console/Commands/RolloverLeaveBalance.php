@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Actions\Cuti\RolloverLeaveBalanceAction;
 use App\Services\Cuti\LeaveBalanceService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
@@ -16,7 +17,7 @@ class RolloverLeaveBalance extends Command
      * Menjalankan rollover tahunan secara idempotent.
      * Argumen year adalah tahun sumber, bukan tahun target, agar scheduler 1 Januari menutup tahun sebelumnya.
      */
-    public function handle(LeaveBalanceService $balances): int
+    public function handle(RolloverLeaveBalanceAction $rollover, LeaveBalanceService $balances): int
     {
         $year = (string) ($this->argument('year') ?? Carbon::now(config('app.timezone'))->subYear()->year);
 
@@ -29,7 +30,7 @@ class RolloverLeaveBalance extends Command
         $sourceYear = (int) $year;
         $targetYear = $sourceYear + 1;
 
-        $balances->rolloverYear($sourceYear);
+        $rollover->execute($sourceYear, fn (...$arguments) => $balances->rolloverLockedEmployee(...$arguments));
 
         $this->info("Rollover saldo cuti tahun {$sourceYear} ke {$targetYear} selesai.");
 

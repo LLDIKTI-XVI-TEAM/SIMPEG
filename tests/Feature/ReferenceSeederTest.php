@@ -158,6 +158,7 @@ class ReferenceSeederTest extends TestCase
         $this->seedReferenceData();
 
         $expectedEvents = [
+            'cuti.dikembalikan_karena_rollover',
             'cuti.disetujui',
             'cuti.ditunda',
             'cuti.menunggu_persetujuan',
@@ -184,7 +185,7 @@ class ReferenceSeederTest extends TestCase
                 'ref_notification_channels.code',
             ]);
 
-        $this->assertCount(26, $policies);
+        $this->assertCount(28, $policies);
         $this->assertSame($expectedEvents, $policies->pluck('event_key')->unique()->values()->all());
         $this->assertSame(['email', 'in_app'], $policies->pluck('code')->unique()->sort()->values()->all());
         $this->assertTrue($policies->every(fn (object $policy): bool => (bool) $policy->is_enabled));
@@ -211,7 +212,7 @@ class ReferenceSeederTest extends TestCase
                 'ref_notification_channels.code',
             ]);
 
-        $this->assertDatabaseCount('notification_event_channels', 27);
+        $this->assertDatabaseCount('notification_event_channels', 31);
         $this->assertCount(1, $policies);
         $this->assertSame('in_app', $policies->sole()->code);
         $this->assertTrue((bool) $policies->sole()->is_enabled);
@@ -240,7 +241,7 @@ class ReferenceSeederTest extends TestCase
 
         $this->seedReferenceData();
 
-        $this->assertDatabaseCount('notification_event_channels', 27);
+        $this->assertDatabaseCount('notification_event_channels', 31);
         $this->assertDatabaseHas('notification_event_channels', [
             'event_key' => 'ews.satyalancana',
             'notification_channel_id' => $emailChannelId,

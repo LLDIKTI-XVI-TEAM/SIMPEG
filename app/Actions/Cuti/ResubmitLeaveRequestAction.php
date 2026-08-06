@@ -8,6 +8,7 @@ use App\Services\AuditService;
 use App\Services\Cuti\LeaveBalanceReservationService;
 use App\Services\Cuti\LeaveEligibilityService;
 use App\Services\EmployeeFileStorageService;
+use App\Services\NotificationService;
 use App\Services\WorkdayCalculator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -24,6 +25,7 @@ class ResubmitLeaveRequestAction
         private readonly EmployeeFileStorageService $files,
         private readonly LeaveBalanceReservationService $reservations,
         private readonly LeaveEligibilityService $eligibility,
+        private readonly NotificationService $notifications,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -38,6 +40,9 @@ class ResubmitLeaveRequestAction
 
         $mulai = Carbon::createFromFormat('Y-m-d', (string) $data['tanggal_mulai'])->startOfDay();
         $selesai = Carbon::createFromFormat('Y-m-d', (string) $data['tanggal_selesai'])->startOfDay();
+        // Boundary Action menolak bypass FormRequest sebelum file maupun data pengajuan ditulis.
+        $this->eligibility->assertSingleCalendarYear($mulai, $selesai);
+        $this->assertResubmissionStatusAndTargetYear($leaveRequest, $mulai);
         $oldLampiranPath = $leaveRequest->lampiran_path;
         $newLampiranPath = null;
 
@@ -53,6 +58,9 @@ class ResubmitLeaveRequestAction
                 $locked = LeaveRequest::query()->whereKey($leaveRequest->id)->lockForUpdate()->firstOrFail();
                 $employee = $locked->employee()->firstOrFail();
 
+                $isRolloverReturn = $locked->status === LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER;
+                $this->assertResubmissionStatusAndTargetYear($locked, $mulai);
+
                 // Pemeriksaan FormRequest hanya memberi umpan balik awal. Rangkaian
                 // dikunci dan dihitung kembali di sini agar resubmit paralel tidak
                 // dapat menggeser periode melewati batas kalender yang sama.
@@ -67,6 +75,8 @@ class ResubmitLeaveRequestAction
                     'nomor_telepon',
                     'lampiran_path',
                     'status',
+                    'rollover_source_year',
+                    'rollover_target_year',
                 ]);
                 $newWorkdays = $this->workdayCalculator->calculate($mulai, $selesai);
 
@@ -79,11 +89,21 @@ class ResubmitLeaveRequestAction
                     'nomor_telepon' => $data['nomor_telepon'],
                     'lampiran_path' => $newLampiranPath ?? $locked->lampiran_path,
                     'status' => 'menunggu_approval',
+                    'rollover_source_year' => null,
+                    'rollover_target_year' => null,
                 ])->save();
 
                 $this->reservations->adjustForResubmission($locked, $mulai, $newWorkdays, $actor);
 
-                return ['leaveRequest' => $locked, 'oldValues' => $oldValues];
+                if ($isRolloverReturn) {
+                    // Notifikasi approver adalah bagian transaksi resubmit agar status dan reservasi tidak berubah sendiri.
+                    $this->notifyActiveApprover($locked);
+                }
+
+                return [
+                    'leaveRequest' => $locked,
+                    'oldValues' => $oldValues,
+                ];
             });
         } catch (\Throwable $exception) {
             $this->files->deletePublicFile($newLampiranPath);
@@ -114,5 +134,44 @@ class ResubmitLeaveRequestAction
         AuditService::log('UPDATE', 'LeaveRequest', $updated->id, $oldValues, $newValues, $request);
 
         return $updated;
+    }
+
+    /** Mengirim ulang notifikasi kepada approver yang sama pada snapshot langkah aktif. */
+    private function notifyActiveApprover(LeaveRequest $leaveRequest): void
+    {
+        $approver = $leaveRequest->steps()
+            ->with('approver')
+            ->where('status', 'active')
+            ->orderBy('step_order')
+            ->first()?->approver;
+
+        if ($approver === null) {
+            return;
+        }
+
+        $this->notifications->createForEmployee(
+            $approver,
+            'cuti.pengajuan_baru',
+            'Pengajuan Cuti Menunggu Persetujuan',
+            "{$leaveRequest->employee?->nama_lengkap} mengajukan ulang cuti setelah rollover dan menunggu persetujuan Anda.",
+            ['leave_request_id' => $leaveRequest->id, 'url' => route('cuti.approval', [], false)],
+        );
+    }
+
+    /** Menjaga bypass FormRequest tidak dapat menulis file atau data di luar lifecycle resubmit. */
+    private function assertResubmissionStatusAndTargetYear(LeaveRequest $leaveRequest, Carbon $startDate): void
+    {
+        if (! in_array($leaveRequest->status, ['perlu_perubahan', LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER], true)) {
+            throw ValidationException::withMessages([
+                'status' => 'Pengajuan cuti ini tidak dapat dikirim ulang.',
+            ]);
+        }
+
+        if ($leaveRequest->status === LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER
+            && ($leaveRequest->rollover_target_year === null || $startDate->year !== $leaveRequest->rollover_target_year)) {
+            throw ValidationException::withMessages([
+                'tanggal_mulai' => "Pengajuan yang dikembalikan saat rollover wajib diajukan pada tahun {$leaveRequest->rollover_target_year}.",
+            ]);
+        }
     }
 }

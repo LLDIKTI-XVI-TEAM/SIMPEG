@@ -57,10 +57,103 @@ class PimpinanFrontendViewTest extends TestCase
             ->assertSee('Pegawai Cuti Tampilan')
             ->assertSee('Perubahan')
             ->assertDontSee('Disetujui dengan Perubahan')
-            ->assertSee('Wajib diisi jika memilih Perubahan, Ditangguhkan, atau Tidak Disetujui...')
+            ->assertSee('Wajib diisi jika memilih Perubahan, Tunda Sementara, atau Tidak Disetujui...')
             ->assertDontSee('aria-describedby="decision-note-help keputusan-error"', false)
             ->assertDontSee('aria-describedby="decision-note-help catatan-error"', false)
             ->assertSee(route('pimpinan.cuti.decision', $leave), false);
+    }
+
+    public function test_leave_surfaces_label_returned_rollover_without_offering_a_decision(): void
+    {
+        $applicant = Employee::factory()->create(['nama_lengkap' => 'Pegawai Rollover Pimpinan']);
+        $approver = Employee::factory()->create();
+        $leave = LeaveRequest::create([
+            'employee_id' => $applicant->id,
+            'jenis_cuti_id' => RefJenisCuti::create([
+                'nama' => 'Cuti Tahunan Rollover Pimpinan',
+                'code' => 'tahunan_rollover_pimpinan',
+                'mengurangi_saldo_tahunan' => true,
+                'khusus_pns' => false,
+            ])->id,
+            'tanggal_mulai' => '2026-12-28',
+            'tanggal_selesai' => '2026-12-30',
+            'jumlah_hari_kerja' => 3,
+            'alasan' => 'Pengajuan rollover untuk tampilan pimpinan.',
+            'status' => LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER,
+            'rollover_source_year' => 2026,
+            'rollover_target_year' => 2027,
+        ]);
+        LeaveRequestStep::create([
+            'leave_request_id' => $leave->id,
+            'step_order' => 1,
+            'step_type' => 'pybmc',
+            'role_label' => 'PYBMC',
+            'approver_employee_id' => $approver->id,
+            'status' => 'active',
+            'is_final' => true,
+        ]);
+        $user = $this->pimpinan(['employee_id' => $approver->id]);
+
+        $this->actingAs($user)
+            ->get(route('pimpinan.cuti.index', ['status' => LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER]))
+            ->assertOk()
+            ->assertSee('Pegawai Rollover Pimpinan')
+            ->assertSee('Dikembalikan karena Rollover')
+            ->assertSee('value="'.LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER.'"', false);
+
+        $this->actingAs($user)
+            ->get(route('pimpinan.cuti.show', $leave))
+            ->assertOk()
+            ->assertSee('Dikembalikan karena Rollover')
+            ->assertDontSee(route('pimpinan.cuti.decision', $leave), false);
+    }
+
+    /**
+     * Counter antrean harus memakai predikat yang sama dengan daftarnya. Pengajuan yang dikembalikan
+     * saat rollover masih menyimpan step aktif sebagai snapshot, sehingga counter tidak boleh
+     * menghitungnya dan membuat angka berbeda dari isi daftar yang dibuka approver.
+     */
+    public function test_rollover_return_is_excluded_from_my_pending_action_counter(): void
+    {
+        $applicant = Employee::factory()->create(['nama_lengkap' => 'Pegawai Counter Rollover']);
+        $approver = Employee::factory()->create();
+        $leave = LeaveRequest::create([
+            'employee_id' => $applicant->id,
+            'jenis_cuti_id' => RefJenisCuti::create([
+                'nama' => 'Cuti Tahunan Counter Rollover',
+                'code' => 'tahunan_counter_rollover',
+                'mengurangi_saldo_tahunan' => true,
+                'khusus_pns' => false,
+            ])->id,
+            'tanggal_mulai' => '2026-12-28',
+            'tanggal_selesai' => '2026-12-30',
+            'jumlah_hari_kerja' => 3,
+            'alasan' => 'Pengajuan rollover tidak boleh masuk antrean.',
+            'status' => LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER,
+            'rollover_source_year' => 2026,
+            'rollover_target_year' => 2027,
+        ]);
+        LeaveRequestStep::create([
+            'leave_request_id' => $leave->id,
+            'step_order' => 1,
+            'step_type' => 'pybmc',
+            'role_label' => 'PYBMC',
+            'approver_employee_id' => $approver->id,
+            'status' => 'active',
+            'is_final' => true,
+        ]);
+        $user = $this->pimpinan(['employee_id' => $approver->id]);
+
+        $this->actingAs($user)
+            ->get(route('pimpinan.cuti.index'))
+            ->assertOk()
+            ->assertViewHas('menungguTindakanSaya', 0);
+
+        $this->actingAs($user)
+            ->get(route('pimpinan.cuti.index', ['status' => 'menunggu_saya']))
+            ->assertOk()
+            ->assertViewHas('menungguTindakanSaya', 0)
+            ->assertDontSee('Pegawai Counter Rollover');
     }
 
     public function test_employee_detail_exposes_an_accessible_info_tab_without_a_dummy_export_submission(): void

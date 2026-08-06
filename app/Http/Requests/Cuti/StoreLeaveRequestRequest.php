@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Models\RefJenisCuti;
 use App\Services\Cuti\ApprovalChainResolver;
 use App\Services\Cuti\LeaveBalanceReservationService;
+use App\Services\Cuti\LeaveBalanceService;
 use App\Services\Cuti\LeaveEligibilityService;
 use App\Services\WorkdayCalculator;
 use Illuminate\Contracts\Validation\Validator;
@@ -190,6 +191,20 @@ class StoreLeaveRequestRequest extends FormRequest
                 'tanggal_mulai',
                 'Data TMT pengangkatan pegawai belum tersedia sehingga hak cuti tahunan belum dapat dihitung.',
             );
+
+            return;
+        }
+
+        try {
+            // Validasi awal memberi pesan Rule 5 yang spesifik; Action/reservasi tetap
+            // mengulang guard ini dalam lock transaksi untuk keamanan submit paralel.
+            app(LeaveBalanceService::class)->assertAnnualLeaveAllowed($employee, $mulai->year);
+        } catch (ValidationException $exception) {
+            foreach ($exception->errors() as $field => $messages) {
+                foreach ($messages as $message) {
+                    $validator->errors()->add($field, $message);
+                }
+            }
 
             return;
         }

@@ -63,6 +63,8 @@ class SubmitLeaveRequestAction
 
         $mulai = Carbon::createFromFormat('Y-m-d', (string) $data['tanggal_mulai'])->startOfDay();
         $selesai = Carbon::createFromFormat('Y-m-d', (string) $data['tanggal_selesai'])->startOfDay();
+        // Boundary Action menolak bypass FormRequest sebelum file maupun data pengajuan ditulis.
+        $this->eligibility->assertSingleCalendarYear($mulai, $selesai);
         $leaveType = RefJenisCuti::query()->findOrFail($data['jenis_cuti_id']);
 
         // Hari kerja selalu dihitung ulang di server agar tidak bergantung pada nilai yang dikirim klien.

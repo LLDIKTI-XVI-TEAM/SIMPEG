@@ -144,6 +144,7 @@
                             name="tanggal_pensiun"
                             label="Tanggal Pensiun"
                             id="tanggal_pensiun"
+                            help="Opsional — jika dikosongkan, EWS menghitung tanggal pensiun berdasarkan BUP jabatan."
                         />
 
                         {{-- Pendidikan Terakhir --}}

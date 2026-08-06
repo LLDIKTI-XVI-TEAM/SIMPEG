@@ -52,6 +52,54 @@ class PimpinanLeaveDetailTest extends TestCase
             ->assertSee('Perubahan');
     }
 
+    public function test_monitoring_accepts_and_labels_duty_postponement_status(): void
+    {
+        $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Terminal Pimpinan']);
+        $leave = $this->leave(
+            $employee,
+            $this->leaveType(),
+            '2026-07-06',
+            LeaveRequest::STATUS_DUTY_POSTPONED,
+        );
+
+        $response = $this->actingAs($this->pimpinan())
+            ->get(route('pimpinan.cuti.index', ['status' => LeaveRequest::STATUS_DUTY_POSTPONED]));
+
+        $response->assertOk()
+            ->assertSee('Pegawai Terminal Pimpinan')
+            ->assertSee('Ditangguhkan karena Tugas Dinas')
+            ->assertSee('value="'.LeaveRequest::STATUS_DUTY_POSTPONED.'"', false)
+            ->assertViewHas('totalDitangguhkan', 1);
+    }
+
+    public function test_detail_pending_step_explains_waiting_role_and_unknown_remains_neutral(): void
+    {
+        $leave = $this->leave(Employee::factory()->create(), $this->leaveType(), '2026-07-06', 'menunggu_approval');
+        LeaveRequestStep::create([
+            'leave_request_id' => $leave->id,
+            'step_order' => 1,
+            'step_type' => 'pybmc',
+            'role_label' => 'PYBMC',
+            'status' => 'pending',
+            'is_final' => true,
+        ]);
+        LeaveRequestStep::create([
+            'leave_request_id' => $leave->id,
+            'step_order' => 2,
+            'step_type' => 'unknown',
+            'role_label' => 'Role Rahasia',
+            'status' => 'status_rahasia',
+            'is_final' => false,
+        ]);
+
+        $this->actingAs($this->pimpinan())
+            ->get(route('pimpinan.cuti.show', $leave))
+            ->assertOk()
+            ->assertSeeInOrder(['Tahap 1 · PYBMC', 'Menunggu PYBMC'])
+            ->assertSeeInOrder(['Tahap 2 · Role Rahasia', 'Status tidak tersedia'])
+            ->assertDontSee('status_rahasia');
+    }
+
     public function test_detail_shows_official_timeline_actions_notes_and_times(): void
     {
         $approver = Employee::factory()->create(['nama_lengkap' => 'Pejabat Cuti']);

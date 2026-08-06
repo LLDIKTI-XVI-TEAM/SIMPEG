@@ -204,7 +204,7 @@ class EmployeeReportExportTest extends TestCase
             ->assertSee('get canPrintPreview()', false)
             ->assertSee('(!this.previewError || this.hasCurrentPreview)', false)
             ->assertSee('if (!this.canPrintPreview)', false)
-            ->assertSee("document.title = 'Daftar Nominatif Pegawai — SIMPEG';", false)
+            ->assertSee("const base = @js(route('laporan.pegawai.pdf'));", false)
             ->assertSee('get printStatusMessage()', false)
             ->assertSee('Pembaruan pratinjau gagal. Data yang ditampilkan sebelumnya tetap dapat dicetak.', false)
             ->assertSee('Pratinjau gagal diperbarui. Cetak PDF sementara belum tersedia.', false)

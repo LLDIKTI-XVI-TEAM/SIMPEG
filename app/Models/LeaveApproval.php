@@ -17,6 +17,8 @@ class LeaveApproval extends Model
 {
     use HasUuid;
 
+    public const ACTION_DUTY_POSTPONEMENT = 'DUTY_POSTPONEMENT';
+
     protected $fillable = [
         'leave_request_id',
         'approver_id',

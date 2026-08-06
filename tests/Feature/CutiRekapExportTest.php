@@ -261,6 +261,23 @@ class CutiRekapExportTest extends TestCase
             ->assertDontSee('perlu_perubahan', false);
     }
 
+    public function test_rekap_menampilkan_label_pengembalian_rollover_bukan_token_internal(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $pegawai = Employee::factory()->create();
+        $jenis = RefJenisCuti::create(['nama' => 'Cuti Label Rollover Rekap']);
+        $this->createLeaveRequest($pegawai, $jenis, '2026-06-15', LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER)
+            ->forceFill([
+                'rollover_source_year' => 2026,
+                'rollover_target_year' => 2027,
+            ])->save();
+
+        $this->actingAs($user)->get(route('cuti.rekap', ['pegawai' => $pegawai->id]))
+            ->assertOk()
+            ->assertSee('Dikembalikan karena Rollover')
+            ->assertDontSee(LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER, false);
+    }
+
     public function test_rekap_menampilkan_label_status_saldo(): void
     {
         $user = User::factory()->superAdmin()->create();
@@ -314,6 +331,7 @@ class CutiRekapExportTest extends TestCase
             'ditangguhkan' => ['ditangguhkan', null, 'Ditangguhkan'],
             'perlu perubahan' => ['perlu_perubahan', null, 'Perubahan'],
             'tidak disetujui' => ['tidak_disetujui', null, 'Tidak Disetujui'],
+            'dikembalikan karena rollover' => [LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER, null, 'Dikembalikan karena Rollover'],
             'tahap aktif' => ['menunggu_approval', 'active', 'Menunggu Verifikator'],
             'fallback approver' => ['menunggu_approval', null, 'Menunggu Approver'],
         ];

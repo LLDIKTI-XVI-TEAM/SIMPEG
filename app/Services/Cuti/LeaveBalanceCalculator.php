@@ -103,6 +103,50 @@ class LeaveBalanceCalculator
     }
 
     /**
+     * Mengalokasikan saldo yang dilindungi karena penangguhan dinas dari tahun berjalan ke bucket terlama.
+     * Alokasi bersifat semua-atau-tidak-sama-sekali: hari non-positif atau saldo kurang ditolak tanpa mengubah bucket.
+     *
+     * @param  array{n2:int, n1:int, current:int}  $buckets
+     * @return array{
+     *     success: bool,
+     *     allocations: array{n2:int, n1:int, current:int},
+     *     remaining: array{n2:int, n1:int, current:int}
+     * }
+     */
+    public function allocateDutyPostponement(array $buckets, int $days): array
+    {
+        if ($days <= 0 || ! $this->isSufficient($buckets, $days)) {
+            return [
+                'success' => false,
+                'allocations' => ['n2' => 0, 'n1' => 0, 'current' => 0],
+                'remaining' => $buckets,
+            ];
+        }
+
+        $allocations = ['n2' => 0, 'n1' => 0, 'current' => 0];
+        $remaining = $buckets;
+        $sisaPerlindungan = $days;
+
+        // Urutan reverse mencegah protected overlap dengan deduction biasa selama invariant reservasi dijaga.
+        foreach (['current', 'n1', 'n2'] as $bucket) {
+            if ($sisaPerlindungan <= 0) {
+                break;
+            }
+
+            $ambil = min($remaining[$bucket], $sisaPerlindungan);
+            $allocations[$bucket] = $ambil;
+            $remaining[$bucket] -= $ambil;
+            $sisaPerlindungan -= $ambil;
+        }
+
+        return [
+            'success' => true,
+            'allocations' => $allocations,
+            'remaining' => $remaining,
+        ];
+    }
+
+    /**
      * Menerapkan koreksi saldo bertanda dengan clamp agar saldo tidak pernah negatif.
      *
      * Untuk koreksi debit yang melewati nol, hanya porsi yang benar-benar terpakai yang dicatat
@@ -123,51 +167,40 @@ class LeaveBalanceCalculator
     }
 
     /**
-     * Menghitung bucket saldo tahun berikutnya beserta hangus saat rollover.
+     * Menghitung saldo target dengan memisahkan eligibility carry ordinary dari carry statutory.
+     * Satu approval tahunan pada tahun sumber menghanguskan sisa current ordinary, tetapi tidak
+     * membatalkan hak penangguhan dinas yang telah tercatat melalui jalur statutory terpisah.
      *
-     * Aturan cap:
-     * - Tanpa carry-over: seluruh sisa lama sudah habis, hanya jatah tahun berjalan 12 yang tersedia (maxUsable 12).
-     * - Normal: N-2 hilang (0), N-1 diisi sisa tahun berjalan maksimal 6, tahun berjalan 12, batas atas 18.
-     * - Dua tahun tanpa cuti tahunan: N-2 dan N-1 masing-masing maksimal 6, tahun berjalan 12, batas atas 24.
-     *   Pemanggil wajib mengirim false ketika ada cuti tahunan sebagian, sehingga hasil kembali ke batas normal.
-     * - Penangguhan dinas: hak cuti yang tertunda karena dinas mendesak dibawa penuh ke N-1 tahun berikutnya,
-     *   tetapi total saldo tersedia tetap dibatasi maksimal 24 termasuk jatah tahun berjalan.
-     *   Pemanggil wajib memisahkan sisa normal dan sisa yang benar-benar ditetapkan sebagai penangguhan dinas
-     *   agar hari yang sama tidak dihitung dua kali.
-     *
-     * maxUsable adalah total saldo tersedia sesungguhnya setelah rollover (n2 + n1 + current),
-     * bukan plafon statis; nilainya sama dengan availableTotal() untuk bucket hasil rollover.
-     *
-     * Kelebihan di atas cap tiap bucket dicatat sebagai hangus dan tidak pernah dikonversi menjadi uang.
-     *
-     * @param  int  $previousN1  Sisa bucket N-1 pada akhir tahun berjalan (carry-over dari dua tahun lalu).
-     * @param  int  $previousCurrent  Sisa jatah tahun berjalan pada akhir tahun.
-     * @param  bool  $twoYearsNoAnnualLeave  True hanya bila pegawai tidak mengambil cuti tahunan selama dua tahun berturut-turut.
-     * @param  int  $postponedByDuty  Sisa cuti yang ditangguhkan atasan karena dinas mendesak; berlaku maksimal 1 tahun.
+     * @param  int  $previousN1  Sisa bucket N-1 pada akhir tahun sumber.
+     * @param  int  $previousCurrent  Sisa jatah current pada akhir tahun sumber.
+     * @param  bool  $sourceYearNoApprovedAnnualLeave  True bila tidak ada Cuti Tahunan disetujui pada tahun sumber.
+     * @param  bool  $twoYearsNoAnnualLeave  True bila dua tahun bersih; hanya sah jika tahun sumber juga tanpa approval.
+     * @param  int  $postponedByDuty  Hak statutory penangguhan dinas yang berlaku satu tahun.
      * @return array{n2:int, n1:int, current:int, hangus:int, maxUsable:int}
      */
     public function calculateRollover(
         int $previousN1,
         int $previousCurrent,
+        bool $sourceYearNoApprovedAnnualLeave,
         bool $twoYearsNoAnnualLeave,
         int $postponedByDuty = 0,
     ): array {
-        // Sisa tahun berjalan bergeser menjadi N-1 tahun depan, dibatasi cap carry-over.
-        $n1 = min($previousCurrent, self::CARRY_OVER_CAP);
+        // Carry ordinary hanya lahir ketika tahun sumber tidak mempunyai Cuti Tahunan disetujui.
+        $n1 = $sourceYearNoApprovedAnnualLeave
+            ? min($previousCurrent, self::CARRY_OVER_CAP)
+            : 0;
         $hangus = $previousCurrent - $n1;
 
         if ($twoYearsNoAnnualLeave) {
-            // Skenario dua tahun: bucket N-1 lama bergeser menjadi N-2, tetap dibatasi cap.
+            // N-1 lama hanya boleh menua menjadi N-2 setelah dua tahun tanpa approval tahunan.
             $n2 = min($previousN1, self::CARRY_OVER_CAP);
             $hangus += $previousN1 - $n2;
         } else {
-            // Skenario normal: bucket N-2 tidak dipertahankan sehingga sisa N-1 lama hangus seluruhnya.
             $n2 = 0;
             $hangus += $previousN1;
         }
 
-        // Ruang carry-over maksimal 12 karena jatah tahun berjalan selalu 12 dari total maksimum 24.
-        // Penangguhan dinas dihitung penuh hanya sampai ruang carry-over tersisa menuju total 24 hari.
+        // Carry statutory tidak bergantung pada eligibility ordinary, tetapi tetap berbagi cap total 24 hari.
         $carryOverRoom = self::ANNUAL_ENTITLEMENT - $n2 - $n1;
         $postponedCarried = min($postponedByDuty, $carryOverRoom);
         $n1 += $postponedCarried;
@@ -177,8 +210,9 @@ class LeaveBalanceCalculator
             'n2' => $n2,
             'n1' => $n1,
             'current' => self::ANNUAL_ENTITLEMENT,
+            // Hari di luar cap menjadi hangus dan tidak boleh dikonversi menjadi uang atau kompensasi.
             'hangus' => $hangus,
-            // Total saldo tersedia nyata setelah rollover; batasnya 12, maksimal 18, atau maksimal 24 sesuai bucket terisi.
+            // Total saldo nyata setelah rollover, bukan plafon statis kebijakan.
             'maxUsable' => $n2 + $n1 + self::ANNUAL_ENTITLEMENT,
         ];
     }

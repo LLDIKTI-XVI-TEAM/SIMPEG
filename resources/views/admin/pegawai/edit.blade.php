@@ -459,7 +459,7 @@
                             <input id="tanggal_pensiun" name="tanggal_pensiun" type="date"
                                 class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer"
                                 value="{{ $p->tanggal_pensiun ? \Carbon\Carbon::parse($p->tanggal_pensiun)->format('Y-m-d') : '' }}">
-                            <p class="text-xs text-muted">Opsional - Kosongkan untuk kalkulasi otomatis dari BUP</p>
+                            <p class="text-xs text-muted">Opsional — jika dikosongkan, EWS menghitung tanggal pensiun berdasarkan BUP jabatan.</p>
                         </div>
 
                         {{-- Penanda eksplisit agar alur cuti tidak menebak Kepala Lembaga dari nama jabatan bebas. --}}

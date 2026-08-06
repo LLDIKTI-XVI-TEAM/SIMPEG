@@ -2,18 +2,20 @@
 
 namespace App\Actions\Dashboards;
 
+use App\Actions\Cuti\PreviewLeaveBalanceAction;
 use App\Actions\Ews\ListActiveEwsAlertsAction;
 use App\Models\Employee;
-use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
 use App\Models\SimpegNotification;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Carbon;
 
 class BuildPegawaiDashboardAction
 {
     public function __construct(
         private readonly ListActiveEwsAlertsAction $ewsAlerts,
+        private readonly PreviewLeaveBalanceAction $balancePreview,
     ) {}
 
     /**
@@ -35,6 +37,7 @@ class BuildPegawaiDashboardAction
 
         $employee = null;
         $saldoCuti = null;
+        $rule5Active = false;
         $cutiAktif = new Collection;
         $notifikasi = new Collection;
 
@@ -53,14 +56,14 @@ class BuildPegawaiDashboardAction
                 ])
                 ->find($employeeId);
 
-            $saldoCuti = LeaveBalance::query()
-                ->where('employee_id', $employeeId)
-                ->where('tahun', now()->year)
-                ->first();
+            if ($employee !== null) {
+                $saldoCuti = $this->balancePreview->execute($employee, Carbon::now());
+                $rule5Active = $saldoCuti['rule_5_active'];
+            }
 
             $cutiAktif = LeaveRequest::query()
                 ->where('employee_id', $employeeId)
-                ->whereIn('status', ['menunggu_approval', 'ditangguhkan', 'perlu_perubahan'])
+                ->whereIn('status', ['menunggu_approval', 'ditangguhkan', 'perlu_perubahan', LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER])
                 ->latest()
                 ->take(5)
                 ->get();
@@ -83,6 +86,7 @@ class BuildPegawaiDashboardAction
             'dashboardEwsLink' => route('ews.saya'),
             'employee' => $employee,
             'saldoCuti' => $saldoCuti,
+            'rule5Active' => $rule5Active,
             'cutiAktif' => $cutiAktif,
             'notifikasi' => $notifikasi,
         ];

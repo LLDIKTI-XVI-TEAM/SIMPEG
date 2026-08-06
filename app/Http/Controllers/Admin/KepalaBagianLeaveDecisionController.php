@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Admin;
 use App\Actions\Cuti\ApproveLeaveAction;
 use App\Actions\Cuti\DeclineLeaveAction;
 use App\Actions\Cuti\PostponeLeaveAction;
+use App\Actions\Cuti\RecordDutyPostponementAction;
 use App\Actions\Cuti\RequestChangesLeaveAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Cuti\KepalaBagianLeaveDecisionRequest;
+use App\Http\Requests\Cuti\RecordDutyPostponementRequest;
 use App\Models\LeaveRequest;
 use App\Services\Employees\KepalaBagianScopeService;
 
@@ -43,5 +45,23 @@ class KepalaBagianLeaveDecisionController extends Controller
         };
 
         return redirect()->route('kepala-bagian.cuti.show', $leave)->with('success', $message);
+    }
+
+    /** Menjaga scope bawahan sebelum Action memverifikasi approver snapshot di bawah lock. */
+    public function recordDutyPostponement(
+        RecordDutyPostponementRequest $request,
+        LeaveRequest $leave,
+        KepalaBagianScopeService $scope,
+        RecordDutyPostponementAction $action,
+    ) {
+        $user = $request->user();
+        $actor = $user?->employee;
+        abort_if($user === null || $actor === null, 403, 'Akun Kepala Bagian belum tertaut ke data pegawai.');
+        abort_unless($scope->hasDirectReport($user, $leave->employee_id), 403);
+
+        $action->execute($leave, $actor, $user, $request->validated()['alasan']);
+
+        return redirect()->route('kepala-bagian.cuti.show', $leave)
+            ->with('success', 'Cuti Tahunan ditangguhkan karena tugas dinas dan hak terkait telah dilindungi untuk satu tahun berikutnya.');
     }
 }

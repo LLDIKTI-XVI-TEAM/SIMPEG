@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Cuti;
 
+use App\Models\LeaveRequest;
 use App\Services\Cuti\LeaveBalanceReservationService;
+use App\Services\Cuti\LeaveBalanceService;
 use App\Services\Cuti\LeaveEligibilityService;
 use App\Services\WorkdayCalculator;
 use Illuminate\Contracts\Validation\Validator;
@@ -11,7 +13,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Memvalidasi revisi pengajuan berstatus perlu_perubahan.
+ * Memvalidasi revisi pengajuan berstatus perlu_perubahan atau pengembalian rollover.
  * Jenis cuti tetap terkunci; pemohon hanya boleh memperbaiki tanggal, alasan, dan lampiran.
  */
 class ResubmitLeaveRequestRequest extends FormRequest
@@ -22,7 +24,10 @@ class ResubmitLeaveRequestRequest extends FormRequest
 
         return $leaveRequest !== null
             && $this->user()?->employee_id === $leaveRequest->employee_id
-            && $leaveRequest->status === 'perlu_perubahan';
+            && in_array($leaveRequest->status, [
+                'perlu_perubahan',
+                LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER,
+            ], true);
     }
 
     /**
@@ -98,6 +103,16 @@ class ResubmitLeaveRequestRequest extends FormRequest
 
             $leaveRequest = $this->route('leaveRequest');
 
+            if ($leaveRequest?->status === LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER
+                && ($leaveRequest->rollover_target_year === null || $mulai->year !== $leaveRequest->rollover_target_year)) {
+                $validator->errors()->add(
+                    'tanggal_mulai',
+                    "Pengajuan yang dikembalikan saat rollover wajib diajukan pada tahun {$leaveRequest->rollover_target_year}.",
+                );
+
+                return;
+            }
+
             $employee = $this->user()?->employee;
 
             if ($leaveRequest === null || $employee === null) {
@@ -127,6 +142,20 @@ class ResubmitLeaveRequestRequest extends FormRequest
             }
 
             if (! $leaveRequest?->jenisCuti?->mengurangi_saldo_tahunan) {
+                return;
+            }
+
+            try {
+                // Validasi awal memberi pesan Rule 5 yang spesifik; Action/reservasi tetap
+                // mengulang guard ini dalam lock transaksi untuk keamanan submit paralel.
+                app(LeaveBalanceService::class)->assertAnnualLeaveAllowed($employee, $mulai->year);
+            } catch (ValidationException $exception) {
+                foreach ($exception->errors() as $field => $messages) {
+                    foreach ($messages as $message) {
+                        $validator->errors()->add($field, $message);
+                    }
+                }
+
                 return;
             }
 
