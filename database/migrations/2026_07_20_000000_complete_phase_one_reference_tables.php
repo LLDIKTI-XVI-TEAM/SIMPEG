@@ -36,7 +36,7 @@ return new class extends Migration
         });
 
         Schema::table('ref_unit_kerja', function (Blueprint $table): void {
-            $table->dropForeign('ref_unit_kerja_parent_id_foreign');
+            $table->dropForeign(['parent_id']);
             $table->dropIndex('ref_unit_kerja_parent_level_index');
             $table->dropIndex('ref_unit_kerja_is_active_index');
             $table->dropColumn(['parent_id', 'level', 'jenis_unit', 'is_active']);

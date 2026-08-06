@@ -152,7 +152,7 @@ class LeaveActionCalendarBoundaryTest extends TestCase
     #[DataProvider('crossYearActionCases')]
     public function test_direct_action_menolak_lintas_tahun_sebelum_file_dan_mutasi(string $operation, string $code): void
     {
-        Storage::fake('public');
+
         $fixture = $this->fixture($code);
         $payload = [
             'jenis_cuti_id' => $fixture['type']->id,

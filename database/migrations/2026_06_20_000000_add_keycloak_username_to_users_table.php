@@ -16,6 +16,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table): void {
+            $table->dropUnique(['keycloak_username']);
+        });
+        Schema::table('users', function (Blueprint $table): void {
             $table->dropColumn('keycloak_username');
         });
     }

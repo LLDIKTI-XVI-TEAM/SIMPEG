@@ -34,7 +34,6 @@ class EmployeeCreateIntegrationTest extends TestCase
 
     public function test_can_create_employee_via_ui_form()
     {
-        Storage::fake('public');
 
         // Arrange
         $user = User::factory()->create([

@@ -26,7 +26,7 @@ class PimpinanLeaveProofTest extends TestCase
 
     public function test_final_approval_generates_one_private_leave_proof_document(): void
     {
-        Storage::fake('local');
+
         [$leave, $pimpinan] = $this->leaveAwaitingFinalApproval();
 
         $this->actingAs($pimpinan)
@@ -46,7 +46,7 @@ class PimpinanLeaveProofTest extends TestCase
 
     public function test_public_verification_shows_required_leave_data_without_sensitive_identifiers(): void
     {
-        Storage::fake('local');
+
         [$leave, $pimpinan] = $this->leaveAwaitingFinalApproval();
         $leave->employee->forceFill([
             'nik' => '7301010101010001',
@@ -80,7 +80,7 @@ class PimpinanLeaveProofTest extends TestCase
 
     public function test_pimpinan_can_open_and_download_a_final_leave_document(): void
     {
-        Storage::fake('local');
+
         [$leave, $pimpinan] = $this->leaveAwaitingFinalApproval();
 
         $this->actingAs($pimpinan)->post(route('pimpinan.cuti.decision', $leave), [
@@ -100,7 +100,7 @@ class PimpinanLeaveProofTest extends TestCase
 
     public function test_non_pimpinan_cannot_open_a_final_leave_document(): void
     {
-        Storage::fake('local');
+
         [$leave, $pimpinan] = $this->leaveAwaitingFinalApproval();
 
         $this->actingAs($pimpinan)->post(route('pimpinan.cuti.decision', $leave), [

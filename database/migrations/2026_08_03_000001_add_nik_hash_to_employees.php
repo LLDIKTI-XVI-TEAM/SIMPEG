@@ -100,6 +100,8 @@ return new class extends Migration
     {
         Schema::table('employees', function (Blueprint $table): void {
             $table->dropUnique('employees_nik_hash_unique');
+        });
+        Schema::table('employees', function (Blueprint $table): void {
             $table->dropColumn('nik_hash');
         });
     }

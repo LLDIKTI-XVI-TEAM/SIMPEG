@@ -682,7 +682,7 @@ class SubmitLeaveRequestTest extends TestCase
 
     public function test_menolak_lampiran_melebihi_batas(): void
     {
-        Storage::fake('public');
+
         $aktor = $this->makePemohon();
         $jenis = $this->jenisCuti('Cuti Sakit');
 
@@ -699,7 +699,7 @@ class SubmitLeaveRequestTest extends TestCase
 
     public function test_menyimpan_lampiran_saat_diunggah(): void
     {
-        Storage::fake('public');
+
         $aktor = $this->makePemohon();
         $jenis = $this->jenisCuti('Cuti Sakit');
 
@@ -716,7 +716,7 @@ class SubmitLeaveRequestTest extends TestCase
 
     public function test_submit_gagal_setelah_upload_membersihkan_lampiran_baru(): void
     {
-        Storage::fake('public');
+
         $aktor = $this->makePemohon();
         $jenis = $this->jenisCuti('Cuti Sakit Gagal Notifikasi');
         $this->mock(NotificationService::class, function (MockInterface $mock): void {
@@ -1052,7 +1052,7 @@ class SubmitLeaveRequestTest extends TestCase
 
     public function test_submission_tanpa_approver_non_pemohon_tidak_menyimpan_efek_samping(): void
     {
-        Storage::fake('public');
+
         $aktor = $this->makePemohon();
         $aktor['employee']->supervisorAssignments()->delete();
         $chain = LeaveApprovalChain::query()->where('employee_id', $aktor['employee']->id)->firstOrFail();
@@ -1307,7 +1307,7 @@ class SubmitLeaveRequestTest extends TestCase
 
     public function test_resubmit_gagal_setelah_upload_mempertahankan_lampiran_lama_dan_membersihkan_yang_baru(): void
     {
-        Storage::fake('public');
+
         $aktor = $this->makePemohon();
         $jenis = $this->jenisCuti('Cuti Sakit Resubmit Gagal');
         $this->actingAs($aktor['user'])->post(route(self::ROUTE), $this->payload($jenis, [
@@ -1345,7 +1345,7 @@ class SubmitLeaveRequestTest extends TestCase
 
     public function test_resubmit_berhasil_mengganti_lampiran_lalu_menghapus_file_lama(): void
     {
-        Storage::fake('public');
+
         $aktor = $this->makePemohon();
         $jenis = $this->jenisCuti('Cuti Sakit Ganti Lampiran');
         $this->actingAs($aktor['user'])->post(route(self::ROUTE), $this->payload($jenis, [
@@ -1373,7 +1373,7 @@ class SubmitLeaveRequestTest extends TestCase
 
     public function test_resubmit_ditolak_jika_pemohon_sekarang_kepala_lembaga_tanpa_mutasi(): void
     {
-        Storage::fake('public');
+
         $aktor = $this->makePemohon();
         $jenis = $this->jenisCuti('Cuti Sakit Resubmit Kepala Lembaga');
         $this->actingAs($aktor['user'])->post(route(self::ROUTE), $this->payload($jenis));
