@@ -23,8 +23,8 @@
         .number { text-align: right; }
         .center { text-align: center; }
         .empty { padding: 18px; text-align: center; color: #6b7280; }
-        .signatures { margin-top: 36px; width: 100%; }
-        .signature { display: inline-block; text-align: center; vertical-align: top; width: 48%; }
+        table.signatures { width: 100%; margin-top: 36px; border: none; }
+        table.signatures td { text-align: center; width: 50%; vertical-align: top; border: none; }
         .signature-space { height: 54px; }
         footer { bottom: 0; color: #6b7280; font-size: 8px; left: 0; position: fixed; right: 0; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 6px; }
         .page-number::after  { content: counter(page); }
@@ -42,6 +42,7 @@
                 <h2>Lembaga Layanan Pendidikan Tinggi (LLDIKTI) Wilayah XVI</h2>
                 <p>Jl. Prof. Dr. Aloei Saboe, Wongkaditi, Kota Gorontalo</p>
             </td>
+            <td width="80"></td>
         </tr>
     </table>
 
@@ -79,10 +80,20 @@
         </tbody>
     </table>
 
-    <div class="signatures">
-        <div class="signature"><strong>Pembuat Laporan</strong><div class="signature-space"></div><p>(................................)</p></div>
-        <div class="signature"><strong>Mengetahui</strong><div class="signature-space"></div><p>(................................)</p></div>
-    </div>
+    <table class="signatures">
+        <tr>
+            <td>
+                <strong>Pembuat Laporan</strong>
+                <div class="signature-space"></div>
+                <p>(................................)</p>
+            </td>
+            <td>
+                <strong>Mengetahui</strong>
+                <div class="signature-space"></div>
+                <p>(................................)</p>
+            </td>
+        </tr>
+    </table>
 
     <footer>
         Dokumen dibuat pada {{ $generatedAt->format('d-m-Y H:i:s') }}
