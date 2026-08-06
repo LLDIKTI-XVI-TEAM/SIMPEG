@@ -73,35 +73,61 @@
                 :value="$jabatanCreateFailed ? old('nama') : null"
                 :error-key="$jabatanCreateFailed ? 'nama' : 'jabatan_create_nama'" />
 
-            <div>
+            @php
+                $jabatanCreateJenisError = $jabatanCreateFailed && $errors->has('jenis_jabatan_id');
+                $jabatanCreateEselonError = $jabatanCreateFailed && $errors->has('eselon_id');
+                $jabatanCreateKeteranganError = $jabatanCreateFailed && $errors->has('keterangan');
+            @endphp
+
+            <div class="space-y-1">
                 <label for="jabatan-jenis-jabatan" class="mb-1 block text-sm font-semibold text-ink">Jenis Jabatan</label>
-                <select id="jabatan-jenis-jabatan" name="jenis_jabatan_id" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                <select id="jabatan-jenis-jabatan" name="jenis_jabatan_id"
+                    @if ($jabatanCreateJenisError) aria-invalid="true" aria-describedby="jabatan-jenis-jabatan-error" @endif
+                    class="w-full rounded-lg border bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 @if ($jabatanCreateJenisError) border-danger focus:border-danger focus:ring-danger/20 @else border-border focus:border-primary focus:ring-primary/20 @endif">
                     <option value="">Tidak ditentukan</option>
                     @foreach ($jenisJabatanOptions->where('is_active', true) as $jenis)
                         <option value="{{ $jenis->id }}" @selected($jabatanCreateFailed && (string) old('jenis_jabatan_id') === (string) $jenis->id)>{{ $jenis->nama }}</option>
                     @endforeach
                 </select>
+                @if ($jabatanCreateFailed)
+                    @error('jenis_jabatan_id')
+                        <p id="jabatan-jenis-jabatan-error" class="text-[11px] font-semibold text-danger">{{ $message }}</p>
+                    @enderror
+                @endif
             </div>
 
-            <div>
+            <div class="space-y-1">
                 <label for="jabatan-eselon" class="mb-1 block text-sm font-semibold text-ink">Eselon</label>
-                <select id="jabatan-eselon" name="eselon_id" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                <select id="jabatan-eselon" name="eselon_id"
+                    @if ($jabatanCreateEselonError) aria-invalid="true" aria-describedby="jabatan-eselon-error" @endif
+                    class="w-full rounded-lg border bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 @if ($jabatanCreateEselonError) border-danger focus:border-danger focus:ring-danger/20 @else border-border focus:border-primary focus:ring-primary/20 @endif">
                     <option value="">Tidak ditentukan</option>
                     @foreach ($eselonOptions->where('is_active', true) as $eselonItem)
                         <option value="{{ $eselonItem->id }}" @selected($jabatanCreateFailed && (string) old('eselon_id') === (string) $eselonItem->id)>{{ $eselonItem->kode }} — {{ $eselonItem->nama }}</option>
                     @endforeach
                 </select>
+                @if ($jabatanCreateFailed)
+                    @error('eselon_id')
+                        <p id="jabatan-eselon-error" class="text-[11px] font-semibold text-danger">{{ $message }}</p>
+                    @enderror
+                @endif
             </div>
 
             <x-form.input name="default_bup" type="number" label="BUP Default" min="50" max="70" placeholder="cth: 60"
                 :value="$jabatanCreateFailed ? old('default_bup') : null"
                 :error-key="$jabatanCreateFailed ? 'default_bup' : 'jabatan_create_default_bup'" />
 
-            <div>
+            <div class="space-y-1">
                 <label for="jabatan-keterangan" class="mb-1 block text-sm font-semibold text-ink">Keterangan</label>
                 <input id="jabatan-keterangan" name="keterangan" type="text" maxlength="255" placeholder="Opsional"
                     value="{{ $jabatanCreateFailed ? old('keterangan') : '' }}"
-                    class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                    @if ($jabatanCreateKeteranganError) aria-invalid="true" aria-describedby="jabatan-keterangan-error" @endif
+                    class="w-full rounded-lg border bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 @if ($jabatanCreateKeteranganError) border-danger focus:border-danger focus:ring-danger/20 @else border-border focus:border-primary focus:ring-primary/20 @endif">
+                @if ($jabatanCreateFailed)
+                    @error('keterangan')
+                        <p id="jabatan-keterangan-error" class="text-[11px] font-semibold text-danger">{{ $message }}</p>
+                    @enderror
+                @endif
             </div>
 
             <div class="flex items-end">
@@ -196,35 +222,62 @@
                                         :error-key="$jabatanEditId === $item->id ? 'nama' : 'jabatan_edit_'.$item->id.'_nama'"
                                         required />
 
-                                    <div>
+                                    @php
+                                        $jabatanEditFailed = $jabatanEditId === $item->id;
+                                        $jabatanEditJenisError = $jabatanEditFailed && $errors->has('jenis_jabatan_id');
+                                        $jabatanEditEselonError = $jabatanEditFailed && $errors->has('eselon_id');
+                                        $jabatanEditKeteranganError = $jabatanEditFailed && $errors->has('keterangan');
+                                    @endphp
+
+                                    <div class="space-y-1">
                                         <label for="jabatan-jenis-{{ $item->id }}" class="mb-1 block text-sm font-semibold text-ink">Jenis Jabatan</label>
-                                        <select id="jabatan-jenis-{{ $item->id }}" name="jenis_jabatan_id" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                        <select id="jabatan-jenis-{{ $item->id }}" name="jenis_jabatan_id"
+                                            @if ($jabatanEditJenisError) aria-invalid="true" aria-describedby="jabatan-jenis-{{ $item->id }}-error" @endif
+                                            class="w-full rounded-lg border bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 @if ($jabatanEditJenisError) border-danger focus:border-danger focus:ring-danger/20 @else border-border focus:border-primary focus:ring-primary/20 @endif">
                                             <option value="">Tidak ditentukan</option>
                                             @foreach ($jenisJabatanOptions->filter(fn ($jenis) => $jenis->is_active || $jenis->id === $item->jenis_jabatan_id) as $jenis)
                                                 <option value="{{ $jenis->id }}" @selected((string) $jenis->id === (string) ($jabatanEditId === $item->id ? old('jenis_jabatan_id', $item->jenis_jabatan_id) : $item->jenis_jabatan_id))>{{ $jenis->nama }}{{ $jenis->is_active ? '' : ' (Nonaktif)' }}</option>
                                             @endforeach
                                         </select>
+                                        @if ($jabatanEditFailed)
+                                            @error('jenis_jabatan_id')
+                                                <p id="jabatan-jenis-{{ $item->id }}-error" class="text-[11px] font-semibold text-danger">{{ $message }}</p>
+                                            @enderror
+                                        @endif
                                     </div>
 
-                                    <div>
+                                    <div class="space-y-1">
                                         <label for="jabatan-eselon-{{ $item->id }}" class="mb-1 block text-sm font-semibold text-ink">Eselon</label>
-                                        <select id="jabatan-eselon-{{ $item->id }}" name="eselon_id" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                        <select id="jabatan-eselon-{{ $item->id }}" name="eselon_id"
+                                            @if ($jabatanEditEselonError) aria-invalid="true" aria-describedby="jabatan-eselon-{{ $item->id }}-error" @endif
+                                            class="w-full rounded-lg border bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 @if ($jabatanEditEselonError) border-danger focus:border-danger focus:ring-danger/20 @else border-border focus:border-primary focus:ring-primary/20 @endif">
                                             <option value="">Tidak ditentukan</option>
                                             @foreach ($eselonOptions->filter(fn ($eselonItem) => $eselonItem->is_active || $eselonItem->id === $item->eselon_id) as $eselonItem)
                                                 <option value="{{ $eselonItem->id }}" @selected((string) $eselonItem->id === (string) ($jabatanEditId === $item->id ? old('eselon_id', $item->eselon_id) : $item->eselon_id))>{{ $eselonItem->kode }} — {{ $eselonItem->nama }}{{ $eselonItem->is_active ? '' : ' (Nonaktif)' }}</option>
                                             @endforeach
                                         </select>
+                                        @if ($jabatanEditFailed)
+                                            @error('eselon_id')
+                                                <p id="jabatan-eselon-{{ $item->id }}-error" class="text-[11px] font-semibold text-danger">{{ $message }}</p>
+                                            @enderror
+                                        @endif
                                     </div>
 
                                     <x-form.input name="default_bup" type="number" label="BUP Default" min="50" max="70"
                                         :value="$jabatanEditId === $item->id ? old('default_bup', $item->default_bup) : $item->default_bup"
                                         :error-key="$jabatanEditId === $item->id ? 'default_bup' : 'jabatan_edit_'.$item->id.'_default_bup'" />
 
-                                    <div>
+                                    <div class="space-y-1">
                                         <label for="jabatan-keterangan-{{ $item->id }}" class="mb-1 block text-sm font-semibold text-ink">Keterangan</label>
                                         <input id="jabatan-keterangan-{{ $item->id }}" name="keterangan" type="text" maxlength="255"
                                             value="{{ $jabatanEditId === $item->id ? old('keterangan', $item->keterangan) : $item->keterangan }}"
-                                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                            @if ($jabatanEditKeteranganError) aria-invalid="true" aria-describedby="jabatan-keterangan-{{ $item->id }}-error" @endif
+                                            class="w-full rounded-lg border bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 @if ($jabatanEditKeteranganError) border-danger focus:border-danger focus:ring-danger/20 @else border-border focus:border-primary focus:ring-primary/20 @endif">
+                                        @if ($jabatanEditFailed)
+                                            @error('keterangan')
+                                                <p id="jabatan-keterangan-{{ $item->id }}-error" class="text-[11px] font-semibold text-danger">{{ $message }}</p>
+                                            @enderror
+                                        @endif
                                     </div>
 
                                     <div class="flex items-end gap-2">

@@ -9,8 +9,10 @@ use App\Models\RefJenisJabatan;
 use App\Models\RefUnitKerja;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -163,9 +165,8 @@ class DataMasterJabatanTest extends TestCase
     {
         $jabatan = RefJabatan::create(['nama' => 'Analis Kepegawaian', 'is_active' => true]);
         $employee = Employee::factory()->create();
-        // FK position_histories.jabatan_id bersifat nullOnDelete sehingga database
-        // tidak memblokir penghapusan dan justru mengosongkan kolom riwayat diam-diam;
-        // guard aplikasi adalah satu-satunya pelindung jejak jabatan pegawai.
+        // Guard aplikasi memberi pesan yang dapat ditindaklanjuti admin, sedangkan
+        // FK RESTRICT menjadi lapisan terakhir bila penghapusan melewati Action.
         $employee->positionHistories()->create([
             'jabatan_id' => $jabatan->id,
             'nama_jabatan' => 'Analis Kepegawaian',
@@ -184,6 +185,32 @@ class DataMasterJabatanTest extends TestCase
         ]);
     }
 
+    public function test_fk_jabatan_menolak_penghapusan_langsung_saat_masih_dipakai_riwayat(): void
+    {
+        $jabatan = RefJabatan::create(['nama' => 'Jabatan Berelasi', 'is_active' => true]);
+        $employee = Employee::factory()->create();
+        $employee->positionHistories()->create([
+            'jabatan_id' => $jabatan->id,
+            'nama_jabatan' => 'Jabatan Berelasi',
+            'tmt_jabatan' => '2026-01-01',
+        ]);
+
+        try {
+            DB::transaction(function () use ($jabatan): void {
+                RefJabatan::query()->whereKey($jabatan->id)->delete();
+                self::fail('Basis data harus menolak penghapusan jabatan yang masih dirujuk riwayat.');
+            });
+        } catch (QueryException) {
+            // FK RESTRICT adalah lapisan terakhir saat penghapusan tidak melewati Action.
+        }
+
+        $this->assertDatabaseHas('ref_jabatan', ['id' => $jabatan->id]);
+        $this->assertDatabaseHas('position_histories', [
+            'employee_id' => $employee->id,
+            'jabatan_id' => $jabatan->id,
+        ]);
+    }
+
     public function test_mutasi_jabatan_menghapus_cache_dropdown(): void
     {
         // Cache menyimpan snapshot jabatan beserta jenisnya untuk dropdown penugasan,
@@ -196,6 +223,60 @@ class DataMasterJabatanTest extends TestCase
             ->assertRedirect();
 
         $this->assertNull(Cache::get('ref.jabatan_with_jenis'));
+    }
+
+    public function test_pembaruan_jabatan_menghapus_cache_dropdown(): void
+    {
+        $jabatan = RefJabatan::create(['nama' => 'Analis Kepegawaian']);
+        Cache::put('ref.jabatan_with_jenis', ['stale'], 3600);
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->postWithCsrf(route('data-master.jabatan.update', $jabatan), ['nama' => 'Analis SDM'])
+            ->assertRedirect();
+
+        $this->assertNull(Cache::get('ref.jabatan_with_jenis'));
+    }
+
+    public function test_toggle_jabatan_menghapus_cache_dropdown(): void
+    {
+        $jabatan = RefJabatan::create(['nama' => 'Analis Kepegawaian']);
+        Cache::put('ref.jabatan_with_jenis', ['stale'], 3600);
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->postWithCsrf(route('data-master.jabatan.toggle', $jabatan), [])
+            ->assertRedirect();
+
+        $this->assertNull(Cache::get('ref.jabatan_with_jenis'));
+    }
+
+    public function test_penghapusan_jabatan_menghapus_cache_dropdown(): void
+    {
+        $jabatan = RefJabatan::create(['nama' => 'Analis Kepegawaian']);
+        Cache::put('ref.jabatan_with_jenis', ['stale'], 3600);
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->postWithCsrf(route('data-master.jabatan.destroy', $jabatan), [])
+            ->assertRedirect();
+
+        $this->assertNull(Cache::get('ref.jabatan_with_jenis'));
+    }
+
+    public function test_tamu_tidak_boleh_memutasi_jabatan(): void
+    {
+        $jabatan = RefJabatan::create(['nama' => 'Analis Kepegawaian']);
+
+        $this->postWithCsrf(route('data-master.jabatan.store'), ['nama' => 'Jabatan Baru'])
+            ->assertRedirect(route('login'));
+        $this->postWithCsrf(route('data-master.jabatan.update', $jabatan), ['nama' => 'Diubah Paksa'])
+            ->assertRedirect(route('login'));
+        $this->postWithCsrf(route('data-master.jabatan.toggle', $jabatan), [])
+            ->assertRedirect(route('login'));
+        $this->postWithCsrf(route('data-master.jabatan.destroy', $jabatan), [])
+            ->assertRedirect(route('login'));
+
+        $this->assertSame(1, RefJabatan::query()->count());
+        $this->assertTrue($jabatan->refresh()->is_active);
+        $this->assertSame('Analis Kepegawaian', $jabatan->nama);
     }
 
     public function test_admin_kepegawaian_tidak_boleh_mengelola_jabatan(): void

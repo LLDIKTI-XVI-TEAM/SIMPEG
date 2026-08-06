@@ -64,9 +64,9 @@ final class ReferenceTableCatalog
             'cache_keys' => ['ref.jenis_jabatan', 'ref.jabatan_with_jenis'],
         ],
         RefJabatan::class => [
-            // FK position_histories.jabatan_id bersifat nullOnDelete: database tidak
-            // menolak penghapusan, melainkan mengosongkan jabatan pada riwayat pegawai
-            // diam-diam. Guard pemakaian di sini yang menjaga jejak jabatan tetap utuh.
+            // FK position_histories.jabatan_id memakai RESTRICT sebagai backstop
+            // basis data. Guard pemakaian tetap memberi pesan yang dapat ditindaklanjuti
+            // admin, sebelum penghapusan mencapai pelanggaran constraint.
             'usage' => [
                 ['table' => 'position_histories', 'column' => 'jabatan_id', 'label' => 'riwayat jabatan'],
             ],

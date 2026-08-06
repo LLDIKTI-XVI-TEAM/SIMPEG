@@ -18,17 +18,27 @@ class DeleteReferenceItemAction
 
     /**
      * Menghapus permanen item referensi yang belum pernah dipakai. Item yang
-     * masih dirujuk data lain ditolak di sini karena sebagian FK pemakai
-     * bersifat nullOnDelete: database tidak memblokir dan justru mengosongkan
-     * kolom riwayat diam-diam bila penghapusan diteruskan.
+     * masih dirujuk ditolak lebih dulu untuk memberi pesan yang dapat
+     * ditindaklanjuti admin; lapisan ini tetap diperlukan bagi FK legacy yang
+     * nullOnDelete maupun FK RESTRICT yang menjadi backstop jalur di luar Action.
      */
     public function execute(Model $item, Request $request): void
     {
         DB::transaction(function () use ($item, $request): void {
+            // Lock baris katalog sebelum memeriksa pemakaian. FK pemakai yang
+            // menyisip bersamaan membutuhkan key-share lock pada baris ini, jadi
+            // urutan ini menyerialkan pembuatan riwayat dengan penghapusan dan
+            // menyerialkan pembuatan riwayat dengan penghapusan dan memastikan
+            // pemeriksaan pemakaian melihat relasi yang sudah committed.
+            $lockedItem = $item->newQuery()
+                ->whereKey($item->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
             // Baris data sistem ditolak lebih dulu: cek pemakaian saja tidak
             // cukup karena baris bisa saja belum dirujuk data mana pun padahal
             // logika aplikasi mencarinya secara langsung berdasarkan kode.
-            $protectionReason = ReferenceTableCatalog::protectionReason($item);
+            $protectionReason = ReferenceTableCatalog::protectionReason($lockedItem);
 
             if ($protectionReason !== null) {
                 throw ValidationException::withMessages([
@@ -36,7 +46,7 @@ class DeleteReferenceItemAction
                 ]);
             }
 
-            $usageDetail = $this->usage->usageDetail($item);
+            $usageDetail = $this->usage->usageDetail($lockedItem);
 
             if ($usageDetail !== []) {
                 $usageSummary = collect($usageDetail)
@@ -51,11 +61,11 @@ class DeleteReferenceItemAction
                 ]);
             }
 
-            $snapshot = $item->toArray();
-            $item->delete();
+            $snapshot = $lockedItem->toArray();
+            $lockedItem->delete();
 
-            AuditService::logOrFail('DELETE', class_basename($item), $item->getKey(), $snapshot, null, $request);
-            ReferenceTableCatalog::forgetCachesAfterCommit($item::class);
+            AuditService::logOrFail('DELETE', class_basename($lockedItem), $lockedItem->getKey(), $snapshot, null, $request);
+            ReferenceTableCatalog::forgetCachesAfterCommit($lockedItem::class);
         });
     }
 }
