@@ -345,6 +345,55 @@ class DataMasterJabatanTest extends TestCase
         $this->assertDatabaseHas('ref_jabatan', ['id' => $jabatan->id, 'default_bup' => 60]);
     }
 
+    public function test_ubah_bup_memperingatkan_snapshot_pensiun_pemegang_jabatan(): void
+    {
+        $jabatan = RefJabatan::create(['nama' => 'Analis Berdampak', 'default_bup' => 58]);
+        $pegawaiDenganSnapshot = Employee::factory()->create(['tanggal_pensiun' => '2030-01-01']);
+        $pegawaiTanpaSnapshot = Employee::factory()->create(['tanggal_pensiun' => null]);
+
+        foreach ([$pegawaiDenganSnapshot, $pegawaiTanpaSnapshot] as $pegawai) {
+            $pegawai->positionHistories()->create([
+                'jabatan_id' => $jabatan->id,
+                'nama_jabatan' => 'Analis Berdampak',
+                'tmt_jabatan' => '2026-01-01',
+            ]);
+        }
+
+        // Hanya snapshot yang sudah terisi yang menjadi basi, sehingga peringatan menghitung
+        // pegawai itu saja dan tidak menjanjikan sinkronisasi yang tidak terjadi.
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->postWithCsrf(route('data-master.jabatan.update', $jabatan), [
+                'nama' => 'Analis Berdampak',
+                'default_bup' => 65,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', fn (string $pesan): bool => str_contains($pesan, 'berhasil diperbarui')
+                && str_contains($pesan, '1 pegawai'));
+
+        $this->assertDatabaseHas('employees', [
+            'id' => $pegawaiDenganSnapshot->id,
+            'tanggal_pensiun' => '2030-01-01',
+        ]);
+    }
+
+    public function test_ubah_jabatan_tanpa_mengubah_dasar_pensiun_tidak_memunculkan_peringatan(): void
+    {
+        $jabatan = RefJabatan::create(['nama' => 'Analis Tenang', 'default_bup' => 58]);
+        Employee::factory()->create(['tanggal_pensiun' => '2030-01-01'])
+            ->positionHistories()->create([
+                'jabatan_id' => $jabatan->id,
+                'nama_jabatan' => 'Analis Tenang',
+                'tmt_jabatan' => '2026-01-01',
+            ]);
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->postWithCsrf(route('data-master.jabatan.update', $jabatan), [
+                'nama' => 'Analis Tenang Sekali',
+                'default_bup' => 58,
+            ])
+            ->assertSessionHas('success', 'Jabatan berhasil diperbarui.');
+    }
+
     public function test_uuid_tidak_valid_menghasilkan_not_found(): void
     {
         $user = User::factory()->superAdmin()->create();

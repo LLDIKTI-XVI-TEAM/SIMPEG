@@ -27,9 +27,29 @@ class DataMasterJabatanController extends Controller
 
     public function update(UpdateJabatanRequest $request, RefJabatan $jabatan, UpdateReferenceItemAction $action): RedirectResponse
     {
-        $action->execute($jabatan, $request->validated(), $request);
+        $data = $request->validated();
 
-        return $this->backToTab($request, 'Jabatan berhasil diperbarui.');
+        // BUP dan jenis jabatan adalah dasar perhitungan tanggal pensiun, sedangkan tanggal
+        // pensiun pegawai tersimpan sebagai snapshot yang tidak dihitung ulang di sini.
+        // Sinkronisasi otomatis belum dapat dilakukan dengan aman karena tanggal hasil
+        // kalkulasi tidak dapat dibedakan dari tanggal manual atau hasil impor, sehingga
+        // konsekuensinya disampaikan terbuka kepada admin daripada dibiarkan senyap.
+        $dasarPensiunBerubah = $this->nilaiBerubah($jabatan->default_bup, $data['default_bup'] ?? null)
+            || $this->nilaiBerubah($jabatan->jenis_jabatan_id, $data['jenis_jabatan_id'] ?? null);
+
+        $pemegangDenganSnapshot = $dasarPensiunBerubah
+            ? $jabatan->jumlahPemegangDenganTanggalPensiunTersimpan()
+            : 0;
+
+        $action->execute($jabatan, $data, $request);
+
+        $pesan = 'Jabatan berhasil diperbarui.';
+
+        if ($pemegangDenganSnapshot > 0) {
+            $pesan .= ' Perhatian: '.$pemegangDenganSnapshot.' pegawai pemegang jabatan ini sudah punya tanggal pensiun tersimpan yang tidak ikut dihitung ulang, sehingga peringatan pensiun mereka masih memakai dasar lama dan perlu disesuaikan lewat data pegawai.';
+        }
+
+        return $this->backToTab($request, $pesan);
     }
 
     public function toggle(Request $request, RefJabatan $jabatan, ToggleReferenceItemActiveAction $action): RedirectResponse
@@ -46,5 +66,14 @@ class DataMasterJabatanController extends Controller
         $action->execute($jabatan, $request);
 
         return $this->backToTab($request, 'Jabatan berhasil dihapus.');
+    }
+
+    /**
+     * Membandingkan nilai lama dan baru secara longgar karena masukan formulir selalu berupa
+     * teks, sementara nilai tersimpan sudah bertipe integer atau null.
+     */
+    private function nilaiBerubah(mixed $lama, mixed $baru): bool
+    {
+        return (string) ($lama ?? '') !== (string) ($baru ?? '');
     }
 }

@@ -49,4 +49,20 @@ class RefJabatan extends Model
     {
         return $this->belongsTo(RefEselon::class, 'eselon_id');
     }
+
+    /**
+     * Menghitung pemegang jabatan ini yang sudah menyimpan tanggal pensiun.
+     *
+     * Tanggal pensiun pegawai adalah snapshot yang hanya diisi ketika masih kosong, karena
+     * tanggal manual maupun hasil impor dianggap data resmi dan tidak boleh tertimpa. Akibatnya
+     * mengubah dasar perhitungan pensiun pada jabatan tidak menyinkronkan snapshot yang sudah
+     * terisi, sehingga jumlah ini dipakai untuk memperingatkan admin secara terbuka.
+     */
+    public function jumlahPemegangDenganTanggalPensiunTersimpan(): int
+    {
+        return Employee::query()
+            ->whereNotNull('tanggal_pensiun')
+            ->whereHas('positionHistories', fn ($query) => $query->where('jabatan_id', $this->id))
+            ->count();
+    }
 }
