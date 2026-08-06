@@ -46,8 +46,12 @@ class ExportCutiExcelAction
         $details = $detailQuery->get();
         $employeeIds = $details->pluck('employee_id')->unique();
 
-        $balanceQuery = $this->rekapQuery->balanceRows($filters)
-            ->whereIn('leave_balances.employee_id', $employeeIds);
+        $balanceQuery = $this->rekapQuery->balanceRows($filters);
+        
+        if (empty($filters['pegawai'])) {
+            $balanceQuery->whereIn('leave_balances.employee_id', $employeeIds);
+        }
+        
         $balanceCount = (clone $balanceQuery)->count();
 
         if ($balanceCount > self::MAX_ROWS) {

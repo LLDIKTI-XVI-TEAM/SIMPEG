@@ -400,8 +400,6 @@ class CutiExcelExportTest extends TestCase
     {
         $user = User::factory()->superAdmin()->create();
         $pegawai = Employee::factory()->create();
-        $jenis = RefJenisCuti::create(['nama' => 'Test 5001']);
-        $this->createLeaveRequest($pegawai, $jenis, '2026-06-01');
         $now = now();
 
         foreach (array_chunk(range(1, 5001), 500) as $years) {
