@@ -29,15 +29,18 @@ class DataMasterJabatanController extends Controller
     {
         $data = $request->validated();
 
-        // BUP dan jenis jabatan adalah dasar perhitungan tanggal pensiun, sedangkan tanggal
-        // pensiun pegawai tersimpan sebagai snapshot yang tidak dihitung ulang di sini.
-        // Sinkronisasi otomatis belum dapat dilakukan dengan aman karena tanggal hasil
-        // kalkulasi tidak dapat dibedakan dari tanggal manual atau hasil impor, sehingga
-        // konsekuensinya disampaikan terbuka kepada admin daripada dibiarkan senyap.
-        $dasarPensiunBerubah = $this->nilaiBerubah($jabatan->default_bup, $data['default_bup'] ?? null)
-            || $this->nilaiBerubah($jabatan->jenis_jabatan_id, $data['jenis_jabatan_id'] ?? null);
+        // Hanya perubahan BUP yang mengubah dasar perhitungan pensiun pegawai yang sudah
+        // menjabat, karena kalkulator membaca default_bup langsung dari jabatan ini. Jenis
+        // jabatan tidak disertakan: nilai yang dipakai perhitungan adalah jenis yang tersalin
+        // pada riwayat jabatan saat penugasan dibuat, sehingga mengubahnya di sini tidak
+        // menggeser tanggal pensiun pegawai mana pun.
+        //
+        // Peringatan hanya menyasar pegawai yang tanggal pensiunnya sudah tersimpan, karena
+        // snapshot itulah yang menjadi basi. Pegawai tanpa snapshot dihitung ulang setiap kali
+        // dievaluasi sehingga otomatis mengikuti nilai baru.
+        $bupBerubah = $this->nilaiBerubah($jabatan->default_bup, $data['default_bup'] ?? null);
 
-        $pemegangDenganSnapshot = $dasarPensiunBerubah
+        $pemegangDenganSnapshot = $bupBerubah
             ? $jabatan->jumlahPemegangDenganTanggalPensiunTersimpan()
             : 0;
 

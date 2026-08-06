@@ -394,6 +394,35 @@ class DataMasterJabatanTest extends TestCase
             ->assertSessionHas('success', 'Jabatan berhasil diperbarui.');
     }
 
+    public function test_ubah_jenis_jabatan_tidak_memunculkan_peringatan_pensiun(): void
+    {
+        $jenisAwal = RefJenisJabatan::create(['nama' => 'Jenis Awal', 'maks_usia_pensiun' => 58]);
+        $jenisBaru = RefJenisJabatan::create(['nama' => 'Jenis Baru', 'maks_usia_pensiun' => 65]);
+        $jabatan = RefJabatan::create(['nama' => 'Analis Jenis', 'jenis_jabatan_id' => $jenisAwal->id]);
+        Employee::factory()->create(['tanggal_pensiun' => '2030-01-01'])
+            ->positionHistories()->create([
+                'jabatan_id' => $jabatan->id,
+                'jenis_jabatan_id' => $jenisAwal->id,
+                'nama_jabatan' => 'Analis Jenis',
+                'tmt_jabatan' => '2026-01-01',
+            ]);
+
+        // Perhitungan pensiun memakai jenis jabatan yang tersalin pada riwayat, bukan relasi
+        // terbaru pada master jabatan, sehingga perubahan di sini tidak menggeser tanggal
+        // pensiun siapa pun dan peringatan justru akan menyesatkan.
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->postWithCsrf(route('data-master.jabatan.update', $jabatan), [
+                'nama' => 'Analis Jenis',
+                'jenis_jabatan_id' => $jenisBaru->id,
+            ])
+            ->assertSessionHas('success', 'Jabatan berhasil diperbarui.');
+
+        $this->assertDatabaseHas('position_histories', [
+            'jabatan_id' => $jabatan->id,
+            'jenis_jabatan_id' => $jenisAwal->id,
+        ]);
+    }
+
     public function test_uuid_tidak_valid_menghasilkan_not_found(): void
     {
         $user = User::factory()->superAdmin()->create();
