@@ -34,14 +34,40 @@
                     ['label' => 'Daftar Nominatif Pegawai']
                 ]" />
             </div>
-            <div class="flex w-full flex-wrap items-center gap-3 sm:w-auto sm:justify-end">
+            <div class="flex w-full flex-wrap items-start gap-3 sm:w-auto sm:justify-end">
                 {{-- Cetak PDF --}}
-                <x-ui.button @click="printReport()" x-bind:disabled="previewLoading || previewError || pensiunError" variant="secondary">
-                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.617 0-1.11-.476-1.12-1.09l-.23-2.523M19.5 10.5v.375c0 .621-.504 1.125-1.125 1.125H5.625A1.125 1.125 0 0 1 4.5 11.25v-.375m15 0V9a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 9v1.5m15 0A1.5 1.5 0 0 0 18 9h-3V6a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3H6a1.5 1.5 0 0 0-1.5 1.5" />
-                    </svg>
-                    Cetak PDF
-                </x-ui.button>
+                <div class="flex min-w-0 flex-col items-stretch gap-1.5">
+                    <x-ui.button
+                        @click="printReport()"
+                        x-bind:disabled="!canPrintPreview"
+                        x-bind:aria-describedby="printStatusMessage ? 'print-status' : null"
+                        variant="secondary"
+                    >
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.617 0-1.11-.476-1.12-1.09l-.23-2.523M19.5 10.5v.375c0 .621-.504 1.125-1.125 1.125H5.625A1.125 1.125 0 0 1 4.5 11.25v-.375m15 0V9a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 18 9h-3V6a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3H6a1.5 1.5 0 0 0-1.5 1.5" />
+                        </svg>
+                        Cetak PDF
+                    </x-ui.button>
+                    <div
+                        id="print-status"
+                        x-cloak
+                        x-show="printStatusMessage"
+                        aria-live="polite"
+                        class="flex max-w-80 flex-wrap items-center justify-end gap-x-2 gap-y-1 text-right text-xs font-medium font-sans"
+                        :class="pensiunError || (previewError && !hasCurrentPreview) ? 'text-danger' : 'text-muted'"
+                    >
+                        <span x-text="printStatusMessage"></span>
+                        <button
+                            x-cloak
+                            x-show="previewError && !previewLoading"
+                            type="button"
+                            @click="retryPreview()"
+                            class="font-semibold text-primary underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-primary/20 rounded"
+                        >
+                            Muat ulang pratinjau
+                        </button>
+                    </div>
+                </div>
                 <x-ui.button type="submit" form="custom-export-form" x-bind:disabled="previewLoading" variant="secondary">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
@@ -509,6 +535,7 @@
             previewError: '',
             previewRequestId: 0,
             previewRefreshTimer: null,
+            lastSuccessfulPreviewParams: null,
             exportError: @js($errors->first('columns') ?: $errors->first('columns.0')),
             pensiunError: @js($errors->first('pensiun_dari') ?: $errors->first('pensiun_sampai')),
 
@@ -516,6 +543,10 @@
             // WATCHERS
             // =====================================================================
             init() {
+                // Halaman awal sudah dirender server dengan filter yang sama, sehingga
+                // pratinjau tersebut aman dicetak jika pembaruan latar belakang gagal.
+                this.lastSuccessfulPreviewParams = this.previewParams().toString();
+
                 [
                     'searchQuery', 'activeUnit', 'activeGolongan', 'activeJenis', 'activeStatus',
                     'activeJabatan', 'pensiunDari', 'pensiunSampai', 'sortBy', 'sortDir',
@@ -554,8 +585,17 @@
                 }
 
                 this.pensiunError = '';
+                this.previewError = '';
                 this.previewLoading = true;
                 this.previewRefreshTimer = window.setTimeout(() => this.refreshPreview(requestId), 350);
+            },
+
+            retryPreview() {
+                if (this.previewLoading) {
+                    return;
+                }
+
+                this.queuePreviewRefresh();
             },
 
             previewParams() {
@@ -611,6 +651,7 @@
 
                     this.allPegawai = payload?.pegawai ?? [];
                     const query = params.toString();
+                    this.lastSuccessfulPreviewParams = query;
                     window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
                 } catch (error) {
                     if (requestId === this.previewRequestId) {
@@ -632,6 +673,33 @@
             },
             get totalPages() {
                 return Math.ceil(this.exportRows.length / this.perPage) || 1;
+            },
+            get hasCurrentPreview() {
+                return this.lastSuccessfulPreviewParams === this.previewParams().toString();
+            },
+            get canPrintPreview() {
+                return !this.previewLoading
+                    && !this.pensiunError
+                    && (!this.previewError || this.hasCurrentPreview);
+            },
+            get printStatusMessage() {
+                if (this.previewLoading) {
+                    return 'Pratinjau sedang diperbarui. Tunggu sebentar sebelum mencetak.';
+                }
+
+                if (this.pensiunError) {
+                    return this.pensiunError;
+                }
+
+                if (this.previewError) {
+                    if (this.hasCurrentPreview) {
+                        return 'Pembaruan pratinjau gagal. Data yang ditampilkan sebelumnya tetap dapat dicetak.';
+                    }
+
+                    return 'Pratinjau gagal diperbarui. Cetak PDF sementara belum tersedia.';
+                }
+
+                return '';
             },
 
             // =====================================================================
@@ -687,10 +755,11 @@
             },
 
             printReport() {
-                if (this.previewLoading || this.previewError || this.pensiunError) {
+                if (!this.canPrintPreview) {
                     return;
                 }
 
+                document.title = 'Daftar Nominatif Pegawai — SIMPEG';
                 window.print();
             }
             }));
