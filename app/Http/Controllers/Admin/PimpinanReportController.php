@@ -89,6 +89,10 @@ class PimpinanReportController extends Controller
     public function exportFixedEmployeeReportExcel(ExportPegawaiRequest $request, ExportCustomPegawaiExcelAction $action)
     {
         $validated = $request->validated();
+        
+        // Samakan scope Excel nominatif pimpinan dengan pratinjau (hanya Aktif) jika tidak ditentukan
+        $validated['status'] ??= 'Aktif';
+        
         // Paksa hanya kolom aman PRD (NIP, Nama, Golongan, Jabatan, Unit Kerja, Jenis Pegawai)
         $validated['columns'] = ['nip', 'nama', 'golongan', 'jabatan', 'unit', 'jenis'];
 
