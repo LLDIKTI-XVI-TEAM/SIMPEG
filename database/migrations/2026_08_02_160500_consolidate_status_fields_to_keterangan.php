@@ -89,21 +89,23 @@ return new class extends Migration
             $table->text('status_deskripsi')->nullable()->after('status_alasan');
         });
 
-        // Pisahkan keterangan kembali (ambil sebelum " - " sebagai alasan, sisanya deskripsi)
-        DB::statement("
-            UPDATE employees
-            SET status_alasan = CASE
-                WHEN status_keterangan LIKE '% - %'
-                THEN SUBSTRING(status_keterangan, 1, POSITION(' - ' IN status_keterangan) - 1)
-                ELSE status_keterangan
-            END,
-            status_deskripsi = CASE
-                WHEN status_keterangan LIKE '% - %'
-                THEN SUBSTRING(status_keterangan, POSITION(' - ' IN status_keterangan) + 3)
-                ELSE NULL
-            END
-            WHERE status_keterangan IS NOT NULL
-        ");
+        if (DB::getDriverName() === 'pgsql') {
+            // Pisahkan keterangan kembali (ambil sebelum " - " sebagai alasan, sisanya deskripsi)
+            DB::statement("
+                UPDATE employees
+                SET status_alasan = CASE
+                    WHEN status_keterangan LIKE '% - %'
+                    THEN SUBSTRING(status_keterangan, 1, POSITION(' - ' IN status_keterangan) - 1)
+                    ELSE status_keterangan
+                END,
+                status_deskripsi = CASE
+                    WHEN status_keterangan LIKE '% - %'
+                    THEN SUBSTRING(status_keterangan, POSITION(' - ' IN status_keterangan) + 3)
+                    ELSE NULL
+                END
+                WHERE status_keterangan IS NOT NULL
+            ");
+        }
 
         Schema::table('employees', function (Blueprint $table) {
             $table->dropColumn('status_keterangan');
@@ -115,20 +117,22 @@ return new class extends Migration
             $table->text('deskripsi')->nullable()->after('alasan');
         });
 
-        DB::statement("
-            UPDATE employee_status_histories
-            SET alasan = CASE
-                WHEN keterangan LIKE '% - %'
-                THEN SUBSTRING(keterangan, 1, POSITION(' - ' IN keterangan) - 1)
-                ELSE keterangan
-            END,
-            deskripsi = CASE
-                WHEN keterangan LIKE '% - %'
-                THEN SUBSTRING(keterangan, POSITION(' - ' IN keterangan) + 3)
-                ELSE NULL
-            END
-            WHERE keterangan IS NOT NULL
-        ");
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement("
+                UPDATE employee_status_histories
+                SET alasan = CASE
+                    WHEN keterangan LIKE '% - %'
+                    THEN SUBSTRING(keterangan, 1, POSITION(' - ' IN keterangan) - 1)
+                    ELSE keterangan
+                END,
+                deskripsi = CASE
+                    WHEN keterangan LIKE '% - %'
+                    THEN SUBSTRING(keterangan, POSITION(' - ' IN keterangan) + 3)
+                    ELSE NULL
+                END
+                WHERE keterangan IS NOT NULL
+            ");
+        }
 
         Schema::table('employee_status_histories', function (Blueprint $table) {
             $table->dropColumn('keterangan');

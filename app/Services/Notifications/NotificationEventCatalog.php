@@ -81,6 +81,16 @@ final class NotificationEventCatalog
             'group' => 'EWS',
             'allowed_channels' => ['in_app'],
         ],
+        'import_pegawai' => [
+            'label' => 'Impor pegawai selesai',
+            'group' => 'Impor Pegawai',
+            'allowed_channels' => ['in_app'],
+        ],
+        'import_pegawai_gagal' => [
+            'label' => 'Impor pegawai gagal',
+            'group' => 'Impor Pegawai',
+            'allowed_channels' => ['in_app'],
+        ],
     ];
 
     /** @var list<string> */

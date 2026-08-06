@@ -208,6 +208,11 @@ class NotificationService
 
         return SimpegNotification::query()
             ->where('user_id', $employeeId)
+            // Notifikasi yang sudah dibaca lebih dari 5 menit lalu tidak lagi ditampilkan di lonceng header.
+            ->where(function ($query): void {
+                $query->where('is_read', false)
+                    ->orWhere('read_at', '>', now()->subMinutes(5));
+            })
             // Notifikasi belum dibaca tetap berada di atas, termasuk EWS yang sudah melewati targetnya.
             ->orderBy('is_read')
             ->orderByDesc('created_at')

@@ -80,7 +80,7 @@ class NotificationEventChannelMigrationTest extends TestCase
 
         $this->assertSame(['email', 'in_app'], $rolloverReturnPolicies->pluck('code')->sort()->values()->all());
         $this->assertTrue($rolloverReturnPolicies->every(fn (object $policy): bool => (bool) $policy->is_enabled));
-        $this->assertDatabaseCount('notification_event_channels', 31);
+        $this->assertDatabaseCount('notification_event_channels', 33);
 
         $orphanCount = DB::table('notification_event_channels')
             ->leftJoin('ref_notification_channels', 'ref_notification_channels.id', '=', 'notification_event_channels.notification_channel_id')

@@ -5,8 +5,8 @@ namespace App\Jobs;
 use App\Actions\Employees\ExecuteImportBatchAction;
 use App\Actions\Employees\UploadImportBatchAction;
 use App\Models\ImportBatch;
-use App\Models\SimpegNotification;
 use App\Models\User;
+use App\Services\NotificationService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -31,31 +31,31 @@ class ImportEmployeeBatchJob implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(ExecuteImportBatchAction $action): void
+    public function handle(ExecuteImportBatchAction $action, NotificationService $notificationService): void
     {
         $user = $this->userId ? User::find($this->userId) : null;
         $result = $action->execute($this->batchId, $user, $this->ipAddress, $this->userAgent);
 
-        // Kirim notifikasi in-app jika user memiliki employee record
-        $employeeId = $user?->employee_id;
-        if ($employeeId) {
+        // Kirim notifikasi in-app melalui NotificationService jika user memiliki employee record
+        $employee = $user?->employee;
+        if ($employee) {
             $inserted = $result['inserted'] ?? 0;
             $skipped = $result['skipped'] ?? 0;
             $failed = $result['failed'] ?? 0;
 
-            SimpegNotification::create([
-                'user_id' => $employeeId,
-                'type' => 'import_pegawai',
-                'title' => 'Import Pegawai Selesai',
-                'body' => "Import selesai: {$inserted} berhasil ditambahkan, {$skipped} di-skip (duplikat), {$failed} gagal.",
-                'data' => [
+            $notificationService->createForEmployee(
+                $employee,
+                'import_pegawai',
+                'Import Pegawai Selesai',
+                "Import selesai: {$inserted} berhasil ditambahkan, {$skipped} di-skip (duplikat), {$failed} gagal.",
+                [
                     'inserted' => $inserted,
                     'skipped' => $skipped,
                     'failed' => $failed,
                     'batch_id' => $this->batchId,
-                ],
-                'is_read' => false,
-            ]);
+                    'url' => route('data-pegawai'),
+                ]
+            );
         }
     }
 
@@ -79,18 +79,21 @@ class ImportEmployeeBatchJob implements ShouldQueue
             Cache::put(UploadImportBatchAction::CACHE_PREFIX.$this->batchId, $batch, now()->addMinutes(10));
         }
 
-        // Kirim notifikasi error in-app
+        // Kirim notifikasi error in-app via NotificationService
         $user = $this->userId ? User::find($this->userId) : null;
-        $employeeId = $user?->employee_id;
-        if ($employeeId) {
-            SimpegNotification::create([
-                'user_id' => $employeeId,
-                'type' => 'import_pegawai_gagal',
-                'title' => 'Import Pegawai Gagal',
-                'body' => 'Proses import pegawai gagal: '.$exception->getMessage(),
-                'data' => ['batch_id' => $this->batchId],
-                'is_read' => false,
-            ]);
+        $employee = $user?->employee;
+        if ($employee) {
+            $notificationService = app(NotificationService::class);
+            $notificationService->createForEmployee(
+                $employee,
+                'import_pegawai_gagal',
+                'Import Pegawai Gagal',
+                'Proses import pegawai gagal: '.$exception->getMessage(),
+                [
+                    'batch_id' => $this->batchId,
+                    'url' => route('pegawai.import'),
+                ]
+            );
         }
     }
 }

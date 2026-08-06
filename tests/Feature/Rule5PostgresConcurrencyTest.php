@@ -10,7 +10,7 @@ use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisPegawai;
 use Database\Seeders\ReferenceSeeder;
-use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -19,13 +19,18 @@ use Tests\TestCase;
 
 class Rule5PostgresConcurrencyTest extends TestCase
 {
-    use DatabaseMigrations;
+    use RefreshDatabase;
 
     private ?string $raceDirectory = null;
 
     protected function setUp(): void
     {
         parent::setUp();
+
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Race Rule 5 wajib dijalankan pada PostgreSQL.');
+        }
+
         $this->seed(ReferenceSeeder::class);
     }
 
