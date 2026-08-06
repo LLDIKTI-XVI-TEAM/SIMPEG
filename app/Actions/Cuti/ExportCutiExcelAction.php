@@ -10,6 +10,9 @@ use Illuminate\Http\RedirectResponse;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Shared\Date;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\Response;
@@ -40,7 +43,11 @@ class ExportCutiExcelAction
             );
         }
 
-        $balanceQuery = $this->rekapQuery->balanceRows($filters);
+        $details = $detailQuery->get();
+        $employeeIds = $details->pluck('employee_id')->unique();
+
+        $balanceQuery = $this->rekapQuery->balanceRows($filters)
+            ->whereIn('leave_balances.employee_id', $employeeIds);
         $balanceCount = (clone $balanceQuery)->count();
 
         if ($balanceCount > self::MAX_ROWS) {
@@ -50,7 +57,6 @@ class ExportCutiExcelAction
             );
         }
 
-        $details = $detailQuery->get();
         $balances = $balanceQuery->get();
         $spreadsheet = new Spreadsheet;
         $detailSheet = $spreadsheet->getActiveSheet();
@@ -106,6 +112,8 @@ class ExportCutiExcelAction
             $sheet->setCellValue('H'.$row, $leaveRequest->jumlah_hari_kerja);
             $this->setSafeText($sheet, 'I'.$row, $this->statusFormatter->format($leaveRequest));
         }
+
+        $this->applyTableStyles($sheet, 'I', empty($rows) ? 1 : (is_array($rows) || $rows instanceof \Countable ? count($rows) + 1 : 1000));
     }
 
     /**
@@ -139,6 +147,8 @@ class ExportCutiExcelAction
                 is_int($summary['sisa_saldo']) ? DataType::TYPE_NUMERIC : DataType::TYPE_STRING,
             );
         }
+
+        $this->applyTableStyles($sheet, 'F', empty($rows) ? 1 : (is_array($rows) || $rows instanceof \Countable ? count($rows) + 1 : 1000));
     }
 
     /** @param iterable<int, LeaveBalance> $rows */
@@ -162,6 +172,8 @@ class ExportCutiExcelAction
             $sheet->setCellValue('H'.$row, $balance->sisa);
             $sheet->setCellValue('I'.$row, $balance->hangus);
         }
+
+        $this->applyTableStyles($sheet, 'I', empty($rows) ? 1 : (is_array($rows) || $rows instanceof \Countable ? count($rows) + 1 : 1000));
     }
 
     /**
@@ -175,5 +187,35 @@ class ExportCutiExcelAction
     private function setSafeText(Worksheet $sheet, string $cell, string $value): void
     {
         $sheet->setCellValueExplicit($cell, $this->safeText($value), DataType::TYPE_STRING);
+    }
+
+    private function applyTableStyles(Worksheet $sheet, string $lastColumn, int $lastRow): void
+    {
+        $sheet->getStyle('A1:'.$lastColumn.'1')->applyFromArray([
+            'font' => ['bold' => true],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['argb' => 'FFDBEAFE'],
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+                'vertical' => Alignment::VERTICAL_CENTER,
+            ],
+        ]);
+
+        if ($lastRow >= 1) {
+            $sheet->getStyle('A1:'.$lastColumn.$lastRow)->applyFromArray([
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => Border::BORDER_THIN,
+                        'color' => ['argb' => 'FF9CA3AF'],
+                    ],
+                ],
+            ]);
+        }
+
+        foreach (range('A', $lastColumn) as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
     }
 }

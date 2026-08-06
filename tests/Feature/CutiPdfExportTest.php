@@ -107,24 +107,22 @@ class CutiPdfExportTest extends TestCase
         ])->render();
 
         foreach ([
-            'LEMBAGA LAYANAN PENDIDIKAN TINGGI WILAYAH XVI',
+            'Lembaga Layanan Pendidikan Tinggi (LLDIKTI) Wilayah XVI',
             'Rekap Cuti Pegawai',
             'Periode: 2026-06',
-            '<th>No</th>',
-            '<th>NIP</th>',
-            '<th>Nama Pegawai</th>',
-            '<th>Jenis Cuti</th>',
-            '<th>Mulai</th>',
-            '<th>Selesai</th>',
-            'Hari Kerja',
-            '<th>Status</th>',
+            '>No</th>',
+            '>NIP</th>',
+            '>Nama Pegawai</th>',
+            '>Jenis Cuti</th>',
             'Pembuat Laporan',
             'Mengetahui',
             'Dokumen dibuat pada',
         ] as $expected) {
             $this->assertStringContainsString($expected, $html);
         }
-        $this->assertStringNotContainsString('<img', $html);
+        $this->assertStringContainsString('<img', $html); // Logo LLDIKTI
+        $this->assertStringNotContainsString('<th>Mulai</th>', $html); // Detail pengajuan dihapus
+        $this->assertStringNotContainsString('<th>Selesai</th>', $html);
         $this->assertStringNotContainsString('http://', $html);
         $this->assertStringNotContainsString('https://', $html);
     }
