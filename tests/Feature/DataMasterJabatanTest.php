@@ -269,6 +269,80 @@ class DataMasterJabatanTest extends TestCase
         ]);
     }
 
+    public function test_pembuatan_pegawai_menolak_jabatan_nonaktif(): void
+    {
+        // Jalur formulir pegawai juga menulis riwayat jabatan, sehingga penolakan harus sama
+        // dengan endpoint riwayat agar jabatan nonaktif tidak masuk lewat pintu lain.
+        $jabatanNonaktif = RefJabatan::create(['nama' => 'Jabatan Dibekukan', 'is_active' => false]);
+        $user = User::factory()->superAdmin()->create();
+
+        $this->actingAs($user)
+            ->postWithCsrf(route('pegawai.store'), ['jabatan_jabatan_id' => $jabatanNonaktif->id])
+            ->assertSessionHasErrors('jabatan_jabatan_id');
+    }
+
+    public function test_pembaruan_pegawai_boleh_mempertahankan_jabatan_nonaktif_yang_sudah_tercatat(): void
+    {
+        $jabatanNonaktif = RefJabatan::create(['nama' => 'Jabatan Dibekukan', 'is_active' => false]);
+        $employee = Employee::factory()->create();
+        $employee->positionHistories()->create([
+            'jabatan_id' => $jabatanNonaktif->id,
+            'nama_jabatan' => 'Jabatan Dibekukan',
+            'tmt_jabatan' => '2026-01-01',
+        ]);
+        $user = User::factory()->superAdmin()->create();
+
+        // Penugasan yang sudah tercatat tetap boleh dipertahankan agar admin dapat mengoreksi
+        // metadata lain tanpa dipaksa mengganti jabatan pegawai.
+        $this->actingAs($user)
+            ->postWithCsrf(route('pegawai.update', $employee->id), ['jabatan_jabatan_id' => $jabatanNonaktif->id])
+            ->assertSessionDoesntHaveErrors('jabatan_jabatan_id');
+    }
+
+    public function test_jenis_jabatan_dan_eselon_nonaktif_ditolak_saat_membuat_jabatan(): void
+    {
+        $jenisNonaktif = RefJenisJabatan::create(['nama' => 'Jenis Dibekukan', 'maks_usia_pensiun' => 58, 'is_active' => false]);
+        $eselonNonaktif = RefEselon::create(['kode' => 'V.z', 'nama' => 'Eselon Dibekukan', 'is_active' => false]);
+        $user = User::factory()->superAdmin()->create();
+
+        // Jenis jabatan menjadi sumber cadangan batas usia pensiun, sehingga jabatan baru tidak
+        // boleh menautkan referensi yang sudah dinonaktifkan meski formulir menyembunyikannya.
+        $this->actingAs($user)
+            ->postWithCsrf(route('data-master.jabatan.store'), [
+                'nama' => 'Jabatan Relasi Nonaktif',
+                'jenis_jabatan_id' => $jenisNonaktif->id,
+            ])
+            ->assertSessionHasErrors('jenis_jabatan_id');
+
+        $this->actingAs($user)
+            ->postWithCsrf(route('data-master.jabatan.store'), [
+                'nama' => 'Jabatan Eselon Nonaktif',
+                'eselon_id' => $eselonNonaktif->id,
+            ])
+            ->assertSessionHasErrors('eselon_id');
+
+        $this->assertSame(0, RefJabatan::query()->count());
+    }
+
+    public function test_ubah_jabatan_boleh_mempertahankan_jenis_jabatan_nonaktif_yang_sudah_terpasang(): void
+    {
+        $jenisNonaktif = RefJenisJabatan::create(['nama' => 'Jenis Dibekukan', 'maks_usia_pensiun' => 58, 'is_active' => false]);
+        $jabatan = RefJabatan::create(['nama' => 'Analis Warisan', 'jenis_jabatan_id' => $jenisNonaktif->id]);
+        $user = User::factory()->superAdmin()->create();
+
+        // Admin harus tetap dapat mengoreksi kolom lain tanpa dipaksa mengganti relasi lama.
+        $this->actingAs($user)
+            ->postWithCsrf(route('data-master.jabatan.update', $jabatan), [
+                'nama' => 'Analis Warisan',
+                'jenis_jabatan_id' => $jenisNonaktif->id,
+                'default_bup' => 60,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('ref_jabatan', ['id' => $jabatan->id, 'default_bup' => 60]);
+    }
+
     public function test_uuid_tidak_valid_menghasilkan_not_found(): void
     {
         $user = User::factory()->superAdmin()->create();

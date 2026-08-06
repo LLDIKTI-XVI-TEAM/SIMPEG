@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Referensi;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreJabatanRequest extends FormRequest
 {
@@ -25,8 +26,11 @@ class StoreJabatanRequest extends FormRequest
     {
         return [
             'nama' => 'required|string|max:255|unique:ref_jabatan,nama',
-            'jenis_jabatan_id' => 'nullable|uuid|exists:ref_jenis_jabatan,id',
-            'eselon_id' => 'nullable|uuid|exists:ref_eselon,id',
+            // Jabatan baru tidak boleh menunjuk referensi yang sudah dinonaktifkan, karena
+            // jenis jabatan juga menjadi sumber cadangan batas usia pensiun bagi jabatan
+            // yang tidak punya nilai sendiri.
+            'jenis_jabatan_id' => ['nullable', 'uuid', Rule::exists('ref_jenis_jabatan', 'id')->where('is_active', true)],
+            'eselon_id' => ['nullable', 'uuid', Rule::exists('ref_eselon', 'id')->where('is_active', true)],
             'default_bup' => 'nullable|integer|min:50|max:70',
             'keterangan' => 'nullable|string|max:255',
         ];
