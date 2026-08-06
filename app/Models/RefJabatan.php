@@ -51,18 +51,32 @@ class RefJabatan extends Model
     }
 
     /**
-     * Menghitung pemegang jabatan ini yang sudah menyimpan tanggal pensiun.
+     * Menghitung pegawai yang penugasan terkininya memakai jabatan ini dan tanggal pensiunnya
+     * sudah tersimpan.
      *
      * Tanggal pensiun pegawai adalah snapshot yang hanya diisi ketika masih kosong, karena
      * tanggal manual maupun hasil impor dianggap data resmi dan tidak boleh tertimpa. Akibatnya
      * mengubah dasar perhitungan pensiun pada jabatan tidak menyinkronkan snapshot yang sudah
      * terisi, sehingga jumlah ini dipakai untuk memperingatkan admin secara terbuka.
+     *
+     * Urutan penentuan riwayat terkini sengaja disalin dari kalkulator TMT dan mesin EWS, sebab
+     * hanya penugasan terkini yang menjadi dasar perhitungan. Pegawai yang pernah memegang
+     * jabatan ini tetapi sudah berpindah tidak terpengaruh dan tidak boleh ikut dihitung.
      */
     public function jumlahPemegangDenganTanggalPensiunTersimpan(): int
     {
         return Employee::query()
             ->whereNotNull('tanggal_pensiun')
-            ->whereHas('positionHistories', fn ($query) => $query->where('jabatan_id', $this->id))
+            ->where(function ($query): void {
+                $query->select('jabatan_id')
+                    ->from('position_histories')
+                    ->whereColumn('position_histories.employee_id', 'employees.id')
+                    ->whereNotNull('tmt_jabatan')
+                    ->orderByDesc('tmt_jabatan')
+                    ->orderByDesc('created_at')
+                    ->orderByDesc('id')
+                    ->limit(1);
+            }, $this->id)
             ->count();
     }
 }

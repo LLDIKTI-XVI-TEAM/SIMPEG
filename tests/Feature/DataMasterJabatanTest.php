@@ -370,10 +370,9 @@ class DataMasterJabatanTest extends TestCase
             ->assertSessionHas('success', fn (string $pesan): bool => str_contains($pesan, 'berhasil diperbarui')
                 && str_contains($pesan, '1 pegawai'));
 
-        $this->assertDatabaseHas('employees', [
-            'id' => $pegawaiDenganSnapshot->id,
-            'tanggal_pensiun' => '2030-01-01',
-        ]);
+        // Dibaca lewat model agar perbandingan tidak bergantung pada format penyimpanan tanggal
+        // yang berbeda antara PostgreSQL dan SQLite.
+        $this->assertSame('2030-01-01', $pegawaiDenganSnapshot->fresh()?->tanggal_pensiun?->format('Y-m-d'));
     }
 
     public function test_ubah_jabatan_tanpa_mengubah_dasar_pensiun_tidak_memunculkan_peringatan(): void
@@ -421,6 +420,40 @@ class DataMasterJabatanTest extends TestCase
             'jabatan_id' => $jabatan->id,
             'jenis_jabatan_id' => $jenisAwal->id,
         ]);
+    }
+
+    public function test_peringatan_pensiun_tidak_menghitung_pegawai_yang_sudah_berpindah_jabatan(): void
+    {
+        $jabatan = RefJabatan::create(['nama' => 'Analis Lama', 'default_bup' => 58]);
+        $jabatanLain = RefJabatan::create(['nama' => 'Analis Baru', 'default_bup' => 60]);
+
+        $pemegangSekarang = Employee::factory()->create(['tanggal_pensiun' => '2030-01-01']);
+        $pemegangSekarang->positionHistories()->create([
+            'jabatan_id' => $jabatan->id,
+            'nama_jabatan' => 'Analis Lama',
+            'tmt_jabatan' => '2026-01-01',
+        ]);
+
+        $sudahBerpindah = Employee::factory()->create(['tanggal_pensiun' => '2031-01-01']);
+        $sudahBerpindah->positionHistories()->create([
+            'jabatan_id' => $jabatan->id,
+            'nama_jabatan' => 'Analis Lama',
+            'tmt_jabatan' => '2024-01-01',
+        ]);
+        $sudahBerpindah->positionHistories()->create([
+            'jabatan_id' => $jabatanLain->id,
+            'nama_jabatan' => 'Analis Baru',
+            'tmt_jabatan' => '2026-06-01',
+        ]);
+
+        // Perhitungan pensiun hanya memakai penugasan terkini, sehingga pegawai yang sudah
+        // berpindah tidak terpengaruh dan tidak boleh muncul pada jumlah terdampak.
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->postWithCsrf(route('data-master.jabatan.update', $jabatan), [
+                'nama' => 'Analis Lama',
+                'default_bup' => 65,
+            ])
+            ->assertSessionHas('success', fn (string $pesan): bool => str_contains($pesan, '1 pegawai'));
     }
 
     public function test_uuid_tidak_valid_menghasilkan_not_found(): void
