@@ -39,6 +39,7 @@ class DataMasterPageTest extends TestCase
         RefJenisJabatan::create(['nama' => 'Fungsional Kekhususan', 'maks_usia_pensiun' => 60]);
         RefEselon::create(['kode' => 'IV.a', 'nama' => 'Eselon Uji IV.a']);
         RefJenjangPendidikan::create(['nama' => 'S3 Terapan Uji', 'urutan' => 10]);
+        RefJabatan::create(['nama' => 'Analis Kepegawaian Uji', 'default_bup' => 60]);
         $user = User::factory()->superAdmin()->create();
 
         $response = $this->actingAs($user)->get(route('data-master'));
@@ -49,7 +50,8 @@ class DataMasterPageTest extends TestCase
             ->assertSee('Eselon Uji IV.a')
             ->assertSee('S3 Terapan Uji')
             ->assertSee('Jabatan')
-            ->assertSee('Data jabatan belum dimuat oleh backend.')
+            ->assertSee('Analis Kepegawaian Uji')
+            ->assertSee('60 tahun')
             // Baris status pegawai bawaan migration ikut tampil, lengkap
             // dengan penanda baris yang dikunci logika sistem.
             ->assertSee('PERPANJANGAN_CLTN')
@@ -94,6 +96,11 @@ class DataMasterPageTest extends TestCase
             'is_active' => false,
             'keterangan' => 'Referensi uji untuk tab Jabatan.',
         ]);
+
+        // Form CRUD kini ikut dirender karena route-nya sudah tersedia, dan komponen input
+        // di dalamnya membaca error bag yang pada permintaan nyata selalu dibagikan
+        // middleware web. Pembagian di sini menirukan kondisi itu untuk render terisolasi.
+        $this->withViewErrors([]);
 
         $html = view('admin.data-master.partials.tab-jabatan', [
             'jabatan' => collect([$jabatan]),
