@@ -55,22 +55,10 @@ class UpdateEmployeeRequest extends FormRequest
             $rules['file_sk_pangkat'] = ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png'];
 
             // Jabatan (Position)
-            // Penugasan baru wajib memakai jabatan aktif. Jabatan pada riwayat terakhir tetap
-            // diizinkan agar admin dapat mengoreksi metadata penugasan yang sudah tercatat
-            // meskipun jabatannya kemudian dinonaktifkan.
-            $jabatanTerakhir = $employee->positionHistories()
-                ->whereNotNull('jabatan_id')
-                ->latest('tmt_jabatan')
-                ->value('jabatan_id');
-
-            $rules['jabatan_jabatan_id'] = ['nullable', 'uuid', Rule::exists('ref_jabatan', 'id')
-                ->where(function ($query) use ($jabatanTerakhir): void {
-                    $query->where('is_active', true);
-
-                    if ($jabatanTerakhir !== null) {
-                        $query->orWhere('id', $jabatanTerakhir);
-                    }
-                })];
+            // Blok jabatan pada formulir ini selalu menambah riwayat penugasan baru, bukan
+            // mengoreksi riwayat lama, sehingga jabatan nonaktif harus ditolak tanpa
+            // pengecualian sama seperti pada pembuatan pegawai.
+            $rules['jabatan_jabatan_id'] = ['nullable', 'uuid', Rule::exists('ref_jabatan', 'id')->where('is_active', true)];
             $rules['jabatan_nama_jabatan'] = ['nullable', 'string', 'max:255'];
             $rules['jabatan_jenis_jabatan_id'] = ['nullable', 'uuid', 'exists:ref_jenis_jabatan,id'];
             $rules['jabatan_eselon_id'] = ['nullable', 'uuid', 'exists:ref_eselon,id'];

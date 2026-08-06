@@ -281,7 +281,7 @@ class DataMasterJabatanTest extends TestCase
             ->assertSessionHasErrors('jabatan_jabatan_id');
     }
 
-    public function test_pembaruan_pegawai_boleh_mempertahankan_jabatan_nonaktif_yang_sudah_tercatat(): void
+    public function test_pembaruan_pegawai_menolak_jabatan_nonaktif_meski_sama_dengan_riwayat_terakhir(): void
     {
         $jabatanNonaktif = RefJabatan::create(['nama' => 'Jabatan Dibekukan', 'is_active' => false]);
         $employee = Employee::factory()->create();
@@ -292,11 +292,13 @@ class DataMasterJabatanTest extends TestCase
         ]);
         $user = User::factory()->superAdmin()->create();
 
-        // Penugasan yang sudah tercatat tetap boleh dipertahankan agar admin dapat mengoreksi
-        // metadata lain tanpa dipaksa mengganti jabatan pegawai.
+        // Blok jabatan pada formulir pembaruan bersifat append-only, sehingga mengirim jabatan
+        // yang sama dengan riwayat terakhir tetap berarti membuat penugasan baru.
         $this->actingAs($user)
             ->postWithCsrf(route('pegawai.update', $employee->id), ['jabatan_jabatan_id' => $jabatanNonaktif->id])
-            ->assertSessionDoesntHaveErrors('jabatan_jabatan_id');
+            ->assertSessionHasErrors('jabatan_jabatan_id');
+
+        $this->assertSame(1, $employee->positionHistories()->count());
     }
 
     public function test_jenis_jabatan_dan_eselon_nonaktif_ditolak_saat_membuat_jabatan(): void
