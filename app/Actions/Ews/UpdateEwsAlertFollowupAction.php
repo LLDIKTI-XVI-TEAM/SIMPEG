@@ -80,16 +80,41 @@ class UpdateEwsAlertFollowupAction
         $alert->refresh();
         AuditService::log('UPDATE', 'EwsAlert', $alert->id, $before, $this->alertSnapshot($alert), $request);
 
-        if ($followupStatus === EwsAlert::FOLLOWUP_STATUS_NOT_NEEDED && $employee instanceof Employee) {
+        if ($employee instanceof Employee) {
+            $typeLabel = EwsAlert::typeLabels()[$alert->type] ?? $alert->type;
+
+            if ($followupStatus === EwsAlert::FOLLOWUP_STATUS_HANDLED) {
+                $notificationType = match ($alert->type) {
+                    'KENAIKAN_PANGKAT' => 'ews.kenaikan_pangkat',
+                    'KGB' => 'ews.kgb',
+                    'PENSIUN' => 'ews.pensiun',
+                    'KONTRAK_PPPK' => 'ews.kontrak_pppk',
+                    'SATYALANCANA' => 'ews.satyalancana',
+                    default => 'ews.'.strtolower($alert->type),
+                };
+                $title = 'Tindak Lanjut EWS: Disetujui';
+                $body = trim($handledNote) !== ''
+                    ? $handledNote
+                    : "Tindak lanjut EWS {$typeLabel} Anda telah disetujui / ditangani oleh Admin.";
+            } else {
+                $notificationType = 'ews.tidak_perlu';
+                $title = 'Tindak Lanjut EWS: Tidak Perlu';
+                $body = trim($handledNote) !== ''
+                    ? $handledNote
+                    : "Tindak lanjut EWS {$typeLabel} Anda telah ditandai tidak perlu oleh Admin.";
+            }
+
             $this->notifications->createForEmployee(
                 $employee,
-                'ews.tidak_perlu',
-                'Tindak Lanjut EWS: Tidak Perlu',
-                $handledNote,
+                $notificationType,
+                $title,
+                $body,
                 [
                     'ews_alert_id' => $alert->id,
-                    'followup_status' => EwsAlert::FOLLOWUP_STATUS_NOT_NEEDED,
+                    'followup_status' => $followupStatus,
                     'event_type' => $alert->type,
+                    'handled_note' => $handledNote,
+                    'url' => route('ews.saya'),
                 ],
             );
         }
