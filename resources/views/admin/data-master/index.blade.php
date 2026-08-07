@@ -4,6 +4,7 @@
         $tabs = [
             'golongan' => 'Golongan',
             'jenis_jabatan' => 'Jenis Jabatan',
+            'jabatan' => 'Jabatan',
             'eselon' => 'Eselon',
             'status_pegawai' => 'Status Pegawai',
             'jenis_cuti' => 'Jenis Cuti',
@@ -146,6 +147,9 @@
 
             {{-- TAB: JENIS JABATAN --}}
             @include('admin.data-master.partials.tab-jenis-jabatan')
+
+            {{-- TAB: JABATAN --}}
+            @include('admin.data-master.partials.tab-jabatan')
 
             {{-- TAB: ESELON --}}
             @include('admin.data-master.partials.tab-eselon')

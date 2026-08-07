@@ -4,6 +4,7 @@ namespace App\Http\Requests\History;
 
 use App\Support\SkFilePathRules;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StorePositionHistoryRequest extends FormRequest
 {
@@ -24,7 +25,10 @@ class StorePositionHistoryRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'jabatan_id' => ['required', 'uuid', 'exists:ref_jabatan,id'],
+            // Jabatan yang sudah dinonaktifkan tidak boleh dipakai pada riwayat baru,
+            // sementara riwayat lama yang menunjuknya tetap tampil utuh. Penolakan
+            // ditegakkan di sini karena penyaringan dropdown di tampilan tidak mengikat.
+            'jabatan_id' => ['required', 'uuid', Rule::exists('ref_jabatan', 'id')->where('is_active', true)],
             'nama_jabatan' => ['nullable', 'string', 'max:255'],
             'jenis_jabatan_id' => ['nullable', 'uuid', 'exists:ref_jenis_jabatan,id'],
             'eselon_id' => ['nullable', 'uuid', 'exists:ref_eselon,id'],

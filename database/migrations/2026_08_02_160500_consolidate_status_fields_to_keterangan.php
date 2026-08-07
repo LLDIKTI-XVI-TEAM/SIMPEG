@@ -79,7 +79,7 @@ return new class extends Migration
     }
 
     /**
-     * Rollback: pisahkan kembali keterangan menjadi alasan dan deskripsi
+     * Rollback: pisahkan kembali keterangan menjadi alasan dan deskripsi.
      */
     public function down(): void
     {
