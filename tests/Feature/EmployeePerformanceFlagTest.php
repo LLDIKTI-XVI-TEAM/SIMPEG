@@ -39,6 +39,18 @@ class EmployeePerformanceFlagTest extends TestCase
         $this->assertFalse($employee->refresh()->is_kinerja_baik);
     }
 
+    public function test_employee_detail_explains_that_performance_flag_is_temporary(): void
+    {
+        // Teks penjelasan harus menyatakan bahwa flag ini pengganti sementara penilaian SKP,
+        // supaya admin tidak menganggapnya penilaian kinerja yang permanen.
+        $employee = Employee::factory()->create();
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSee('Flag ini menggantikan penilaian SKP yang belum tersedia di Fase 1. Akan digantikan oleh modul Penilaian Kinerja di fase selanjutnya.');
+    }
+
     public function test_admin_kepegawaian_can_update_performance_flag(): void
     {
         $employee = Employee::factory()->create(['is_kinerja_baik' => false]);
