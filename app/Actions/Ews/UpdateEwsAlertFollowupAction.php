@@ -114,7 +114,7 @@ class UpdateEwsAlertFollowupAction
                     'followup_status' => $followupStatus,
                     'event_type' => $alert->type,
                     'handled_note' => $handledNote,
-                    'url' => route('ews.saya'),
+                    'url' => route('notifications.index'),
                 ],
             );
         }
