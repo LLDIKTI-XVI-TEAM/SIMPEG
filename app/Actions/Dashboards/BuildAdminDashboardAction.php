@@ -7,10 +7,14 @@ use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\RankHistory;
+use App\Queries\Dashboards\EmployeeTrendQuery;
 
 class BuildAdminDashboardAction
 {
-    public function __construct(private readonly ListActiveEwsAlertsAction $ewsAlerts) {}
+    public function __construct(
+        private readonly ListActiveEwsAlertsAction $ewsAlerts,
+        private readonly EmployeeTrendQuery $trenPegawai,
+    ) {}
 
     /**
      * Menyusun seluruh data dashboard Admin: 7 widget real sesuai kontrak K-3.
@@ -64,22 +68,7 @@ class BuildAdminDashboardAction
                 ];
             });
 
-        $trenPegawai = collect(range(11, 0))
-            ->map(function (int $offset) use ($now): array {
-                $targetDate = $now->copy()->subMonths($offset)->endOfMonth();
-
-                return [
-                    'label' => $now->copy()->subMonths($offset)->translatedFormat('M Y'),
-                    'jumlah' => Employee::query()
-                        ->where('status_aktif', 'Aktif')
-                        ->whereDate('created_at', '<=', $targetDate)
-                        ->where(function ($q) use ($targetDate): void {
-                            $q->whereNull('tanggal_pensiun')
-                                ->orWhereDate('tanggal_pensiun', '>', $targetDate);
-                        })
-                        ->count(),
-                ];
-            });
+        $trenPegawai = collect($this->trenPegawai->monthlyActiveCounts($now));
 
         $distribusiGolongan = $employees
             ->map(fn (Employee $employee): string => (string) $employee->golongan_terakhir ?: 'Belum Diisi')
