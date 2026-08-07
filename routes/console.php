@@ -19,7 +19,7 @@ Schedule::command('cuti:rollover')
     ->yearlyOn(1, 1, '00:05')
     ->timezone(config('app.timezone'));
 
-Schedule::command('notifications:purge-read-ews')
+Schedule::command('notifications:purge-read')
     ->everyMinute()
     ->timezone(config('app.timezone'));
 
