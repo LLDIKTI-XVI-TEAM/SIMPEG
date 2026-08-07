@@ -101,6 +101,40 @@ class CutiController extends Controller
             ? $balancePreview->execute($cuti->employee, Carbon::create($cuti->rollover_target_year, 1, 1)->startOfDay())
             : null;
 
+        // US-4.5 AC-2: Saldo cuti pemohon untuk verifikator (tahun berjalan + riwayat N-1/N-2)
+        $leaveBalance = null;
+        if ($cuti->employee !== null && $cuti->jenisCuti?->code === 'tahunan') {
+            $currentYear = now()->year;
+            $currentYearBalance = $balancePreview->execute($cuti->employee, now());
+            $nMinus1Balance = $balancePreview->execute($cuti->employee, Carbon::create($currentYear - 1, 12, 31));
+            $nMinus2Balance = $balancePreview->execute($cuti->employee, Carbon::create($currentYear - 2, 12, 31));
+
+            $leaveBalance = [
+                'current' => [
+                    'year' => $currentYear,
+                    'entitlement' => $currentYearBalance['jatah_dasar'] ?? 0,
+                    'carry_over' => $currentYearBalance['carry_over'] ?? 0,
+                    'used' => $currentYearBalance['terpakai_final'] ?? 0,
+                    'reserved' => $currentYearBalance['dialokasikan_aktif'] ?? 0,
+                    'protected' => $currentYearBalance['dilindungi_penangguhan_dinas'] ?? 0,
+                    'available' => $currentYearBalance['saldo_dapat_diajukan'] ?? 0,
+                    'total_available' => $currentYearBalance['saldo_aktual'] ?? 0,
+                ],
+                'n_minus_1' => [
+                    'year' => $currentYear - 1,
+                    'entitlement' => $nMinus1Balance['jatah_dasar'] ?? 0,
+                    'used' => $nMinus1Balance['terpakai_final'] ?? 0,
+                    'total_available' => ($nMinus1Balance['jatah_dasar'] ?? 0) + ($nMinus1Balance['carry_over'] ?? 0),
+                ],
+                'n_minus_2' => [
+                    'year' => $currentYear - 2,
+                    'entitlement' => $nMinus2Balance['jatah_dasar'] ?? 0,
+                    'used' => $nMinus2Balance['terpakai_final'] ?? 0,
+                    'total_available' => ($nMinus2Balance['jatah_dasar'] ?? 0) + ($nMinus2Balance['carry_over'] ?? 0),
+                ],
+            ];
+        }
+
         return view('admin.cuti.show', [
             'cuti' => $cuti,
             'canAct' => $canAct,
@@ -110,6 +144,7 @@ class CutiController extends Controller
             'isRolloverReturn' => $isRolloverReturn,
             'targetBalance' => $targetBalance,
             'activeStep' => $stage === null ? null : $cuti->steps->firstWhere('step_order', $stage),
+            'leaveBalance' => $leaveBalance, // US-4.5 AC-2
         ]);
     }
 

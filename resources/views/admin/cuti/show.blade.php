@@ -66,6 +66,92 @@
                 </div>
             </div>
 
+            {{-- US-4.5 AC-2: Informasi Saldo Cuti Pemohon --}}
+            @if ($leaveBalance !== null)
+                <section class="rounded-lg border border-primary/20 bg-primary/5 p-5" aria-labelledby="leave-balance-title">
+                    <div class="flex items-start justify-between mb-4">
+                        <div>
+                            <h4 id="leave-balance-title" class="text-sm font-bold text-ink font-sans">📊 Informasi Saldo Cuti Pemohon</h4>
+                            <p class="text-xs text-muted font-sans mt-1">Data saldo untuk verifikasi kelayakan pengajuan</p>
+                        </div>
+                        <x-ui.badge variant="primary" size="sm" :pill="false">
+                            Tahun {{ $leaveBalance['current']['year'] }}
+                        </x-ui.badge>
+                    </div>
+
+                    {{-- Saldo Tahun Berjalan --}}
+                    <div class="grid grid-cols-2 gap-4 sm:grid-cols-4 mb-4">
+                        <div class="rounded-lg bg-surface/50 border border-border p-3">
+                            <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Jatah {{ $leaveBalance['current']['year'] }}</span>
+                            <p class="text-2xl font-bold text-ink mt-1">{{ $leaveBalance['current']['entitlement'] }}</p>
+                            <span class="text-xs text-muted">hari</span>
+                        </div>
+                        <div class="rounded-lg bg-surface/50 border border-border p-3">
+                            <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Carry-Over</span>
+                            <p class="text-2xl font-bold text-ink mt-1">{{ $leaveBalance['current']['carry_over'] }}</p>
+                            <span class="text-xs text-muted">hari</span>
+                        </div>
+                        <div class="rounded-lg bg-surface/50 border border-border p-3">
+                            <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Sudah Terpakai</span>
+                            <p class="text-2xl font-bold text-warning mt-1">{{ $leaveBalance['current']['used'] }}</p>
+                            <span class="text-xs text-muted">hari</span>
+                        </div>
+                        <div class="rounded-lg bg-success/10 border border-success/30 p-3">
+                            <span class="text-[10px] font-bold text-success uppercase tracking-wider font-sans">Sisa Saldo</span>
+                            <p class="text-2xl font-bold text-success mt-1">{{ $leaveBalance['current']['available'] }}</p>
+                            <span class="text-xs text-success">hari</span>
+                        </div>
+                    </div>
+
+                    {{-- Detail Saldo --}}
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-3 mb-4 pb-4 border-b border-border">
+                        <div class="flex items-center justify-between sm:justify-start sm:gap-2">
+                            <span class="text-xs text-muted font-sans">Total Tersedia:</span>
+                            <span class="text-sm font-semibold text-ink">{{ $leaveBalance['current']['total_available'] }} hari</span>
+                        </div>
+                        <div class="flex items-center justify-between sm:justify-start sm:gap-2">
+                            <span class="text-xs text-muted font-sans">Dialokasikan:</span>
+                            <span class="text-sm font-semibold text-ink">{{ $leaveBalance['current']['reserved'] }} hari</span>
+                        </div>
+                        <div class="flex items-center justify-between sm:justify-start sm:gap-2">
+                            <span class="text-xs text-muted font-sans">Dilindungi:</span>
+                            <span class="text-sm font-semibold text-ink">{{ $leaveBalance['current']['protected'] }} hari</span>
+                        </div>
+                    </div>
+
+                    {{-- Riwayat 2 Tahun Sebelumnya --}}
+                    <div>
+                        <h5 class="text-xs font-bold text-ink uppercase tracking-wider font-sans mb-3">Riwayat Penggunaan</h5>
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div class="rounded-lg bg-surface/30 border border-border p-3">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-xs font-bold text-muted uppercase tracking-wider">Tahun {{ $leaveBalance['n_minus_2']['year'] }}</span>
+                                    <x-ui.badge variant="muted" size="xs">N-2</x-ui.badge>
+                                </div>
+                                <div class="flex items-baseline gap-2">
+                                    <span class="text-lg font-bold text-ink">{{ $leaveBalance['n_minus_2']['used'] }}</span>
+                                    <span class="text-xs text-muted">/</span>
+                                    <span class="text-sm font-semibold text-muted">{{ $leaveBalance['n_minus_2']['total_available'] }} hari</span>
+                                </div>
+                                <p class="text-[10px] text-muted font-sans mt-1">Terpakai dari total tersedia</p>
+                            </div>
+                            <div class="rounded-lg bg-surface/30 border border-border p-3">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-xs font-bold text-muted uppercase tracking-wider">Tahun {{ $leaveBalance['n_minus_1']['year'] }}</span>
+                                    <x-ui.badge variant="muted" size="xs">N-1</x-ui.badge>
+                                </div>
+                                <div class="flex items-baseline gap-2">
+                                    <span class="text-lg font-bold text-ink">{{ $leaveBalance['n_minus_1']['used'] }}</span>
+                                    <span class="text-xs text-muted">/</span>
+                                    <span class="text-sm font-semibold text-muted">{{ $leaveBalance['n_minus_1']['total_available'] }} hari</span>
+                                </div>
+                                <p class="text-[10px] text-muted font-sans mt-1">Terpakai dari total tersedia</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            @endif
+
             {{-- Metadata Grid --}}
             @if ($isRolloverReturn)
                 <section class="rounded-lg border border-warning/25 bg-warning/5 p-4" aria-labelledby="rollover-return-title">
