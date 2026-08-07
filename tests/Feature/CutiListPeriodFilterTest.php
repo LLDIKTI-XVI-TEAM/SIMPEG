@@ -113,6 +113,9 @@ class CutiListPeriodFilterTest extends TestCase
             'bulan di luar rentang' => ['2026-13'],
             'bulan nol' => ['2026-00'],
             'tahun tidak lengkap' => ['202'],
+            // Tahun 0 sempat diteruskan sebagai batas tanggal dan ditolak PostgreSQL sehingga halaman gagal dimuat.
+            'tahun nol' => ['0000'],
+            'tahun nol dengan bulan' => ['0000-01'],
         ];
     }
 

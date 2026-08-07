@@ -47,11 +47,11 @@ final class CutiPeriodFilter
         }
 
         if (preg_match('/^(\d{4})$/', $value, $matches) === 1) {
-            return new self((int) $matches[1], null);
+            return self::fromParts((int) $matches[1], null);
         }
 
         if (preg_match('/^(\d{4})-(0[1-9]|1[0-2])$/', $value, $matches) === 1) {
-            return new self((int) $matches[1], (int) $matches[2]);
+            return self::fromParts((int) $matches[1], (int) $matches[2]);
         }
 
         if (preg_match('/^([A-Za-z]+) (\d{4})$/', $value, $matches) !== 1
@@ -59,7 +59,21 @@ final class CutiPeriodFilter
             return null;
         }
 
-        return new self((int) $matches[2], self::MONTH_NAMES[$matches[1]]);
+        return self::fromParts((int) $matches[2], self::MONTH_NAMES[$matches[1]]);
+    }
+
+    /**
+     * Menolak tahun di luar kalender yang didukung basis data. PostgreSQL tidak mengenal tahun 0,
+     * sehingga rentang tanggal yang dibentuk darinya akan ditolak dan menggagalkan permintaan.
+     * Nilai seperti itu diperlakukan sama dengan format yang tidak dikenal, yaitu tidak memfilter.
+     */
+    private static function fromParts(int $year, ?int $month): ?self
+    {
+        if ($year < 1) {
+            return null;
+        }
+
+        return new self($year, $month);
     }
 
     /**

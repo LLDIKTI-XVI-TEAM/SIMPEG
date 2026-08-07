@@ -69,6 +69,10 @@ class CutiPeriodFilterTest extends TestCase
             'null' => [null],
             'angka' => [2026],
             'array' => [['2026']],
+            // Tahun 0 tidak ada pada kalender PostgreSQL; bila diteruskan, rentangnya menggagalkan permintaan.
+            'tahun nol' => ['0000'],
+            'tahun nol dengan bulan' => ['0000-01'],
+            'tahun nol dengan nama bulan' => ['Januari 0000'],
         ];
     }
 

@@ -126,9 +126,14 @@ class ListLeaveRequestsAction
     }
 
     /**
-     * Opsi tahun dibentuk dari rentang tanggal data yang benar-benar berada dalam scope pengguna,
-     * supaya dropdown tidak menawarkan tahun yang pasti kosong dan tidak membocorkan keberadaan data pegawai lain.
-     * Tahun berjalan selalu disertakan agar filter tetap berguna saat belum ada pengajuan sama sekali.
+     * Opsi tahun mencakup rentang berurutan antara pengajuan terawal dan terakhir yang berada dalam scope
+     * pengguna, sehingga tidak membocorkan keberadaan data pegawai lain. Tahun berjalan selalu disertakan
+     * agar filter tetap berguna saat belum ada pengajuan sama sekali.
+     *
+     * Rentang berurutan dipilih, bukan daftar tahun yang benar-benar berisi, karena mengambil tahun distinct
+     * menuntut fungsi tanggal khas satu basis data sedangkan opsi periode pada halaman ini sengaja dijaga
+     * portabel. Konsekuensinya tahun tanpa pengajuan dapat muncul sebagai opsi, sama seperti opsi bulan yang
+     * juga menawarkan dua belas bulan terakhir tanpa memandang ada tidaknya data.
      *
      * @param  Builder<LeaveRequest>  $baseQuery
      * @return Collection<int, string>
