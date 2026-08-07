@@ -59,7 +59,6 @@ class KepalaLembagaSupportingDocumentTest extends TestCase
 
     public function test_admin_can_upload_pdf_for_kepala_lembaga_with_uuid_path_and_audit(): void
     {
-        Storage::fake('local');
 
         $employee = Employee::factory()->create(['is_kepala_lembaga' => true]);
         $user = User::factory()->adminKepegawaian()->create();
@@ -89,7 +88,7 @@ class KepalaLembagaSupportingDocumentTest extends TestCase
 
     public function test_upload_rejected_for_non_kepala_lembaga_employee(): void
     {
-        Storage::fake('local');
+
         $employee = Employee::factory()->create(['is_kepala_lembaga' => false]);
         $user = User::factory()->adminKepegawaian()->create();
 
@@ -100,7 +99,7 @@ class KepalaLembagaSupportingDocumentTest extends TestCase
 
     public function test_upload_orphan_file_cleaned_when_audit_write_fails(): void
     {
-        Storage::fake('local');
+
         $employee = Employee::factory()->create(['is_kepala_lembaga' => true]);
         $user = User::factory()->adminKepegawaian()->create();
 
@@ -158,7 +157,7 @@ class KepalaLembagaSupportingDocumentTest extends TestCase
 
     public function test_pdf_response_is_inline_and_missing_file_is_not_found(): void
     {
-        Storage::fake('local');
+
         $employee = Employee::factory()->create(['is_kepala_lembaga' => true]);
         $user = User::factory()->adminKepegawaian()->create();
 
@@ -177,7 +176,7 @@ class KepalaLembagaSupportingDocumentTest extends TestCase
 
     public function test_response_aborts_404_when_employee_marker_flipped_off(): void
     {
-        Storage::fake('local');
+
         $employee = Employee::factory()->create(['is_kepala_lembaga' => true]);
         $user = User::factory()->adminKepegawaian()->create();
 
@@ -193,7 +192,7 @@ class KepalaLembagaSupportingDocumentTest extends TestCase
 
     public function test_docx_response_forces_attachment_disposition(): void
     {
-        Storage::fake('local');
+
         $employee = Employee::factory()->create(['is_kepala_lembaga' => true]);
         $user = User::factory()->adminKepegawaian()->create();
 
@@ -212,7 +211,7 @@ class KepalaLembagaSupportingDocumentTest extends TestCase
 
     public function test_delete_soft_deletes_commits_audit_then_removes_file(): void
     {
-        Storage::fake('local');
+
         $employee = Employee::factory()->create(['is_kepala_lembaga' => true]);
         $user = User::factory()->adminKepegawaian()->create();
         $document = app(StoreKepalaLembagaSupportingDocumentAction::class)
@@ -234,20 +233,25 @@ class KepalaLembagaSupportingDocumentTest extends TestCase
 
     public function test_delete_rolls_back_soft_delete_and_keeps_file_when_audit_fails(): void
     {
-        Storage::fake('local');
+
         $employee = Employee::factory()->create(['is_kepala_lembaga' => true]);
         $user = User::factory()->adminKepegawaian()->create();
         $document = app(StoreKepalaLembagaSupportingDocumentAction::class)
             ->execute($employee, UploadedFile::fake()->create('a.pdf', 20, 'application/pdf'), $user);
         $path = $document->stored_path;
 
-        Schema::drop('audit_logs');
+        $dispatcher = AuditLog::getEventDispatcher();
+        AuditLog::creating(function (): void {
+            throw new \RuntimeException('Simulasi kegagalan audit.');
+        });
 
         try {
             app(DeleteKepalaLembagaSupportingDocumentAction::class)->execute($document, $user);
             $this->fail('Penghapusan harus melempar ketika penulisan audit gagal.');
         } catch (\Throwable) {
             // Audit gagal harus membatalkan tombstone sebelum penghapusan fisik dimulai.
+        } finally {
+            AuditLog::setEventDispatcher($dispatcher);
         }
 
         $this->assertDatabaseHas('kepala_lembaga_supporting_documents', [
@@ -259,7 +263,7 @@ class KepalaLembagaSupportingDocumentTest extends TestCase
 
     public function test_physical_delete_failure_logs_warning_and_keeps_committed_tombstone(): void
     {
-        Storage::fake('local');
+
         $employee = Employee::factory()->create(['is_kepala_lembaga' => true]);
         $user = User::factory()->adminKepegawaian()->create();
         $document = app(StoreKepalaLembagaSupportingDocumentAction::class)
@@ -294,7 +298,7 @@ class KepalaLembagaSupportingDocumentTest extends TestCase
 
     public function test_authorized_admin_can_upload_via_http_and_unauthorized_denied(): void
     {
-        Storage::fake('local');
+
         $employee = Employee::factory()->create(['is_kepala_lembaga' => true]);
         $admin = User::factory()->adminKepegawaian()->create();
         $pegawai = User::factory()->pegawai()->create();
@@ -338,7 +342,7 @@ class KepalaLembagaSupportingDocumentTest extends TestCase
 
     public function test_upload_rejects_file_over_10mb_boundary(): void
     {
-        Storage::fake('local');
+
         $employee = Employee::factory()->create(['is_kepala_lembaga' => true]);
         $admin = User::factory()->adminKepegawaian()->create();
 
@@ -356,7 +360,7 @@ class KepalaLembagaSupportingDocumentTest extends TestCase
 
     public function test_upload_accepts_file_at_10mb_boundary(): void
     {
-        Storage::fake('local');
+
         $employee = Employee::factory()->create(['is_kepala_lembaga' => true]);
         $admin = User::factory()->adminKepegawaian()->create();
 
@@ -383,7 +387,7 @@ class KepalaLembagaSupportingDocumentTest extends TestCase
 
     public function test_store_denies_non_kepala_lembaga_target(): void
     {
-        Storage::fake('local');
+
         $notMarked = Employee::factory()->create(['is_kepala_lembaga' => false]);
         $admin = User::factory()->adminKepegawaian()->create();
 
@@ -419,7 +423,7 @@ class KepalaLembagaSupportingDocumentTest extends TestCase
 
     public function test_index_lists_uploaded_document_for_selected_kepala_lembaga(): void
     {
-        Storage::fake('local');
+
         $employee = Employee::factory()->create(['is_kepala_lembaga' => true]);
         $admin = User::factory()->adminKepegawaian()->create();
 
@@ -438,7 +442,7 @@ class KepalaLembagaSupportingDocumentTest extends TestCase
 
     public function test_retry_purges_physical_files_for_tombstoned_documents(): void
     {
-        Storage::fake('local');
+
         $employee = Employee::factory()->create(['is_kepala_lembaga' => true]);
         $user = User::factory()->adminKepegawaian()->create();
         $document = app(StoreKepalaLembagaSupportingDocumentAction::class)
@@ -458,7 +462,7 @@ class KepalaLembagaSupportingDocumentTest extends TestCase
 
     public function test_retry_logs_and_continues_when_a_file_delete_throws(): void
     {
-        Storage::fake('local');
+
         $employee = Employee::factory()->create(['is_kepala_lembaga' => true]);
         $user = User::factory()->adminKepegawaian()->create();
         $document = app(StoreKepalaLembagaSupportingDocumentAction::class)
@@ -488,7 +492,7 @@ class KepalaLembagaSupportingDocumentTest extends TestCase
 
     public function test_artisan_command_runs_retry(): void
     {
-        Storage::fake('local');
+
         $employee = Employee::factory()->create(['is_kepala_lembaga' => true]);
         $user = User::factory()->adminKepegawaian()->create();
         $document = app(StoreKepalaLembagaSupportingDocumentAction::class)

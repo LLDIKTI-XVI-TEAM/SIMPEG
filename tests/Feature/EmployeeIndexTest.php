@@ -187,7 +187,7 @@ class EmployeeIndexTest extends TestCase
 
     public function test_document_completeness_is_true_when_no_required_history_exists(): void
     {
-        Storage::fake(Document::STORAGE_DISK);
+
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create(['profil_status' => 'belum_lengkap']);
 
@@ -196,7 +196,7 @@ class EmployeeIndexTest extends TestCase
 
     public function test_document_completeness_requires_file_for_the_existing_rank_history_only(): void
     {
-        Storage::fake(Document::STORAGE_DISK);
+
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create(['profil_status' => 'lengkap']);
         $rank = RefGolongan::where('kode', 'III/a')->firstOrFail();
@@ -221,7 +221,7 @@ class EmployeeIndexTest extends TestCase
 
     public function test_document_completeness_is_tersedia_when_only_other_documents_with_files_exist(): void
     {
-        Storage::fake(Document::STORAGE_DISK);
+
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create(['profil_status' => 'belum_lengkap']);
 
@@ -304,11 +304,14 @@ class EmployeeIndexTest extends TestCase
         foreach ($paths as $type => $path) {
             $disk->delete($path);
             $this->assertEmployeeDocumentCompleteness($user, $employee, 'tidak_lengkap');
-            $disk->put($path, 'SK tersedia');
+
+            $newPath = str_replace('.pdf', '_new.pdf', $path);
+            $disk->put($newPath, 'SK tersedia');
 
             $records[$type]->update(['file_sk' => null]);
             $this->assertEmployeeDocumentCompleteness($user, $employee, 'tidak_lengkap');
-            $records[$type]->update(['file_sk' => $path]);
+            $records[$type]->update(['file_sk' => $newPath]);
+            $paths[$type] = $newPath;
         }
 
         $this->assertEmployeeDocumentCompleteness($user, $employee, 'lengkap');

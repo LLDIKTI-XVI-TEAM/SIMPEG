@@ -6,56 +6,49 @@
     <style>
         @page { margin: 28px 32px 42px; }
         body { color: #111827; font-family: DejaVu Sans, sans-serif; font-size: 9px; }
-        header { border-bottom: 2px solid #1e3a8a; margin-bottom: 16px; padding-bottom: 10px; text-align: center; }
-        header p, header h1 { margin: 2px 0; }
-        h1 { font-size: 16px; text-transform: uppercase; }
-        h2 { font-size: 12px; margin: 14px 0 6px; }
-        .meta { margin-bottom: 12px; }
-        table { border-collapse: collapse; width: 100%; margin-bottom: 18px; }
-        th, td { border: 1px solid #9ca3af; padding: 5px 4px; vertical-align: top; }
-        th { background: #dbeafe; font-size: 8px; text-align: left; }
+        .title-doc { text-align: center; margin-top: 16px; margin-bottom: 16px; }
+        .title-doc h3 { font-size: 12px; margin: 0 0 4px 0; text-transform: uppercase; text-decoration: underline; letter-spacing: 1px; }
+        .title-doc p { font-size: 9px; margin: 0; color: #4b5563; }
+        .meta { margin-bottom: 12px; font-weight: bold; }
+        table.data-table { border-collapse: collapse; width: 100%; margin-bottom: 18px; color: #000; }
+        table.data-table th, table.data-table td { border: 1px solid #000; padding: 6px 5px; vertical-align: top; color: #000; }
+        table.data-table th { font-size: 8px; text-align: left; font-weight: bold; text-transform: uppercase; background-color: transparent; }
         .number { text-align: right; }
         .center { text-align: center; }
-        .empty { padding: 18px; text-align: center; }
-        .section-title { background: #1e3a8a; color: #fff; font-size: 10px; font-weight: bold;
-                         padding: 5px 8px; margin: 20px 0 6px; }
-        .signatures { margin-top: 36px; width: 100%; }
-        .signature { display: inline-block; text-align: center; vertical-align: top; width: 48%; }
+        .empty { padding: 18px; text-align: center; color: #6b7280; }
+        table.signatures { width: 100%; margin-top: 36px; border: none; }
+        table.signatures td { text-align: center; width: 50%; vertical-align: top; border: none; }
         .signature-space { height: 54px; }
-        /* Footer tetap di bawah setiap halaman — didukung Dompdf lewat position:fixed. */
-        footer { bottom: 0; color: #6b7280; font-size: 8px; left: 0; position: fixed; right: 0; text-align: center; }
-        /* Dompdf mengisi counter(page) dan counter(pages) secara native pada elemen fixed. */
+        footer { bottom: 0; color: #6b7280; font-size: 8px; left: 0; position: fixed; right: 0; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 6px; }
         .page-number::after  { content: counter(page); }
         .total-pages::after  { content: counter(pages); }
     </style>
 </head>
 <body>
-    <header>
-        <p>LEMBAGA LAYANAN PENDIDIKAN TINGGI WILAYAH XVI</p>
-        <h1>Rekap Cuti Pegawai</h1>
-    </header>
+    <x-laporan.kop-surat :forPdf="true" />
 
-    <p class="meta">Periode: {{ $periodLabel ?? ($filters['periode'] ?? 'Semua periode') }}</p>
+    <div class="title-doc">
+        <h3>Rekap Cuti Pegawai</h3>
+        <p>Tanggal Cetak: {{ now()->translatedFormat('d F Y') }}</p>
+    </div>
 
-    {{-- ============================================================ --}}
-    {{-- BAGIAN 1: REKAP PER PEGAWAI PER JENIS CUTI                  --}}
-    {{-- ============================================================ --}}
-    <div class="section-title">Ringkasan Cuti Per Pegawai</div>
-    <table>
+    <p class="meta">Periode: {{ $periodLabel ?? 'Semua periode' }}</p>
+
+    <table class="data-table">
         <thead>
             <tr>
-                <th>No</th>
-                <th>NIP</th>
+                <th class="center" width="20">No</th>
+                <th width="100">NIP</th>
                 <th>Nama Pegawai</th>
-                <th>Jenis Cuti</th>
-                <th class="center">Total Hari</th>
-                <th class="center">Sisa Saldo {{ isset($summaryRows) && $summaryRows->isNotEmpty() ? $summaryRows->first()['saldo_tahun'] ?? '' : '' }}</th>
+                <th width="100">Jenis Cuti</th>
+                <th class="center" width="60">Total Hari</th>
+                <th class="center" width="60">Sisa Saldo {{ isset($summaryRows) && $summaryRows->isNotEmpty() ? $summaryRows->first()['saldo_tahun'] ?? '' : '' }}</th>
             </tr>
         </thead>
         <tbody>
             @forelse($summaryRows ?? [] as $i => $row)
                 <tr>
-                    <td>{{ $i + 1 }}</td>
+                    <td class="center">{{ $i + 1 }}</td>
                     <td>{{ $row['nip'] }}</td>
                     <td>{{ $row['nama'] }}</td>
                     <td>{{ $row['jenis'] }}</td>
@@ -68,38 +61,20 @@
         </tbody>
     </table>
 
-    {{-- ============================================================ --}}
-    {{-- BAGIAN 2: DETAIL PENGAJUAN CUTI                              --}}
-    {{-- ============================================================ --}}
-    <div class="section-title">Detail Pengajuan Cuti</div>
-    <table>
-        <thead>
-            <tr>
-                <th>No</th><th>NIP</th><th>Nama</th><th>Jenis</th><th>Mulai</th><th>Selesai</th><th class="center">Hari Kerja</th><th>Status</th>
-            </tr>
-        </thead>
-        <tbody>
-            @forelse($rows as $row)
-                <tr>
-                    <td>{{ $loop->iteration }}</td>
-                    <td>{{ $row->employee?->nip ?? '-' }}</td>
-                    <td>{{ $row->employee?->nama_lengkap ?? '-' }}</td>
-                    <td>{{ $row->jenisCuti?->nama ?? '-' }}</td>
-                    <td>{{ $row->tanggal_mulai?->format('Y-m-d') ?? '-' }}</td>
-                    <td>{{ $row->tanggal_selesai?->format('Y-m-d') ?? '-' }}</td>
-                    <td class="number">{{ $row->jumlah_hari_kerja }}</td>
-                    <td>{{ $row->report_status }}</td>
-                </tr>
-            @empty
-                <tr><td class="empty" colspan="8">Tidak ada data cuti sesuai filter.</td></tr>
-            @endforelse
-        </tbody>
+    <table class="signatures">
+        <tr>
+            <td>
+                <strong>Pembuat Laporan</strong>
+                <div class="signature-space"></div>
+                <p>(................................)</p>
+            </td>
+            <td>
+                <strong>Mengetahui</strong>
+                <div class="signature-space"></div>
+                <p>(................................)</p>
+            </td>
+        </tr>
     </table>
-
-    <div class="signatures">
-        <div class="signature"><strong>Pembuat Laporan</strong><div class="signature-space"></div><p>(................................)</p></div>
-        <div class="signature"><strong>Mengetahui</strong><div class="signature-space"></div><p>(................................)</p></div>
-    </div>
 
     <footer>
         Dokumen dibuat pada {{ $generatedAt->format('d-m-Y H:i:s') }}

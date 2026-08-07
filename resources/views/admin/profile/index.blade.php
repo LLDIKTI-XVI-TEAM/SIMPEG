@@ -330,7 +330,7 @@
                     </div>
 
                     <div class="max-w-xs">
-                        <x-ui.stat-card label="Hak Efektif Tahun Ini" value="{{ $saldoCuti['saldo_dapat_diajukan'] ?? 0 }}" unit="Hari" variant="primary" size="lg" center role="group" aria-label="{{ $saldoCuti['saldo_dapat_diajukan'] ?? 0 }} Hari">
+                        <x-ui.stat-card label="Hak Efektif Tahun Ini" value="{{ $saldoCuti['saldo_dapat_diajukan'] ?? '-' }}" unit="Hari" variant="primary" size="lg" center role="group" aria-label="{{ $saldoCuti['saldo_dapat_diajukan'] ?? '-' }} Hari">
                         </x-ui.stat-card>
                     </div>
                     @if ($rule5Active)

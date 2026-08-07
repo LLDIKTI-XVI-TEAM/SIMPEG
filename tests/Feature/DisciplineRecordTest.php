@@ -114,8 +114,7 @@ class DisciplineRecordTest extends TestCase
 
     public function test_admin_can_create_discipline_record_with_sk_upload(): void
     {
-        Storage::fake(Document::STORAGE_DISK);
-        Storage::fake('public');
+
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create();
 
