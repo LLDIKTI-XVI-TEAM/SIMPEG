@@ -281,6 +281,8 @@
                             </div>
                         </form>
                     </div>
+                @endif
+
             {{-- Multi-year Leave Balance Widget for Verifier (US-4.5 AC-2) --}}
             @if ($employeeBalance !== null)
                 <div class="border-t border-border pt-6 space-y-4">
