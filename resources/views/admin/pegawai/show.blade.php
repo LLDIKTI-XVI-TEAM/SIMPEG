@@ -1929,7 +1929,7 @@
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jabatan</label>
                                     <x-form.select x-model="newJabatan.jabatan_id" required>
                                         <option value="">-- Pilih Jabatan --</option>
-                                        @foreach($jabatanOptions as $jabatan)
+                                        @foreach($jabatanOptions->where('is_active', true) as $jabatan)
                                             <option value="{{ $jabatan->id }}">{{ $jabatan->nama }}{{ $jabatan->jenisJabatan ? ' - '.$jabatan->jenisJabatan->nama : '' }}</option>
                                         @endforeach
                                     </x-form.select>

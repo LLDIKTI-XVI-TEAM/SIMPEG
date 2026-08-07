@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Support\EmployeeValidationRules;
 use Carbon\Carbon;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class UpdateEmployeeRequest extends FormRequest
@@ -54,7 +55,10 @@ class UpdateEmployeeRequest extends FormRequest
             $rules['file_sk_pangkat'] = ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png'];
 
             // Jabatan (Position)
-            $rules['jabatan_jabatan_id'] = ['nullable', 'uuid', 'exists:ref_jabatan,id'];
+            // Blok jabatan pada formulir ini selalu menambah riwayat penugasan baru, bukan
+            // mengoreksi riwayat lama, sehingga jabatan nonaktif harus ditolak tanpa
+            // pengecualian sama seperti pada pembuatan pegawai.
+            $rules['jabatan_jabatan_id'] = ['nullable', 'uuid', Rule::exists('ref_jabatan', 'id')->where('is_active', true)];
             $rules['jabatan_nama_jabatan'] = ['nullable', 'string', 'max:255'];
             $rules['jabatan_jenis_jabatan_id'] = ['nullable', 'uuid', 'exists:ref_jenis_jabatan,id'];
             $rules['jabatan_eselon_id'] = ['nullable', 'uuid', 'exists:ref_eselon,id'];
