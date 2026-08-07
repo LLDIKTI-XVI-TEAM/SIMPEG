@@ -1,158 +1,17 @@
 <x-layouts.app title="Hari Libur">
 
     @php
-    $hariLiburData = [
-        ['id' => 1, 'tanggal' => '2026-01-01', 'nama' => 'Tahun Baru 2026 Masehi', 'tipe' => 'libur_nasional', 'hari' => 'Kamis'],
-        ['id' => 2, 'tanggal' => '2026-02-17', 'nama' => 'Isra Mikraj Nabi Muhammad SAW', 'tipe' => 'libur_nasional', 'hari' => 'Selasa'],
-        ['id' => 3, 'tanggal' => '2026-03-19', 'nama' => 'Hari Suci Nyepi Saka 1948', 'tipe' => 'libur_nasional', 'hari' => 'Kamis'],
-        ['id' => 4, 'tanggal' => '2026-03-20', 'nama' => 'Cuti Bersama Nyepi', 'tipe' => 'cuti_bersama', 'hari' => 'Jumat'],
-        ['id' => 5, 'tanggal' => '2026-04-03', 'nama' => 'Wafat Yesus Kristus', 'tipe' => 'libur_nasional', 'hari' => 'Jumat'],
-        ['id' => 6, 'tanggal' => '2026-04-05', 'nama' => 'Hari Raya Paskah', 'tipe' => 'libur_nasional', 'hari' => 'Minggu'],
-        ['id' => 7, 'tanggal' => '2026-05-01', 'nama' => 'Hari Buruh Internasional', 'tipe' => 'libur_nasional', 'hari' => 'Jumat'],
-        ['id' => 8, 'tanggal' => '2026-05-13', 'nama' => 'Hari Raya Waisak 2570 BE', 'tipe' => 'libur_nasional', 'hari' => 'Rabu'],
-        ['id' => 9, 'tanggal' => '2026-05-14', 'nama' => 'Kenaikan Yesus Kristus', 'tipe' => 'libur_nasional', 'hari' => 'Kamis'],
-        ['id' => 10, 'tanggal' => '2026-05-15', 'nama' => 'Cuti Bersama Kenaikan Yesus', 'tipe' => 'cuti_bersama', 'hari' => 'Jumat'],
-        ['id' => 11, 'tanggal' => '2026-06-01', 'nama' => 'Hari Lahir Pancasila', 'tipe' => 'libur_nasional', 'hari' => 'Senin'],
-        ['id' => 12, 'tanggal' => '2026-06-17', 'nama' => 'Hari Raya Idul Adha 1447 H', 'tipe' => 'libur_nasional', 'hari' => 'Rabu'],
-        ['id' => 13, 'tanggal' => '2026-08-17', 'nama' => 'HUT Kemerdekaan RI', 'tipe' => 'libur_nasional', 'hari' => 'Senin'],
-        ['id' => 14, 'tanggal' => '2026-12-25', 'nama' => 'Hari Raya Natal', 'tipe' => 'libur_nasional', 'hari' => 'Jumat'],
-
-        // 2025 Data
-        ['id' => 15, 'tanggal' => '2025-01-01', 'nama' => 'Tahun Baru 2025 Masehi', 'tipe' => 'libur_nasional', 'hari' => 'Rabu'],
-        ['id' => 16, 'tanggal' => '2025-01-27', 'nama' => 'Isra Mikraj Nabi Muhammad SAW', 'tipe' => 'libur_nasional', 'hari' => 'Senin'],
-        ['id' => 17, 'tanggal' => '2025-03-29', 'nama' => 'Hari Raya Nyepi Saka 1947', 'tipe' => 'libur_nasional', 'hari' => 'Sabtu'],
-        ['id' => 18, 'tanggal' => '2025-03-31', 'nama' => 'Hari Raya Idul Fitri 1446 H', 'tipe' => 'libur_nasional', 'hari' => 'Senin'],
-        ['id' => 19, 'tanggal' => '2025-04-18', 'nama' => 'Wafat Yesus Kristus', 'tipe' => 'libur_nasional', 'hari' => 'Jumat'],
-        ['id' => 20, 'tanggal' => '2025-05-01', 'nama' => 'Hari Buruh Internasional', 'tipe' => 'libur_nasional', 'hari' => 'Kamis'],
-        ['id' => 21, 'tanggal' => '2025-05-29', 'nama' => 'Kenaikan Yesus Kristus', 'tipe' => 'libur_nasional', 'hari' => 'Kamis'],
-        ['id' => 22, 'tanggal' => '2025-06-01', 'nama' => 'Hari Lahir Pancasila', 'tipe' => 'libur_nasional', 'hari' => 'Minggu'],
-        ['id' => 23, 'tanggal' => '2025-12-25', 'nama' => 'Hari Raya Natal', 'tipe' => 'libur_nasional', 'hari' => 'Kamis'],
-
-        // 2024 Data
-        ['id' => 24, 'tanggal' => '2024-01-01', 'nama' => 'Tahun Baru 2024 Masehi', 'tipe' => 'libur_nasional', 'hari' => 'Senin'],
-        ['id' => 25, 'tanggal' => '2024-02-08', 'nama' => 'Isra Mikraj Nabi Muhammad SAW', 'tipe' => 'libur_nasional', 'hari' => 'Kamis'],
-        ['id' => 26, 'tanggal' => '2024-03-11', 'nama' => 'Hari Raya Nyepi Saka 1946', 'tipe' => 'libur_nasional', 'hari' => 'Senin'],
-        ['id' => 27, 'tanggal' => '2024-04-10', 'nama' => 'Hari Raya Idul Fitri 1445 H', 'tipe' => 'libur_nasional', 'hari' => 'Rabu'],
-        ['id' => 28, 'tanggal' => '2024-04-11', 'nama' => 'Cuti Bersama Idul Fitri', 'tipe' => 'cuti_bersama', 'hari' => 'Kamis'],
-        ['id' => 29, 'tanggal' => '2024-05-01', 'nama' => 'Hari Buruh Internasional', 'tipe' => 'libur_nasional', 'hari' => 'Rabu'],
-        ['id' => 30, 'tanggal' => '2024-05-09', 'nama' => 'Kenaikan Yesus Kristus', 'tipe' => 'libur_nasional', 'hari' => 'Kamis'],
-        ['id' => 31, 'tanggal' => '2024-06-01', 'nama' => 'Hari Lahir Pancasila', 'tipe' => 'libur_nasional', 'hari' => 'Sabtu'],
-        ['id' => 32, 'tanggal' => '2024-12-25', 'nama' => 'Hari Raya Natal', 'tipe' => 'libur_nasional', 'hari' => 'Rabu'],
-    ];
-
-    // Combine with dynamic session additions if any
-    $sessionLogs = session('dynamic_audit_logs', []);
-    $addedHolidays = [];
-    foreach ($sessionLogs as $log) {
-        if ($log['event'] === 'CREATE_HOLIDAY' && isset($log['new_values'])) {
-            $newVal = $log['new_values'];
-            // Determine day of the week
-            $timestamp = strtotime($newVal['tanggal']);
-            $days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-            $hariName = $days[date('w', $timestamp)];
-
-            $addedHolidays[] = [
-                'id' => $log['id'],
-                'tanggal' => $newVal['tanggal'],
-                'nama' => $newVal['nama'],
-                'tipe' => $newVal['tipe'],
-                'hari' => $hariName
-            ];
-        }
-    }
-    // Remove deleted ones
-    $deletedIds = [];
-    foreach ($sessionLogs as $log) {
-        if ($log['event'] === 'DELETE_HOLIDAY') {
-            // Find matched holiday ID in original list if possible
-            // In our prototype, since we delete by ID, we extract the log's original values or target
-            // Let's assume the session deletes contain info to identify the deleted ID
-        }
-    }
-
-    $allHolidays = array_merge($hariLiburData, $addedHolidays);
+        // Nilai filter aktif dipakai ulang untuk tautan tab tahun, form per-halaman,
+        // dan link paginasi supaya konteks filter tidak hilang saat berpindah.
+        $filterAktif = array_filter([
+            'tahun' => $filters['tahun'],
+            'tipe' => $filters['tipe'] !== '' ? $filters['tipe'] : null,
+            'search' => $filters['search'] !== '' ? $filters['search'] : null,
+            'per_page' => $filters['per_page'],
+        ], static fn ($nilai) => $nilai !== null);
     @endphp
 
-    <div x-data="{
-        showAddForm: false,
-        activeYear: 2026,
-        activeTipe: 'semua',
-        searchQuery: '',
-        perPage: 10,
-        currentPage: 1,
-        holidays: {{ json_encode($allHolidays) }},
-
-        get filteredHolidays() {
-            return this.holidays.filter(h => {
-                const date = new Date(h.tanggal);
-                const yearMatches = date.getFullYear() === parseInt(this.activeYear);
-                const tipeMatches = this.activeTipe === 'semua' || h.tipe === this.activeTipe;
-                const searchMatches = this.searchQuery === '' || h.nama.toLowerCase().includes(this.searchQuery.toLowerCase());
-                return yearMatches && tipeMatches && searchMatches;
-            });
-        },
-
-        get paginatedHolidays() {
-            const start = (this.currentPage - 1) * parseInt(this.perPage);
-            return this.filteredHolidays.slice(start, start + parseInt(this.perPage));
-        },
-
-        get totalPages() {
-            return Math.max(1, Math.ceil(this.filteredHolidays.length / parseInt(this.perPage)));
-        },
-
-        get totalFiltered() {
-            return this.filteredHolidays.length;
-        },
-
-        get startRange() {
-            if (this.totalFiltered === 0) return 0;
-            return (this.currentPage - 1) * parseInt(this.perPage) + 1;
-        },
-
-        get endRange() {
-            return Math.min(this.currentPage * parseInt(this.perPage), this.totalFiltered);
-        },
-
-        getYearCount(year) {
-            return this.holidays.filter(h => new Date(h.tanggal).getFullYear() === year).length;
-        },
-
-        setPage(p) {
-            if (p >= 1 && p <= this.totalPages) {
-                this.currentPage = p;
-            }
-        },
-
-        formatDate(dateStr) {
-            if (!dateStr) return '';
-            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
-            const parts = dateStr.split('-');
-            if (parts.length !== 3) return dateStr;
-            const year = parts[0];
-            const monthIndex = parseInt(parts[1], 10) - 1;
-            const day = parseInt(parts[2], 10);
-            return `${day.toString().padStart(2, '0')} ${months[monthIndex]} ${year}`;
-        },
-
-        selectedHoliday: null,
-        executeDeleteHoliday() {
-            if (!this.selectedHoliday) return;
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = '/hari-libur/' + this.selectedHoliday.id + '/delete';
-
-            const csrfToken = document.querySelector('meta[name=csrf-token]').getAttribute('content');
-            const tokenInput = document.createElement('input');
-            tokenInput.type = 'hidden';
-            tokenInput.name = '_token';
-            tokenInput.value = csrfToken;
-            form.appendChild(tokenInput);
-
-            document.body.appendChild(form);
-            form.submit();
-        }
-    }" @confirm-delete-holiday.window="executeDeleteHoliday()" x-init="$watch('activeYear', () => { currentPage = 1; }); $watch('activeTipe', () => { currentPage = 1; }); $watch('searchQuery', () => { currentPage = 1; }); $watch('perPage', () => { currentPage = 1; });" class="space-y-6">
+    <div x-data="{ showAddForm: @json($errors->any()) }" class="space-y-6">
 
         {{-- PAGE HEADER --}}
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -163,7 +22,7 @@
                     ['label' => 'Hari Libur']
                 ]" />
                 <nav class="mt-1 flex items-center gap-1.5 text-xs text-muted">
-                    <span>•</span>
+                    <span>&bull;</span>
                     <span class="text-muted italic font-sans">Akses: Khusus Super Admin</span>
                 </nav>
             </div>
@@ -175,7 +34,10 @@
                     Lihat Audit Log Master
                 </x-ui.button>
                 <button
+                    type="button"
                     @click="showAddForm = !showAddForm"
+                    :aria-expanded="showAddForm ? 'true' : 'false'"
+                    aria-controls="form-tambah-hari-libur"
                     class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2.5 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm font-sans"
                 >
                     <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -186,39 +48,47 @@
             </div>
         </div>
 
-        {{-- Info Alert Card --}}
-        <div class="rounded-lg border border-info/20 bg-info/5 p-4 flex gap-3 text-xs text-info leading-relaxed shadow-sm">
-            <svg class="w-5 h-5 shrink-0 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 1 1 1.085 1.086L10.5 14.25a.75.75 0 0 1-1.086-1.085l1.086-1.086Zm.75-5.25a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm-9 6c0 4.97 4.03 9 9 9s9-4.03 9-9-4.03-9-9-9-9 4.03-9 9Z" />
-            </svg>
-            <div>
-                <span class="font-bold">ℹ️ PENTING UNTUK INTEGRITAS SISTEM:</span> Data hari libur nasional dan cuti bersama ini digunakan secara langsung oleh sistem untuk menghitung secara akurat jumlah **hari kerja efektif pengajuan cuti** pegawai serta menentukan jadwal pengiriman notifikasi/alert otomatis pada **Early Warning System (EWS)** kepegawaian.
-            </div>
-        </div>
+        @if (session('success'))
+            <x-ui.alert variant="success">{{ session('success') }}</x-ui.alert>
+        @endif
 
-        {{-- Form Tambah Hari Libur (Collapsible) --}}
-        <x-ui.card padding="lg" x-show="showAddForm"   style="display: none;" class="space-y-4">
+        @if ($errors->any())
+            <x-ui.alert variant="danger" title="Perubahan hari libur belum tersimpan">
+                Periksa kembali kolom yang ditandai pada formulir.
+            </x-ui.alert>
+        @endif
+
+        {{-- Penjelasan dampak data ini terhadap kalkulasi cuti dan EWS --}}
+        <x-ui.alert variant="info" title="Penting untuk integritas sistem">
+            Tanggal pada halaman ini dibaca langsung oleh sistem untuk menghitung jumlah
+            <strong>hari kerja efektif pengajuan cuti</strong> dan menentukan jadwal peringatan
+            <strong>Early Warning System (EWS)</strong>. Perubahan di sini berlaku pada kalkulasi berikutnya.
+        </x-ui.alert>
+
+        {{-- Form Tambah Hari Libur --}}
+        <x-ui.card id="form-tambah-hari-libur" padding="lg" x-show="showAddForm" x-cloak class="space-y-4">
             <form action="{{ route('hari-libur.store') }}" method="POST" class="space-y-4">
                 @csrf
                 <h3 class="text-sm font-semibold text-primary font-sans">Tambah Hari Libur Baru</h3>
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <x-form.date
-    name="tanggal"
-    label="Tanggal"
-    required
-    size="lg"
-/>
+                        name="tanggal"
+                        label="Tanggal"
+                        required
+                        size="lg"
+                    />
                     <x-form.input
-    name="nama"
-    label="Nama Hari Libur"
-    type="text"
-    placeholder="Contoh: Hari Raya Idul Fitri"
-    required
-    size="lg"
-/>
+                        name="nama"
+                        label="Nama Hari Libur"
+                        type="text"
+                        placeholder="Contoh: Hari Raya Idul Fitri"
+                        required
+                        size="lg"
+                    />
                     <x-form.select
                         name="tipe"
                         label="Jenis Libur"
+                        :value="old('tipe', 'libur_nasional')"
                         required
                     >
                         <option value="libur_nasional">Libur Nasional</option>
@@ -234,41 +104,65 @@
 
         {{-- Filter Bar --}}
         <x-ui.card padding="sm" class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            {{-- Tabs Tahun --}}
-            <div class="flex items-center gap-4 border-b border-border pb-2 md:border-b-0 md:pb-0">
-                <button @click="activeYear = 2026" :class="activeYear === 2026 ? 'text-primary font-semibold border-b-2 border-primary' : 'text-muted hover:text-ink'" class="text-sm pb-1 font-sans cursor-pointer focus:outline-none">
-                    2026 (<span x-text="getYearCount(2026)"></span>)
-                </button>
-                <button @click="activeYear = 2025" :class="activeYear === 2025 ? 'text-primary font-semibold border-b-2 border-primary' : 'text-muted hover:text-ink'" class="text-sm pb-1 font-sans cursor-pointer focus:outline-none">
-                    2025 (<span x-text="getYearCount(2025)"></span>)
-                </button>
-                <button @click="activeYear = 2024" :class="activeYear === 2024 ? 'text-primary font-semibold border-b-2 border-primary' : 'text-muted hover:text-ink'" class="text-sm pb-1 font-sans cursor-pointer focus:outline-none">
-                    2024 (<span x-text="getYearCount(2024)"></span>)
-                </button>
-            </div>
+            {{-- Tab tahun dari data yang benar-benar ada di database --}}
+            <nav aria-label="Filter tahun" class="flex flex-wrap items-center gap-4 border-b border-border pb-2 md:border-b-0 md:pb-0">
+                @forelse ($tahunTersedia as $tahun => $jumlah)
+                    <a
+                        href="{{ route('hari-libur', array_merge($filterAktif, ['tahun' => $tahun])) }}"
+                        @class([
+                            'text-sm pb-1 font-sans focus:outline-none focus:ring-2 focus:ring-primary/20 rounded',
+                            'text-primary font-semibold border-b-2 border-primary' => (int) $tahun === $filters['tahun'],
+                            'text-muted hover:text-ink' => (int) $tahun !== $filters['tahun'],
+                        ])
+                        @if ((int) $tahun === $filters['tahun']) aria-current="page" @endif
+                    >
+                        {{ $tahun }} ({{ $jumlah }})
+                    </a>
+                @empty
+                    <span class="text-sm text-muted font-sans">Belum ada tahun yang terdaftar</span>
+                @endforelse
+            </nav>
 
-            {{-- Search & Tipe Filters --}}
-            <div class="flex flex-col sm:flex-row sm:items-center gap-3">
-                {{-- Search --}}
-                <div class="relative w-full sm:w-64">
-                    <input type="text" x-model="searchQuery" placeholder="Cari nama hari libur..." class="w-full rounded-lg border border-border bg-surface pl-9 pr-4 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.602 10.602Z" />
-                        </svg>
+            {{-- Pencarian & filter tipe, keduanya diproses di server --}}
+            <form method="GET" action="{{ route('hari-libur') }}" class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <input type="hidden" name="tahun" value="{{ $filters['tahun'] }}">
+                <input type="hidden" name="per_page" value="{{ $filters['per_page'] }}">
+
+                <div class="w-full sm:w-64">
+                    <label for="search" class="sr-only">Cari nama hari libur</label>
+                    <div class="relative">
+                        <input
+                            type="text"
+                            id="search"
+                            name="search"
+                            value="{{ $filters['search'] }}"
+                            placeholder="Cari nama hari libur..."
+                            class="w-full rounded-lg border border-border bg-surface pl-9 pr-4 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans"
+                        >
+                        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.602 10.602Z" />
+                            </svg>
+                        </div>
                     </div>
                 </div>
 
-                {{-- Tipe Dropdown --}}
-                <div class="flex items-center gap-2">
-                    <label class="text-xs text-muted font-sans font-medium whitespace-nowrap">Tipe Libur:</label>
-                    <x-form.select x-model="activeTipe">
-                        <option value="semua">Semua Tipe</option>
-                        <option value="libur_nasional">Libur Nasional</option>
-                        <option value="cuti_bersama">Cuti Bersama</option>
-                    </x-form.select>
-                </div>
-            </div>
+                <x-form.select
+                    id="tipe"
+                    name="tipe"
+                    label="Tipe Libur"
+                    size="sm"
+                    :value="$filters['tipe']"
+                    onchange="this.form.submit()"
+                    wrapperClass="w-full sm:w-44"
+                >
+                    <option value="">Semua Tipe</option>
+                    <option value="libur_nasional">Libur Nasional</option>
+                    <option value="cuti_bersama">Cuti Bersama</option>
+                </x-form.select>
+
+                <x-ui.button type="submit" variant="secondary" size="xs">Terapkan</x-ui.button>
+            </form>
         </x-ui.card>
 
         {{-- Table --}}
@@ -286,44 +180,80 @@
                         </x-ui.table-row>
                     </x-ui.table-head>
                     <x-ui.table-body>
-                        <template x-for="(h, index) in paginatedHolidays" :key="h.id">
+                        @forelse ($hariLibur as $item)
                             <x-ui.table-row :interactive="true">
-                                <x-ui.table-td x-text="formatDate(h.tanggal)" padding="comfortable" class="text-sm font-medium"></x-ui.table-td>
-                                <x-ui.table-td x-text="h.hari" padding="comfortable" class="text-sm"></x-ui.table-td>
-                                <x-ui.table-td x-text="h.nama" padding="comfortable" class="text-sm font-medium"></x-ui.table-td>
+                                <x-ui.table-td padding="comfortable" class="text-sm font-medium">
+                                    {{ $item->tanggal?->translatedFormat('d M Y') }}
+                                </x-ui.table-td>
+                                <x-ui.table-td padding="comfortable" class="text-sm">
+                                    {{ $item->tanggal?->translatedFormat('l') }}
+                                </x-ui.table-td>
+                                <x-ui.table-td padding="comfortable" class="text-sm font-medium">
+                                    {{ $item->nama }}
+                                </x-ui.table-td>
                                 <x-ui.table-td padding="comfortable">
-                                    <span class="text-xs font-semibold font-sans"
-                                          :class="h.tipe === 'libur_nasional' ? 'text-primary' : 'text-secondary'"
-                                          x-text="h.tipe === 'libur_nasional' ? 'Libur Nasional' : 'Cuti Bersama'">
+                                    <span @class([
+                                        'text-xs font-semibold font-sans',
+                                        'text-secondary' => $item->is_cuti_bersama,
+                                        'text-primary' => ! $item->is_cuti_bersama,
+                                    ])>
+                                        {{ $item->labelTipe() }}
                                     </span>
                                 </x-ui.table-td>
-                                <x-ui.table-td x-text="new Date(h.tanggal).getFullYear()" padding="comfortable" class="text-sm text-muted"></x-ui.table-td>
+                                <x-ui.table-td padding="comfortable" class="text-sm text-muted">
+                                    {{ $item->tahun }}
+                                </x-ui.table-td>
                                 <x-ui.table-td padding="comfortable">
                                     <div class="flex items-center gap-1.5">
-                                        {{-- Edit Button --}}
-                                        <x-ui.button as="a" x-bind:href="'/hari-libur/' + h.id + '/edit'" variant="secondary" size="icon" title="Edit Hari Libur" aria-label="Edit Hari Libur">
+                                        <x-ui.button
+                                            href="{{ route('hari-libur.edit', $item) }}"
+                                            variant="secondary"
+                                            size="icon"
+                                            title="Edit {{ $item->nama }}"
+                                            aria-label="Edit {{ $item->nama }}"
+                                        >
                                             <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                             </svg>
                                         </x-ui.button>
-                                        {{-- Delete Button --}}
 
-                                        <button type="button" @click="selectedHoliday = h; document.getElementById('modal-title-delete-holiday').innerText = 'Hapus ' + h.nama; $dispatch('open-confirm-delete-holiday')" class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-danger shadow-sm hover:bg-soft cursor-pointer" title="Hapus Hari Libur">
-                                            <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                                            </svg>
-                                        </button>
-
+                                        {{-- Hapus selalu melalui form DELETE ber-CSRF, bukan manipulasi DOM --}}
+                                        <x-ui.confirm-dialog
+                                            id="hapus-hari-libur-{{ $item->id }}"
+                                            title="Hapus Hari Libur"
+                                            message="Hapus {{ $item->nama }} ({{ $item->tanggal?->translatedFormat('d M Y') }})? Kalkulasi hari kerja cuti akan menghitung tanggal ini sebagai hari kerja."
+                                            confirm-text="Hapus"
+                                            variant="danger"
+                                            :action="route('hari-libur.destroy', $item)"
+                                            method="DELETE"
+                                        >
+                                            <x-slot:trigger>
+                                                <button
+                                                    type="button"
+                                                    class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-danger shadow-sm transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-danger/20"
+                                                    title="Hapus {{ $item->nama }}"
+                                                    aria-label="Hapus {{ $item->nama }}"
+                                                >
+                                                    <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                                    </svg>
+                                                </button>
+                                            </x-slot:trigger>
+                                        </x-ui.confirm-dialog>
                                     </div>
                                 </x-ui.table-td>
                             </x-ui.table-row>
-                        </template>
-                        {{-- Empty state --}}
-                        <x-ui.table-row x-show="totalFiltered === 0">
-                            <x-ui.table-td colspan="6" align="center" class="px-0 py-0 text-muted bg-surface">
-                                <x-ui.empty-state icon="document" title="Tidak ada data hari libur untuk filter yang dipilih." />
-                            </x-ui.table-td>
-                        </x-ui.table-row>
+                        @empty
+                            <x-ui.table-row>
+                                <x-ui.table-td colspan="6" align="center" class="px-0 py-0 text-muted bg-surface">
+                                    <x-ui.empty-state
+                                        icon="document"
+                                        title="Belum ada hari libur untuk filter yang dipilih."
+                                        message="Tambahkan hari libur agar kalkulasi hari kerja cuti dan jadwal EWS mengikuti kalender resmi."
+                                    />
+                                </x-ui.table-td>
+                            </x-ui.table-row>
+                        @endforelse
                     </x-ui.table-body>
                 </x-ui.table>
             </div>
@@ -332,38 +262,30 @@
             <div class="flex flex-col gap-3 border-t border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between bg-surface">
                 <div class="flex items-center gap-3">
                     <p class="text-xs text-muted font-sans">
-                        Menampilkan <span class="font-semibold text-ink" x-text="startRange"></span> - <span class="font-semibold text-ink" x-text="endRange"></span> dari <span class="font-semibold text-ink" x-text="totalFiltered"></span> data
+                        Menampilkan
+                        <span class="font-semibold text-ink">{{ $hariLibur->total() === 0 ? 0 : $hariLibur->firstItem() }}</span> -
+                        <span class="font-semibold text-ink">{{ $hariLibur->total() === 0 ? 0 : $hariLibur->lastItem() }}</span> dari
+                        <span class="font-semibold text-ink">{{ $hariLibur->total() }}</span> data
                     </p>
-                    <div class="relative">
-                        <select x-model="perPage" class="appearance-none rounded-lg border border-border bg-surface pl-3 pr-8 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                            <option value="10">10 / halaman</option>
-                            <option value="25">25 / halaman</option>
-                            <option value="50">50 / halaman</option>
-                        </select>
-                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                            </svg>
-                        </div>
-                    </div>
+
+                    <form method="GET" action="{{ route('hari-libur') }}">
+                        <input type="hidden" name="tahun" value="{{ $filters['tahun'] }}">
+                        <input type="hidden" name="tipe" value="{{ $filters['tipe'] }}">
+                        <input type="hidden" name="search" value="{{ $filters['search'] }}">
+                        <label for="per_page" class="sr-only">Jumlah baris per halaman</label>
+                        <x-form.select id="per_page" name="per_page" size="sm" :value="$filters['per_page']" onchange="this.form.submit()">
+                            @foreach ($perPageOptions as $opsi)
+                                <option value="{{ $opsi }}">{{ $opsi }} / halaman</option>
+                            @endforeach
+                        </x-form.select>
+                    </form>
                 </div>
 
-                {{-- Pagination Control --}}
-
                 <div class="flex items-center gap-1.5">
-                    <x-ui.pagination current="currentPage" total="totalPages" action="setPage(page)" />
-
+                    {{ $hariLibur->appends(request()->query())->links('vendor.pagination.simpeg') }}
                 </div>
             </div>
         </x-ui.card>
-
-        <x-ui.confirm-dialog
-            id="delete-holiday"
-            title="Hapus Hari Libur"
-            message="Apakah Anda yakin ingin menghapus hari libur ini?"
-            confirm-text="Hapus"
-            variant="danger"
-        />
 
     </div>
 
