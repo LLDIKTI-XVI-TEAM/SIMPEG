@@ -433,20 +433,25 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         return redirect()->route('data-pegawai');
     })->name('pegawai.index');
 
+    // Parameter memakai model binding ber-UUID agar id rusak berhenti sebagai 404
+    // di layer route, bukan menjadi error database.
     Route::get('/hari-libur', [HariLiburController::class, 'index'])
         ->middleware(['role:super_admin', 'permission:hari_libur.read'])
         ->name('hari-libur');
     Route::post('/hari-libur', [HariLiburController::class, 'store'])
         ->middleware(['role:super_admin', 'permission:hari_libur.create'])
         ->name('hari-libur.store');
-    Route::get('/hari-libur/{id}/edit', [HariLiburController::class, 'edit'])
+    Route::get('/hari-libur/{hariLibur}/edit', [HariLiburController::class, 'edit'])
         ->middleware(['role:super_admin', 'permission:hari_libur.update'])
+        ->whereUuid('hariLibur')
         ->name('hari-libur.edit');
-    Route::post('/hari-libur/{id}', [HariLiburController::class, 'update'])
+    Route::put('/hari-libur/{hariLibur}', [HariLiburController::class, 'update'])
         ->middleware(['role:super_admin', 'permission:hari_libur.update'])
+        ->whereUuid('hariLibur')
         ->name('hari-libur.update');
-    Route::post('/hari-libur/{id}/delete', [HariLiburController::class, 'destroy'])
+    Route::delete('/hari-libur/{hariLibur}', [HariLiburController::class, 'destroy'])
         ->middleware(['role:super_admin', 'permission:hari_libur.delete'])
+        ->whereUuid('hariLibur')
         ->name('hari-libur.destroy');
 
     Route::get('/hari-libur/legacy', function () {
