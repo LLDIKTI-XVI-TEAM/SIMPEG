@@ -80,7 +80,56 @@ class NotificationEventChannelMigrationTest extends TestCase
 
         $this->assertSame(['email', 'in_app'], $rolloverReturnPolicies->pluck('code')->sort()->values()->all());
         $this->assertTrue($rolloverReturnPolicies->every(fn (object $policy): bool => (bool) $policy->is_enabled));
-        $this->assertDatabaseCount('notification_event_channels', 33);
+
+        // Event impor hanya memakai in_app; kedua barisnya sudah ada sebelum migration
+        // 2026_08_05 sehingga migration tersebut tidak menambah baris baru.
+        $importPolicies = DB::table('notification_event_channels')
+            ->join('ref_notification_channels', 'ref_notification_channels.id', '=', 'notification_event_channels.notification_channel_id')
+            ->whereIn('notification_event_channels.event_key', ['import_pegawai', 'import_pegawai_gagal'])
+            ->get([
+                'notification_event_channels.event_key',
+                'notification_event_channels.is_enabled',
+                'ref_notification_channels.code',
+            ]);
+
+        $this->assertCount(2, $importPolicies);
+        $this->assertTrue($importPolicies->every(fn (object $policy): bool => (bool) $policy->is_enabled));
+        $this->assertTrue($importPolicies->every(fn (object $policy): bool => $policy->code === 'in_app'));
+
+        // Event hasil tindak lanjut EWS (migration 2026_08_07) wajib aktif di in_app + email.
+        $followupEvents = [
+            'ews.followup.kenaikan_pangkat',
+            'ews.followup.kgb',
+            'ews.followup.pensiun',
+            'ews.followup.kontrak_pppk',
+            'ews.followup.satyalancana',
+            'ews.followup.tidak_perlu',
+        ];
+
+        $followupPolicies = DB::table('notification_event_channels')
+            ->join('ref_notification_channels', 'ref_notification_channels.id', '=', 'notification_event_channels.notification_channel_id')
+            ->whereIn('notification_event_channels.event_key', $followupEvents)
+            ->get([
+                'notification_event_channels.event_key',
+                'notification_event_channels.is_enabled',
+                'ref_notification_channels.code',
+            ]);
+
+        $this->assertCount(12, $followupPolicies);
+        $this->assertTrue($followupPolicies->every(fn (object $policy): bool => (bool) $policy->is_enabled));
+
+        foreach ($followupEvents as $eventKey) {
+            $this->assertSame(['email', 'in_app'], $followupPolicies
+                ->where('event_key', $eventKey)
+                ->pluck('code')
+                ->sort()
+                ->values()
+                ->all());
+        }
+
+        // Agregat 45 = 33 kebijakan existing (termasuk 2 event impor in_app)
+        // + 12 baris dari 6 event ews.followup.* (in_app + email).
+        $this->assertDatabaseCount('notification_event_channels', 45);
 
         $orphanCount = DB::table('notification_event_channels')
             ->leftJoin('ref_notification_channels', 'ref_notification_channels.id', '=', 'notification_event_channels.notification_channel_id')
