@@ -183,7 +183,8 @@ class EmployeeReportPdfExportTest extends TestCase
         foreach ([
             'Kementerian Pendidikan Tinggi, Sains, dan Teknologi',
             'Lembaga Layanan Pendidikan Tinggi (LLDIKTI) Wilayah XVI',
-            'Daftar Nominatif Pegawai',
+            // Judul resmi PDF mengikuti acceptance criteria secara persis.
+            'Daftar Pegawai',
             'Tanggal Cetak:',
             '>NIP</th>',
             '>Nama Pegawai</th>',
