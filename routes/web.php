@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\CutiReportController;
 use App\Http\Controllers\Admin\DataMasterController;
 use App\Http\Controllers\Admin\DataMasterEselonController;
 use App\Http\Controllers\Admin\DataMasterGolonganController;
+use App\Http\Controllers\Admin\DataMasterJabatanController;
 use App\Http\Controllers\Admin\DataMasterJenisJabatanController;
 use App\Http\Controllers\Admin\DataMasterJenjangPendidikanController;
 use App\Http\Controllers\Admin\DataMasterStatusPegawaiController;
@@ -263,6 +264,14 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
             ->whereUuid('jenisJabatan')->name('jenis-jabatan.toggle');
         Route::post('/jenis-jabatan/{jenisJabatan}/destroy', [DataMasterJenisJabatanController::class, 'destroy'])
             ->whereUuid('jenisJabatan')->name('jenis-jabatan.destroy');
+
+        Route::post('/jabatan', [DataMasterJabatanController::class, 'store'])->name('jabatan.store');
+        Route::post('/jabatan/{jabatan}/update', [DataMasterJabatanController::class, 'update'])
+            ->whereUuid('jabatan')->name('jabatan.update');
+        Route::post('/jabatan/{jabatan}/toggle-aktif', [DataMasterJabatanController::class, 'toggle'])
+            ->whereUuid('jabatan')->name('jabatan.toggle');
+        Route::post('/jabatan/{jabatan}/destroy', [DataMasterJabatanController::class, 'destroy'])
+            ->whereUuid('jabatan')->name('jabatan.destroy');
 
         Route::post('/unit-kerja', [DataMasterUnitKerjaController::class, 'store'])->name('unit-kerja.store');
         Route::post('/unit-kerja/{unitKerja}/update', [DataMasterUnitKerjaController::class, 'update'])
