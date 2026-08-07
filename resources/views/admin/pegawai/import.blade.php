@@ -53,6 +53,21 @@
         get unmappedHeadersCount() {
             return this.unmappedHeaders.length;
         },
+        get hasDuplicateMapping() {
+            const selected = Object.values(this.columnMapping).filter(val => val && val !== 'ignore');
+            return new Set(selected).size !== selected.length;
+        },
+        get duplicateMappedFields() {
+            const counts = {};
+            const duplicates = [];
+            Object.values(this.columnMapping).forEach(val => {
+                if (val && val !== 'ignore') {
+                    counts[val] = (counts[val] || 0) + 1;
+                    if (counts[val] === 2) duplicates.push(val);
+                }
+            });
+            return duplicates;
+        },
         autoMatchHeaders() {
             const mapping = {};
             this.mainHeaders.forEach(header => {
@@ -255,6 +270,11 @@
         // Step 2 → 3: Jalankan validasi (kirim rows yang diedit)
         async runValidation() {
             if (!this.batchId) return;
+            
+            if (this.hasDuplicateMapping) {
+                this.apiError = 'Terdapat target kolom SIMPEG yang dipetakan lebih dari sekali (' + this.duplicateMappedFields.join(', ') + '). Setiap target SIMPEG hanya boleh dipilih oleh satu kolom sumber.';
+                return;
+            }
             
             this.isValidating = true;
             this.apiError = '';
@@ -634,6 +654,11 @@
                         </div>
                     </template>
                 </div>
+                <div x-show="hasDuplicateMapping" x-cloak>
+                    <x-ui.alert variant="warning" size="sm">
+                        ⚠️ <strong>Konflik Pemetaan Kolom:</strong> Target <span class="font-bold underline" x-text="duplicateMappedFields.join(', ')"></span> dipilih lebih dari sekali. Setiap target SIMPEG hanya boleh dipetakan dari satu kolom sumber agar data tidak tertimpa.
+                    </x-ui.alert>
+                </div>
             </x-ui.card>
 
             {{-- Editable Preview Table --}}
@@ -695,8 +720,8 @@
                     <x-ui.button type="button" variant="muted" @click="resetAll()">
                         Batal & Upload Ulang
                     </x-ui.button>
-                    <button type="button" @click="runValidation()" :disabled="isValidating"
-                        :class="isValidating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'"
+                    <button type="button" @click="runValidation()" :disabled="isValidating || hasDuplicateMapping"
+                        :class="(isValidating || hasDuplicateMapping) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'"
                         class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition font-sans gap-2">
                         <x-ui.loading x-show="isValidating" size="md" />
                         <span x-text="isValidating ? 'Memvalidasi...' : 'Lanjutkan ke Validasi'"></span>
