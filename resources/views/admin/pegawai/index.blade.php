@@ -417,6 +417,13 @@
                     </svg>
                     Export Excel
                 </button>
+                <button onclick="exportFilteredDataPdf()" id="export-pdf-btn"
+                    class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm cursor-pointer">
+                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.617 0-1.11-.476-1.12-1.09l-.23-2.523M19.5 10.5v.375c0 .621-.504 1.125-1.125 1.125H5.625A1.125 1.125 0 0 1 4.5 11.25v-.375m15 0V9a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 9v1.5m15 0A1.5 1.5 0 0 0 18 9h-3V6a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3H6a1.5 1.5 0 0 0-1.5 1.5" />
+                    </svg>
+                    Export PDF
+                </button>
                 <div class="relative" x-data="{ open: false }">
                     <button @click="open = !open" @click.outside="open = false" id="add-pegawai-btn"
                         class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
@@ -1058,7 +1065,7 @@
                                 class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 <option value="">Pilih Jabatan</option>
                                 @foreach($jabatanOptions ?? [] as $ref)
-                                    <option value="{{ $ref->id }}">{{ $ref->nama }}</option>
+                                    <option value="{{ data_get($ref, 'id') }}">{{ data_get($ref, 'nama') }}</option>
                                 @endforeach
                             </select>
                             <template x-if="errors.jabatan_id">
@@ -1071,7 +1078,7 @@
                                 class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 <option value="">Pilih Jenis</option>
                                 @foreach($jenisJabatanOptions ?? [] as $ref)
-                                    <option value="{{ $ref->id }}">{{ $ref->nama }}</option>
+                                    <option value="{{ data_get($ref, 'id') }}">{{ data_get($ref, 'nama') }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -1083,7 +1090,7 @@
                                 class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 <option value="">Pilih Unit</option>
                                 @foreach($unitKerjaOptions ?? [] as $unit)
-                                    <option value="{{ $unit->id }}">{{ $unit->nama }}</option>
+                                    <option value="{{ data_get($unit, 'id') }}">{{ data_get($unit, 'nama') }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -1214,18 +1221,57 @@
         }
 
         function exportFilteredData() {
-            // Find the Alpine component data
-            const alpineData = Alpine.$data(document.querySelector('[x-data="employeeManagement()"]'));
+            // Find the Alpine component data by passing a child element
+            const btnEl = document.getElementById('export-btn');
+            if (!btnEl) { alert('Export button not found'); return; }
+            const alpineData = Alpine.$data(btnEl);
             const form = document.createElement('form');
             form.method = 'GET';
             form.action = '{{ route("pegawai.export") }}';
             
             const params = {
-                search: alpineData.search,
-                golongan: alpineData.golongan,
-                unit: alpineData.unit,
-                jenis: alpineData.jenis,
-                status: alpineData.status
+                search: alpineData.filters.search,
+                golongan: alpineData.filters.golongan,
+                unit: alpineData.filters.unit_kerja_id,
+                jenis: alpineData.filters.jenis_pegawai_id,
+                status: alpineData.filters.status_pegawai_id === 'all' ? '' : alpineData.filters.status_pegawai_id
+            };
+
+            for (const key in params) {
+                if (params[key]) {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = key;
+                    input.value = params[key];
+                    form.appendChild(input);
+                }
+            }
+            
+            document.body.appendChild(form);
+            form.submit();
+            document.body.removeChild(form);
+        }
+
+        function exportFilteredDataPdf() {
+            const btnEl = document.getElementById('export-pdf-btn');
+            if (!btnEl) { alert('Export button not found'); return; }
+            const alpineData = Alpine.$data(btnEl);
+            
+            if (alpineData.meta.total > 500) {
+                alert('Tolong sempitkan filter Anda terlebih dahulu, maksimal 500 baris.');
+                return;
+            }
+
+            const form = document.createElement('form');
+            form.method = 'GET';
+            form.action = '{{ route("laporan.pegawai.pdf") }}';
+            
+            const params = {
+                search: alpineData.filters.search,
+                golongan: alpineData.filters.golongan,
+                unit: alpineData.filters.unit_kerja_id,
+                jenis: alpineData.filters.jenis_pegawai_id,
+                status: alpineData.filters.status_pegawai_id === 'all' ? '' : alpineData.filters.status_pegawai_id
             };
 
             for (const key in params) {

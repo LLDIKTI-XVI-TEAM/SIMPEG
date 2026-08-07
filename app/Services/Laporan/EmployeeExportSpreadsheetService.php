@@ -2,13 +2,11 @@
 
 namespace App\Services\Laporan;
 
+use App\Support\Laporan\ExcelStyleHelper;
 use Illuminate\Support\Collection;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Style\Alignment;
-use PhpOffice\PhpSpreadsheet\Style\Border;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
 
 class EmployeeExportSpreadsheetService
 {
@@ -47,13 +45,8 @@ class EmployeeExportSpreadsheetService
             $columnIndex++;
         }
 
-        $sheet->getRowDimension(1)->setRowHeight(30);
-        $sheet->getStyle('A1:'.$lastColumn.'1')->applyFromArray([
-            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 11, 'name' => 'Calibri'],
-            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '122E92']],
-            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => true],
-            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CACFE0']]],
-        ]);
+        $sheet->getRowDimension(1)->setRowHeight(32);
+        ExcelStyleHelper::applyHeaderStyle($sheet, 'A1:'.$lastColumn.'1');
 
         foreach ($rows->values() as $index => $row) {
             $rowNumber = $index + 2;
@@ -72,18 +65,14 @@ class EmployeeExportSpreadsheetService
                 $columnIndex++;
             }
 
-            $sheet->getRowDimension($rowNumber)->setRowHeight(18);
-            $sheet->getStyle('A'.$rowNumber.':'.$lastColumn.$rowNumber)->applyFromArray([
-                'font' => ['size' => 10, 'name' => 'Calibri'],
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $index % 2 === 0 ? 'FFFFFF' : 'EEF2FF']],
-                'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
-                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CACFE0']]],
-            ]);
         }
 
         $lastRow = max(1, $rows->count() + 1);
-        $sheet->freezePane('A2');
-        $sheet->setAutoFilter('A1:'.$lastColumn.$lastRow);
+        if ($rows->isNotEmpty()) {
+            ExcelStyleHelper::applyRowStyle($sheet, 'A2:'.$lastColumn.$lastRow);
+        }
+
+        ExcelStyleHelper::applyGlobalSetup($sheet, 'A1:'.$lastColumn.$lastRow);
 
         return $spreadsheet;
     }

@@ -6,20 +6,13 @@
     <style>
         @page { margin: 28px 32px 42px; }
         body { color: #111827; font-family: DejaVu Sans, sans-serif; font-size: 9px; }
-        .kop-surat { width: 100%; border-bottom: 2px solid #111827; margin-bottom: 16px; padding-bottom: 10px; }
-        .kop-surat td { vertical-align: middle; border: none; padding: 0; }
-        .kop-surat img { width: 60px; height: 60px; }
-        .kop-text { text-align: center; }
-        .kop-text h1 { font-size: 14px; margin: 0 0 2px 0; text-transform: uppercase; }
-        .kop-text h2 { font-size: 12px; margin: 0 0 4px 0; color: #1e3a8a; text-transform: uppercase; }
-        .kop-text p { font-size: 8px; margin: 0; color: #4b5563; }
         .title-doc { text-align: center; margin-top: 16px; margin-bottom: 16px; }
         .title-doc h3 { font-size: 12px; margin: 0 0 4px 0; text-transform: uppercase; text-decoration: underline; letter-spacing: 1px; }
         .title-doc p { font-size: 9px; margin: 0; color: #4b5563; }
         .meta { margin-bottom: 12px; font-weight: bold; }
-        table.data-table { border-collapse: collapse; width: 100%; margin-bottom: 18px; }
-        table.data-table th, table.data-table td { border: 1px solid #9ca3af; padding: 6px 5px; vertical-align: top; }
-        table.data-table th { background: #f3f4f6; font-size: 8px; text-align: left; font-weight: bold; text-transform: uppercase; }
+        table.data-table { border-collapse: collapse; width: 100%; margin-bottom: 18px; color: #000; }
+        table.data-table th, table.data-table td { border: 1px solid #000; padding: 6px 5px; vertical-align: top; color: #000; }
+        table.data-table th { font-size: 8px; text-align: left; font-weight: bold; text-transform: uppercase; background-color: transparent; }
         .number { text-align: right; }
         .center { text-align: center; }
         .empty { padding: 18px; text-align: center; color: #6b7280; }
@@ -32,19 +25,7 @@
     </style>
 </head>
 <body>
-    <table class="kop-surat">
-        <tr>
-            <td width="80" class="center">
-                <img src="{{ public_path('img/dikti16-favicon-blue-150x150.png') }}" alt="Logo LLDIKTI XVI">
-            </td>
-            <td class="kop-text">
-                <h1>Kementerian Pendidikan Tinggi, Sains, dan Teknologi</h1>
-                <h2>Lembaga Layanan Pendidikan Tinggi (LLDIKTI) Wilayah XVI</h2>
-                <p>Jl. Prof. Dr. Aloei Saboe, Wongkaditi, Kota Gorontalo</p>
-            </td>
-            <td width="80"></td>
-        </tr>
-    </table>
+    <x-laporan.kop-surat :forPdf="true" />
 
     <div class="title-doc">
         <h3>Rekap Cuti Pegawai</h3>

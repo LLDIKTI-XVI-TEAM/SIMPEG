@@ -6,14 +6,13 @@ use App\Models\Employee;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
+use App\Support\Laporan\ExcelStyleHelper;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Shared\Date;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
-use PhpOffice\PhpSpreadsheet\Style\Border;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
-use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -140,13 +139,7 @@ class ExportEmployeeAction
             $sheet->setCellValue($col.'1', $label);
         }
         $sheet->getRowDimension(1)->setRowHeight(32);
-
-        $sheet->getStyle('A1:P1')->applyFromArray([
-            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 10, 'name' => 'Calibri'],
-            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1F5A83']],
-            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => true],
-            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '69BFE3']]],
-        ]);
+        ExcelStyleHelper::applyHeaderStyle($sheet, 'A1:P1');
 
         foreach ($pegawaiData as $i => $employee) {
             $r = $i + 2;
@@ -175,18 +168,12 @@ class ExportEmployeeAction
                 $sheet->setCellValue('P'.$r, Date::PHPToExcel($employee->tanggal_lahir));
             }
 
-            $sheet->getRowDimension($r)->setRowHeight(21);
-            $sheet->getStyle('A'.$r.':P'.$r)->applyFromArray([
-                'font' => ['size' => 10, 'name' => 'Calibri', 'color' => ['rgb' => '111827']],
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'D9F2FB']],
-                'alignment' => ['vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => false],
-                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '69BFE3']]],
-            ]);
         }
 
         $lastRow = $pegawaiData->count() + 1;
 
         if ($pegawaiData->isNotEmpty()) {
+            ExcelStyleHelper::applyRowStyle($sheet, 'A2:P'.$lastRow);
             $sheet->getStyle('A2:A'.$lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle('D2:D'.$lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle('F2:K'.$lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
@@ -195,11 +182,7 @@ class ExportEmployeeAction
             $sheet->getStyle('P2:P'.$lastRow)->getNumberFormat()->setFormatCode('mmmm d, yyyy');
         }
 
-        $sheet->freezePane('A2');
-        $sheet->setAutoFilter('A1:P'.$lastRow);
-        $sheet->getPageSetup()->setOrientation(PageSetup::ORIENTATION_LANDSCAPE)->setPaperSize(PageSetup::PAPERSIZE_A4)->setFitToWidth(1)->setFitToHeight(0);
-        $sheet->getPageMargins()->setTop(0.3)->setRight(0.25)->setBottom(0.3)->setLeft(0.25);
-        $sheet->getPageSetup()->setRowsToRepeatAtTopByStartAndEnd(1, 1);
+        ExcelStyleHelper::applyGlobalSetup($sheet, 'A1:P'.$lastRow);
 
         return $spreadsheet;
     }

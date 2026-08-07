@@ -33,7 +33,7 @@ class LaporanController extends Controller
         return $action->execute($request->validated());
     }
 
-    public function exportPegawaiPdf(ExportPegawaiRequest $request, ExportPegawaiPdfAction $action): StreamedResponse|RedirectResponse
+    public function exportPegawaiPdf(ExportPegawaiRequest $request, ExportPegawaiPdfAction $action): \Illuminate\Http\Response|StreamedResponse|RedirectResponse
     {
         return $action->execute($request->validated());
     }

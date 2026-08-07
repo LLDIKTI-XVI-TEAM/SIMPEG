@@ -9,14 +9,7 @@
         {{-- PRINT ONLY HEADER (Kop Surat Resmi)                         --}}
         {{-- ============================================================ --}}
         <div class="hidden print:block mb-8">
-            <div class="flex items-center justify-center border-b-2 border-black pb-4">
-                <img src="{{ asset('img/dikti16-favicon-blue-150x150.png') }}" class="h-16 w-16 mr-4" alt="Logo LLDIKTI XVI">
-                <div class="text-center">
-                    <h1 class="text-lg font-bold uppercase font-sans leading-tight">Kementerian Pendidikan Tinggi, Sains, dan Teknologi</h1>
-                    <h2 class="text-base font-bold uppercase font-sans text-primary leading-tight">Lembaga Layanan Pendidikan Tinggi (LLDIKTI) Wilayah XVI</h2>
-                    <p class="text-xs text-muted">Jl. Prof. Dr. Aloei Saboe, Wongkaditi, Kota Gorontalo</p>
-                </div>
-            </div>
+            <x-laporan.kop-surat />
             <div class="text-center mt-6">
                 <div class="font-bold uppercase font-sans tracking-wide text-sm underline">Daftar Nominatif Pegawai</div>
                 <p class="text-[11px] text-muted mt-1 font-sans">Tanggal Cetak: {{ now()->translatedFormat('d F Y') }}</p>
@@ -361,7 +354,7 @@
             {{-- Table --}}
             <div class="overflow-x-auto print:overflow-visible">
                 <x-ui.table class="print:border-collapse print:border print:border-black">
-                    <x-ui.table-head class="print:bg-gray-100">
+                    <x-ui.table-head class="print:bg-transparent">
                         <x-ui.table-row>
                             <x-ui.table-th class="w-14 text-center select-none print:border print:border-black print:text-black">No</x-ui.table-th>
                             <template x-for="col in activeColumns" :key="col.key">
@@ -457,7 +450,7 @@
             .print\:table-row  { display: table-row !important; }
             @page { size: landscape; margin: 1.2cm 1.2cm 1cm 1.2cm; }
 
-            table {
+            table:not(.kop-surat) {
                 width: 100% !important;
                 border-collapse: collapse !important;
                 border-spacing: 0 !important;
@@ -467,21 +460,21 @@
                 box-sizing: border-box !important;
             }
 
-            table th, table td {
+            table:not(.kop-surat) th, table:not(.kop-surat) td {
                 border: 1px solid #000000 !important;
                 padding: 4px 6px !important;
                 color: #000000 !important;
                 font-size: 9.5px !important;
-                background-color: #ffffff !important;
+                background-color: transparent !important;
                 box-sizing: border-box !important;
             }
 
-            table th {
+            table:not(.kop-surat) th {
                 font-weight: bold !important;
                 text-transform: uppercase !important;
             }
 
-            table tr {
+            table:not(.kop-surat) tr {
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
             }

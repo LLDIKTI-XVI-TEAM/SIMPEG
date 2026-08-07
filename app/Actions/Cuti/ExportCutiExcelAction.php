@@ -6,13 +6,11 @@ use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
 use App\Queries\Cuti\CutiRekapQuery;
 use App\Support\Cuti\CutiReportStatusFormatter;
+use App\Support\Laporan\ExcelStyleHelper;
 use Illuminate\Http\RedirectResponse;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Shared\Date;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Style\Alignment;
-use PhpOffice\PhpSpreadsheet\Style\Border;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\Response;
@@ -47,11 +45,11 @@ class ExportCutiExcelAction
         $employeeIds = $details->pluck('employee_id')->unique();
 
         $balanceQuery = $this->rekapQuery->balanceRows($filters);
-        
+
         if (empty($filters['pegawai'])) {
             $balanceQuery->whereIn('leave_balances.employee_id', $employeeIds);
         }
-        
+
         $balanceCount = (clone $balanceQuery)->count();
 
         if ($balanceCount > self::MAX_ROWS) {
@@ -195,28 +193,14 @@ class ExportCutiExcelAction
 
     private function applyTableStyles(Worksheet $sheet, string $lastColumn, int $lastRow): void
     {
-        $sheet->getStyle('A1:'.$lastColumn.'1')->applyFromArray([
-            'font' => ['bold' => true],
-            'fill' => [
-                'fillType' => Fill::FILL_SOLID,
-                'startColor' => ['argb' => 'FFDBEAFE'],
-            ],
-            'alignment' => [
-                'horizontal' => Alignment::HORIZONTAL_CENTER,
-                'vertical' => Alignment::VERTICAL_CENTER,
-            ],
-        ]);
+        $sheet->getRowDimension(1)->setRowHeight(32);
+        ExcelStyleHelper::applyHeaderStyle($sheet, 'A1:'.$lastColumn.'1');
 
-        if ($lastRow >= 1) {
-            $sheet->getStyle('A1:'.$lastColumn.$lastRow)->applyFromArray([
-                'borders' => [
-                    'allBorders' => [
-                        'borderStyle' => Border::BORDER_THIN,
-                        'color' => ['argb' => 'FF9CA3AF'],
-                    ],
-                ],
-            ]);
+        if ($lastRow >= 2) {
+            ExcelStyleHelper::applyRowStyle($sheet, 'A2:'.$lastColumn.$lastRow);
         }
+
+        ExcelStyleHelper::applyGlobalSetup($sheet, 'A1:'.$lastColumn.$lastRow);
 
         foreach (range('A', $lastColumn) as $col) {
             $sheet->getColumnDimension($col)->setAutoSize(true);

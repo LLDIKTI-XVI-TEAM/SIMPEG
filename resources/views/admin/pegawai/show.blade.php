@@ -877,7 +877,7 @@
                         <div class="flex items-start sm:items-center justify-between gap-4">
                             <div>
                             <span class="text-xs font-bold text-ink font-sans block">Toggle Flag "Kinerja Baik"</span>
-                            <p class="text-xs text-muted">Flag manual pengganti SKP sementara untuk menentukan eligibility kenaikan pangkat di EWS.</p>
+                            <p class="text-xs text-muted">Flag ini menggantikan penilaian SKP yang belum tersedia di Fase 1. Akan digantikan oleh modul Penilaian Kinerja di fase selanjutnya.</p>
                             <p x-show="isUpdatingKinerja" class="mt-1 text-[10px] text-primary font-sans" style="display: none;">
                                 Menyimpan status kinerja.
                             </p>
