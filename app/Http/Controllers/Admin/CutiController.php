@@ -97,16 +97,18 @@ class CutiController extends Controller
         }
 
         $isRolloverReturn = $cuti->status === LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER;
+        $isVerifierContext = $canAct || $user->hasPermission('cuti.read_all');
         $targetBalance = $isRolloverReturn && $cuti->employee !== null && $cuti->rollover_target_year !== null
             ? $balancePreview->execute($cuti->employee, Carbon::create($cuti->rollover_target_year, 1, 1)->startOfDay())
             : null;
-        $employeeBalance = $cuti->employee !== null
+        $employeeBalance = $isVerifierContext && $cuti->employee !== null
             ? $balancePreview->execute($cuti->employee, $cuti->tanggal_mulai ?? now())
             : null;
 
         return view('admin.cuti.show', [
             'cuti' => $cuti,
             'canAct' => $canAct,
+            'isVerifierContext' => $isVerifierContext,
             'canDownloadFormulir' => $canDownloadFormulir,
             'canResubmit' => in_array($cuti->status, ['perlu_perubahan', LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER], true)
                 && $cuti->employee_id === $user->employee_id,

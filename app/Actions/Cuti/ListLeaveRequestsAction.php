@@ -85,8 +85,8 @@ class ListLeaveRequestsAction
                 $query->whereYear('tanggal_mulai', $parts[0])->whereMonth('tanggal_mulai', $parts[1]);
             }
         }
-        if ($tahun !== '') {
-            $query->whereYear('tanggal_mulai', $tahun);
+        if ($tahun !== '' && ctype_digit($tahun) && strlen($tahun) === 4) {
+            $query->whereYear('tanggal_mulai', (int) $tahun);
         }
         if ($search !== '') {
             $query->whereHas('employee', function ($employeeQuery) use ($search): void {

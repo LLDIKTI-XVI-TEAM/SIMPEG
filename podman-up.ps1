@@ -19,17 +19,21 @@ if (-not (Get-Command podman -ErrorAction SilentlyContinue)) {
 }
 
 # Pastikan Podman machine berjalan
-try {
-    $null = podman ps 2>&1
-} catch {
+$null = podman ps 2>&1
+if ($LASTEXITCODE -ne 0) {
     Write-Host "[INFO] Menyalakan Podman machine..." -ForegroundColor Yellow
     podman machine start
 }
 
 # Tambahkan path ke Python Scripts jika podman-compose ada di sana
-$pythonScripts = "$env:USERPROFILE\AppData\Roaming\Python\Python314\Scripts"
-if ((Test-Path $pythonScripts) -and (-not ($env:Path -split ';' -contains $pythonScripts))) {
-    $env:Path = "$pythonScripts;$env:Path"
+$pythonDirs = Get-ChildItem "$env:USERPROFILE\AppData\Roaming\Python" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
+if ($pythonDirs) {
+    foreach ($dir in $pythonDirs) {
+        $scriptsPath = Join-Path $dir "Scripts"
+        if ((Test-Path $scriptsPath) -and (-not ($env:Path -split ';' -contains $scriptsPath))) {
+            $env:Path = "$scriptsPath;$env:Path"
+        }
+    }
 }
 
 function Invoke-PodmanCompose {

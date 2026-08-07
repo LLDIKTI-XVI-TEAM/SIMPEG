@@ -61,6 +61,22 @@
             this.columnMapping = mapping;
         },
 
+        // Transform row keys based on columnMapping selection before sending to validation/import pipeline
+        getMappedRows() {
+            return this.allRows.map(rowObj => {
+                const mappedData = {};
+                Object.keys(rowObj.data).forEach(header => {
+                    const targetField = this.columnMapping[header];
+                    if (targetField && targetField !== 'ignore') {
+                        mappedData[targetField] = rowObj.data[header];
+                    } else if (!targetField) {
+                        mappedData[header] = rowObj.data[header];
+                    }
+                });
+                return { row: rowObj.row, data: mappedData };
+            });
+        },
+
         // Pagination preview
         previewPage: 1,
         previewPerPage: 10,
@@ -238,8 +254,8 @@
             this.apiError = '';
             
             try {
-                // Kirim rows jika ada edit, atau tanpa body jika tidak ada perubahan
-                const body = this.hasEdits ? { rows: this.allRows } : {};
+                // Kirim rows yang sudah dipetakan berdasarkan pilihan columnMapping
+                const body = { rows: this.getMappedRows() };
                 
                 const res = await fetch('/api/pegawai/import/' + this.batchId + '/validate', {
                     method: 'POST',

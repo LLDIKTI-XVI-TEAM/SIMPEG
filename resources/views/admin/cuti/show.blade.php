@@ -284,7 +284,7 @@
                 @endif
 
             {{-- Multi-year Leave Balance Widget for Verifier (US-4.5 AC-2) --}}
-            @if ($employeeBalance !== null)
+            @if (($isVerifierContext ?? false) && $employeeBalance !== null)
                 <div class="border-t border-border pt-6 space-y-4">
                     <x-ui.card padding="md" class="border-primary/20 bg-primary/5 space-y-4">
                         <div class="flex items-center justify-between border-b border-border pb-3">
@@ -314,13 +314,13 @@
 
                             <div class="p-3 bg-surface rounded-lg border border-border space-y-1">
                                 <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Penggunaan N-1 ({{ $employeeBalance['tahun'] - 1 }})</span>
-                                <p class="text-lg font-bold text-ink font-sans">{{ $employeeBalance['bucket']['n1'] ?? 0 }} Hari</p>
+                                <p class="text-lg font-bold text-ink font-sans">{{ $employeeBalance['used_n1'] ?? 0 }} Hari</p>
                                 <p class="text-[10px] text-muted">Terpakai pada N-1</p>
                             </div>
 
                             <div class="p-3 bg-surface rounded-lg border border-border space-y-1">
                                 <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Penggunaan N-2 ({{ $employeeBalance['tahun'] - 2 }})</span>
-                                <p class="text-lg font-bold text-ink font-sans">{{ $employeeBalance['bucket']['n2'] ?? 0 }} Hari</p>
+                                <p class="text-lg font-bold text-ink font-sans">{{ $employeeBalance['used_n2'] ?? 0 }} Hari</p>
                                 <p class="text-[10px] text-muted">Terpakai pada N-2</p>
                             </div>
                         </div>

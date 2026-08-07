@@ -92,6 +92,15 @@ class LeaveBalanceService
             ->first();
         $rule5Active = $this->hasApprovedCutiBesar($employeeModel->id, $tahun);
 
+        $usedN1 = (int) (LeaveBalance::query()
+            ->where('employee_id', $employeeModel->id)
+            ->where('tahun', $tahun - 1)
+            ->value('terpakai') ?? 0);
+        $usedN2 = (int) (LeaveBalance::query()
+            ->where('employee_id', $employeeModel->id)
+            ->where('tahun', $tahun - 2)
+            ->value('terpakai') ?? 0);
+
         if ($rule5Active) {
             // Cuti Besar final menonaktifkan hak efektif tanpa mengubah summary atau ledger,
             // karena keduanya tetap diperlukan sebagai riwayat administratif yang auditabel.
@@ -102,6 +111,8 @@ class LeaveBalanceService
                 'jatah_dasar' => 0,
                 'carry_over' => 0,
                 'terpakai_final' => (int) ($balance?->terpakai ?? 0),
+                'used_n1' => $usedN1,
+                'used_n2' => $usedN2,
                 'koreksi_administratif' => (int) LeaveBalanceLedger::query()
                     ->where('employee_id', $employeeModel->id)
                     ->where('tahun', $tahun)
@@ -141,6 +152,8 @@ class LeaveBalanceService
                 : (int) $balance->jatah_awal,
             'carry_over' => $buckets['n2'] + $buckets['n1'],
             'terpakai_final' => (int) ($balance?->terpakai ?? 0),
+            'used_n1' => $usedN1,
+            'used_n2' => $usedN2,
             'koreksi_administratif' => (int) LeaveBalanceLedger::query()
                 ->where('employee_id', $employeeModel->id)
                 ->where('tahun', $tahun)
