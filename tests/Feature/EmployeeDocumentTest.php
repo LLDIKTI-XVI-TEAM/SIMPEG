@@ -34,8 +34,6 @@ class EmployeeDocumentTest extends TestCase
         $this->seed(ReferenceSeeder::class);
         $this->seed(RbacSeeder::class);
 
-        Storage::fake(Document::STORAGE_DISK);
-        Storage::fake('public');
     }
 
     public function test_rank_history_creation_syncs_to_documents_table(): void

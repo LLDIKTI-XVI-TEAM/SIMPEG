@@ -65,6 +65,7 @@ class ProfileTest extends TestCase
         $response->assertOk();
         $response->assertDontSee('Belum tersedia', false);
         $response->assertSee('Hak Efektif Tahun Ini', false);
+        $response->assertSee('-', false);
     }
 
     public function test_profile_rule_5_menampilkan_sisa_efektif_nol_tanpa_mengubah_saldo_tercatat(): void

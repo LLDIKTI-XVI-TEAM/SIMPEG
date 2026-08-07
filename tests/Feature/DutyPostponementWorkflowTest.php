@@ -978,7 +978,6 @@ class DutyPostponementWorkflowTest extends TestCase
         if (DB::connection()->getDriverName() !== 'pgsql') {
             $this->markTestSkipped('Constraint PostgreSQL hanya dapat diuji pada database PostgreSQL.');
         }
-
         $fixture = $this->makeWorkflowFixture();
         $before = $this->workflowState($fixture['request']->id, $fixture['balance']);
         DB::statement("ALTER TABLE audit_logs ADD CONSTRAINT test_duty_postponement_audit_failure CHECK (event <> 'DUTY_POSTPONEMENT')");
@@ -999,7 +998,6 @@ class DutyPostponementWorkflowTest extends TestCase
         if (DB::connection()->getDriverName() !== 'pgsql') {
             $this->markTestSkipped('Constraint PostgreSQL hanya dapat diuji pada database PostgreSQL.');
         }
-
         $fixture = $this->makeWorkflowFixture();
         $before = $this->workflowState($fixture['request']->id, $fixture['balance']);
         DB::statement("ALTER TABLE notifications ADD CONSTRAINT test_duty_postponement_notification_failure CHECK (type <> 'cuti.ditangguhkan_tugas_dinas')");

@@ -22,8 +22,11 @@ class EmployeeExportDataService
     public function rows(array $filters, bool $defaultToActive = true): Collection
     {
         $status = $this->stringFilter($filters, 'status');
+        $statusId = $this->stringFilter($filters, 'status_pegawai_id');
         $unit = $this->stringFilter($filters, 'unit');
+        $unitId = $this->stringFilter($filters, 'unit_kerja_id');
         $jenis = $this->stringFilter($filters, 'jenis');
+        $jenisId = $this->stringFilter($filters, 'jenis_pegawai_id');
         $golongan = $this->stringFilter($filters, 'golongan');
         $jabatan = $this->stringFilter($filters, 'jabatan');
         $search = mb_strtolower($this->stringFilter($filters, 'search'));
@@ -67,16 +70,27 @@ class EmployeeExportDataService
                         ->orWhere('golongan_terakhir', 'like', $golongan.'/%');
                 });
             })
-            ->when($unit !== '', function (Builder $query) use ($unit): void {
+            ->when($unitId !== '', function (Builder $query) use ($unitId): void {
+                $query->whereHas('positionHistories', function (Builder $query) use ($unitId): void {
+                    $query->where('is_latest', true)->where('unit_kerja_id', $unitId);
+                });
+            })
+            ->when($unitId === '' && $unit !== '', function (Builder $query) use ($unit): void {
                 $query->whereHas('positionHistories', function (Builder $query) use ($unit): void {
                     $query->where('is_latest', true)
                         ->whereHas('unitKerja', fn (Builder $query) => $query->where('nama', $unit));
                 });
             })
-            ->when($jenis !== '', function (Builder $query) use ($jenis): void {
+            ->when($jenisId !== '', function (Builder $query) use ($jenisId): void {
+                $query->where('jenis_pegawai_id', $jenisId);
+            })
+            ->when($jenisId === '' && $jenis !== '', function (Builder $query) use ($jenis): void {
                 $query->whereHas('jenisPegawai', fn (Builder $query) => $query->where('nama', $jenis));
             })
-            ->when($status !== '' || $defaultToActive, function (Builder $query) use ($status): void {
+            ->when($statusId !== '', function (Builder $query) use ($statusId): void {
+                $query->where('status_pegawai_id', $statusId);
+            })
+            ->when($statusId === '' && ($status !== '' || $defaultToActive), function (Builder $query) use ($status): void {
                 $resolvedStatus = $status ?: 'Aktif';
 
                 $query->where(function (Builder $query) use ($resolvedStatus): void {

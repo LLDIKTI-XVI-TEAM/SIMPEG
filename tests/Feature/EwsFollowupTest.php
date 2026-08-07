@@ -135,7 +135,7 @@ class EwsFollowupTest extends TestCase
 
     public function test_pangkat_approval_creates_new_history_and_resets_ews_from_configured_tmt(): void
     {
-        Storage::fake('public');
+
         EwsConfig::setVal('pangkat_required_years', '3');
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create([
@@ -203,7 +203,7 @@ class EwsFollowupTest extends TestCase
 
     public function test_kgb_approval_creates_new_history_and_resets_ews_from_configured_tmt(): void
     {
-        Storage::fake('public');
+
         EwsConfig::setVal('kgb_required_years', '4');
         $user = User::factory()->superAdmin()->create();
         $employee = Employee::factory()->create([
@@ -258,7 +258,7 @@ class EwsFollowupTest extends TestCase
 
     public function test_pension_approval_uploads_sk_sets_employee_to_pensiun_and_stops_reminders(): void
     {
-        Storage::fake('public');
+
         $user = User::factory()->superAdmin()->create();
         $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
         $alert = $this->activeAlertFor($employee, 'PENSIUN', now()->subDay()->toDateString(), 90);
@@ -360,7 +360,7 @@ class EwsFollowupTest extends TestCase
 
     public function test_failed_pension_followup_cleans_up_uploaded_sk_file(): void
     {
-        Storage::fake('public');
+
         $user = User::factory()->superAdmin()->create();
         $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
         $alert = $this->activeAlertFor($employee, 'PENSIUN', now()->subDay()->toDateString(), 90);
@@ -400,7 +400,7 @@ class EwsFollowupTest extends TestCase
 
     public function test_failed_pangkat_followup_cleans_up_uploaded_sk_file(): void
     {
-        Storage::fake('public');
+
         $user = User::factory()->adminKepegawaian()->create();
         // Golongan awal ditetapkan eksplisit agar update snapshot ke III/b selalu
         // dirty; nilai acak dari factory bisa kebetulan sudah III/b sehingga hook

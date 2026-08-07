@@ -197,7 +197,7 @@ class EmployeeReportExportTest extends TestCase
         $this->actingAs($admin)
             ->get(route('laporan.pegawai'))
             ->assertOk()
-            ->assertSee('x-bind:disabled="previewLoading || previewError || pensiunError"', false)
+            ->assertSee('x-bind:disabled="previewLoading || !!previewError || !!pensiunError"', false)
             ->assertSee('if (this.previewLoading || this.previewError || this.pensiunError)', false);
     }
 

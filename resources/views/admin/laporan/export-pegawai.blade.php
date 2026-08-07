@@ -6,27 +6,9 @@
     >
 
         {{-- ============================================================ --}}
-        {{-- PRINT ONLY HEADER (Kop Surat Resmi)                         --}}
+        {{-- PAGE HEADER                                                  --}}
         {{-- ============================================================ --}}
-        <div class="hidden print:block mb-8">
-            <div class="flex items-center justify-center border-b-2 border-black pb-4">
-                <img src="{{ asset('img/dikti16-favicon-blue-150x150.png') }}" class="h-16 w-16 mr-4" alt="Logo LLDIKTI XVI">
-                <div class="text-center">
-                    <h1 class="text-lg font-bold uppercase font-sans leading-tight">Kementerian Pendidikan Tinggi, Sains, dan Teknologi</h1>
-                    <h2 class="text-base font-bold uppercase font-sans text-primary leading-tight">Lembaga Layanan Pendidikan Tinggi (LLDIKTI) Wilayah XVI</h2>
-                    <p class="text-xs text-muted">Jl. Prof. Dr. Aloei Saboe, Wongkaditi, Kota Gorontalo</p>
-                </div>
-            </div>
-            <div class="text-center mt-6">
-                <div class="font-bold uppercase font-sans tracking-wide text-sm underline">Daftar Nominatif Pegawai</div>
-                <p class="text-[11px] text-muted mt-1 font-sans">Tanggal Cetak: {{ now()->translatedFormat('d F Y') }}</p>
-            </div>
-        </div>
-
-        {{-- ============================================================ --}}
-        {{-- PAGE HEADER (Screen only)                                    --}}
-        {{-- ============================================================ --}}
-        <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between print:hidden">
+        <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h2 class="text-2xl font-semibold text-ink font-sans">Daftar Nominatif Pegawai</h2>
                 <x-ui.breadcrumb :items="[
@@ -35,14 +17,15 @@
                 ]" />
             </div>
             <div class="flex w-full flex-wrap items-center gap-3 sm:w-auto sm:justify-end">
-                {{-- Cetak PDF --}}
-                <x-ui.button @click="printReport()" x-bind:disabled="previewLoading || previewError || pensiunError" variant="secondary">
-                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                {{-- Export PDF melalui rute backend resmi --}}
+                <x-ui.button @click="exportPdf()" x-bind:disabled="previewLoading || !!previewError || !!pensiunError" variant="secondary"
+                    aria-describedby="pdf-export-error">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true" focusable="false">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.617 0-1.11-.476-1.12-1.09l-.23-2.523M19.5 10.5v.375c0 .621-.504 1.125-1.125 1.125H5.625A1.125 1.125 0 0 1 4.5 11.25v-.375m15 0V9a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 9v1.5m15 0A1.5 1.5 0 0 0 18 9h-3V6a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3H6a1.5 1.5 0 0 0-1.5 1.5" />
                     </svg>
-                    Cetak PDF
+                    Export PDF
                 </x-ui.button>
-                <x-ui.button type="submit" form="custom-export-form" x-bind:disabled="previewLoading" variant="secondary">
+                <x-ui.button type="submit" form="custom-export-form" x-bind:disabled="previewLoading || !!previewError || !!pensiunError" variant="secondary">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
                     </svg>
@@ -51,10 +34,12 @@
             </div>
         </div>
 
+        <p x-cloak x-show="pdfError" id="pdf-export-error" role="alert" class="text-sm text-danger font-sans" x-text="pdfError"></p>
+
         {{-- ============================================================ --}}
         {{-- PANEL KONFIGURASI EXPORT (Screen only)                       --}}
         {{-- ============================================================ --}}
-        <form id="custom-export-form" method="POST" action="{{ route('laporan.pegawai.custom') }}" @submit="submitCustomExport($event)" class="print:hidden">
+        <form id="custom-export-form" method="POST" action="{{ route('laporan.pegawai.custom') }}" @submit="submitCustomExport($event)">
             @csrf
 
             <template x-for="column in activeColumns" :key="'custom-export-column-' + column.key">
@@ -65,6 +50,9 @@
             <x-ui.card padding="none" class="overflow-hidden">
                 {{-- Header Panel --}}
                 <button type="button" @click="configOpen = !configOpen"
+                    id="export-config-toggle"
+                    aria-controls="export-config-panel"
+                    x-bind:aria-expanded="configOpen ? 'true' : 'false'"
                     class="w-full flex items-center justify-between px-6 py-4 border-b border-border bg-surface hover:bg-soft transition">
                     <div class="flex items-center gap-3">
                         <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
@@ -78,13 +66,13 @@
                         </div>
                     </div>
                     <svg class="w-4 h-4 text-muted transition-transform duration-200" :class="configOpen ? 'rotate-180' : ''"
-                        fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true" focusable="false">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
                     </svg>
                 </button>
 
                 {{-- Body Panel --}}
-                <div x-show="configOpen" x-collapse class="bg-soft/30">
+                <div x-show="configOpen" x-collapse id="export-config-panel" role="region" aria-labelledby="export-config-toggle" class="bg-soft/30">
                     <div class="p-6 space-y-6">
 
                         {{-- === BAGIAN 1: PILIH KOLOM === --}}
@@ -156,9 +144,9 @@
                             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                                 {{-- Search --}}
                                 <div class="relative">
-                                    <label class="block text-xs font-semibold text-muted font-sans mb-1">Cari Nama / NIP</label>
+                                    <label for="filter-search" class="block text-xs font-semibold text-muted font-sans mb-1">Cari Nama / NIP</label>
                                     <div class="relative">
-                                        <input type="text" name="search" x-model="searchQuery" @keydown.enter.prevent placeholder="Cari nama atau NIP"
+                                        <input type="text" id="filter-search" name="search" x-model="searchQuery" @keydown.enter.prevent placeholder="Cari nama atau NIP"
                                             class="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans" />
                                         <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -170,9 +158,9 @@
 
                                 {{-- Unit Kerja --}}
                                 <div>
-                                    <label class="block text-xs font-semibold text-muted font-sans mb-1">Unit Kerja</label>
+                                    <label for="filter-unit" class="block text-xs font-semibold text-muted font-sans mb-1">Unit Kerja</label>
                                     <div class="relative">
-                                        <select name="unit" x-model="activeUnit"
+                                        <select id="filter-unit" name="unit" x-model="activeUnit"
                                             class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                                             <option value="">Semua Unit Kerja</option>
                                             @foreach($filterOptions['units'] as $unit)
@@ -184,9 +172,9 @@
 
                                 {{-- Golongan --}}
                                 <div>
-                                    <label class="block text-xs font-semibold text-muted font-sans mb-1">Golongan</label>
+                                    <label for="filter-golongan" class="block text-xs font-semibold text-muted font-sans mb-1">Golongan</label>
                                     <div class="relative">
-                                        <select name="golongan" x-model="activeGolongan"
+                                        <select id="filter-golongan" name="golongan" x-model="activeGolongan"
                                             class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                                             <option value="">Semua Golongan</option>
                                             @foreach($filterOptions['golongan'] as $gol)
@@ -198,9 +186,9 @@
 
                                 {{-- Jenis Pegawai --}}
                                 <div>
-                                    <label class="block text-xs font-semibold text-muted font-sans mb-1">Jenis Pegawai</label>
+                                    <label for="filter-jenis" class="block text-xs font-semibold text-muted font-sans mb-1">Jenis Pegawai</label>
                                     <div class="relative">
-                                        <select name="jenis" x-model="activeJenis"
+                                        <select id="filter-jenis" name="jenis" x-model="activeJenis"
                                             class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                                             <option value="">Semua Jenis</option>
                                             @foreach($filterOptions['jenis'] as $jenis)
@@ -212,9 +200,9 @@
 
                                 {{-- Status Pegawai --}}
                                 <div>
-                                    <label class="block text-xs font-semibold text-muted font-sans mb-1">Status</label>
+                                    <label for="filter-status" class="block text-xs font-semibold text-muted font-sans mb-1">Status</label>
                                     <div class="relative">
-                                        <select name="status" x-model="activeStatus"
+                                        <select id="filter-status" name="status" x-model="activeStatus"
                                             class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                                             <option value="">Semua Status</option>
                                             @foreach($filterOptions['status'] as $st)
@@ -226,9 +214,9 @@
 
                                 {{-- Jabatan --}}
                                 <div>
-                                    <label class="block text-xs font-semibold text-muted font-sans mb-1">Jabatan</label>
+                                    <label for="filter-jabatan" class="block text-xs font-semibold text-muted font-sans mb-1">Jabatan</label>
                                     <div class="relative">
-                                        <select name="jabatan" x-model="activeJabatan"
+                                        <select id="filter-jabatan" name="jabatan" x-model="activeJabatan"
                                             class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                                             <option value="">Semua Jabatan</option>
                                             <template x-for="jabatan in filterOptions.jabatan" :key="jabatan">
@@ -240,22 +228,22 @@
 
                                 {{-- Periode Pensiun --}}
                                 <div>
-                                    <label class="block text-xs font-semibold text-muted font-sans mb-1">Pensiun dari</label>
-                                    <input type="date" name="pensiun_dari" x-model="pensiunDari"
+                                    <label for="filter-pensiun-dari" class="block text-xs font-semibold text-muted font-sans mb-1">Pensiun dari</label>
+                                    <input type="date" id="filter-pensiun-dari" name="pensiun_dari" x-model="pensiunDari"
                                         class="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans" />
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-semibold text-muted font-sans mb-1">Pensiun sampai</label>
-                                    <input type="date" name="pensiun_sampai" x-model="pensiunSampai" :min="pensiunDari || null"
+                                    <label for="filter-pensiun-sampai" class="block text-xs font-semibold text-muted font-sans mb-1">Pensiun sampai</label>
+                                    <input type="date" id="filter-pensiun-sampai" name="pensiun_sampai" x-model="pensiunSampai" :min="pensiunDari || null"
                                         class="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans" />
                                 </div>
 
                                 {{-- Urut Berdasarkan + Arah --}}
                                 <div>
-                                    <label class="block text-xs font-semibold text-muted font-sans mb-1">Urutkan Berdasarkan</label>
+                                    <label for="filter-sort" class="block text-xs font-semibold text-muted font-sans mb-1">Urutkan Berdasarkan</label>
                                     <div class="flex gap-2">
                                         <div class="relative flex-1">
-                                            <select name="sort" x-model="sortBy"
+                                            <select id="filter-sort" name="sort" x-model="sortBy"
                                                 class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                                                 <option value="nama">Nama Pegawai</option>
                                                 <option value="nip">NIP</option>
@@ -265,6 +253,7 @@
                                         {{-- Toggle Asc / Desc --}}
                                         <button type="button" @click="sortDir = sortDir === 'asc' ? 'desc' : 'asc'"
                                             :title="sortDir === 'asc' ? 'Ascending (A→Z / kecil→besar)' : 'Descending (Z→A / besar→kecil)'"
+                                            x-bind:aria-label="sortDir === 'asc' ? 'Arah urutan: naik. Klik untuk mengubah ke menurun.' : 'Arah urutan: menurun. Klik untuk mengubah ke naik.'"
                                             class="h-10 w-10 shrink-0 flex items-center justify-center rounded-lg border border-border bg-surface text-ink transition hover:bg-soft hover:border-primary/40 cursor-pointer">
                                             <svg x-show="sortDir === 'asc'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h5.25m5.25-.75L17.25 9m0 0L21 12.75M17.25 9v12" />
@@ -278,14 +267,15 @@
 
                                 {{-- Filter Awalan (Prefix) --}}
                                 <div class="sm:col-span-2 lg:col-span-3 xl:col-span-4">
-                                    <label class="block text-xs font-semibold text-muted font-sans mb-1">
+                                    <label for="filter-prefix-value" class="block text-xs font-semibold text-muted font-sans mb-1">
                                         Filter Awalan
                                         <span class="ml-1 text-muted font-normal">— tampilkan data yang diawali karakter tertentu</span>
                                     </label>
                                     <div class="flex gap-2">
                                         {{-- Pilih field untuk prefix --}}
                                         <div class="relative w-44 shrink-0">
-                                            <select name="prefix_field" x-model="prefixField"
+                                            <select id="filter-prefix-field" name="prefix_field" x-model="prefixField"
+                                                aria-label="Kolom yang dipakai filter awalan"
                                                 class="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
                                                 <template x-for="(col, key) in columns" :key="key">
                                                     <option :value="col.key" x-text="col.label"></option>
@@ -294,7 +284,7 @@
                                         </div>
                                         {{-- Input awalan --}}
                                         <div class="relative flex-1">
-                                            <input type="text" name="prefix_value" x-model="prefixValue" @keydown.enter.prevent
+                                            <input type="text" id="filter-prefix-value" name="prefix_value" x-model="prefixValue" @keydown.enter.prevent
                                                 :placeholder="'Awali dengan… (misal: G, A, 1990, III)'"
                                                 class="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans" />
                                             <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted">
@@ -323,14 +313,14 @@
                             <h3 class="text-xs font-bold uppercase tracking-widest text-muted font-sans mb-3">Range Baris</h3>
                             <div class="flex flex-wrap items-end gap-4">
                                 <div>
-                                    <label class="block text-xs font-semibold text-muted font-sans mb-1">Dari Baris</label>
-                                    <input type="number" name="row_start" x-model.number="rowStart" min="1" placeholder="1"
+                                    <label for="filter-row-start" class="block text-xs font-semibold text-muted font-sans mb-1">Dari Baris</label>
+                                    <input type="number" id="filter-row-start" name="row_start" x-model.number="rowStart" min="1" placeholder="1"
                                         class="h-10 w-28 rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans" />
                                 </div>
                                 <div class="text-muted font-sans text-sm pb-2.5">–</div>
                                 <div>
-                                    <label class="block text-xs font-semibold text-muted font-sans mb-1">Sampai Baris</label>
-                                    <input type="number" name="row_end" x-model.number="rowEnd" min="1" :placeholder="filteredPegawai.length || 'Semua'"
+                                    <label for="filter-row-end" class="block text-xs font-semibold text-muted font-sans mb-1">Sampai Baris</label>
+                                    <input type="number" id="filter-row-end" name="row_end" x-model.number="rowEnd" min="1" :placeholder="filteredPegawai.length || 'Semua'"
                                         class="h-10 w-28 rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans" />
                                 </div>
                                 <div class="pb-1">
@@ -350,55 +340,41 @@
         {{-- ============================================================ --}}
         {{-- TABLE PRATINJAU                                              --}}
         {{-- ============================================================ --}}
-        <x-ui.card padding="none" class="overflow-hidden print:border-none print:shadow-none print:bg-transparent">
-            {{-- Header (Screen only) --}}
-            <div class="flex items-center justify-between gap-3 px-6 py-4 border-b border-border bg-surface print:hidden">
+        <x-ui.card padding="none" class="overflow-hidden">
+            <div class="flex items-center justify-between gap-3 px-6 py-4 border-b border-border bg-surface">
                 <h3 class="text-sm font-semibold text-ink font-sans">Pratinjau Data Export</h3>
                 <p x-cloak x-show="previewLoading" role="status" aria-live="polite" class="text-xs font-medium text-muted font-sans">Memperbarui pratinjau…</p>
             </div>
-            <p x-cloak x-show="previewError" role="alert" class="px-6 pt-4 text-sm text-danger font-sans print:hidden" x-text="previewError"></p>
+            <p x-cloak x-show="previewError" role="alert" class="px-6 pt-4 text-sm text-danger font-sans" x-text="previewError"></p>
 
             {{-- Table --}}
-            <div class="overflow-x-auto print:overflow-visible">
-                <x-ui.table class="print:border-collapse print:border print:border-black">
-                    <x-ui.table-head class="print:bg-gray-100">
+            <div class="overflow-x-auto">
+                <x-ui.table>
+                    <x-ui.table-head>
                         <x-ui.table-row>
-                            <x-ui.table-th class="w-14 text-center select-none print:border print:border-black print:text-black">No</x-ui.table-th>
+                            <x-ui.table-th class="w-14 text-center select-none">No</x-ui.table-th>
                             <template x-for="col in activeColumns" :key="col.key">
-                                <x-ui.table-th class="select-none print:border print:border-black print:text-black"
-                                    x-text="col.label"></x-ui.table-th>
+                                <x-ui.table-th class="select-none" x-text="col.label"></x-ui.table-th>
                             </template>
                             <template x-if="activeColumns.length === 0">
                                 <x-ui.table-th>Pilih minimal satu kolom</x-ui.table-th>
                             </template>
                         </x-ui.table-row>
                     </x-ui.table-head>
-                    <x-ui.table-body class="print:divide-y print:divide-black">
-                        {{-- SCREEN VIEW: paginasi --}}
+                    <x-ui.table-body>
+                        {{-- Hanya baris halaman aktif yang dirender; berkas PDF/Excel dibentuk backend. --}}
                         <template x-for="(row, index) in paginatedPreview" :key="row.id">
-                            <x-ui.table-row :interactive="true" class="print:hidden">
+                            <x-ui.table-row :interactive="true">
                                 <x-ui.table-td class="w-14 text-center whitespace-nowrap" x-text="(currentPage - 1) * perPage + index + 1"></x-ui.table-td>
                                 <template x-for="col in activeColumns" :key="col.key">
-                                    <x-ui.table-td class="whitespace-nowrap print:border print:border-black"
-                                        x-text="getCellValue(row, col.key)"></x-ui.table-td>
-                                </template>
-                            </x-ui.table-row>
-                        </template>
-
-                        {{-- PRINT VIEW: semua export rows --}}
-                        <template x-for="(row, index) in exportRows" :key="'print-' + row.id">
-                            <x-ui.table-row class="hidden print:table-row">
-                                <x-ui.table-td class="w-14 text-center border border-black" x-text="index + 1"></x-ui.table-td>
-                                <template x-for="col in activeColumns" :key="col.key">
-                                    <x-ui.table-td class="border border-black"
-                                        x-text="getCellValue(row, col.key)"></x-ui.table-td>
+                                    <x-ui.table-td class="whitespace-nowrap" x-text="getCellValue(row, col.key)"></x-ui.table-td>
                                 </template>
                             </x-ui.table-row>
                         </template>
 
                         {{-- Empty state --}}
                         <tr x-show="exportRows.length === 0">
-                            <td :colspan="activeColumns.length + 1" class="px-0 py-0 print:border print:border-black">
+                            <td :colspan="activeColumns.length + 1" class="px-0 py-0">
                                 <x-ui.empty-state icon="document" title="Tidak ada data yang cocok dengan konfigurasi Anda." />
                             </td>
                         </tr>
@@ -406,12 +382,12 @@
                 </x-ui.table>
             </div>
 
-            {{-- Footer: Paginasi (Screen only) --}}
-            <div class="flex flex-col gap-4 border-t border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between bg-surface print:hidden">
+            {{-- Footer: Paginasi --}}
+            <div class="flex flex-col gap-4 border-t border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between bg-surface">
                 <div class="flex items-center gap-4">
                     <div class="flex items-center gap-2">
                         <span class="text-sm text-muted font-sans">Tampilkan</span>
-                        <select x-model.number="perPage" @change="currentPage = 1" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center w-auto">
+                        <select x-model.number="perPage" @change="currentPage = 1" aria-label="Jumlah data pratinjau per halaman" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center w-auto">
                             <option value="10">10</option>
                             <option value="25">25</option>
                             <option value="50">50</option>
@@ -432,27 +408,7 @@
             </div>
         </x-ui.card>
 
-        {{-- PRINT ONLY FOOTER --}}
-        <div id="print-footer" class="hidden print:block"></div>
-
     </div>
-
-    {{-- CUSTOM CSS PRINTING --}}
-    @push('head')
-    <style>
-        @media print {
-            aside, header, nav, button, select, input, .table-footer, .print\:hidden { display: none !important; }
-            body, main, div { background: transparent !important; box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; }
-            .print\:block      { display: block !important; }
-            .print\:table-row  { display: table-row !important; }
-            @page { size: landscape; margin: 1.5cm; }
-            table { width: 100% !important; border-collapse: collapse !important; }
-            th, td { border: 1px solid #000 !important; padding: 6px 8px !important; color: #000 !important; font-size: 10px !important; background-color: transparent !important; }
-            #print-footer { position: fixed; bottom: -0.5cm; left: 0; right: 0; border-top: 1px solid #000; text-align: right; font-size: 10px; font-family: 'Poppins', sans-serif; color: #6B7280; padding-top: 5px; }
-            #print-footer::after { content: "Halaman " counter(page) " dari " counter(pages); }
-        }
-    </style>
-    @endpush
 
     @push('scripts')
     <script>
@@ -464,6 +420,8 @@
                 allPegawai: initialPegawai,
                 filterOptions: initialFilterOptions,
                 previewEndpoint: @js(route('laporan.pegawai.preview')),
+                pdfEndpoint: @js(route('laporan.pegawai.pdf')),
+                maxPdfRows: @js(\App\Actions\Laporan\ExportPegawaiPdfAction::MAX_ROWS),
 
                 // =====================================================================
                 // FILTER STATE
@@ -509,6 +467,7 @@
             previewError: '',
             previewRequestId: 0,
             previewRefreshTimer: null,
+            pdfError: '',
             exportError: @js($errors->first('columns') ?: $errors->first('columns.0')),
             pensiunError: @js($errors->first('pensiun_dari') ?: $errors->first('pensiun_sampai')),
 
@@ -522,6 +481,7 @@
                     'prefixField', 'prefixValue', 'rowStart', 'rowEnd',
                 ].forEach((field) => this.$watch(field, () => {
                     this.currentPage = 1;
+                    this.pdfError = '';
                     this.queuePreviewRefresh();
                 }));
             },
@@ -686,39 +646,24 @@
                 return row[key] ?? '-';
             },
 
-            printReport() {
+            // Mengunduh PDF melalui rute backend resmi supaya isi berkas, gerbang peran,
+            // dan batas baris ditentukan server. Cetak browser tidak dipakai agar tidak ada
+            // dua jalur PDF dengan hasil berbeda.
+            exportPdf() {
                 if (this.previewLoading || this.previewError || this.pensiunError) {
                     return;
                 }
 
-                // Bangun URL PDF dengan filter aktif saat ini agar output PDF
-                // mencerminkan data yang sedang ditampilkan di preview.
-                const params = new URLSearchParams();
-                if (this.searchQuery)    params.set('search',   this.searchQuery);
-                if (this.activeUnit)     params.set('unit',     this.activeUnit);
-                if (this.activeGolongan) params.set('golongan', this.activeGolongan);
-                if (this.activeJenis)    params.set('jenis',    this.activeJenis);
-                // Status selalu dikirim termasuk saat kosong (Semua Status = '').
-                // Tanpa ini ExportPegawaiPdfAction menganggap status tidak diberikan
-                // dan memaksa default 'Aktif', sehingga PDF tidak mencerminkan preview.
-                params.set('status', this.activeStatus);
-                if (this.activeJabatan) params.set('jabatan',   this.activeJabatan);
-                if (this.pensiunDari)   params.set('pensiun_dari',  this.pensiunDari);
-                if (this.pensiunSampai) params.set('pensiun_sampai', this.pensiunSampai);
-                if (this.sortBy)        params.set('sort',          this.sortBy);
-                if (this.sortDir)       params.set('sort_dir',      this.sortDir);
-                // Filter awalan (prefix) diteruskan agar PDF mencerminkan data preview.
-                // prefix_field tanpa prefix_value tidak menghasilkan filter di backend,
-                // sehingga keduanya dikirim bersama hanya bila prefix_value tidak kosong.
-                if (this.prefixValue.trim()) {
-                    params.set('prefix_field', this.prefixField);
-                    params.set('prefix_value', this.prefixValue.trim());
-                }
-                if (this.rowStart > 1)  params.set('row_start',     this.rowStart);
-                if (this.rowEnd)        params.set('row_end',       this.rowEnd);
+                // Pesan penyempitan filter ditampilkan lebih awal; backend tetap menolak
+                // permintaan yang melewati batas sebagai penegakan sesungguhnya.
+                if (this.exportRows.length > this.maxPdfRows) {
+                    this.pdfError = `Laporan memuat ${this.exportRows.length} baris, melebihi batas ${this.maxPdfRows}. Persempit filter lalu coba lagi.`;
 
-                const base = @js(route('laporan.pegawai.pdf'));
-                window.open(base + (params.toString() ? '?' + params.toString() : ''), '_blank');
+                    return;
+                }
+
+                this.pdfError = '';
+                window.location.assign(`${this.pdfEndpoint}?${this.previewParams().toString()}`);
             }
             }));
         };
