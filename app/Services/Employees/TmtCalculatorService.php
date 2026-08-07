@@ -2,7 +2,9 @@
 
 namespace App\Services\Employees;
 
+use App\Models\Appointment;
 use App\Models\Employee;
+use App\Models\EmployeeMilestone;
 use App\Models\EwsConfig;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
@@ -13,6 +15,7 @@ class TmtCalculatorService
 {
     /**
      * Menyinkronkan snapshot tanggal turunan dari riwayat bertanggal terbaru tanpa mengubah riwayat sumber.
+     * US-5.5 AC-4,5: Juga menyimpan hasil kalkulasi ke tabel employee_milestones untuk optimisasi scheduler.
      */
     public function syncForEmployee(Employee $employee): void
     {
@@ -38,6 +41,144 @@ class TmtCalculatorService
         }
 
         $employee->update($updates);
+
+        // US-5.5 AC-5: Simpan hasil kalkulasi ke tabel milestones untuk optimisasi scheduler
+        $this->storeMilestones($employee, $latestRank, $latestSalary);
+    }
+
+    /**
+     * US-5.5 AC-4,5: Menyimpan milestone yang sudah dikalkulasi ke tabel terpisah.
+     * Scheduler EWS dapat langsung query tabel ini tanpa perlu kalkulasi ulang.
+     */
+    private function storeMilestones(Employee $employee, ?RankHistory $latestRank, ?SalaryHistory $latestSalary): void
+    {
+        $today = now()->startOfDay();
+        $pangkatRequiredYears = $this->configYears('pangkat_required_years', 4);
+        $kgbRequiredYears = $this->configYears('kgb_required_years', 2);
+
+        // 1. Kenaikan Pangkat
+        if ($latestRank?->tmt_pangkat !== null) {
+            $nextPangkat = $latestRank->tmt_pangkat->copy()->addYearsNoOverflow($pangkatRequiredYears);
+
+            EmployeeMilestone::updateOrCreate(
+                [
+                    'employee_id' => $employee->id,
+                    'type' => EmployeeMilestone::TYPE_KENAIKAN_PANGKAT,
+                ],
+                [
+                    'milestone_date' => $nextPangkat,
+                    'calculated_at' => $today,
+                    'metadata' => [
+                        'tmt_pangkat' => $latestRank->tmt_pangkat->toDateString(),
+                        'golongan_id' => $latestRank->golongan_id,
+                        'required_years' => $pangkatRequiredYears,
+                    ],
+                    'is_active' => true,
+                ]
+            );
+        }
+
+        // 2. KGB
+        if ($latestSalary?->tmt_kgb !== null) {
+            $nextKgb = $latestSalary->tmt_kgb->copy()->addYearsNoOverflow($kgbRequiredYears);
+
+            EmployeeMilestone::updateOrCreate(
+                [
+                    'employee_id' => $employee->id,
+                    'type' => EmployeeMilestone::TYPE_KGB,
+                ],
+                [
+                    'milestone_date' => $nextKgb,
+                    'calculated_at' => $today,
+                    'metadata' => [
+                        'tmt_kgb' => $latestSalary->tmt_kgb->toDateString(),
+                        'gaji_pokok' => $latestSalary->gaji_pokok,
+                        'required_years' => $kgbRequiredYears,
+                    ],
+                    'is_active' => true,
+                ]
+            );
+        }
+
+        // 3. Pensiun
+        $pensionDate = $this->pensionDate($employee);
+        if ($pensionDate !== null) {
+            $position = $this->latestPosition($employee);
+            $bup = $position?->jabatan?->default_bup ?? $position?->jenisJabatan?->maks_usia_pensiun;
+
+            EmployeeMilestone::updateOrCreate(
+                [
+                    'employee_id' => $employee->id,
+                    'type' => EmployeeMilestone::TYPE_PENSIUN,
+                ],
+                [
+                    'milestone_date' => $pensionDate,
+                    'calculated_at' => $today,
+                    'metadata' => [
+                        'tanggal_lahir' => $employee->tanggal_lahir?->toDateString(),
+                        'bup' => $bup,
+                        'jabatan' => $position?->jabatan?->nama,
+                    ],
+                    'is_active' => true,
+                ]
+            );
+        }
+
+        // 4. US-5.5 AC-4: Satyalancana (10, 20, 30 tahun dari pengangkatan pertama)
+        $tmtPengangkatan = $this->firstAppointmentDate($employee);
+        if ($tmtPengangkatan !== null) {
+            foreach ([10, 20, 30] as $years) {
+                $satyalancanaDate = $tmtPengangkatan->copy()->addYearsNoOverflow($years);
+
+                EmployeeMilestone::updateOrCreate(
+                    [
+                        'employee_id' => $employee->id,
+                        'type' => EmployeeMilestone::TYPE_SATYALANCANA,
+                        'milestone_date' => $satyalancanaDate,
+                    ],
+                    [
+                        'calculated_at' => $today,
+                        'metadata' => [
+                            'tmt_pengangkatan' => $tmtPengangkatan->toDateString(),
+                            'years_of_service' => $years,
+                        ],
+                        'is_active' => true,
+                    ]
+                );
+            }
+        }
+
+        // 5. PPPK Contract End (jika ada)
+        if ($employee->tanggal_akhir_kontrak !== null) {
+            EmployeeMilestone::updateOrCreate(
+                [
+                    'employee_id' => $employee->id,
+                    'type' => EmployeeMilestone::TYPE_PPPK_CONTRACT_END,
+                ],
+                [
+                    'milestone_date' => $employee->tanggal_akhir_kontrak,
+                    'calculated_at' => $today,
+                    'metadata' => [
+                        'contract_type' => 'PPPK',
+                    ],
+                    'is_active' => true,
+                ]
+            );
+        }
+    }
+
+    /**
+     * US-5.5 AC-4: Ambil TMT pengangkatan pertama dari tabel appointments.
+     */
+    private function firstAppointmentDate(Employee $employee): ?Carbon
+    {
+        $appointment = Appointment::where('employee_id', $employee->id)
+            ->whereNotNull('tmt_pengangkatan')
+            ->orderBy('tmt_pengangkatan', 'asc')
+            ->orderBy('created_at', 'asc')
+            ->first();
+
+        return $appointment?->tmt_pengangkatan;
     }
 
     private function configYears(string $key, int $default): int
