@@ -49,6 +49,12 @@
             'border' => 'border-b-danger',
             'surface' => 'border-danger/20 bg-danger/5',
         ],
+        'orange' => [
+            'text' => 'text-orange',
+            'icon' => 'bg-orange/10 text-orange',
+            'border' => 'border-b-orange',
+            'surface' => 'border-orange/20 bg-orange/5',
+        ],
         'info' => [
             'text' => 'text-info',
             'icon' => 'bg-info/10 text-info',
