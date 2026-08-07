@@ -536,6 +536,126 @@
                 </div>
             </div>
 
+            {{-- US-3.2 (AC-4,5): Column Mapping Info Panel --}}
+            <x-ui.card padding="lg" class="space-y-4" x-data="{
+                knownHeaders: ['Nama Pegawai', 'Email Pegawai', 'Golongan', 'Jabatan', 'Kelas Jabatan', 'NIP', 'Nomor Telepon', 'Pangkat', 'Pendidikan Terakhir', 'Pensiun', 'Person', 'Person Formula', 'Prodi Pendidikan Terakhir', 'Status Kepegawaian', 'Tanggal Lahir', 'Role', 'NIK', 'No KK'],
+                get recognizedHeaders() {
+                    return mainHeaders.filter(h => this.knownHeaders.includes(h));
+                },
+                get unknownHeaders() {
+                    return mainHeaders.filter(h => !this.knownHeaders.includes(h));
+                },
+                showDetails: false
+            }">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2">
+                            <h4 class="text-sm font-bold text-ink uppercase tracking-wider font-sans">📋 Informasi Pemetaan Kolom</h4>
+                            <x-ui.badge variant="success" size="xs" :pill="false">
+                                <span x-text="recognizedHeaders.length"></span> Kolom Dikenali
+                            </x-ui.badge>
+                            <x-ui.badge x-show="unknownHeaders.length > 0" variant="warning" size="xs" :pill="false">
+                                <span x-text="unknownHeaders.length"></span> Tidak Dikenal
+                            </x-ui.badge>
+                        </div>
+                        <p class="text-xs text-muted font-sans mt-1">Sistem secara otomatis memetakan kolom Excel ke field SIMPEG. Kolom yang tidak dikenal akan diabaikan saat impor.</p>
+                    </div>
+                    <button type="button" @click="showDetails = !showDetails" 
+                        class="text-xs font-semibold text-primary hover:text-primary/80 transition flex items-center gap-1">
+                        <span x-text="showDetails ? 'Sembunyikan' : 'Lihat Detail'"></span>
+                        <svg class="w-4 h-4 transition-transform" :class="showDetails ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                </div>
+
+                {{-- Mapping Details Table (Collapsible) --}}
+                <div x-show="showDetails" x-collapse class="mt-4">
+                    <div class="overflow-x-auto rounded-lg border border-border">
+                        <table class="min-w-full divide-y divide-border text-xs">
+                            <thead class="bg-soft/50">
+                                <tr>
+                                    <th class="px-3 py-2 text-left text-[10px] font-bold text-muted uppercase tracking-wider">Kolom Excel</th>
+                                    <th class="px-3 py-2 text-left text-[10px] font-bold text-muted uppercase tracking-wider">Sample Data</th>
+                                    <th class="px-3 py-2 text-left text-[10px] font-bold text-muted uppercase tracking-wider">Dipetakan ke Field SIMPEG</th>
+                                    <th class="px-3 py-2 text-center text-[10px] font-bold text-muted uppercase tracking-wider">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-surface divide-y divide-border">
+                                <template x-for="(header, idx) in mainHeaders" :key="header">
+                                    <tr :class="!knownHeaders.includes(header) ? 'bg-warning/5' : ''">
+                                        <td class="px-3 py-2 font-medium text-ink" x-text="header"></td>
+                                        <td class="px-3 py-2 text-muted truncate max-w-xs">
+                                            <template x-if="allRows.length > 0 && allRows[0].data[header]">
+                                                <span x-text="String(allRows[0].data[header]).substring(0, 30) + (String(allRows[0].data[header]).length > 30 ? '...' : '')"></span>
+                                            </template>
+                                            <span x-show="!allRows.length || !allRows[0].data[header]" class="text-muted/50 italic">-</span>
+                                        </td>
+                                        <td class="px-3 py-2">
+                                            <template x-if="knownHeaders.includes(header)">
+                                                <span class="text-ink font-medium" x-text="header === 'Nama Pegawai' ? 'nama_dengan_gelar' : 
+                                                    header === 'Person' ? 'nama_lengkap' :
+                                                    header === 'Email Pegawai' ? 'email_pribadi' :
+                                                    header === 'Golongan' ? 'golongan_terakhir' :
+                                                    header === 'Jabatan' ? 'jabatan_terakhir' :
+                                                    header === 'Kelas Jabatan' ? 'kelas_jabatan_terakhir' :
+                                                    header === 'NIP' ? 'nip' :
+                                                    header === 'NIK' ? 'nik' :
+                                                    header === 'No KK' ? 'no_kk' :
+                                                    header === 'Nomor Telepon' ? 'no_hp' :
+                                                    header === 'Pangkat' ? 'pangkat_terakhir' :
+                                                    header === 'Pendidikan Terakhir' ? 'pendidikan_terakhir' :
+                                                    header === 'Pensiun' ? 'tanggal_pensiun' :
+                                                    header === 'Prodi Pendidikan Terakhir' ? 'prodi_pendidikan_terakhir' :
+                                                    header === 'Status Kepegawaian' ? 'jenis_pegawai' :
+                                                    header === 'Tanggal Lahir' ? 'tanggal_lahir' :
+                                                    header === 'Role' ? 'role' :
+                                                    header === 'Person Formula' ? '(internal check)' : header.toLowerCase().replace(/ /g, '_')
+                                                "></span>
+                                            </template>
+                                            <span x-show="!knownHeaders.includes(header)" class="text-warning font-medium">❌ Tidak dipetakan (akan diabaikan)</span>
+                                        </td>
+                                        <td class="px-3 py-2 text-center">
+                                            <template x-if="knownHeaders.includes(header)">
+                                                <x-ui.badge variant="success" size="xs">✓ Auto-Matched</x-ui.badge>
+                                            </template>
+                                            <template x-if="!knownHeaders.includes(header)">
+                                                <x-ui.badge variant="warning" size="xs">⚠ Unknown Column</x-ui.badge>
+                                            </template>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {{-- Warning for Unknown Columns --}}
+                    <div x-show="unknownHeaders.length > 0" class="mt-4 rounded-lg bg-warning/10 border border-warning/20 p-4" x-transition>
+                        <div class="flex items-start gap-3">
+                            <svg class="w-5 h-5 text-warning shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                            </svg>
+                            <div class="flex-1">
+                                <h5 class="text-xs font-bold text-warning uppercase tracking-wider font-sans">Peringatan: Kolom Tidak Dikenal</h5>
+                                <p class="text-xs text-muted font-sans mt-1">Kolom berikut tidak cocok dengan template standar dan akan <strong>diabaikan</strong> saat impor:</p>
+                                <ul class="mt-2 space-y-1">
+                                    <template x-for="header in unknownHeaders" :key="header">
+                                        <li class="text-xs font-medium text-ink flex items-center gap-2">
+                                            <span class="inline-block w-1.5 h-1.5 rounded-full bg-warning"></span>
+                                            <span x-text="header"></span>
+                                        </li>
+                                    </template>
+                                </ul>
+                                <div class="mt-3 text-xs text-muted font-sans border-t border-warning/20 pt-3">
+                                    <strong>Rekomendasi:</strong> Gunakan template standar atau pastikan nama kolom Excel sesuai dengan template. 
+                                    <a href="#" @click.prevent="activeTemplate = 'utama'; downloadTemplate('utama')" class="text-primary hover:underline font-semibold">Download template standar</a> untuk referensi.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </x-ui.card>
+
             {{-- Editable Preview Table --}}
             <x-ui.card padding="lg" class="space-y-4">
                 <div class="flex items-center justify-between">
