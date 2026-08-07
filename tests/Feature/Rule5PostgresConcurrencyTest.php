@@ -25,12 +25,6 @@ class Rule5PostgresConcurrencyTest extends TestCase
 
     protected function setUp(): void
     {
-        $driver = $_SERVER['DB_CONNECTION'] ?? $_ENV['DB_CONNECTION'] ?? getenv('DB_CONNECTION');
-
-        if ($driver !== 'pgsql') {
-            $this->markTestSkipped('Race Rule 5 wajib dijalankan pada PostgreSQL.');
-        }
-
         parent::setUp();
 
         if (DB::connection()->getDriverName() !== 'pgsql') {
