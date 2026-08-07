@@ -111,6 +111,8 @@ class EwsEngineService
                                 $hasActiveDiscipline = $employee->disciplineRecords->contains('is_active', true);
                                 $isEligible = ($employee->is_kinerja_baik === true) && ! $hasActiveDiscipline;
 
+                                // US-5.4 AC-2: Skip notifikasi kenaikan pangkat jika kinerja buruk atau ada disiplin aktif
+                                // Alert tetap dibuat untuk record keeping, tapi notifikasi tidak dikirim
                                 $created = $this->createAlertIfNotExist(
                                     $employee,
                                     'KENAIKAN_PANGKAT',
@@ -118,6 +120,7 @@ class EwsEngineService
                                     $days,
                                     'Kenaikan Pangkat',
                                     $isEligible,
+                                    sendNotification: $isEligible, // Hanya kirim notif jika eligible
                                 );
                                 if ($created) {
                                     $alertsCreated++;
@@ -364,6 +367,7 @@ class EwsEngineService
      *
      * @param  bool|null  $isEligible  null = tidak ada eligibility check untuk tipe ini
      * @param  int|null  $satyalancanaYears  milestone dalam tahun; diisi hanya untuk SATYALANCANA
+     * @param  bool  $sendNotification  apakah notifikasi harus dikirim (default true); false = hanya buat alert tanpa notif
      */
     protected function createAlertIfNotExist(
         Employee $employee,
@@ -373,6 +377,7 @@ class EwsEngineService
         string $titleLabel,
         ?bool $isEligible = null,
         ?int $satyalancanaYears = null,
+        bool $sendNotification = true,
     ): bool {
         $identity = [
             'employee_id' => $employee->id,
@@ -425,6 +430,12 @@ class EwsEngineService
             $timeLabel,
             $eligibilityNote,
         );
+
+        // US-5.4 AC-2: Jika sendNotification = false, skip pembuatan notifikasi
+        // Alert tetap dibuat untuk record keeping, tapi notifikasi tidak dikirim
+        if (! $sendNotification) {
+            return $wasCreated;
+        }
 
         $notification = $this->notificationService->upsertEwsReminder(
             $employee,
