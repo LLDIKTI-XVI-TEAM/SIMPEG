@@ -305,6 +305,39 @@ class CutiListPeriodFilterTest extends TestCase
         $this->actingAs($user)->get('/dashboard/cuti/legacy')->assertRedirect(route('cuti'));
     }
 
+    /**
+     * Basis data mengizinkan status di luar lima status keputusan. Seluruhnya harus tetap dapat dirender
+     * karena label status dibaca dari peta tetap, sehingga satu status tanpa label akan menjatuhkan daftar.
+     *
+     * @return array<string, array{0: string}>
+     */
+    public static function statusDiizinkanProvider(): array
+    {
+        return [
+            'menunggu approval' => ['menunggu_approval'],
+            'ditangguhkan' => ['ditangguhkan'],
+            'ditangguhkan tugas dinas' => ['ditangguhkan_tugas_dinas'],
+            'perlu perubahan' => ['perlu_perubahan'],
+            'disetujui' => ['disetujui'],
+            'tidak disetujui' => ['tidak_disetujui'],
+            'dikembalikan karena rollover' => ['dikembalikan_karena_rollover'],
+        ];
+    }
+
+    #[DataProvider('statusDiizinkanProvider')]
+    public function test_setiap_status_yang_diizinkan_tetap_dapat_dirender(string $status): void
+    {
+        $jenis = $this->createJenis();
+        $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Status Lengkap']);
+        $this->createLeave($employee, $jenis, '2026-03-02', $status);
+
+        $response = $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('cuti'));
+
+        $response->assertOk();
+        $this->assertSame(1, $response->viewData('riwayatCuti')->total());
+    }
+
     private function seedThreeYears(): void
     {
         $jenis = $this->createJenis();
