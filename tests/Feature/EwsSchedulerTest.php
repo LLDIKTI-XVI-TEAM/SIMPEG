@@ -257,11 +257,39 @@ class EwsSchedulerTest extends TestCase
         app(EwsEngineService::class)->run();
 
         $this->assertSame(1, EwsAlert::count());
-        $this->assertNotNull(EwsAlert::firstOrFail()->notified_at);
+        $alert = EwsAlert::firstOrFail();
+        $this->assertNotNull($alert->notified_at);
+        // Status kelayakan yang tersimpan harus mengikuti keadaan terbaru, bukan keadaan saat
+        // alert pertama kali dibuat, agar pembaca kolom ini tidak tertinggal dari kenyataan.
+        $this->assertTrue($alert->is_eligible);
         $this->assertDatabaseHas('notifications', [
             'user_id' => $employee->id,
             'type' => 'ews.kenaikan_pangkat',
         ]);
+    }
+
+    public function test_stored_eligibility_follows_latest_state_when_flag_turns_negative(): void
+    {
+        // Alert yang pengingatnya sudah terbit tetap harus melaporkan kelayakan terbaru supaya
+        // admin dapat melihat alasan pengingat berhenti diterbitkan. Notifikasi yang sudah
+        // sampai ke pegawai tidak ditarik oleh penjadwalan ini.
+        $employee = Employee::factory()->create([
+            'tanggal_kenaikan_pangkat_berikutnya' => now()->addDays(90)->toDateString(),
+            'is_kinerja_baik' => true,
+        ]);
+
+        app(EwsEngineService::class)->run();
+
+        $alert = EwsAlert::firstOrFail();
+        $this->assertTrue($alert->is_eligible);
+        $this->assertNotNull($alert->notified_at);
+
+        $employee->update(['is_kinerja_baik' => false]);
+
+        app(EwsEngineService::class)->run();
+
+        $this->assertSame(1, EwsAlert::count());
+        $this->assertFalse(EwsAlert::firstOrFail()->is_eligible);
     }
 
     public function test_withheld_promotion_reminder_does_not_queue_email_for_admin(): void

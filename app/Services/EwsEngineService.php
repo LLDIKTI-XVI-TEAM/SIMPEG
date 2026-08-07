@@ -408,6 +408,14 @@ class EwsEngineService
             }
         }
 
+        // Status kelayakan yang tersimpan harus mengikuti keadaan pegawai saat penjadwalan
+        // berjalan, bukan keadaan saat alert pertama kali dibuat. Kolom ini menjelaskan alasan
+        // sebuah pengingat ditahan atau diterbitkan, sehingga nilai yang tertinggal akan
+        // menyesatkan pembaca yang memakainya tanpa menghitung ulang kelayakan.
+        if ($isEligible !== null && $alert->is_eligible !== $isEligible) {
+            $alert->forceFill(['is_eligible' => $isEligible])->save();
+        }
+
         // Pengingat kenaikan pangkat ditahan selama pegawai belum memenuhi syarat kelayakan,
         // baik karena flag kinerja negatif maupun hukuman disiplin aktif. Alert tetap disimpan
         // supaya status kelayakan tetap terbaca pada daftar EWS maupun EWS pribadi, dan
