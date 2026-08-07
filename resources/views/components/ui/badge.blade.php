@@ -30,6 +30,10 @@
             'box' => 'bg-warning/10 text-warning',
             'dot' => 'bg-warning',
         ],
+        'orange' => [
+            'box' => 'bg-orange/10 text-orange',
+            'dot' => 'bg-orange',
+        ],
         'info' => [
             'box' => 'bg-info/10 text-info',
             'dot' => 'bg-info',

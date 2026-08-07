@@ -520,12 +520,14 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->name('cuti.config.employee-chain.store')
         ->whereUuid('employee');
 
+    // Query string diteruskan agar tautan berfilter yang dibagikan atau dibookmark tidak kehilangan
+    // filternya secara diam-diam. Setiap filter tetap divalidasi ulang di tujuan.
     Route::get('/dashboard/cuti/legacy', function () {
-        return redirect()->route('cuti');
+        return redirect()->route('cuti', request()->query());
     })->name('cuti.index');
 
     Route::get('/cuti', function () {
-        return redirect()->route('cuti');
+        return redirect()->route('cuti', request()->query());
     });
 
     Route::get('/dashboard/dokumen', [DokumenController::class, 'index'])
