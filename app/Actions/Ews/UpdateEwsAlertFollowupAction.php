@@ -118,7 +118,9 @@ class UpdateEwsAlertFollowupAction
                     'followup_status' => $followupStatus,
                     'event_type' => $alert->type,
                     'handled_note' => $handledNote,
-                    'url' => route('notifications.index'),
+                    // Klik notifikasi membawa pegawai ke halaman EWS Saya agar hasil
+                    // tindak lanjut langsung terlihat pada konteks alert miliknya.
+                    'url' => route('ews.saya', [], false),
                 ],
             );
         }

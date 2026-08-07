@@ -85,6 +85,11 @@ class EwsFollowupTest extends TestCase
             'is_read' => false,
         ]);
 
+        // Notifikasi follow-up harus mengarah ke halaman EWS Saya, bukan daftar notifikasi.
+        $followupNotification = SimpegNotification::where('type', 'ews.followup.satyalancana')->firstOrFail();
+        $this->assertSame(route('ews.saya', [], false), $followupNotification->data['url']);
+        $this->assertSame($alert->id, $followupNotification->data['ews_alert_id']);
+
         $this->actingAs($user)
             ->get(route('ews'))
             ->assertOk()
@@ -492,6 +497,11 @@ class EwsFollowupTest extends TestCase
             'body' => 'Usulan belum diperlukan karena data masih valid.',
             'is_read' => false,
         ]);
+
+        // Notifikasi follow-up harus mengarah ke halaman EWS Saya, bukan daftar notifikasi.
+        $followupNotification = SimpegNotification::where('type', 'ews.followup.tidak_perlu')->firstOrFail();
+        $this->assertSame(route('ews.saya', [], false), $followupNotification->data['url']);
+        $this->assertSame($alert->id, $followupNotification->data['ews_alert_id']);
     }
 
     public function test_pangkat_or_kgb_approval_requires_new_history_and_sk_data(): void
