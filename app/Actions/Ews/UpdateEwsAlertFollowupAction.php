@@ -84,20 +84,24 @@ class UpdateEwsAlertFollowupAction
             $typeLabel = EwsAlert::typeLabels()[$alert->type] ?? $alert->type;
 
             if ($followupStatus === EwsAlert::FOLLOWUP_STATUS_HANDLED) {
+                // Pakai prefix ews.followup.* agar tidak masuk logika additionalRecipients
+                // yang mengirim ke semua admin_kepegawaian. Notifikasi hasil follow-up
+                // hanya ditujukan kepada pegawai target, bukan admin.
                 $notificationType = match ($alert->type) {
-                    'KENAIKAN_PANGKAT' => 'ews.kenaikan_pangkat',
-                    'KGB' => 'ews.kgb',
-                    'PENSIUN' => 'ews.pensiun',
-                    'KONTRAK_PPPK' => 'ews.kontrak_pppk',
-                    'SATYALANCANA' => 'ews.satyalancana',
-                    default => 'ews.'.strtolower($alert->type),
+                    'KENAIKAN_PANGKAT' => 'ews.followup.kenaikan_pangkat',
+                    'KGB' => 'ews.followup.kgb',
+                    'PENSIUN' => 'ews.followup.pensiun',
+                    'KONTRAK_PPPK' => 'ews.followup.kontrak_pppk',
+                    'SATYALANCANA' => 'ews.followup.satyalancana',
+                    default => 'ews.followup.'.strtolower($alert->type),
                 };
                 $title = 'Tindak Lanjut EWS: Disetujui';
                 $body = trim($handledNote) !== ''
                     ? $handledNote
                     : "Tindak lanjut EWS {$typeLabel} Anda telah disetujui / ditangani oleh Admin.";
             } else {
-                $notificationType = 'ews.tidak_perlu';
+                // Prefix ews.followup.* agar tidak dikirim ke admin_kepegawaian
+                $notificationType = 'ews.followup.tidak_perlu';
                 $title = 'Tindak Lanjut EWS: Tidak Perlu';
                 $body = trim($handledNote) !== ''
                     ? $handledNote

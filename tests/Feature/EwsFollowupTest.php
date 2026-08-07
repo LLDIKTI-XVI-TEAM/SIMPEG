@@ -79,7 +79,7 @@ class EwsFollowupTest extends TestCase
 
         $this->assertDatabaseHas('notifications', [
             'user_id' => $alert->employee_id,
-            'type' => 'ews.satyalancana',
+            'type' => 'ews.followup.satyalancana',
             'title' => 'Tindak Lanjut EWS: Disetujui',
             'body' => 'Berkas kenaikan pangkat sudah diproses.',
             'is_read' => false,
@@ -182,7 +182,7 @@ class EwsFollowupTest extends TestCase
 
         $this->assertDatabaseHas('notifications', [
             'user_id' => $employee->id,
-            'type' => 'ews.kenaikan_pangkat',
+            'type' => 'ews.followup.kenaikan_pangkat',
             'title' => 'Tindak Lanjut EWS: Disetujui',
             'body' => 'SK pangkat baru sudah disetujui.',
             'is_read' => false,
@@ -244,7 +244,7 @@ class EwsFollowupTest extends TestCase
 
         $this->assertDatabaseHas('notifications', [
             'user_id' => $employee->id,
-            'type' => 'ews.kgb',
+            'type' => 'ews.followup.kgb',
             'title' => 'Tindak Lanjut EWS: Disetujui',
             'body' => 'SK KGB baru sudah disetujui.',
             'is_read' => false,
@@ -300,7 +300,7 @@ class EwsFollowupTest extends TestCase
         ]);
         $this->assertDatabaseHas('notifications', [
             'user_id' => $employee->id,
-            'type' => 'ews.pensiun',
+            'type' => 'ews.followup.pensiun',
             'title' => 'Tindak Lanjut EWS: Disetujui',
             'body' => 'SK pensiun telah diterbitkan.',
             'is_read' => false,
@@ -346,7 +346,7 @@ class EwsFollowupTest extends TestCase
         );
         $this->assertDatabaseHas('notifications', [
             'user_id' => $employee->id,
-            'type' => 'ews.satyalancana',
+            'type' => 'ews.followup.satyalancana',
             'title' => 'Tindak Lanjut EWS: Disetujui',
             'body' => 'Usulan satyalancana sudah diproses.',
             'is_read' => false,
@@ -487,7 +487,7 @@ class EwsFollowupTest extends TestCase
         $this->assertSame(EwsAlert::FOLLOWUP_STATUS_NOT_NEEDED, $alert->refresh()->followup_status);
         $this->assertDatabaseHas('notifications', [
             'user_id' => $employee->id,
-            'type' => 'ews.tidak_perlu',
+            'type' => 'ews.followup.tidak_perlu',
             'title' => 'Tindak Lanjut EWS: Tidak Perlu',
             'body' => 'Usulan belum diperlukan karena data masih valid.',
             'is_read' => false,
