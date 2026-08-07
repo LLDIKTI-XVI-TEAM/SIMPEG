@@ -43,13 +43,16 @@ class ExportPegawaiRequest extends FormRequest
     {
         return [
             'search' => ['nullable', 'string', 'max:100'],
+            // Filter referensi menerima dua bentuk: nama (dipakai halaman laporan) dan
+            // UUID (dipakai halaman daftar pegawai). Bentuk UUID divalidasi ketat agar
+            // string sembarang tidak diteruskan sebagai kunci pencarian.
             'unit' => ['nullable', 'string', 'max:255'],
-            'unit_kerja_id' => ['nullable', 'string', 'max:36'],
+            'unit_kerja_id' => ['nullable', 'uuid'],
             'golongan' => ['nullable', 'string', 'max:50'],
             'jenis' => ['nullable', 'string', 'max:100'],
-            'jenis_pegawai_id' => ['nullable', 'string', 'max:36'],
+            'jenis_pegawai_id' => ['nullable', 'uuid'],
             'status' => ['nullable', 'string', 'max:100'],
-            'status_pegawai_id' => ['nullable', 'string', 'max:36'],
+            'status_pegawai_id' => ['nullable', 'uuid'],
             'jabatan' => ['nullable', 'string', 'max:255'],
             'pensiun_dari' => ['nullable', 'date_format:Y-m-d'],
             'pensiun_sampai' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:pensiun_dari'],

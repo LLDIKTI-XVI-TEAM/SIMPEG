@@ -494,7 +494,7 @@
             <x-slot:filters>
                 {{-- Filter Golongan --}}
                 <div>
-                    <x-form.select x-model="filters.golongan" @change="applyFilter()" size="md">
+                    <x-form.select x-model="filters.golongan" @change="applyFilter()" size="md" aria-label="Filter golongan">
                         <option value="">Semua Golongan</option>
                         @foreach($golonganOptions as $golongan)
                             <option value="{{ $golongan }}">Golongan {{ $golongan }}</option>
@@ -504,7 +504,7 @@
 
                 {{-- Filter Unit Kerja --}}
                 <div>
-                    <x-form.select x-model="filters.unit_kerja_id" @change="applyFilter()" size="md">
+                    <x-form.select x-model="filters.unit_kerja_id" @change="applyFilter()" size="md" aria-label="Filter unit kerja">
                         <option value="">Semua Unit</option>
                         @foreach($unitKerjaOptions as $unit)
                             <option value="{{ $unit->id }}">{{ $unit->nama }}</option>
@@ -514,7 +514,7 @@
 
                 {{-- Filter Jenis Pegawai --}}
                 <div>
-                    <x-form.select x-model="filters.jenis_pegawai_id" @change="applyFilter()" size="md">
+                    <x-form.select x-model="filters.jenis_pegawai_id" @change="applyFilter()" size="md" aria-label="Filter jenis pegawai">
                         <option value="">Semua Jenis</option>
                         @foreach($jenisPegawaiOptions as $jenis)
                             <option value="{{ $jenis->id }}">{{ $jenis->nama }}</option>
@@ -524,7 +524,7 @@
 
                 {{-- Filter Status --}}
                 <div>
-                    <x-form.select x-model="filters.status_pegawai_id" @change="applyFilter()" size="md">
+                    <x-form.select x-model="filters.status_pegawai_id" @change="applyFilter()" size="md" aria-label="Filter status pegawai">
                         <option value="all">Semua Status</option>
                         @foreach($statusOptions as $status)
                             <option value="{{ $status->id }}">{{ $status->nama }}</option>
@@ -1255,41 +1255,38 @@
             document.body.removeChild(form);
         }
 
+        const PDF_MAX_ROWS = @js(\App\Actions\Laporan\ExportPegawaiPdfAction::MAX_ROWS);
+
         function exportFilteredDataPdf() {
             const btnEl = document.getElementById('export-pdf-btn');
-            if (!btnEl) { alert('Export button not found'); return; }
+            if (!btnEl) { return; }
             const alpineData = Alpine.$data(btnEl);
-            
-            if (alpineData.meta.total > 500) {
-                alert('Tolong sempitkan filter Anda terlebih dahulu, maksimal 500 baris.');
+
+            // Pesan awal untuk pengguna; backend tetap menolak permintaan di atas batas.
+            if (alpineData.meta.total > PDF_MAX_ROWS) {
+                alert(`Laporan memuat ${alpineData.meta.total} baris, melebihi batas ${PDF_MAX_ROWS}. Persempit filter lalu coba lagi.`);
                 return;
             }
 
-            const form = document.createElement('form');
-            form.method = 'GET';
-            form.action = '{{ route("laporan.pegawai.pdf") }}';
-            
             const params = {
                 search: alpineData.filters.search,
                 golongan: alpineData.filters.golongan,
                 unit_kerja_id: alpineData.filters.unit_kerja_id,
                 jenis_pegawai_id: alpineData.filters.jenis_pegawai_id,
-                status_pegawai_id: alpineData.filters.status_pegawai_id === 'all' ? '' : alpineData.filters.status_pegawai_id
+                status_pegawai_id: alpineData.filters.status_pegawai_id === 'all' ? '' : alpineData.filters.status_pegawai_id,
             };
 
-            for (const key in params) {
-                if (params[key]) {
-                    const input = document.createElement('input');
-                    input.type = 'hidden';
-                    input.name = key;
-                    input.value = params[key];
-                    form.appendChild(input);
+            const query = new URLSearchParams();
+            Object.entries(params).forEach(([key, value]) => {
+                // status_pegawai_id selalu dikirim walau kosong. Nilai kosong berarti
+                // "semua status", sedangkan parameter yang hilang membuat backend
+                // kembali ke default Aktif sehingga pilihan pengguna terabaikan.
+                if (key === 'status_pegawai_id' || (value !== '' && value !== null && value !== undefined)) {
+                    query.set(key, String(value));
                 }
-            }
-            
-            document.body.appendChild(form);
-            form.submit();
-            document.body.removeChild(form);
+            });
+
+            window.location.assign(`{{ route('laporan.pegawai.pdf') }}?${query.toString()}`);
         }
 
         function exportSelectedData() {

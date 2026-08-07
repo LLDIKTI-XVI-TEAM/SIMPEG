@@ -4,6 +4,8 @@
     <meta charset="utf-8">
     <title>Daftar Nominatif Pegawai</title>
     <style>
+        /* Margin bawah disisihkan agar footer bernomor halaman tidak menimpa baris tabel. */
+        @page { margin: 28px 32px 42px; }
         body {
             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
             font-size: 10px;
@@ -42,12 +44,27 @@
             text-transform: uppercase;
             font-size: 9px;
         }
+        /* Footer dicetak ulang pada setiap halaman oleh DOMPDF melalui position: fixed.
+           Penomoran memakai counter CSS karena eksekusi PHP di dalam template PDF dimatikan. */
+        footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 6px;
+            color: #6b7280;
+            font-size: 8px;
+            text-align: center;
+        }
+        .page-number::after { content: counter(page); }
+        .total-pages::after { content: counter(pages); }
     </style>
 </head>
 <body>
 
     <x-laporan.kop-surat :forPdf="true" />
-    
+
     <div class="report-header">
         <div class="report-title">Daftar Nominatif Pegawai</div>
         <div class="report-date">Tanggal Cetak: {{ now()->translatedFormat('d F Y') }}</div>
@@ -81,6 +98,10 @@
             @endforeach
         </tbody>
     </table>
+
+    <footer>
+        Halaman <span class="page-number"></span> dari <span class="total-pages"></span>
+    </footer>
 
 </body>
 </html>

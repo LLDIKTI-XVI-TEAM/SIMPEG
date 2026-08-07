@@ -10,7 +10,11 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ExportPegawaiPdfAction
 {
-    private const MAX_ROWS = 500;
+    /**
+     * Batas baris PDF. Dibuka sebagai konstanta publik agar halaman pemicu
+     * memakai angka yang sama dengan penegakan backend, bukan duplikat literal.
+     */
+    public const MAX_ROWS = 500;
 
     public function __construct(private readonly EmployeeExportDataService $employeeExportData) {}
 

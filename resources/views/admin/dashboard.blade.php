@@ -139,7 +139,7 @@
             <h2 class="text-xl sm:text-2xl font-extrabold text-white leading-tight">
                 {{ preg_replace('/\s*\(.*?\)/', '', auth()->user()->name) }}
             </h2>
-            
+
             <p class="mt-1 text-[12px] text-white/80 font-sans max-w-lg">
                 Semangat menjalankan tugas hari ini. Tetap produktif dan berikan pelayanan terbaik.
             </p>
@@ -170,7 +170,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Image Right (Pure SVG Illustration) -->
         <div class="hidden lg:block absolute right-4 bottom-0 z-10 w-[180px] pointer-events-none">
             <svg class="w-full h-auto drop-shadow-xl" viewBox="0 0 400 300" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -180,18 +180,18 @@
                 <!-- Monitor -->
                 <rect x="30" y="40" width="340" height="180" rx="14" fill="#E2E8F0" stroke="#FFFFFF" stroke-width="6"/>
                 <rect x="40" y="50" width="320" height="160" rx="8" fill="#FFFFFF"/>
-                
+
                 <!-- Dashboard UI inside Monitor -->
                 <!-- Profile -->
                 <circle cx="80" cy="90" r="22" fill="#E2E8F0"/>
                 <circle cx="80" cy="85" r="9" fill="#94A3B8"/>
                 <path d="M 62 107 Q 80 85 98 107 Z" fill="#94A3B8"/>
-                
+
                 <!-- Bar Chart -->
                 <rect x="135" y="145" width="18" height="45" rx="4" fill="#3B82F6"/>
                 <rect x="165" y="120" width="18" height="70" rx="4" fill="#60A5FA"/>
                 <rect x="195" y="85" width="18" height="105" rx="4" fill="#2563EB"/>
-                
+
                 <!-- Pie Chart -->
                 <circle cx="300" cy="115" r="40" fill="#E2E8F0"/>
                 <path d="M 300 115 L 300 75 A 40 40 0 0 1 340 115 Z" fill="#2563EB"/>
