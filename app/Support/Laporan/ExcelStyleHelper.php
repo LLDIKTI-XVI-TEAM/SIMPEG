@@ -43,14 +43,14 @@ class ExcelStyleHelper
     {
         $sheet->freezePane('A2');
         $sheet->setAutoFilter($autoFilterRange);
-        
+
         $sheet->getPageSetup()
             ->setOrientation(PageSetup::ORIENTATION_LANDSCAPE)
             ->setPaperSize(PageSetup::PAPERSIZE_A4)
             ->setFitToWidth(1)
             ->setFitToHeight(0)
             ->setRowsToRepeatAtTopByStartAndEnd(1, 1);
-            
+
         $sheet->getPageMargins()
             ->setTop(0.3)
             ->setRight(0.25)

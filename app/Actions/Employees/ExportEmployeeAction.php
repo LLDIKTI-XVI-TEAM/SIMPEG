@@ -8,7 +8,6 @@ use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
 use App\Support\Laporan\ExcelStyleHelper;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Shared\Date;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
