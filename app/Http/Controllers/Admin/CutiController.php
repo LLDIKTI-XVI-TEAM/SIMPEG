@@ -100,6 +100,9 @@ class CutiController extends Controller
         $targetBalance = $isRolloverReturn && $cuti->employee !== null && $cuti->rollover_target_year !== null
             ? $balancePreview->execute($cuti->employee, Carbon::create($cuti->rollover_target_year, 1, 1)->startOfDay())
             : null;
+        $employeeBalance = $cuti->employee !== null
+            ? $balancePreview->execute($cuti->employee, $cuti->tanggal_mulai ?? now())
+            : null;
 
         return view('admin.cuti.show', [
             'cuti' => $cuti,
@@ -109,6 +112,7 @@ class CutiController extends Controller
                 && $cuti->employee_id === $user->employee_id,
             'isRolloverReturn' => $isRolloverReturn,
             'targetBalance' => $targetBalance,
+            'employeeBalance' => $employeeBalance,
             'activeStep' => $stage === null ? null : $cuti->steps->firstWhere('step_order', $stage),
         ]);
     }

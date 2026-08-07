@@ -281,7 +281,50 @@
                             </div>
                         </form>
                     </div>
-                @endif
+            {{-- Multi-year Leave Balance Widget for Verifier (US-4.5 AC-2) --}}
+            @if ($employeeBalance !== null)
+                <div class="border-t border-border pt-6 space-y-4">
+                    <x-ui.card padding="md" class="border-primary/20 bg-primary/5 space-y-4">
+                        <div class="flex items-center justify-between border-b border-border pb-3">
+                            <div>
+                                <h4 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
+                                    Informasi Saldo & Riwayat Cuti Pemohon
+                                </h4>
+                                <p class="text-xs text-muted font-sans mt-0.5">Rincian saldo hak cuti berjalan (N), carry-over (N-1), dan riwayat pemakaian dua tahun sebelumnya (N-2/N-1).</p>
+                            </div>
+                            <x-ui.badge variant="{{ $employeeBalance['eligible'] ? 'success' : 'danger' }}" size="sm">
+                                {{ $employeeBalance['eligible'] ? 'Hak Cuti Aktif' : 'Tidak Eligible' }}
+                            </x-ui.badge>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div class="p-3 bg-surface rounded-lg border border-border space-y-1">
+                                <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Saldo Tahun Berjalan (N={{ $employeeBalance['tahun'] }})</span>
+                                <p class="text-lg font-bold text-primary font-sans">{{ $employeeBalance['saldo_dapat_diajukan'] }} Hari</p>
+                                <p class="text-[10px] text-muted">Jatah dasar: {{ $employeeBalance['jatah_dasar'] }} hari</p>
+                            </div>
+
+                            <div class="p-3 bg-surface rounded-lg border border-border space-y-1">
+                                <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Carry-over (N-1={{ $employeeBalance['tahun'] - 1 }})</span>
+                                <p class="text-lg font-bold text-warning font-sans">{{ $employeeBalance['carry_over'] }} Hari</p>
+                                <p class="text-[10px] text-muted">Sisa saldo dilindungi</p>
+                            </div>
+
+                            <div class="p-3 bg-surface rounded-lg border border-border space-y-1">
+                                <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Penggunaan N-1 ({{ $employeeBalance['tahun'] - 1 }})</span>
+                                <p class="text-lg font-bold text-ink font-sans">{{ $employeeBalance['bucket']['n1'] ?? 0 }} Hari</p>
+                                <p class="text-[10px] text-muted">Terpakai pada N-1</p>
+                            </div>
+
+                            <div class="p-3 bg-surface rounded-lg border border-border space-y-1">
+                                <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Penggunaan N-2 ({{ $employeeBalance['tahun'] - 2 }})</span>
+                                <p class="text-lg font-bold text-ink font-sans">{{ $employeeBalance['bucket']['n2'] ?? 0 }} Hari</p>
+                                <p class="text-[10px] text-muted">Terpakai pada N-2</p>
+                            </div>
+                        </div>
+                    </x-ui.card>
+                </div>
+            @endif
 
                 @if ($canAct)
                     {{-- Catatan keputusan wajib untuk tindakan selain setuju agar pemohon memahami dasar keputusan. --}}

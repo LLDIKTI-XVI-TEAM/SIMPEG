@@ -36,6 +36,7 @@ class ListLeaveRequestsAction
         $jenis = (string) $request->query('jenis', '');
         $unit = $isPegawai ? '' : (string) $request->query('unit', '');
         $periode = (string) $request->query('periode', '');
+        $tahun = (string) $request->query('tahun', '');
         $perPage = min(max((int) $request->query('per_page', 10), 10), 50);
 
         $query = LeaveRequest::query()
@@ -84,6 +85,9 @@ class ListLeaveRequestsAction
                 $query->whereYear('tanggal_mulai', $parts[0])->whereMonth('tanggal_mulai', $parts[1]);
             }
         }
+        if ($tahun !== '') {
+            $query->whereYear('tanggal_mulai', $tahun);
+        }
         if ($search !== '') {
             $query->whereHas('employee', function ($employeeQuery) use ($search): void {
                 $employeeQuery->where('nama_lengkap', 'like', "%{$search}%")
@@ -93,6 +97,9 @@ class ListLeaveRequestsAction
 
         $riwayatCuti = $query->paginate($perPage)->withQueryString();
         $riwayatCuti->getCollection()->transform(fn (LeaveRequest $r): array => $this->mapRow($r));
+
+        $currentYear = (int) date('Y');
+        $optTahuns = collect(range($currentYear + 1, $currentYear - 3))->map(fn ($y) => (string) $y);
 
         return [
             'riwayatCuti' => $riwayatCuti,
@@ -112,11 +119,13 @@ class ListLeaveRequestsAction
                     ->pluck('jabatan_terakhir'),
             // Portable periode options (verified current producer): 12 bulan terakhir, tanpa SQL PostgreSQL-only.
             'optPeriodes' => collect(range(0, 11))->map(fn (int $offset): string => now()->subMonths($offset)->format('Y-m')),
+            'optTahuns' => $optTahuns,
             'search' => $search,
             'status' => $status,
             'jenis' => $jenis,
             'unit' => $unit,
             'periode' => $periode,
+            'tahun' => $tahun,
             'isPegawai' => $isPegawai,
         ];
     }

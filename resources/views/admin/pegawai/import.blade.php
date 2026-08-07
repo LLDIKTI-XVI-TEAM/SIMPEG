@@ -26,6 +26,41 @@
         mainHeaders: [],
         allRows: [],
         
+        // Target fields SIMPEG untuk mapping (US-3.2 AC-4, AC-5)
+        simpegTargetFields: [
+            { key: 'nip', label: 'NIP / NUPTK' },
+            { key: 'nama_lengkap', label: 'Nama Lengkap' },
+            { key: 'email', label: 'Email Official' },
+            { key: 'status_pegawai', label: 'Status Pegawai (PNS/CPNS/PPPK)' },
+            { key: 'gelar_depan', label: 'Gelar Depan' },
+            { key: 'gelar_belakang', label: 'Gelar Belakang' },
+            { key: 'tempat_lahir', label: 'Tempat Lahir' },
+            { key: 'tanggal_lahir', label: 'Tanggal Lahir' },
+            { key: 'jenis_kelamin', label: 'Jenis Kelamin' },
+            { key: 'agama', label: 'Agama' },
+            { key: 'nomor_hp', label: 'Nomor HP' },
+        ],
+        columnMapping: {},
+        get unmappedHeaders() {
+            return this.mainHeaders.filter(h => !this.columnMapping[h] || this.columnMapping[h] === 'ignore');
+        },
+        get unmappedHeadersCount() {
+            return this.unmappedHeaders.length;
+        },
+        autoMatchHeaders() {
+            const mapping = {};
+            this.mainHeaders.forEach(header => {
+                const cleanHeader = (header || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                const matched = this.simpegTargetFields.find(f => {
+                    const cleanFieldKey = f.key.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const cleanFieldLabel = f.label.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    return cleanHeader === cleanFieldKey || cleanHeader.includes(cleanFieldKey) || cleanHeader === cleanFieldLabel;
+                });
+                mapping[header] = matched ? matched.key : 'ignore';
+            });
+            this.columnMapping = mapping;
+        },
+
         // Pagination preview
         previewPage: 1,
         previewPerPage: 10,
@@ -184,6 +219,7 @@
                 this.previewPage = 1;
                 this.hasEdits = false;
                 this.editedRowIndices = new Set();
+                this.autoMatchHeaders();
                 
                 this.step = 2;
                 
@@ -535,6 +571,48 @@
                     <span>●</span> Ada perubahan belum divalidasi
                 </div>
             </div>
+
+            {{-- Warning Alert Kolom Tidak Cocok (US-3.2 AC-5) --}}
+            <div x-show="unmappedHeadersCount > 0" class="transition">
+                <x-ui.alert variant="warning" size="md">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                            <strong class="font-sans">Peringatan Kolom Tidak Cocok:</strong>
+                            Terdapat <span class="font-bold" x-text="unmappedHeadersCount"></span> kolom dari file yang belum terpetakan ke field SIMPEG (<span class="italic font-medium" x-text="unmappedHeaders.join(', ')"></span>). Kolom tidak terpetakan akan diabaikan.
+                        </div>
+                    </div>
+                </x-ui.alert>
+            </div>
+
+            {{-- Pemetaan Kolom (Column Mapping) Card (US-3.2 AC-4) --}}
+            <x-ui.card padding="md" class="space-y-4">
+                <div class="flex items-center justify-between border-b border-border pb-3">
+                    <div>
+                        <h3 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Pemetaan Kolom (Excel/CSV → SIMPEG)</h3>
+                        <p class="text-xs text-muted font-sans mt-0.5">Sistem telah memetakan header secara otomatis. Anda dapat mengubah pasangan kolom secara manual menggunakan pilihan di bawah.</p>
+                    </div>
+                    <x-ui.badge variant="info" size="sm">
+                        <span x-text="mainHeaders.length - unmappedHeadersCount"></span> / <span x-text="mainHeaders.length"></span> Terpetakan
+                    </x-ui.badge>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <template x-for="header in mainHeaders" :key="header">
+                        <div class="rounded-lg border border-border p-2.5 bg-soft/30 space-y-1.5">
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="font-semibold text-ink truncate font-sans" :title="header" x-text="header"></span>
+                                <span x-show="columnMapping[header] && columnMapping[header] !== 'ignore'" class="text-[10px] font-bold text-success">✓ Matched</span>
+                                <span x-show="!columnMapping[header] || columnMapping[header] === 'ignore'" class="text-[10px] font-bold text-warning">! Unmatched</span>
+                            </div>
+                            <x-form.select x-model="columnMapping[header]" class="w-full text-xs py-1">
+                                <option value="ignore">-- Abaikan Kolom Ini --</option>
+                                <template x-for="field in simpegTargetFields" :key="field.key">
+                                    <option :value="field.key" x-text="field.label" :selected="columnMapping[header] === field.key"></option>
+                                </template>
+                            </x-form.select>
+                        </div>
+                    </template>
+                </div>
+            </x-ui.card>
 
             {{-- Editable Preview Table --}}
             <x-ui.card padding="lg" class="space-y-4">

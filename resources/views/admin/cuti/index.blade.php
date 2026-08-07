@@ -142,10 +142,20 @@
             </div>
             @endunless
 
+            {{-- Filter Tahun (US-4.2 AC-4) --}}
+            <div class="relative">
+                <x-form.select id="filter-tahun" name="tahun" onchange="this.form.submit()">
+                    <option value="">Semua Tahun</option>
+                    @foreach($optTahuns ?? [] as $tahunOption)
+                        <option value="{{ $tahunOption }}" @selected(($tahun ?? '') === $tahunOption)>Tahun {{ $tahunOption }}</option>
+                    @endforeach
+                </x-form.select>
+            </div>
+
             {{-- Filter Periode Bulan --}}
             <div class="relative">
                 <x-form.select id="filter-periode" name="periode" onchange="this.form.submit()">
-                    <option value="">Semua Periode</option>
+                    <option value="">Semua Bulan</option>
                     @foreach($optPeriodes as $periodeOption)
                         <option value="{{ $periodeOption }}" @selected($periode === $periodeOption)>{{ \Carbon\Carbon::createFromFormat('Y-m', $periodeOption)->translatedFormat('F Y') }}</option>
                     @endforeach
