@@ -1,14 +1,17 @@
 <x-layouts.app title="Cuti Pegawai">
 
     @php
-        // Peta status runtime resmi (spec 3.2). Kunci memakai token runtime mentah dari Action.
+        // Warna badge mengikuti ketetapan resmi: kuning menunggu, hijau disetujui, biru perubahan,
+        // oranye ditangguhkan, merah tidak disetujui. Kunci memakai token runtime mentah dari Action.
         $statusVariant = [
-            'menunggu_approval' => 'info',
+            'menunggu_approval' => 'warning',
             'disetujui' => 'success',
-            'ditangguhkan' => 'warning',
-            'ditangguhkan_tugas_dinas' => 'warning',
-            'dikembalikan_karena_rollover' => 'warning',
-            'perlu_perubahan' => 'danger',
+            'ditangguhkan' => 'orange',
+            'ditangguhkan_tugas_dinas' => 'orange',
+            // Pengembalian karena rollover tidak termasuk lima status yang warnanya ditetapkan resmi;
+            // dibuat netral agar tidak menyerupai salah satu keputusan approval.
+            'dikembalikan_karena_rollover' => 'muted',
+            'perlu_perubahan' => 'info',
             'tidak_disetujui' => 'danger',
         ];
         
@@ -85,7 +88,8 @@
             </x-ui.stat-card>
 
             {{-- Postponed --}}
-            <x-ui.stat-card label="Ditangguhkan" value="{{ $jumlahDitangguhkan }}" variant="danger" size="lg" accent>
+            {{-- Warna mengikuti badge status: penangguhan menahan pengajuan, bukan menolaknya, sehingga tidak memakai merah. --}}
+            <x-ui.stat-card label="Ditangguhkan" value="{{ $jumlahDitangguhkan }}" variant="orange" size="lg" accent>
                 <x-slot:icon>
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" /></svg>
                 </x-slot:icon>
@@ -142,23 +146,20 @@
             </div>
             @endunless
 
-            {{-- Filter Tahun (US-4.2 AC-4) --}}
-            <div class="relative">
-                <x-form.select id="filter-tahun" name="tahun" onchange="this.form.submit()">
-                    <option value="">Semua Tahun</option>
-                    @foreach($optTahuns ?? [] as $tahunOption)
-                        <option value="{{ $tahunOption }}" @selected(($tahun ?? '') === $tahunOption)>Tahun {{ $tahunOption }}</option>
-                    @endforeach
-                </x-form.select>
-            </div>
-
-            {{-- Filter Periode Bulan --}}
+            {{-- Filter Periode: setahun penuh atau satu bulan --}}
             <div class="relative">
                 <x-form.select id="filter-periode" name="periode" onchange="this.form.submit()">
-                    <option value="">Semua Bulan</option>
-                    @foreach($optPeriodes as $periodeOption)
-                        <option value="{{ $periodeOption }}" @selected($periode === $periodeOption)>{{ \Carbon\Carbon::createFromFormat('Y-m', $periodeOption)->translatedFormat('F Y') }}</option>
-                    @endforeach
+                    <option value="">Semua Periode</option>
+                    <optgroup label="Tahun">
+                        @foreach($optTahuns as $tahunOption)
+                            <option value="{{ $tahunOption }}" @selected($periode === $tahunOption)>Tahun {{ $tahunOption }}</option>
+                        @endforeach
+                    </optgroup>
+                    <optgroup label="Bulan">
+                        @foreach($optPeriodes as $periodeOption)
+                            <option value="{{ $periodeOption }}" @selected($periode === $periodeOption)>{{ \Carbon\Carbon::createFromFormat('Y-m', $periodeOption)->translatedFormat('F Y') }}</option>
+                        @endforeach
+                    </optgroup>
                 </x-form.select>
             </div>
         </x-ui.filter-bar>

@@ -6,7 +6,10 @@ use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
 use App\Models\User;
+use App\Support\Cuti\CutiPeriodFilter;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 
@@ -24,6 +27,7 @@ class ListLeaveRequestsAction
      *   optJenisCutis: Collection<int|string, mixed>,
      *   optUnits: Collection<int|string, mixed>,
      *   optPeriodes: Collection<int, non-falsy-string>,
+     *   optTahuns: Collection<int, string>,
      *   search: string, status: string, jenis: string, unit: string, periode: string,
      *   isPegawai: bool
      * }
@@ -51,7 +55,9 @@ class ListLeaveRequestsAction
             ->latest();
 
         // Role pegawai selalu dibatasi ke data sendiri meski mapping permission salah konfigurasi.
-        if ($user->role === 'pegawai' || ! $user->hasPermission('cuti.read_all')) {
+        $dibatasiKeDataSendiri = $user->role === 'pegawai' || ! $user->hasPermission('cuti.read_all');
+
+        if ($dibatasiKeDataSendiri) {
             $query->where('employee_id', $user->employee_id);
         }
 
@@ -80,10 +86,7 @@ class ListLeaveRequestsAction
             $query->whereHas('employee', fn ($employeeQuery) => $employeeQuery->where('jabatan_terakhir', $unit));
         }
         if ($periode !== '') {
-            $parts = explode('-', $periode);
-            if (count($parts) === 2) {
-                $query->whereYear('tanggal_mulai', $parts[0])->whereMonth('tanggal_mulai', $parts[1]);
-            }
+            CutiPeriodFilter::parse($periode)?->applyToDateColumn($query, 'tanggal_mulai');
         }
         if ($tahun !== '' && ctype_digit($tahun) && strlen($tahun) === 4) {
             $query->whereYear('tanggal_mulai', (int) $tahun);
@@ -119,7 +122,7 @@ class ListLeaveRequestsAction
                     ->pluck('jabatan_terakhir'),
             // Portable periode options (verified current producer): 12 bulan terakhir, tanpa SQL PostgreSQL-only.
             'optPeriodes' => collect(range(0, 11))->map(fn (int $offset): string => now()->subMonths($offset)->format('Y-m')),
-            'optTahuns' => $optTahuns,
+            'optTahuns' => $this->tahunOptions($baseQuery),
             'search' => $search,
             'status' => $status,
             'jenis' => $jenis,
@@ -128,6 +131,38 @@ class ListLeaveRequestsAction
             'tahun' => $tahun,
             'isPegawai' => $isPegawai,
         ];
+    }
+
+    /**
+     * Opsi tahun mencakup rentang berurutan antara pengajuan terawal dan terakhir yang berada dalam scope
+     * pengguna, sehingga tidak membocorkan keberadaan data pegawai lain. Tahun berjalan selalu disertakan
+     * agar filter tetap berguna saat belum ada pengajuan sama sekali.
+     *
+     * Rentang berurutan dipilih, bukan daftar tahun yang benar-benar berisi, karena mengambil tahun distinct
+     * menuntut fungsi tanggal khas satu basis data sedangkan opsi periode pada halaman ini sengaja dijaga
+     * portabel. Konsekuensinya tahun tanpa pengajuan dapat muncul sebagai opsi, sama seperti opsi bulan yang
+     * juga menawarkan dua belas bulan terakhir tanpa memandang ada tidaknya data.
+     *
+     * @param  Builder<LeaveRequest>  $baseQuery
+     * @return Collection<int, string>
+     */
+    private function tahunOptions(Builder $baseQuery): Collection
+    {
+        // reorder() melepas urutan default; agregat tanpa GROUP BY tidak boleh membawa ORDER BY kolom lain di PostgreSQL.
+        $terawal = (clone $baseQuery)->reorder()->min('tanggal_mulai');
+        $terakhir = (clone $baseQuery)->reorder()->max('tanggal_mulai');
+
+        $tahunSekarang = (int) now()->year;
+        $tahunAwal = $terawal !== null ? (int) CarbonImmutable::parse((string) $terawal)->year : $tahunSekarang;
+        $tahunAkhir = $terakhir !== null ? (int) CarbonImmutable::parse((string) $terakhir)->year : $tahunSekarang;
+
+        $tahunAwal = min($tahunAwal, $tahunSekarang);
+        $tahunAkhir = max($tahunAkhir, $tahunSekarang);
+
+        /** @var list<string> $tahunTerurut */
+        $tahunTerurut = array_map('strval', range($tahunAkhir, $tahunAwal));
+
+        return collect($tahunTerurut);
     }
 
     /**

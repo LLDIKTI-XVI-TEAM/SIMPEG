@@ -86,11 +86,17 @@ final class ReferenceTableCatalog
             'cache_keys' => ['ref.unit_kerja'],
         ],
         RefStatusPegawai::class => [
-            // FK employees.status_pegawai_id bersifat nullOnDelete; tanpa
-            // guard ini status pegawai bisa terhapus diam-diam dari data
-            // pegawai yang merujuknya.
+            // Status pegawai dirujuk dua tempat: kolom status terkini pada data
+            // pegawai dan baris riwayat status yang bersifat append-only. Riwayat
+            // wajib ikut dihitung karena pegawai yang sudah berpindah status
+            // membuat baris lamanya menjadi satu-satunya perujuk, sehingga tanpa
+            // entri ini status lama tampak belum terpakai dan boleh dihapus.
+            // FK employee_status_histories.status_pegawai_id memakai RESTRICT
+            // sebagai backstop basis data; guard ini yang memberi pesan yang
+            // dapat ditindaklanjuti admin sebelum constraint dilanggar.
             'usage' => [
                 ['table' => 'employees', 'column' => 'status_pegawai_id', 'label' => 'data pegawai'],
+                ['table' => 'employee_status_histories', 'column' => 'status_pegawai_id', 'label' => 'riwayat status pegawai'],
             ],
             'cache_keys' => ['ref.status_pegawai'],
             // Baris terproteksi: kode PENSIUN dicari langsung oleh proses
