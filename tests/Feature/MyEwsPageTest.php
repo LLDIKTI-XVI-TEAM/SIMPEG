@@ -53,6 +53,33 @@ class MyEwsPageTest extends TestCase
             ->assertDontSee('Tidak Perlu', false);
     }
 
+    public function test_withheld_promotion_alert_still_appears_on_personal_page(): void
+    {
+        // Pengingat pegawai yang belum memenuhi syarat memang ditahan, namun barisnya harus tetap
+        // terlihat pada halaman pribadi supaya pegawai mengetahui status kelayakannya sendiri.
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Pegawai Belum Layak',
+            'is_kinerja_baik' => false,
+        ]);
+        $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+
+        EwsAlert::create([
+            'employee_id' => $employee->id,
+            'type' => 'KENAIKAN_PANGKAT',
+            'target_date' => now()->addDays(90)->toDateString(),
+            'interval_days' => 90,
+            'is_processed' => false,
+            'is_eligible' => false,
+            'notified_at' => null,
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_ACTIVE,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('ews.saya'))
+            ->assertOk()
+            ->assertSee('Kenaikan Pangkat', false);
+    }
+
     public function test_admin_cannot_open_personal_ews_page(): void
     {
         $this->actingAs(User::factory()->adminKepegawaian()->create())
