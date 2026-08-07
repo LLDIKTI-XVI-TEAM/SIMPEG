@@ -231,6 +231,68 @@ class EmployeeImportTest extends TestCase
             ->assertSeeText('8');
     }
 
+    public function test_import_wizard_applies_custom_column_mapping_payload_end_to_end(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile([$this->validRows()[0]]),
+        ]);
+
+        $upload->assertOk();
+        $batchId = $upload->json('batch_id');
+
+        // Simulasi UI Column Mapping yang mentransformasi header kustom ke header resmi SIMPEG
+        $mappedRowsPayload = [
+            [
+                'row' => 2,
+                'data' => [
+                    'Nama Pegawai' => 'Ahmad Subandi, S.T.',
+                    'Person' => 'Ahmad Subandi',
+                    'Email Pegawai' => 'ahmad.subandi@example.com',
+                    'NIP' => '199001012015031001',
+                    'Status Kepegawaian' => 'PNS',
+                    'Nomor Telepon' => '081234567890',
+                    'Tanggal Lahir' => '1990-01-01',
+                    'Jabatan' => 'Analis Kepegawaian',
+                    'Golongan' => 'III/a',
+                    'Kelas Jabatan' => '7',
+                    'Pangkat' => 'Penata Muda',
+                    'Pendidikan Terakhir' => 'S1',
+                    'Prodi Pendidikan Terakhir' => 'Teknik Informatika',
+                    'Pensiun' => '2048-01-01',
+                    'Role' => 'pegawai',
+                ],
+            ],
+        ];
+
+        $validation = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [
+            'rows' => $mappedRowsPayload,
+        ]);
+
+        $validation->assertOk();
+        $validation->assertJsonPath('valid_count', 1);
+        $validation->assertJsonPath('error_count', 0);
+
+        $execute = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", []);
+        $execute->assertOk();
+
+        $status = $this->getJson("/api/pegawai/import/{$batchId}/status");
+        $status->assertOk();
+        $status->assertJsonPath('status', 'completed');
+        $status->assertJsonPath('result.inserted', 1);
+
+        $this->assertDatabaseHas('employees', [
+            'nip' => '199001012015031001',
+            'nama_lengkap' => 'Ahmad Subandi',
+            'nama_dengan_gelar' => 'Ahmad Subandi, S.T.',
+            'email_pribadi' => 'ahmad.subandi@example.com',
+            'status_aktif' => 'Aktif',
+        ]);
+    }
+
     public function test_import_wizard_persists_data_utama_snapshots_without_histories_or_tmt_calculation(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
