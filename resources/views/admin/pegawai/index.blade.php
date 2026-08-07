@@ -1057,7 +1057,10 @@
                             <select x-model="newJabatan.jabatan_id"
                                 class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 <option value="">Pilih Jabatan</option>
-                                @foreach($jabatanOptions ?? [] as $ref)
+                                {{-- Hanya jabatan aktif ditawarkan karena validasi riwayat jabatan
+                                     menolak jabatan nonaktif; menampilkannya berarti menyuguhkan
+                                     pilihan yang pasti gagal disimpan. --}}
+                                @foreach(collect($jabatanOptions ?? [])->where('is_active', true) as $ref)
                                     <option value="{{ $ref->id }}">{{ $ref->nama }}</option>
                                 @endforeach
                             </select>

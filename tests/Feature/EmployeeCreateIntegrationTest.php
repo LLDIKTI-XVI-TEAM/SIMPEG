@@ -150,6 +150,33 @@ class EmployeeCreateIntegrationTest extends TestCase
         $editResponse->assertSee('name="is_kepala_lembaga"', false);
     }
 
+    public function test_form_penugasan_baru_tidak_menawarkan_jabatan_nonaktif(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'admin_kepegawaian',
+        ]);
+        $employee = Employee::factory()->create();
+        $jabatanAktif = RefJabatan::create([
+            'nama' => 'Jabatan Aktif Untuk Penugasan Baru',
+        ]);
+        $jabatanNonaktif = RefJabatan::create([
+            'nama' => 'Jabatan Nonaktif Tidak Boleh Dipilih',
+            'is_active' => false,
+        ]);
+
+        foreach ([
+            route('pegawai.create'),
+            route('pegawai.edit', $employee),
+            route('pegawai.show', $employee),
+        ] as $url) {
+            $this->actingAs($user)
+                ->get($url)
+                ->assertOk()
+                ->assertSee($jabatanAktif->nama)
+                ->assertDontSee($jabatanNonaktif->nama);
+        }
+    }
+
     public function test_null_tmt_source_histories_are_not_latest_and_leave_derived_dates_null(): void
     {
         $user = User::factory()->create(['role' => 'admin_kepegawaian']);

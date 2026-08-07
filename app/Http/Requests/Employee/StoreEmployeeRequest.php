@@ -4,6 +4,7 @@ namespace App\Http\Requests\Employee;
 
 use App\Support\EmployeeValidationRules;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreEmployeeRequest extends FormRequest
 {
@@ -34,7 +35,10 @@ class StoreEmployeeRequest extends FormRequest
             $rules['file_sk_pangkat'] = ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png'];
 
             // Jabatan (Position)
-            $rules['jabatan_jabatan_id'] = ['nullable', 'uuid', 'exists:ref_jabatan,id']; // Could be optional if nama_jabatan is used
+            // Penugasan pegawai baru hanya boleh memakai jabatan yang masih aktif, sama seperti
+            // penambahan riwayat jabatan lewat endpoint riwayat, agar jabatan yang sudah
+            // dinonaktifkan tidak bisa masuk lewat jalur pembuatan pegawai.
+            $rules['jabatan_jabatan_id'] = ['nullable', 'uuid', Rule::exists('ref_jabatan', 'id')->where('is_active', true)];
             $rules['jabatan_nama_jabatan'] = ['nullable', 'string', 'max:255'];
             $rules['jabatan_jenis_jabatan_id'] = ['nullable', 'required_with:jabatan_unit_kerja_id,jabatan_no_sk,jabatan_tanggal_sk,jabatan_tmt_jabatan', 'uuid', 'exists:ref_jenis_jabatan,id'];
             $rules['jabatan_eselon_id'] = ['nullable', 'uuid', 'exists:ref_eselon,id'];
