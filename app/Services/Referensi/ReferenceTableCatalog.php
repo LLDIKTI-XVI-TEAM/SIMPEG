@@ -4,6 +4,7 @@ namespace App\Services\Referensi;
 
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
+use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenjangPendidikan;
 use App\Models\RefStatusPegawai;
@@ -61,6 +62,17 @@ final class ReferenceTableCatalog
                 ['table' => 'ref_jabatan', 'column' => 'jenis_jabatan_id', 'label' => 'referensi jabatan'],
             ],
             'cache_keys' => ['ref.jenis_jabatan', 'ref.jabatan_with_jenis'],
+        ],
+        RefJabatan::class => [
+            // FK position_histories.jabatan_id memakai RESTRICT sebagai backstop
+            // basis data. Guard pemakaian tetap memberi pesan yang dapat ditindaklanjuti
+            // admin, sebelum penghapusan mencapai pelanggaran constraint.
+            'usage' => [
+                ['table' => 'position_histories', 'column' => 'jabatan_id', 'label' => 'riwayat jabatan'],
+            ],
+            // Snapshot relasi jabatan-jenis ikut dibuang agar dropdown tidak menyajikan
+            // nama jabatan yang sudah diubah atau sudah dinonaktifkan.
+            'cache_keys' => ['ref.jabatan_with_jenis'],
         ],
         RefUnitKerja::class => [
             // Self-FK parent_id bersifat nullOnDelete: menghapus induk tidak
