@@ -237,12 +237,51 @@ class EmployeeImportTest extends TestCase
 
         $this->actingAs($user);
 
+        // Upload file Excel dengan header non-standar / kustom
+        $customHeaders = [
+            'Nama Pegawai Custom',
+            'Person Custom',
+            'Email Utama',
+            'No NIP',
+            'Status Pegawai Custom',
+            'Telepon',
+            'Tgl Lahir',
+            'Jabatan Custom',
+            'Golongan Custom',
+            'Kelas Jabatan',
+            'Pangkat',
+            'Pendidikan',
+            'Prodi',
+            'Pensiun',
+            'Role',
+        ];
+
+        $customRowValues = [
+            'Ahmad Subandi, S.T.',
+            'Ahmad Subandi',
+            'ahmad.subandi@example.com',
+            '199001012015031001',
+            'PNS',
+            '081234567890',
+            '1990-01-01',
+            'Analis Kepegawaian',
+            'III/a',
+            '7',
+            'Penata Muda',
+            'S1',
+            'Teknik Informatika',
+            '2048-01-01',
+            'pegawai',
+        ];
+
         $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
-            'file' => $this->xlsxFile([$this->validRows()[0]]),
+            'file' => $this->xlsxFileWithHeaders($customHeaders, [$customRowValues], 'custom_headers.xlsx'),
+            'type' => 'utama',
         ]);
 
         $upload->assertOk();
         $batchId = $upload->json('batch_id');
+        $this->assertContains('No NIP', $upload->json('headers'));
 
         // Simulasi UI Column Mapping yang mentransformasi header kustom ke header resmi SIMPEG
         $mappedRowsPayload = [

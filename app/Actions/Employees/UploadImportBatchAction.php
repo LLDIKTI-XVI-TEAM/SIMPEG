@@ -94,17 +94,17 @@ class UploadImportBatchAction
         $requestedType = is_string($requestedType) ? trim($requestedType) : null;
 
         if ($requestedType !== null && isset(self::TEMPLATE_HEADERS[$requestedType])) {
-            $missing = array_values(array_diff(self::TEMPLATE_HEADERS[$requestedType], $headers));
-
-            if ($missing === []) {
-                return $requestedType;
-            }
+            return $requestedType;
         }
 
         foreach (self::TEMPLATE_HEADERS as $type => $requiredHeaders) {
             if (array_values(array_diff($requiredHeaders, $headers)) === []) {
                 return $type;
             }
+        }
+
+        if (count($headers) > 0) {
+            return 'utama';
         }
 
         throw ValidationException::withMessages([
