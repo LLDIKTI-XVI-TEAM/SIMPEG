@@ -36,8 +36,8 @@ class ExportPegawaiPdfAction
         }
 
         $pdf = Pdf::loadView('admin.laporan.pdf-pegawai', ['rows' => $rows])
-                  ->setPaper('a4', 'landscape');
-                  
+            ->setPaper('a4', 'landscape');
+
         $filename = 'Laporan_Pegawai_'.now()->format('Ymd').'.pdf';
 
         return $pdf->download($filename);

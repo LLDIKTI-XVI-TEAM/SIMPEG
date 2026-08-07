@@ -11,6 +11,7 @@ use App\Http\Requests\Laporan\CustomEmployeeExportRequest;
 use App\Http\Requests\Laporan\ExportPegawaiRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Response;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -33,7 +34,7 @@ class LaporanController extends Controller
         return $action->execute($request->validated());
     }
 
-    public function exportPegawaiPdf(ExportPegawaiRequest $request, ExportPegawaiPdfAction $action): \Illuminate\Http\Response|StreamedResponse|RedirectResponse
+    public function exportPegawaiPdf(ExportPegawaiRequest $request, ExportPegawaiPdfAction $action): Response|StreamedResponse|RedirectResponse
     {
         return $action->execute($request->validated());
     }
