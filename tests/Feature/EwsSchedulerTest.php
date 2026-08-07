@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\SendSimpegNotificationEmailJob;
 use App\Models\Appointment;
 use App\Models\DisciplineRecord;
 use App\Models\Employee;
@@ -21,6 +22,7 @@ use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Mockery\Expectation;
 use Mockery\MockInterface;
@@ -184,10 +186,10 @@ class EwsSchedulerTest extends TestCase
         ]);
     }
 
-    public function test_promotion_eligibility_stores_false_and_still_notifies_when_performance_is_poor(): void
+    public function test_promotion_reminder_is_withheld_when_performance_flag_is_negative(): void
     {
-        // Kenaikan Pangkat H-90, poor performance (is_kinerja_baik = false)
-        // Notifikasi TETAP terkirim; is_eligible=false disimpan untuk kebutuhan dashboard/filtering.
+        // Alert tetap dibuat agar status kelayakan terbaca pada daftar EWS, namun pengingat
+        // tidak diterbitkan ke penerima mana pun selama pegawai belum memenuhi syarat.
         $employee = Employee::factory()->create([
             'tanggal_kenaikan_pangkat_berikutnya' => now()->addDays(90)->toDateString(),
             'is_kinerja_baik' => false,
@@ -197,18 +199,19 @@ class EwsSchedulerTest extends TestCase
 
         $this->assertSame(1, EwsAlert::count());
         $alert = EwsAlert::first();
-        $this->assertFalse($alert->is_eligible);      // is_eligible tersimpan false
-        $this->assertNotNull($alert->notified_at);    // notifikasi tetap terkirim
-        $this->assertDatabaseHas('notifications', [
+        $this->assertFalse($alert->is_eligible);
+        // Tanpa penjaga ini alert tampak sudah memberi tahu pegawai padahal notifikasinya ditahan.
+        $this->assertNull($alert->notified_at);
+        $this->assertDatabaseMissing('notifications', [
             'user_id' => $employee->id,
             'type' => 'ews.kenaikan_pangkat',
         ]);
     }
 
-    public function test_promotion_eligibility_stores_false_and_still_notifies_when_disciplinary_record_is_active(): void
+    public function test_promotion_reminder_is_withheld_when_disciplinary_record_is_active(): void
     {
-        // Kenaikan Pangkat H-90, kinerja baik, but active disciplinary record
-        // Notifikasi TETAP terkirim; is_eligible=false disimpan untuk keperluan admin.
+        // Hukuman disiplin aktif dan flag kinerja negatif adalah syarat kelayakan sederajat,
+        // sehingga keduanya harus menahan pengingat dengan cara yang sama.
         $employee = Employee::factory()->create([
             'tanggal_kenaikan_pangkat_berikutnya' => now()->addDays(90)->toDateString(),
             'is_kinerja_baik' => true,
@@ -228,9 +231,57 @@ class EwsSchedulerTest extends TestCase
 
         $this->assertSame(1, EwsAlert::count());
         $alert = EwsAlert::first();
-        $this->assertFalse($alert->is_eligible);   // is_eligible tersimpan false
-        $this->assertNotNull($alert->notified_at); // notifikasi tetap terkirim
+        $this->assertFalse($alert->is_eligible);
+        $this->assertNull($alert->notified_at);
+        $this->assertDatabaseMissing('notifications', [
+            'user_id' => $employee->id,
+            'type' => 'ews.kenaikan_pangkat',
+        ]);
+    }
+
+    public function test_withheld_promotion_reminder_is_sent_after_flag_turns_positive(): void
+    {
+        // Penahanan tidak boleh permanen. Begitu pegawai memenuhi syarat, pengingat pada alert
+        // yang sudah tersimpan harus tetap dapat diterbitkan pada penjadwalan berikutnya.
+        $employee = Employee::factory()->create([
+            'tanggal_kenaikan_pangkat_berikutnya' => now()->addDays(90)->toDateString(),
+            'is_kinerja_baik' => false,
+        ]);
+
+        app(EwsEngineService::class)->run();
+
+        $this->assertNull(EwsAlert::firstOrFail()->notified_at);
+
+        $employee->update(['is_kinerja_baik' => true]);
+
+        app(EwsEngineService::class)->run();
+
+        $this->assertSame(1, EwsAlert::count());
+        $this->assertNotNull(EwsAlert::firstOrFail()->notified_at);
         $this->assertDatabaseHas('notifications', [
+            'user_id' => $employee->id,
+            'type' => 'ews.kenaikan_pangkat',
+        ]);
+    }
+
+    public function test_withheld_promotion_reminder_does_not_queue_email_for_admin(): void
+    {
+        // Penahanan berlaku untuk seluruh penerima, termasuk Admin Kepegawaian yang biasanya
+        // menerima salinan pengingat lewat email.
+        Queue::fake();
+
+        $adminEmployee = Employee::factory()->create();
+        User::factory()->adminKepegawaian()->create(['employee_id' => $adminEmployee->id]);
+
+        $employee = Employee::factory()->create([
+            'tanggal_kenaikan_pangkat_berikutnya' => now()->addDays(90)->toDateString(),
+            'is_kinerja_baik' => false,
+        ]);
+
+        app(EwsEngineService::class)->run();
+
+        Queue::assertNotPushed(SendSimpegNotificationEmailJob::class);
+        $this->assertDatabaseMissing('notifications', [
             'user_id' => $employee->id,
             'type' => 'ews.kenaikan_pangkat',
         ]);
