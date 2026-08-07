@@ -22,7 +22,7 @@ class ExportPegawaiPdfAction
      */
     public function execute(array $filters): Response|RedirectResponse|StreamedResponse
     {
-        if (! array_key_exists('status', $filters)) {
+        if (! array_key_exists('status', $filters) && ! array_key_exists('status_pegawai_id', $filters)) {
             $filters['status'] = 'Aktif';
         }
 

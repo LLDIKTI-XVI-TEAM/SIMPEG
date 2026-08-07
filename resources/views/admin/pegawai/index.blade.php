@@ -1235,9 +1235,9 @@
             const params = {
                 search: alpineData.filters.search,
                 golongan: alpineData.filters.golongan,
-                unit: alpineData.filters.unit_kerja_id,
-                jenis: alpineData.filters.jenis_pegawai_id,
-                status: alpineData.filters.status_pegawai_id === 'all' ? '' : alpineData.filters.status_pegawai_id
+                unit_kerja_id: alpineData.filters.unit_kerja_id,
+                jenis_pegawai_id: alpineData.filters.jenis_pegawai_id,
+                status_pegawai_id: alpineData.filters.status_pegawai_id === 'all' ? '' : alpineData.filters.status_pegawai_id
             };
 
             for (const key in params) {
@@ -1272,9 +1272,9 @@
             const params = {
                 search: alpineData.filters.search,
                 golongan: alpineData.filters.golongan,
-                unit: alpineData.filters.unit_kerja_id,
-                jenis: alpineData.filters.jenis_pegawai_id,
-                status: alpineData.filters.status_pegawai_id === 'all' ? '' : alpineData.filters.status_pegawai_id
+                unit_kerja_id: alpineData.filters.unit_kerja_id,
+                jenis_pegawai_id: alpineData.filters.jenis_pegawai_id,
+                status_pegawai_id: alpineData.filters.status_pegawai_id === 'all' ? '' : alpineData.filters.status_pegawai_id
             };
 
             for (const key in params) {
