@@ -42,13 +42,12 @@ class ExportCutiExcelAction
         }
 
         $details = $detailQuery->get();
-        $employeeIds = $details->pluck('employee_id')->unique();
 
+        // Sheet saldo adalah state materialized per tahun dan menentukan scope-nya
+        // sendiri lewat filter unit/pegawai/tahun. Ia tidak boleh dibatasi oleh
+        // keberadaan transaksi pada sheet detail, karena pegawai yang belum pernah
+        // mengajukan cuti tetap memiliki hak yang wajib terlapor.
         $balanceQuery = $this->rekapQuery->balanceRows($filters);
-
-        if (empty($filters['pegawai'])) {
-            $balanceQuery->whereIn('leave_balances.employee_id', $employeeIds);
-        }
 
         $balanceCount = (clone $balanceQuery)->count();
 
