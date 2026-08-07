@@ -113,29 +113,28 @@ class ValidateImportBatchAction
 
         $validated = $validator->validated();
         $referenceErrors = $this->resolveReferences($validated);
-        $skipErrors = [];
-
-        if (! empty($validated['nip']) && Employee::where('nip', $validated['nip'])->exists()) {
-            $skipErrors['NIP'][] = 'NIP sudah terdaftar di database.';
-        }
-
-        $databaseErrors = [];
-        if (! empty($validated['email_pribadi']) && Employee::whereRaw('LOWER(email_pribadi) = ?', [strtolower($validated['email_pribadi'])])->exists()) {
-            $databaseErrors['Email Pegawai'][] = 'Email pegawai sudah terdaftar di database.';
-        }
-
+        
+        // Check for duplicate NIP within the file (tetap error)
         $duplicateErrors = $this->mapErrors($this->duplicateErrors($validated, $row['row'], $seenNips, $seenEmails), [
             'nip' => 'NIP',
             'email_pribadi' => 'Email Pegawai',
         ]);
 
-        if ($skipErrors !== []) {
+        // K-US-02: NIP yang sudah ada di database → skip (bukan error)
+        if (! empty($validated['nip']) && Employee::where('nip', $validated['nip'])->exists()) {
             return [
                 'row' => $row['row'],
                 'nama' => $nama,
                 'status' => 'skip',
-                'errors' => $skipErrors,
+                'errors' => [],
+                'skip_reason' => 'NIP sudah terdaftar di database — baris akan dilewati.',
             ];
+        }
+
+        // Email yang sudah terdaftar tetap error (sesuai K-US-02)
+        $databaseErrors = [];
+        if (! empty($validated['email_pribadi']) && Employee::whereRaw('LOWER(email_pribadi) = ?', [strtolower($validated['email_pribadi'])])->exists()) {
+            $databaseErrors['Email Pegawai'][] = 'Email pegawai sudah terdaftar di database.';
         }
 
         $allErrors = array_merge_recursive(

@@ -149,7 +149,10 @@ class ImportEmployeesAction
     }
 
     /**
-     * Menjaga file import tidak berisi NIP/email ganda sebelum transaksi insert dimulai.
+     * K-US-02: Menjaga file import tidak berisi NIP/email ganda sebelum transaksi insert dimulai.
+     * - NIP ganda dalam satu berkas → error
+     * - NIP sudah ada di database → error (karena ini legacy endpoint yang tidak support skip)
+     * - Email ganda → error
      *
      * @param  array<string, mixed>  $data
      * @param  array<string, int>  $seenNips
@@ -163,20 +166,32 @@ class ImportEmployeesAction
         if (! empty($data['nip'])) {
             $nip = (string) $data['nip'];
 
+            // NIP ganda dalam berkas → error
             if (isset($seenNips[$nip])) {
                 $errors['nip'][] = "NIP sudah ada pada baris {$seenNips[$nip]}.";
             } else {
                 $seenNips[$nip] = $row;
+            }
+
+            // NIP sudah ada di database → error (legacy endpoint tidak support skip)
+            if (Employee::where('nip', $nip)->exists()) {
+                $errors['nip'][] = 'NIP sudah terdaftar di database.';
             }
         }
 
         if (! empty($data['email_pribadi'])) {
             $email = strtolower((string) $data['email_pribadi']);
 
+            // Email ganda dalam berkas → error
             if (isset($seenEmails[$email])) {
                 $errors['email_pribadi'][] = "Email pegawai sudah ada pada baris {$seenEmails[$email]}.";
             } else {
                 $seenEmails[$email] = $row;
+            }
+
+            // Email sudah ada di database → error
+            if (Employee::whereRaw('LOWER(email_pribadi) = ?', [$email])->exists()) {
+                $errors['email_pribadi'][] = 'Email pegawai sudah terdaftar di database.';
             }
         }
 
