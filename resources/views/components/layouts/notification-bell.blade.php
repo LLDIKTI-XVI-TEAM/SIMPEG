@@ -59,14 +59,6 @@
             const data = notification.data ?? {};
             return data.url ?? data.link ?? data.redirect_url ?? (data.leave_request_id ? `/dashboard/cuti/${data.leave_request_id}` : @js(route('notifications.index')));
         },
-        colorFor(notification) {
-            const type = (notification.type ?? '').toLowerCase();
-            if (type.includes('pensiun')) return 'warning';
-            if (type.includes('dokumen')) return 'danger';
-            if (type.includes('cuti')) return 'info';
-            if (type.includes('kenaikan_pangkat')) return 'success';
-            return 'primary';
-        },
         async openNotification(notification) {
             try {
                 if (!notification.read_at) {
@@ -102,8 +94,8 @@
         </svg>
         <span
             x-show="unreadCount > 0"
-            x-text="unreadCount > 9 ? '9+' : unreadCount"
-            class="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-danger text-[10px] font-bold text-white"
+            x-text="unreadCount > 99 ? '99+' : unreadCount"
+            class="absolute top-0 right-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white leading-none"
             style="display: none;"
         ></span>
     </button>
@@ -130,19 +122,18 @@
                     type="button"
                     @click="openNotification(notification)"
                     class="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-soft"
+                    :class="{ 'opacity-70': notification.read_at }"
                 >
                     <span
-                        class="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-                        :class="{
-                            'bg-warning': colorFor(notification) === 'warning',
-                            'bg-danger': colorFor(notification) === 'danger',
-                            'bg-info': colorFor(notification) === 'info',
-                            'bg-success': colorFor(notification) === 'success',
-                            'bg-primary': colorFor(notification) === 'primary'
-                        }"
+                        class="mt-1.5 h-2 w-2 shrink-0 rounded-full transition-colors"
+                        :class="notification.read_at ? 'bg-border' : 'bg-primary'"
                     ></span>
-                    <span class="min-w-0">
-                        <span class="block truncate text-sm font-medium text-ink" x-text="notification.title"></span>
+                    <span class="min-w-0 flex-1">
+                        <span
+                            class="block truncate text-sm font-medium"
+                            :class="notification.read_at ? 'font-normal text-muted' : 'font-semibold text-ink'"
+                            x-text="notification.title"
+                        ></span>
                         <span class="mt-0.5 block line-clamp-2 text-xs text-muted" x-text="notification.body"></span>
                     </span>
                 </button>
