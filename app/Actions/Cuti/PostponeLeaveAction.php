@@ -9,6 +9,7 @@ use App\Services\AuditService;
 use App\Services\LeaveApprovalService;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Mengoordinasikan tindakan menunda pengajuan cuti.
@@ -35,19 +36,24 @@ class PostponeLeaveAction
             ->where('approver_employee_id', $actor->id)
             ->first();
 
-        $leaveRequest = $this->approvals->postpone($leaveRequest, $actor, $komentar);
-        $auditPayload = $this->decisionAuditPayload($statusSebelum, $leaveRequest, $stepSebelum, $actor, 'POSTPONE', $komentar);
+        // Keputusan dan jejaknya disatukan dalam satu transaksi supaya pengajuan tidak pernah
+        // berpindah status tanpa baris audit yang menerangkan siapa yang memutuskan. Notifikasi tetap
+        // di luar transaksi agar kegagalan pengiriman tidak membatalkan penangguhan yang sah.
+        $leaveRequest = DB::transaction(function () use ($leaveRequest, $actor, $komentar, $request, $statusSebelum, $stepSebelum): LeaveRequest {
+            $leaveRequest = $this->approvals->postpone($leaveRequest, $actor, $komentar);
+            $auditPayload = $this->decisionAuditPayload($statusSebelum, $leaveRequest, $stepSebelum, $actor, 'DEFER', $komentar);
 
-        // Audit dan notifikasi dijalankan setelah transaksi penundaan berhasil agar kegagalan keduanya
-        // tidak membatalkan penundaan yang sudah sah tersimpan.
-        AuditService::log(
-            'POSTPONE',
-            'LeaveRequest',
-            $leaveRequest->id,
-            $auditPayload['old'],
-            $auditPayload['new'],
-            $request,
-        );
+            AuditService::logOrFail(
+                'DEFER',
+                'LeaveRequest',
+                $leaveRequest->id,
+                $auditPayload['old'],
+                $auditPayload['new'],
+                $request,
+            );
+
+            return $leaveRequest;
+        });
 
         $pemohon = $leaveRequest->employee;
 
