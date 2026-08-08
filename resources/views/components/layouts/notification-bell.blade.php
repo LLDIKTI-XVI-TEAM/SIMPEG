@@ -59,23 +59,17 @@
             const data = notification.data ?? {};
             return data.url ?? data.link ?? data.redirect_url ?? (data.leave_request_id ? `/dashboard/cuti/${data.leave_request_id}` : @js(route('notifications.index')));
         },
-        colorFor(notification) {
-            const type = (notification.type ?? '').toLowerCase();
-            if (type.includes('pensiun') || type.includes('gagal')) return 'danger';
-            if (type.includes('dokumen')) return 'danger';
-            if (type.includes('cuti')) return 'info';
-            if (type.includes('kenaikan_pangkat') || type.includes('import_pegawai')) return 'success';
-            return 'primary';
-        },
         async markSingleAsRead(notification, e) {
             if (e) e.stopPropagation();
-            if (notification.is_read) return;
+            const isUnread = !notification.read_at && !notification.is_read;
+            if (!isUnread) return;
 
             notification.is_read = true;
+            notification.read_at = new Date().toISOString();
             this.unreadCount = Math.max(0, this.unreadCount - 1);
 
             try {
-                await fetch(this.markEndpoint(notification.id), {
+                const response = await fetch(this.markEndpoint(notification.id), {
                     method: 'PATCH',
                     headers: {
                         Accept: 'application/json',
@@ -84,30 +78,44 @@
                     },
                     credentials: 'same-origin'
                 });
+                if (response.ok) {
+                    window.dispatchEvent(new CustomEvent('notification-marked-read', { detail: { id: notification.id } }));
+                } else {
+                    this.load();
+                }
             } catch (err) {
-                // Ignore error if already updated locally
+                this.load();
             }
         },
         async openNotification(notification) {
+            const isUnread = !notification.read_at && !notification.is_read;
+            if (isUnread) {
+                notification.is_read = true;
+                notification.read_at = new Date().toISOString();
+                this.unreadCount = Math.max(0, this.unreadCount - 1);
+            }
             try {
-                if (!notification.is_read) {
-                    notification.is_read = true;
-                    this.unreadCount = Math.max(0, this.unreadCount - 1);
+                if (isUnread) {
+                    const response = await fetch(this.markEndpoint(notification.id), {
+                        method: 'PATCH',
+                        headers: {
+                            Accept: 'application/json',
+                            'X-CSRF-TOKEN': this.csrf,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        credentials: 'same-origin'
+                    });
+                    if (response.ok) {
+                        window.dispatchEvent(new CustomEvent('notification-marked-read', { detail: { id: notification.id } }));
+                    }
                 }
-                await fetch(this.markEndpoint(notification.id), {
-                    method: 'PATCH',
-                    headers: {
-                        Accept: 'application/json',
-                        'X-CSRF-TOKEN': this.csrf,
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    credentials: 'same-origin'
-                });
             } finally {
                 window.location.href = this.targetUrl(notification);
             }
         }
     }"
+    @notification-marked-read.window="load()"
+    @notification-read.window="load()"
 >
     <button
         @click="open = !open; if (open) load()"
@@ -121,8 +129,8 @@
         </svg>
         <span
             x-show="unreadCount > 0"
-            x-text="unreadCount > 9 ? '9+' : unreadCount"
-            class="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-danger text-[10px] font-bold text-white"
+            x-text="unreadCount > 99 ? '99+' : unreadCount"
+            class="absolute top-0 right-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white leading-none"
             style="display: none;"
         ></span>
     </button>
@@ -147,28 +155,26 @@
             <template x-for="notification in notifications" :key="notification.id">
                 <div
                     class="group relative flex w-full items-start justify-between gap-2 px-4 py-3 text-left transition-colors hover:bg-soft cursor-pointer"
-                    :class="{ 'bg-primary/5 font-medium': !notification.is_read }"
+                    :class="{ 'opacity-70': notification.read_at || notification.is_read }"
                     @click="openNotification(notification)"
                 >
                     <div class="flex items-start gap-3 min-w-0 flex-1">
                         <span
-                            class="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-                            :class="{
-                                'bg-warning': colorFor(notification) === 'warning',
-                                'bg-danger': colorFor(notification) === 'danger',
-                                'bg-info': colorFor(notification) === 'info',
-                                'bg-success': colorFor(notification) === 'success',
-                                'bg-primary': colorFor(notification) === 'primary'
-                            }"
+                            class="mt-1.5 h-2 w-2 shrink-0 rounded-full transition-colors"
+                            :class="(notification.read_at || notification.is_read) ? 'bg-border' : 'bg-primary'"
                         ></span>
                         <span class="min-w-0 flex-1">
-                            <span class="block truncate text-sm text-ink" :class="{ 'font-semibold': !notification.is_read }" x-text="notification.title"></span>
+                            <span
+                                class="block truncate text-sm"
+                                :class="(notification.read_at || notification.is_read) ? 'font-normal text-muted' : 'font-semibold text-ink'"
+                                x-text="notification.title"
+                            ></span>
                             <span class="mt-0.5 block line-clamp-2 text-xs text-muted" x-text="notification.body"></span>
                         </span>
                     </div>
 
                     <button
-                        x-show="!notification.is_read"
+                        x-show="!notification.read_at && !notification.is_read"
                         @click.stop="markSingleAsRead(notification, $event)"
                         type="button"
                         class="shrink-0 rounded p-1 text-muted hover:bg-surface hover:text-primary transition-colors mt-0.5"
