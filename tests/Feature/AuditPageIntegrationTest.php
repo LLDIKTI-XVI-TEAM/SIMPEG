@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Tests\TestCase;
 
 class AuditPageIntegrationTest extends TestCase
@@ -38,8 +39,8 @@ class AuditPageIntegrationTest extends TestCase
             ->get('/dashboard/audit');
 
         $response->assertOk();
-        $response->assertViewHas('auditLogs', function (array $logs) use ($audit): bool {
-            $log = collect($logs)->firstWhere('id', $audit->id);
+        $response->assertViewHas('auditLogs', function (LengthAwarePaginator $logs) use ($audit): bool {
+            $log = collect($logs->items())->firstWhere('id', $audit->id);
 
             return $log !== null
                 && $log['operator'] === 'Admin Audit Nyata'
@@ -96,8 +97,8 @@ class AuditPageIntegrationTest extends TestCase
             ->get('/dashboard/audit');
 
         $response->assertOk();
-        $response->assertViewHas('auditLogs', function (array $logs): bool {
-            return collect($logs)->contains(function (array $log): bool {
+        $response->assertViewHas('auditLogs', function (LengthAwarePaginator $logs): bool {
+            return collect($logs->items())->contains(function (array $log): bool {
                 return $log['modul'] === 'EwsConfig'
                     && $log['record_id'] === 'ews_scheduler_time'
                     && data_get($log, 'old_values.value') === '07:00'

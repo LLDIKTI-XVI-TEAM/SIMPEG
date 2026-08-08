@@ -175,8 +175,26 @@ class Rule5PostgresConcurrencyTest extends TestCase
         } finally {
             // Evidence worker hanya hidup dalam database test; bersihkan sebelum hook migration
             // agar guard rollback produksi tetap melindungi data nyata.
-            DB::table('audit_logs')->delete();
+            $this->kosongkanAuditSebelumPenurunanMigrasi();
             DB::table('leave_balance_reservation_events')->delete();
         }
+    }
+
+    /**
+     * Membuang baris audit yang ditulis proses pekerja sebelum penurunan migrasi dijalankan.
+     *
+     * Proses pekerja berjalan di luar transaksi test sehingga barisnya benar-benar tersimpan,
+     * sedangkan penurunan migrasi menolak berjalan selama audit masih memuat event saldo cuti.
+     * Penjaga append-only dilepas lebih dahulu karena tabel ini memang akan dibuang seketika
+     * setelahnya, dan penjaga dipasang kembali oleh migrasi pada test berikutnya.
+     */
+    private function kosongkanAuditSebelumPenurunanMigrasi(): void
+    {
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::unprepared('drop trigger if exists audit_logs_append_only on audit_logs;');
+            DB::unprepared('drop trigger if exists audit_logs_append_only_truncate on audit_logs;');
+        }
+
+        DB::table('audit_logs')->delete();
     }
 }
