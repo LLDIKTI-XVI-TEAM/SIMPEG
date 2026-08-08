@@ -19,10 +19,6 @@ Schedule::command('cuti:rollover')
     ->yearlyOn(1, 1, '00:05')
     ->timezone(config('app.timezone'));
 
-Schedule::command('notifications:purge-read-ews')
-    ->everyMinute()
-    ->timezone(config('app.timezone'));
-
 // Setelah jam konfigurasi tercapai, EWS diperiksa ulang setiap lima menit sampai
 // akhir hari. Waktu dibaca saat task dievaluasi agar perubahan konfigurasi
 // langsung berlaku pada scheduler worker yang berjalan terus-menerus.

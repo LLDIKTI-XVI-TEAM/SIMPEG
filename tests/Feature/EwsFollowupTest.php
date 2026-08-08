@@ -77,6 +77,19 @@ class EwsFollowupTest extends TestCase
             'auditable_id' => $alert->id,
         ]);
 
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $alert->employee_id,
+            'type' => 'ews.followup.satyalancana',
+            'title' => 'Tindak Lanjut EWS: Disetujui',
+            'body' => 'Berkas kenaikan pangkat sudah diproses.',
+            'is_read' => false,
+        ]);
+
+        // Notifikasi follow-up harus mengarah ke halaman EWS Saya, bukan daftar notifikasi.
+        $followupNotification = SimpegNotification::where('type', 'ews.followup.satyalancana')->firstOrFail();
+        $this->assertSame(route('ews.saya', [], false), $followupNotification->data['url']);
+        $this->assertSame($alert->id, $followupNotification->data['ews_alert_id']);
+
         $this->actingAs($user)
             ->get(route('ews'))
             ->assertOk()
@@ -172,6 +185,14 @@ class EwsFollowupTest extends TestCase
         $this->assertSame(EwsAlert::FOLLOWUP_STATUS_HANDLED, $otherStage->refresh()->followup_status);
         $this->assertTrue(SimpegNotification::whereIn('ews_alert_id', [$current->id, $otherStage->id])->where('is_read', true)->exists());
 
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $employee->id,
+            'type' => 'ews.followup.kenaikan_pangkat',
+            'title' => 'Tindak Lanjut EWS: Disetujui',
+            'body' => 'SK pangkat baru sudah disetujui.',
+            'is_read' => false,
+        ]);
+
         app(EwsEngineService::class)->run();
         $this->assertSame(0, EwsAlert::query()
             ->where('employee_id', $employee->id)
@@ -225,6 +246,14 @@ class EwsFollowupTest extends TestCase
         $this->assertSame('2030-07-22', $employee->fresh()->tanggal_kgb_berikutnya->toDateString());
         $this->assertSame(EwsAlert::FOLLOWUP_STATUS_HANDLED, $alert->refresh()->followup_status);
         $this->assertTrue(SimpegNotification::where('ews_alert_id', $alert->id)->firstOrFail()->is_read);
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $employee->id,
+            'type' => 'ews.followup.kgb',
+            'title' => 'Tindak Lanjut EWS: Disetujui',
+            'body' => 'SK KGB baru sudah disetujui.',
+            'is_read' => false,
+        ]);
     }
 
     public function test_pension_approval_uploads_sk_sets_employee_to_pensiun_and_stops_reminders(): void
@@ -274,6 +303,13 @@ class EwsFollowupTest extends TestCase
             'auditable_type' => 'Employee',
             'auditable_id' => $employee->id,
         ]);
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $employee->id,
+            'type' => 'ews.followup.pensiun',
+            'title' => 'Tindak Lanjut EWS: Disetujui',
+            'body' => 'SK pensiun telah diterbitkan.',
+            'is_read' => false,
+        ]);
     }
 
     public function test_handled_satyalancana_closes_sibling_alerts_and_stops_reminders(): void
@@ -313,6 +349,13 @@ class EwsFollowupTest extends TestCase
                 ->where('is_read', false)
                 ->count()
         );
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $employee->id,
+            'type' => 'ews.followup.satyalancana',
+            'title' => 'Tindak Lanjut EWS: Disetujui',
+            'body' => 'Usulan satyalancana sudah diproses.',
+            'is_read' => false,
+        ]);
     }
 
     public function test_failed_pension_followup_cleans_up_uploaded_sk_file(): void
@@ -449,11 +492,16 @@ class EwsFollowupTest extends TestCase
         $this->assertSame(EwsAlert::FOLLOWUP_STATUS_NOT_NEEDED, $alert->refresh()->followup_status);
         $this->assertDatabaseHas('notifications', [
             'user_id' => $employee->id,
-            'type' => 'ews.tidak_perlu',
+            'type' => 'ews.followup.tidak_perlu',
             'title' => 'Tindak Lanjut EWS: Tidak Perlu',
             'body' => 'Usulan belum diperlukan karena data masih valid.',
             'is_read' => false,
         ]);
+
+        // Notifikasi follow-up harus mengarah ke halaman EWS Saya, bukan daftar notifikasi.
+        $followupNotification = SimpegNotification::where('type', 'ews.followup.tidak_perlu')->firstOrFail();
+        $this->assertSame(route('ews.saya', [], false), $followupNotification->data['url']);
+        $this->assertSame($alert->id, $followupNotification->data['ews_alert_id']);
     }
 
     public function test_pangkat_or_kgb_approval_requires_new_history_and_sk_data(): void

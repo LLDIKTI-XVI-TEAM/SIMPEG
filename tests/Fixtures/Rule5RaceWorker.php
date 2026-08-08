@@ -4,6 +4,7 @@ use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
 use App\Services\Cuti\LeaveBalanceReservationService;
+use App\Services\Cuti\LeaveBalanceService;
 use App\Services\LeaveApprovalService;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
@@ -24,7 +25,18 @@ try {
         app(LeaveApprovalService::class)->approve($request, $approver);
     } else {
         DB::transaction(function () use ($input): void {
+            // Lock employee FIRST before creating LeaveRequest to ensure proper serialization
+            // with concurrent Cuti Besar approval. This ensures Rule 5 checks see a consistent
+            // state of either: (1) approved Cuti Besar + no annual leave, or (2) active annual
+            // leave + no approved Cuti Besar. Without this lock order, both could succeed.
+            $employee = Employee::query()->whereKey($input['employee_id'])->lockForUpdate()->firstOrFail();
+
             $annual = RefJenisCuti::query()->where('code', 'tahunan')->firstOrFail();
+
+            // Check for approved Cuti Besar while holding the employee lock
+            $service = app(LeaveBalanceService::class);
+            $service->assertAnnualLeaveAllowed($employee, 2026);
+
             $request = LeaveRequest::create([
                 'employee_id' => $input['employee_id'],
                 'jenis_cuti_id' => $annual->id,

@@ -975,8 +975,8 @@ class DutyPostponementWorkflowTest extends TestCase
 
     public function test_postgresql_audit_constraint_failure_rolls_back_all_terminal_effects(): void
     {
-        if (DB::getDriverName() !== 'pgsql') {
-            $this->markTestSkipped('Inject constraint audit hanya didukung PostgreSQL.');
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Constraint PostgreSQL hanya dapat diuji pada database PostgreSQL.');
         }
         $fixture = $this->makeWorkflowFixture();
         $before = $this->workflowState($fixture['request']->id, $fixture['balance']);
@@ -995,8 +995,8 @@ class DutyPostponementWorkflowTest extends TestCase
 
     public function test_postgresql_notification_constraint_failure_rolls_back_all_terminal_effects(): void
     {
-        if (DB::getDriverName() !== 'pgsql') {
-            $this->markTestSkipped('Inject constraint notifikasi hanya didukung PostgreSQL.');
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Constraint PostgreSQL hanya dapat diuji pada database PostgreSQL.');
         }
         $fixture = $this->makeWorkflowFixture();
         $before = $this->workflowState($fixture['request']->id, $fixture['balance']);

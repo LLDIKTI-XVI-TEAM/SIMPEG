@@ -25,6 +25,11 @@ class Rule5PostgresConcurrencyTest extends TestCase
 
     protected function setUp(): void
     {
+        // Worker race berjalan sebagai proses terpisah dengan koneksi database sendiri,
+        // sehingga fixture harus ter-commit (DatabaseMigrations). RefreshDatabase
+        // membungkus test dalam transaksi dan membuat fixture tidak terlihat worker.
+        // Cek driver dilakukan sebelum parent::setUp() agar driver non-pgsql tidak
+        // menanggung migrate:fresh yang percuma.
         $driver = $_SERVER['DB_CONNECTION'] ?? $_ENV['DB_CONNECTION'] ?? getenv('DB_CONNECTION');
 
         if ($driver !== 'pgsql') {
