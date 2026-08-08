@@ -13,6 +13,25 @@ use App\Models\AuditLog;
 class AuditLogViewPayload
 {
     /**
+     * Istilah resmi untuk event keputusan cuti.
+     *
+     * Dua kosakata sengaja dipetakan ke label yang sama karena baris audit lama memakai APPROVE dan
+     * POSTPONE, sedangkan baris baru memakai kosakata keputusan. Audit tidak dapat ditulis ulang,
+     * jadi keduanya akan selalu berdampingan dan harus terbaca dengan istilah yang sama.
+     *
+     * @var array<string, string>
+     */
+    private const DECISION_LABELS = [
+        'VERIFY' => 'Diverifikasi',
+        'DECIDE' => 'Disetujui',
+        'APPROVE' => 'Disetujui',
+        'CHANGE_REQUESTED' => 'Perubahan',
+        'DEFER' => 'Ditangguhkan',
+        'POSTPONE' => 'Ditangguhkan',
+        'NOT_APPROVED' => 'Tidak Disetujui',
+    ];
+
+    /**
      * @return array<string, mixed>
      */
     public static function forView(AuditLog $log): array
@@ -28,6 +47,7 @@ class AuditLogViewPayload
             'timestamp' => $log->created_at?->format('Y-m-d H:i:s') ?? '-',
             'operator' => $log->user_name ?: 'Sistem',
             'event' => $log->event,
+            'event_label' => self::DECISION_LABELS[$log->event] ?? $log->event,
             'kategori' => self::categoryFor($module, $log->event),
             'modul' => $module,
             'record_id' => (string) $recordId,

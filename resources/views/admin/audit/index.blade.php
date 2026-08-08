@@ -21,8 +21,10 @@
             if (log.event === 'LOGIN') return 'LOGIN: Login berhasil';
             if (log.event === 'LOGOUT') return 'LOGOUT: Logout dari sistem';
             if (log.event === 'SESSION_TIMEOUT') return 'SESSION_TIMEOUT: Sesi berakhir karena idle timeout';
-            if (log.event === 'APPROVE' || log.event === 'POSTPONE') {
-                return `${log.event}: Mengubah status pengajuan cuti`;
+            // Kosakata keputusan cuti lama dan baru diringkas sama karena baris audit lama memakai
+            // APPROVE dan POSTPONE, sedangkan baris baru memakai istilah keputusan resmi.
+            if (['APPROVE', 'POSTPONE', 'VERIFY', 'DECIDE', 'CHANGE_REQUESTED', 'DEFER', 'NOT_APPROVED'].includes(log.event)) {
+                return `${log.event_label}: Mengubah status pengajuan cuti`;
             }
 
             let target = log.modul;
@@ -41,7 +43,7 @@
                 return `RESTORE: Mengaktifkan kembali data ${target} #${log.record_id}`;
             }
 
-            return `${log.event}: ${log.event} pada ${target} #${log.record_id}`;
+            return `${log.event_label}: pada ${target} #${log.record_id}`;
         },
         get selectedLog() {
             return this.logs.find(l => l.id === this.selectedLogId) || this.logs[0] || {};
@@ -213,10 +215,12 @@
                             @php
                                 // Kelas ditulis utuh, bukan disusun dari potongan, supaya pemindai
                                 // Tailwind tetap menemukannya saat membangun berkas gaya.
+                                // Kosakata keputusan lama dan baru dipetakan bersama karena baris
+                                // audit lama tidak dapat ditulis ulang.
                                 [$warnaTeks, $warnaTitik] = match (true) {
-                                    in_array($log['event'], ['CREATE', 'IMPORT', 'APPROVE', 'RESTORE'], true) => ['text-success', 'bg-success'],
-                                    $log['event'] === 'LOGIN' => ['text-primary', 'bg-primary'],
-                                    in_array($log['event'], ['SOFT_DELETE', 'LOGOUT'], true) => ['text-danger', 'bg-danger'],
+                                    in_array($log['event'], ['CREATE', 'IMPORT', 'RESTORE', 'APPROVE', 'DECIDE'], true) => ['text-success', 'bg-success'],
+                                    in_array($log['event'], ['LOGIN', 'VERIFY'], true) => ['text-primary', 'bg-primary'],
+                                    in_array($log['event'], ['SOFT_DELETE', 'DELETE', 'LOGOUT', 'NOT_APPROVED'], true) => ['text-danger', 'bg-danger'],
                                     default => ['text-warning', 'bg-warning'],
                                 };
                             @endphp
@@ -226,7 +230,7 @@
                                 <td class="px-4 py-3.5">
                                     <span class="inline-flex items-center gap-1.5 text-xs font-semibold font-sans {{ $warnaTeks }}">
                                         <span class="h-1.5 w-1.5 rounded-full {{ $warnaTitik }}"></span>
-                                        <span>{{ $log['event'] }}</span>
+                                        <span>{{ $log['event_label'] }}</span>
                                     </span>
                                 </td>
                                 <td class="px-4 py-3.5 text-xs text-muted font-sans">{{ $log['modul'] }}</td>

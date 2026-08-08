@@ -48,7 +48,7 @@
             {{-- Header info --}}
             <div class="border-b border-border pb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h3 class="text-base font-bold text-ink font-sans leading-tight">Aktivitas: {{ $log['event'] }}</h3>
+                    <h3 class="text-base font-bold text-ink font-sans leading-tight">Aktivitas: {{ $log['event_label'] }}</h3>
                     <p class="text-xs text-muted font-sans mt-0.5">Waktu Operasional: {{ $log['timestamp'] }}</p>
                 </div>
                 <div>
