@@ -59,9 +59,36 @@
             const data = notification.data ?? {};
             return data.url ?? data.link ?? data.redirect_url ?? (data.leave_request_id ? `/dashboard/cuti/${data.leave_request_id}` : @js(route('notifications.index')));
         },
+        async markSingleAsRead(notification, e) {
+            if (e) e.stopPropagation();
+            const isUnread = !notification.read_at && !notification.is_read;
+            if (!isUnread) return;
+
+            notification.is_read = true;
+            notification.read_at = new Date().toISOString();
+            this.unreadCount = Math.max(0, this.unreadCount - 1);
+            window.dispatchEvent(new CustomEvent('notification-marked-read', { detail: { id: notification.id } }));
+
+            try {
+                await fetch(this.markEndpoint(notification.id), {
+                    method: 'PATCH',
+                    headers: {
+                        Accept: 'application/json',
+                        'X-CSRF-TOKEN': this.csrf,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'same-origin'
+                });
+            } catch (err) {
+                // Ignore error if already updated locally
+            }
+        },
         async openNotification(notification) {
             try {
-                if (!notification.read_at) {
+                const isUnread = !notification.read_at && !notification.is_read;
+                if (isUnread) {
+                    notification.is_read = true;
+                    notification.read_at = new Date().toISOString();
                     this.unreadCount = Math.max(0, this.unreadCount - 1);
                     window.dispatchEvent(new CustomEvent('notification-marked-read', { detail: { id: notification.id } }));
                 }
@@ -118,25 +145,39 @@
 
         <div class="max-h-96 divide-y divide-border overflow-y-auto">
             <template x-for="notification in notifications" :key="notification.id">
-                <button
-                    type="button"
+                <div
+                    class="group relative flex w-full items-start justify-between gap-2 px-4 py-3 text-left transition-colors hover:bg-soft cursor-pointer"
+                    :class="{ 'opacity-70': notification.read_at || notification.is_read }"
                     @click="openNotification(notification)"
-                    class="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-soft"
-                    :class="{ 'opacity-70': notification.read_at }"
                 >
-                    <span
-                        class="mt-1.5 h-2 w-2 shrink-0 rounded-full transition-colors"
-                        :class="notification.read_at ? 'bg-border' : 'bg-primary'"
-                    ></span>
-                    <span class="min-w-0 flex-1">
+                    <div class="flex items-start gap-3 min-w-0 flex-1">
                         <span
-                            class="block truncate text-sm font-medium"
-                            :class="notification.read_at ? 'font-normal text-muted' : 'font-semibold text-ink'"
-                            x-text="notification.title"
+                            class="mt-1.5 h-2 w-2 shrink-0 rounded-full transition-colors"
+                            :class="(notification.read_at || notification.is_read) ? 'bg-border' : 'bg-primary'"
                         ></span>
-                        <span class="mt-0.5 block line-clamp-2 text-xs text-muted" x-text="notification.body"></span>
-                    </span>
-                </button>
+                        <span class="min-w-0 flex-1">
+                            <span
+                                class="block truncate text-sm"
+                                :class="(notification.read_at || notification.is_read) ? 'font-normal text-muted' : 'font-semibold text-ink'"
+                                x-text="notification.title"
+                            ></span>
+                            <span class="mt-0.5 block line-clamp-2 text-xs text-muted" x-text="notification.body"></span>
+                        </span>
+                    </div>
+
+                    <button
+                        x-show="!notification.read_at && !notification.is_read"
+                        @click.stop="markSingleAsRead(notification, $event)"
+                        type="button"
+                        class="shrink-0 rounded p-1 text-muted hover:bg-surface hover:text-primary transition-colors mt-0.5"
+                        title="Tandai dibaca"
+                        aria-label="Tandai dibaca"
+                    >
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                    </button>
+                </div>
             </template>
 
             <div x-show="!loading && notifications.length === 0" class="px-4 py-6 text-center">

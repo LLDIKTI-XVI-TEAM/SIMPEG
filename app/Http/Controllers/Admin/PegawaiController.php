@@ -546,6 +546,9 @@ class PegawaiController extends Controller
                 'created_at' => $now,
             ])->all();
 
+            // Penulisan massal melewati cast dan model event audit, sehingga penyamaran nomor
+            // identitas maupun penjaga append-only tidak berjalan di sini. Payload dijaga tetap
+            // hanya berisi penanda waktu penghapusan; jangan menambahkan data pribadi pegawai.
             AuditLog::insert($auditRows);
         });
 
@@ -614,6 +617,9 @@ class PegawaiController extends Controller
                 'created_at' => $now,
             ])->all();
 
+            // Penulisan massal melewati cast dan model event audit, sehingga penyamaran nomor
+            // identitas maupun penjaga append-only tidak berjalan di sini. Payload dijaga tetap
+            // hanya berisi penanda waktu penghapusan; jangan menambahkan data pribadi pegawai.
             AuditLog::insert($auditRows);
         });
 
