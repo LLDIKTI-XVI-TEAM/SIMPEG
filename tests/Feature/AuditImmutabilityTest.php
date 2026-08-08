@@ -173,6 +173,22 @@ class AuditImmutabilityTest extends TestCase
         }
     }
 
+    public function test_basis_data_menolak_pengosongan_tabel_audit(): void
+    {
+        $this->lewatiJikaBukanPostgres();
+        $log = $this->auditLog();
+
+        try {
+            DB::transaction(function (): void {
+                DB::statement('truncate table audit_logs');
+            });
+            $this->fail('Pengosongan tabel audit wajib ditolak basis data.');
+        } catch (QueryException $e) {
+            $this->assertStringContainsString('append-only', $e->getMessage());
+            $this->assertDatabaseHas('audit_logs', ['id' => $log->id]);
+        }
+    }
+
     public function test_basis_data_tetap_mengizinkan_penambahan_baris_audit(): void
     {
         $this->lewatiJikaBukanPostgres();
