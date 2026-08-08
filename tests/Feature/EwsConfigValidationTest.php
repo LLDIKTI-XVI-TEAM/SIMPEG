@@ -48,6 +48,26 @@ class EwsConfigValidationTest extends TestCase
         $response->assertSessionDoesntHaveErrors(['pangkat_h30']);
     }
 
+    public function test_perubahan_konfigurasi_tercatat_di_basis_data_tanpa_jejak_sesi(): void
+    {
+        $admin = User::factory()->create(['role' => 'super_admin']);
+
+        $response = $this->actingAs($admin)
+            ->withSession(['active_role' => 'super_admin'])
+            ->post('/konfigurasi/update', $this->validPayload([
+                'pangkat_required_years' => '5',
+                'reason' => 'Penyesuaian masa kerja minimum kenaikan pangkat.',
+            ]));
+
+        $response->assertSessionHasNoErrors();
+        // Catatan berbasis sesi hilang saat pengguna keluar sehingga tidak dapat disebut audit;
+        // jejak permanennya harus berada di tabel audit.
+        $response->assertSessionMissing('dynamic_audit_logs');
+        $this->assertDatabaseHas('audit_logs', [
+            'auditable_type' => 'EwsConfig',
+        ]);
+    }
+
     public function test_update_konfigurasi_ditolak_untuk_role_selain_super_admin(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();
