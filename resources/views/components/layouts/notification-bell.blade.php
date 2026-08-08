@@ -67,10 +67,9 @@
             notification.is_read = true;
             notification.read_at = new Date().toISOString();
             this.unreadCount = Math.max(0, this.unreadCount - 1);
-            window.dispatchEvent(new CustomEvent('notification-marked-read', { detail: { id: notification.id } }));
 
             try {
-                await fetch(this.markEndpoint(notification.id), {
+                const response = await fetch(this.markEndpoint(notification.id), {
                     method: 'PATCH',
                     headers: {
                         Accept: 'application/json',
@@ -79,28 +78,37 @@
                     },
                     credentials: 'same-origin'
                 });
+                if (response.ok) {
+                    window.dispatchEvent(new CustomEvent('notification-marked-read', { detail: { id: notification.id } }));
+                } else {
+                    this.load();
+                }
             } catch (err) {
-                // Ignore error if already updated locally
+                this.load();
             }
         },
         async openNotification(notification) {
+            const isUnread = !notification.read_at && !notification.is_read;
+            if (isUnread) {
+                notification.is_read = true;
+                notification.read_at = new Date().toISOString();
+                this.unreadCount = Math.max(0, this.unreadCount - 1);
+            }
             try {
-                const isUnread = !notification.read_at && !notification.is_read;
                 if (isUnread) {
-                    notification.is_read = true;
-                    notification.read_at = new Date().toISOString();
-                    this.unreadCount = Math.max(0, this.unreadCount - 1);
-                    window.dispatchEvent(new CustomEvent('notification-marked-read', { detail: { id: notification.id } }));
+                    const response = await fetch(this.markEndpoint(notification.id), {
+                        method: 'PATCH',
+                        headers: {
+                            Accept: 'application/json',
+                            'X-CSRF-TOKEN': this.csrf,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        credentials: 'same-origin'
+                    });
+                    if (response.ok) {
+                        window.dispatchEvent(new CustomEvent('notification-marked-read', { detail: { id: notification.id } }));
+                    }
                 }
-                await fetch(this.markEndpoint(notification.id), {
-                    method: 'PATCH',
-                    headers: {
-                        Accept: 'application/json',
-                        'X-CSRF-TOKEN': this.csrf,
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    credentials: 'same-origin'
-                });
             } finally {
                 window.location.href = this.targetUrl(notification);
             }

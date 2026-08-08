@@ -70,8 +70,7 @@
                 },
                 async openNotification(id, target) {
                     try {
-                        window.dispatchEvent(new CustomEvent('notification-marked-read', { detail: { id } }));
-                        await fetch(this.endpoint(id), {
+                        const response = await fetch(this.endpoint(id), {
                             method: 'PATCH',
                             headers: {
                                 Accept: 'application/json',
@@ -80,6 +79,9 @@
                             },
                             credentials: 'same-origin'
                         });
+                        if (response.ok) {
+                            window.dispatchEvent(new CustomEvent('notification-marked-read', { detail: { id } }));
+                        }
                     } finally {
                         window.location.href = target;
                     }
