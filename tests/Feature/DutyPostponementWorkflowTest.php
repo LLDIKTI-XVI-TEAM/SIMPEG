@@ -826,7 +826,10 @@ class DutyPostponementWorkflowTest extends TestCase
 
     public function test_terminal_retry_fails_closed_when_any_persisted_effect_is_missing(): void
     {
-        foreach (['ledger', 'release', 'approval', 'audit', 'notification'] as $missing) {
+        // Baris audit tidak ikut diuji hilang karena basis data menolak penghapusannya. Bentuk
+        // kerusakan yang masih mungkin pada tabel append-only adalah baris berlebih, dan itu
+        // diuji terpisah pada test duplikasi di bawah.
+        foreach (['ledger', 'release', 'approval', 'notification'] as $missing) {
             $fixture = $this->makeWorkflowFixture();
             $terminal = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], self::REASON);
             $this->deleteTerminalEffect($terminal->id, $missing);
@@ -843,7 +846,8 @@ class DutyPostponementWorkflowTest extends TestCase
 
     public function test_terminal_retry_fails_closed_when_any_persisted_effect_is_mismatched(): void
     {
-        foreach (['ledger', 'release', 'approval', 'audit', 'notification'] as $mismatched) {
+        // Payload audit tidak ikut dirusak karena basis data menolak pembaruannya.
+        foreach (['ledger', 'release', 'approval', 'notification'] as $mismatched) {
             $fixture = $this->makeWorkflowFixture();
             $terminal = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], self::REASON);
             $this->corruptTerminalEffect($terminal->id, $mismatched);
@@ -855,6 +859,55 @@ class DutyPostponementWorkflowTest extends TestCase
             } catch (ValidationException) {
                 $this->assertSame($counts, $this->effectCounts($terminal->id));
             }
+        }
+    }
+
+    public function test_terminal_retry_fails_closed_when_audit_row_is_duplicated(): void
+    {
+        $fixture = $this->makeWorkflowFixture();
+        $terminal = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], self::REASON);
+        $asli = AuditLog::query()
+            ->where('auditable_type', 'LeaveRequest')
+            ->where('auditable_id', $terminal->id)
+            ->where('event', 'DUTY_POSTPONEMENT')
+            ->sole();
+
+        // Audit hanya dapat bertambah, tidak dapat diubah maupun dihapus. Karena itu kontrak
+        // terminal harus menolak keadaan dengan lebih dari satu baris audit penangguhan.
+        AuditLog::query()->create([
+            'user_id' => $asli->user_id,
+            'user_name' => $asli->user_name,
+            'event' => 'DUTY_POSTPONEMENT',
+            'auditable_type' => 'LeaveRequest',
+            'auditable_id' => $terminal->id,
+            'old_values' => $asli->old_values,
+            'new_values' => $asli->new_values,
+            'ip_address' => $asli->ip_address,
+            'user_agent' => $asli->user_agent,
+        ]);
+        $counts = $this->effectCounts($terminal->id);
+
+        try {
+            $this->action()->execute($terminal, $fixture['actor'], $fixture['actingUser'], self::REASON);
+            $this->fail('Retry terminal dengan baris audit berlebih wajib ditolak.');
+        } catch (ValidationException) {
+            $this->assertSame($counts, $this->effectCounts($terminal->id));
+        }
+    }
+
+    public function test_terminal_retry_fails_closed_when_reason_differs_from_audit_snapshot(): void
+    {
+        $fixture = $this->makeWorkflowFixture();
+        $terminal = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], self::REASON);
+        $counts = $this->effectCounts($terminal->id);
+
+        // Alasan yang berbeda dari snapshot audit menandakan permintaan ulang bukan pengulangan
+        // keputusan yang sama, sehingga kontrak terminal wajib menolaknya.
+        try {
+            $this->action()->execute($terminal, $fixture['actor'], $fixture['actingUser'], 'Alasan yang berbeda dari catatan audit.');
+            $this->fail('Retry terminal dengan alasan berbeda wajib ditolak.');
+        } catch (ValidationException) {
+            $this->assertSame($counts, $this->effectCounts($terminal->id));
         }
     }
 
@@ -907,57 +960,37 @@ class DutyPostponementWorkflowTest extends TestCase
         }
     }
 
-    public function test_terminal_retry_fails_closed_when_audit_notification_snapshot_is_missing_or_not_boolean(): void
+    /**
+     * Snapshot notifikasi pada audit sebelumnya diuji dengan merusak payload audit yang sudah
+     * tersimpan, dan keadaan itu tidak dapat lagi terjadi karena basis data menolak pembaruan
+     * baris audit. Yang diuji di sini adalah keadaan yang masih mungkin terjadi, yaitu
+     * penangguhan yang tercatat tanpa notifikasi dalam aplikasi karena kanalnya dimatikan.
+     * Permintaan ulang pada keadaan itu sah dan tidak boleh menambah efek apa pun.
+     */
+    public function test_terminal_retry_stays_idempotent_when_in_app_notification_is_disabled(): void
     {
-        foreach (['missing', 'non_boolean'] as $corruption) {
-            $fixture = $this->makeWorkflowFixture();
-            $terminal = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], self::REASON);
-            $audit = AuditLog::query()
-                ->where('auditable_id', $terminal->id)
-                ->where('event', 'DUTY_POSTPONEMENT')
-                ->sole();
-            $facts = $audit->new_values;
+        $this->setDutyPostponementChannelPolicy('in_app', false);
+        $fixture = $this->makeWorkflowFixture();
+        $terminal = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], self::REASON);
+        $counts = $this->effectCounts($terminal->id);
+        $this->assertSame(0, $counts['notification']);
 
-            if ($corruption === 'missing') {
-                unset($facts['in_app_notification_recorded']);
-            } else {
-                $facts['in_app_notification_recorded'] = 'true';
-            }
+        $diulang = $this->action()->execute($terminal, $fixture['actor'], $fixture['actingUser'], self::REASON);
 
-            DB::table('audit_logs')->where('id', $audit->id)->update([
-                'new_values' => json_encode($facts, JSON_THROW_ON_ERROR),
-            ]);
-            $counts = $this->effectCounts($terminal->id);
-
-            try {
-                $this->action()->execute($terminal, $fixture['actor'], $fixture['actingUser'], self::REASON);
-                $this->fail("Retry terminal dengan snapshot notification {$corruption} wajib ditolak.");
-            } catch (ValidationException) {
-                $this->assertSame($counts, $this->effectCounts($terminal->id));
-            }
-        }
+        $this->assertSame($terminal->id, $diulang->id);
+        $this->assertSame($counts, $this->effectCounts($terminal->id));
     }
 
-    public function test_terminal_retry_fails_closed_when_status_before_is_not_actionable(): void
+    public function test_terminal_retry_fails_closed_when_ledger_source_status_does_not_match_audit_snapshot(): void
     {
         $fixture = $this->makeWorkflowFixture();
         $terminal = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], self::REASON);
-        $audit = AuditLog::query()
-            ->where('auditable_id', $terminal->id)
-            ->where('event', 'DUTY_POSTPONEMENT')
-            ->sole();
-        $facts = $audit->new_values;
-        $facts['status_before'] = 'disetujui';
-        $oldValues = $audit->old_values;
-        $oldValues['status'] = 'disetujui';
-        DB::table('audit_logs')->where('id', $audit->id)->update([
-            'new_values' => json_encode($facts, JSON_THROW_ON_ERROR),
-            'old_values' => json_encode($oldValues, JSON_THROW_ON_ERROR),
-        ]);
         $ledger = LeaveBalanceLedger::query()
             ->where('leave_request_id', $terminal->id)
             ->where('event_type', LeaveBalanceLedger::EVENT_DUTY_POSTPONEMENT_RECORDED)
             ->sole();
+        // Status pra-terminal pada ledger harus sama dengan snapshot audit. Ketidakcocokan diuji
+        // dari sisi ledger karena baris audit tidak dapat diubah lagi setelah tersimpan.
         $metadata = $ledger->metadata;
         $metadata['source_status'] = 'disetujui';
         DB::table('leave_balance_ledger')->where('id', $ledger->id)->update([
@@ -1088,7 +1121,6 @@ class DutyPostponementWorkflowTest extends TestCase
             'ledger' => DB::table('leave_balance_ledger')->where('leave_request_id', $requestId)->where('event_type', LeaveBalanceLedger::EVENT_DUTY_POSTPONEMENT_RECORDED)->delete(),
             'release' => DB::table('leave_balance_reservation_events')->where('leave_request_id', $requestId)->where('event_type', LeaveBalanceReservationEvent::EVENT_RELEASED)->delete(),
             'approval' => DB::table('leave_approvals')->where('leave_request_id', $requestId)->where('action', LeaveApproval::ACTION_DUTY_POSTPONEMENT)->delete(),
-            'audit' => DB::table('audit_logs')->where('auditable_type', 'LeaveRequest')->where('auditable_id', $requestId)->where('event', 'DUTY_POSTPONEMENT')->delete(),
             'notification' => DB::table('notifications')->where('data->leave_request_id', $requestId)->where('type', 'cuti.ditangguhkan_tugas_dinas')->delete(),
         };
     }
@@ -1099,7 +1131,6 @@ class DutyPostponementWorkflowTest extends TestCase
             'ledger' => DB::table('leave_balance_ledger')->where('leave_request_id', $requestId)->where('event_type', LeaveBalanceLedger::EVENT_DUTY_POSTPONEMENT_RECORDED)->update(['reason' => 'Alasan ledger dirusak.']),
             'release' => DB::table('leave_balance_reservation_events')->where('leave_request_id', $requestId)->where('event_type', LeaveBalanceReservationEvent::EVENT_RELEASED)->update(['created_by' => User::factory()->create()->id]),
             'approval' => DB::table('leave_approvals')->where('leave_request_id', $requestId)->where('action', LeaveApproval::ACTION_DUTY_POSTPONEMENT)->update(['komentar' => 'Komentar history dirusak.']),
-            'audit' => DB::table('audit_logs')->where('auditable_type', 'LeaveRequest')->where('auditable_id', $requestId)->where('event', 'DUTY_POSTPONEMENT')->update(['user_id' => User::factory()->create()->id]),
             'notification' => DB::table('notifications')->where('data->leave_request_id', $requestId)->where('type', 'cuti.ditangguhkan_tugas_dinas')->update(['title' => 'Judul dirusak']),
         };
     }

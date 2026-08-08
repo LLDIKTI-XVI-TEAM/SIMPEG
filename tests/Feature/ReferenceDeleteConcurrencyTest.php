@@ -164,7 +164,9 @@ class ReferenceDeleteConcurrencyTest extends TestCase
 
             $create?->stop(1);
             $delete?->stop(1);
-            DB::table('audit_logs')->delete();
+            // Baris audit dari proses pekerja dikosongkan lewat TRUNCATE karena penghapusan
+            // baris audit ditolak basis data.
+            DB::statement('truncate table audit_logs');
         }
     }
 

@@ -169,8 +169,9 @@ class Rule5PostgresConcurrencyTest extends TestCase
                 ->count());
         } finally {
             // Evidence worker hanya hidup dalam database test; bersihkan sebelum hook migration
-            // agar guard rollback produksi tetap melindungi data nyata.
-            DB::table('audit_logs')->delete();
+            // agar guard rollback produksi tetap melindungi data nyata. Tabel audit dikosongkan
+            // lewat TRUNCATE karena penghapusan baris audit ditolak basis data.
+            DB::statement('truncate table audit_logs');
             DB::table('leave_balance_reservation_events')->delete();
         }
     }
