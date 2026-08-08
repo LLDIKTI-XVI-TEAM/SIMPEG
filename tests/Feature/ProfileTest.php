@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\EducationHistory;
 use App\Models\Employee;
 use App\Models\EmployeeFamily;
@@ -248,5 +249,33 @@ class ProfileTest extends TestCase
         $response->assertRedirect('/dashboard/profil');
         $response->assertSessionHas('success');
         $this->assertTrue(Hash::check('password-baru', $user->refresh()->password));
+    }
+
+    public function test_perubahan_kata_sandi_tercatat_pada_audit_tanpa_menyimpan_kata_sandi(): void
+    {
+        $user = User::factory()->pegawai()->create([
+            'password' => Hash::make('password-lama'),
+        ]);
+
+        $this->actingAs($user);
+        $this->post('/dashboard/profil/password', [
+            'current_password' => 'password-lama',
+            'new_password' => 'password-baru',
+            'new_password_confirmation' => 'password-baru',
+        ]);
+
+        $audit = AuditLog::query()
+            ->where('event', 'UPDATE')
+            ->where('auditable_type', 'User')
+            ->where('auditable_id', $user->id)
+            ->sole();
+
+        // Jejak perubahan kredensial wajib ada, namun nilai maupun hash kata sandi tidak boleh
+        // ikut tersimpan karena audit bersifat append-only dan dapat dibaca operator lain.
+        $isiAudit = json_encode([$audit->old_values, $audit->new_values], JSON_THROW_ON_ERROR);
+        $this->assertStringNotContainsString('password-lama', $isiAudit);
+        $this->assertStringNotContainsString('password-baru', $isiAudit);
+        $this->assertStringNotContainsString($user->refresh()->password, $isiAudit);
+        $this->assertTrue($audit->new_values['password_changed']);
     }
 }

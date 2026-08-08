@@ -2,11 +2,13 @@
 
 namespace App\Actions\Documents;
 
+use App\Actions\Documents\Concerns\BuildsDocumentAuditPayload;
 use App\Models\Appointment;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
+use App\Services\AuditService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -15,6 +17,8 @@ use Throwable;
 
 class StoreDocumentAction
 {
+    use BuildsDocumentAuditPayload;
+
     /**
      * Categories that should also create a history record.
      * Maps jenis_dokumen → history table class.
@@ -52,6 +56,16 @@ class StoreDocumentAction
                 }
 
                 $this->syncEmployeeStatus($employee, $category);
+
+                // Payload audit dibatasi pada metadata arsip. Isi berkas tidak pernah masuk audit,
+                // dan jalur berkas cukup untuk menelusuri dokumen mana yang dimaksud.
+                AuditService::logOrFail(
+                    'CREATE',
+                    'Document',
+                    $document->id,
+                    null,
+                    $this->auditPayload($document),
+                );
 
                 return $document;
             });
