@@ -43,60 +43,75 @@
             { key: 'Pendidikan Terakhir', label: 'Pendidikan Terakhir' },
             { key: 'Prodi Pendidikan Terakhir', label: 'Prodi Pendidikan Terakhir' },
             { key: 'Pensiun', label: 'Tanggal Pensiun' },
-            { key: 'Role', label: 'Peran / Role' },
             { key: 'NIK', label: 'NIK (Opsional)' },
             { key: 'No KK', label: 'No KK (Opsional)' },
         ],
         columnMapping: {},
+        // Target wajib dan peringatan dihitung server saat upload agar UI mengikuti state batch.
+        requiredTargetFields: [],
+        serverWarnings: { unmatched_columns: [], missing_required: [] },
+        mappingSaveTimer: null,
         get unmappedHeaders() {
-            return this.mainHeaders.filter(h => !this.columnMapping[h] || this.columnMapping[h] === 'ignore');
+            return this.mainHeaders.filter(h => !this.columnMapping[h] || this.columnMapping[h] === 'tidak_dipakai');
         },
         get unmappedHeadersCount() {
             return this.unmappedHeaders.length;
         },
         get hasDuplicateMapping() {
-            const selected = Object.values(this.columnMapping).filter(val => val && val !== 'ignore');
+            const selected = Object.values(this.columnMapping).filter(val => val && val !== 'tidak_dipakai');
             return new Set(selected).size !== selected.length;
         },
         get duplicateMappedFields() {
             const counts = {};
             const duplicates = [];
             Object.values(this.columnMapping).forEach(val => {
-                if (val && val !== 'ignore') {
+                if (val && val !== 'tidak_dipakai') {
                     counts[val] = (counts[val] || 0) + 1;
                     if (counts[val] === 2) duplicates.push(val);
                 }
             });
             return duplicates;
         },
-        autoMatchHeaders() {
-            const mapping = {};
-            this.mainHeaders.forEach(header => {
-                const cleanHeader = (header || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-                const matched = this.simpegTargetFields.find(f => {
-                    const cleanFieldKey = f.key.toLowerCase().replace(/[^a-z0-9]/g, '');
-                    const cleanFieldLabel = f.label.toLowerCase().replace(/[^a-z0-9]/g, '');
-                    return cleanHeader === cleanFieldKey || cleanHeader.includes(cleanFieldKey) || cleanHeader === cleanFieldLabel;
-                });
-                mapping[header] = matched ? matched.key : 'ignore';
-            });
-            this.columnMapping = mapping;
+        get missingRequiredTargets() {
+            const selected = Object.values(this.columnMapping).filter(val => val && val !== 'tidak_dipakai');
+            return this.requiredTargetFields.filter(t => !selected.includes(t));
         },
 
-        // Ubah key setiap baris mengikuti pilihan pemetaan kolom; server hanya mengenali key kanonis.
-        getMappedRows() {
-            return this.allRows.map(rowObj => {
-                const mappedData = {};
-                Object.keys(rowObj.data).forEach(header => {
-                    const targetField = this.columnMapping[header];
-                    if (targetField && targetField !== 'ignore') {
-                        mappedData[targetField] = rowObj.data[header];
-                    } else if (!targetField) {
-                        mappedData[header] = rowObj.data[header];
+        // Simpan pemetaan pilihan admin ke state batch (debounce) agar preview, validasi,
+        // dan eksekusi memakai kontrak yang sama. Server menolak target ganda atau target
+        // tidak dikenal dengan pesan yang menyebut field-nya.
+        saveMapping() {
+            if (!this.batchId) return;
+
+            window.clearTimeout(this.mappingSaveTimer);
+            this.mappingSaveTimer = window.setTimeout(async () => {
+                try {
+                    const res = await fetch('/api/pegawai/import/' + this.batchId + '/mapping', {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
+                        },
+                        body: JSON.stringify({ mapping: this.columnMapping }),
+                    });
+
+                    const data = await res.json();
+                    if (!res.ok) {
+                        throw new Error(data.errors ? Object.values(data.errors).flat().join(' ') : (data.message || 'Gagal menyimpan pemetaan kolom.'));
                     }
-                });
-                return { row: rowObj.row, data: mappedData };
-            });
+
+                    this.serverWarnings = data.warnings || this.serverWarnings;
+                } catch (e) {
+                    this.apiError = e.message;
+                }
+            }, 400);
+        },
+
+        // Kirim hanya baris yang benar-benar diedit (key sumber apa adanya); tafsir kolom
+        // sepenuhnya memakai pemetaan yang tersimpan di batch server.
+        getEditedRows() {
+            return this.allRows.filter((rowObj, index) => this.editedRowIndices.has(index));
         },
 
         // Pagination preview
@@ -252,12 +267,16 @@
                 
                 const previewData = await previewRes.json();
                 this.mainHeaders = previewData.headers;
-                this.allRows = previewData.rows; // [{row: N, data: {...}}, ...]
+                this.allRows = previewData.rows; // [{row: N, data: {...}}, ...] — maksimal 10 baris dari server
                 this.totalRows = previewData.total_rows;
                 this.previewPage = 1;
                 this.hasEdits = false;
                 this.editedRowIndices = new Set();
-                this.autoMatchHeaders();
+                // Pemetaan awal dan peringatan kolom berasal dari state batch server,
+                // bukan tebakan ulang di browser.
+                this.columnMapping = previewData.mapping || {};
+                this.requiredTargetFields = previewData.required_targets || [];
+                this.serverWarnings = previewData.warnings || { unmatched_columns: [], missing_required: [] };
                 
                 this.step = 2;
                 
@@ -276,13 +295,19 @@
                 this.apiError = 'Terdapat target kolom SIMPEG yang dipetakan lebih dari sekali (' + this.duplicateMappedFields.join(', ') + '). Setiap target SIMPEG hanya boleh dipilih oleh satu kolom sumber.';
                 return;
             }
-            
+
+            if (this.missingRequiredTargets.length > 0) {
+                this.apiError = 'Field wajib belum dipetakan: ' + this.missingRequiredTargets.join(', ') + '. Petakan setiap field wajib ke kolom sumber sebelum melanjutkan.';
+                return;
+            }
+
             this.isValidating = true;
             this.apiError = '';
-            
+
             try {
-                // Kirim rows yang sudah dipetakan berdasarkan pilihan columnMapping
-                const body = { rows: this.getMappedRows() };
+                // Hanya baris hasil edit yang dikirim; baris lain tetap memakai state batch di server.
+                const editedRows = this.getEditedRows();
+                const body = editedRows.length > 0 ? { rows: editedRows } : {};
                 
                 const res = await fetch('/api/pegawai/import/' + this.batchId + '/validate', {
                     method: 'POST',
@@ -459,6 +484,10 @@
             this.previewPage = 1;
             this.valPage = 1;
             this.valFilter = 'all';
+            this.columnMapping = {};
+            this.requiredTargetFields = [];
+            this.serverWarnings = { unmatched_columns: [], missing_required: [] };
+            this.mappingSaveTimer = null;
         }
     }">
         
@@ -621,9 +650,17 @@
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div>
                             <strong class="font-sans">Peringatan Kolom Tidak Cocok:</strong>
-                            Terdapat <span class="font-bold" x-text="unmappedHeadersCount"></span> kolom dari file yang belum terpetakan ke field SIMPEG (<span class="italic font-medium" x-text="unmappedHeaders.join(', ')"></span>). Kolom tidak terpetakan akan diabaikan.
+                            Terdapat <span class="font-bold" x-text="unmappedHeadersCount"></span> kolom dari file yang belum terpetakan ke field SIMPEG (<span class="italic font-medium" x-text="unmappedHeaders.join(', ')"></span>). Nilai kolom yang dipetakan ke "Tidak Dipakai" tidak akan disimpan.
                         </div>
                     </div>
+                </x-ui.alert>
+            </div>
+
+            {{-- Header wajib yang belum terpetakan diperingatkan lebih awal; server tetap menolak validasi bila ini lolos. --}}
+            <div x-show="missingRequiredTargets.length > 0" x-cloak class="transition">
+                <x-ui.alert variant="danger" size="md">
+                    <strong class="font-sans">Field Wajib Belum Terpetakan:</strong>
+                    <span x-text="missingRequiredTargets.join(', ')"></span>. Petakan setiap field wajib ke kolom sumber sebelum validasi dapat dijalankan.
                 </x-ui.alert>
             </div>
 
@@ -643,11 +680,11 @@
                         <div class="rounded-lg border border-border p-2.5 bg-soft/30 space-y-1.5">
                             <div class="flex items-center justify-between text-xs">
                                 <span class="font-semibold text-ink truncate font-sans" :title="header" x-text="header"></span>
-                                <span x-show="columnMapping[header] && columnMapping[header] !== 'ignore'" class="text-[10px] font-bold text-success">✓ Matched</span>
-                                <span x-show="!columnMapping[header] || columnMapping[header] === 'ignore'" class="text-[10px] font-bold text-warning">! Unmatched</span>
+                                <span x-show="columnMapping[header] && columnMapping[header] !== 'tidak_dipakai'" class="text-[10px] font-bold text-success">✓ Matched</span>
+                                <span x-show="!columnMapping[header] || columnMapping[header] === 'tidak_dipakai'" class="text-[10px] font-bold text-warning">! Unmatched</span>
                             </div>
-                            <x-form.select x-model="columnMapping[header]" class="w-full text-xs py-1">
-                                <option value="ignore">-- Abaikan Kolom Ini --</option>
+                            <x-form.select x-model="columnMapping[header]" @change="saveMapping()" class="w-full text-xs py-1">
+                                <option value="tidak_dipakai">-- Tidak Dipakai --</option>
                                 <template x-for="field in simpegTargetFields" :key="field.key">
                                     <option :value="field.key" x-text="field.label" :selected="columnMapping[header] === field.key"></option>
                                 </template>
@@ -721,8 +758,8 @@
                     <x-ui.button type="button" variant="muted" @click="resetAll()">
                         Batal & Upload Ulang
                     </x-ui.button>
-                    <button type="button" @click="runValidation()" :disabled="isValidating || hasDuplicateMapping"
-                        :class="(isValidating || hasDuplicateMapping) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'"
+                    <button type="button" @click="runValidation()" :disabled="isValidating || hasDuplicateMapping || missingRequiredTargets.length > 0"
+                        :class="(isValidating || hasDuplicateMapping || missingRequiredTargets.length > 0) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'"
                         class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition font-sans gap-2">
                         <x-ui.loading x-show="isValidating" size="md" />
                         <span x-text="isValidating ? 'Memvalidasi...' : 'Lanjutkan ke Validasi'"></span>

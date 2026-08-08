@@ -16,7 +16,7 @@ class GenerateImportTemplateActionTest extends TestCase
 
         $expected = array_merge(['No'], UploadImportBatchAction::TEMPLATE_HEADERS['utama']);
         $this->assertSame($expected, $def['headers']);
-        $this->assertContains('Role', $def['headers']);
+        $this->assertNotContains('Role', $def['headers']);
     }
 
     public function test_template_utama_contains_two_example_rows(): void
@@ -33,7 +33,8 @@ class GenerateImportTemplateActionTest extends TestCase
         [$pns, $pppk] = $def['examples'];
 
         $this->assertSame(EmployeeRowMapper::EXAMPLE_ROW_MARKER, $pns['Nama Pegawai']);
-        $this->assertSame('pegawai', $pns['Role']);
+        // Baris contoh tidak boleh membawa kolom Role; role ditetapkan lewat Kelola Akses User.
+        $this->assertArrayNotHasKey('Role', $pns);
         $this->assertSame('PNS', $pns['Status Kepegawaian']);
         $this->assertSame('1980-01-01', $pns['Tanggal Lahir']);
         $this->assertNotNull($pns['Pangkat']);
