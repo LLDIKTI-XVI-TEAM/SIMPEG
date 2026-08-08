@@ -23,11 +23,11 @@ class NotificationEventChannelManagementTest extends TestCase
         $this->seedRbac();
     }
 
-    public function test_katalog_memuat_17_event_dan_hanya_adapter_runtime_yang_tersedia(): void
+    public function test_katalog_memuat_23_event_dan_hanya_adapter_runtime_yang_tersedia(): void
     {
         $catalog = app(NotificationEventCatalog::class);
 
-        $this->assertCount(17, $catalog->events());
+        $this->assertCount(23, $catalog->events());
         $this->assertTrue($catalog->hasEvent('cuti.ditangguhkan_tugas_dinas'));
         $this->assertTrue($catalog->hasEvent('cuti.dikembalikan_karena_rollover'));
         $this->assertTrue($catalog->hasEvent('cuti.pengajuan_baru'));
@@ -40,6 +40,11 @@ class NotificationEventChannelManagementTest extends TestCase
         $this->assertFalse($catalog->hasAdapter('whatsapp_business'));
         $this->assertTrue($catalog->supportsChannel('cuti.disetujui', 'email'));
         $this->assertFalse($catalog->supportsChannel('ews.scheduler_failed', 'email'));
+        // Event hasil tindak lanjut EWS dikenal katalog dan untuk sementara in_app saja.
+        $this->assertTrue($catalog->hasEvent('ews.followup.pensiun'));
+        $this->assertTrue($catalog->hasEvent('ews.followup.tidak_perlu'));
+        $this->assertTrue($catalog->supportsChannel('ews.followup.pensiun', 'in_app'));
+        $this->assertFalse($catalog->supportsChannel('ews.followup.pensiun', 'email'));
     }
 
     public function test_super_admin_dapat_membuat_dan_memperbarui_policy_supported(): void

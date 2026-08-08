@@ -20,7 +20,9 @@ return new class extends Migration
             'ews.followup.tidak_perlu',
         ];
 
-        foreach (['in_app', 'email'] as $channelCode) {
+        // Email untuk hasil tindak lanjut sengaja belum didaftarkan; cukup in_app
+        // sampai keputusan produk membuka channel email lewat konfigurasi.
+        foreach (['in_app'] as $channelCode) {
             $channelId = DB::table('ref_notification_channels')->where('code', $channelCode)->value('id');
             if ($channelId === null) {
                 continue;

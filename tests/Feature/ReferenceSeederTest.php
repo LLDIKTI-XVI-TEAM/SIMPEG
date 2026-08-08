@@ -212,10 +212,19 @@ class ReferenceSeederTest extends TestCase
                 'ref_notification_channels.code',
             ]);
 
-        $this->assertDatabaseCount('notification_event_channels', 35);
+        $this->assertDatabaseCount('notification_event_channels', 41);
         $this->assertCount(1, $policies);
         $this->assertSame('in_app', $policies->sole()->code);
         $this->assertTrue((bool) $policies->sole()->is_enabled);
+
+        // Hasil tindak lanjut EWS hanya memakai in_app, konsisten dengan katalog event.
+        $followupPolicies = DB::table('notification_event_channels')
+            ->join('ref_notification_channels', 'ref_notification_channels.id', '=', 'notification_event_channels.notification_channel_id')
+            ->where('notification_event_channels.event_key', 'like', 'ews.followup.%')
+            ->get(['notification_event_channels.is_enabled', 'ref_notification_channels.code']);
+
+        $this->assertCount(6, $followupPolicies);
+        $this->assertTrue($followupPolicies->every(fn (object $policy): bool => (bool) $policy->is_enabled && $policy->code === 'in_app'));
 
         DB::table('notification_event_channels')
             ->where('event_key', 'ews.scheduler_failed')
@@ -241,7 +250,7 @@ class ReferenceSeederTest extends TestCase
 
         $this->seedReferenceData();
 
-        $this->assertDatabaseCount('notification_event_channels', 35);
+        $this->assertDatabaseCount('notification_event_channels', 41);
         $this->assertDatabaseHas('notification_event_channels', [
             'event_key' => 'ews.satyalancana',
             'notification_channel_id' => $emailChannelId,

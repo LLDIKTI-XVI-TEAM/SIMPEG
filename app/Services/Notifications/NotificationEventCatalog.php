@@ -81,6 +81,39 @@ final class NotificationEventCatalog
             'group' => 'EWS',
             'allowed_channels' => ['in_app'],
         ],
+        // Hasil tindak lanjut EWS untuk pegawai target. Email sengaja belum dibuka;
+        // channel email dapat dinyalakan lewat konfigurasi saat keputusan produk
+        // mengaktifkannya, tanpa mengubah kode domain.
+        'ews.followup.kenaikan_pangkat' => [
+            'label' => 'Hasil tindak lanjut EWS kenaikan pangkat',
+            'group' => 'EWS',
+            'allowed_channels' => ['in_app'],
+        ],
+        'ews.followup.kgb' => [
+            'label' => 'Hasil tindak lanjut EWS KGB',
+            'group' => 'EWS',
+            'allowed_channels' => ['in_app'],
+        ],
+        'ews.followup.pensiun' => [
+            'label' => 'Hasil tindak lanjut EWS pensiun',
+            'group' => 'EWS',
+            'allowed_channels' => ['in_app'],
+        ],
+        'ews.followup.kontrak_pppk' => [
+            'label' => 'Hasil tindak lanjut EWS kontrak PPPK',
+            'group' => 'EWS',
+            'allowed_channels' => ['in_app'],
+        ],
+        'ews.followup.satyalancana' => [
+            'label' => 'Hasil tindak lanjut EWS Satyalancana',
+            'group' => 'EWS',
+            'allowed_channels' => ['in_app'],
+        ],
+        'ews.followup.tidak_perlu' => [
+            'label' => 'Hasil tindak lanjut EWS tidak perlu',
+            'group' => 'EWS',
+            'allowed_channels' => ['in_app'],
+        ],
         'import_pegawai' => [
             'label' => 'Impor pegawai selesai',
             'group' => 'Impor Pegawai',
