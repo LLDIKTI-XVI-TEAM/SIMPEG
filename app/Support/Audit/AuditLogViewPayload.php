@@ -13,6 +13,44 @@ use App\Models\AuditLog;
 class AuditLogViewPayload
 {
     /**
+     * Istilah resmi untuk event keputusan cuti.
+     *
+     * Dua kosakata sengaja dipetakan ke label yang sama karena baris audit lama memakai APPROVE dan
+     * POSTPONE, sedangkan baris baru memakai kosakata keputusan. Audit tidak dapat ditulis ulang,
+     * jadi keduanya akan selalu berdampingan dan harus terbaca dengan istilah yang sama.
+     *
+     * @var array<string, string>
+     */
+    private const DECISION_LABELS = [
+        'VERIFY' => 'Diverifikasi',
+        'DECIDE' => 'Disetujui',
+        'CHANGE_REQUESTED' => 'Perubahan',
+        'DEFER' => 'Ditangguhkan',
+        'POSTPONE' => 'Ditangguhkan',
+        'NOT_APPROVED' => 'Tidak Disetujui',
+    ];
+
+    /**
+     * Menentukan istilah resmi untuk sebuah baris audit.
+     *
+     * APPROVE lama tidak dapat dipetakan ke satu label saja karena event itu dahulu dipakai untuk
+     * persetujuan tahap menengah maupun keputusan final. Baris lama tidak boleh dibackfill, tetapi
+     * payloadnya sudah membawa status hasil, sehingga status itulah yang menentukan labelnya.
+     */
+    private static function decisionLabel(AuditLog $log): string
+    {
+        if ($log->event === 'APPROVE') {
+            $status = data_get($log->new_values, 'status');
+
+            // Tanpa status hasil, label dipertahankan seperti sebelumnya agar baris lama tidak
+            // berpindah makna tanpa dasar.
+            return $status !== null && $status !== 'disetujui' ? 'Diverifikasi' : 'Disetujui';
+        }
+
+        return self::DECISION_LABELS[$log->event] ?? $log->event;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public static function forView(AuditLog $log): array
@@ -28,6 +66,7 @@ class AuditLogViewPayload
             'timestamp' => $log->created_at?->format('Y-m-d H:i:s') ?? '-',
             'operator' => $log->user_name ?: 'Sistem',
             'event' => $log->event,
+            'event_label' => self::decisionLabel($log),
             'kategori' => self::categoryFor($module, $log->event),
             'modul' => $module,
             'record_id' => (string) $recordId,

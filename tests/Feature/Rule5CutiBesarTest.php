@@ -171,11 +171,15 @@ class Rule5CutiBesarTest extends TestCase
             'action' => 'APPROVE',
         ]);
         $this->assertDatabaseMissing('leave_proofs', ['leave_request_id' => $large->id]);
-        $this->assertDatabaseMissing('audit_logs', [
-            'auditable_type' => 'LeaveRequest',
-            'auditable_id' => $large->id,
-            'event' => 'APPROVE',
-        ]);
+        // Persetujuan tahap menengah dan keputusan akhir memakai kosakata berbeda, sehingga keduanya
+        // harus sama-sama tidak ada agar test tetap membuktikan pengajuan belum pernah disetujui.
+        foreach (['VERIFY', 'DECIDE'] as $eventKeputusan) {
+            $this->assertDatabaseMissing('audit_logs', [
+                'auditable_type' => 'LeaveRequest',
+                'auditable_id' => $large->id,
+                'event' => $eventKeputusan,
+            ]);
+        }
         $this->assertFalse(SimpegNotification::query()
             ->where('data->leave_request_id', $large->id)
             ->exists());

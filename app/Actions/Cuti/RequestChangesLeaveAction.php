@@ -9,6 +9,7 @@ use App\Services\AuditService;
 use App\Services\LeaveApprovalService;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /** Mengembalikan pengajuan cuti ke pemohon untuk diperbaiki dengan catatan wajib dari approver. */
 class RequestChangesLeaveAction
@@ -28,17 +29,23 @@ class RequestChangesLeaveAction
             ->where('approver_employee_id', $actor->id)
             ->first();
 
-        $leaveRequest = $this->approvals->requestChanges($leaveRequest, $actor, $komentar);
-        $auditPayload = $this->decisionAuditPayload($statusSebelum, $leaveRequest, $stepSebelum, $actor, 'REQUEST_CHANGES', $komentar);
+        // Keputusan dan jejaknya disatukan dalam satu transaksi supaya pengajuan tidak pernah
+        // berpindah status tanpa baris audit yang menerangkan siapa yang memutuskan.
+        $leaveRequest = DB::transaction(function () use ($leaveRequest, $actor, $komentar, $request, $statusSebelum, $stepSebelum): LeaveRequest {
+            $leaveRequest = $this->approvals->requestChanges($leaveRequest, $actor, $komentar);
+            $auditPayload = $this->decisionAuditPayload($statusSebelum, $leaveRequest, $stepSebelum, $actor, 'CHANGE_REQUESTED', $komentar);
 
-        AuditService::log(
-            'UPDATE',
-            'LeaveRequest',
-            $leaveRequest->id,
-            $auditPayload['old'],
-            $auditPayload['new'],
-            $request,
-        );
+            AuditService::logOrFail(
+                'CHANGE_REQUESTED',
+                'LeaveRequest',
+                $leaveRequest->id,
+                $auditPayload['old'],
+                $auditPayload['new'],
+                $request,
+            );
+
+            return $leaveRequest;
+        });
 
         $pemohon = $leaveRequest->employee;
 
