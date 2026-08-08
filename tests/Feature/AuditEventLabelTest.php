@@ -82,6 +82,46 @@ class AuditEventLabelTest extends TestCase
         $detail->assertSee('Disetujui');
     }
 
+    public function test_approve_lama_tahap_menengah_terbaca_sebagai_diverifikasi(): void
+    {
+        // Sebelum kosakata dipisah, APPROVE dipakai untuk tahap menengah maupun tahap final.
+        // Baris lama tidak dapat dibackfill, sehingga labelnya ditentukan dari status hasil keputusan.
+        $log = $this->auditLogDenganStatus('APPROVE', 'menunggu_approval');
+
+        $this->assertSame('Diverifikasi', AuditLogViewPayload::forView($log)['event_label']);
+    }
+
+    public function test_approve_lama_tahap_final_terbaca_sebagai_disetujui(): void
+    {
+        $log = $this->auditLogDenganStatus('APPROVE', 'disetujui');
+
+        $this->assertSame('Disetujui', AuditLogViewPayload::forView($log)['event_label']);
+    }
+
+    public function test_approve_lama_tanpa_status_tetap_terbaca_sebagai_disetujui(): void
+    {
+        // Bila status hasil tidak tersedia, label dipertahankan seperti sebelum perubahan ini
+        // agar baris lama tidak berpindah makna tanpa dasar.
+        $log = $this->auditLogDenganStatus('APPROVE', null);
+
+        $this->assertSame('Disetujui', AuditLogViewPayload::forView($log)['event_label']);
+    }
+
+    private function auditLogDenganStatus(string $event, ?string $status): AuditLog
+    {
+        return AuditLog::query()->create([
+            'user_id' => null,
+            'user_name' => 'Petugas Uji',
+            'event' => $event,
+            'auditable_type' => 'LeaveRequest',
+            'auditable_id' => (string) Str::uuid(),
+            'old_values' => ['status' => 'menunggu_approval'],
+            'new_values' => $status === null ? ['step_order' => 1] : ['status' => $status],
+            'ip_address' => '127.0.0.1',
+            'user_agent' => 'PHPUnit',
+        ]);
+    }
+
     private function auditLog(string $event): AuditLog
     {
         return AuditLog::query()->create([

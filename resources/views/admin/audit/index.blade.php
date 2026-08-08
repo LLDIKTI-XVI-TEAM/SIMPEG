@@ -215,12 +215,15 @@
                             @php
                                 // Kelas ditulis utuh, bukan disusun dari potongan, supaya pemindai
                                 // Tailwind tetap menemukannya saat membangun berkas gaya.
-                                // Kosakata keputusan lama dan baru dipetakan bersama karena baris
-                                // audit lama tidak dapat ditulis ulang.
+                                // Untuk keputusan cuti, warna mengikuti istilah resmi alih-alih kode event
+                                // karena APPROVE lama bisa berarti tahap menengah maupun keputusan final.
                                 [$warnaTeks, $warnaTitik] = match (true) {
-                                    in_array($log['event'], ['CREATE', 'IMPORT', 'RESTORE', 'APPROVE', 'DECIDE'], true) => ['text-success', 'bg-success'],
-                                    in_array($log['event'], ['LOGIN', 'VERIFY'], true) => ['text-primary', 'bg-primary'],
-                                    in_array($log['event'], ['SOFT_DELETE', 'DELETE', 'LOGOUT', 'NOT_APPROVED'], true) => ['text-danger', 'bg-danger'],
+                                    $log['event_label'] === 'Diverifikasi' => ['text-primary', 'bg-primary'],
+                                    $log['event_label'] === 'Disetujui' => ['text-success', 'bg-success'],
+                                    $log['event_label'] === 'Tidak Disetujui' => ['text-danger', 'bg-danger'],
+                                    in_array($log['event'], ['CREATE', 'IMPORT', 'RESTORE'], true) => ['text-success', 'bg-success'],
+                                    $log['event'] === 'LOGIN' => ['text-primary', 'bg-primary'],
+                                    in_array($log['event'], ['SOFT_DELETE', 'DELETE', 'LOGOUT'], true) => ['text-danger', 'bg-danger'],
                                     default => ['text-warning', 'bg-warning'],
                                 };
                             @endphp
