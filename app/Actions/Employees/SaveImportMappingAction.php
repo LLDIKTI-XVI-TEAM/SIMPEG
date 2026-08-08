@@ -53,6 +53,12 @@ class SaveImportMappingAction
             ]);
         }
 
+        // Validasi sebelumnya kedaluwarsa bila mapping benar-benar berubah,
+        // karena validated_data dibentuk berdasarkan interpretasi mapping lama.
+        if (($batch['mapping'] ?? []) !== $merged) {
+            $batch['validation'] = null;
+        }
+
         $batch['mapping'] = $merged;
         $batch['mapping_source'] = 'manual';
         $batch['warnings'] = ImportColumnMapping::warnings($merged);

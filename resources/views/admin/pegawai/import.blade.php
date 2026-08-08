@@ -77,35 +77,38 @@
             return this.requiredTargetFields.filter(t => !selected.includes(t));
         },
 
-        // Simpan pemetaan pilihan admin ke state batch (debounce) agar preview, validasi,
-        // dan eksekusi memakai kontrak yang sama. Server menolak target ganda atau target
-        // tidak dikenal dengan pesan yang menyebut field-nya.
+        // Kirim mapping ke server secara eksplisit dan kembalikan promise agar validasi
+        // bisa menunggu penyimpanan selesai sebelum berjalan. Dipanggil langsung oleh
+        // runValidation() dan dijadwalkan oleh saveMapping() melalui debounce.
+        async persistMapping() {
+            if (!this.batchId) return;
+
+            window.clearTimeout(this.mappingSaveTimer);
+            const res = await fetch('/api/pegawai/import/' + this.batchId + '/mapping', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
+                },
+                body: JSON.stringify({ mapping: this.columnMapping }),
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.errors ? Object.values(data.errors).flat().join(' ') : (data.message || 'Gagal menyimpan pemetaan kolom.'));
+            }
+
+            this.serverWarnings = data.warnings || this.serverWarnings;
+        },
+
+        // Autosave pemetaan kolom setiap Admin mengubah dropdown — memakai debounce agar
+        // tidak membanjiri server saat Admin masih mencari pasangan kolom.
         saveMapping() {
             if (!this.batchId) return;
 
             window.clearTimeout(this.mappingSaveTimer);
-            this.mappingSaveTimer = window.setTimeout(async () => {
-                try {
-                    const res = await fetch('/api/pegawai/import/' + this.batchId + '/mapping', {
-                        method: 'POST',
-                        headers: {
-                            'Accept': 'application/json',
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
-                        },
-                        body: JSON.stringify({ mapping: this.columnMapping }),
-                    });
-
-                    const data = await res.json();
-                    if (!res.ok) {
-                        throw new Error(data.errors ? Object.values(data.errors).flat().join(' ') : (data.message || 'Gagal menyimpan pemetaan kolom.'));
-                    }
-
-                    this.serverWarnings = data.warnings || this.serverWarnings;
-                } catch (e) {
-                    this.apiError = e.message;
-                }
-            }, 400);
+            this.mappingSaveTimer = window.setTimeout(() => this.persistMapping().catch(_e => { /* apiError sudah ditulis persistMapping */ }), 400);
         },
 
         // Kirim hanya baris yang benar-benar diedit (key sumber apa adanya); tafsir kolom
@@ -305,6 +308,10 @@
             this.apiError = '';
 
             try {
+                // Mapping wajib tersimpan di server sebelum validasi dijalankan,
+                // agar server menafsirkan data dengan mapping yang sedang dilihat admin.
+                await this.persistMapping();
+
                 // Hanya baris hasil edit yang dikirim; baris lain tetap memakai state batch di server.
                 const editedRows = this.getEditedRows();
                 const body = editedRows.length > 0 ? { rows: editedRows } : {};

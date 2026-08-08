@@ -678,6 +678,60 @@ class EmployeeImportTest extends TestCase
         $response->assertNotFound();
     }
 
+    public function test_perubahan_mapping_menginvalidasi_hasil_validasi_lama(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($this->validRows()),
+        ]);
+        $upload->assertOk();
+        $batchId = $upload->json('batch_id');
+
+        // Validasi awal dengan mapping otomatis
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])
+            ->assertOk()
+            ->assertJsonPath('valid_count', 2);
+
+        // Ubah mapping: hasil validasi lama harus kedaluwarsa
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/mapping", [
+            'mapping' => ['Pangkat' => 'tidak_dipakai'],
+        ])->assertOk();
+
+        // Eksekusi wajib menolak karena validasi tidak lagi mewakili mapping aktif
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", [])
+            ->assertUnprocessable()
+            ->assertJson(['message' => 'Data belum divalidasi. Jalankan validasi terlebih dahulu.']);
+    }
+
+    public function test_mapping_identik_tidak_menginvalidasi_validasi(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($this->validRows()),
+        ]);
+        $upload->assertOk();
+        $batchId = $upload->json('batch_id');
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])
+            ->assertOk();
+
+        // Simpan mapping dengan nilai yang persis sama dengan auto-map (tidak berubah)
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/mapping", [
+            'mapping' => ['Pangkat' => 'Pangkat'],
+        ])->assertOk();
+
+        // Validasi tidak kedaluwarsa — eksekusi tetap berjalan
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", [])
+            ->assertOk()
+            ->assertJsonPath('status', 'queued');
+    }
+
     private function validCsv(): string
     {
         return implode(',', $this->headers())."\n".
