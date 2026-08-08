@@ -15,12 +15,20 @@ class NotificationRecipientResolver
 
     /**
      * Mengembalikan penerima tambahan untuk EWS lintas role; cuti tetap memakai penerima in-app utama.
+     * Event hasil follow-up (ews.followup.*) TIDAK mendapat penerima tambahan karena hanya ditujukan
+     * kepada pegawai target, bukan admin yang melakukan tindak lanjut.
      *
      * @param  array<string, mixed>|null  $data
      * @return Collection<int, Employee>
      */
     public function additionalRecipients(Employee $primaryRecipient, string $type, ?array $data = null): Collection
     {
+        // Event hasil follow-up (ews.followup.*) hanya untuk pegawai target
+        if (str_starts_with($type, 'ews.followup.')) {
+            return collect();
+        }
+
+        // Event reminder EWS dan scheduler failure
         if (! str_starts_with($type, 'ews.') || $type === 'ews.scheduler_failed') {
             return collect();
         }

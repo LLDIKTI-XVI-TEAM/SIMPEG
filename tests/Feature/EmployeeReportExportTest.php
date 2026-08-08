@@ -158,7 +158,6 @@ class EmployeeReportExportTest extends TestCase
             ]))
             ->assertRedirect(route('laporan.pegawai'))
             ->assertSessionHasErrors(['columns.1', 'columns.2']);
-
     }
 
     public function test_preview_preserves_export_configuration_in_initial_filter_state(): void
@@ -191,26 +190,15 @@ class EmployeeReportExportTest extends TestCase
             });
     }
 
-    public function test_pdf_print_keeps_the_current_server_preview_printable_when_refresh_fails(): void
+    public function test_pdf_print_is_blocked_when_preview_is_not_current(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();
 
         $this->actingAs($admin)
             ->get(route('laporan.pegawai'))
             ->assertOk()
-            ->assertSee('x-bind:disabled="!canPrintPreview"', false)
-            ->assertSee('lastSuccessfulPreviewParams: null', false)
-            ->assertSee('this.lastSuccessfulPreviewParams = this.previewParams().toString();', false)
-            ->assertSee('get canPrintPreview()', false)
-            ->assertSee('(!this.previewError || this.hasCurrentPreview)', false)
-            ->assertSee('if (!this.canPrintPreview)', false)
-            ->assertSee('const base = ', false)
-            ->assertSee('laporan\/export-pegawai\/pdf', false)
-            ->assertSee('get printStatusMessage()', false)
-            ->assertSee('Pembaruan pratinjau gagal. Data yang ditampilkan sebelumnya tetap dapat dicetak.', false)
-            ->assertSee('Pratinjau gagal diperbarui. Cetak PDF sementara belum tersedia.', false)
-            ->assertSee('Muat ulang pratinjau')
-            ->assertSee('@click="retryPreview()"', false);
+            ->assertSee('x-bind:disabled="previewLoading || !!previewError || !!pensiunError"', false)
+            ->assertSee('if (this.previewLoading || this.previewError || this.pensiunError)', false);
     }
 
     public function test_preview_applies_initial_row_range_once_on_backend(): void

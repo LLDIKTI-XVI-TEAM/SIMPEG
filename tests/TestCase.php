@@ -14,7 +14,22 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
-        Storage::fake('local');
+        // Mitigasi race condition pada Windows/Podman bind mount di mana proses eksternal
+        // (seperti wkhtmltopdf) mungkin masih memegang file handle untuk sepersekian detik.
+        $attempts = 0;
+        while (true) {
+            try {
+                Storage::fake('local');
+                Storage::fake('public');
+                break;
+            } catch (\UnexpectedValueException $e) {
+                $attempts++;
+                if ($attempts >= 5) {
+                    throw $e;
+                }
+                usleep(100_000); // Tunggu 100ms sebelum mencoba lagi
+            }
+        }
     }
 
     /**

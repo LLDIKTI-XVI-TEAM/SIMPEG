@@ -217,9 +217,9 @@
                     [
                         'group' => 'Laporan',
                         'items' => [
-                            ['label' => 'Data Pegawai', 'route' => 'pimpinan.laporan.pegawai', 'icon' => 'clipboard-document-list'],
+                            ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'clipboard-document-list'],
                             ['label' => 'Nominatif Pegawai', 'route' => 'pimpinan.laporan.nominatif', 'icon' => 'document-text'],
-                            ['label' => 'Rekapitulasi Cuti', 'route' => 'pimpinan.laporan.cuti', 'icon' => 'calendar-days'],
+                            ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down'],
                             ['label' => 'Riwayat Kepangkatan', 'route' => 'pimpinan.laporan.kepangkatan', 'icon' => 'document-chart-bar'],
                         ]
                     ]
@@ -375,7 +375,7 @@
                 </div>
                 <div class="min-w-0 flex-1">
                     <p class="truncate text-sm font-semibold text-ink">
-                        {{ str_replace(['(', ')'], '', auth()->user()->name ?? 'Pengguna') }}
+                        {{ preg_replace('/\s*\(.*?\)/', '', auth()->user()->name ?? 'Pengguna') }}
                     </p>
                     <p class="truncate text-xs text-muted">{{ ucwords(str_replace('_', ' ', $activeRole)) }}</p>
                 </div>
@@ -482,7 +482,7 @@
                         </div>
                         <div class="hidden text-left md:block">
                             <p class="text-sm font-semibold leading-tight text-ink font-sans">
-                                {{ str_replace(['(', ')'], '', auth()->user()->name ?? 'Pengguna') }}
+                                {{ preg_replace('/\s*\(.*?\)/', '', auth()->user()->name ?? 'Pengguna') }}
                             </p>
                             <p class="text-[11px] leading-tight text-muted font-sans">{{ ucwords(str_replace('_', ' ', $activeRole)) }}</p>
                         </div>
@@ -502,7 +502,7 @@
                         style="display: none;"
                     >
                         <div class="border-b border-border px-4 py-3">
-                            <p class="text-xs font-semibold text-ink font-sans">{{ str_replace(['(', ')'], '', auth()->user()->name ?? 'Pengguna') }}</p>
+                            <p class="text-xs font-semibold text-ink font-sans">{{ preg_replace('/\s*\(.*?\)/', '', auth()->user()->name ?? 'Pengguna') }}</p>
                             <p class="mt-0.5 text-xs text-muted font-sans">{{ auth()->user()->email ?? '' }}</p>
                         </div>
                         <div class="p-1.5 space-y-0.5">

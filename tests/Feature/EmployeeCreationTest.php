@@ -75,7 +75,7 @@ class EmployeeCreationTest extends TestCase
 
     public function test_authenticated_user_can_create_employee_with_photo_upload(): void
     {
-        Storage::fake('public');
+
         $user = User::factory()->adminKepegawaian()->create();
         $payload = $this->validPayload([
             'foto' => UploadedFile::fake()->image('foto-valid.jpg', 640, 640)->size(512),

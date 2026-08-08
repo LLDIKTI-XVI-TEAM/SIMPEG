@@ -417,6 +417,13 @@
                     </svg>
                     Export Excel
                 </button>
+                <button onclick="exportFilteredDataPdf()" id="export-pdf-btn"
+                    class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm cursor-pointer">
+                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.617 0-1.11-.476-1.12-1.09l-.23-2.523M19.5 10.5v.375c0 .621-.504 1.125-1.125 1.125H5.625A1.125 1.125 0 0 1 4.5 11.25v-.375m15 0V9a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 9v1.5m15 0A1.5 1.5 0 0 0 18 9h-3V6a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3H6a1.5 1.5 0 0 0-1.5 1.5" />
+                    </svg>
+                    Export PDF
+                </button>
                 <div class="relative" x-data="{ open: false }">
                     <button @click="open = !open" @click.outside="open = false" id="add-pegawai-btn"
                         class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
@@ -449,7 +456,7 @@
                     </div>
                 </div>
                 @else
-                <a href="{{ route('pimpinan.laporan.pegawai') }}"
+                <a href="{{ route('pimpinan.laporan.nominatif') }}"
                     class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm cursor-pointer">
                     <svg class="w-4 h-4 mr-1.5 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
@@ -487,7 +494,7 @@
             <x-slot:filters>
                 {{-- Filter Golongan --}}
                 <div>
-                    <x-form.select x-model="filters.golongan" @change="applyFilter()" size="md">
+                    <x-form.select x-model="filters.golongan" @change="applyFilter()" size="md" aria-label="Filter golongan">
                         <option value="">Semua Golongan</option>
                         @foreach($golonganOptions as $golongan)
                             <option value="{{ $golongan }}">Golongan {{ $golongan }}</option>
@@ -497,7 +504,7 @@
 
                 {{-- Filter Unit Kerja --}}
                 <div>
-                    <x-form.select x-model="filters.unit_kerja_id" @change="applyFilter()" size="md">
+                    <x-form.select x-model="filters.unit_kerja_id" @change="applyFilter()" size="md" aria-label="Filter unit kerja">
                         <option value="">Semua Unit</option>
                         @foreach($unitKerjaOptions as $unit)
                             <option value="{{ $unit->id }}">{{ $unit->nama }}</option>
@@ -507,7 +514,7 @@
 
                 {{-- Filter Jenis Pegawai --}}
                 <div>
-                    <x-form.select x-model="filters.jenis_pegawai_id" @change="applyFilter()" size="md">
+                    <x-form.select x-model="filters.jenis_pegawai_id" @change="applyFilter()" size="md" aria-label="Filter jenis pegawai">
                         <option value="">Semua Jenis</option>
                         @foreach($jenisPegawaiOptions as $jenis)
                             <option value="{{ $jenis->id }}">{{ $jenis->nama }}</option>
@@ -517,7 +524,7 @@
 
                 {{-- Filter Status --}}
                 <div>
-                    <x-form.select x-model="filters.status_pegawai_id" @change="applyFilter()" size="md">
+                    <x-form.select x-model="filters.status_pegawai_id" @change="applyFilter()" size="md" aria-label="Filter status pegawai">
                         <option value="all">Semua Status</option>
                         @foreach($statusOptions as $status)
                             <option value="{{ $status->id }}">{{ $status->nama }}</option>
@@ -1061,7 +1068,7 @@
                                      menolak jabatan nonaktif; menampilkannya berarti menyuguhkan
                                      pilihan yang pasti gagal disimpan. --}}
                                 @foreach(collect($jabatanOptions ?? [])->where('is_active', true) as $ref)
-                                    <option value="{{ $ref->id }}">{{ $ref->nama }}</option>
+                                    <option value="{{ data_get($ref, 'id') }}">{{ data_get($ref, 'nama') }}</option>
                                 @endforeach
                             </select>
                             <template x-if="errors.jabatan_id">
@@ -1074,7 +1081,7 @@
                                 class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 <option value="">Pilih Jenis</option>
                                 @foreach($jenisJabatanOptions ?? [] as $ref)
-                                    <option value="{{ $ref->id }}">{{ $ref->nama }}</option>
+                                    <option value="{{ data_get($ref, 'id') }}">{{ data_get($ref, 'nama') }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -1086,7 +1093,7 @@
                                 class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 <option value="">Pilih Unit</option>
                                 @foreach($unitKerjaOptions ?? [] as $unit)
-                                    <option value="{{ $unit->id }}">{{ $unit->nama }}</option>
+                                    <option value="{{ data_get($unit, 'id') }}">{{ data_get($unit, 'nama') }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -1217,18 +1224,20 @@
         }
 
         function exportFilteredData() {
-            // Find the Alpine component data
-            const alpineData = Alpine.$data(document.querySelector('[x-data="employeeManagement()"]'));
+            // Find the Alpine component data by passing a child element
+            const btnEl = document.getElementById('export-btn');
+            if (!btnEl) { alert('Export button not found'); return; }
+            const alpineData = Alpine.$data(btnEl);
             const form = document.createElement('form');
             form.method = 'GET';
             form.action = '{{ route("pegawai.export") }}';
             
             const params = {
-                search: alpineData.search,
-                golongan: alpineData.golongan,
-                unit: alpineData.unit,
-                jenis: alpineData.jenis,
-                status: alpineData.status
+                search: alpineData.filters.search,
+                golongan: alpineData.filters.golongan,
+                unit_kerja_id: alpineData.filters.unit_kerja_id,
+                jenis_pegawai_id: alpineData.filters.jenis_pegawai_id,
+                status_pegawai_id: alpineData.filters.status_pegawai_id === 'all' ? '' : alpineData.filters.status_pegawai_id
             };
 
             for (const key in params) {
@@ -1244,6 +1253,40 @@
             document.body.appendChild(form);
             form.submit();
             document.body.removeChild(form);
+        }
+
+        const PDF_MAX_ROWS = @js(\App\Actions\Laporan\ExportPegawaiPdfAction::MAX_ROWS);
+
+        function exportFilteredDataPdf() {
+            const btnEl = document.getElementById('export-pdf-btn');
+            if (!btnEl) { return; }
+            const alpineData = Alpine.$data(btnEl);
+
+            // Pesan awal untuk pengguna; backend tetap menolak permintaan di atas batas.
+            if (alpineData.meta.total > PDF_MAX_ROWS) {
+                alert(`Laporan memuat ${alpineData.meta.total} baris, melebihi batas ${PDF_MAX_ROWS}. Persempit filter lalu coba lagi.`);
+                return;
+            }
+
+            const params = {
+                search: alpineData.filters.search,
+                golongan: alpineData.filters.golongan,
+                unit_kerja_id: alpineData.filters.unit_kerja_id,
+                jenis_pegawai_id: alpineData.filters.jenis_pegawai_id,
+                status_pegawai_id: alpineData.filters.status_pegawai_id === 'all' ? '' : alpineData.filters.status_pegawai_id,
+            };
+
+            const query = new URLSearchParams();
+            Object.entries(params).forEach(([key, value]) => {
+                // status_pegawai_id selalu dikirim walau kosong. Nilai kosong berarti
+                // "semua status", sedangkan parameter yang hilang membuat backend
+                // kembali ke default Aktif sehingga pilihan pengguna terabaikan.
+                if (key === 'status_pegawai_id' || (value !== '' && value !== null && value !== undefined)) {
+                    query.set(key, String(value));
+                }
+            });
+
+            window.location.assign(`{{ route('laporan.pegawai.pdf') }}?${query.toString()}`);
         }
 
         function exportSelectedData() {

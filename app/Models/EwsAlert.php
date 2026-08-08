@@ -64,6 +64,18 @@ class EwsAlert extends Model
         ];
     }
 
+    /** @return array<string, string> */
+    public static function typeLabels(): array
+    {
+        return [
+            'KENAIKAN_PANGKAT' => 'Kenaikan Pangkat',
+            'KGB' => 'Kenaikan Gaji Berkala (KGB)',
+            'PENSIUN' => 'Pensiun',
+            'KONTRAK_PPPK' => 'Kontrak PPPK',
+            'SATYALANCANA' => 'Satyalancana',
+        ];
+    }
+
     /** @return array<int, string> */
     public static function manualFollowupStatuses(): array
     {
