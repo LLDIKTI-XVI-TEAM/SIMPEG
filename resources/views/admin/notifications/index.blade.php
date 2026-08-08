@@ -14,25 +14,42 @@
             type="button"
             x-data="{
                 unreadCount: @js($unreadCount),
+                isSubmitting: false,
                 csrf: document.querySelector('meta[name=csrf-token]')?.content ?? '',
                 async markAll() {
-                    const response = await fetch(@js(route('api.v1.notifikasi.tandai-semua-dibaca')), {
-                        method: 'PATCH',
-                        headers: {
-                            Accept: 'application/json',
-                            'X-CSRF-TOKEN': this.csrf,
-                            'X-Requested-With': 'XMLHttpRequest'
-                        },
-                        credentials: 'same-origin'
-                    });
-                    if (response.ok) window.location.reload();
+                    if (this.isSubmitting) return;
+                    this.isSubmitting = true;
+                    try {
+                        const response = await fetch(@js(route('api.v1.notifikasi.tandai-semua-dibaca')), {
+                            method: 'PATCH',
+                            headers: {
+                                Accept: 'application/json',
+                                'X-CSRF-TOKEN': this.csrf,
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            credentials: 'same-origin'
+                        });
+                        if (response.ok) {
+                            window.dispatchEvent(new CustomEvent('notification-marked-read'));
+                            window.location.reload();
+                        }
+                    } finally {
+                        this.isSubmitting = false;
+                    }
                 }
             }"
             @click="markAll()"
             x-show="unreadCount > 0"
-            class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
+            :disabled="isSubmitting"
+            class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 font-sans cursor-pointer"
         >
-            Tandai semua dibaca
+            <template x-if="isSubmitting">
+                <svg class="h-4 w-4 animate-spin text-white shrink-0" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+            </template>
+            <span x-text="isSubmitting ? 'Memproses...' : 'Tandai semua dibaca'"></span>
         </button>
     </div>
 
@@ -48,6 +65,7 @@
                 },
                 async openNotification(id, target) {
                     try {
+                        window.dispatchEvent(new CustomEvent('notification-marked-read', { detail: { id } }));
                         await fetch(this.endpoint(id), {
                             method: 'PATCH',
                             headers: {
@@ -109,9 +127,13 @@
                     </div>
                 </button>
             @empty
-                <div class="rounded-lg border border-border bg-surface p-8 text-center shadow-sm">
-                    <p class="text-sm text-muted">Belum ada notifikasi.</p>
-                </div>
+                <x-ui.card class="py-8">
+                    <x-ui.empty-state
+                        icon="bell"
+                        title="Belum Ada Notifikasi"
+                        message="Anda belum memiliki notifikasi atau seluruh notifikasi telah ditandai dibaca."
+                    />
+                </x-ui.card>
             @endforelse
 
 

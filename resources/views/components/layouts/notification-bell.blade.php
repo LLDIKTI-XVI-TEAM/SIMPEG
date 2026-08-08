@@ -69,6 +69,10 @@
         },
         async openNotification(notification) {
             try {
+                if (!notification.read_at) {
+                    this.unreadCount = Math.max(0, this.unreadCount - 1);
+                    window.dispatchEvent(new CustomEvent('notification-marked-read', { detail: { id: notification.id } }));
+                }
                 await fetch(this.markEndpoint(notification.id), {
                     method: 'PATCH',
                     headers: {
@@ -83,6 +87,8 @@
             }
         }
     }"
+    @notification-marked-read.window="load()"
+    @notification-read.window="load()"
 >
     <button
         @click="open = !open; if (open) load()"
