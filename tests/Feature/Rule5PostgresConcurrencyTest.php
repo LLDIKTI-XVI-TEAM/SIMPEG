@@ -10,7 +10,7 @@ use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisPegawai;
 use Database\Seeders\ReferenceSeeder;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -19,18 +19,24 @@ use Tests\TestCase;
 
 class Rule5PostgresConcurrencyTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseMigrations;
 
     private ?string $raceDirectory = null;
 
     protected function setUp(): void
     {
-        parent::setUp();
+        // Worker race berjalan sebagai proses terpisah dengan koneksi database sendiri,
+        // sehingga fixture harus ter-commit (DatabaseMigrations). RefreshDatabase
+        // membungkus test dalam transaksi dan membuat fixture tidak terlihat worker.
+        // Cek driver dilakukan sebelum parent::setUp() agar driver non-pgsql tidak
+        // menanggung migrate:fresh yang percuma.
+        $driver = $_SERVER['DB_CONNECTION'] ?? $_ENV['DB_CONNECTION'] ?? getenv('DB_CONNECTION');
 
-        if (DB::connection()->getDriverName() !== 'pgsql') {
+        if ($driver !== 'pgsql') {
             $this->markTestSkipped('Race Rule 5 wajib dijalankan pada PostgreSQL.');
         }
 
+        parent::setUp();
         $this->seed(ReferenceSeeder::class);
     }
 
