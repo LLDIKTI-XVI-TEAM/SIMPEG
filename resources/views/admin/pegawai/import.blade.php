@@ -26,7 +26,8 @@
         mainHeaders: [],
         allRows: [],
         
-        // Target fields SIMPEG untuk mapping (US-3.2 AC-4, AC-5)
+        // Field tujuan pemetaan kolom import. Nilai `key` wajib persis sama dengan header kanonis
+        // template karena mapper di server membaca baris berdasarkan nama header tersebut.
         simpegTargetFields: [
             { key: 'Nama Pegawai', label: 'Nama & Gelar (Nama Pegawai)' },
             { key: 'Person', label: 'Nama Lengkap Tanpa Gelar (Person)' },
@@ -82,7 +83,7 @@
             this.columnMapping = mapping;
         },
 
-        // Transform row keys based on columnMapping selection before sending to validation/import pipeline
+        // Ubah key setiap baris mengikuti pilihan pemetaan kolom; server hanya mengenali key kanonis.
         getMappedRows() {
             return this.allRows.map(rowObj => {
                 const mappedData = {};
@@ -614,7 +615,7 @@
                 </div>
             </div>
 
-            {{-- Warning Alert Kolom Tidak Cocok (US-3.2 AC-5) --}}
+            {{-- Peringatan non-blocking: kolom tak terpetakan tetap diabaikan, tetapi admin wajib sadar data kolom itu tidak ikut terimport. --}}
             <div x-show="unmappedHeadersCount > 0" class="transition">
                 <x-ui.alert variant="warning" size="md">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -626,7 +627,7 @@
                 </x-ui.alert>
             </div>
 
-            {{-- Pemetaan Kolom (Column Mapping) Card (US-3.2 AC-4) --}}
+            {{-- Pemetaan kolom manual: satu target SIMPEG hanya boleh dipilih oleh satu kolom sumber agar nilai tidak tertimpa. --}}
             <x-ui.card padding="md" class="space-y-4">
                 <div class="flex items-center justify-between border-b border-border pb-3">
                     <div>
@@ -656,7 +657,7 @@
                 </div>
                 <div x-show="hasDuplicateMapping" x-cloak>
                     <x-ui.alert variant="warning" size="sm">
-                        ⚠️ <strong>Konflik Pemetaan Kolom:</strong> Target <span class="font-bold underline" x-text="duplicateMappedFields.join(', ')"></span> dipilih lebih dari sekali. Setiap target SIMPEG hanya boleh dipetakan dari satu kolom sumber agar data tidak tertimpa.
+                        <strong>Konflik Pemetaan Kolom:</strong> Target <span class="font-bold underline" x-text="duplicateMappedFields.join(', ')"></span> dipilih lebih dari sekali. Setiap target SIMPEG hanya boleh dipetakan dari satu kolom sumber agar data tidak tertimpa.
                     </x-ui.alert>
                 </div>
             </x-ui.card>

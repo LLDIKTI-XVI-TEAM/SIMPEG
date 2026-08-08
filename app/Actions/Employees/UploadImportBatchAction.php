@@ -103,6 +103,10 @@ class UploadImportBatchAction
             }
         }
 
+        // Header non-standar sengaja tetap diterima sebagai 'utama' karena admin masih dapat
+        // memetakan kolom secara manual pada langkah preview. Batas kepercayaan data tidak
+        // berada di sini, melainkan pada validasi per-baris di sisi server (field wajib, NIP,
+        // email, referensi), sehingga file yang salah total tetap ditolak di tahap itu.
         if (count($headers) > 0) {
             return 'utama';
         }
