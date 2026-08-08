@@ -131,19 +131,19 @@ class EmployeeValidationRules
      * - nama_lengkap      : opsional, diambil dari kolom 'Person' (nama tanpa gelar).
      *                       Diisi nullable agar file yang tidak memiliki kolom Person
      *                       tetap dapat di-import tanpa error.
-     * 
-     * NOTE (K-US-02): unique:employees,nip dihapus dari validasi Laravel agar NIP duplikat
-     * dapat ditangani secara manual sebagai "skip" (bukan error) di ValidateImportBatchAction.
-     * Email tetap menggunakan unique karena email duplikat tetap error (sesuai K-US-02).
+     *
+     * NOTE: unique constraints dihapus dari validasi Laravel agar pengecekan database
+     * dapat dilakukan manual setelah duplicate-in-file detection. Ini memastikan
+     * duplicate dalam file tetap dilaporkan sebagai error walaupun data sudah ada di DB.
      */
     public static function import(): array
     {
         return [
             'nama_dengan_gelar' => ['required', 'string', 'max:255'],
             'nama_lengkap' => ['nullable', 'string', 'max:255'],
-            'nip' => ['required', 'string', 'size:18'], // unique dihapus (K-US-02)
-            'email_pribadi' => ['required', 'email', 'max:255', 'unique:employees,email_pribadi'],
-            'email' => ['nullable', 'email', 'max:255', 'unique:employees,email'],
+            'nip' => ['required', 'string', 'size:18'],
+            'email_pribadi' => ['required', 'email', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
             'tanggal_lahir' => ['nullable', 'date', 'before:today'],
             'jenis_pegawai' => ['required', 'in:PNS,PPPK,CPNS'],
             'golongan_terakhir' => ['required', 'string', 'max:20'],

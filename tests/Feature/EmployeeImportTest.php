@@ -130,7 +130,7 @@ class EmployeeImportTest extends TestCase
     public function test_import_wizard_skips_duplicate_nip_from_database(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
-        
+
         // Buat employee dengan NIP yang sama dengan row pertama
         Employee::factory()->create(['nip' => '198001012006041001']);
 
@@ -255,7 +255,7 @@ class EmployeeImportTest extends TestCase
     public function test_import_wizard_rejects_duplicate_email(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
-        
+
         // Buat employee dengan email yang sama
         Employee::factory()->create(['email_pribadi' => 'budi@example.com']);
 
@@ -528,6 +528,50 @@ class EmployeeImportTest extends TestCase
         $response->assertJsonPath('inserted', 0);
         $response->assertJsonPath('errors.0.row', 2);
         $this->assertDatabaseCount('employees', 0);
+    }
+
+    public function test_duplicate_nip_in_file_is_error_even_if_nip_exists_in_database(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        // NIP sudah ada di database
+        Employee::factory()->create(['nip' => '198001012006041001']);
+
+        // Buat file dengan 2 baris yang memiliki NIP yang sama (dan NIP tersebut sudah ada di DB)
+        $csv = implode(',', $this->headers())."\n".
+            implode(',', $this->validRows()[0])."\n". // Baris 2: NIP 198001012006041001
+            implode(',', array_map(function ($value) {
+                // Baris 3: NIP sama (198001012006041001) tapi nama berbeda
+                if ($value === 'Budi Santoso') {
+                    return 'Budi Duplikat';
+                }
+                if ($value === 'budi@example.com') {
+                    return 'budi.duplikat@example.com';
+                }
+
+                return $value;
+            }, $this->validRows()[0]))."\n";
+
+        $this->actingAs($user);
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->csvFile($csv),
+        ]);
+
+        $upload->assertOk();
+        $batchId = $upload->json('batch_id');
+
+        $validation = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", []);
+        $validation->assertOk();
+
+        // Baris 2: skip karena NIP sudah ada di database (dan tidak ada duplicate in-file)
+        // Baris 3: error karena NIP sudah ada pada baris 2 (duplicate in-file)
+        $validation->assertJsonPath('valid_count', 0);
+        $validation->assertJsonPath('error_count', 1); // Baris 3 harus error
+        $validation->assertJsonPath('skip_count', 1); // Baris 2 boleh skip
+        $validation->assertJsonPath('results.0.status', 'skip'); // Baris 2
+        $validation->assertJsonPath('results.0.errors.NIP.0', 'NIP sudah terdaftar di database.');
+        $validation->assertJsonPath('results.1.status', 'error'); // Baris 3
+        $validation->assertJsonPath('results.1.errors.NIP.0', 'NIP sudah ada pada baris 2.');
     }
 
     public function test_old_employee_import_endpoint_is_not_available(): void

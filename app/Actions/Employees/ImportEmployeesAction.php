@@ -63,7 +63,17 @@ class ImportEmployeesAction
             $data = $validator->validated();
             $referenceErrors = $this->resolveReferences($data);
             $duplicateErrors = $this->duplicateErrors($data, $row['row'], $seenNips, $seenEmails);
-            $rowErrors = array_merge_recursive($referenceErrors, $duplicateErrors);
+
+            // Cek database untuk NIP dan email yang sudah terdaftar
+            $databaseErrors = [];
+            if (! empty($data['nip']) && Employee::where('nip', $data['nip'])->exists()) {
+                $databaseErrors['nip'] = ['NIP tersebut sudah digunakan/terdaftar.'];
+            }
+            if (! empty($data['email_pribadi']) && Employee::whereRaw('LOWER(email_pribadi) = ?', [strtolower($data['email_pribadi'])])->exists()) {
+                $databaseErrors['email_pribadi'] = ['Email pegawai tersebut sudah digunakan/terdaftar.'];
+            }
+
+            $rowErrors = array_merge_recursive($referenceErrors, $duplicateErrors, $databaseErrors);
 
             if ($rowErrors !== []) {
                 $errors[] = [
