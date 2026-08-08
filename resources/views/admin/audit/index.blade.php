@@ -1,28 +1,21 @@
 <x-layouts.app title="Audit Log">
 
+    @php
+        // Tautan pengurutan mempertahankan penyaring yang sedang aktif dan hanya membalik arah
+        // pada kolom yang sedang diurutkan, supaya pengguna tidak kehilangan konteks pencarian.
+        $sortAktif = $activeFilters['sort'];
+        $arahAktif = $activeFilters['direction'];
+        $tautanUrut = function (string $kolom) use ($sortAktif, $arahAktif): string {
+            $arah = $sortAktif === $kolom && $arahAktif === 'desc' ? 'asc' : 'desc';
+
+            return request()->fullUrlWithQuery(['sort' => $kolom, 'direction' => $arah, 'page' => null]);
+        };
+    @endphp
+
     <div x-data="{
-        filterEvent: 'all',
-        filterUser: 'all',
-        filterModul: 'all',
-        filterStartDate: '',
-        filterEndDate: '',
         selectedLogId: null,
         showDrawer: false,
-        searchQuery: '',
-        logs: {{ json_encode($auditLogs) }},
-        currentPage: 1,
-        perPage: 25,
-        sortField: 'timestamp',
-        sortDirection: 'desc',
-        toggleSort(field) {
-            if (this.sortField === field) {
-                this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
-            } else {
-                this.sortField = field;
-                this.sortDirection = 'asc';
-            }
-            this.currentPage = 1;
-        },
+        logs: @js($auditLogs->items()),
         getRingkasan(log) {
             if (!log) return '';
             if (log.event === 'LOGIN') return 'LOGIN: Login berhasil';
@@ -49,56 +42,6 @@
             }
 
             return `${log.event}: ${log.event} pada ${target} #${log.record_id}`;
-        },
-        get filteredLogs() {
-            let filtered = this.logs.filter(log => {
-                const query = this.searchQuery.toLowerCase().trim();
-                const matchesSearch = !query ||
-                                      (log.operator && log.operator.toLowerCase().includes(query)) ||
-                                      (log.record_id && log.record_id.toLowerCase().includes(query));
-
-                const matchesEvent = this.filterEvent === 'all' || log.event === this.filterEvent;
-                const matchesUser = this.filterUser === 'all' || log.operator === this.filterUser;
-                const matchesModul = this.filterModul === 'all' || log.modul === this.filterModul;
-
-                let matchesPeriode = true;
-                if (log.timestamp) {
-                    const logDateStr = log.timestamp.split(' ')[0];
-                    if (this.filterStartDate) {
-                        if (logDateStr < this.filterStartDate) matchesPeriode = false;
-                    }
-                    if (this.filterEndDate) {
-                        if (logDateStr > this.filterEndDate) matchesPeriode = false;
-                    }
-                }
-
-                return matchesSearch && matchesEvent && matchesUser && matchesModul && matchesPeriode;
-            });
-
-            return [...filtered].sort((a, b) => {
-                let valA = a[this.sortField];
-                let valB = b[this.sortField];
-
-                if (this.sortField === 'timestamp') {
-                    valA = new Date(valA || 0);
-                    valB = new Date(valB || 0);
-                } else if (typeof valA === 'string') {
-                    valA = valA.toLowerCase();
-                    valB = (valB || '').toLowerCase();
-                }
-
-                if (valA < valB) return this.sortDirection === 'asc' ? -1 : 1;
-                if (valA > valB) return this.sortDirection === 'asc' ? 1 : -1;
-                return 0;
-            });
-        },
-        get paginatedLogs() {
-            const start = (this.currentPage - 1) * this.perPage;
-            const end = start + this.perPage;
-            return this.filteredLogs.slice(start, end);
-        },
-        get totalPages() {
-            return Math.ceil(this.filteredLogs.length / this.perPage) || 1;
         },
         get selectedLog() {
             return this.logs.find(l => l.id === this.selectedLogId) || this.logs[0] || {};
@@ -147,86 +90,87 @@
         </div>
 
         {{-- FILTER PANEL --}}
-        <x-ui.filter-bar
-            class="sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 items-end"
-            searchModel="searchQuery"
-            searchLabel="Cari"
-            searchPlaceholder="Ketik nama operator atau ID record..."
-            searchCols="col-span-1 lg:col-span-2"
-        >
-            <x-slot:header>
-                <h3 class="text-sm font-semibold text-ink font-sans">Filter & Pencarian</h3>
-                <p class="text-xs text-muted">Saring jejak audit berdasarkan kriteria spesifik di bawah ini.</p>
-            </x-slot:header>
+        <form method="GET" action="{{ route('audit-log') }}">
+            <input type="hidden" name="sort" value="{{ $activeFilters['sort'] }}">
+            <input type="hidden" name="direction" value="{{ $activeFilters['direction'] }}">
+            <input type="hidden" name="per_page" value="{{ request('per_page', 25) }}">
 
-            <x-slot:actions>
-                <button @click="filterEvent = 'all'; filterUser = 'all'; filterModul = 'all'; filterStartDate = ''; filterEndDate = ''; searchQuery = '';"
-                        class="text-xs text-primary font-semibold hover:underline font-sans cursor-pointer flex items-center gap-1">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-                    </svg>
-                    Reset Filter
-                </button>
-            </x-slot:actions>
+            <x-ui.filter-bar
+                class="sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 items-end"
+                searchId="cari-audit"
+                searchName="q"
+                searchValue="{{ $activeFilters['q'] }}"
+                searchLabel="Cari"
+                searchPlaceholder="Ketik nama operator atau ID record..."
+                searchCols="col-span-1 lg:col-span-2"
+            >
+                <x-slot:header>
+                    <h3 class="text-sm font-semibold text-ink font-sans">Filter & Pencarian</h3>
+                    <p class="text-xs text-muted">Saring jejak audit berdasarkan kriteria spesifik di bawah ini.</p>
+                </x-slot:header>
 
-            {{-- Dropdown Event --}}
-            <div class="space-y-1.5">
-                <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Jenis Event</label>
-                <div class="relative">
-                    <x-form.select x-model="filterEvent">
-                        <option value="all">Semua Event</option>
-                        <option value="LOGIN">LOGIN</option>
-                        <option value="LOGOUT">LOGOUT</option>
-                        <option value="SESSION_TIMEOUT">SESSION_TIMEOUT</option>
-                        <option value="CREATE">CREATE</option>
-                        <option value="UPDATE">UPDATE</option>
-                        <option value="SOFT_DELETE">SOFT_DELETE</option>
-                        <option value="RESTORE">RESTORE</option>
-                        <option value="APPROVE">APPROVE</option>
-                        <option value="POSTPONE">POSTPONE</option>
-                        <option value="IMPORT">IMPORT</option>
-                    </x-form.select>
+                <x-slot:actions>
+                    <a href="{{ route('audit-log') }}"
+                       class="text-xs text-primary font-semibold hover:underline font-sans cursor-pointer flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                        </svg>
+                        Reset Filter
+                    </a>
+                </x-slot:actions>
+
+                {{-- Dropdown Event --}}
+                <div class="space-y-1.5">
+                    <label for="filter-event" class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Jenis Event</label>
+                    <div class="relative">
+                        <x-form.select id="filter-event" name="event" onchange="this.form.submit()">
+                            <option value="">Semua Event</option>
+                            @foreach ($eventOptions as $event)
+                                <option value="{{ $event }}"@selected($activeFilters['event'] === $event)>{{ $event }}</option>
+                            @endforeach
+                        </x-form.select>
+                    </div>
                 </div>
-            </div>
 
-            {{-- Dropdown Operator --}}
-            <div class="space-y-1.5">
-                <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">User / Operator</label>
-                <div class="relative">
-                    <x-form.select x-model="filterUser">
-                        <option value="all">Semua User</option>
-                        <template x-for="op in [...new Set(logs.map(l => l.operator))]" :key="op">
-                            <option :value="op" x-text="op"></option>
-                        </template>
-                    </x-form.select>
+                {{-- Dropdown Operator --}}
+                <div class="space-y-1.5">
+                    <label for="filter-operator" class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">User / Operator</label>
+                    <div class="relative">
+                        <x-form.select id="filter-operator" name="operator" onchange="this.form.submit()">
+                            <option value="">Semua User</option>
+                            @foreach ($operatorOptions as $operator)
+                                <option value="{{ $operator }}"@selected($activeFilters['operator'] === $operator)>{{ $operator }}</option>
+                            @endforeach
+                        </x-form.select>
+                    </div>
                 </div>
-            </div>
 
-            {{-- Dropdown Modul --}}
-            <div class="space-y-1.5">
-                <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Modul / Tabel</label>
-                <div class="relative">
-                    <x-form.select x-model="filterModul">
-                        <option value="all">Semua Modul</option>
-                        <template x-for="mod in [...new Set(logs.map(l => l.modul))]" :key="mod">
-                            <option :value="mod" x-text="mod"></option>
-                        </template>
-                    </x-form.select>
+                {{-- Dropdown Modul --}}
+                <div class="space-y-1.5">
+                    <label for="filter-modul" class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Modul / Tabel</label>
+                    <div class="relative">
+                        <x-form.select id="filter-modul" name="modul" onchange="this.form.submit()">
+                            <option value="">Semua Modul</option>
+                            @foreach ($modulOptions as $modul)
+                                <option value="{{ $modul }}"@selected($activeFilters['modul'] === $modul)>{{ class_basename($modul) }}</option>
+                            @endforeach
+                        </x-form.select>
+                    </div>
                 </div>
-            </div>
 
-            {{-- Periode Mulai --}}
-            <div class="space-y-1.5">
-                <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Periode Mulai</label>
-                <input type="date" x-model="filterStartDate" class="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
-            </div>
+                {{-- Periode Mulai --}}
+                <div class="space-y-1.5">
+                    <label for="filter-from" class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Periode Mulai</label>
+                    <input id="filter-from" type="date" name="from" value="{{ $activeFilters['from'] }}" onchange="this.form.submit()" class="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
+                </div>
 
-            {{-- Periode Selesai --}}
-            <div class="space-y-1.5">
-                <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Periode Selesai</label>
-                <input type="date" x-model="filterEndDate" class="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
-            </div>
-        </x-ui.filter-bar>
+                {{-- Periode Selesai --}}
+                <div class="space-y-1.5">
+                    <label for="filter-to" class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Periode Selesai</label>
+                    <input id="filter-to" type="date" name="to" value="{{ $activeFilters['to'] }}" onchange="this.form.submit()" class="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
+                </div>
+            </x-ui.filter-bar>
+        </form>
 
         {{-- Table Card --}}
         <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
@@ -244,87 +188,54 @@
                 <table class="w-full">
                     <thead class="bg-soft border-b border-border">
                         <tr>
-                            <th @click="toggleSort('timestamp')" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans cursor-pointer hover:text-primary transition-colors select-none">
-                                <div class="flex items-center gap-1.5">
-                                    Waktu
-                                    <template x-if="sortField === 'timestamp'">
-                                        <span>
-                                            <svg x-show="sortDirection === 'asc'" class="w-3 h-3 text-primary inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>
-                                            <svg x-show="sortDirection === 'desc'" class="w-3 h-3 text-primary inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
-                                        </span>
-                                    </template>
-                                    <template x-if="sortField !== 'timestamp'">
-                                        <svg class="w-3 h-3 text-muted/40 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
-                                    </template>
-                                </div>
-                            </th>
-                            <th @click="toggleSort('operator')" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans cursor-pointer hover:text-primary transition-colors select-none">
-                                <div class="flex items-center gap-1.5">
-                                    User
-                                    <template x-if="sortField === 'operator'">
-                                        <span>
-                                            <svg x-show="sortDirection === 'asc'" class="w-3 h-3 text-primary inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>
-                                            <svg x-show="sortDirection === 'desc'" class="w-3 h-3 text-primary inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
-                                        </span>
-                                    </template>
-                                    <template x-if="sortField !== 'operator'">
-                                        <svg class="w-3 h-3 text-muted/40 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
-                                    </template>
-                                </div>
-                            </th>
-                            <th @click="toggleSort('event')" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans cursor-pointer hover:text-primary transition-colors select-none">
-                                <div class="flex items-center gap-1.5">
-                                    Jenis Event
-                                    <template x-if="sortField === 'event'">
-                                        <span>
-                                            <svg x-show="sortDirection === 'asc'" class="w-3 h-3 text-primary inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>
-                                            <svg x-show="sortDirection === 'desc'" class="w-3 h-3 text-primary inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
-                                        </span>
-                                    </template>
-                                    <template x-if="sortField !== 'event'">
-                                        <svg class="w-3 h-3 text-muted/40 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
-                                    </template>
-                                </div>
-                            </th>
-                            <th @click="toggleSort('modul')" class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans cursor-pointer hover:text-primary transition-colors select-none">
-                                <div class="flex items-center gap-1.5">
-                                    Modul/Tabel
-                                    <template x-if="sortField === 'modul'">
-                                        <span>
-                                            <svg x-show="sortDirection === 'asc'" class="w-3 h-3 text-primary inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>
-                                            <svg x-show="sortDirection === 'desc'" class="w-3 h-3 text-primary inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
-                                        </span>
-                                    </template>
-                                    <template x-if="sortField !== 'modul'">
-                                        <svg class="w-3 h-3 text-muted/40 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
-                                    </template>
-                                </div>
-                            </th>
+                            @foreach (['timestamp' => 'Waktu', 'operator' => 'User', 'event' => 'Jenis Event', 'modul' => 'Modul/Tabel'] as $kolom => $judul)
+                                <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans select-none">
+                                    <a href="{{ $tautanUrut($kolom) }}" class="flex items-center gap-1.5 hover:text-primary transition-colors">
+                                        {{ $judul }}
+                                        @if ($sortAktif === $kolom)
+                                            @if ($arahAktif === 'asc')
+                                                <svg class="w-3 h-3 text-primary inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>
+                                            @else
+                                                <svg class="w-3 h-3 text-primary inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+                                            @endif
+                                        @else
+                                            <svg class="w-3 h-3 text-muted/40 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
+                                        @endif
+                                    </a>
+                                </th>
+                            @endforeach
                             <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans select-none">Ringkasan Perubahan</th>
                             <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans select-none">Aksi</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-border">
-                        <template x-for="log in paginatedLogs" :key="log.id">
-                            <tr @click="selectedLogId = log.id; showDrawer = true" class="transition-colors hover:bg-soft/50 cursor-pointer">
-                                <td class="px-4 py-3.5 text-xs text-ink" x-text="log.timestamp"></td>
-                                <td class="px-4 py-3.5 text-sm font-semibold text-ink font-sans" x-text="log.operator"></td>
+                        @forelse ($auditLogs as $log)
+                            @php
+                                // Kelas ditulis utuh, bukan disusun dari potongan, supaya pemindai
+                                // Tailwind tetap menemukannya saat membangun berkas gaya.
+                                [$warnaTeks, $warnaTitik] = match (true) {
+                                    in_array($log['event'], ['CREATE', 'IMPORT', 'APPROVE', 'RESTORE'], true) => ['text-success', 'bg-success'],
+                                    $log['event'] === 'LOGIN' => ['text-primary', 'bg-primary'],
+                                    in_array($log['event'], ['SOFT_DELETE', 'LOGOUT'], true) => ['text-danger', 'bg-danger'],
+                                    default => ['text-warning', 'bg-warning'],
+                                };
+                            @endphp
+                            <tr @click="selectedLogId = '{{ $log['id'] }}'; showDrawer = true" class="transition-colors hover:bg-soft/50 cursor-pointer">
+                                <td class="px-4 py-3.5 text-xs text-ink">{{ $log['timestamp'] }}</td>
+                                <td class="px-4 py-3.5 text-sm font-semibold text-ink font-sans">{{ $log['operator'] }}</td>
                                 <td class="px-4 py-3.5">
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-semibold font-sans"
-                                        :class="log.event === 'CREATE' || log.event === 'IMPORT' || log.event === 'APPROVE' || log.event === 'RESTORE' ? 'text-success' : (log.event === 'LOGIN' ? 'text-primary' : (log.event === 'SOFT_DELETE' || log.event === 'LOGOUT' ? 'text-danger' : 'text-warning'))"
-                                    >
-                                        <span class="h-1.5 w-1.5 rounded-full"
-                                            :class="log.event === 'CREATE' || log.event === 'IMPORT' || log.event === 'APPROVE' || log.event === 'RESTORE' ? 'bg-success' : (log.event === 'LOGIN' ? 'bg-primary' : (log.event === 'SOFT_DELETE' || log.event === 'LOGOUT' ? 'bg-danger' : 'bg-warning'))"
-                                        ></span>
-                                        <span x-text="log.event"></span>
+                                    <span class="inline-flex items-center gap-1.5 text-xs font-semibold font-sans {{ $warnaTeks }}">
+                                        <span class="h-1.5 w-1.5 rounded-full {{ $warnaTitik }}"></span>
+                                        <span>{{ $log['event'] }}</span>
                                     </span>
                                 </td>
-                                <td class="px-4 py-3.5 text-xs text-muted font-sans" x-text="log.modul"></td>
-                                <td class="px-4 py-3.5 text-xs text-ink font-sans" x-text="getRingkasan(log)"></td>
+                                <td class="px-4 py-3.5 text-xs text-muted font-sans">{{ $log['modul'] }}</td>
+                                <td class="px-4 py-3.5 text-xs text-ink font-sans" x-text="getRingkasan(logs.find(l => l.id === '{{ $log['id'] }}'))"></td>
                                 <td class="px-4 py-3.5" @click.stop>
                                     <div class="flex items-center gap-1.5">
                                         <button
-                                            @click.stop="selectedLogId = log.id; showDrawer = true"
+                                            type="button"
+                                            @click.stop="selectedLogId = '{{ $log['id'] }}'; showDrawer = true"
                                             class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/30 shadow-sm cursor-pointer"
                                             title="Detail Drawer"
                                         >
@@ -334,8 +245,7 @@
                                             </svg>
                                         </button>
                                         <a
-                                            @click.stop
-                                            :href="'/dashboard/audit/' + log.id"
+                                            href="{{ route('audit-log.show', $log['id']) }}"
                                             class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted transition hover:bg-soft hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/30 shadow-sm"
                                             title="Halaman Detail"
                                         >
@@ -346,12 +256,13 @@
                                     </div>
                                 </td>
                             </tr>
-                        </template>
-                        <tr x-show="filteredLogs.length === 0">
-                            <td colspan="6" class="px-6 py-8 text-center text-xs text-muted font-sans">
-                                Tidak ada log aktivitas yang cocok dengan filter pencarian.
-                            </td>
-                        </tr>
+                        @empty
+                            <tr>
+                                <td colspan="6" class="px-6 py-8 text-center text-xs text-muted font-sans">
+                                    Tidak ada log aktivitas yang cocok dengan filter pencarian.
+                                </td>
+                            </tr>
+                        @endforelse
                     </tbody>
                 </table>
             </div>
@@ -360,26 +271,29 @@
             <div class="flex flex-col gap-3 border-t border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between bg-surface">
                 <div class="flex items-center gap-3">
                     <p class="text-sm text-muted font-sans">
-                        Menampilkan
-                        <span x-text="filteredLogs.length === 0 ? 0 : (currentPage - 1) * perPage + 1"></span> -
-                        <span x-text="Math.min(currentPage * perPage, filteredLogs.length)"></span> dari
-                        <span x-text="filteredLogs.length"></span> data
+                        Menampilkan {{ $auditLogs->total() === 0 ? 0 : $auditLogs->firstItem() }} -
+                        {{ $auditLogs->total() === 0 ? 0 : $auditLogs->lastItem() }} dari
+                        {{ $auditLogs->total() }} data
                     </p>
-                    <div class="relative">
-                        <select id="per-page" x-model.number="perPage" @change="currentPage = 1" class="appearance-none rounded-lg border border-border bg-surface pl-3 pr-8 py-1 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                            <option value="10">10 / halaman</option>
-                            <option value="25">25 / halaman</option>
-                            <option value="50">50 / halaman</option>
+                    <form method="GET" action="{{ route('audit-log') }}" class="relative">
+                        @foreach ($activeFilters as $nama => $nilai)
+                            <input type="hidden" name="{{ $nama }}" value="{{ $nilai }}">
+                        @endforeach
+                        <label for="per-page" class="sr-only">Jumlah baris per halaman</label>
+                        <select id="per-page" name="per_page" onchange="this.form.submit()" class="appearance-none rounded-lg border border-border bg-surface pl-3 pr-8 py-1 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+                            @foreach ([10, 25, 50] as $jumlah)
+                                <option value="{{ $jumlah }}"@selected((int) request('per_page', 25) === $jumlah)>{{ $jumlah }} / halaman</option>
+                            @endforeach
                         </select>
                         <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
                             </svg>
                         </div>
-                    </div>
+                    </form>
                 </div>
                 <div class="flex items-center gap-1.5">
-                    <x-ui.pagination current="currentPage" total="totalPages" />
+                    {{ $auditLogs->onEachSide(1)->links('vendor.pagination.simpeg') }}
                 </div>
             </div>
 

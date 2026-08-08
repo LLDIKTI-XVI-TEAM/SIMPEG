@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AuditLog;
 use App\Models\User;
+use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -114,19 +115,25 @@ class AuditLogIndexTest extends TestCase
         $createdAt = $attributes['created_at'] ?? now();
         unset($attributes['created_at']);
 
-        $auditLog = AuditLog::query()->create(array_merge([
-            'user_id' => null,
-            'user_name' => 'Tester',
-            'event' => 'CREATE',
-            'auditable_type' => 'Employee',
-            'auditable_id' => null,
-            'old_values' => null,
-            'new_values' => null,
-            'ip_address' => '127.0.0.1',
-            'user_agent' => 'PHPUnit',
-        ], $attributes));
+        // Audit log menolak pembaruan, sehingga waktu pembuatan ditetapkan melalui waktu uji
+        // sebelum baris dibuat, bukan dengan menyunting baris yang sudah tersimpan.
+        Carbon::setTestNow($createdAt);
 
-        $auditLog->forceFill(['created_at' => $createdAt])->save();
+        try {
+            $auditLog = AuditLog::query()->create(array_merge([
+                'user_id' => null,
+                'user_name' => 'Tester',
+                'event' => 'CREATE',
+                'auditable_type' => 'Employee',
+                'auditable_id' => null,
+                'old_values' => null,
+                'new_values' => null,
+                'ip_address' => '127.0.0.1',
+                'user_agent' => 'PHPUnit',
+            ], $attributes));
+        } finally {
+            Carbon::setTestNow();
+        }
 
         return $auditLog->refresh();
     }
