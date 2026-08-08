@@ -50,7 +50,6 @@
         // Target wajib dan peringatan dihitung server saat upload agar UI mengikuti state batch.
         requiredTargetFields: [],
         serverWarnings: { unmatched_columns: [], missing_required: [] },
-        mappingSaveTimer: null,
         get unmappedHeaders() {
             return this.mainHeaders.filter(h => !this.columnMapping[h] || this.columnMapping[h] === 'tidak_dipakai');
         },
@@ -77,13 +76,12 @@
             return this.requiredTargetFields.filter(t => !selected.includes(t));
         },
 
-        // Kirim mapping ke server secara eksplisit dan kembalikan promise agar validasi
-        // bisa menunggu penyimpanan selesai sebelum berjalan. Dipanggil langsung oleh
-        // runValidation() dan dijadwalkan oleh saveMapping() melalui debounce.
+        // Simpan mapping ke server tepat sebelum validasi — tidak ada autosave pada
+        // perubahan dropdown agar tidak ada dua request mapping yang bisa berjalan
+        // paralel dan saling menimpa.
         async persistMapping() {
             if (!this.batchId) return;
 
-            window.clearTimeout(this.mappingSaveTimer);
             const res = await fetch('/api/pegawai/import/' + this.batchId + '/mapping', {
                 method: 'POST',
                 headers: {
@@ -100,15 +98,6 @@
             }
 
             this.serverWarnings = data.warnings || this.serverWarnings;
-        },
-
-        // Autosave pemetaan kolom setiap Admin mengubah dropdown — memakai debounce agar
-        // tidak membanjiri server saat Admin masih mencari pasangan kolom.
-        saveMapping() {
-            if (!this.batchId) return;
-
-            window.clearTimeout(this.mappingSaveTimer);
-            this.mappingSaveTimer = window.setTimeout(() => this.persistMapping().catch(_e => { /* apiError sudah ditulis persistMapping */ }), 400);
         },
 
         // Kirim hanya baris yang benar-benar diedit (key sumber apa adanya); tafsir kolom
@@ -494,7 +483,6 @@
             this.columnMapping = {};
             this.requiredTargetFields = [];
             this.serverWarnings = { unmatched_columns: [], missing_required: [] };
-            this.mappingSaveTimer = null;
         }
     }">
         
@@ -690,7 +678,7 @@
                                 <span x-show="columnMapping[header] && columnMapping[header] !== 'tidak_dipakai'" class="text-[10px] font-bold text-success">✓ Matched</span>
                                 <span x-show="!columnMapping[header] || columnMapping[header] === 'tidak_dipakai'" class="text-[10px] font-bold text-warning">! Unmatched</span>
                             </div>
-                            <x-form.select x-model="columnMapping[header]" @change="saveMapping()" class="w-full text-xs py-1">
+                            <x-form.select x-model="columnMapping[header]" class="w-full text-xs py-1">
                                 <option value="tidak_dipakai">-- Tidak Dipakai --</option>
                                 <template x-for="field in simpegTargetFields" :key="field.key">
                                     <option :value="field.key" x-text="field.label" :selected="columnMapping[header] === field.key"></option>
