@@ -17,7 +17,9 @@ use App\Models\User;
 use App\Services\Cuti\ApprovalChainResolver;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Database\MultipleRecordsFoundException;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -425,6 +427,84 @@ class EmployeeApprovalChainConfigTest extends TestCase
 
         $this->assertSame([$kepalaBagian->id, $pybmc->id], $chain->steps()->orderBy('step_order')->pluck('approver_employee_id')->all());
         $this->assertTrue($chain->steps()->orderByDesc('step_order')->firstOrFail()->is_final);
+    }
+
+    public function test_audit_chain_pegawai_menyimpan_jejak_forensik_permintaan(): void
+    {
+        // Audit konfigurasi persetujuan wajib menyimpan alamat dan perangkat pemohon supaya perubahan
+        // kewenangan dapat ditelusuri, bukan hanya diketahui siapa aktornya.
+        $actor = User::factory()->superAdmin()->create();
+        $kepalaBagian = Employee::factory()->create();
+        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $pybmc = Employee::factory()->create();
+
+        $this->actingAs($actor)->app->make(ApplyGlobalPybmcAction::class)->execute($pybmc, $actor, 'PYBMC global.');
+
+        $this->actingAs($actor)
+            ->withServerVariables(['REMOTE_ADDR' => '203.0.113.7', 'HTTP_USER_AGENT' => 'PengujiJejak/1.0'])
+            ->post(route('cuti.config.employee-chain.store', $pegawai), [
+                'steps' => [[
+                    'step_type' => 'kepala_bagian',
+                    'role_label' => 'Kepala Bagian',
+                    'approver_employee_id' => $kepalaBagian->id,
+                ]],
+                'reason' => 'Set chain pegawai untuk uji jejak forensik.',
+            ])
+            ->assertRedirect(route('cuti.config'));
+
+        $audit = AuditLog::query()
+            ->where('auditable_type', 'LeaveApprovalChain')
+            ->where('event', 'CREATE')
+            ->sole();
+
+        $this->assertSame('203.0.113.7', $audit->ip_address);
+        $this->assertSame('PengujiJejak/1.0', $audit->user_agent);
+    }
+
+    public function test_kegagalan_audit_membatalkan_penyimpanan_chain_pegawai(): void
+    {
+        // Konfigurasi persetujuan tidak boleh berpindah tanpa jejak. Penulisan audit berada di dalam
+        // transaksi penyimpanan, sehingga kegagalannya wajib menggagalkan penyimpanan rantai juga.
+        // Test ini menjaga sifat itu agar penulisan audit tidak dipindahkan ke luar transaksi.
+        $actor = User::factory()->superAdmin()->create();
+        $kepalaBagian = Employee::factory()->create();
+        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+
+        $this->tolakPenulisanAuditRantai();
+
+        try {
+            $this->actingAs($actor)->app->make(SaveEmployeeApprovalChainAction::class)->execute($pegawai, [
+                ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $kepalaBagian->id, 'is_final' => false],
+                ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $kepalaBagian->id, 'is_final' => true],
+            ], $actor, 'Chain yang auditnya gagal ditulis.');
+
+            $this->fail('Penyimpanan chain seharusnya dibatalkan ketika audit gagal ditulis.');
+        } catch (QueryException) {
+            // Kegagalan memang diharapkan; yang diuji adalah keadaan basis data sesudahnya.
+        }
+
+        $this->assertDatabaseMissing('leave_approval_chains', ['employee_id' => $pegawai->id]);
+    }
+
+    /**
+     * Memasang penjaga sementara yang menolak penulisan audit rantai approval.
+     * Dipakai untuk membuktikan sifat fail-closed tanpa menyentuh kode produksi.
+     */
+    private function tolakPenulisanAuditRantai(): void
+    {
+        DB::unprepared(<<<'SQL'
+            CREATE OR REPLACE FUNCTION uji_tolak_audit_rantai() RETURNS trigger AS $$
+            BEGIN
+                RAISE EXCEPTION 'Penulisan audit rantai ditolak untuk pengujian.';
+            END;
+            $$ LANGUAGE plpgsql;
+
+            CREATE TRIGGER uji_tolak_audit_rantai
+            BEFORE INSERT ON audit_logs
+            FOR EACH ROW
+            WHEN (NEW.auditable_type = 'LeaveApprovalChain')
+            EXECUTE FUNCTION uji_tolak_audit_rantai();
+        SQL);
     }
 
     public function test_super_admin_bisa_menyimpan_chain_pegawai_melalui_route(): void

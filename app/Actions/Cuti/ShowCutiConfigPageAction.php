@@ -6,6 +6,8 @@ use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveApprovalChain;
 use App\Models\LeavePybmcGlobalConfig;
+use App\Models\PositionHistory;
+use App\Models\RefUnitKerja;
 use Illuminate\Support\Collection;
 
 /**
@@ -51,7 +53,37 @@ class ShowCutiConfigPageAction
                 'active' => LeaveApprovalChain::query()->where('is_active', true)->count(),
             ],
             'globalPybmc' => $globalPybmc,
+            // Penerapan template ke unit hanya masuk akal bila pegawai terpilih sudah punya chain aktif,
+            // jadi kelayakan dan unit asalnya dihitung di server agar tombolnya tidak menyesatkan.
+            'unitKerjaOptions' => $this->unitKerjaOptions(),
+            'templateSourceHasActiveChain' => $activeChain !== null,
+            'templateSourceUnitKerjaId' => $this->unitKerjaTerkini($selectedEmployee),
         ];
+    }
+
+    /** @return Collection<int, RefUnitKerja> */
+    private function unitKerjaOptions(): Collection
+    {
+        return RefUnitKerja::query()
+            ->where('is_active', true)
+            ->orderBy('nama')
+            ->get(['id', 'nama']);
+    }
+
+    /**
+     * Unit kerja pegawai diturunkan dari riwayat jabatan terkini, sumber yang sama dengan aksi
+     * penerapan template, supaya unit yang tampil di layar tidak berbeda dari unit yang diproses.
+     */
+    private function unitKerjaTerkini(?Employee $selectedEmployee): ?string
+    {
+        if ($selectedEmployee === null) {
+            return null;
+        }
+
+        return PositionHistory::query()
+            ->where('employee_id', $selectedEmployee->id)
+            ->where('is_latest', true)
+            ->value('unit_kerja_id');
     }
 
     /** @return Collection<int, Employee> */
@@ -189,7 +221,15 @@ class ShowCutiConfigPageAction
     {
         return AuditLog::query()
             ->select(['id', 'user_name', 'event', 'auditable_type', 'old_values', 'new_values', 'ip_address', 'user_agent', 'created_at'])
-            ->whereIn('auditable_type', ['ApprovalConfig', 'LeaveApprovalChain', 'LeavePybmcGlobalConfig'])
+            // Penerapan template ke unit melekat pada unit kerja, jadi barisnya dibatasi pada event
+            // konfigurasi supaya perubahan data master unit kerja tidak ikut masuk ke log ini.
+            ->where(function ($query): void {
+                $query->whereIn('auditable_type', ['ApprovalConfig', 'LeaveApprovalChain', 'LeavePybmcGlobalConfig'])
+                    ->orWhere(function ($unit): void {
+                        $unit->where('auditable_type', 'RefUnitKerja')
+                            ->where('event', 'CONFIG_UPDATE');
+                    });
+            })
             ->orderByDesc('created_at')
             ->limit(20)
             ->get()
@@ -200,6 +240,7 @@ class ShowCutiConfigPageAction
                 'source' => match ($row->auditable_type) {
                     'LeaveApprovalChain' => 'Chain pegawai',
                     'LeavePybmcGlobalConfig' => 'PYBMC global',
+                    'RefUnitKerja' => 'Template unit',
                     default => 'Konfigurasi lama',
                 },
                 'event' => $row->event,

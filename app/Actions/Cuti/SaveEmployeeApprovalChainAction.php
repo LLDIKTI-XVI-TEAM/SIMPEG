@@ -7,6 +7,7 @@ use App\Models\LeaveApprovalChain;
 use App\Models\LeavePybmcGlobalConfig;
 use App\Models\User;
 use App\Services\AuditService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -17,15 +18,15 @@ use RuntimeException;
 class SaveEmployeeApprovalChainAction
 {
     /**
-     * @param  list<array{step_type:string, role_label:string, approver_employee_id:string, is_final:bool}>  $steps
+     * @param  list<array{step_type:string, role_label:string, approver_employee_id:string, approver_role_key?:string|null, is_final:bool}>  $steps
      */
-    public function execute(Employee $employee, array $steps, User $actor, string $reason): LeaveApprovalChain
+    public function execute(Employee $employee, array $steps, User $actor, string $reason, ?Request $request = null): LeaveApprovalChain
     {
         $steps = $this->appendGlobalPybmcWhenNeeded($steps);
         $this->ensureOneFinalStep($steps);
         $this->ensureFinalStepIsLast($steps);
 
-        return DB::transaction(function () use ($employee, $steps, $actor, $reason): LeaveApprovalChain {
+        return DB::transaction(function () use ($employee, $steps, $actor, $reason, $request): LeaveApprovalChain {
             $oldChain = LeaveApprovalChain::query()
                 ->where('employee_id', $employee->id)
                 ->where('is_active', true)
@@ -57,12 +58,17 @@ class SaveEmployeeApprovalChainAction
                     'step_type' => $step['step_type'],
                     'role_label' => $step['role_label'],
                     'approver_employee_id' => $step['approver_employee_id'],
+                    // Kunci peran ikut disimpan supaya salinan rantai tidak kehilangan metadata langkah
+                    // yang sudah ada pada rantai sumber.
+                    'approver_role_key' => $step['approver_role_key'] ?? null,
                     'is_final' => $step['is_final'],
                 ]);
             }
 
             // Audit konfigurasi chain dicatat per chain baru agar perubahan approver dapat ditelusuri.
-            AuditService::log(
+            // Ditulis fail-closed di dalam transaksi supaya kewenangan persetujuan tidak pernah
+            // berpindah tanpa baris audit yang menerangkan siapa mengubahnya dan dari perangkat mana.
+            AuditService::logOrFail(
                 'CREATE',
                 'LeaveApprovalChain',
                 $chain->id,
@@ -72,6 +78,7 @@ class SaveEmployeeApprovalChainAction
                     'steps' => $steps,
                     'reason' => $reason,
                 ],
+                $request,
             );
 
             return $chain->load('steps');

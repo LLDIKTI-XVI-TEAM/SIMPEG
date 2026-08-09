@@ -515,6 +515,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::post('/cuti/konfigurasi-approval/pybmc-global', [CutiConfigController::class, 'updateGlobalPybmc'])
         ->middleware(['role:super_admin', 'permission:cuti.configure_chain'])
         ->name('cuti.config.pybmc-global');
+    Route::post('/cuti/konfigurasi-approval/unit', [CutiConfigController::class, 'applyTemplateToUnit'])
+        ->middleware(['role:super_admin', 'permission:cuti.configure_chain'])
+        ->name('cuti.config.unit-template.apply');
     Route::post('/cuti/konfigurasi-approval/pegawai/{employee}', [CutiConfigController::class, 'storeEmployeeChain'])
         ->middleware(['role:super_admin', 'permission:cuti.configure_chain'])
         ->name('cuti.config.employee-chain.store')
