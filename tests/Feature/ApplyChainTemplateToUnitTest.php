@@ -299,6 +299,49 @@ class ApplyChainTemplateToUnitTest extends TestCase
         $this->assertSame([$anggota->id], $hasil['applied_employee_ids']);
     }
 
+    public function test_langkah_approver_duplikat_dipertahankan_saat_disalin(): void
+    {
+        // Snapshot pengajuan mempertahankan seluruh langkah lalu menandai kemunculan lebih awal
+        // sebagai dilewati, sehingga kemunculan terakhir yang menjadi otoritas efektif. Penyalinan
+        // tidak boleh membuang langkah duplikat karena itu akan menghilangkan label dan peran yang
+        // dipakai snapshot serta audit keputusan seluruh anggota unit.
+        $aktor = User::factory()->superAdmin()->create();
+        $unit = $this->unit('Bagian Keuangan');
+        $verifikator = Employee::factory()->create();
+        $pybmc = Employee::factory()->create();
+
+        $sumber = $this->pegawaiUnit($unit, 'Pegawai Sumber');
+        $anggota = $this->pegawaiUnit($unit, 'Anggota Unit');
+
+        $this->actingAs($aktor)->app->make(SaveEmployeeApprovalChainAction::class)->execute($sumber, [
+            ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => (string) $sumber->kepala_bagian_id, 'is_final' => false],
+            ['step_type' => 'verifier', 'role_label' => 'Verifikasi Awal', 'approver_employee_id' => $verifikator->id, 'is_final' => false],
+            ['step_type' => 'verifier', 'role_label' => 'Verifikasi Akhir', 'approver_employee_id' => $verifikator->id, 'is_final' => false],
+            ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $pybmc->id, 'is_final' => true],
+        ], $aktor, 'Rantai dengan verifikator berulang.');
+
+        $this->terapkan($unit, $sumber, $aktor);
+
+        $langkah = LeaveApprovalChain::query()
+            ->where('employee_id', $anggota->id)
+            ->where('is_active', true)
+            ->sole()
+            ->steps()
+            ->orderBy('step_order')
+            ->get();
+
+        $this->assertSame(
+            ['kepala_bagian', 'verifier', 'verifier', 'pybmc'],
+            $langkah->pluck('step_type')->all(),
+        );
+        $this->assertSame(
+            ['Kepala Bagian', 'Verifikasi Awal', 'Verifikasi Akhir', 'PYBMC'],
+            $langkah->pluck('role_label')->all(),
+        );
+        $this->assertSame($verifikator->id, $langkah[1]->approver_employee_id);
+        $this->assertSame($verifikator->id, $langkah[2]->approver_employee_id);
+    }
+
     public function test_langkah_kepala_bagian_memakai_atasan_pegawai_tujuan_bukan_atasan_sumber(): void
     {
         // Rantai hasil penyalinan wajib menunjuk kepala bagian pegawai tujuan supaya tidak melanggar

@@ -255,12 +255,17 @@ class ApplyChainTemplateToUnitAction
      * Menyesuaikan langkah template untuk satu pegawai tujuan.
      *
      * Langkah Kepala Bagian diisi atasan pegawai tujuan, bukan atasan pegawai sumber, karena rantai
-     * milik pegawai wajib menunjuk atasannya sendiri. Approver yang sama dengan pegawai tujuan
-     * dibuang supaya tidak ada orang yang menyetujui pengajuannya sendiri, dan approver yang berulang
-     * berurutan dilewati agar satu orang tidak menyetujui dua tahap beruntun.
+     * milik pegawai wajib menunjuk atasannya sendiri.
      *
-     * Mengembalikan null bila pegawai tujuan menjadi approver pada langkah yang tidak dapat dibuang,
-     * karena rantai seperti itu akan memindahkan keputusan akhir ke pejabat yang tidak ditunjuk.
+     * Langkah yang berulang tidak dibuang di sini. Snapshot pengajuan mempertahankan seluruh langkah
+     * lalu menandai kemunculan lebih awal sebagai dilewati, sehingga kemunculan terakhir yang menjadi
+     * otoritas efektif; membuang duplikat saat menyalin akan mengubah label dan peran yang dipakai
+     * snapshot serta audit keputusan. Approver yang sama dengan pegawai tujuan pada langkah opsional
+     * juga dibiarkan karena mesin snapshot menolak pemohon dari daftar approvernya sendiri.
+     *
+     * Mengembalikan null hanya bila pegawai tujuan menjadi approver pada langkah wajib, yaitu langkah
+     * final atau Kepala Bagian, karena membuang langkah seperti itu akan memindahkan keputusan akhir
+     * ke pejabat yang tidak ditunjuk.
      *
      * @param  list<array{step_type:string, role_label:string, approver_employee_id:string, approver_role_key:?string, is_final:bool}>  $langkahSumber
      * @return list<array{step_type:string, role_label:string, approver_employee_id:string, approver_role_key:?string, is_final:bool}>|null
@@ -268,7 +273,6 @@ class ApplyChainTemplateToUnitAction
     private function langkahUntukTujuan(array $langkahSumber, string $kepalaBagianId, Employee $tujuan): ?array
     {
         $hasil = [];
-        $approverSebelumnya = null;
 
         foreach ($langkahSumber as $langkah) {
             if ($langkah['step_type'] === 'kepala_bagian') {
@@ -281,12 +285,7 @@ class ApplyChainTemplateToUnitAction
                 return null;
             }
 
-            if (! $wajibAda && ($langkah['approver_employee_id'] === $tujuan->id || $langkah['approver_employee_id'] === $approverSebelumnya)) {
-                continue;
-            }
-
             $hasil[] = $langkah;
-            $approverSebelumnya = $langkah['approver_employee_id'];
         }
 
         return $hasil;
