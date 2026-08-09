@@ -37,16 +37,27 @@ class BuildVerifierLeaveContextAction
                 ->where('is_cuti_bersama', true)
                 ->orderBy('tanggal')
                 ->get(['id', 'tanggal', 'nama']),
-            // Riwayat dibatasi pada pengajuan pengurang saldo tahunan yang sudah final disetujui;
-            // pengajuan aktif/ditolak bukan bukti pemakaian hak. Dibatasi lima terbaru agar
-            // halaman detail tetap ringan.
-            'riwayatTahunan' => LeaveRequest::query()
+            'riwayatTahunan' => $this->approvedAnnualHistory($employee, $asOf),
+        ];
+    }
+
+    /**
+     * Mengambil riwayat N, N-1, dan N-2 secara terpisah agar aktivitas tahun berjalan
+     * tidak menghabiskan slot dua tahun sebelumnya yang dibutuhkan verifikator.
+     *
+     * @return Collection<int, LeaveRequest>
+     */
+    private function approvedAnnualHistory(Employee $employee, Carbon $asOf): Collection
+    {
+        return collect(range($asOf->year, $asOf->year - 2))
+            ->flatMap(fn (int $year) => LeaveRequest::query()
                 ->where('employee_id', $employee->id)
                 ->where('status', 'disetujui')
                 ->whereHas('jenisCuti', fn (Builder $query) => $query->where('mengurangi_saldo_tahunan', true))
+                ->whereYear('tanggal_mulai', $year)
                 ->orderByDesc('tanggal_mulai')
                 ->limit(5)
-                ->get(['id', 'tanggal_mulai', 'tanggal_selesai', 'jumlah_hari_kerja']),
-        ];
+                ->get(['id', 'tanggal_mulai', 'tanggal_selesai', 'jumlah_hari_kerja']))
+            ->values();
     }
 }

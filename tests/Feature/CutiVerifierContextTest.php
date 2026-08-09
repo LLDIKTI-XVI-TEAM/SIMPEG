@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Cuti\BuildVerifierLeaveContextAction;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
@@ -166,6 +167,46 @@ class CutiVerifierContextTest extends TestCase
 
         $response->assertOk();
         $response->assertDontSee('Informasi Saldo & Riwayat Cuti Pemohon', false);
+    }
+
+    public function test_riwayat_verifikator_tetap_memuat_tahun_n1_dan_n2_saat_tahun_berjalan_melebihi_lima_record(): void
+    {
+        $jenis = $this->jenisTahunan();
+        $employee = Employee::factory()->create();
+
+        foreach (range(1, 6) as $month) {
+            LeaveRequest::create([
+                'employee_id' => $employee->id,
+                'jenis_cuti_id' => $jenis->id,
+                'tanggal_mulai' => sprintf('2026-%02d-10', $month),
+                'tanggal_selesai' => sprintf('2026-%02d-10', $month),
+                'jumlah_hari_kerja' => 1,
+                'alasan' => "Riwayat tahun berjalan {$month}",
+                'status' => 'disetujui',
+            ]);
+        }
+
+        foreach ([2025, 2024] as $year) {
+            LeaveRequest::create([
+                'employee_id' => $employee->id,
+                'jenis_cuti_id' => $jenis->id,
+                'tanggal_mulai' => "{$year}-01-10",
+                'tanggal_selesai' => "{$year}-01-10",
+                'jumlah_hari_kerja' => 1,
+                'alasan' => "Riwayat tahun {$year}",
+                'status' => 'disetujui',
+            ]);
+        }
+
+        $context = app(BuildVerifierLeaveContextAction::class)
+            ->execute($employee, now()->setDate(2026, 8, 10));
+        $years = $context['riwayatTahunan']
+            ->map(fn (LeaveRequest $request): int => $request->tanggal_mulai->year)
+            ->unique()
+            ->values()
+            ->all();
+
+        $this->assertSame([2026, 2025, 2024], $years);
     }
 
     private function jenisTahunan(): RefJenisCuti
