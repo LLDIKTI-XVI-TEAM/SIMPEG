@@ -30,6 +30,26 @@ class ApplyChainTemplateToUnitAction
      */
     private const LOCK_PREFIX = 'simpeg.leave_chain_unit:';
 
+    /**
+     * Ingatan status kepala bagian selama satu eksekusi. Banyak anggota unit berbagi atasan yang sama,
+     * jadi status cukup diperiksa sekali per pejabat alih-alih sekali per pegawai.
+     *
+     * @var array<string, bool>
+     */
+    private array $statusKepalaBagian = [];
+
+    /**
+     * Kepala bagian dianggap sah hanya bila masih aktif dan belum dihapus, sama dengan syarat approver
+     * pada form konfigurasi rantai per pegawai.
+     */
+    private function kepalaBagianAktif(string $kepalaBagianId): bool
+    {
+        return $this->statusKepalaBagian[$kepalaBagianId] ??= Employee::query()
+            ->whereKey($kepalaBagianId)
+            ->where('status_aktif', 'Aktif')
+            ->exists();
+    }
+
     public function __construct(private readonly SaveEmployeeApprovalChainAction $saveChain) {}
 
     /**
@@ -49,6 +69,7 @@ class ApplyChainTemplateToUnitAction
         string $reason,
         ?Request $request = null,
     ): array {
+        $this->statusKepalaBagian = [];
         $langkahSumber = $this->langkahSumber($sumber);
 
         // Penerapan dan jejaknya disatukan dalam satu transaksi supaya konfigurasi persetujuan unit
@@ -86,7 +107,11 @@ class ApplyChainTemplateToUnitAction
                         // itu diterima karena penerapan ini dijalankan sesekali untuk satu unit.
                         $kepalaBagianId = $pegawai->currentSupervisor()?->kepala_bagian_id;
 
-                        if ($kepalaBagianId === null) {
+                        // Penugasan atasan dapat tetap efektif walau pejabatnya sudah pensiun atau
+                        // dihapus, sedangkan form per pegawai hanya menerima approver aktif. Kepala
+                        // bagian nonaktif diperlakukan sama dengan tidak ada supaya rantai yang
+                        // dibuat di sini selalu dapat dipertahankan lewat form konfigurasi.
+                        if ($kepalaBagianId === null || ! $this->kepalaBagianAktif($kepalaBagianId)) {
                             $hasil['skipped_missing_kepala_bagian_employee_ids'][] = $pegawai->id;
 
                             continue;

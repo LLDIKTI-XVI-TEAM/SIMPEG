@@ -149,6 +149,46 @@ class ApplyChainTemplateToUnitTest extends TestCase
         $this->assertDatabaseMissing('leave_approval_chains', ['employee_id' => $anggota->id]);
     }
 
+    public function test_pegawai_dengan_kepala_bagian_nonaktif_dilewati(): void
+    {
+        // Penugasan atasan bisa tetap efektif walau orangnya sudah pensiun. Form per pegawai hanya
+        // menerima approver aktif, jadi rantai dengan kepala bagian nonaktif tidak boleh dibuat di
+        // sini karena admin sendiri tidak dapat menyimpan rantai serupa secara manual.
+        $aktor = User::factory()->superAdmin()->create();
+        $unit = $this->unit('Bagian Keuangan');
+        $pybmc = Employee::factory()->create();
+        $verifikator = Employee::factory()->create();
+
+        $sumber = $this->pegawaiUnit($unit, 'Pegawai Sumber');
+        $anggota = $this->pegawaiUnit($unit, 'Anggota Unit');
+
+        $this->rantaiAwal($sumber, $aktor, $verifikator, $pybmc);
+
+        Employee::query()->whereKey($anggota->kepala_bagian_id)->update(['status_aktif' => 'Pensiun']);
+
+        $hasil = $this->terapkan($unit, $sumber, $aktor);
+
+        $this->assertSame([], $hasil['applied_employee_ids']);
+        $this->assertContains($anggota->id, $hasil['skipped_missing_kepala_bagian_employee_ids']);
+        $this->assertDatabaseMissing('leave_approval_chains', ['employee_id' => $anggota->id]);
+    }
+
+    public function test_pengenal_sumber_cacat_tidak_menjadi_galat_basis_data(): void
+    {
+        // PostgreSQL menolak perbandingan kolom uuid dengan teks sembarang, jadi pengenal cacat harus
+        // berhenti pada validasi sebelum menyentuh kueri apa pun.
+        $aktor = User::factory()->superAdmin()->create();
+        $unit = $this->unit('Bagian Keuangan');
+
+        $this->actingAs($aktor)
+            ->post(route('cuti.config.unit-template.apply'), [
+                'unit_kerja_id' => $unit->id,
+                'source_employee_id' => 'bukan-uuid',
+                'template_reason' => 'Alasan cukup panjang.',
+            ])
+            ->assertSessionHasErrors('source_employee_id');
+    }
+
     public function test_langkah_kepala_bagian_memakai_atasan_pegawai_tujuan_bukan_atasan_sumber(): void
     {
         // Rantai hasil penyalinan wajib menunjuk kepala bagian pegawai tujuan supaya tidak melanggar

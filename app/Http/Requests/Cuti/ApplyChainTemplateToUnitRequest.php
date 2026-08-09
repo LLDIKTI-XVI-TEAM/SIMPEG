@@ -37,7 +37,10 @@ class ApplyChainTemplateToUnitRequest extends FormRequest
         $validator->after(function (Validator $validator): void {
             $sumber = $this->input('source_employee_id');
 
-            if (! is_string($sumber)) {
+            // Pemeriksaan lanjutan hanya dijalankan bila pengenal sudah lolos aturan dasarnya.
+            // PostgreSQL menolak perbandingan kolom uuid dengan teks sembarang, jadi kueri di bawah
+            // akan menjadi galat basis data alih-alih galat validasi bila nilainya cacat.
+            if (! is_string($sumber) || $validator->errors()->has('source_employee_id')) {
                 return;
             }
 
