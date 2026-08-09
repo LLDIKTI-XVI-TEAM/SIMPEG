@@ -189,6 +189,61 @@ class ApplyChainTemplateToUnitTest extends TestCase
             ->assertSessionHasErrors('source_employee_id');
     }
 
+    public function test_penerapan_ditolak_bila_template_sumber_punya_final_ganda(): void
+    {
+        // Struktur final rusak hanya bisa lahir lewat manipulasi data langsung karena jalur pembuatan
+        // menjaganya, tetapi bila terjadi dan unit hanya berisi pegawai sumber, penyalinan tidak
+        // pernah memanggil penyimpanan sehingga template rusak lolos dan aksi dilaporkan berhasil.
+        // Struktur final wajib diperiksa di depan, sekelas dengan pemeriksaan struktur lainnya.
+        $aktor = User::factory()->superAdmin()->create();
+        $unit = $this->unit('Bagian Keuangan');
+        $verifikator = Employee::factory()->create();
+        $pybmc = Employee::factory()->create();
+
+        $sumber = $this->pegawaiUnit($unit, 'Pegawai Sumber');
+        $this->rantaiAwal($sumber, $aktor, $verifikator, $pybmc);
+
+        // Menjadikan verifikator ikut final sehingga rantai memiliki dua langkah final.
+        DB::table('leave_approval_chain_steps')
+            ->where('approver_employee_id', $verifikator->id)
+            ->update(['is_final' => true]);
+
+        try {
+            $this->terapkan($unit, $sumber, $aktor);
+            $this->fail('Penerapan seharusnya ditolak karena template sumber memiliki lebih dari satu langkah final.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('final', $exception->getMessage());
+        }
+    }
+
+    public function test_endpoint_menolak_template_sumber_dengan_final_bukan_terakhir(): void
+    {
+        $aktor = User::factory()->superAdmin()->create();
+        $unit = $this->unit('Bagian Keuangan');
+        $verifikator = Employee::factory()->create();
+        $pybmc = Employee::factory()->create();
+
+        $sumber = $this->pegawaiUnit($unit, 'Pegawai Sumber');
+        $this->rantaiAwal($sumber, $aktor, $verifikator, $pybmc);
+
+        // Memindahkan final ke verifikator dan mencabutnya dari PYBMC sehingga langkah final bukan
+        // langkah terakhir.
+        DB::table('leave_approval_chain_steps')
+            ->where('approver_employee_id', $verifikator->id)
+            ->update(['is_final' => true]);
+        DB::table('leave_approval_chain_steps')
+            ->where('approver_employee_id', $pybmc->id)
+            ->update(['is_final' => false]);
+
+        $this->actingAs($aktor)
+            ->post(route('cuti.config.unit-template.apply'), [
+                'unit_kerja_id' => $unit->id,
+                'source_employee_id' => $sumber->id,
+                'template_reason' => 'Menyeragamkan chain unit keuangan.',
+            ])
+            ->assertSessionHasErrors('source_employee_id');
+    }
+
     public function test_penerapan_ditolak_bila_template_sumber_tanpa_kepala_bagian(): void
     {
         // Rantai yang dibuat lewat jalur non-form dapat kehilangan langkah Kepala Bagian karena

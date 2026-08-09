@@ -210,6 +210,17 @@ class ApplyChainTemplateToUnitAction
             throw new RuntimeException('Chain pegawai sumber tidak memiliki langkah Kepala Bagian. Perbaiki chain sumber sebelum diterapkan ke unit.');
         }
 
+        // Struktur final divalidasi di depan, sekelas dengan pemeriksaan lain, supaya template rusak
+        // tidak lolos ketika unit hanya berisi pegawai sumber dan tidak berakhir sebagai galat di
+        // tengah penyimpanan anggota pertama. Langkah dibaca terurut step_order dari kueri di atas.
+        if ($rantai->steps->where('is_final', true)->count() !== 1) {
+            throw new RuntimeException('Chain pegawai sumber wajib memiliki tepat satu approver final. Perbaiki chain sumber sebelum diterapkan ke unit.');
+        }
+
+        if ((bool) $rantai->steps->last()?->is_final !== true) {
+            throw new RuntimeException('Approver final pada chain pegawai sumber wajib berada di urutan terakhir. Perbaiki chain sumber sebelum diterapkan ke unit.');
+        }
+
         // Approver pada langkah kepala bagian selalu diganti dengan atasan efektif pegawai tujuan,
         // dan resolver melakukan substitusi yang sama saat pengajuan dibentuk. Id kepala bagian pada
         // rantai sumber karena itu tidak pernah disalin, sehingga snapshot yang usang akibat rotasi

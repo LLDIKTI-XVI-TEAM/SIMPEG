@@ -73,6 +73,27 @@ class ApplyChainTemplateToUnitRequest extends FormRequest
                 return;
             }
 
+            // Struktur final divalidasi di depan agar template rusak menjadi galat validasi yang
+            // terbaca, bukan galat server saat penyimpanan anggota pertama atau sukses palsu ketika
+            // unit hanya berisi pegawai sumber.
+            if ($rantai->steps->where('is_final', true)->count() !== 1) {
+                $validator->errors()->add(
+                    'source_employee_id',
+                    'Chain pegawai sumber wajib memiliki tepat satu approver final. Perbaiki chain tersebut lebih dahulu.',
+                );
+
+                return;
+            }
+
+            if ((bool) $rantai->steps->sortBy('step_order')->last()?->is_final !== true) {
+                $validator->errors()->add(
+                    'source_employee_id',
+                    'Approver final pada chain pegawai sumber wajib berada di urutan terakhir. Perbaiki chain tersebut lebih dahulu.',
+                );
+
+                return;
+            }
+
             // Langkah kepala bagian selalu diisi ulang dengan atasan efektif pegawai tujuan, jadi
             // approver lama pada langkah itu tidak pernah disalin dan tidak perlu diperiksa. Membatasi
             // pemeriksaan ke langkah yang benar-benar disalin mencegah penolakan palsu ketika snapshot
