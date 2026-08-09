@@ -245,6 +245,60 @@ class ApplyChainTemplateToUnitTest extends TestCase
         $this->assertDatabaseMissing('leave_approval_chains', ['employee_id' => $anggota->id]);
     }
 
+    public function test_kepala_bagian_sumber_yang_nonaktif_tidak_memblokir_penerapan(): void
+    {
+        // Approver pada langkah kepala bagian selalu diganti dengan atasan pegawai tujuan, baik oleh
+        // aksi ini maupun oleh resolver saat pengajuan dibentuk, sehingga id lama pada chain sumber
+        // tidak pernah disalin. Snapshot kepala bagian sumber yang usang karena rotasi jabatan tidak
+        // boleh membatalkan penerapan yang sebenarnya sah.
+        $aktor = User::factory()->superAdmin()->create();
+        $unit = $this->unit('Bagian Keuangan');
+        $pybmc = Employee::factory()->create();
+        $verifikator = Employee::factory()->create();
+
+        $sumber = $this->pegawaiUnit($unit, 'Pegawai Sumber');
+        $anggota = $this->pegawaiUnit($unit, 'Anggota Unit');
+
+        $this->rantaiAwal($sumber, $aktor, $verifikator, $pybmc);
+
+        Employee::query()->whereKey($sumber->kepala_bagian_id)->update(['status_aktif' => 'Pensiun']);
+
+        $hasil = $this->terapkan($unit, $sumber, $aktor);
+
+        $this->assertSame([$anggota->id], $hasil['applied_employee_ids']);
+
+        $langkahPertama = LeaveApprovalChain::query()
+            ->where('employee_id', $anggota->id)
+            ->where('is_active', true)
+            ->sole()
+            ->steps()
+            ->orderBy('step_order')
+            ->first();
+
+        $this->assertSame($anggota->kepala_bagian_id, $langkahPertama->approver_employee_id);
+    }
+
+    public function test_langkah_kepala_bagian_sumber_tanpa_approver_tidak_memblokir_penerapan(): void
+    {
+        $aktor = User::factory()->superAdmin()->create();
+        $unit = $this->unit('Bagian Keuangan');
+        $pybmc = Employee::factory()->create();
+        $verifikator = Employee::factory()->create();
+
+        $sumber = $this->pegawaiUnit($unit, 'Pegawai Sumber');
+        $anggota = $this->pegawaiUnit($unit, 'Anggota Unit');
+
+        $this->rantaiAwal($sumber, $aktor, $verifikator, $pybmc);
+
+        DB::table('leave_approval_chain_steps')
+            ->where('approver_employee_id', $sumber->kepala_bagian_id)
+            ->update(['approver_employee_id' => null]);
+
+        $hasil = $this->terapkan($unit, $sumber, $aktor);
+
+        $this->assertSame([$anggota->id], $hasil['applied_employee_ids']);
+    }
+
     public function test_langkah_kepala_bagian_memakai_atasan_pegawai_tujuan_bukan_atasan_sumber(): void
     {
         // Rantai hasil penyalinan wajib menunjuk kepala bagian pegawai tujuan supaya tidak melanggar

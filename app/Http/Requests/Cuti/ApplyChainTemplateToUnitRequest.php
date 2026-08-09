@@ -61,9 +61,15 @@ class ApplyChainTemplateToUnitRequest extends FormRequest
                 return;
             }
 
+            // Langkah kepala bagian selalu diisi ulang dengan atasan efektif pegawai tujuan, jadi
+            // approver lama pada langkah itu tidak pernah disalin dan tidak perlu diperiksa. Membatasi
+            // pemeriksaan ke langkah yang benar-benar disalin mencegah penolakan palsu ketika snapshot
+            // kepala bagian sumber sudah usang karena rotasi jabatan.
+            $langkahDisalin = $rantai->steps->reject(fn ($step): bool => $step->step_type === 'kepala_bagian');
+
             // Kunci asing approver memakai SET NULL, sehingga penghapusan permanen pegawai
             // meninggalkan langkah tanpa approver yang tidak dapat disalin ke kolom uuid.
-            $langkahTanpaApprover = $rantai->steps
+            $langkahTanpaApprover = $langkahDisalin
                 ->filter(fn ($step): bool => $step->approver_employee_id === null)
                 ->pluck('role_label');
 
@@ -84,7 +90,7 @@ class ApplyChainTemplateToUnitRequest extends FormRequest
             // supaya admin melihat galat yang menerangkan sebabnya, bukan galat server.
             $approverNonaktif = Employee::query()
                 ->withTrashed()
-                ->whereIn('id', $rantai->steps->pluck('approver_employee_id')->filter()->unique())
+                ->whereIn('id', $langkahDisalin->pluck('approver_employee_id')->filter()->unique())
                 ->where(fn ($query) => $query->where('status_aktif', '!=', 'Aktif')->orWhereNotNull('deleted_at'))
                 ->pluck('nama_lengkap');
 

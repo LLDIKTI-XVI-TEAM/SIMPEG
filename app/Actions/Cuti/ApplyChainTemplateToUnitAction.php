@@ -199,11 +199,18 @@ class ApplyChainTemplateToUnitAction
             throw new RuntimeException('Pegawai sumber belum memiliki rantai approval aktif untuk disalin.');
         }
 
+        // Approver pada langkah kepala bagian selalu diganti dengan atasan efektif pegawai tujuan,
+        // dan resolver melakukan substitusi yang sama saat pengajuan dibentuk. Id kepala bagian pada
+        // rantai sumber karena itu tidak pernah disalin, sehingga snapshot yang usang akibat rotasi
+        // jabatan tidak boleh membatalkan penerapan. Pemeriksaan di bawah hanya berlaku bagi langkah
+        // yang approvernya benar-benar diteruskan ke rantai tujuan.
+        $langkahDisalin = $rantai->steps->reject(fn ($step): bool => $step->step_type === 'kepala_bagian');
+
         // Kunci asing approver memakai SET NULL, jadi penghapusan permanen pegawai meninggalkan
         // langkah tanpa approver. Langkah seperti itu tidak dapat disalin karena kolom approver pada
         // rantai tujuan bertipe uuid, dan penyalinan tanpa penjaga ini gagal di tengah penyimpanan
         // sebagai galat basis data alih-alih menerangkan bahwa rantai sumbernya sudah rusak.
-        $langkahTanpaApprover = $rantai->steps
+        $langkahTanpaApprover = $langkahDisalin
             ->filter(fn ($step): bool => $step->approver_employee_id === null)
             ->pluck('role_label');
 
@@ -220,7 +227,7 @@ class ApplyChainTemplateToUnitAction
         // pengajuan seluruh unit ke pejabat yang sudah tidak menjabat. Seluruh aksi ditolak alih-alih
         // dilanjutkan sebagian supaya admin memperbaiki rantai sumber lebih dulu.
         $approverNonaktif = Employee::query()
-            ->whereIn('id', $rantai->steps->pluck('approver_employee_id')->filter()->unique())
+            ->whereIn('id', $langkahDisalin->pluck('approver_employee_id')->filter()->unique())
             ->where(fn ($query) => $query->where('status_aktif', '!=', 'Aktif')->orWhereNotNull('deleted_at'))
             ->withTrashed()
             ->pluck('nama_lengkap');
