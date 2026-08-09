@@ -70,12 +70,15 @@ class ApplyChainTemplateToUnitAction
         ?Request $request = null,
     ): array {
         $this->statusKepalaBagian = [];
-        $langkahSumber = $this->langkahSumber($sumber);
 
-        // Penerapan dan jejaknya disatukan dalam satu transaksi supaya konfigurasi persetujuan unit
-        // tidak pernah berpindah sebagian tanpa baris audit yang menerangkan cakupan perubahannya.
-        return DB::transaction(function () use ($unitKerja, $sumber, $actor, $reason, $request, $langkahSumber): array {
+        // Pembacaan dan validasi template dilakukan di dalam transaksi setelah lock unit diperoleh,
+        // supaya lock benar-benar menserialkan seluruh keputusan. Bila dibaca lebih dulu, dua
+        // penerapan bersamaan ke unit yang sama dapat memakai snapshot sumber usang sehingga hasilnya
+        // tidak setara dengan eksekusi berurutan.
+        return DB::transaction(function () use ($unitKerja, $sumber, $actor, $reason, $request): array {
             $this->lockUnit($unitKerja);
+
+            $langkahSumber = $this->langkahSumber($sumber);
 
             $hasil = [
                 'applied_employee_ids' => [],

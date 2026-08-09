@@ -600,6 +600,49 @@ class ApplyChainTemplateToUnitTest extends TestCase
         $this->assertSame($sebelum, $pengajuan->steps()->orderBy('step_order')->pluck('approver_employee_id')->all());
     }
 
+    public function test_template_sumber_dibaca_setelah_lock_unit_diperoleh(): void
+    {
+        // Advisory lock hanya menserialkan penerapan bila keputusan dibaca setelah lock diperoleh.
+        // Bila template sumber dibaca sebelum lock, dua penerapan bersamaan ke unit yang sama dapat
+        // memakai snapshot sumber usang sehingga hasilnya tidak setara dengan eksekusi berurutan.
+        $aktor = User::factory()->superAdmin()->create();
+        $unit = $this->unit('Bagian Keuangan');
+        $pybmc = Employee::factory()->create();
+        $verifikator = Employee::factory()->create();
+
+        $sumber = $this->pegawaiUnit($unit, 'Pegawai Sumber');
+        $this->pegawaiUnit($unit, 'Anggota Unit');
+        $this->rantaiAwal($sumber, $aktor, $verifikator, $pybmc);
+
+        $kueri = [];
+        DB::listen(function ($event) use (&$kueri): void {
+            $kueri[] = $event->sql;
+        });
+
+        $this->terapkan($unit, $sumber, $aktor);
+
+        $indeksLock = null;
+        $indeksBacaTemplate = null;
+
+        foreach ($kueri as $indeks => $sql) {
+            if ($indeksLock === null && str_contains($sql, 'pg_advisory_xact_lock')) {
+                $indeksLock = $indeks;
+            }
+
+            if ($indeksBacaTemplate === null && str_contains($sql, 'leave_approval_chain_steps') && str_starts_with(trim($sql), 'select')) {
+                $indeksBacaTemplate = $indeks;
+            }
+        }
+
+        $this->assertNotNull($indeksLock, 'Penerapan wajib mengambil advisory lock.');
+        $this->assertNotNull($indeksBacaTemplate, 'Penerapan wajib membaca langkah template sumber.');
+        $this->assertLessThan(
+            $indeksBacaTemplate,
+            $indeksLock,
+            'Template sumber harus dibaca setelah advisory lock diperoleh agar lock benar-benar menserialkan penerapan.',
+        );
+    }
+
     public function test_penerapan_mengambil_advisory_lock_per_unit(): void
     {
         // Dua penerapan massal yang berjalan bersamaan tidak boleh menghasilkan unit setengah tersalin.
