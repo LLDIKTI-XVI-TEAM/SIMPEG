@@ -53,14 +53,16 @@ class SaveImportMappingAction
             ]);
         }
 
-        // Validasi sebelumnya kedaluwarsa bila mapping benar-benar berubah,
-        // karena validated_data dibentuk berdasarkan interpretasi mapping lama.
-        if (($batch['mapping'] ?? []) !== $merged) {
+        $mappingChanged = ($batch['mapping'] ?? []) !== $merged;
+
+        // Hanya perubahan pilihan admin yang mengubah sumber mapping menjadi manual.
+        // UI tetap menyimpan mapping sebelum validasi meski dropdown tidak disentuh.
+        if ($mappingChanged) {
             $batch['validation'] = null;
+            $batch['mapping_source'] = 'manual';
         }
 
         $batch['mapping'] = $merged;
-        $batch['mapping_source'] = 'manual';
         $batch['warnings'] = ImportColumnMapping::warnings($merged);
         Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $batch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
 

@@ -669,6 +669,12 @@ class EmployeeImportTest extends TestCase
         $preview->assertJsonPath('rows.0.data.Status Kepegawaian', 'pegawai');
         $preview->assertJsonPath('rows.0.data.Tanggal Lahir', null);
 
+        // Browser selalu menyimpan mapping yang sedang tampil sebelum validasi.
+        // Mapping otomatis yang tidak diubah tidak boleh dianggap sebagai mapping manual.
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/mapping", [
+            'mapping' => $upload->json('mapping'),
+        ])->assertOk();
+
         $validation = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", []);
         $validation->assertOk();
         $validation->assertJsonPath('valid_count', 1);
