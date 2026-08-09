@@ -140,9 +140,12 @@ class ValidateImportBatchAction
     {
         // Key baris sumber dinormalkan ke header kanonis memakai mapping aktif batch;
         // kolom bertanda tidak dipakai dibuang sebelum mapper membaca nilai apa pun.
-        $data = ImportColumnMapping::apply($row['data'], $mapping);
+        $sourceData = $allowShiftDetection
+            ? app(EmployeeRowMapper::class)->alignShiftedOptionalIdentityColumns($row['data'])
+            : $row['data'];
+        $data = ImportColumnMapping::apply($sourceData, $mapping);
         $nama = $data['Nama Pegawai'] ?? '-';
-        $mappedData = app(EmployeeRowMapper::class)->map($data, $allowShiftDetection);
+        $mappedData = app(EmployeeRowMapper::class)->map($data, allowShiftDetection: false);
         $validator = Validator::make($mappedData, EmployeeValidationRules::import(), [], EmployeeValidationRules::attributes());
 
         if ($validator->fails()) {

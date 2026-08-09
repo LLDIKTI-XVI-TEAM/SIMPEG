@@ -328,6 +328,86 @@ class EmployeeImportTest extends TestCase
         ]);
     }
 
+    public function test_manual_mapping_imports_original_source_values_that_resemble_shifted_columns(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        $headers = [
+            'Nama Pegawai',
+            'Person',
+            'Email Pegawai',
+            'NIP',
+            'Status Kepegawaian',
+            'NIK',
+            'Tanggal Lahir',
+            'Jabatan',
+            'Golongan',
+            'Kelas Jabatan',
+            'Pangkat',
+            'Nomor Telepon',
+            'Prodi Pendidikan Terakhir',
+            'Pensiun',
+        ];
+        $sourceRow = [
+            'Rina Hartati, S.Kom.',
+            'Rina Hartati',
+            'rina.hartati@example.com',
+            '199101012016032001',
+            'PNS',
+            '081298761234',
+            '1991-01-01',
+            'Pranata Komputer',
+            'III/b',
+            '8',
+            'Penata Muda Tingkat I',
+            'S1',
+            'Teknik Informatika',
+            '2049-01-01',
+        ];
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFileWithHeaders($headers, [$sourceRow], 'manual_mapping.xlsx'),
+            'type' => 'utama',
+        ]);
+
+        $upload->assertOk();
+        $batchId = $upload->json('batch_id');
+
+        $this->getJson("/api/pegawai/import/{$batchId}/preview")
+            ->assertOk()
+            ->assertJsonPath('rows.0.data.NIK', '081298761234')
+            ->assertJsonPath('rows.0.data.Nomor Telepon', 'S1')
+            ->assertJsonPath('rows.0.data.Tanggal Lahir', '1991-01-01');
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/mapping", [
+            'mapping' => [
+                'NIK' => 'Nomor Telepon',
+                'Nomor Telepon' => 'Pendidikan Terakhir',
+            ],
+        ])->assertOk();
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])
+            ->assertOk()
+            ->assertJsonPath('valid_count', 1)
+            ->assertJsonPath('error_count', 0);
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", [])
+            ->assertOk()
+            ->assertJsonPath('status', 'queued');
+
+        $this->assertDatabaseHas('employees', [
+            'nip' => '199101012016032001',
+            'no_hp' => '081298761234',
+            'pendidikan_terakhir' => 'S1',
+        ]);
+        $this->assertSame(
+            '1991-01-01',
+            Employee::where('nip', '199101012016032001')->firstOrFail()->tanggal_lahir->format('Y-m-d'),
+        );
+    }
+
     public function test_upload_memperingatkan_kolom_role_sebagai_kolom_ekstra(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -581,15 +661,13 @@ class EmployeeImportTest extends TestCase
 
         $preview = $this->getJson("/api/pegawai/import/{$batchId}/preview");
         $preview->assertOk();
-        $preview->assertJsonPath('rows.0.data.NIK', null);
-        $preview->assertJsonPath('rows.0.data.No KK', null);
-        $preview->assertJsonPath('rows.0.data.Nomor Telepon', '081234567890');
-        $preview->assertJsonPath('rows.0.data.Pangkat', 'Penata Muda');
-        $preview->assertJsonPath('rows.0.data.Pendidikan Terakhir', 'S1');
-        $preview->assertJsonPath('rows.0.data.Pensiun', '2038-01-01');
-        $preview->assertJsonPath('rows.0.data.Prodi Pendidikan Terakhir', 'Manajemen');
-        $preview->assertJsonPath('rows.0.data.Status Kepegawaian', 'PNS');
-        $preview->assertJsonPath('rows.0.data.Tanggal Lahir', '1980-01-01');
+        // Preview mempertahankan nilai sumber; heuristik legacy baru diterapkan saat
+        // validasi dengan mapping otomatis, bukan saat batch raw dibentuk.
+        $preview->assertJsonPath('rows.0.data.NIK', '081234567890');
+        $preview->assertJsonPath('rows.0.data.No KK', 'Penata Muda');
+        $preview->assertJsonPath('rows.0.data.Nomor Telepon', 'S1');
+        $preview->assertJsonPath('rows.0.data.Status Kepegawaian', 'pegawai');
+        $preview->assertJsonPath('rows.0.data.Tanggal Lahir', null);
 
         $validation = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", []);
         $validation->assertOk();

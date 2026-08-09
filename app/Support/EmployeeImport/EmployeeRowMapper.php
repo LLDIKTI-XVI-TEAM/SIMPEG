@@ -135,29 +135,8 @@ class EmployeeRowMapper
      */
     public function map(array $row, bool $allowShiftDetection = true): array
     {
-        // ── Auto-Alignment for Shifted Columns ───────────────────────────────
-        // Detect if columns are shifted due to missing NIK and No KK values.
-        // If NIK (col 8) is a phone number (starts with 08 or is 9-14 digits)
-        // AND Nomor Telepon (col 10) contains education (e.g. S1, S2, D3, etc.),
-        // the row has shifted left.
-        $nikVal = isset($row['NIK']) ? trim((string) $row['NIK']) : '';
-        $phoneVal = isset($row['Nomor Telepon']) ? trim((string) $row['Nomor Telepon']) : '';
-
-        $isNikAPhone = preg_match('/^(08|\+?62)\d+$/', $nikVal) || (is_numeric($nikVal) && strlen($nikVal) >= 9 && strlen($nikVal) <= 14);
-        $isPhoneEducation = in_array(strtoupper($phoneVal), ['SD', 'SMP', 'SMA', 'SMK', 'D1', 'D2', 'D3', 'D4', 'S1', 'S2', 'S3'], true);
-
-        if ($allowShiftDetection && $isNikAPhone && $isPhoneEducation) {
-            $row['Tanggal Lahir'] = $row['Prodi Pendidikan Terakhir'] ?? null;
-            $row['Status Kepegawaian'] = $row['Person Formula'] ?? null;
-            $row['Prodi Pendidikan Terakhir'] = $row['Person'] ?? null;
-            $row['Person Formula'] = $row['Pensiun'] ?? null;
-            $row['Person'] = $row['Pendidikan Terakhir'] ?? null;
-            $row['Pensiun'] = $row['Pangkat'] ?? null;
-            $row['Pangkat'] = $row['No KK'] ?? null;
-            $row['Pendidikan Terakhir'] = $row['Nomor Telepon'] ?? null;
-            $row['Nomor Telepon'] = $row['NIK'] ?? null;
-            $row['NIK'] = null;
-            $row['No KK'] = null;
+        if ($allowShiftDetection) {
+            $row = $this->alignShiftedOptionalIdentityColumns($row);
         }
 
         $mapped = [];
@@ -171,7 +150,7 @@ class EmployeeRowMapper
                 $value = (string) $value;
             }
 
-            // Normalize scientific notation for NIP, NIK, and KK (long numerical values)
+            // Notasi ilmiah dari spreadsheet dinormalkan agar identitas numerik tetap utuh.
             if (in_array($field, ['nip', 'nik', 'no_kk'], true) && $value !== null) {
                 if (preg_match('/^[0-9]+(\.[0-9]+)?[eE]\+?[0-9]+$/', $value)) {
                     $value = number_format((float) $value, 0, '', '');
@@ -190,6 +169,37 @@ class EmployeeRowMapper
         }
 
         return $mapped;
+    }
+
+    /**
+     * Menyelaraskan baris template lama yang kehilangan slot kosong NIK dan No KK.
+     * Pemanggil wajib menonaktifkannya setelah admin menyimpan mapping manual.
+     */
+    public function alignShiftedOptionalIdentityColumns(array $row): array
+    {
+        $nikVal = isset($row['NIK']) ? trim((string) $row['NIK']) : '';
+        $phoneVal = isset($row['Nomor Telepon']) ? trim((string) $row['Nomor Telepon']) : '';
+
+        $isNikAPhone = preg_match('/^(08|\+?62)\d+$/', $nikVal) || (is_numeric($nikVal) && strlen($nikVal) >= 9 && strlen($nikVal) <= 14);
+        $isPhoneEducation = in_array(strtoupper($phoneVal), ['SD', 'SMP', 'SMA', 'SMK', 'D1', 'D2', 'D3', 'D4', 'S1', 'S2', 'S3'], true);
+
+        if (! $isNikAPhone || ! $isPhoneEducation) {
+            return $row;
+        }
+
+        $row['Tanggal Lahir'] = $row['Prodi Pendidikan Terakhir'] ?? null;
+        $row['Status Kepegawaian'] = $row['Person Formula'] ?? null;
+        $row['Prodi Pendidikan Terakhir'] = $row['Person'] ?? null;
+        $row['Person Formula'] = $row['Pensiun'] ?? null;
+        $row['Person'] = $row['Pendidikan Terakhir'] ?? null;
+        $row['Pensiun'] = $row['Pangkat'] ?? null;
+        $row['Pangkat'] = $row['No KK'] ?? null;
+        $row['Pendidikan Terakhir'] = $row['Nomor Telepon'] ?? null;
+        $row['Nomor Telepon'] = $row['NIK'] ?? null;
+        $row['NIK'] = null;
+        $row['No KK'] = null;
+
+        return $row;
     }
 
     public function isEmptyRow(array $row): bool

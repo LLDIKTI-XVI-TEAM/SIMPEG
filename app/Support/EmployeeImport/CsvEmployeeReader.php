@@ -191,40 +191,11 @@ class CsvEmployeeReader
             }
         }
 
-        $combined = $this->alignShiftedOptionalIdentityColumns($combined);
-
-        return $combined;
-    }
-
-    private function alignShiftedOptionalIdentityColumns(array $row): array
-    {
-        $nik = isset($row['NIK']) ? trim((string) $row['NIK']) : '';
-        $phone = isset($row['Nomor Telepon']) ? trim((string) $row['Nomor Telepon']) : '';
-
-        $nikLooksLikePhone = preg_match('/^(08|\+?62)\d+$/', $nik)
-            || (is_numeric($nik) && strlen($nik) >= 9 && strlen($nik) <= 14);
-        $phoneLooksLikeEducation = in_array(strtoupper($phone), ['SD', 'SMP', 'SMA', 'SMK', 'D1', 'D2', 'D3', 'D4', 'S1', 'S2', 'S3'], true);
-
-        if (! $nikLooksLikePhone || ! $phoneLooksLikeEducation) {
-            return $row;
+        if ($keepNoColumn) {
+            $combined = $this->mapper->alignShiftedOptionalIdentityColumns($combined);
         }
 
-        // Pada baris yang tergeser (NIK & No KK kosong), slot Status Kepegawaian berisi
-        // sisa kolom Role dari layout lama. Import tidak lagi membaca Role (penetapan role
-        // berjalan lewat Kelola Akses User), jadi slot tersebut cukup ditimpa rantai di bawah.
-        $row['Tanggal Lahir'] = $row['Prodi Pendidikan Terakhir'] ?? null;
-        $row['Status Kepegawaian'] = $row['Person Formula'] ?? null;
-        $row['Prodi Pendidikan Terakhir'] = $row['Person'] ?? null;
-        $row['Person Formula'] = $row['Pensiun'] ?? null;
-        $row['Person'] = $row['Pendidikan Terakhir'] ?? null;
-        $row['Pensiun'] = $row['Pangkat'] ?? null;
-        $row['Pangkat'] = $row['No KK'] ?? null;
-        $row['Pendidikan Terakhir'] = $row['Nomor Telepon'] ?? null;
-        $row['Nomor Telepon'] = $row['NIK'] ?? null;
-        $row['NIK'] = null;
-        $row['No KK'] = null;
-
-        return $row;
+        return $combined;
     }
 
     private function isSpreadsheet(UploadedFile $file): bool
