@@ -61,6 +61,24 @@ class ApplyChainTemplateToUnitRequest extends FormRequest
                 return;
             }
 
+            // Kunci asing approver memakai SET NULL, sehingga penghapusan permanen pegawai
+            // meninggalkan langkah tanpa approver yang tidak dapat disalin ke kolom uuid.
+            $langkahTanpaApprover = $rantai->steps
+                ->filter(fn ($step): bool => $step->approver_employee_id === null)
+                ->pluck('role_label');
+
+            if ($langkahTanpaApprover->isNotEmpty()) {
+                $validator->errors()->add(
+                    'source_employee_id',
+                    sprintf(
+                        'Chain pegawai sumber memuat langkah tanpa approver: %s. Perbaiki chain tersebut lebih dahulu.',
+                        $langkahTanpaApprover->implode(', '),
+                    ),
+                );
+
+                return;
+            }
+
             // Approver pada rantai sumber bisa sudah pensiun atau keluar sejak rantai dibuat. Form
             // per pegawai hanya menerima approver aktif, jadi template kedaluwarsa ditolak di sini
             // supaya admin melihat galat yang menerangkan sebabnya, bukan galat server.

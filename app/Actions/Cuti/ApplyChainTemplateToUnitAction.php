@@ -199,6 +199,21 @@ class ApplyChainTemplateToUnitAction
             throw new RuntimeException('Pegawai sumber belum memiliki rantai approval aktif untuk disalin.');
         }
 
+        // Kunci asing approver memakai SET NULL, jadi penghapusan permanen pegawai meninggalkan
+        // langkah tanpa approver. Langkah seperti itu tidak dapat disalin karena kolom approver pada
+        // rantai tujuan bertipe uuid, dan penyalinan tanpa penjaga ini gagal di tengah penyimpanan
+        // sebagai galat basis data alih-alih menerangkan bahwa rantai sumbernya sudah rusak.
+        $langkahTanpaApprover = $rantai->steps
+            ->filter(fn ($step): bool => $step->approver_employee_id === null)
+            ->pluck('role_label');
+
+        if ($langkahTanpaApprover->isNotEmpty()) {
+            throw new RuntimeException(sprintf(
+                'Chain pegawai sumber memuat langkah tanpa approver: %s. Perbaiki chain sumber sebelum diterapkan ke unit.',
+                $langkahTanpaApprover->implode(', '),
+            ));
+        }
+
         // Rantai sumber bisa menua: approver yang aktif saat rantai dibuat mungkin sudah pensiun atau
         // keluar. Form konfigurasi per pegawai hanya menerima approver aktif dan resolver pengajuan
         // tidak memeriksa status approver, jadi penyalinan tanpa pemeriksaan ini akan mengarahkan

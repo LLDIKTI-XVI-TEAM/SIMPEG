@@ -189,6 +189,62 @@ class ApplyChainTemplateToUnitTest extends TestCase
             ->assertSessionHasErrors('source_employee_id');
     }
 
+    public function test_penerapan_ditolak_bila_langkah_template_kehilangan_approver(): void
+    {
+        // Kunci asing approver memakai SET NULL, jadi penghapusan permanen pegawai meninggalkan
+        // langkah tanpa approver. Langkah seperti itu tidak dapat disalin dan harus menghentikan
+        // penerapan dengan galat yang terbaca, bukan galat kolom uuid di tengah penyimpanan.
+        $aktor = User::factory()->superAdmin()->create();
+        $unit = $this->unit('Bagian Keuangan');
+        $pybmc = Employee::factory()->create();
+        $verifikator = Employee::factory()->create();
+
+        $sumber = $this->pegawaiUnit($unit, 'Pegawai Sumber');
+        $anggota = $this->pegawaiUnit($unit, 'Anggota Unit');
+
+        $this->rantaiAwal($sumber, $aktor, $verifikator, $pybmc);
+
+        DB::table('leave_approval_chain_steps')
+            ->where('approver_employee_id', $verifikator->id)
+            ->update(['approver_employee_id' => null]);
+
+        try {
+            $this->terapkan($unit, $sumber, $aktor);
+            $this->fail('Penerapan seharusnya ditolak karena ada langkah tanpa approver.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('approver', $exception->getMessage());
+        }
+
+        $this->assertDatabaseMissing('leave_approval_chains', ['employee_id' => $anggota->id]);
+    }
+
+    public function test_endpoint_menolak_template_yang_kehilangan_approver(): void
+    {
+        $aktor = User::factory()->superAdmin()->create();
+        $unit = $this->unit('Bagian Keuangan');
+        $pybmc = Employee::factory()->create();
+        $verifikator = Employee::factory()->create();
+
+        $sumber = $this->pegawaiUnit($unit, 'Pegawai Sumber');
+        $anggota = $this->pegawaiUnit($unit, 'Anggota Unit');
+
+        $this->rantaiAwal($sumber, $aktor, $verifikator, $pybmc);
+
+        DB::table('leave_approval_chain_steps')
+            ->where('approver_employee_id', $pybmc->id)
+            ->update(['approver_employee_id' => null]);
+
+        $this->actingAs($aktor)
+            ->post(route('cuti.config.unit-template.apply'), [
+                'unit_kerja_id' => $unit->id,
+                'source_employee_id' => $sumber->id,
+                'template_reason' => 'Menyeragamkan chain unit keuangan.',
+            ])
+            ->assertSessionHasErrors('source_employee_id');
+
+        $this->assertDatabaseMissing('leave_approval_chains', ['employee_id' => $anggota->id]);
+    }
+
     public function test_langkah_kepala_bagian_memakai_atasan_pegawai_tujuan_bukan_atasan_sumber(): void
     {
         // Rantai hasil penyalinan wajib menunjuk kepala bagian pegawai tujuan supaya tidak melanggar
