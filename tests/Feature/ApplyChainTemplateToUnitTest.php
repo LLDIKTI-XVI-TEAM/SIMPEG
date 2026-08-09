@@ -189,6 +189,72 @@ class ApplyChainTemplateToUnitTest extends TestCase
             ->assertSessionHasErrors('source_employee_id');
     }
 
+    public function test_penerapan_ditolak_bila_template_sumber_tanpa_kepala_bagian(): void
+    {
+        // Rantai yang dibuat lewat jalur non-form dapat kehilangan langkah Kepala Bagian karena
+        // SaveEmployeeApprovalChainAction hanya memvalidasi approver final. Penyalinan tidak dapat
+        // menyisipkan slot yang tidak ada, dan rantai hasil salinan akan ditolak resolver saat
+        // pengajuan sehingga seluruh anggota unit tidak dapat mengajukan cuti. Penerapan harus
+        // dibatalkan sebelum satu pun chain lama dinonaktifkan.
+        $aktor = User::factory()->superAdmin()->create();
+        $unit = $this->unit('Bagian Keuangan');
+        $verifikator = Employee::factory()->create();
+        $pybmc = Employee::factory()->create();
+
+        $sumber = $this->pegawaiUnit($unit, 'Pegawai Sumber');
+        $anggota = $this->pegawaiUnit($unit, 'Anggota Unit');
+        $this->rantaiAwal($anggota, $aktor, $verifikator, $pybmc);
+
+        $this->actingAs($aktor)->app->make(SaveEmployeeApprovalChainAction::class)->execute($sumber, [
+            ['step_type' => 'verifier', 'role_label' => 'Verifikator Kepegawaian', 'approver_employee_id' => $verifikator->id, 'is_final' => false],
+            ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $pybmc->id, 'is_final' => true],
+        ], $aktor, 'Rantai sumber tanpa kepala bagian.');
+
+        $chainAnggotaSebelum = LeaveApprovalChain::query()
+            ->where('employee_id', $anggota->id)
+            ->where('is_active', true)
+            ->sole()
+            ->id;
+
+        try {
+            $this->terapkan($unit, $sumber, $aktor);
+            $this->fail('Penerapan seharusnya ditolak karena template sumber tidak memiliki Kepala Bagian.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('Kepala Bagian', $exception->getMessage());
+        }
+
+        // Chain lama anggota wajib tetap aktif; penerapan yang gagal tidak boleh menonaktifkannya.
+        $this->assertDatabaseHas('leave_approval_chains', [
+            'id' => $chainAnggotaSebelum,
+            'is_active' => true,
+        ]);
+    }
+
+    public function test_endpoint_menolak_template_sumber_tanpa_kepala_bagian(): void
+    {
+        $aktor = User::factory()->superAdmin()->create();
+        $unit = $this->unit('Bagian Keuangan');
+        $verifikator = Employee::factory()->create();
+        $pybmc = Employee::factory()->create();
+
+        $sumber = $this->pegawaiUnit($unit, 'Pegawai Sumber');
+        $anggota = $this->pegawaiUnit($unit, 'Anggota Unit');
+        $this->rantaiAwal($anggota, $aktor, $verifikator, $pybmc);
+
+        $this->actingAs($aktor)->app->make(SaveEmployeeApprovalChainAction::class)->execute($sumber, [
+            ['step_type' => 'verifier', 'role_label' => 'Verifikator Kepegawaian', 'approver_employee_id' => $verifikator->id, 'is_final' => false],
+            ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $pybmc->id, 'is_final' => true],
+        ], $aktor, 'Rantai sumber tanpa kepala bagian.');
+
+        $this->actingAs($aktor)
+            ->post(route('cuti.config.unit-template.apply'), [
+                'unit_kerja_id' => $unit->id,
+                'source_employee_id' => $sumber->id,
+                'template_reason' => 'Menyeragamkan chain unit keuangan.',
+            ])
+            ->assertSessionHasErrors('source_employee_id');
+    }
+
     public function test_penerapan_ditolak_bila_langkah_template_kehilangan_approver(): void
     {
         // Kunci asing approver memakai SET NULL, jadi penghapusan permanen pegawai meninggalkan

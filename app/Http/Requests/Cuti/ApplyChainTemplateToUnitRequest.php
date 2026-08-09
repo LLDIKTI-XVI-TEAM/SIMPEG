@@ -61,6 +61,18 @@ class ApplyChainTemplateToUnitRequest extends FormRequest
                 return;
             }
 
+            // Resolver menolak pengajuan pada rantai tanpa langkah Kepala Bagian, dan penyalinan tidak
+            // dapat menyisipkannya. Rantai sumber seperti itu ditolak agar salinan rusak tidak
+            // menonaktifkan chain sah seluruh anggota unit.
+            if ($rantai->steps->doesntContain(fn ($step): bool => $step->step_type === 'kepala_bagian')) {
+                $validator->errors()->add(
+                    'source_employee_id',
+                    'Chain pegawai sumber tidak memiliki langkah Kepala Bagian. Perbaiki chain tersebut lebih dahulu.',
+                );
+
+                return;
+            }
+
             // Langkah kepala bagian selalu diisi ulang dengan atasan efektif pegawai tujuan, jadi
             // approver lama pada langkah itu tidak pernah disalin dan tidak perlu diperiksa. Membatasi
             // pemeriksaan ke langkah yang benar-benar disalin mencegah penolakan palsu ketika snapshot

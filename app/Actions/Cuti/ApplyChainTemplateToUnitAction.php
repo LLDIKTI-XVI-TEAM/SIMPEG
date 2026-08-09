@@ -202,6 +202,14 @@ class ApplyChainTemplateToUnitAction
             throw new RuntimeException('Pegawai sumber belum memiliki rantai approval aktif untuk disalin.');
         }
 
+        // Rantai wajib memiliki langkah Kepala Bagian karena resolver menolak pengajuan tanpa slot
+        // itu. Penyalinan tidak dapat menyisipkan langkah yang tidak ada pada sumber, jadi rantai
+        // sumber yang kehilangan Kepala Bagian akan menghasilkan salinan rusak yang membuat seluruh
+        // anggota unit tidak dapat mengajukan cuti. Ditolak sebelum satu pun chain lama dinonaktifkan.
+        if ($rantai->steps->doesntContain(fn ($step): bool => $step->step_type === 'kepala_bagian')) {
+            throw new RuntimeException('Chain pegawai sumber tidak memiliki langkah Kepala Bagian. Perbaiki chain sumber sebelum diterapkan ke unit.');
+        }
+
         // Approver pada langkah kepala bagian selalu diganti dengan atasan efektif pegawai tujuan,
         // dan resolver melakukan substitusi yang sama saat pengajuan dibentuk. Id kepala bagian pada
         // rantai sumber karena itu tidak pernah disalin, sehingga snapshot yang usang akibat rotasi
