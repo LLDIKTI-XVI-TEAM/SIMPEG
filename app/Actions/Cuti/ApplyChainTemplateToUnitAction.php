@@ -174,6 +174,24 @@ class ApplyChainTemplateToUnitAction
             throw new RuntimeException('Pegawai sumber belum memiliki rantai approval aktif untuk disalin.');
         }
 
+        // Rantai sumber bisa menua: approver yang aktif saat rantai dibuat mungkin sudah pensiun atau
+        // keluar. Form konfigurasi per pegawai hanya menerima approver aktif dan resolver pengajuan
+        // tidak memeriksa status approver, jadi penyalinan tanpa pemeriksaan ini akan mengarahkan
+        // pengajuan seluruh unit ke pejabat yang sudah tidak menjabat. Seluruh aksi ditolak alih-alih
+        // dilanjutkan sebagian supaya admin memperbaiki rantai sumber lebih dulu.
+        $approverNonaktif = Employee::query()
+            ->whereIn('id', $rantai->steps->pluck('approver_employee_id')->filter()->unique())
+            ->where(fn ($query) => $query->where('status_aktif', '!=', 'Aktif')->orWhereNotNull('deleted_at'))
+            ->withTrashed()
+            ->pluck('nama_lengkap');
+
+        if ($approverNonaktif->isNotEmpty()) {
+            throw new RuntimeException(sprintf(
+                'Chain pegawai sumber memuat approver nonaktif: %s. Perbarui chain sumber sebelum diterapkan ke unit.',
+                $approverNonaktif->implode(', '),
+            ));
+        }
+
         return $rantai->steps
             ->map(fn ($step): array => [
                 'step_type' => (string) $step->step_type,
@@ -231,6 +249,10 @@ class ApplyChainTemplateToUnitAction
      * Anggota unit ditentukan dari riwayat jabatan yang ditandai terkini, sumber yang sama dengan
      * yang dipakai halaman daftar pegawai, supaya unit di layar dan unit yang dipakai aksi sama.
      *
+     * Kueri sengaja tidak diurutkan. Pemrosesan memakai chunkById yang memaginasi dengan kondisi id
+     * lebih besar dari id terakhir, sehingga urutan lain seperti nama akan membuat sebagian pegawai
+     * terlewat atau diproses dua kali begitu unit melewati satu chunk.
+     *
      * @return Builder<Employee>
      */
     private function anggotaUnit(RefUnitKerja $unitKerja)
@@ -238,8 +260,7 @@ class ApplyChainTemplateToUnitAction
         return Employee::query()
             ->whereHas('positionHistories', fn ($query) => $query
                 ->where('is_latest', true)
-                ->where('unit_kerja_id', $unitKerja->id))
-            ->orderBy('nama_lengkap');
+                ->where('unit_kerja_id', $unitKerja->id));
     }
 
     /**

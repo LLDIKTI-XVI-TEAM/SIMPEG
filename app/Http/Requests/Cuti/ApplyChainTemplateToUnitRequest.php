@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Cuti;
 
+use App\Models\Employee;
 use App\Models\LeaveApprovalChain;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -42,15 +43,37 @@ class ApplyChainTemplateToUnitRequest extends FormRequest
 
             // Tanpa rantai aktif pada pegawai sumber tidak ada yang dapat disalin, dan kesalahan ini
             // harus terbaca sebagai galat validasi alih-alih kegagalan di tengah penerapan.
-            $punyaRantaiAktif = LeaveApprovalChain::query()
+            $rantai = LeaveApprovalChain::query()
+                ->with('steps')
                 ->where('employee_id', $sumber)
                 ->where('is_active', true)
-                ->exists();
+                ->first();
 
-            if (! $punyaRantaiAktif) {
+            if ($rantai === null) {
                 $validator->errors()->add(
                     'source_employee_id',
                     'Pegawai sumber belum memiliki chain approval aktif untuk disalin.',
+                );
+
+                return;
+            }
+
+            // Approver pada rantai sumber bisa sudah pensiun atau keluar sejak rantai dibuat. Form
+            // per pegawai hanya menerima approver aktif, jadi template kedaluwarsa ditolak di sini
+            // supaya admin melihat galat yang menerangkan sebabnya, bukan galat server.
+            $approverNonaktif = Employee::query()
+                ->withTrashed()
+                ->whereIn('id', $rantai->steps->pluck('approver_employee_id')->filter()->unique())
+                ->where(fn ($query) => $query->where('status_aktif', '!=', 'Aktif')->orWhereNotNull('deleted_at'))
+                ->pluck('nama_lengkap');
+
+            if ($approverNonaktif->isNotEmpty()) {
+                $validator->errors()->add(
+                    'source_employee_id',
+                    sprintf(
+                        'Chain pegawai sumber memuat approver nonaktif: %s. Perbarui chain tersebut lebih dahulu.',
+                        $approverNonaktif->implode(', '),
+                    ),
                 );
             }
         });

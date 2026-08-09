@@ -18,6 +18,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 use Tests\TestCase;
 
 /**
@@ -67,6 +68,85 @@ class ApplyChainTemplateToUnitTest extends TestCase
         $this->assertSame(['kepala_bagian', 'verifier', 'pybmc'], $langkah->pluck('step_type')->all());
         $this->assertSame($verifikator->id, $langkah[1]->approver_employee_id);
         $this->assertSame($pybmc->id, $langkah[2]->approver_employee_id);
+    }
+
+    public function test_unit_lebih_dari_satu_chunk_diproses_seluruhnya(): void
+    {
+        // chunkById memaginasi dengan kondisi id lebih besar dari id terakhir, sehingga urutan lain
+        // pada kueri akan membuat sebagian pegawai terlewat begitu unit melewati satu chunk.
+        $aktor = User::factory()->superAdmin()->create();
+        $unit = $this->unit('Bagian Keuangan');
+        $pybmc = Employee::factory()->create();
+        $verifikator = Employee::factory()->create();
+
+        $sumber = $this->pegawaiUnit($unit, 'Pegawai Sumber');
+
+        $jumlahAnggota = 150;
+
+        for ($i = 1; $i <= $jumlahAnggota; $i++) {
+            $this->pegawaiUnit($unit, sprintf('Anggota %03d', $i));
+        }
+
+        $this->rantaiAwal($sumber, $aktor, $verifikator, $pybmc);
+
+        $hasil = $this->terapkan($unit, $sumber, $aktor);
+
+        $this->assertCount($jumlahAnggota, $hasil['applied_employee_ids']);
+        $this->assertSame(
+            $jumlahAnggota,
+            LeaveApprovalChain::query()->where('is_active', true)->where('employee_id', '!=', $sumber->id)->count(),
+        );
+    }
+
+    public function test_penerapan_ditolak_bila_approver_template_sudah_nonaktif(): void
+    {
+        // Form konfigurasi per pegawai hanya menerima approver aktif, jadi penyalinan massal tidak
+        // boleh menyebarkan approver nonaktif ke seluruh unit lewat template yang sudah kedaluwarsa.
+        $aktor = User::factory()->superAdmin()->create();
+        $unit = $this->unit('Bagian Keuangan');
+        $pybmc = Employee::factory()->create();
+        $verifikator = Employee::factory()->create();
+
+        $sumber = $this->pegawaiUnit($unit, 'Pegawai Sumber');
+        $anggota = $this->pegawaiUnit($unit, 'Anggota Unit');
+
+        $this->rantaiAwal($sumber, $aktor, $verifikator, $pybmc);
+
+        $verifikator->update(['status_aktif' => 'Pensiun']);
+
+        try {
+            $this->terapkan($unit, $sumber, $aktor);
+            $this->fail('Penerapan seharusnya ditolak karena approver template sudah nonaktif.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('nonaktif', $exception->getMessage());
+        }
+
+        $this->assertDatabaseMissing('leave_approval_chains', ['employee_id' => $anggota->id]);
+    }
+
+    public function test_endpoint_menolak_template_dengan_approver_nonaktif_sebagai_galat_validasi(): void
+    {
+        $aktor = User::factory()->superAdmin()->create();
+        $unit = $this->unit('Bagian Keuangan');
+        $pybmc = Employee::factory()->create();
+        $verifikator = Employee::factory()->create();
+
+        $sumber = $this->pegawaiUnit($unit, 'Pegawai Sumber');
+        $anggota = $this->pegawaiUnit($unit, 'Anggota Unit');
+
+        $this->rantaiAwal($sumber, $aktor, $verifikator, $pybmc);
+
+        $pybmc->update(['status_aktif' => 'Pensiun']);
+
+        $this->actingAs($aktor)
+            ->post(route('cuti.config.unit-template.apply'), [
+                'unit_kerja_id' => $unit->id,
+                'source_employee_id' => $sumber->id,
+                'template_reason' => 'Menyeragamkan chain unit keuangan.',
+            ])
+            ->assertSessionHasErrors('source_employee_id');
+
+        $this->assertDatabaseMissing('leave_approval_chains', ['employee_id' => $anggota->id]);
     }
 
     public function test_langkah_kepala_bagian_memakai_atasan_pegawai_tujuan_bukan_atasan_sumber(): void
