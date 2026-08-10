@@ -132,12 +132,20 @@ class EmployeeValidationRules
      *                       Diisi nullable agar file yang tidak memiliki kolom Person
      *                       tetap dapat di-import tanpa error.
      */
-    public static function import(): array
+    public static function import(bool $allowExistingNip = false): array
     {
+        $nipRules = ['required', 'string', 'size:18'];
+
+        // Wizard import menandai NIP yang telah tersimpan sebagai SKIP, sedangkan
+        // endpoint kompatibilitas tetap bersifat all-or-nothing seperti sebelumnya.
+        if (! $allowExistingNip) {
+            $nipRules[] = 'unique:employees,nip';
+        }
+
         return [
             'nama_dengan_gelar' => ['required', 'string', 'max:255'],
             'nama_lengkap' => ['nullable', 'string', 'max:255'],
-            'nip' => ['required', 'string', 'size:18', 'unique:employees,nip'],
+            'nip' => $nipRules,
             'email_pribadi' => ['required', 'email', 'max:255', 'unique:employees,email_pribadi'],
             'email' => ['nullable', 'email', 'max:255', 'unique:employees,email'],
             'tanggal_lahir' => ['nullable', 'date', 'before:today'],

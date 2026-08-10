@@ -87,7 +87,12 @@ class ValidateImportBatchAction
         $data = $row['data'];
         $nama = $data['Nama Pegawai'] ?? ($data['nama_dengan_gelar'] ?? '-');
         $mappedData = app(EmployeeRowMapper::class)->map($data);
-        $validator = Validator::make($mappedData, EmployeeValidationRules::import(), [], EmployeeValidationRules::attributes());
+        $validator = Validator::make(
+            $mappedData,
+            EmployeeValidationRules::import(allowExistingNip: true),
+            [],
+            EmployeeValidationRules::attributes(),
+        );
 
         if ($validator->fails()) {
             return $this->rowError($row, $nama, $this->mapErrors($validator->errors()->toArray(), [
@@ -129,15 +134,6 @@ class ValidateImportBatchAction
             'email_pribadi' => 'Email Pegawai',
         ]);
 
-        if ($skipErrors !== []) {
-            return [
-                'row' => $row['row'],
-                'nama' => $nama,
-                'status' => 'skip',
-                'errors' => $skipErrors,
-            ];
-        }
-
         $allErrors = array_merge_recursive(
             $this->mapErrors($referenceErrors, ['jenis_pegawai' => 'Status Kepegawaian']),
             $databaseErrors,
@@ -146,6 +142,15 @@ class ValidateImportBatchAction
 
         if ($allErrors !== []) {
             return $this->rowError($row, $nama, $allErrors);
+        }
+
+        if ($skipErrors !== []) {
+            return [
+                'row' => $row['row'],
+                'nama' => $nama,
+                'status' => 'skip',
+                'errors' => $skipErrors,
+            ];
         }
 
         return $this->rowValid($row, $nama, $validated);

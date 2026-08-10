@@ -231,6 +231,89 @@ class EmployeeImportTest extends TestCase
             ->assertSeeText('8');
     }
 
+    public function test_import_wizard_skips_nip_already_registered_in_database(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        Employee::factory()->create(['nip' => '198001012006041001']);
+
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($this->validRows()),
+        ]);
+
+        $upload->assertOk();
+        $batchId = $upload->json('batch_id');
+
+        $validation = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", []);
+
+        $validation->assertOk();
+        $validation->assertJsonPath('valid_count', 1);
+        $validation->assertJsonPath('skip_count', 1);
+        $validation->assertJsonPath('error_count', 0);
+        $validation->assertJsonPath('results.0.status', 'skip');
+        $validation->assertJsonPath('results.0.errors.NIP.0', 'NIP sudah terdaftar di database.');
+        $validation->assertJsonPath('results.1.status', 'valid');
+    }
+
+    public function test_import_wizard_rejects_duplicate_nip_within_file_even_when_registered(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        Employee::factory()->create(['nip' => '198001012006041001']);
+        $rows = $this->validRows();
+        $rows[1][5] = '198001012006041001';
+
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($rows),
+        ]);
+
+        $upload->assertOk();
+        $batchId = $upload->json('batch_id');
+
+        $validation = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", []);
+
+        $validation->assertOk();
+        $validation->assertJsonPath('valid_count', 0);
+        $validation->assertJsonPath('skip_count', 1);
+        $validation->assertJsonPath('error_count', 1);
+        $validation->assertJsonPath('results.0.status', 'skip');
+        $validation->assertJsonPath('results.1.status', 'error');
+        $validation->assertJsonPath('results.1.errors.NIP.0', 'NIP sudah ada pada baris 2.');
+    }
+
+    public function test_import_wizard_skips_nip_registered_after_validation(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile([$this->validRows()[0]]),
+        ]);
+
+        $upload->assertOk();
+        $batchId = $upload->json('batch_id');
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])
+            ->assertOk()
+            ->assertJsonPath('valid_count', 1);
+
+        Employee::factory()->create(['nip' => '198001012006041001']);
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", [])
+            ->assertOk()
+            ->assertJsonPath('status', 'queued');
+
+        $this->getJson("/api/pegawai/import/{$batchId}/status")
+            ->assertOk()
+            ->assertJsonPath('status', 'completed')
+            ->assertJsonPath('result.inserted', 0)
+            ->assertJsonPath('result.skipped', 1)
+            ->assertJsonPath('result.failed', 0);
+    }
+
     public function test_import_wizard_persists_data_utama_snapshots_without_histories_or_tmt_calculation(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
