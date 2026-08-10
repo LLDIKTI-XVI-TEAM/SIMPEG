@@ -265,23 +265,23 @@ return new class extends Migration
      */
     private function rollbackUnitKerjaHierarchySqlite(): void
     {
-        // Backup existing data
-        DB::statement('CREATE TEMPORARY TABLE ref_unit_kerja_backup AS SELECT id, nama, kode, keterangan, created_at, updated_at FROM ref_unit_kerja');
+        // Backup existing data (only columns that exist in original schema)
+        // Original schema: id, nama, keterangan, timestamps
+        DB::statement('CREATE TEMPORARY TABLE ref_unit_kerja_backup AS SELECT id, nama, keterangan, created_at, updated_at FROM ref_unit_kerja');
 
         // Drop original table
         Schema::dropIfExists('ref_unit_kerja');
 
-        // Recreate table without hierarchy columns
+        // Recreate table without hierarchy columns (matching original schema)
         Schema::create('ref_unit_kerja', function (Blueprint $table): void {
             $table->uuid('id')->primary();
-            $table->string('nama', 200);
-            $table->string('kode', 50)->nullable();
-            $table->text('keterangan')->nullable();
+            $table->string('nama', 100);
+            $table->string('keterangan', 255)->nullable();
             $table->timestamps();
         });
 
         // Restore data
-        DB::statement('INSERT INTO ref_unit_kerja (id, nama, kode, keterangan, created_at, updated_at) SELECT id, nama, kode, keterangan, created_at, updated_at FROM ref_unit_kerja_backup');
+        DB::statement('INSERT INTO ref_unit_kerja (id, nama, keterangan, created_at, updated_at) SELECT id, nama, keterangan, created_at, updated_at FROM ref_unit_kerja_backup');
 
         // Drop temporary table
         DB::statement('DROP TABLE ref_unit_kerja_backup');
