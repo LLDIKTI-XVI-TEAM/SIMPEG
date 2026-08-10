@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Services\AuditService;
+use App\Services\Employees\TmtCalculatorService;
 use App\Support\EmployeeImport\CsvEmployeeReader;
 use App\Support\EmployeeValidationRules;
 use Illuminate\Http\Request;
@@ -19,7 +20,10 @@ class ImportEmployeesAction
     /** @var array<string, string>|null */
     private ?array $jenisPegawaiCache = null;
 
-    public function __construct(private readonly CsvEmployeeReader $reader) {}
+    public function __construct(
+        private readonly CsvEmployeeReader $reader,
+        private readonly TmtCalculatorService $tmtCalculator,
+    ) {}
 
     /**
      * Mengimpor pegawai secara all-or-nothing agar file bermasalah tidak membuat data parsial.
@@ -95,12 +99,18 @@ class ImportEmployeesAction
                 ?? RefStatusPegawai::where('is_default', true)->value('id');
 
             foreach ($validatedRows as $data) {
-                Employee::create($data + [
+                $employee = Employee::create($data + [
                     'status_pegawai_id' => $aktifId,
                     'status_aktif' => 'Aktif',
                     'profil_status' => 'belum_lengkap',
                     'is_kinerja_baik' => true,
                 ]);
+
+                // Endpoint import kompatibilitas mengikuti batas yang sama dengan wizard:
+                // catat provenance pensiun tanpa menghitung milestone lain dari snapshot massal.
+                if ($employee->tanggal_pensiun !== null) {
+                    $this->tmtCalculator->recordImportedPensionDate($employee);
+                }
             }
         });
 

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\EmployeeMilestone;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\RefJenisPegawai;
@@ -13,6 +14,7 @@ use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Mockery\MockInterface;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Tests\TestCase;
@@ -60,7 +62,29 @@ class EmployeeImportTest extends TestCase
             'nip' => '198001012006041001',
             'jenis_pegawai_id' => RefJenisPegawai::where('nama', 'PNS')->firstOrFail()->id,
         ]);
-        $this->assertSame('1985-02-12', Employee::where('nama_lengkap', 'Siti')->firstOrFail()->tanggal_lahir->format('Y-m-d'));
+        $budi = Employee::where('nama_lengkap', 'Budi')->firstOrFail();
+        $siti = Employee::where('nama_lengkap', 'Siti')->firstOrFail();
+        $this->assertSame('1985-02-12', $siti->tanggal_lahir->format('Y-m-d'));
+
+        foreach ([$budi, $siti] as $employee) {
+            $this->assertSame(1, $employee->milestones()->count());
+            $milestone = $employee->milestones()->sole();
+            $this->assertSame(EmployeeMilestone::TYPE_PENSIUN, $milestone->type);
+            $this->assertSame('employee_import', $milestone->metadata['source']);
+            $this->assertTrue($milestone->metadata['is_manual']);
+        }
+
+        $this->artisan('milestone:backfill', [
+            '--recalculate-legacy-pension' => true,
+            '--no-interaction' => true,
+        ])
+            ->expectsQuestion('Do you want to proceed with the backfill?', true)
+            ->assertSuccessful();
+
+        $this->assertSame('2038-01-01', $budi->fresh()->tanggal_pensiun?->toDateString());
+        $this->assertSame('2043-02-12', $siti->fresh()->tanggal_pensiun?->toDateString());
+        $this->assertSame(1, $budi->milestones()->count());
+        $this->assertSame(1, $siti->milestones()->count());
     }
 
     public function test_pegawai_cannot_import_employees(): void
@@ -711,8 +735,13 @@ class EmployeeImportTest extends TestCase
         $validation->assertJsonPath('valid_count', 1);
         $validation->assertJsonPath('error_count', 0);
 
-        $this->mock(TmtCalculatorService::class)
-            ->shouldNotReceive('syncForEmployee');
+        $realCalculator = new TmtCalculatorService;
+        $this->mock(TmtCalculatorService::class, function (MockInterface $mock) use ($realCalculator): void {
+            $mock->shouldNotReceive('syncForEmployee');
+            $mock->expects('recordImportedPensionDate')
+                ->once()
+                ->andReturnUsing(fn (Employee $employee) => $realCalculator->recordImportedPensionDate($employee));
+        });
 
         $execute = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", []);
         $execute->assertOk();
@@ -736,6 +765,62 @@ class EmployeeImportTest extends TestCase
         $this->assertSame(0, RankHistory::where('employee_id', $employee->id)->count());
         $this->assertSame(0, PositionHistory::where('employee_id', $employee->id)->count());
         $this->assertSame(0, SalaryHistory::where('employee_id', $employee->id)->count());
+
+        $this->assertSame(1, $employee->milestones()->count());
+        $pensionMilestone = $employee->milestones()->sole();
+        $this->assertSame(EmployeeMilestone::TYPE_PENSIUN, $pensionMilestone->type);
+        $this->assertSame('employee_import', $pensionMilestone->metadata['source']);
+        $this->assertTrue($pensionMilestone->metadata['is_manual']);
+
+        // Import telah selesai dan ekspektasi mock melindungi batas import saja;
+        // backfill berikutnya memang harus memakai kalkulator nyata.
+        $this->app->forgetInstance(TmtCalculatorService::class);
+
+        $this->artisan('milestone:backfill', [
+            '--recalculate-legacy-pension' => true,
+            '--no-interaction' => true,
+        ])
+            ->expectsQuestion('Do you want to proceed with the backfill?', true)
+            ->assertSuccessful();
+
+        $employee->refresh();
+        $pensionMilestone->refresh();
+        $this->assertSame('2038-01-01', $employee->tanggal_pensiun?->toDateString());
+        $this->assertSame('2038-01-01', $pensionMilestone->milestone_date->toDateString());
+        $this->assertNotSame('legacy_unverified', $pensionMilestone->metadata['source']);
+        $this->assertSame(1, $employee->milestones()->count());
+    }
+
+    /** Import tanpa tanggal pensiun tidak boleh memanggil kalkulator atau membuat milestone. */
+    public function test_import_without_pension_date_does_not_trigger_tmt_calculation(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $row = $this->validRows()[0];
+        $row[9] = null;
+
+        $this->mock(TmtCalculatorService::class, function (MockInterface $mock): void {
+            $mock->shouldNotReceive('syncForEmployee');
+            $mock->shouldNotReceive('recordImportedPensionDate');
+        });
+
+        $this->actingAs($user);
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile([$row]),
+        ])->assertOk();
+        $batchId = $upload->json('batch_id');
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])
+            ->assertOk()
+            ->assertJsonPath('valid_count', 1);
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", [])
+            ->assertOk()
+            ->assertJsonPath('status', 'queued');
+
+        $employee = Employee::query()->where('nip', '198001012006041001')->firstOrFail();
+        $this->assertNull($employee->tanggal_pensiun);
+        $this->assertSame('III/a', $employee->golongan_terakhir);
+        $this->assertSame('Analis Kepegawaian', $employee->jabatan_terakhir);
+        $this->assertSame(0, $employee->milestones()->count());
     }
 
     public function test_import_wizard_realigns_old_template_rows_without_nik_and_no_kk_values(): void

@@ -7,6 +7,7 @@ use App\Models\ImportBatch;
 use App\Models\RefStatusPegawai;
 use App\Models\User;
 use App\Services\AuditService;
+use App\Services\Employees\TmtCalculatorService;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +16,8 @@ use Illuminate\Validation\ValidationException;
 
 class ExecuteImportBatchAction
 {
+    public function __construct(private readonly TmtCalculatorService $tmtCalculator) {}
+
     /**
      * Execute the validated batch.
      *
@@ -238,12 +241,18 @@ class ExecuteImportBatchAction
                 ?? RefStatusPegawai::where('is_default', true)->value('id');
 
             try {
-                Employee::create($data + [
+                $employee = Employee::create($data + [
                     'status_pegawai_id' => $aktifId,
                     'status_aktif' => 'Aktif',
                     'profil_status' => 'belum_lengkap',
                     'is_kinerja_baik' => true,
                 ]);
+
+                // Import Data Utama tidak menjalankan kalkulator TMT penuh. Hanya provenance
+                // tanggal pensiun resmi yang dicatat agar snapshot lain tidak dihitung atau ditimpa.
+                if ($employee->tanggal_pensiun !== null) {
+                    $this->tmtCalculator->recordImportedPensionDate($employee);
+                }
             } catch (QueryException $exception) {
                 // Hanya tabrakan constraint NIP yang merupakan outcome skip; pelanggaran lain
                 // harus tetap gagal agar masalah integritas data tidak tersamarkan.

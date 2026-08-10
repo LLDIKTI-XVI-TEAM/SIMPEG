@@ -15,6 +15,8 @@ class TmtCalculatorService
 {
     private const PENSION_SOURCE_CALCULATED = 'calculated_from_bup';
 
+    private const PENSION_SOURCE_IMPORT = 'employee_import';
+
     private const PENSION_SOURCE_LEGACY_UNVERIFIED = 'legacy_unverified';
 
     private const PENSION_SOURCE_OFFICIAL = 'employees.tanggal_pensiun';
@@ -70,6 +72,36 @@ class TmtCalculatorService
         $employee->update($updates);
 
         $this->storeMilestones($employee, $latestRank, $latestSalary, $pensionSource);
+    }
+
+    /**
+     * Mencatat provenance tanggal pensiun hasil import tanpa menjalankan kalkulasi TMT lain.
+     * Batas ini melindungi snapshot import dan mencegah pembuatan milestone yang tidak memiliki riwayat resmi.
+     */
+    public function recordImportedPensionDate(Employee $employee): void
+    {
+        if ($employee->tanggal_pensiun === null) {
+            return;
+        }
+
+        EmployeeMilestone::updateOrCreate(
+            [
+                'employee_id' => $employee->id,
+                'type' => EmployeeMilestone::TYPE_PENSIUN,
+            ],
+            [
+                'milestone_date' => $employee->tanggal_pensiun,
+                'calculated_at' => now()->startOfDay(),
+                'metadata' => [
+                    'tanggal_lahir' => $employee->tanggal_lahir?->toDateString(),
+                    'is_manual' => true,
+                    'source' => self::PENSION_SOURCE_IMPORT,
+                    'bup' => null,
+                    'jabatan' => null,
+                ],
+                'is_active' => true,
+            ],
+        );
     }
 
     /**

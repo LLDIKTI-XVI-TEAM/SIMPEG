@@ -42,6 +42,9 @@ class CreateEmployeeAction
 
                 $employee = Employee::create($data);
                 $sourceHistoryChanged = false;
+                $hasAuthoritativePensionDate = array_key_exists('tanggal_pensiun', $data)
+                    && $data['tanggal_pensiun'] !== null
+                    && $data['tanggal_pensiun'] !== '';
 
                 // 1. Pangkat (RankHistory)
                 if ($request->filled('pangkat_golongan_id') || $request->filled('pangkat_no_sk') || $request->filled('pangkat_tmt_pangkat') || $request->hasFile('file_sk_pangkat')) {
@@ -161,8 +164,11 @@ class CreateEmployeeAction
                     $sourceHistoryChanged = true;
                 }
 
-                // Sinkronisasi ditunda sampai seluruh riwayat sumber tersimpan agar snapshot tidak membaca keadaan parsial.
-                if ($sourceHistoryChanged) {
+                // Tanggal pensiun dari form adalah data resmi dan harus memiliki provenance meski belum ada riwayat.
+                // Hint authoritative mencegah backfill menganggap nilai baru sebagai tanggal kalkulasi legacy.
+                if ($hasAuthoritativePensionDate) {
+                    $this->tmtCalculator->syncForEmployee($employee, true);
+                } elseif ($sourceHistoryChanged) {
                     $this->tmtCalculator->syncForEmployee($employee);
                 }
 
