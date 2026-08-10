@@ -57,7 +57,7 @@ class EmployeeImportMappingBrowserTest extends DuskTestCase
             JS)[0];
             $isHighlighted = $browser->script(<<<'JS'
                 return document
-                    .querySelector('input[aria-label="Baris 2, Full Name"]')
+                    .querySelector('input[aria-label="Baris validasi 2, Full Name"]')
                     ?.classList.contains('border-danger/50') ?? false;
             JS)[0];
 
@@ -117,8 +117,14 @@ class EmployeeImportMappingBrowserTest extends DuskTestCase
                 ->waitFor('@mapping-duplicate-warning')
                 ->assertDisabled('@mapping-continue')
                 ->select('#mapping-4-kolom-cadangan', 'tidak_dipakai')
-                ->waitUntilMissing('@mapping-duplicate-warning')
-                ->waitUntilMissing('@mapping-required-warning')
+                ->waitUntil(<<<'JS'
+                    ['mapping-duplicate-warning', 'mapping-required-warning'].every((name) => {
+                        const alert = document.querySelector(`[dusk="${name}"]`);
+                        return !alert || getComputedStyle(alert).display === 'none';
+                    })
+                JS)
+                ->assertMissing('@mapping-duplicate-warning')
+                ->assertMissing('@mapping-required-warning')
                 ->assertEnabled('@mapping-continue');
 
             $browser->script(<<<'JS'
