@@ -49,6 +49,9 @@ class TmtCalculatorService
     /**
      * US-5.5 AC-4,5: Menyimpan milestone yang sudah dikalkulasi ke tabel terpisah.
      * Scheduler EWS dapat langsung query tabel ini tanpa perlu kalkulasi ulang.
+     *
+     * Reconciliation: Milestone yang tidak lagi dihasilkan akan dinonaktifkan
+     * untuk mencegah scheduler memproses data yang sudah tidak berlaku.
      */
     private function storeMilestones(Employee $employee, ?RankHistory $latestRank, ?SalaryHistory $latestSalary): void
     {
@@ -56,11 +59,13 @@ class TmtCalculatorService
         $pangkatRequiredYears = $this->configYears('pangkat_required_years', 4);
         $kgbRequiredYears = $this->configYears('kgb_required_years', 2);
 
+        $activeMilestoneIds = [];
+
         // 1. Kenaikan Pangkat
         if ($latestRank?->tmt_pangkat !== null) {
             $nextPangkat = $latestRank->tmt_pangkat->copy()->addYearsNoOverflow($pangkatRequiredYears);
 
-            EmployeeMilestone::updateOrCreate(
+            $milestone = EmployeeMilestone::updateOrCreate(
                 [
                     'employee_id' => $employee->id,
                     'type' => EmployeeMilestone::TYPE_KENAIKAN_PANGKAT,
@@ -76,13 +81,20 @@ class TmtCalculatorService
                     'is_active' => true,
                 ]
             );
+            $activeMilestoneIds[] = $milestone->id;
+        } else {
+            // Source data hilang: nonaktifkan milestone lama
+            EmployeeMilestone::where('employee_id', $employee->id)
+                ->where('type', EmployeeMilestone::TYPE_KENAIKAN_PANGKAT)
+                ->where('is_active', true)
+                ->update(['is_active' => false]);
         }
 
         // 2. KGB
         if ($latestSalary?->tmt_kgb !== null) {
             $nextKgb = $latestSalary->tmt_kgb->copy()->addYearsNoOverflow($kgbRequiredYears);
 
-            EmployeeMilestone::updateOrCreate(
+            $milestone = EmployeeMilestone::updateOrCreate(
                 [
                     'employee_id' => $employee->id,
                     'type' => EmployeeMilestone::TYPE_KGB,
@@ -98,6 +110,13 @@ class TmtCalculatorService
                     'is_active' => true,
                 ]
             );
+            $activeMilestoneIds[] = $milestone->id;
+        } else {
+            // Source data hilang: nonaktifkan milestone lama
+            EmployeeMilestone::where('employee_id', $employee->id)
+                ->where('type', EmployeeMilestone::TYPE_KGB)
+                ->where('is_active', true)
+                ->update(['is_active' => false]);
         }
 
         // 3. Pensiun
@@ -106,7 +125,7 @@ class TmtCalculatorService
             $position = $this->latestPosition($employee);
             $bup = $position?->jabatan?->default_bup ?? $position?->jenisJabatan?->maks_usia_pensiun;
 
-            EmployeeMilestone::updateOrCreate(
+            $milestone = EmployeeMilestone::updateOrCreate(
                 [
                     'employee_id' => $employee->id,
                     'type' => EmployeeMilestone::TYPE_PENSIUN,
@@ -122,15 +141,25 @@ class TmtCalculatorService
                     'is_active' => true,
                 ]
             );
+            $activeMilestoneIds[] = $milestone->id;
+        } else {
+            // Source data hilang: nonaktifkan milestone lama
+            EmployeeMilestone::where('employee_id', $employee->id)
+                ->where('type', EmployeeMilestone::TYPE_PENSIUN)
+                ->where('is_active', true)
+                ->update(['is_active' => false]);
         }
 
         // 4. US-5.5 AC-4: Satyalancana (10, 20, 30 tahun dari pengangkatan pertama)
         $tmtPengangkatan = $this->firstAppointmentDate($employee);
         if ($tmtPengangkatan !== null) {
+            $currentSatyalancanaDates = [];
+            $currentSatyalancanaMilestoneIds = [];
+
             foreach ([10, 20, 30] as $years) {
                 $satyalancanaDate = $tmtPengangkatan->copy()->addYearsNoOverflow($years);
 
-                EmployeeMilestone::updateOrCreate(
+                $milestone = EmployeeMilestone::updateOrCreate(
                     [
                         'employee_id' => $employee->id,
                         'type' => EmployeeMilestone::TYPE_SATYALANCANA,
@@ -140,17 +169,33 @@ class TmtCalculatorService
                         'calculated_at' => $today,
                         'metadata' => [
                             'tmt_pengangkatan' => $tmtPengangkatan->toDateString(),
-                            'years_of_service' => $years,
+                            'satyalancana_years' => $years,
+                            'years_of_service' => $years, // Backward compatibility
                         ],
                         'is_active' => true,
                     ]
                 );
+                $currentSatyalancanaMilestoneIds[] = $milestone->id;
             }
+
+            // Nonaktifkan Satyalancana milestone lama yang tidak lagi di-generate
+            // (misalnya TMT pengangkatan berubah)
+            EmployeeMilestone::where('employee_id', $employee->id)
+                ->where('type', EmployeeMilestone::TYPE_SATYALANCANA)
+                ->where('is_active', true)
+                ->whereNotIn('id', $currentSatyalancanaMilestoneIds)
+                ->update(['is_active' => false]);
+        } else {
+            // Source data hilang: nonaktifkan semua milestone Satyalancana
+            EmployeeMilestone::where('employee_id', $employee->id)
+                ->where('type', EmployeeMilestone::TYPE_SATYALANCANA)
+                ->where('is_active', true)
+                ->update(['is_active' => false]);
         }
 
         // 5. PPPK Contract End (jika ada)
         if ($employee->tanggal_akhir_kontrak !== null) {
-            EmployeeMilestone::updateOrCreate(
+            $milestone = EmployeeMilestone::updateOrCreate(
                 [
                     'employee_id' => $employee->id,
                     'type' => EmployeeMilestone::TYPE_PPPK_CONTRACT_END,
@@ -164,6 +209,13 @@ class TmtCalculatorService
                     'is_active' => true,
                 ]
             );
+            $activeMilestoneIds[] = $milestone->id;
+        } else {
+            // Source data hilang: nonaktifkan milestone lama
+            EmployeeMilestone::where('employee_id', $employee->id)
+                ->where('type', EmployeeMilestone::TYPE_PPPK_CONTRACT_END)
+                ->where('is_active', true)
+                ->update(['is_active' => false]);
         }
     }
 
