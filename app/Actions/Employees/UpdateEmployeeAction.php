@@ -44,6 +44,7 @@ class UpdateEmployeeAction
             $rankHistoryChanged = false;
             $positionHistoryChanged = false;
             $salaryHistoryChanged = false;
+            $appointmentChanged = false;
 
             if ($request->hasFile('foto') && $request->file('foto')->isValid()) {
                 $validated['foto'] = $this->files->storePhoto($request->file('foto'));
@@ -262,8 +263,10 @@ class UpdateEmployeeAction
                 $appointment = $employee->appointment;
                 if ($appointment) {
                     $appointment->update($appointmentData);
+                    $appointmentChanged = true;
                 } else {
                     $employee->appointment()->create($appointmentData);
+                    $appointmentChanged = true;
                 }
 
                 $jenisPegawai = RefJenisPegawai::whereRaw('UPPER(nama) = ?', [
@@ -283,6 +286,7 @@ class UpdateEmployeeAction
                 if ($pppkAppointment && $pppkAppointment->tmt_pengangkatan?->toDateString() !== $validated['pppk_tmt_pengangkatan']) {
                     $pppkAppointment->update(['tmt_pengangkatan' => $validated['pppk_tmt_pengangkatan']]);
                     $pppkContractChanged = true;
+                    $appointmentChanged = true;  // Track PPPK TMT changes for Satyalancana milestone
                 }
             }
 
@@ -303,6 +307,12 @@ class UpdateEmployeeAction
                         ->where('is_read', false)
                         ->update(['is_read' => true, 'read_at' => now()]);
                 }
+            }
+
+            // Final milestone sync after ALL writes complete (including appointments)
+            // This ensures appointment TMT changes trigger Satyalancana milestone recalculation
+            if ($appointmentChanged) {
+                $this->tmtCalculator->syncForEmployee($employee);
             }
 
             $employee->refresh();
