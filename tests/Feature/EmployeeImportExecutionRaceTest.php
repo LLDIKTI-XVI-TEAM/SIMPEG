@@ -65,9 +65,16 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $persistedBatch = ImportBatch::query()->findOrFail($batchId);
         $this->assertSame($result['inserted_count'], $persistedBatch->inserted_count);
         $this->assertSame($result['skipped_count'], $persistedBatch->skipped_count);
-        $this->assertSame('dilewati', $persistedBatch->row_issues[0]['kategori']);
-        $this->assertSame(2, $persistedBatch->row_issues[0]['row']);
-        $this->assertArrayHasKey('NIP', $persistedBatch->row_issues[0]['errors']);
+        $this->assertSame([
+            [
+                'row' => 2,
+                'nama' => 'Budi Santoso',
+                'kategori' => 'dilewati',
+                'errors' => [
+                    'NIP' => ['NIP sudah terdaftar saat proses import dijalankan.'],
+                ],
+            ],
+        ], $persistedBatch->row_issues);
 
         $cachedBatch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
         $this->assertSame(0, $cachedBatch['result']['inserted']);

@@ -735,13 +735,27 @@ class EmployeeImportTest extends TestCase
         $validation->assertJsonPath('valid_count', 1);
         $validation->assertJsonPath('error_count', 0);
 
-        $realCalculator = new TmtCalculatorService;
-        $this->mock(TmtCalculatorService::class, function (MockInterface $mock) use ($realCalculator): void {
-            $mock->shouldNotReceive('syncForEmployee');
-            $mock->expects('recordImportedPensionDate')
-                ->once()
-                ->andReturnUsing(fn (Employee $employee) => $realCalculator->recordImportedPensionDate($employee));
-        });
+        $calculator = new class extends TmtCalculatorService
+        {
+            public int $recordImportedPensionDateCalls = 0;
+
+            public int $syncForEmployeeCalls = 0;
+
+            public function syncForEmployee(
+                Employee $employee,
+                ?bool $pensionDateIsAuthoritative = null,
+                bool $recalculateLegacyPension = false,
+            ): void {
+                $this->syncForEmployeeCalls++;
+            }
+
+            public function recordImportedPensionDate(Employee $employee): void
+            {
+                $this->recordImportedPensionDateCalls++;
+                parent::recordImportedPensionDate($employee);
+            }
+        };
+        $this->app->instance(TmtCalculatorService::class, $calculator);
 
         $execute = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", []);
         $execute->assertOk();
@@ -752,6 +766,8 @@ class EmployeeImportTest extends TestCase
         $status->assertJsonPath('status', 'completed');
         $status->assertJsonPath('result.inserted', 1);
         $status->assertJsonPath('result.failed', 0);
+        $this->assertSame(0, $calculator->syncForEmployeeCalls);
+        $this->assertSame(1, $calculator->recordImportedPensionDateCalls);
 
         $employee = Employee::where('nip', '198001012006041001')->firstOrFail();
 
