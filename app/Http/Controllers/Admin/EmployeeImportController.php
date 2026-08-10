@@ -43,6 +43,19 @@ class EmployeeImportController extends Controller
     {
         $batch = $this->getBatchOrFail($batchId, $request);
 
+        $rows = array_slice($batch['rows'], 0, 10);
+        if ($request->has('row')) {
+            $rowNumber = (int) $request->validate([
+                'row' => ['required', 'integer', 'min:2'],
+            ])['row'];
+            $row = collect($batch['rows'])->first(
+                fn (array $candidate): bool => (int) ($candidate['row'] ?? 0) === $rowNumber,
+            );
+
+            abort_if($row === null, 404, 'Baris import tidak ditemukan pada batch ini.');
+            $rows = [$row];
+        }
+
         // Respons preview dibatasi server ke 10 baris pertama sesuai kontrak wizard;
         // seluruh baris tetap tersimpan pada batch untuk validasi dan eksekusi.
         // Mapping aktif ikut dikembalikan agar UI menampilkan state server,
@@ -54,7 +67,7 @@ class EmployeeImportController extends Controller
             'type_label' => $batch['type_label'] ?? UploadImportBatchAction::TEMPLATE_LABELS['utama'],
             'total_rows' => $batch['total_rows'],
             'headers' => $batch['headers'],
-            'rows' => array_slice($batch['rows'], 0, 10),
+            'rows' => $rows,
             'mapping' => $batch['mapping'] ?? ImportColumnMapping::autoMap($batch['headers']),
             'warnings' => $batch['warnings'] ?? ImportColumnMapping::warnings($batch['mapping'] ?? []),
             'required_targets' => ImportColumnMapping::requiredTargets(),

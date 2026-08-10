@@ -470,6 +470,51 @@ class EmployeeImportTest extends TestCase
         $this->assertCount(10, $preview->json('rows'));
     }
 
+    public function test_preview_dapat_memuat_satu_baris_di_luar_batas_awal_untuk_diperbaiki(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        $rows = [];
+        foreach (range(1, 15) as $i) {
+            $rows[] = [
+                "Pegawai Nomor {$i}",
+                "pegawai{$i}@example.com",
+                'III/a',
+                'Analis Kepegawaian',
+                '7',
+                sprintf('%018d', $i),
+                '081234567890',
+                'Penata Muda',
+                'S1',
+                '2038-01-01',
+                "Pegawai {$i}",
+                "Pegawai {$i}",
+                'Manajemen',
+                'PNS',
+                '1990-01-01',
+            ];
+        }
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFileWithHeaders($this->headers(), $rows, 'baris_di_luar_preview.xlsx'),
+        ]);
+
+        $upload->assertOk();
+        $batchId = $upload->json('batch_id');
+
+        $preview = $this->getJson("/api/pegawai/import/{$batchId}/preview?row=12");
+
+        $preview->assertOk();
+        $this->assertCount(1, $preview->json('rows'));
+        $preview->assertJsonPath('rows.0.row', 12);
+        $preview->assertJsonPath('rows.0.data.Nama Pegawai', 'Pegawai Nomor 11');
+
+        $this->getJson("/api/pegawai/import/{$batchId}/preview?row=999")
+            ->assertNotFound();
+    }
+
     public function test_validasi_menolak_field_wajib_yang_belum_terpetakan_dengan_nama_field(): void
     {
         $user = User::factory()->adminKepegawaian()->create();

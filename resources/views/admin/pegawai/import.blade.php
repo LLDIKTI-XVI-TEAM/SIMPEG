@@ -109,10 +109,11 @@
         // Pagination preview
         previewPage: 1,
         previewPerPage: 10,
-        get previewTotalPages() { return Math.max(1, Math.ceil(this.allRows.length / this.previewPerPage)); },
+        previewRowCount: 0,
+        get previewTotalPages() { return Math.max(1, Math.ceil(this.previewRowCount / this.previewPerPage)); },
         get paginatedRows() {
             const start = (this.previewPage - 1) * this.previewPerPage;
-            return this.allRows.slice(start, start + this.previewPerPage);
+            return this.allRows.slice(start, Math.min(start + this.previewPerPage, this.previewRowCount));
         },
         
         // Validation results (dari server)
@@ -126,6 +127,7 @@
         valPage: 1,
         valPerPage: 15,
         valFilter: 'all',
+        validationRowLoads: {},
         get filteredValidations() {
             if (this.valFilter === 'all') return this.validations;
             return this.validations.filter(v => v.status === this.valFilter);
@@ -211,6 +213,64 @@
             this.hasEdits = true;
             this.editedRowIndices.add(rowIndex);
         },
+
+        rowLoadStatus(row) {
+            return this.validationRowLoads[String(row)]?.status || 'idle';
+        },
+
+        rowLoadError(row) {
+            return this.validationRowLoads[String(row)]?.error || '';
+        },
+
+        // Baris di luar preview awal dimuat satu per satu hanya saat perlu diperbaiki.
+        async ensureValidationRow(item) {
+            if (!this.batchId || item.dataIndex >= 0 || !['error', 'skip'].includes(item.status)) return;
+
+            const key = String(item.row);
+            const currentStatus = this.rowLoadStatus(item.row);
+            if (currentStatus === 'loading' || currentStatus === 'loaded') return;
+
+            this.validationRowLoads = {
+                ...this.validationRowLoads,
+                [key]: { status: 'loading', error: '' },
+            };
+
+            try {
+                const res = await fetch('/api/pegawai/import/' + this.batchId + '/preview?row=' + encodeURIComponent(item.row), {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
+                    },
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.message || 'Gagal memuat data baris import.');
+                }
+
+                const loadedRow = data.rows?.[0];
+                if (!loadedRow || Number(loadedRow.row) !== Number(item.row)) {
+                    throw new Error('Data baris yang diterima tidak sesuai dengan hasil validasi.');
+                }
+
+                let dataIndex = this.allRows.findIndex(row => Number(row.row) === Number(item.row));
+                if (dataIndex < 0) {
+                    this.allRows.push(loadedRow);
+                    dataIndex = this.allRows.length - 1;
+                }
+
+                item.dataIndex = dataIndex;
+                this.validationRowLoads = {
+                    ...this.validationRowLoads,
+                    [key]: { status: 'loaded', error: '' },
+                };
+            } catch (e) {
+                this.validationRowLoads = {
+                    ...this.validationRowLoads,
+                    [key]: { status: 'error', error: e.message },
+                };
+            }
+        },
         
         // Step 1 → 2: Upload file ke server, lalu load preview
         async uploadAndPreview() {
@@ -260,6 +320,8 @@
                 const previewData = await previewRes.json();
                 this.mainHeaders = previewData.headers;
                 this.allRows = previewData.rows; // [{row: N, data: {...}}, ...] — maksimal 10 baris dari server
+                this.previewRowCount = previewData.rows.length;
+                this.validationRowLoads = {};
                 this.totalRows = previewData.total_rows;
                 this.previewPage = 1;
                 this.hasEdits = false;
@@ -478,8 +540,10 @@
             this.hasEdits = false;
             this.editedRowIndices = new Set();
             this.previewPage = 1;
+            this.previewRowCount = 0;
             this.valPage = 1;
             this.valFilter = 'all';
+            this.validationRowLoads = {};
             this.columnMapping = {};
             this.requiredTargetFields = [];
             this.serverWarnings = { unmatched_columns: [], missing_required: [] };
@@ -820,7 +884,7 @@
                         </x-ui.table-head>
                         <x-ui.table-body>
                             <template x-for="item in paginatedValidations" :key="item.row">
-                                <x-ui.table-row x-bind:class="{
+                                <x-ui.table-row x-init="ensureValidationRow(item)" x-bind:class="{
                                     'bg-danger/[0.03]': item.status === 'error',
                                     'bg-primary/[0.03]': item.status === 'skip',
                                     '': item.status === 'valid'
@@ -844,22 +908,33 @@
                                         <x-ui.table-td class="px-0.5 py-0.5 border-r border-border">
                                             {{-- Error/skip rows: editable inputs --}}
                                             <template x-if="item.status === 'error' || item.status === 'skip'">
-                                                <input 
-                                                    type="text"
-                                                    :value="allRows[item.dataIndex]?.data[header] ?? ''"
-                                                @input="if (item.dataIndex >= 0) { allRows[item.dataIndex].data[header] = $event.target.value; onCellEdit(item.dataIndex, header) }"
-                                                    :class="item.col && item.col.includes(header) ? 'border-danger/50 bg-danger/[0.03]' : 'border-transparent'"
-                                                    class="w-full px-2 py-1.5 text-xs text-ink bg-transparent border rounded hover:border-border hover:bg-soft/10 focus:border-primary focus:bg-surface focus:outline-none focus:ring-1 focus:ring-primary/30 transition min-w-[200px]"
-                                                >
+                                                 <input
+                                                     type="text"
+                                                     :value="allRows[item.dataIndex]?.data[header] ?? ''"
+                                                     :disabled="item.dataIndex < 0"
+                                                     :aria-busy="rowLoadStatus(item.row) === 'loading'"
+                                                     @input="if (item.dataIndex >= 0) { allRows[item.dataIndex].data[header] = $event.target.value; onCellEdit(item.dataIndex, header) }"
+                                                     :class="item.col && item.col.includes(header) ? 'border-danger/50 bg-danger/[0.03]' : 'border-transparent'"
+                                                     class="w-full px-2 py-1.5 text-xs text-ink bg-transparent border rounded hover:border-border hover:bg-soft/10 focus:border-primary focus:bg-surface focus:outline-none focus:ring-1 focus:ring-primary/30 transition min-w-[200px] disabled:cursor-wait disabled:bg-soft disabled:text-muted"
+                                                 >
                                             </template>
                                             {{-- Valid rows: read-only --}}
                                             <template x-if="item.status === 'valid'">
                                                 <span class="px-2 py-1.5 text-xs text-ink block min-w-[200px]" x-text="allRows[item.dataIndex]?.data[header] ?? '-'"></span>
                                             </template>
                                         </x-ui.table-td>
-                                    </template>
-                                    <x-ui.table-td class="px-3 py-1.5">
-                                        <span :class="{
+                                     </template>
+                                     <x-ui.table-td class="px-3 py-1.5">
+                                         <span x-show="item.dataIndex < 0 && rowLoadStatus(item.row) === 'loading'" class="mb-1 block text-xs text-muted" role="status">
+                                             Memuat data baris untuk diperbaiki...
+                                         </span>
+                                         <div x-show="item.dataIndex < 0 && rowLoadStatus(item.row) === 'error'" class="mb-1 space-y-1">
+                                             <p class="text-xs font-semibold text-danger" x-text="rowLoadError(item.row)"></p>
+                                             <button type="button" @click="ensureValidationRow(item)" class="text-xs font-semibold text-primary hover:underline focus:outline-none focus:ring-1 focus:ring-primary">
+                                                 Muat ulang data baris
+                                             </button>
+                                         </div>
+                                         <span :class="{
                                             'text-danger font-semibold': item.status === 'error',
                                             'text-primary': item.status === 'skip',
                                             'text-success': item.status === 'valid'
