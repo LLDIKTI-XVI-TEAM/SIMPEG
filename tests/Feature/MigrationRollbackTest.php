@@ -11,7 +11,29 @@ use Tests\TestCase;
 
 class MigrationRollbackTest extends TestCase
 {
-    use RefreshDatabase;
+    // Note: Not using RefreshDatabase trait because SQLite VACUUM cannot run within transactions.
+    // Our table rebuild migrations trigger VACUUM through Laravel's Schema::create().
+    // These tests manually manage migration state instead.
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Run migrations fresh for each test
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            Artisan::call('migrate:fresh');
+        }
+    }
+
+    protected function tearDown(): void
+    {
+        // Clean up after tests
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            Artisan::call('migrate:reset');
+        }
+
+        parent::tearDown();
+    }
 
     /**
      * Test: keycloak_username migration dapat di-rollback dengan benar di SQLite.

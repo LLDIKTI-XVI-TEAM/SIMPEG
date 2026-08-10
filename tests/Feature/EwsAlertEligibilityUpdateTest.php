@@ -39,6 +39,7 @@ class EwsAlertEligibilityUpdateTest extends TestCase
             'employee_id' => $employee->id,
             'type' => 'kenaikan_pangkat',
             'milestone_date' => $targetDate,
+            'calculated_at' => now(),
             'is_active' => true,
             'metadata' => ['required_years' => 4],
         ]);
@@ -90,6 +91,7 @@ class EwsAlertEligibilityUpdateTest extends TestCase
             'employee_id' => $employee->id,
             'type' => 'kenaikan_pangkat',
             'milestone_date' => $targetDate,
+            'calculated_at' => now(),
             'is_active' => true,
             'metadata' => ['required_years' => 4],
         ]);
@@ -107,8 +109,10 @@ class EwsAlertEligibilityUpdateTest extends TestCase
         DisciplineRecord::create([
             'employee_id' => $employee->id,
             'jenis_hukuman' => 'Ringan',
+            'deskripsi' => 'Test discipline record',
             'tanggal_mulai' => now()->subDays(10),
             'tanggal_selesai' => now()->addDays(30),
+            'tanggal_sk' => now()->subDays(15),
             'no_sk' => 'SK-DISIPLIN-001',
             'is_active' => true,
         ]);
@@ -138,6 +142,7 @@ class EwsAlertEligibilityUpdateTest extends TestCase
             'employee_id' => $employee->id,
             'type' => 'kenaikan_pangkat',
             'milestone_date' => $targetDate,
+            'calculated_at' => now(),
             'is_active' => true,
             'metadata' => ['required_years' => 4],
         ]);
@@ -184,6 +189,7 @@ class EwsAlertEligibilityUpdateTest extends TestCase
             'employee_id' => $employee->id,
             'type' => 'satyalancana',
             'milestone_date' => $targetDate,
+            'calculated_at' => now(),
             'is_active' => true,
             'metadata' => ['satyalancana_years' => 10],
         ]);
@@ -226,6 +232,7 @@ class EwsAlertEligibilityUpdateTest extends TestCase
             'employee_id' => $employee->id,
             'type' => 'kgb',
             'milestone_date' => $targetDate,
+            'calculated_at' => now(),
             'is_active' => true,
             'metadata' => ['required_years' => 2],
         ]);
