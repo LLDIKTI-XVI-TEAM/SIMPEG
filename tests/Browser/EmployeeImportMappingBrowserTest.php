@@ -41,6 +41,7 @@ class EmployeeImportMappingBrowserTest extends DuskTestCase
                     row: 2,
                     name: '-',
                     status: 'error',
+                    errorSourceHeaders: component.sourceHeadersForErrors(['Nama Lengkap (Person)']),
                     col: component.sourceHeadersForErrors(['Nama Lengkap (Person)']).join(', '),
                     error: 'Nama Lengkap wajib diisi.',
                     dataIndex: 0,
@@ -63,6 +64,65 @@ class EmployeeImportMappingBrowserTest extends DuskTestCase
 
             $this->assertSame(['Full Name'], $mappedSourceHeaders);
             $this->assertTrue($isHighlighted);
+        });
+    }
+
+    public function test_validation_error_highlights_only_the_exact_mapped_source_header(): void
+    {
+        $this->seed(RbacSeeder::class);
+        $admin = User::factory()->adminKepegawaian()->create();
+
+        $this->browse(function (Browser $browser) use ($admin): void {
+            $browser->loginAs($admin)
+                ->visit('/pegawai/import-data')
+                ->waitForText('Import Data Pegawai');
+
+            $browser->script(<<<'JS'
+                const component = Alpine.$data(document.querySelector('[x-data*="simpegTargetFields"]'));
+
+                component.mainHeaders = ['Email', 'Email Address', 'NIP'];
+                component.columnMapping = {
+                    Email: 'tidak_dipakai',
+                    'Email Address': 'Email Pegawai',
+                    NIP: 'NIP',
+                };
+                component.allRows = [{
+                    row: 2,
+                    data: {
+                        Email: 'unused@example.test',
+                        'Email Address': 'invalid-email',
+                        NIP: '999999999999999999',
+                    },
+                }];
+                const errorSourceHeaders = component.sourceHeadersForErrors(['Email Pegawai']);
+                component.validations = [{
+                    row: 2,
+                    name: '-',
+                    status: 'error',
+                    errorSourceHeaders,
+                    col: errorSourceHeaders.join(', '),
+                    error: 'Email Pegawai tidak valid.',
+                    dataIndex: 0,
+                }];
+                component.step = 3;
+            JS);
+
+            $browser->pause(200)
+                ->waitForText('Hasil Validasi');
+
+            $highlightStates = $browser->script(<<<'JS'
+                return ['Email', 'Email Address'].map((header) => ({
+                    header,
+                    highlighted: document
+                        .querySelector(`input[aria-label="Baris validasi 2, ${header}"]`)
+                        ?.classList.contains('border-danger/50') ?? false,
+                }));
+            JS)[0];
+
+            $this->assertSame([
+                ['header' => 'Email', 'highlighted' => false],
+                ['header' => 'Email Address', 'highlighted' => true],
+            ], $highlightStates);
         });
     }
 

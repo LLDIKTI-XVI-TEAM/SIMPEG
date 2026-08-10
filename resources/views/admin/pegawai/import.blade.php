@@ -434,11 +434,17 @@
                             }
                         }
                     }
+                    const errorSourceHeaders = this.sourceHeadersForErrors(errorCols);
+
                     return {
                         row: r.row,
                         name: r.nama,
                         status: r.status,
-                        col: this.sourceHeadersForErrors(errorCols).join(', ') || '-',
+                        // Simpan nama sumber sebagai array untuk sorotan input. String `col`
+                        // hanya dipakai sebagai keterangan; pencarian substring dapat membuat
+                        // header seperti "Email" ikut tersorot saat hanya "Email Address" error.
+                        errorSourceHeaders,
+                        col: errorSourceHeaders.join(', ') || '-',
                         error: errorMessages.join('; ') || '',
                         // Simpan index ke allRows untuk inline edit di step 3
                         dataIndex: this.allRows.findIndex(row => Number(row.row) === Number(r.row)),
@@ -1026,7 +1032,7 @@
                                                      :aria-busy="rowLoadStatus(item.row) === 'loading'"
                                                      :aria-label="'Baris validasi ' + item.row + ', ' + header"
                                                      @input="if (item.dataIndex >= 0) { allRows[item.dataIndex].data[header] = $event.target.value; onCellEdit(item.dataIndex, header) }"
-                                                     :class="item.col && item.col.includes(header) ? 'border-danger/50 bg-danger/[0.03]' : 'border-transparent'"
+                                                     :class="item.errorSourceHeaders?.includes(header) ? 'border-danger/50 bg-danger/[0.03]' : 'border-transparent'"
                                                      class="w-full px-2 py-1.5 text-xs text-ink bg-transparent border rounded hover:border-border hover:bg-soft/10 focus:border-primary focus:bg-surface focus:outline-none focus:ring-1 focus:ring-primary/30 transition min-w-[200px] disabled:cursor-wait disabled:bg-soft disabled:text-muted"
                                                  >
                                             </template>

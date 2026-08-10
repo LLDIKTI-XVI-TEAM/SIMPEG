@@ -37,6 +37,8 @@ class EmployeeImportMappingUiTest extends TestCase
         $response->assertSee('isLockedIgnoredHeader(header)', false);
         $response->assertSee('value="tidak_dipakai"', false);
         $response->assertSee("'Nama Lengkap (Person)': 'Person'", false);
+        $response->assertSee('errorSourceHeaders,', false);
+        $response->assertSee("item.errorSourceHeaders?.includes(header)", false);
         $response->assertSee("'Baris validasi ' + item.row + ', ' + header", false);
         $response->assertSee('dusk="mapping-required-warning"', false);
         $response->assertSee('dusk="mapping-duplicate-warning"', false);
