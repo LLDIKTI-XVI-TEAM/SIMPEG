@@ -114,23 +114,42 @@ class ValidateImportBatchAction
         $validated = $validator->validated();
         $referenceErrors = $this->resolveReferences($validated);
 
-        // Cek duplikasi dalam file terlebih dahulu sebelum skip database
+        // K-US-02: Prioritas validasi
+        // 1. Duplicate dalam file → ERROR (tertinggi)
+        // 2. Email existing DB → ERROR
+        // 3. NIP existing DB → SKIP (terendah, hanya jika tidak ada error lain)
+
+        // Cek duplikasi dalam file terlebih dahulu
         $duplicateErrors = $this->mapErrors($this->duplicateErrors($validated, $row['row'], $seenNips, $seenEmails), [
             'nip' => 'NIP',
             'email_pribadi' => 'Email Pegawai',
         ]);
 
-        // Skip hanya jika tidak ada duplicate-in-file error
-        $skipErrors = [];
-        if ($duplicateErrors === [] && ! empty($validated['nip']) && Employee::where('nip', $validated['nip'])->exists()) {
-            $skipErrors['NIP'][] = 'NIP sudah terdaftar di database.';
-        }
-
+        // Cek email existing di database (prioritas ERROR)
         $databaseErrors = [];
         if (! empty($validated['email_pribadi']) && Employee::whereRaw('LOWER(email_pribadi) = ?', [strtolower($validated['email_pribadi'])])->exists()) {
             $databaseErrors['Email Pegawai'][] = 'Email pegawai sudah terdaftar di database.';
         }
 
+        // Cek NIP existing di database (prioritas SKIP, tapi hanya jika tidak ada error lain)
+        $skipErrors = [];
+        if (! empty($validated['nip']) && Employee::where('nip', $validated['nip'])->exists()) {
+            $skipErrors['NIP'][] = 'NIP sudah terdaftar di database.';
+        }
+
+        // Gabungkan semua errors dengan prioritas
+        $allErrors = array_merge_recursive(
+            $this->mapErrors($referenceErrors, ['jenis_pegawai' => 'Status Kepegawaian']),
+            $duplicateErrors,
+            $databaseErrors,
+        );
+
+        // Jika ada error (duplicate atau email), return ERROR
+        if ($allErrors !== []) {
+            return $this->rowError($row, $nama, $allErrors);
+        }
+
+        // Jika hanya ada skip (NIP existing tanpa error lain), return SKIP
         if ($skipErrors !== []) {
             return [
                 'row' => $row['row'],
@@ -139,16 +158,6 @@ class ValidateImportBatchAction
                 'errors' => $skipErrors,
                 'skip_reason' => 'NIP sudah terdaftar di database — baris akan dilewati.',
             ];
-        }
-
-        $allErrors = array_merge_recursive(
-            $this->mapErrors($referenceErrors, ['jenis_pegawai' => 'Status Kepegawaian']),
-            $databaseErrors,
-            $duplicateErrors,
-        );
-
-        if ($allErrors !== []) {
-            return $this->rowError($row, $nama, $allErrors);
         }
 
         return $this->rowValid($row, $nama, $validated);
