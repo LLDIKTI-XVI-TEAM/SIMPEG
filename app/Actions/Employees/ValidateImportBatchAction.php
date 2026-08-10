@@ -173,7 +173,8 @@ class ValidateImportBatchAction
         $referenceErrors = $this->resolveReferences($validated);
         $skipErrors = [];
 
-        if (! empty($validated['nip']) && Employee::where('nip', $validated['nip'])->exists()) {
+        // withTrashed() agar selaras dengan unique index yang mencakup baris soft-deleted.
+        if (! empty($validated['nip']) && Employee::withTrashed()->where('nip', $validated['nip'])->exists()) {
             $skipErrors['NIP'][] = 'NIP sudah terdaftar di database.';
         }
 

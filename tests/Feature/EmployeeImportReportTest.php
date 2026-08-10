@@ -40,12 +40,12 @@ class EmployeeImportReportTest extends TestCase
         $upload->assertOk();
         $batchId = $upload->json('batch_id');
 
-        // NIP duplikat database tertangkap rule unique sehingga berkategori error, bukan skip.
+        // Per K-US-02: NIP duplikat dari database menjadi SKIP, bukan error.
         $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])
             ->assertOk()
             ->assertJsonPath('valid_count', 1)
-            ->assertJsonPath('skip_count', 0)
-            ->assertJsonPath('error_count', 2);
+            ->assertJsonPath('skip_count', 1)
+            ->assertJsonPath('error_count', 1);
 
         $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", [])->assertOk();
 
@@ -60,8 +60,8 @@ class EmployeeImportReportTest extends TestCase
             'total_rows' => 3,
             'valid_count' => 1,
             'inserted_count' => 1,
-            'skipped_count' => 0,
-            'failed_count' => 2,
+            'skipped_count' => 1,
+            'failed_count' => 1,
         ]);
         $this->assertDatabaseHas('employees', ['nip' => '198001012006041001']);
 
@@ -75,7 +75,8 @@ class EmployeeImportReportTest extends TestCase
         $csv = $report->streamedContent();
         $this->assertStringContainsString('Laporan Hasil Import Pegawai', $csv);
         $this->assertStringContainsString('"Berhasil ditambahkan",1', $csv);
-        $this->assertStringContainsString('"Gagal validasi",2', $csv);
+        $this->assertStringContainsString('"Dilewati (NIP terdaftar)",1', $csv);
+        $this->assertStringContainsString('"Gagal validasi",1', $csv);
         $this->assertStringContainsString('gagal', $csv);
         $this->assertStringContainsString('Siti Aminah', $csv);
         $this->assertStringContainsString('NIP', $csv);
@@ -121,7 +122,7 @@ class EmployeeImportReportTest extends TestCase
     }
 
     /**
-     * Tiga baris: valid, NIP duplikat database (error unique), dan tanggal lahir tidak valid (error).
+     * Tiga baris: valid, NIP duplikat database (skip per K-US-02), dan tanggal lahir tidak valid (error).
      */
     private function mixedCsv(): string
     {

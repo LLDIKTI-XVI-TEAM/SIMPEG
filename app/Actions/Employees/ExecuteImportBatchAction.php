@@ -158,7 +158,9 @@ class ExecuteImportBatchAction
         } catch (\Throwable $exception) {
             ImportBatch::whereKey($batchId)->update([
                 'status' => 'failed',
-                'inserted_count' => $processedCount,
+                'inserted_count' => $insertedCount,
+                'skipped_count' => $skippedCount,
+                'row_issues' => $this->collectRowIssues($batch['validation']['results']),
                 'error_message' => $exception->getMessage(),
                 'finished_at' => now(),
             ]);
@@ -174,9 +176,9 @@ class ExecuteImportBatchAction
 
         return [
             'message' => 'Import selesai.',
-            'inserted' => $processedCount,
+            'inserted' => $insertedCount,
             'processed' => $processedCount,
-            'skipped' => $batch['validation']['skip_count'] ?? 0,
+            'skipped' => $skippedCount,
             'failed' => $batch['validation']['error_count'] ?? 0,
         ];
     }
@@ -186,7 +188,8 @@ class ExecuteImportBatchAction
         if ($type === 'utama') {
             // Validasi dan job berjalan terpisah; periksa ulang agar NIP yang baru
             // tersimpan setelah validasi tetap tercatat sebagai SKIP, bukan gagal.
-            if (! empty($data['nip']) && Employee::where('nip', $data['nip'])->exists()) {
+            // withTrashed() agar selaras dengan unique index yang mencakup baris soft-deleted.
+            if (! empty($data['nip']) && Employee::withTrashed()->where('nip', $data['nip'])->exists()) {
                 return false;
             }
 
