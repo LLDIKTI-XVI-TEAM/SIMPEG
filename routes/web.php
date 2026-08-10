@@ -75,19 +75,6 @@ if (app()->environment(['local', 'testing'])) {
     Route::get('/dev-login', [KeycloakAuthController::class, 'defaultDemoLogin']);
     Route::post('/dev-login', [KeycloakAuthController::class, 'demoLogin'])->name('dev-login');
 
-    Route::get('/set-super-admin', function () {
-        $user = auth()->user();
-        if ($user) {
-            $user->role = 'super_admin';
-            $user->save();
-            session(['active_role' => 'super_admin']);
-
-            return redirect()->route('dashboard')->with('success', 'Role Anda telah diubah menjadi super_admin');
-        }
-
-        return 'Silakan login terlebih dahulu';
-    });
-
     Route::get('/map-dummy-employee', function () {
         $user = auth()->user();
         if ($user) {

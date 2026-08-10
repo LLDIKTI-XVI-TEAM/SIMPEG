@@ -58,4 +58,15 @@ class DashboardRoleGateTest extends TestCase
         $this->assertAuthenticated();
         $this->assertSame('super_admin', auth()->user()->role);
     }
+
+    public function test_legacy_set_super_admin_route_is_not_available(): void
+    {
+        $user = User::factory()->pimpinan()->create();
+
+        $this->actingAs($user)
+            ->get('/set-super-admin')
+            ->assertNotFound();
+
+        $this->assertSame('pimpinan', $user->fresh()->role);
+    }
 }
