@@ -131,6 +131,7 @@ class ExecuteImportBatchAction
             // Persist hasil akhir sebelum file sumber dihapus supaya laporan tidak pernah hilang.
             ImportBatch::whereKey($batchId)->update([
                 'status' => 'completed',
+                'valid_count' => $batch['validation']['valid_count'] ?? $totalRows,
                 'inserted_count' => $insertedCount,
                 'skipped_count' => $skippedCount,
                 'row_issues' => $this->collectRowIssues($batch['validation']['results']),
@@ -158,6 +159,7 @@ class ExecuteImportBatchAction
         } catch (\Throwable $exception) {
             ImportBatch::whereKey($batchId)->update([
                 'status' => 'failed',
+                'valid_count' => $batch['validation']['valid_count'] ?? $totalRows,
                 'inserted_count' => $insertedCount,
                 'skipped_count' => $skippedCount,
                 'row_issues' => $this->collectRowIssues($batch['validation']['results']),
