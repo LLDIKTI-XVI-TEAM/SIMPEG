@@ -26,6 +26,8 @@ class EmployeeImportMappingUiTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Import Data Pegawai');
+        $response->assertSee('Berisi kolom NIP, NIK, No KK, Golongan, Jabatan, dan data kepegawaian lainnya.');
+        $response->assertDontSee('Berisi kolom NIP, NIK, No KK, Golongan, Jabatan, Role, dll.');
         $response->assertSee('Pemetaan Kolom');
         $response->assertSee('Kolom tidak dikenal ditemukan');
         $response->assertSee('Field wajib belum dipetakan');
@@ -34,5 +36,8 @@ class EmployeeImportMappingUiTest extends TestCase
         $response->assertSee('aria-describedby="mapping-readiness-message"', false);
         $response->assertSee('isLockedIgnoredHeader(header)', false);
         $response->assertSee('value="tidak_dipakai"', false);
+        $response->assertSee('dusk="mapping-required-warning"', false);
+        $response->assertSee('dusk="mapping-duplicate-warning"', false);
+        $response->assertSee('dusk="mapping-continue"', false);
     }
 }

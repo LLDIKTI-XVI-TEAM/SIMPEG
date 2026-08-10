@@ -658,7 +658,7 @@
                                 <span x-show="downloadingType === 'utama'">Menyiapkan Template...</span>
                                 <span x-show="downloadingType !== 'utama'">Unduh Template Utama Pegawai</span>
                             </span>
-                            <span class="text-xs text-muted block mt-0.5 font-sans">Berisi kolom NIP, NIK, No KK, Golongan, Jabatan, Role, dll.</span>
+                            <span class="text-xs text-muted block mt-0.5 font-sans">Berisi kolom NIP, NIK, No KK, Golongan, Jabatan, dan data kepegawaian lainnya.</span>
                         </div>
                     </button>
                 </div>
@@ -784,7 +784,7 @@
                     </div>
                 </div>
 
-                <div x-show="duplicateMappedFields.length > 0" x-cloak role="alert" aria-live="assertive"
+                <div x-show="duplicateMappedFields.length > 0" x-cloak role="alert" aria-live="assertive" dusk="mapping-duplicate-warning"
                     class="flex items-start gap-3 rounded-lg border border-danger/20 bg-danger/10 p-4 text-danger" x-transition>
                     <svg class="mt-0.5 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -800,7 +800,7 @@
                     </div>
                 </div>
 
-                <div x-show="missingRequiredTargets.length > 0" x-cloak role="alert" aria-live="assertive"
+                <div x-show="missingRequiredTargets.length > 0" x-cloak role="alert" aria-live="assertive" dusk="mapping-required-warning"
                     class="flex items-start gap-3 rounded-lg border border-danger/20 bg-danger/10 p-4 text-danger" x-transition>
                     <svg class="mt-0.5 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -916,7 +916,7 @@
                         <p id="mapping-readiness-message" aria-live="polite" class="text-xs"
                             :class="canProceedToValidation ? 'text-success' : 'text-danger'"
                             x-text="canProceedToValidation ? 'Pemetaan siap digunakan untuk validasi.' : 'Selesaikan konflik dan field wajib pada panel pemetaan.'"></p>
-                        <button type="button" @click="runValidation()" :disabled="isValidating || !canProceedToValidation"
+                        <button type="button" @click="runValidation()" :disabled="isValidating || !canProceedToValidation" dusk="mapping-continue"
                             aria-describedby="mapping-readiness-message"
                             :class="(isValidating || !canProceedToValidation) ? 'cursor-not-allowed bg-muted opacity-60' : 'cursor-pointer bg-primary hover:bg-primary-hover'"
                             class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition font-sans focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2">
