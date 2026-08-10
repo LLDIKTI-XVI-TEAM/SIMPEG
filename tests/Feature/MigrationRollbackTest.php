@@ -256,11 +256,10 @@ class MigrationRollbackTest extends TestCase
             $this->markTestSkipped('This test is specific to SQLite rollback behavior.');
         }
 
-        // Insert test data
+        // Insert test data (using only original schema columns: id, nama, keterangan, timestamps)
         DB::table('ref_unit_kerja')->insert([
             'id' => '123e4567-e89b-12d3-a456-426614174000',
             'nama' => 'Test Unit Kerja',
-            'kode' => 'TEST',
             'keterangan' => 'Test keterangan',
             'created_at' => now(),
             'updated_at' => now(),
@@ -272,15 +271,15 @@ class MigrationRollbackTest extends TestCase
             '--force' => true,
         ]);
 
-        // Verify data is preserved after rollback
+        // Verify data is preserved after rollback (only original schema columns)
         $unit = DB::table('ref_unit_kerja')
             ->where('id', '123e4567-e89b-12d3-a456-426614174000')
             ->first();
 
         $this->assertNotNull($unit, 'Data should be preserved after rollback');
         $this->assertEquals('Test Unit Kerja', $unit->nama);
-        $this->assertEquals('TEST', $unit->kode);
         $this->assertEquals('Test keterangan', $unit->keterangan);
+        // Note: 'kode' column was added in later migration, not part of original schema
     }
 
     /**

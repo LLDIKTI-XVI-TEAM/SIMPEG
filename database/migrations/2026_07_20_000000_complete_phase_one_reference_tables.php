@@ -23,7 +23,14 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('ref_notification_channels');
+        // Disable foreign keys temporarily for SQLite
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            DB::statement('PRAGMA foreign_keys = OFF');
+            DB::statement('DROP TABLE IF EXISTS ref_notification_channels');
+            DB::statement('PRAGMA foreign_keys = ON');
+        } else {
+            Schema::dropIfExists('ref_notification_channels');
+        }
 
         Schema::table('ref_status_pegawai', function (Blueprint $table): void {
             $table->dropUnique('ref_status_pegawai_kode_unique');
@@ -265,12 +272,15 @@ return new class extends Migration
      */
     private function rollbackUnitKerjaHierarchySqlite(): void
     {
+        // Disable foreign keys temporarily
+        DB::statement('PRAGMA foreign_keys = OFF');
+
         // Backup existing data (only columns that exist in original schema)
         // Original schema: id, nama, keterangan, timestamps
         DB::statement('CREATE TEMPORARY TABLE ref_unit_kerja_backup AS SELECT id, nama, keterangan, created_at, updated_at FROM ref_unit_kerja');
 
         // Drop original table
-        Schema::dropIfExists('ref_unit_kerja');
+        DB::statement('DROP TABLE IF EXISTS ref_unit_kerja');
 
         // Recreate table without hierarchy columns (matching original schema)
         Schema::create('ref_unit_kerja', function (Blueprint $table): void {
@@ -285,5 +295,8 @@ return new class extends Migration
 
         // Drop temporary table
         DB::statement('DROP TABLE ref_unit_kerja_backup');
+
+        // Re-enable foreign keys
+        DB::statement('PRAGMA foreign_keys = ON');
     }
 };

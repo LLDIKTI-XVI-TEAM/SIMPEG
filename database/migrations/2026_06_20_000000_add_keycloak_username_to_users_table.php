@@ -30,11 +30,14 @@ return new class extends Migration
 
     private function rebuildTableForSQLite(): void
     {
+        // Disable foreign keys temporarily
+        DB::statement('PRAGMA foreign_keys = OFF');
+
         // Get all users data
         $users = DB::table('users')->get();
 
         // Drop and recreate table without keycloak_username
-        Schema::drop('users');
+        DB::statement('DROP TABLE IF EXISTS users');
 
         Schema::create('users', function (Blueprint $table): void {
             $table->uuid('id')->primary();
@@ -65,5 +68,8 @@ return new class extends Migration
                 'updated_at' => $user->updated_at,
             ]);
         }
+
+        // Re-enable foreign keys
+        DB::statement('PRAGMA foreign_keys = ON');
     }
 };
