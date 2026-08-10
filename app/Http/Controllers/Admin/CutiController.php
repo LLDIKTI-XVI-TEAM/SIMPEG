@@ -102,16 +102,18 @@ class CutiController extends Controller
             : null;
 
         // US-4.5 AC-2: Saldo cuti pemohon untuk verifikator (tahun berjalan + riwayat N-1/N-2)
+        // Gunakan tahun pengajuan ($cuti->tanggal_mulai), bukan tahun kalender saat halaman dibuka,
+        // agar verifikator melihat saldo dari tahun yang sesuai dengan pengajuan.
         $leaveBalance = null;
-        if ($cuti->employee !== null && $cuti->jenisCuti?->code === 'tahunan') {
-            $currentYear = now()->year;
-            $currentYearBalance = $balancePreview->execute($cuti->employee, now());
-            $nMinus1Balance = $balancePreview->execute($cuti->employee, Carbon::create($currentYear - 1, 12, 31));
-            $nMinus2Balance = $balancePreview->execute($cuti->employee, Carbon::create($currentYear - 2, 12, 31));
+        if ($cuti->employee !== null && $cuti->jenisCuti?->code === 'tahunan' && $cuti->tanggal_mulai !== null) {
+            $requestYear = $cuti->tanggal_mulai->year;
+            $currentYearBalance = $balancePreview->execute($cuti->employee, Carbon::create($requestYear, 12, 31));
+            $nMinus1Balance = $balancePreview->execute($cuti->employee, Carbon::create($requestYear - 1, 12, 31));
+            $nMinus2Balance = $balancePreview->execute($cuti->employee, Carbon::create($requestYear - 2, 12, 31));
 
             $leaveBalance = [
                 'current' => [
-                    'year' => $currentYear,
+                    'year' => $requestYear,
                     'entitlement' => $currentYearBalance['jatah_dasar'] ?? 0,
                     'carry_over' => $currentYearBalance['carry_over'] ?? 0,
                     'used' => $currentYearBalance['terpakai_final'] ?? 0,
@@ -121,13 +123,13 @@ class CutiController extends Controller
                     'total_available' => $currentYearBalance['saldo_aktual'] ?? 0,
                 ],
                 'n_minus_1' => [
-                    'year' => $currentYear - 1,
+                    'year' => $requestYear - 1,
                     'entitlement' => $nMinus1Balance['jatah_dasar'] ?? 0,
                     'used' => $nMinus1Balance['terpakai_final'] ?? 0,
                     'total_available' => ($nMinus1Balance['jatah_dasar'] ?? 0) + ($nMinus1Balance['carry_over'] ?? 0),
                 ],
                 'n_minus_2' => [
-                    'year' => $currentYear - 2,
+                    'year' => $requestYear - 2,
                     'entitlement' => $nMinus2Balance['jatah_dasar'] ?? 0,
                     'used' => $nMinus2Balance['terpakai_final'] ?? 0,
                     'total_available' => ($nMinus2Balance['jatah_dasar'] ?? 0) + ($nMinus2Balance['carry_over'] ?? 0),
