@@ -3,6 +3,7 @@
 namespace App\Actions\Cuti;
 
 use App\Models\Employee;
+use App\Models\LeaveRequest;
 use App\Services\Cuti\LeaveBalanceService;
 use Illuminate\Support\Carbon;
 
@@ -31,8 +32,11 @@ class PreviewLeaveBalanceAction
      *     bucket:array{n2:int,n1:int,current:int}
      * }
      */
-    public function execute(Employee $employee, Carbon $asOf): array
-    {
-        return $this->balances->previewFor($employee, $asOf);
+    public function execute(
+        Employee $employee,
+        Carbon $asOf,
+        ?LeaveRequest $excludingLeaveRequest = null,
+    ): array {
+        return $this->balances->previewFor($employee, $asOf, $excludingLeaveRequest);
     }
 }

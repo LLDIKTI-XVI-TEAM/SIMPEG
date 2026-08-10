@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Actions\Cuti\ApproveLeaveAction;
+use App\Actions\Cuti\BuildVerifierLeaveContextAction;
 use App\Actions\Cuti\DeclineLeaveAction;
 use App\Actions\Cuti\DownloadOfficialLeavePdfAction;
 use App\Actions\Cuti\ListLeaveRequestsAction;
@@ -72,7 +73,7 @@ class CutiController extends Controller
      * Menampilkan detail satu pengajuan cuti.
      * Pegawai tanpa hak memantau hanya boleh membuka pengajuan miliknya sendiri (cegah akses lintas pegawai).
      */
-    public function show($id, LeaveApprovalService $approvals, DownloadOfficialLeavePdfAction $pdfAction, PreviewLeaveBalanceAction $balancePreview)
+    public function show($id, LeaveApprovalService $approvals, DownloadOfficialLeavePdfAction $pdfAction, PreviewLeaveBalanceAction $balancePreview, BuildVerifierLeaveContextAction $verifierContextAction)
     {
         $user = request()->user();
 
@@ -97,18 +98,24 @@ class CutiController extends Controller
         }
 
         $isRolloverReturn = $cuti->status === LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER;
+        $isVerifierContext = $canAct || $user->hasPermission('cuti.read_all');
         $targetBalance = $isRolloverReturn && $cuti->employee !== null && $cuti->rollover_target_year !== null
             ? $balancePreview->execute($cuti->employee, Carbon::create($cuti->rollover_target_year, 1, 1)->startOfDay())
+            : null;
+        $verifierContext = $isVerifierContext && $cuti->employee !== null
+            ? $verifierContextAction->execute($cuti->employee, $cuti->tanggal_mulai ?? now(), $cuti)
             : null;
 
         return view('admin.cuti.show', [
             'cuti' => $cuti,
             'canAct' => $canAct,
+            'isVerifierContext' => $isVerifierContext,
             'canDownloadFormulir' => $canDownloadFormulir,
             'canResubmit' => in_array($cuti->status, ['perlu_perubahan', LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER], true)
                 && $cuti->employee_id === $user->employee_id,
             'isRolloverReturn' => $isRolloverReturn,
             'targetBalance' => $targetBalance,
+            'verifierContext' => $verifierContext,
             'activeStep' => $stage === null ? null : $cuti->steps->firstWhere('step_order', $stage),
         ]);
     }

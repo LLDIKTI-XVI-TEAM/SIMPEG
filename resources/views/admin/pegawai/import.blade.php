@@ -26,13 +26,94 @@
         mainHeaders: [],
         allRows: [],
         
+        // Field tujuan pemetaan kolom import. Nilai `key` wajib persis sama dengan header kanonis
+        // template karena mapper di server membaca baris berdasarkan nama header tersebut.
+        simpegTargetFields: [
+            { key: 'Nama Pegawai', label: 'Nama & Gelar (Nama Pegawai)' },
+            { key: 'Person', label: 'Nama Lengkap Tanpa Gelar (Person)' },
+            { key: 'NIP', label: 'NIP' },
+            { key: 'Email Pegawai', label: 'Email Pegawai' },
+            { key: 'Status Kepegawaian', label: 'Status Kepegawaian (PNS/PPPK/CPNS)' },
+            { key: 'Nomor Telepon', label: 'Nomor Telepon / No HP' },
+            { key: 'Tanggal Lahir', label: 'Tanggal Lahir' },
+            { key: 'Jabatan', label: 'Jabatan Terakhir' },
+            { key: 'Golongan', label: 'Golongan Terakhir' },
+            { key: 'Kelas Jabatan', label: 'Kelas Jabatan' },
+            { key: 'Pangkat', label: 'Pangkat Terakhir' },
+            { key: 'Pendidikan Terakhir', label: 'Pendidikan Terakhir' },
+            { key: 'Prodi Pendidikan Terakhir', label: 'Prodi Pendidikan Terakhir' },
+            { key: 'Pensiun', label: 'Tanggal Pensiun' },
+            { key: 'NIK', label: 'NIK (Opsional)' },
+            { key: 'No KK', label: 'No KK (Opsional)' },
+        ],
+        columnMapping: {},
+        // Target wajib dan peringatan dihitung server saat upload agar UI mengikuti state batch.
+        requiredTargetFields: [],
+        serverWarnings: { unmatched_columns: [], missing_required: [] },
+        get unmappedHeaders() {
+            return this.mainHeaders.filter(h => !this.columnMapping[h] || this.columnMapping[h] === 'tidak_dipakai');
+        },
+        get unmappedHeadersCount() {
+            return this.unmappedHeaders.length;
+        },
+        get hasDuplicateMapping() {
+            const selected = Object.values(this.columnMapping).filter(val => val && val !== 'tidak_dipakai');
+            return new Set(selected).size !== selected.length;
+        },
+        get duplicateMappedFields() {
+            const counts = {};
+            const duplicates = [];
+            Object.values(this.columnMapping).forEach(val => {
+                if (val && val !== 'tidak_dipakai') {
+                    counts[val] = (counts[val] || 0) + 1;
+                    if (counts[val] === 2) duplicates.push(val);
+                }
+            });
+            return duplicates;
+        },
+        get missingRequiredTargets() {
+            const selected = Object.values(this.columnMapping).filter(val => val && val !== 'tidak_dipakai');
+            return this.requiredTargetFields.filter(t => !selected.includes(t));
+        },
+
+        // Simpan mapping ke server tepat sebelum validasi — tidak ada autosave pada
+        // perubahan dropdown agar tidak ada dua request mapping yang bisa berjalan
+        // paralel dan saling menimpa.
+        async persistMapping() {
+            if (!this.batchId) return;
+
+            const res = await fetch('/api/pegawai/import/' + this.batchId + '/mapping', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
+                },
+                body: JSON.stringify({ mapping: this.columnMapping }),
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.errors ? Object.values(data.errors).flat().join(' ') : (data.message || 'Gagal menyimpan pemetaan kolom.'));
+            }
+
+            this.serverWarnings = data.warnings || this.serverWarnings;
+        },
+
+        // Kirim hanya baris yang benar-benar diedit (key sumber apa adanya); tafsir kolom
+        // sepenuhnya memakai pemetaan yang tersimpan di batch server.
+        getEditedRows() {
+            return this.allRows.filter((rowObj, index) => this.editedRowIndices.has(index));
+        },
+
         // Pagination preview
         previewPage: 1,
         previewPerPage: 10,
-        get previewTotalPages() { return Math.max(1, Math.ceil(this.allRows.length / this.previewPerPage)); },
+        previewRowCount: 0,
+        get previewTotalPages() { return Math.max(1, Math.ceil(this.previewRowCount / this.previewPerPage)); },
         get paginatedRows() {
             const start = (this.previewPage - 1) * this.previewPerPage;
-            return this.allRows.slice(start, start + this.previewPerPage);
+            return this.allRows.slice(start, Math.min(start + this.previewPerPage, this.previewRowCount));
         },
         
         // Validation results (dari server)
@@ -46,6 +127,7 @@
         valPage: 1,
         valPerPage: 15,
         valFilter: 'all',
+        validationRowLoads: {},
         get filteredValidations() {
             if (this.valFilter === 'all') return this.validations;
             return this.validations.filter(v => v.status === this.valFilter);
@@ -131,6 +213,64 @@
             this.hasEdits = true;
             this.editedRowIndices.add(rowIndex);
         },
+
+        rowLoadStatus(row) {
+            return this.validationRowLoads[String(row)]?.status || 'idle';
+        },
+
+        rowLoadError(row) {
+            return this.validationRowLoads[String(row)]?.error || '';
+        },
+
+        // Baris di luar preview awal dimuat satu per satu hanya saat perlu diperbaiki.
+        async ensureValidationRow(item) {
+            if (!this.batchId || item.dataIndex >= 0 || !['error', 'skip'].includes(item.status)) return;
+
+            const key = String(item.row);
+            const currentStatus = this.rowLoadStatus(item.row);
+            if (currentStatus === 'loading' || currentStatus === 'loaded') return;
+
+            this.validationRowLoads = {
+                ...this.validationRowLoads,
+                [key]: { status: 'loading', error: '' },
+            };
+
+            try {
+                const res = await fetch('/api/pegawai/import/' + this.batchId + '/preview?row=' + encodeURIComponent(item.row), {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
+                    },
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.message || 'Gagal memuat data baris import.');
+                }
+
+                const loadedRow = data.rows?.[0];
+                if (!loadedRow || Number(loadedRow.row) !== Number(item.row)) {
+                    throw new Error('Data baris yang diterima tidak sesuai dengan hasil validasi.');
+                }
+
+                let dataIndex = this.allRows.findIndex(row => Number(row.row) === Number(item.row));
+                if (dataIndex < 0) {
+                    this.allRows.push(loadedRow);
+                    dataIndex = this.allRows.length - 1;
+                }
+
+                item.dataIndex = dataIndex;
+                this.validationRowLoads = {
+                    ...this.validationRowLoads,
+                    [key]: { status: 'loaded', error: '' },
+                };
+            } catch (e) {
+                this.validationRowLoads = {
+                    ...this.validationRowLoads,
+                    [key]: { status: 'error', error: e.message },
+                };
+            }
+        },
         
         // Step 1 → 2: Upload file ke server, lalu load preview
         async uploadAndPreview() {
@@ -179,11 +319,18 @@
                 
                 const previewData = await previewRes.json();
                 this.mainHeaders = previewData.headers;
-                this.allRows = previewData.rows; // [{row: N, data: {...}}, ...]
+                this.allRows = previewData.rows; // [{row: N, data: {...}}, ...] — maksimal 10 baris dari server
+                this.previewRowCount = previewData.rows.length;
+                this.validationRowLoads = {};
                 this.totalRows = previewData.total_rows;
                 this.previewPage = 1;
                 this.hasEdits = false;
                 this.editedRowIndices = new Set();
+                // Pemetaan awal dan peringatan kolom berasal dari state batch server,
+                // bukan tebakan ulang di browser.
+                this.columnMapping = previewData.mapping || {};
+                this.requiredTargetFields = previewData.required_targets || [];
+                this.serverWarnings = previewData.warnings || { unmatched_columns: [], missing_required: [] };
                 
                 this.step = 2;
                 
@@ -198,12 +345,27 @@
         async runValidation() {
             if (!this.batchId) return;
             
+            if (this.hasDuplicateMapping) {
+                this.apiError = 'Terdapat target kolom SIMPEG yang dipetakan lebih dari sekali (' + this.duplicateMappedFields.join(', ') + '). Setiap target SIMPEG hanya boleh dipilih oleh satu kolom sumber.';
+                return;
+            }
+
+            if (this.missingRequiredTargets.length > 0) {
+                this.apiError = 'Field wajib belum dipetakan: ' + this.missingRequiredTargets.join(', ') + '. Petakan setiap field wajib ke kolom sumber sebelum melanjutkan.';
+                return;
+            }
+
             this.isValidating = true;
             this.apiError = '';
-            
+
             try {
-                // Kirim rows jika ada edit, atau tanpa body jika tidak ada perubahan
-                const body = this.hasEdits ? { rows: this.allRows } : {};
+                // Mapping wajib tersimpan di server sebelum validasi dijalankan,
+                // agar server menafsirkan data dengan mapping yang sedang dilihat admin.
+                await this.persistMapping();
+
+                // Hanya baris hasil edit yang dikirim; baris lain tetap memakai state batch di server.
+                const editedRows = this.getEditedRows();
+                const body = editedRows.length > 0 ? { rows: editedRows } : {};
                 
                 const res = await fetch('/api/pegawai/import/' + this.batchId + '/validate', {
                     method: 'POST',
@@ -378,8 +540,13 @@
             this.hasEdits = false;
             this.editedRowIndices = new Set();
             this.previewPage = 1;
+            this.previewRowCount = 0;
             this.valPage = 1;
             this.valFilter = 'all';
+            this.validationRowLoads = {};
+            this.columnMapping = {};
+            this.requiredTargetFields = [];
+            this.serverWarnings = { unmatched_columns: [], missing_required: [] };
         }
     }">
         
@@ -536,6 +703,61 @@
                 </div>
             </div>
 
+            {{-- Peringatan non-blocking: kolom tak terpetakan tetap diabaikan, tetapi admin wajib sadar data kolom itu tidak ikut terimport. --}}
+            <div x-show="unmappedHeadersCount > 0" class="transition">
+                <x-ui.alert variant="warning" size="md">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                            <strong class="font-sans">Peringatan Kolom Tidak Cocok:</strong>
+                            Terdapat <span class="font-bold" x-text="unmappedHeadersCount"></span> kolom dari file yang belum terpetakan ke field SIMPEG (<span class="italic font-medium" x-text="unmappedHeaders.join(', ')"></span>). Nilai kolom yang dipetakan ke "Tidak Dipakai" tidak akan disimpan.
+                        </div>
+                    </div>
+                </x-ui.alert>
+            </div>
+
+            {{-- Header wajib yang belum terpetakan diperingatkan lebih awal; server tetap menolak validasi bila ini lolos. --}}
+            <div x-show="missingRequiredTargets.length > 0" x-cloak class="transition">
+                <x-ui.alert variant="danger" size="md">
+                    <strong class="font-sans">Field Wajib Belum Terpetakan:</strong>
+                    <span x-text="missingRequiredTargets.join(', ')"></span>. Petakan setiap field wajib ke kolom sumber sebelum validasi dapat dijalankan.
+                </x-ui.alert>
+            </div>
+
+            {{-- Pemetaan kolom manual: satu target SIMPEG hanya boleh dipilih oleh satu kolom sumber agar nilai tidak tertimpa. --}}
+            <x-ui.card padding="md" class="space-y-4">
+                <div class="flex items-center justify-between border-b border-border pb-3">
+                    <div>
+                        <h3 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Pemetaan Kolom (Excel/CSV → SIMPEG)</h3>
+                        <p class="text-xs text-muted font-sans mt-0.5">Sistem telah memetakan header secara otomatis. Anda dapat mengubah pasangan kolom secara manual menggunakan pilihan di bawah.</p>
+                    </div>
+                    <x-ui.badge variant="info" size="sm">
+                        <span x-text="mainHeaders.length - unmappedHeadersCount"></span> / <span x-text="mainHeaders.length"></span> Terpetakan
+                    </x-ui.badge>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <template x-for="header in mainHeaders" :key="header">
+                        <div class="rounded-lg border border-border p-2.5 bg-soft/30 space-y-1.5">
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="font-semibold text-ink truncate font-sans" :title="header" x-text="header"></span>
+                                <span x-show="columnMapping[header] && columnMapping[header] !== 'tidak_dipakai'" class="text-[10px] font-bold text-success">✓ Matched</span>
+                                <span x-show="!columnMapping[header] || columnMapping[header] === 'tidak_dipakai'" class="text-[10px] font-bold text-warning">! Unmatched</span>
+                            </div>
+                            <x-form.select x-model="columnMapping[header]" class="w-full text-xs py-1">
+                                <option value="tidak_dipakai">-- Tidak Dipakai --</option>
+                                <template x-for="field in simpegTargetFields" :key="field.key">
+                                    <option :value="field.key" x-text="field.label" :selected="columnMapping[header] === field.key"></option>
+                                </template>
+                            </x-form.select>
+                        </div>
+                    </template>
+                </div>
+                <div x-show="hasDuplicateMapping" x-cloak>
+                    <x-ui.alert variant="warning" size="sm">
+                        <strong>Konflik Pemetaan Kolom:</strong> Target <span class="font-bold underline" x-text="duplicateMappedFields.join(', ')"></span> dipilih lebih dari sekali. Setiap target SIMPEG hanya boleh dipetakan dari satu kolom sumber agar data tidak tertimpa.
+                    </x-ui.alert>
+                </div>
+            </x-ui.card>
+
             {{-- Editable Preview Table --}}
             <x-ui.card padding="lg" class="space-y-4">
                 <div class="flex items-center justify-between">
@@ -595,8 +817,8 @@
                     <x-ui.button type="button" variant="muted" @click="resetAll()">
                         Batal & Upload Ulang
                     </x-ui.button>
-                    <button type="button" @click="runValidation()" :disabled="isValidating"
-                        :class="isValidating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'"
+                    <button type="button" @click="runValidation()" :disabled="isValidating || hasDuplicateMapping || missingRequiredTargets.length > 0"
+                        :class="(isValidating || hasDuplicateMapping || missingRequiredTargets.length > 0) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'"
                         class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition font-sans gap-2">
                         <x-ui.loading x-show="isValidating" size="md" />
                         <span x-text="isValidating ? 'Memvalidasi...' : 'Lanjutkan ke Validasi'"></span>
@@ -662,7 +884,7 @@
                         </x-ui.table-head>
                         <x-ui.table-body>
                             <template x-for="item in paginatedValidations" :key="item.row">
-                                <x-ui.table-row x-bind:class="{
+                                <x-ui.table-row x-init="ensureValidationRow(item)" x-bind:class="{
                                     'bg-danger/[0.03]': item.status === 'error',
                                     'bg-primary/[0.03]': item.status === 'skip',
                                     '': item.status === 'valid'
@@ -686,22 +908,33 @@
                                         <x-ui.table-td class="px-0.5 py-0.5 border-r border-border">
                                             {{-- Error/skip rows: editable inputs --}}
                                             <template x-if="item.status === 'error' || item.status === 'skip'">
-                                                <input 
-                                                    type="text"
-                                                    :value="allRows[item.dataIndex]?.data[header] ?? ''"
-                                                @input="if (item.dataIndex >= 0) { allRows[item.dataIndex].data[header] = $event.target.value; onCellEdit(item.dataIndex, header) }"
-                                                    :class="item.col && item.col.includes(header) ? 'border-danger/50 bg-danger/[0.03]' : 'border-transparent'"
-                                                    class="w-full px-2 py-1.5 text-xs text-ink bg-transparent border rounded hover:border-border hover:bg-soft/10 focus:border-primary focus:bg-surface focus:outline-none focus:ring-1 focus:ring-primary/30 transition min-w-[200px]"
-                                                >
+                                                 <input
+                                                     type="text"
+                                                     :value="allRows[item.dataIndex]?.data[header] ?? ''"
+                                                     :disabled="item.dataIndex < 0"
+                                                     :aria-busy="rowLoadStatus(item.row) === 'loading'"
+                                                     @input="if (item.dataIndex >= 0) { allRows[item.dataIndex].data[header] = $event.target.value; onCellEdit(item.dataIndex, header) }"
+                                                     :class="item.col && item.col.includes(header) ? 'border-danger/50 bg-danger/[0.03]' : 'border-transparent'"
+                                                     class="w-full px-2 py-1.5 text-xs text-ink bg-transparent border rounded hover:border-border hover:bg-soft/10 focus:border-primary focus:bg-surface focus:outline-none focus:ring-1 focus:ring-primary/30 transition min-w-[200px] disabled:cursor-wait disabled:bg-soft disabled:text-muted"
+                                                 >
                                             </template>
                                             {{-- Valid rows: read-only --}}
                                             <template x-if="item.status === 'valid'">
                                                 <span class="px-2 py-1.5 text-xs text-ink block min-w-[200px]" x-text="allRows[item.dataIndex]?.data[header] ?? '-'"></span>
                                             </template>
                                         </x-ui.table-td>
-                                    </template>
-                                    <x-ui.table-td class="px-3 py-1.5">
-                                        <span :class="{
+                                     </template>
+                                     <x-ui.table-td class="px-3 py-1.5">
+                                         <span x-show="item.dataIndex < 0 && rowLoadStatus(item.row) === 'loading'" class="mb-1 block text-xs text-muted" role="status">
+                                             Memuat data baris untuk diperbaiki...
+                                         </span>
+                                         <div x-show="item.dataIndex < 0 && rowLoadStatus(item.row) === 'error'" class="mb-1 space-y-1">
+                                             <p class="text-xs font-semibold text-danger" x-text="rowLoadError(item.row)"></p>
+                                             <button type="button" @click="ensureValidationRow(item)" class="text-xs font-semibold text-primary hover:underline focus:outline-none focus:ring-1 focus:ring-primary">
+                                                 Muat ulang data baris
+                                             </button>
+                                         </div>
+                                         <span :class="{
                                             'text-danger font-semibold': item.status === 'error',
                                             'text-primary': item.status === 'skip',
                                             'text-success': item.status === 'valid'
