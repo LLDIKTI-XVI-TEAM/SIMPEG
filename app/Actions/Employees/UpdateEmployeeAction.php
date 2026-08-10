@@ -215,8 +215,8 @@ class UpdateEmployeeAction
                 $this->rebuildLatestSalary($employee);
             }
 
-            // Sinkronkan milestone jika ada perubahan history ATAU field pensiun/lahir
-            if ($rankHistoryChanged || $positionHistoryChanged || $salaryHistoryChanged || $pensionFieldsChanged) {
+            // Sinkronkan milestone jika ada perubahan history ATAU field pensiun/lahir ATAU kontrak PPPK
+            if ($rankHistoryChanged || $positionHistoryChanged || $salaryHistoryChanged || $pensionFieldsChanged || $pppkContractChanged) {
                 $this->tmtCalculator->syncForEmployee($employee);
             }
 
