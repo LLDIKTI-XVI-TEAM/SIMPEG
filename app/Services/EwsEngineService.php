@@ -83,7 +83,7 @@ class EwsEngineService
 
             // Gunakan milestone terhitung untuk mengurangi query, lalu hitung langsung
             // bila backfill belum tersedia atau versi konfigurasinya sudah berubah.
-            // Eager-load relasi yang dipakai fallback untuk menghindari N+1 pada deployment awal (sebelum milestone backfill).
+            // Muat relasi untuk perhitungan cadangan agar tidak terjadi N+1 sebelum milestone direkonsiliasi.
             Employee::with([
                 'milestones' => fn ($q) => $q->where('is_active', true),
                 'jenisPegawai',
@@ -102,7 +102,7 @@ class EwsEngineService
                     foreach ($employees as $employee) {
                         $employeesChecked++;
 
-                        // 1. Kenaikan Pangkat: baca dari milestone, fallback ke perhitungan jika belum ada atau versi config berubah
+                        // Kenaikan pangkat memakai milestone hanya bila versinya masih sesuai konfigurasi.
                         $targetDate = $this->getMilestoneDate($employee, 'kenaikan_pangkat', $pangkatRequiredYears)
                             ?? $this->calculatePangkatDate($employee, $pangkatRequiredYears);
 
@@ -129,7 +129,7 @@ class EwsEngineService
                             }
                         }
 
-                        // 2. KGB: baca dari milestone, fallback ke perhitungan jika belum ada atau versi config berubah
+                        // KGB memakai milestone hanya bila versinya masih sesuai konfigurasi.
                         $targetDate = $this->getMilestoneDate($employee, 'kgb', $kgbRequiredYears)
                             ?? $this->calculateKgbDate($employee, $kgbRequiredYears);
 
@@ -151,7 +151,7 @@ class EwsEngineService
                             }
                         }
 
-                        // 3. Pensiun: baca dari milestone, fallback ke perhitungan jika belum ada
+                        // Pensiun memakai milestone bila tersedia; selain itu dihitung dari sumber data saat ini.
                         $targetDate = $this->getMilestoneDate($employee, 'pensiun')
                             ?? $this->calculatePensionDate($employee, $pensiunRequiredAgeYears);
 
@@ -173,7 +173,7 @@ class EwsEngineService
                             }
                         }
 
-                        // 4. Kontrak PPPK: baca dari milestone, fallback ke perhitungan jika belum ada
+                        // Akhir kontrak PPPK memakai milestone bila tersedia; selain itu dihitung dari sumber data saat ini.
                         $isPppk = $employee->jenisPegawai && strtolower($employee->jenisPegawai->nama) === 'pppk';
                         if ($isPppk) {
                             $targetDate = $this->getMilestoneDate($employee, 'pppk_contract_end')
@@ -198,7 +198,7 @@ class EwsEngineService
                             }
                         }
 
-                        // 5. Satyalancana: baca dari milestone, fallback ke perhitungan jika belum ada
+                        // Satyalancana memakai milestone bila tersedia; selain itu dihitung dari TMT pengangkatan.
                         $satyalancanaMilestones = $this->getSatyalancanaMilestones($employee, $satyalancanaYears);
                         $isEligible = $employee->is_satyalancana_eligible === true;
 
@@ -275,10 +275,10 @@ class EwsEngineService
     }
 
     /**
-     * Ambil milestone date dari employee_milestones jika tersedia dan versi konfigurasi cocok.
-     * Milestone dengan versi konfigurasi yang berbeda akan diabaikan untuk memaksa recalculation.
+     * Mengambil tanggal milestone hanya ketika versinya masih sesuai dengan konfigurasi aktif.
+     * Versi yang berbeda diabaikan supaya tanggal dihitung ulang dari sumber data terbaru.
      *
-     * @param  int|null  $currentRequiredYears  Versi konfigurasi saat ini (null jika tipe milestone tidak bergantung pada config)
+     * @param  int|null  $currentRequiredYears  Nilai konfigurasi aktif; null bila tipe tidak bergantung konfigurasi
      */
     private function getMilestoneDate(Employee $employee, string $type, ?int $currentRequiredYears = null): ?Carbon
     {
@@ -293,12 +293,12 @@ class EwsEngineService
 
         // Untuk milestone yang bergantung pada konfigurasi (pangkat, KGB),
         // validasi bahwa required_years di metadata cocok dengan konfigurasi saat ini.
-        // Jika tidak cocok, abaikan milestone lama dan paksa recalculation.
+        // Jika tidak cocok, abaikan milestone lama dan hitung ulang dari sumber terbaru.
         if ($currentRequiredYears !== null && isset($milestone->metadata['required_years'])) {
             $storedRequiredYears = (int) $milestone->metadata['required_years'];
 
             if ($storedRequiredYears !== $currentRequiredYears) {
-                // Milestone dibuat dengan konfigurasi lama, abaikan dan gunakan fallback
+                // Milestone lama tidak boleh menghasilkan tanggal berdasarkan aturan yang sudah berubah.
                 Log::info("Milestone '{$type}' for employee {$employee->id} uses outdated config (stored: {$storedRequiredYears}, current: {$currentRequiredYears}). Using fallback calculation.");
 
                 return null;
@@ -309,7 +309,7 @@ class EwsEngineService
     }
 
     /**
-     * Hitung tanggal kenaikan pangkat berikutnya (fallback jika milestone belum ada).
+     * Menghitung tanggal kenaikan pangkat ketika milestone belum tersedia.
      */
     private function calculatePangkatDate(Employee $employee, int $requiredYears): ?Carbon
     {
@@ -328,7 +328,7 @@ class EwsEngineService
     }
 
     /**
-     * Hitung tanggal KGB berikutnya (fallback jika milestone belum ada).
+     * Menghitung tanggal KGB ketika milestone belum tersedia.
      */
     private function calculateKgbDate(Employee $employee, int $requiredYears): ?Carbon
     {
@@ -347,7 +347,7 @@ class EwsEngineService
     }
 
     /**
-     * Hitung tanggal pensiun (fallback jika milestone belum ada).
+     * Menghitung tanggal pensiun ketika milestone belum tersedia.
      */
     private function calculatePensionDate(Employee $employee, int $pensiunRequiredAgeYears): ?Carbon
     {
@@ -365,7 +365,7 @@ class EwsEngineService
     }
 
     /**
-     * Hitung tanggal akhir kontrak PPPK (fallback jika milestone belum ada).
+     * Menghitung tanggal akhir kontrak PPPK ketika milestone belum tersedia.
      */
     private function calculatePppkContractDate(Employee $employee, int $contractYears): ?Carbon
     {
@@ -388,16 +388,16 @@ class EwsEngineService
     }
 
     /**
-     * Ambil semua milestone Satyalancana dari precomputed data atau hitung fallback.
+     * Mengambil milestone Satyalancana terhitung atau menghitungnya dari TMT pengangkatan.
      *
-     * @param  list<int>  $configuredYears
+     * @param  list<int>  $configuredYears  Daftar masa kerja yang aktif pada konfigurasi
      * @return list<array{date: Carbon, years: int}>
      */
     private function getSatyalancanaMilestones(Employee $employee, array $configuredYears): array
     {
         $milestones = [];
 
-        // Coba ambil dari precomputed milestone terlebih dahulu
+        // Gunakan milestone terhitung terlebih dahulu untuk menjaga pemindaian tetap efisien.
         $precomputedMilestones = $employee->milestones
             ->where('type', 'satyalancana')
             ->where('is_active', true);
@@ -413,13 +413,13 @@ class EwsEngineService
                 }
             }
 
-            // Jika semua configured years sudah ada di precomputed, return
+            // Semua masa kerja telah tersedia sehingga tidak perlu menghitung ulang.
             if (count($milestones) === count($configuredYears)) {
                 return $milestones;
             }
         }
 
-        // Fallback: hitung dari TMT pengangkatan pertama
+        // Hitung dari TMT pengangkatan pertama bila milestone belum lengkap.
         $firstAppointment = $employee->appointments
             ->filter(fn ($appointment): bool => $appointment->tmt_pengangkatan !== null)
             ->sortBy('tmt_pengangkatan')

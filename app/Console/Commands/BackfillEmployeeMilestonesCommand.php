@@ -8,25 +8,15 @@ use Illuminate\Console\Command;
 
 class BackfillEmployeeMilestonesCommand extends Command
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
+    /** @var string Menetapkan ukuran batch agar rekonsiliasi tidak memuat semua pegawai ke memori. */
     protected $signature = 'milestone:backfill
                             {--chunk=100 : Number of employees to process per chunk}
                             {--only-active : Only backfill for active employees}';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
-    protected $description = 'Backfill employee milestones for existing employees';
+    /** @var string Menjelaskan bahwa perintah merekonsiliasi milestone pegawai yang sudah ada. */
+    protected $description = 'Rekonsiliasi milestone pegawai yang sudah ada';
 
-    /**
-     * Execute the console command.
-     */
+    /** Menjalankan rekonsiliasi milestone per batch dan melaporkan kegagalan setiap pegawai. */
     public function handle(TmtCalculatorService $tmtCalculator): int
     {
         $chunkSize = (int) $this->option('chunk');

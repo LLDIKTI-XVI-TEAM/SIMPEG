@@ -40,7 +40,7 @@ class EmployeeImportReportTest extends TestCase
         $upload->assertOk();
         $batchId = $upload->json('batch_id');
 
-        // K-US-02: NIP duplikat database sekarang di-skip, bukan error.
+        // NIP yang sudah terdaftar dilaporkan sebagai skip agar data pegawai yang ada tidak ditulis ulang.
         $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])
             ->assertOk()
             ->assertJsonPath('valid_count', 1)

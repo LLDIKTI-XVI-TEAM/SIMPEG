@@ -10,14 +10,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
 
-/**
- * Test K-US-02 consistency for legacy API endpoint /api/v1/pegawai/import
- *
- * Ensures that the legacy endpoint follows the same K-US-02 contract as the wizard:
- * - NIP duplicate in-file → error (highest priority)
- * - Email existing DB → error
- * - NIP existing DB → SKIP (not error)
- */
+/** Memastikan endpoint impor lama mempertahankan prioritas konflik yang sama dengan alur impor utama. */
 class LegacyEmployeeImportKus02Test extends TestCase
 {
     use RefreshDatabase;
@@ -32,9 +25,7 @@ class LegacyEmployeeImportKus02Test extends TestCase
         $this->seed(RbacSeeder::class);
     }
 
-    /**
-     * K-US-02: Legacy endpoint should skip NIP existing in database (not error)
-     */
+    /** NIP yang telah ada dilewati tanpa menggandakan data pegawai. */
     public function test_legacy_endpoint_skips_nip_existing_in_database(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -70,9 +61,7 @@ class LegacyEmployeeImportKus02Test extends TestCase
         $this->assertDatabaseCount('employees', 2); // 1 original + 1 new
     }
 
-    /**
-     * K-US-02: Duplicate NIP within file should still be error
-     */
+    /** Duplikasi NIP dalam satu berkas harus menggagalkan impor atomik. */
     public function test_legacy_endpoint_rejects_duplicate_nip_within_file(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -100,9 +89,7 @@ class LegacyEmployeeImportKus02Test extends TestCase
         $this->assertDatabaseCount('employees', 0);
     }
 
-    /**
-     * K-US-02: Email existing in database should be error (not skip)
-     */
+    /** Email terdaftar harus ditolak karena dapat menunjuk pegawai berbeda. */
     public function test_legacy_endpoint_rejects_email_existing_in_database(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -160,9 +147,7 @@ class LegacyEmployeeImportKus02Test extends TestCase
         $this->assertDatabaseCount('employees', 1);
     }
 
-    /**
-     * K-US-02: Priority test - NIP in-file duplicate takes precedence over NIP in DB
-     */
+    /** Duplikasi NIP dalam berkas harus tetap dilaporkan walau NIP tersebut telah ada. */
     public function test_legacy_endpoint_prioritizes_infile_duplicate_over_database_duplicate(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -193,9 +178,7 @@ class LegacyEmployeeImportKus02Test extends TestCase
         $this->assertDatabaseCount('employees', 1); // Only the original
     }
 
-    /**
-     * K-US-02: Mixed scenario - skip some, error some, insert some
-     */
+    /** Satu error harus menggagalkan seluruh impor meski baris lain valid atau dapat dilewati. */
     public function test_legacy_endpoint_handles_mixed_skip_and_error_scenarios(): void
     {
         $user = User::factory()->adminKepegawaian()->create();

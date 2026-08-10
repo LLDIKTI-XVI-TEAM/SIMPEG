@@ -14,13 +14,7 @@ class BackfillEmployeeMilestonesCommandTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * Test: milestone:backfill command creates milestones for employees without them.
-     *
-     * US-5.5 AC-5: On deployment, existing employees don't have milestones until updated.
-     * Scheduler has fallback but causes N+1 queries. Backfill command should create
-     * milestones for all existing employees.
-     */
+    /** Memastikan rekonsiliasi membuat milestone pegawai lama agar scheduler tidak selalu menghitung ulang. */
     public function test_backfill_command_creates_milestones_for_employees_without_them(): void
     {
         $this->seed(ReferenceSeeder::class);
@@ -160,9 +154,7 @@ class BackfillEmployeeMilestonesCommandTest extends TestCase
         );
     }
 
-    /**
-     * Test: backfill command with --only-active flag processes only active employees.
-     */
+    /** Memastikan opsi only-active tidak membuat milestone untuk pegawai tidak aktif. */
     public function test_backfill_command_with_only_active_flag(): void
     {
         $this->seed(ReferenceSeeder::class);
@@ -206,9 +198,7 @@ class BackfillEmployeeMilestonesCommandTest extends TestCase
         $this->assertEquals(0, $inactiveMilestones, 'Inactive employee should NOT have milestones');
     }
 
-    /**
-     * Test: backfill command with custom chunk size.
-     */
+    /** Memastikan rekonsiliasi per batch tetap memproses seluruh pegawai. */
     public function test_backfill_command_with_custom_chunk_size(): void
     {
         $this->seed(ReferenceSeeder::class);
@@ -241,9 +231,7 @@ class BackfillEmployeeMilestonesCommandTest extends TestCase
         }
     }
 
-    /**
-     * Test: backfill command can be cancelled.
-     */
+    /** Memastikan pembatalan tidak membuat milestone parsial. */
     public function test_backfill_command_can_be_cancelled(): void
     {
         $this->seed(ReferenceSeeder::class);
@@ -271,13 +259,7 @@ class BackfillEmployeeMilestonesCommandTest extends TestCase
         $this->assertEquals(0, EmployeeMilestone::count(), 'Should have no milestones after cancelling');
     }
 
-    /**
-     * Test: backfill command syncs employees with only inactive milestones.
-     *
-     * Issue: If employee has only inactive milestones (invalidated by config changes),
-     * exists() returns true so default execution skips them. This leaves inactive
-     * milestones un-restored and scheduler continues using fallback calculation.
-     */
+    /** Memastikan milestone nonaktif tidak membuat pegawai terlewati saat rekonsiliasi. */
     public function test_backfill_command_syncs_employees_with_only_inactive_milestones(): void
     {
         $this->seed(ReferenceSeeder::class);

@@ -17,13 +17,7 @@ class EmployeeAppointmentMilestoneSyncTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * Test: US-5.5 AC-4 - Appointment TMT changes trigger Satyalancana milestone sync.
-     *
-     * Issue: UpdateEmployeeAction called syncForEmployee() BEFORE appointment block
-     * was written. Changes to tmt_pengangkatan through form edit did not trigger
-     * milestone sync, leaving stale Satyalancana milestones until next history change.
-     */
+    /** Memastikan perubahan TMT pengangkatan menyegarkan milestone Satyalancana setelah riwayat tersimpan. */
     public function test_appointment_tmt_change_triggers_milestone_sync_via_update_action(): void
     {
         $this->seed(ReferenceSeeder::class);
@@ -83,9 +77,7 @@ class EmployeeAppointmentMilestoneSyncTest extends TestCase
         $this->assertEquals('2028-06-15', $newMilestone->milestone_date->toDateString(), 'Should be 10 years from new TMT 2018-06-15');
     }
 
-    /**
-     * Test: PPPK TMT pengangkatan change triggers milestone sync.
-     */
+    /** Memastikan perubahan TMT pengangkatan PPPK menyegarkan milestone terkait. */
     public function test_pppk_tmt_change_triggers_milestone_sync(): void
     {
         $this->seed(ReferenceSeeder::class);
@@ -142,9 +134,7 @@ class EmployeeAppointmentMilestoneSyncTest extends TestCase
         $this->assertNotNull($newMilestone, 'Should create new milestone with updated TMT');
     }
 
-    /**
-     * Test: New appointment creation triggers milestone sync.
-     */
+    /** Memastikan pengangkatan baru membentuk milestone yang sebelumnya belum memiliki sumber data. */
     public function test_new_appointment_creation_triggers_milestone_sync(): void
     {
         $this->seed(ReferenceSeeder::class);
@@ -186,9 +176,7 @@ class EmployeeAppointmentMilestoneSyncTest extends TestCase
         $this->assertGreaterThan(0, $milestonesAfterCount, 'Should have Satyalancana milestone after creating appointment');
     }
 
-    /**
-     * Test: Multiple appointment-related changes in single update trigger one final sync.
-     */
+    /** Memastikan satu pembaruan pengangkatan merekonsiliasi semua milestone yang terkait. */
     public function test_multiple_appointment_changes_trigger_single_final_sync(): void
     {
         $this->seed(ReferenceSeeder::class);
@@ -248,9 +236,7 @@ class EmployeeAppointmentMilestoneSyncTest extends TestCase
         $this->assertEquals('2027-06-30', $pppkMilestone->milestone_date->toDateString());
     }
 
-    /**
-     * Test: Non-appointment updates don't cause redundant milestone syncs.
-     */
+    /** Memastikan perubahan yang tidak memengaruhi milestone tidak membuat catatan duplikat. */
     public function test_non_appointment_updates_dont_cause_redundant_sync(): void
     {
         $this->seed(ReferenceSeeder::class);

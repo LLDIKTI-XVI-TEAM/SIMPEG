@@ -18,9 +18,7 @@ use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-/**
- * US-5.5 AC-4,5: Test untuk verifikasi kalkulasi Satyalancana dan penyimpanan milestones
- */
+/** Menguji kalkulasi dan penyimpanan milestone Satyalancana. */
 class TmtCalculatorMilestoneTest extends TestCase
 {
     use RefreshDatabase;

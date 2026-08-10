@@ -15,22 +15,7 @@ class EmployeePensionProvenanceTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * Test: Regression test untuk US-5.5 AC-3 provenance issue.
-     *
-     * Skenario yang diminta reviewer:
-     * 1. tanggal_pensiun awal null
-     * 2. sync dari jabatan A menghitung tanggal X
-     * 3. tambah jabatan resmi B dengan BUP berbeda
-     * 4. assert employees.tanggal_pensiun dan milestone pensiun berubah ke tanggal Y
-     *
-     * Issue: TmtCalculatorService menentukan manual/import dengan:
-     *   $hadManualPensionDate = $employee->tanggal_pensiun !== null
-     *
-     * Tapi service yang sama juga menulis hasil kalkulasi ke employees.tanggal_pensiun.
-     * Setelah kalkulasi pertama, field menjadi non-null dan sync berikutnya dapat
-     * salah menganggap hasil kalkulasi sistem sebagai manual/import authoritative.
-     */
+    /** Memastikan hasil BUP yang tersimpan tidak keliru diperlakukan sebagai tanggal pensiun resmi pada sinkronisasi berikutnya. */
     public function test_pension_date_recalculates_when_position_bup_changes(): void
     {
         $this->seed(ReferenceSeeder::class);
@@ -134,7 +119,7 @@ class EmployeePensionProvenanceTest extends TestCase
             'Milestone MUST update to reflect new BUP'
         );
 
-        // Verify metadata shows this is calculated, not manual
+        // Metadata harus membedakan hasil BUP dari tanggal pensiun resmi agar sinkronisasi berikutnya akurat.
         $this->assertFalse(
             $secondMilestone->metadata['is_manual'] ?? true,
             'Milestone should be marked as calculated, not manual'
@@ -203,10 +188,7 @@ class EmployeePensionProvenanceTest extends TestCase
         );
     }
 
-    /**
-     * Test: Calculated pension date from first sync should be treated as calculated,
-     * not manual, even after field becomes non-null.
-     */
+    /** Hasil BUP tetap harus ditandai sebagai kalkulasi setelah disimpan ke profil pegawai. */
     public function test_calculated_pension_date_is_not_treated_as_manual_on_subsequent_syncs(): void
     {
         $this->seed(ReferenceSeeder::class);
@@ -246,7 +228,7 @@ class EmployeePensionProvenanceTest extends TestCase
 
         $employee->refresh();
 
-        // Milestone should still be marked as calculated, not manual
+        // Metadata harus tetap menandai sumber BUP, bukan tanggal pensiun resmi.
         $milestone = EmployeeMilestone::where('employee_id', $employee->id)
             ->where('type', 'pensiun')
             ->where('is_active', true)

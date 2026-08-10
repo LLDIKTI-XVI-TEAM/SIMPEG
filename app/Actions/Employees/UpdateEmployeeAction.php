@@ -317,8 +317,7 @@ class UpdateEmployeeAction
                 }
             }
 
-            // Final milestone sync after ALL writes complete (including appointments)
-            // This ensures appointment TMT changes trigger Satyalancana milestone recalculation
+            // Sinkronisasi dijalankan setelah seluruh perubahan tersimpan agar TMT pengangkatan terbaru ikut dihitung.
             if ($appointmentChanged) {
                 $this->tmtCalculator->syncForEmployee($employee);
             }

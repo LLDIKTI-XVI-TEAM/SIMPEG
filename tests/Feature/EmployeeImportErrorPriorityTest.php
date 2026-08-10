@@ -14,17 +14,7 @@ class EmployeeImportErrorPriorityTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * Test: K-US-02 - Email existing DB takes priority over NIP existing DB.
-     *
-     * Issue: ValidateImportBatchAction returned "skip" for rows with NIP existing + email existing,
-     * when it should return "error" because email existing is higher priority.
-     *
-     * K-US-02 Priority:
-     * 1. Duplicate NIP/Email within file → ERROR (highest)
-     * 2. Email existing in DB → ERROR
-     * 3. NIP existing in DB → SKIP (lowest, only if no other errors)
-     */
+    /** Email terdaftar tidak boleh tertutupi outcome skip dari NIP yang sudah ada. */
     public function test_email_existing_db_takes_priority_over_nip_existing_db(): void
     {
         $this->seed(ReferenceSeeder::class);

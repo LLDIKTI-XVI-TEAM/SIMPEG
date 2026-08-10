@@ -161,8 +161,8 @@ class ImportEmployeesAction
 
     /**
      * Menjaga file import tidak berisi NIP/email ganda sebelum transaksi insert dimulai.
-     * - NIP ganda dalam satu berkas → error (highest priority)
-     * - Email existing DB → error
+     * - NIP ganda dalam satu berkas → error dengan prioritas tertinggi
+     * - Email yang telah terdaftar → error
      * - Email ganda dalam berkas → error
      * - NIP sudah ada di database → skip bila baris tidak memiliki error lain
      *
@@ -179,7 +179,7 @@ class ImportEmployeesAction
         if (! empty($data['nip'])) {
             $nip = (string) $data['nip'];
 
-            // NIP ganda dalam berkas → error (highest priority)
+            // Duplikasi NIP dalam berkas diprioritaskan agar sumber konflik dapat diperbaiki.
             if (isset($seenNips[$nip])) {
                 $errors['nip'][] = "NIP sudah ada pada baris {$seenNips[$nip]}.";
             } else {
@@ -195,14 +195,14 @@ class ImportEmployeesAction
         if (! empty($data['email_pribadi'])) {
             $email = strtolower((string) $data['email_pribadi']);
 
-            // Email ganda dalam berkas → error
+            // Duplikasi email dalam berkas harus diperbaiki sebelum data disimpan.
             if (isset($seenEmails[$email])) {
                 $errors['email_pribadi'][] = "Email pegawai sudah ada pada baris {$seenEmails[$email]}.";
             } else {
                 $seenEmails[$email] = $row;
             }
 
-            // Email sudah ada di database → error
+            // Email yang telah digunakan tidak boleh dipakai oleh pegawai lain.
             if (Employee::whereRaw('LOWER(email_pribadi) = ?', [$email])->exists()) {
                 $errors['email_pribadi'][] = 'Email pegawai sudah terdaftar di database.';
             }
