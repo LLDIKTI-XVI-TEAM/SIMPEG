@@ -233,7 +233,8 @@ class EmployeeImportTest extends TestCase
     public function test_import_wizard_skips_nip_already_registered_in_database(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
-        Employee::factory()->create(['nip' => '198001012006041001']);
+        // Pegawai sudah terdaftar dengan NIP dan email yang sama (skenario impor ulang file lama).
+        Employee::factory()->create(['nip' => '198001012006041001', 'email_pribadi' => 'budi@example.com']);
 
         $this->actingAs($user);
 
@@ -253,6 +254,32 @@ class EmployeeImportTest extends TestCase
         $validation->assertJsonPath('results.0.status', 'skip');
         $validation->assertJsonPath('results.0.errors.NIP.0', 'NIP sudah terdaftar di database.');
         $validation->assertJsonPath('results.1.status', 'valid');
+    }
+
+    public function test_import_wizard_rejects_email_belonging_to_different_employee(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        // Budi punya email budi@example.com
+        Employee::factory()->create(['nip' => '197001012000031001', 'email_pribadi' => 'budi@example.com']);
+
+        $this->actingAs($user);
+
+        // validRows() memuat row 0 dengan NIP baru 198001012006041001 tetapi email budi@example.com (konflik dengan Budi)
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($this->validRows()),
+        ]);
+
+        $upload->assertOk();
+        $batchId = $upload->json('batch_id');
+
+        $validation = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", []);
+
+        $validation->assertOk();
+        $validation->assertJsonPath('valid_count', 1);
+        $validation->assertJsonPath('skip_count', 0);
+        $validation->assertJsonPath('error_count', 1);
+        $validation->assertJsonPath('results.0.status', 'error');
+        $validation->assertJsonPath('results.0.errors.Email Pegawai.0', 'Email pegawai sudah terdaftar di database.');
     }
 
     public function test_import_wizard_rejects_duplicate_nip_within_file_even_when_registered(): void

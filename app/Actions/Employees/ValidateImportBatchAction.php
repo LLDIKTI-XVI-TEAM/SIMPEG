@@ -179,8 +179,17 @@ class ValidateImportBatchAction
         }
 
         $databaseErrors = [];
-        if (! empty($validated['email_pribadi']) && Employee::whereRaw('LOWER(email_pribadi) = ?', [strtolower($validated['email_pribadi'])])->exists()) {
-            $databaseErrors['Email Pegawai'][] = 'Email pegawai sudah terdaftar di database.';
+        if (! empty($validated['email_pribadi'])) {
+            $emailQuery = Employee::withTrashed()
+                ->whereRaw('LOWER(email_pribadi) = ?', [strtolower($validated['email_pribadi'])]);
+
+            if (! empty($validated['nip'])) {
+                $emailQuery->where('nip', '!=', $validated['nip']);
+            }
+
+            if ($emailQuery->exists()) {
+                $databaseErrors['Email Pegawai'][] = 'Email pegawai sudah terdaftar di database.';
+            }
         }
 
         $duplicateErrors = $this->mapErrors($this->duplicateErrors($validated, $row['row'], $seenNips, $seenEmails), [

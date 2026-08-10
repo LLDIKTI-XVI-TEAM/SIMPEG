@@ -135,19 +135,23 @@ class EmployeeValidationRules
     public static function import(bool $allowExistingNip = false): array
     {
         $nipRules = ['required', 'string', 'size:18'];
+        $emailPribadiRules = ['required', 'email', 'max:255'];
+        $emailRules = ['nullable', 'email', 'max:255'];
 
         // Wizard import menandai NIP yang telah tersimpan sebagai SKIP, sedangkan
         // endpoint kompatibilitas tetap bersifat all-or-nothing seperti sebelumnya.
         if (! $allowExistingNip) {
             $nipRules[] = 'unique:employees,nip';
+            $emailPribadiRules[] = 'unique:employees,email_pribadi';
+            $emailRules[] = 'unique:employees,email';
         }
 
         return [
             'nama_dengan_gelar' => ['required', 'string', 'max:255'],
             'nama_lengkap' => ['nullable', 'string', 'max:255'],
             'nip' => $nipRules,
-            'email_pribadi' => ['required', 'email', 'max:255', 'unique:employees,email_pribadi'],
-            'email' => ['nullable', 'email', 'max:255', 'unique:employees,email'],
+            'email_pribadi' => $emailPribadiRules,
+            'email' => $emailRules,
             // Tanggal lahir wajib pada import karena menjadi dasar kalkulasi BUP/pensiun.
             'tanggal_lahir' => ['required', 'date', 'before:today'],
             'jenis_pegawai' => ['required', 'in:PNS,PPPK,CPNS'],
