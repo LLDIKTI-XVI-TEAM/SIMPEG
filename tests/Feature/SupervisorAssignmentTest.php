@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Employees\AssignSupervisorAction;
 use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveApprovalChain;
+use App\Models\LeaveApprovalChainStep;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
 use App\Services\AuditService;
@@ -14,6 +16,8 @@ use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -195,6 +199,131 @@ class SupervisorAssignmentTest extends TestCase
         $this->assertDatabaseCount('supervisor_assignments', 0);
         $this->assertNull($employee->fresh()->kepala_bagian_id);
         $this->assertDatabaseCount('audit_logs', 0);
+    }
+
+    public function test_direct_action_rejects_nonactive_supervisor_and_preserves_existing_state(): void
+    {
+        $supervisor = Employee::factory()->create(['status_aktif' => 'Non-Aktif']);
+
+        $this->assertDirectAssignmentRejectsInvalidSupervisor($supervisor->id);
+    }
+
+    public function test_direct_action_rejects_soft_deleted_supervisor_and_preserves_existing_state(): void
+    {
+        $supervisor = Employee::factory()->create();
+        $supervisor->delete();
+
+        $this->assertDirectAssignmentRejectsInvalidSupervisor($supervisor->id);
+    }
+
+    public function test_future_direct_action_rejects_nonactive_supervisor_without_touching_current_state(): void
+    {
+        $supervisor = Employee::factory()->create(['status_aktif' => 'Non-Aktif']);
+
+        $this->assertDirectAssignmentRejectsInvalidSupervisor($supervisor->id, '2026-08-01');
+    }
+
+    public function test_future_direct_action_rejects_soft_deleted_supervisor_without_touching_current_state(): void
+    {
+        $supervisor = Employee::factory()->create();
+        $supervisor->delete();
+
+        $this->assertDirectAssignmentRejectsInvalidSupervisor($supervisor->id, '2026-08-01');
+    }
+
+    public static function invalidDirectSupervisorIdProvider(): array
+    {
+        return [
+            'UUID tidak ditemukan' => ['00000000-0000-4000-8000-000000000001'],
+            'string kosong' => [''],
+            'format bukan UUID' => ['bukan-uuid'],
+        ];
+    }
+
+    #[DataProvider('invalidDirectSupervisorIdProvider')]
+    public function test_direct_action_rejects_missing_empty_or_malformed_supervisor_without_query_exception(
+        string $invalidSupervisorId,
+    ): void {
+        $this->assertDirectAssignmentRejectsInvalidSupervisor($invalidSupervisorId);
+    }
+
+    public static function invalidExistingChainProvider(): array
+    {
+        return [
+            'tanpa final' => [true, false],
+            'tanpa Kepala Bagian' => [false, true],
+        ];
+    }
+
+    #[DataProvider('invalidExistingChainProvider')]
+    public function test_direct_action_rejects_invalid_existing_chain_before_mutation(
+        bool $includeKepalaBagian,
+        bool $includeFinal,
+    ): void {
+        $actor = User::factory()->superAdmin()->create();
+        $supervisorLama = Employee::factory()->create();
+        $supervisorBaru = Employee::factory()->create();
+        $pybmc = Employee::factory()->create(['is_kepala_lembaga' => true]);
+        $employee = Employee::factory()->create(['kepala_bagian_id' => $supervisorLama->id]);
+        $assignment = SupervisorAssignment::create([
+            'employee_id' => $employee->id,
+            'kepala_bagian_id' => $supervisorLama->id,
+            'tanggal_mulai' => '2026-01-01',
+            'tanggal_berakhir' => null,
+        ]);
+        $chain = LeaveApprovalChain::create([
+            'employee_id' => $employee->id,
+            'name' => 'Chain aktif tidak lengkap',
+            'is_active' => true,
+            'effective_from' => '2026-01-01',
+        ]);
+        $step = $includeKepalaBagian
+            ? $chain->steps()->create([
+                'step_order' => 1,
+                'step_type' => 'kepala_bagian',
+                'role_label' => 'Kepala Bagian',
+                'approver_employee_id' => $supervisorLama->id,
+                'is_final' => false,
+            ])
+            : $chain->steps()->create([
+                'step_order' => 1,
+                'step_type' => 'pybmc',
+                'role_label' => 'PYBMC',
+                'approver_employee_id' => $pybmc->id,
+                'is_final' => true,
+            ]);
+
+        if ($includeFinal) {
+            $step->update(['is_final' => true]);
+        }
+        $auditCount = AuditLog::count();
+        $exception = null;
+
+        $this->actingAs($actor);
+
+        try {
+            app(AssignSupervisorAction::class)->execute(
+                $employee,
+                $supervisorBaru->id,
+                '2026-07-23',
+            );
+        } catch (ValidationException $caught) {
+            $exception = $caught;
+        }
+
+        if (! $exception instanceof ValidationException) {
+            $this->fail('Direct Action wajib menolak chain aktif yang tidak memenuhi invarian.');
+        }
+
+        $this->assertArrayHasKey('kepala_bagian_id', $exception->errors());
+        $this->assertSame($supervisorLama->id, $assignment->fresh()->kepala_bagian_id);
+        $this->assertNull($assignment->fresh()->tanggal_berakhir);
+        $this->assertSame($supervisorLama->id, $employee->fresh()->kepala_bagian_id);
+        $this->assertSame(
+            $includeKepalaBagian ? $supervisorLama->id : $pybmc->id,
+            $step->fresh()->approver_employee_id,
+        );
+        $this->assertSame($auditCount, AuditLog::count());
     }
 
     public function test_hard_audit_propagates_audit_log_persistence_failure(): void
@@ -406,11 +535,63 @@ class SupervisorAssignmentTest extends TestCase
         $this->assertSame($supervisorSaatIni->id, $step->fresh()->approver_employee_id);
     }
 
+    public function test_assignment_hari_ini_mengambil_lock_global_sebelum_lock_timeline(): void
+    {
+        $employee = Employee::factory()->create();
+        $supervisor = Employee::factory()->create();
+        $advisoryBindings = [];
+
+        DB::listen(function ($event) use (&$advisoryBindings): void {
+            if (str_contains($event->sql, 'pg_advisory_xact_lock')) {
+                $advisoryBindings[] = $event->bindings[0] ?? null;
+            }
+        });
+
+        app(AssignSupervisorAction::class)->execute(
+            $employee,
+            $supervisor->id,
+            '2026-07-23',
+        );
+
+        $this->assertSame(
+            [
+                'simpeg.leave_chain_configuration',
+                'simpeg.supervisor_assignment:'.$employee->id,
+            ],
+            $advisoryBindings,
+        );
+    }
+
+    public function test_assignment_masa_depan_hanya_mengambil_lock_timeline(): void
+    {
+        $employee = Employee::factory()->create();
+        $supervisor = Employee::factory()->create();
+        $advisoryBindings = [];
+
+        DB::listen(function ($event) use (&$advisoryBindings): void {
+            if (str_contains($event->sql, 'pg_advisory_xact_lock')) {
+                $advisoryBindings[] = $event->bindings[0] ?? null;
+            }
+        });
+
+        app(AssignSupervisorAction::class)->execute(
+            $employee,
+            $supervisor->id,
+            '2026-08-01',
+        );
+
+        $this->assertSame(
+            ['simpeg.supervisor_assignment:'.$employee->id],
+            $advisoryBindings,
+        );
+    }
+
     public function test_assignment_rolls_back_history_pointer_audit_and_chain_when_chain_sync_fails(): void
     {
         $user = User::factory()->superAdmin()->create();
         $supervisorLama = Employee::factory()->create();
         $supervisorBaru = Employee::factory()->create();
+        $pybmc = Employee::factory()->create(['is_kepala_lembaga' => true]);
         $employee = Employee::factory()->create(['kepala_bagian_id' => $supervisorLama->id]);
         $assignment = SupervisorAssignment::create([
             'employee_id' => $employee->id,
@@ -429,6 +610,13 @@ class SupervisorAssignmentTest extends TestCase
             'role_label' => 'Kepala Bagian',
             'approver_employee_id' => $supervisorLama->id,
             'is_final' => false,
+        ]);
+        $chain->steps()->create([
+            'step_order' => 2,
+            'step_type' => 'pybmc',
+            'role_label' => 'PYBMC',
+            'approver_employee_id' => $pybmc->id,
+            'is_final' => true,
         ]);
         $auditCount = AuditLog::count();
         $fake = new class extends AuditService
@@ -487,6 +675,96 @@ class SupervisorAssignmentTest extends TestCase
                 'Rentang penugasan Kepala Bagian inklusif tidak boleh tumpang tindih.',
             );
         }
+    }
+
+    private function assertDirectAssignmentRejectsInvalidSupervisor(
+        string $invalidSupervisorId,
+        string $effectiveDate = '2026-07-23',
+    ): void {
+        $actor = User::factory()->superAdmin()->create();
+        $supervisorLama = Employee::factory()->create();
+        $pybmc = Employee::factory()->create(['is_kepala_lembaga' => true]);
+        $employee = Employee::factory()->create(['kepala_bagian_id' => $supervisorLama->id]);
+        $assignment = SupervisorAssignment::create([
+            'employee_id' => $employee->id,
+            'kepala_bagian_id' => $supervisorLama->id,
+            'tanggal_mulai' => '2026-01-01',
+            'tanggal_berakhir' => null,
+        ]);
+        $chain = LeaveApprovalChain::create([
+            'employee_id' => $employee->id,
+            'name' => 'Chain aktif lengkap',
+            'is_active' => true,
+            'effective_from' => '2026-01-01',
+        ]);
+        $kepalaBagianStep = $chain->steps()->create([
+            'step_order' => 1,
+            'step_type' => 'kepala_bagian',
+            'role_label' => 'Kepala Bagian',
+            'approver_employee_id' => $supervisorLama->id,
+            'is_final' => false,
+        ]);
+        $finalStep = $chain->steps()->create([
+            'step_order' => 2,
+            'step_type' => 'pybmc',
+            'role_label' => 'PYBMC',
+            'approver_employee_id' => $pybmc->id,
+            'is_final' => true,
+        ]);
+        $assignmentCount = SupervisorAssignment::count();
+        $chainCount = LeaveApprovalChain::count();
+        $stepCount = LeaveApprovalChainStep::count();
+        $auditCount = AuditLog::count();
+        $exception = null;
+
+        $this->actingAs($actor);
+
+        try {
+            app(AssignSupervisorAction::class)->execute(
+                $employee,
+                $invalidSupervisorId,
+                $effectiveDate,
+            );
+        } catch (ValidationException $caught) {
+            $exception = $caught;
+        }
+
+        if (! $exception instanceof ValidationException) {
+            $this->fail('Direct Action wajib menolak Kepala Bagian yang tidak dapat menjadi approver aktif.');
+        }
+
+        $this->assertArrayHasKey('kepala_bagian_id', $exception->errors());
+        $this->assertSame($assignmentCount, SupervisorAssignment::count());
+        $assignmentAfter = SupervisorAssignment::query()->findOrFail($assignment->id);
+        $this->assertSame($employee->id, $assignmentAfter->employee_id);
+        $this->assertSame($supervisorLama->id, $assignmentAfter->kepala_bagian_id);
+        $this->assertSame('2026-01-01', $assignmentAfter->tanggal_mulai->toDateString());
+        $this->assertNull($assignmentAfter->tanggal_berakhir);
+        $this->assertSame($supervisorLama->id, $employee->fresh()->kepala_bagian_id);
+        $this->assertSame($chainCount, LeaveApprovalChain::count());
+        $this->assertSame($stepCount, LeaveApprovalChainStep::count());
+        $this->assertDatabaseHas('leave_approval_chains', [
+            'id' => $chain->id,
+            'employee_id' => $employee->id,
+            'is_active' => true,
+        ]);
+        $this->assertDatabaseHas('leave_approval_chain_steps', [
+            'id' => $kepalaBagianStep->id,
+            'leave_approval_chain_id' => $chain->id,
+            'step_order' => 1,
+            'step_type' => 'kepala_bagian',
+            'approver_employee_id' => $supervisorLama->id,
+            'is_final' => false,
+        ]);
+        $this->assertDatabaseHas('leave_approval_chain_steps', [
+            'id' => $finalStep->id,
+            'leave_approval_chain_id' => $chain->id,
+            'step_order' => 2,
+            'step_type' => 'pybmc',
+            'approver_employee_id' => $pybmc->id,
+            'is_final' => true,
+        ]);
+        $this->assertSame($auditCount, AuditLog::count());
     }
 
     private function postJsonWithCsrf(string $uri, array $data)

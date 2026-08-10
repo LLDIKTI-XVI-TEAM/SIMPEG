@@ -246,11 +246,10 @@ class ApplyChainTemplateToUnitTest extends TestCase
 
     public function test_penerapan_ditolak_bila_template_sumber_tanpa_kepala_bagian(): void
     {
-        // Rantai yang dibuat lewat jalur non-form dapat kehilangan langkah Kepala Bagian karena
-        // SaveEmployeeApprovalChainAction hanya memvalidasi approver final. Penyalinan tidak dapat
-        // menyisipkan slot yang tidak ada, dan rantai hasil salinan akan ditolak resolver saat
-        // pengajuan sehingga seluruh anggota unit tidak dapat mengajukan cuti. Penerapan harus
-        // dibatalkan sebelum satu pun chain lama dinonaktifkan.
+        // State korup dibuat langsung agar guard jalur simpan tidak menghalangi pengujian
+        // defense-in-depth penerapan template. Penyalinan tidak dapat menyisipkan slot yang
+        // tidak ada, dan rantai hasil salinan akan ditolak resolver saat pengajuan sehingga
+        // seluruh anggota unit tidak dapat mengajukan cuti.
         $aktor = User::factory()->superAdmin()->create();
         $unit = $this->unit('Bagian Keuangan');
         $verifikator = Employee::factory()->create();
@@ -260,10 +259,10 @@ class ApplyChainTemplateToUnitTest extends TestCase
         $anggota = $this->pegawaiUnit($unit, 'Anggota Unit');
         $this->rantaiAwal($anggota, $aktor, $verifikator, $pybmc);
 
-        $this->actingAs($aktor)->app->make(SaveEmployeeApprovalChainAction::class)->execute($sumber, [
+        $this->rantaiKorupTanpaKepalaBagian($sumber, [
             ['step_type' => 'verifier', 'role_label' => 'Verifikator Kepegawaian', 'approver_employee_id' => $verifikator->id, 'is_final' => false],
             ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $pybmc->id, 'is_final' => true],
-        ], $aktor, 'Rantai sumber tanpa kepala bagian.');
+        ]);
 
         $chainAnggotaSebelum = LeaveApprovalChain::query()
             ->where('employee_id', $anggota->id)
@@ -296,10 +295,10 @@ class ApplyChainTemplateToUnitTest extends TestCase
         $anggota = $this->pegawaiUnit($unit, 'Anggota Unit');
         $this->rantaiAwal($anggota, $aktor, $verifikator, $pybmc);
 
-        $this->actingAs($aktor)->app->make(SaveEmployeeApprovalChainAction::class)->execute($sumber, [
+        $this->rantaiKorupTanpaKepalaBagian($sumber, [
             ['step_type' => 'verifier', 'role_label' => 'Verifikator Kepegawaian', 'approver_employee_id' => $verifikator->id, 'is_final' => false],
             ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $pybmc->id, 'is_final' => true],
-        ], $aktor, 'Rantai sumber tanpa kepala bagian.');
+        ]);
 
         $this->actingAs($aktor)
             ->post(route('cuti.config.unit-template.apply'), [
@@ -723,9 +722,8 @@ class ApplyChainTemplateToUnitTest extends TestCase
 
     public function test_template_sumber_dibaca_setelah_lock_unit_diperoleh(): void
     {
-        // Advisory lock hanya menserialkan penerapan bila keputusan dibaca setelah lock diperoleh.
-        // Bila template sumber dibaca sebelum lock, dua penerapan bersamaan ke unit yang sama dapat
-        // memakai snapshot sumber usang sehingga hasilnya tidak setara dengan eksekusi berurutan.
+        // Urutan global lalu unit mencegah ApplyGlobal dan penyalinan unit saling melewati, sedangkan
+        // pembacaan template setelah keduanya memastikan keputusan memakai snapshot yang terserialkan.
         $aktor = User::factory()->superAdmin()->create();
         $unit = $this->unit('Bagian Keuangan');
         $pybmc = Employee::factory()->create();
@@ -737,30 +735,48 @@ class ApplyChainTemplateToUnitTest extends TestCase
 
         $kueri = [];
         DB::listen(function ($event) use (&$kueri): void {
-            $kueri[] = $event->sql;
+            $kueri[] = [
+                'sql' => $event->sql,
+                'bindings' => $event->bindings,
+            ];
         });
 
         $this->terapkan($unit, $sumber, $aktor);
 
-        $indeksLock = null;
+        $indeksLockGlobal = null;
+        $indeksLockUnit = null;
         $indeksBacaTemplate = null;
 
-        foreach ($kueri as $indeks => $sql) {
-            if ($indeksLock === null && str_contains($sql, 'pg_advisory_xact_lock')) {
-                $indeksLock = $indeks;
+        foreach ($kueri as $indeks => $query) {
+            if (str_contains($query['sql'], 'pg_advisory_xact_lock')) {
+                $lockKey = $query['bindings'][0] ?? null;
+
+                if ($indeksLockGlobal === null && $lockKey === 'simpeg.leave_chain_configuration') {
+                    $indeksLockGlobal = $indeks;
+                }
+
+                if ($indeksLockUnit === null && $lockKey === 'simpeg.leave_chain_unit:'.$unit->id) {
+                    $indeksLockUnit = $indeks;
+                }
             }
 
-            if ($indeksBacaTemplate === null && str_contains($sql, 'leave_approval_chain_steps') && str_starts_with(trim($sql), 'select')) {
+            if ($indeksBacaTemplate === null && str_contains($query['sql'], 'leave_approval_chain_steps') && str_starts_with(trim($query['sql']), 'select')) {
                 $indeksBacaTemplate = $indeks;
             }
         }
 
-        $this->assertNotNull($indeksLock, 'Penerapan wajib mengambil advisory lock.');
+        $this->assertNotNull($indeksLockGlobal, 'Penerapan wajib mengambil advisory lock konfigurasi global.');
+        $this->assertNotNull($indeksLockUnit, 'Penerapan wajib mengambil advisory lock unit yang tepat.');
         $this->assertNotNull($indeksBacaTemplate, 'Penerapan wajib membaca langkah template sumber.');
         $this->assertLessThan(
+            $indeksLockUnit,
+            $indeksLockGlobal,
+            'Lock konfigurasi global wajib diperoleh sebelum lock unit.',
+        );
+        $this->assertLessThan(
             $indeksBacaTemplate,
-            $indeksLock,
-            'Template sumber harus dibaca setelah advisory lock diperoleh agar lock benar-benar menserialkan penerapan.',
+            $indeksLockUnit,
+            'Template sumber wajib dibaca setelah lock global dan lock unit diperoleh.',
         );
     }
 
@@ -776,16 +792,19 @@ class ApplyChainTemplateToUnitTest extends TestCase
         $this->pegawaiUnit($unit, 'Anggota Unit');
         $this->rantaiAwal($sumber, $aktor, $verifikator, $pybmc);
 
-        $kueri = [];
-        DB::listen(function ($event) use (&$kueri): void {
-            $kueri[] = $event->sql;
+        $advisoryBindings = [];
+        DB::listen(function ($event) use (&$advisoryBindings): void {
+            if (str_contains($event->sql, 'pg_advisory_xact_lock')) {
+                $advisoryBindings[] = $event->bindings[0] ?? null;
+            }
         });
 
         $this->terapkan($unit, $sumber, $aktor);
 
-        $this->assertNotEmpty(
-            array_filter($kueri, fn (string $sql): bool => str_contains($sql, 'pg_advisory_xact_lock')),
-            'Penerapan template ke unit wajib mengambil advisory lock.',
+        $this->assertContains(
+            'simpeg.leave_chain_unit:'.$unit->id,
+            $advisoryBindings,
+            'Penerapan template ke unit wajib mengambil advisory lock dengan binding unit yang tepat.',
         );
     }
 
@@ -1068,6 +1087,28 @@ class ApplyChainTemplateToUnitTest extends TestCase
             ['step_type' => 'verifier', 'role_label' => 'Verifikator Kepegawaian', 'approver_employee_id' => $verifikator->id, 'is_final' => false],
             ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $pybmc->id, 'is_final' => true],
         ], $aktor, 'Rantai awal untuk pengujian.');
+    }
+
+    /**
+     * Membentuk fixture korup untuk menguji pertahanan aksi penerapan template.
+     *
+     * @param  array<int, array<string, mixed>>  $langkah
+     */
+    private function rantaiKorupTanpaKepalaBagian(Employee $pegawai, array $langkah): LeaveApprovalChain
+    {
+        $rantai = LeaveApprovalChain::create([
+            'employee_id' => $pegawai->id,
+            'name' => 'Rantai sumber tanpa Kepala Bagian',
+            'effective_from' => today(),
+        ]);
+
+        $rantai->steps()->createMany(array_map(
+            fn (array $langkahRantai, int $indeks): array => $langkahRantai + ['step_order' => $indeks + 1],
+            $langkah,
+            array_keys($langkah),
+        ));
+
+        return $rantai;
     }
 
     /**

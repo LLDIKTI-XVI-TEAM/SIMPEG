@@ -94,17 +94,18 @@ class AuditService
         ?string $userAgent = null,
     ): void {
         try {
-            AuditLog::create([
-                'user_id' => $userId,
-                'user_name' => $userName,
-                'event' => $event,
-                'auditable_type' => $auditableType,
-                'auditable_id' => $auditableId,
-                'old_values' => $oldValues,
-                'new_values' => $newValues,
-                'ip_address' => $request?->ip() ?? $ipAddress,
-                'user_agent' => $request?->userAgent() ?? $userAgent,
-            ]);
+            AuditLog::create(self::explicitPayload(
+                $userId,
+                $userName,
+                $event,
+                $auditableType,
+                $auditableId,
+                $oldValues,
+                $newValues,
+                $request,
+                $ipAddress,
+                $userAgent,
+            ));
         } catch (\Throwable $e) {
             Log::warning('Audit log gagal ditulis', [
                 'event' => $event,
@@ -112,6 +113,35 @@ class AuditService
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Menulis audit dengan aktor eksplisit tanpa menelan kegagalan agar mutasi kritis dapat di-rollback.
+     */
+    public static function logAsOrFail(
+        string $userId,
+        string $userName,
+        string $event,
+        string $auditableType,
+        ?string $auditableId = null,
+        ?array $oldValues = null,
+        ?array $newValues = null,
+        ?Request $request = null,
+        ?string $ipAddress = null,
+        ?string $userAgent = null,
+    ): void {
+        AuditLog::create(self::explicitPayload(
+            $userId,
+            $userName,
+            $event,
+            $auditableType,
+            $auditableId,
+            $oldValues,
+            $newValues,
+            $request,
+            $ipAddress,
+            $userAgent,
+        ));
     }
 
     /**
@@ -134,6 +164,36 @@ class AuditService
         return [
             'user_id' => $user?->id,
             'user_name' => $user?->name,
+            'event' => $event,
+            'auditable_type' => $auditableType,
+            'auditable_id' => $auditableId,
+            'old_values' => $oldValues,
+            'new_values' => $newValues,
+            'ip_address' => $request?->ip() ?? $ipAddress,
+            'user_agent' => $request?->userAgent() ?? $userAgent,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $oldValues
+     * @param  array<string, mixed>|null  $newValues
+     * @return array<string, mixed>
+     */
+    private static function explicitPayload(
+        string $userId,
+        string $userName,
+        string $event,
+        string $auditableType,
+        ?string $auditableId,
+        ?array $oldValues,
+        ?array $newValues,
+        ?Request $request,
+        ?string $ipAddress,
+        ?string $userAgent,
+    ): array {
+        return [
+            'user_id' => $userId,
+            'user_name' => $userName,
             'event' => $event,
             'auditable_type' => $auditableType,
             'auditable_id' => $auditableId,
