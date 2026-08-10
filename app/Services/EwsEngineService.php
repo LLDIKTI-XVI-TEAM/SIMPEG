@@ -81,8 +81,8 @@ class EwsEngineService
                 $this->configYears('satyalancana_years_3', 30),
             ];
 
-            // US-5.5: Scan pegawai aktif menggunakan milestone yang sudah diprekomputasi.
-            // Optimisasi ~70-80% query dengan membaca employee_milestones, fallback ke perhitungan real-time jika belum ada.
+            // Gunakan milestone terhitung untuk mengurangi query, lalu hitung langsung
+            // bila backfill belum tersedia atau versi konfigurasinya sudah berubah.
             // Eager-load relasi yang dipakai fallback untuk menghindari N+1 pada deployment awal (sebelum milestone backfill).
             Employee::with([
                 'milestones' => fn ($q) => $q->where('is_active', true),
@@ -542,13 +542,14 @@ class EwsEngineService
                     throw $exception;
                 }
             }
-        } else {
-            // Update eligibility status on existing alert if it has changed
-            // This handles cases where employee conditions change (performance, discipline)
-            // after the alert was initially created
-            if ($alert->is_eligible !== $isEligible) {
-                $alert->update(['is_eligible' => $isEligible]);
-            }
+        }
+
+        // Status kelayakan yang tersimpan harus mengikuti keadaan pegawai saat penjadwalan
+        // berjalan, bukan keadaan saat alert pertama kali dibuat. Kolom ini menjelaskan alasan
+        // sebuah pengingat ditahan atau diterbitkan, sehingga nilai yang tertinggal akan
+        // menyesatkan pembaca yang memakainya tanpa menghitung ulang kelayakan.
+        if ($isEligible !== null && $alert->is_eligible !== $isEligible) {
+            $alert->forceFill(['is_eligible' => $isEligible])->save();
         }
 
         $timeLabel = $days.' hari';
@@ -569,25 +570,35 @@ class EwsEngineService
             $eligibilityNote,
         );
 
-        // Always update existing notification if alert eligibility changed
-        // Even when sendNotification=false, we need to sync notification data
-        $notification = $this->notificationService->upsertEwsReminder(
-            $employee,
-            $alert,
-            'ews.'.strtolower($type),
-            'Peringatan EWS: '.$titleLabel,
-            $body,
-            [
-                'ews_alert_id' => $alert->id,
-                'is_eligible' => $isEligible,
-            ],
-            createIfMissing: $sendNotification,  // Only create NEW notification if eligible
-        );
+        // Notifikasi belum dibaca yang sudah ada tetap diselaraskan saat kelayakan berubah.
+        // Nilai false hanya mencegah pembuatan notifikasi baru untuk pegawai tidak layak.
+        $notificationData = [
+            'ews_alert_id' => $alert->id,
+            'is_eligible' => $isEligible,
+        ];
+        $notification = $sendNotification
+            ? $this->notificationService->upsertEwsReminder(
+                $employee,
+                $alert,
+                'ews.'.strtolower($type),
+                'Peringatan EWS: '.$titleLabel,
+                $body,
+                $notificationData,
+            )
+            : $this->notificationService->upsertEwsReminder(
+                $employee,
+                $alert,
+                'ews.'.strtolower($type),
+                'Peringatan EWS: '.$titleLabel,
+                $body,
+                $notificationData,
+                createIfMissing: false,
+            );
 
         if ($notification !== null) {
             $updates = [];
 
-            // Update notified_at only for unread notifications
+            // Waktu pemberitahuan hanya diperbarui bila notifikasinya belum dibaca.
             if (! $notification->is_read) {
                 $updates['notified_at'] = now();
 

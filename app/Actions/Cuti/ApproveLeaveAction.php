@@ -10,6 +10,7 @@ use App\Services\AuditService;
 use App\Services\LeaveApprovalService;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Mengoordinasikan tindakan menyetujui pengajuan cuti.
@@ -43,19 +44,28 @@ class ApproveLeaveAction
         $requestUser = $request->user();
         $actingUser = $requestUser instanceof User ? $requestUser : null;
 
-        $leaveRequest = $this->approvals->approve($leaveRequest, $actor, $komentar, $actingUser);
-        $auditPayload = $this->decisionAuditPayload($statusSebelum, $leaveRequest, $stepSebelum, $actor, 'APPROVE', $komentar);
+        // Persetujuan dan jejaknya disatukan dalam satu transaksi supaya pengajuan tidak pernah
+        // berpindah tahap tanpa baris audit. Penerbitan bukti dan notifikasi tetap di luar transaksi
+        // agar kegagalannya tidak membatalkan persetujuan yang sah.
+        $leaveRequest = DB::transaction(function () use ($leaveRequest, $actor, $komentar, $request, $actingUser, $statusSebelum, $stepSebelum): LeaveRequest {
+            $leaveRequest = $this->approvals->approve($leaveRequest, $actor, $komentar, $actingUser);
 
-        // Audit dan notifikasi bersifat fire-and-forget setelah transaksi persetujuan berhasil di service,
-        // agar kegagalan audit/notifikasi tidak membatalkan persetujuan yang sudah sah tersimpan.
-        AuditService::log(
-            'APPROVE',
-            'LeaveRequest',
-            $leaveRequest->id,
-            $auditPayload['old'],
-            $auditPayload['new'],
-            $request,
-        );
+            // Persetujuan tahap menengah hanya meneruskan berkas, sedangkan tahap akhir menutup pengajuan.
+            // Keduanya dipisahkan agar penyaringan audit dapat membedakan verifikasi dari keputusan resmi.
+            $event = $leaveRequest->status === 'disetujui' ? 'DECIDE' : 'VERIFY';
+            $auditPayload = $this->decisionAuditPayload($statusSebelum, $leaveRequest, $stepSebelum, $actor, $event, $komentar);
+
+            AuditService::logOrFail(
+                $event,
+                'LeaveRequest',
+                $leaveRequest->id,
+                $auditPayload['old'],
+                $auditPayload['new'],
+                $request,
+            );
+
+            return $leaveRequest;
+        });
 
         $this->notifyAfterApproval($leaveRequest);
 

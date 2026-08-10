@@ -5,12 +5,17 @@ namespace Tests\Feature;
 use App\Models\Employee;
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
+use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenjangPendidikan;
 use App\Models\RefUnitKerja;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\MessageBag;
+use Illuminate\Support\ViewErrorBag;
 use Tests\TestCase;
 
 /**
@@ -34,6 +39,7 @@ class DataMasterPageTest extends TestCase
         RefJenisJabatan::create(['nama' => 'Fungsional Kekhususan', 'maks_usia_pensiun' => 60]);
         RefEselon::create(['kode' => 'IV.a', 'nama' => 'Eselon Uji IV.a']);
         RefJenjangPendidikan::create(['nama' => 'S3 Terapan Uji', 'urutan' => 10]);
+        RefJabatan::create(['nama' => 'Analis Kepegawaian Uji', 'default_bup' => 60]);
         $user = User::factory()->superAdmin()->create();
 
         $response = $this->actingAs($user)->get(route('data-master'));
@@ -43,6 +49,9 @@ class DataMasterPageTest extends TestCase
             ->assertSee('Fungsional Kekhususan')
             ->assertSee('Eselon Uji IV.a')
             ->assertSee('S3 Terapan Uji')
+            ->assertSee('Jabatan')
+            ->assertSee('Analis Kepegawaian Uji')
+            ->assertSee('60 tahun')
             // Baris status pegawai bawaan migration ikut tampil, lengkap
             // dengan penanda baris yang dikunci logika sistem.
             ->assertSee('PERPANJANGAN_CLTN')
@@ -67,6 +76,192 @@ class DataMasterPageTest extends TestCase
             ->assertDontSee('Kelompok Kerja Akademik dan Kemahasiswaan')
             ->assertDontSee('Kelompok Kerja Kelembagaan dan Sistem Informasi')
             ->assertSee('Belum ada data unit kerja.');
+    }
+
+    public function test_tab_jabatan_merender_kontrak_frontend_tanpa_route_crud_palsu(): void
+    {
+        $jenis = RefJenisJabatan::create([
+            'nama' => 'Fungsional Jabatan Uji',
+            'maks_usia_pensiun' => 60,
+        ]);
+        $eselon = RefEselon::create([
+            'kode' => 'IV.a',
+            'nama' => 'Eselon Jabatan Uji',
+        ]);
+        $jabatan = RefJabatan::create([
+            'nama' => 'Analis Jabatan Uji',
+            'jenis_jabatan_id' => $jenis->id,
+            'eselon_id' => $eselon->id,
+            'default_bup' => 60,
+            'is_active' => false,
+            'keterangan' => 'Referensi uji untuk tab Jabatan.',
+        ]);
+
+        // Form CRUD kini ikut dirender karena route-nya sudah tersedia, dan komponen input
+        // di dalamnya membaca error bag yang pada permintaan nyata selalu dibagikan
+        // middleware web. Pembagian di sini menirukan kondisi itu untuk render terisolasi.
+        $this->withViewErrors([]);
+
+        $html = view('admin.data-master.partials.tab-jabatan', [
+            'jabatan' => collect([$jabatan]),
+            'jabatanUsage' => [$jabatan->id => 2],
+            'jenisJabatan' => collect([$jenis]),
+            'eselon' => collect([$eselon]),
+        ])->render();
+
+        $this->assertStringContainsString('Analis Jabatan Uji', $html);
+        $this->assertStringContainsString('Fungsional Jabatan Uji', $html);
+        $this->assertStringContainsString('IV.a — Eselon Jabatan Uji', $html);
+        $this->assertStringContainsString('60 tahun', $html);
+        $this->assertStringContainsString('Nonaktif', $html);
+        $this->assertStringContainsString('2 pemakai', $html);
+        $this->assertStringNotContainsString('href="#"', $html);
+        $this->assertStringNotContainsString('action="#"', $html);
+    }
+
+    public function test_tab_jabatan_memulihkan_form_yang_tepat_saat_validasi_gagal(): void
+    {
+        $jenis = RefJenisJabatan::create([
+            'nama' => 'Fungsional Jabatan Validasi',
+            'maks_usia_pensiun' => 60,
+        ]);
+        $eselon = RefEselon::create([
+            'kode' => 'IV.a',
+            'nama' => 'Eselon Jabatan Validasi',
+        ]);
+        $jabatan = RefJabatan::create([
+            'nama' => 'Analis Jabatan Validasi',
+            'jenis_jabatan_id' => $jenis->id,
+            'eselon_id' => $eselon->id,
+            'default_bup' => 60,
+        ]);
+
+        $this->daftarkanRouteJabatanUntukRenderTab();
+
+        $errors = (new ViewErrorBag)->put('default', new MessageBag([
+            'nama' => ['Nama jabatan wajib diisi.'],
+        ]));
+
+        $session = app('session.store');
+        $session->put('_old_input', [
+            'tab' => 'jabatan',
+            'form_context' => (string) $jabatan->id,
+            'nama' => 'Draf edit Jabatan',
+            'jenis_jabatan_id' => (string) $jenis->id,
+            'eselon_id' => (string) $eselon->id,
+            'default_bup' => '61',
+            'keterangan' => 'Keterangan draf edit.',
+        ]);
+
+        $request = Request::create('/admin/data-master', 'GET');
+        $request->setLaravelSession($session);
+        app()->instance('request', $request);
+        view()->share('errors', $errors);
+
+        $editHtml = view('admin.data-master.partials.tab-jabatan', [
+            'jabatan' => collect([$jabatan]),
+            'jabatanUsage' => [],
+            'jenisJabatan' => collect([$jenis]),
+            'eselon' => collect([$eselon]),
+            'errors' => $errors,
+        ])->render();
+
+        $this->assertStringContainsString("showTambah: false, editId: '{$jabatan->id}'", $editHtml);
+        $this->assertSame(1, substr_count($editHtml, 'value="Draf edit Jabatan"'));
+        $this->assertStringContainsString('name="form_context" value="'.$jabatan->id.'"', $editHtml);
+        $this->assertSame(2, substr_count($editHtml, 'maxlength="255"'));
+        $this->assertStringNotContainsString('maxlength="1000"', $editHtml);
+
+        $session->put('_old_input', [
+            'tab' => 'jabatan',
+            'form_context' => 'create',
+            'nama' => 'Draf tambah Jabatan',
+        ]);
+
+        $createHtml = view('admin.data-master.partials.tab-jabatan', [
+            'jabatan' => collect([$jabatan]),
+            'jabatanUsage' => [],
+            'jenisJabatan' => collect([$jenis]),
+            'eselon' => collect([$eselon]),
+            'errors' => $errors,
+        ])->render();
+
+        $this->assertStringContainsString('showTambah: true, editId: null', $createHtml);
+        $this->assertSame(1, substr_count($createHtml, 'value="Draf tambah Jabatan"'));
+        $this->assertStringContainsString('name="form_context" value="create"', $createHtml);
+    }
+
+    public function test_tab_jabatan_merender_feedback_validasi_aksesibel_pada_form_tambah_dan_edit(): void
+    {
+        $jenis = RefJenisJabatan::create([
+            'nama' => 'Jenis Validasi Aksesibel',
+            'maks_usia_pensiun' => 60,
+        ]);
+        $eselon = RefEselon::create([
+            'kode' => 'IV.a',
+            'nama' => 'Eselon Validasi Aksesibel',
+        ]);
+        $jabatan = RefJabatan::create([
+            'nama' => 'Analis Validasi Aksesibel',
+            'jenis_jabatan_id' => $jenis->id,
+            'eselon_id' => $eselon->id,
+        ]);
+        $this->daftarkanRouteJabatanUntukRenderTab();
+
+        $errors = (new ViewErrorBag)->put('default', new MessageBag([
+            'jenis_jabatan_id' => ['Jenis jabatan tidak valid.'],
+            'eselon_id' => ['Eselon tidak valid.'],
+            'keterangan' => ['Keterangan terlalu panjang.'],
+        ]));
+        $session = app('session.store');
+        $request = Request::create('/admin/data-master', 'GET');
+        $request->setLaravelSession($session);
+        app()->instance('request', $request);
+        view()->share('errors', $errors);
+
+        $session->put('_old_input', ['tab' => 'jabatan', 'form_context' => 'create']);
+        $createHtml = view('admin.data-master.partials.tab-jabatan', [
+            'jabatan' => collect([$jabatan]),
+            'jabatanUsage' => [],
+            'jenisJabatan' => collect([$jenis]),
+            'eselon' => collect([$eselon]),
+            'errors' => $errors,
+        ])->render();
+
+        foreach (['jabatan-jenis-jabatan', 'jabatan-eselon', 'jabatan-keterangan'] as $fieldId) {
+            $this->assertStringContainsString('aria-invalid="true" aria-describedby="'.$fieldId.'-error"', $createHtml);
+            $this->assertStringContainsString('id="'.$fieldId.'-error"', $createHtml);
+        }
+
+        $session->put('_old_input', ['tab' => 'jabatan', 'form_context' => (string) $jabatan->id]);
+        $editHtml = view('admin.data-master.partials.tab-jabatan', [
+            'jabatan' => collect([$jabatan]),
+            'jabatanUsage' => [],
+            'jenisJabatan' => collect([$jenis]),
+            'eselon' => collect([$eselon]),
+            'errors' => $errors,
+        ])->render();
+
+        foreach (['jabatan-jenis-'.$jabatan->id, 'jabatan-eselon-'.$jabatan->id, 'jabatan-keterangan-'.$jabatan->id] as $fieldId) {
+            $this->assertStringContainsString('aria-invalid="true" aria-describedby="'.$fieldId.'-error"', $editHtml);
+            $this->assertStringContainsString('id="'.$fieldId.'-error"', $editHtml);
+        }
+    }
+
+    private function daftarkanRouteJabatanUntukRenderTab(): void
+    {
+        foreach ([
+            'data-master.jabatan.store' => '/__test/data-master/jabatan',
+            'data-master.jabatan.update' => '/__test/data-master/jabatan/{jabatan}/update',
+            'data-master.jabatan.toggle' => '/__test/data-master/jabatan/{jabatan}/toggle',
+            'data-master.jabatan.destroy' => '/__test/data-master/jabatan/{jabatan}/destroy',
+        ] as $name => $uri) {
+            if (! Route::has($name)) {
+                Route::post($uri, static fn () => null)->name($name);
+            }
+        }
+
+        Route::getRoutes()->refreshNameLookups();
     }
 
     public function test_unit_kerja_ditampilkan_berjenjang_dari_database(): void

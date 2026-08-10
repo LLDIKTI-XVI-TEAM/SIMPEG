@@ -730,6 +730,63 @@
             </div>
         </section>
 
+        <section class="overflow-hidden rounded-xl border border-border bg-surface shadow-sm" aria-labelledby="unit-template-heading">
+            <div class="border-b border-border bg-soft/30 px-5 py-4">
+                <h3 id="unit-template-heading" class="text-xs font-bold uppercase tracking-wider text-ink">Terapkan Chain ke Unit Kerja</h3>
+                <p class="mt-0.5 text-xs text-muted">Salin chain pegawai terpilih ke seluruh anggota satu unit kerja.</p>
+            </div>
+            <div class="space-y-4 px-5 py-5">
+                <p class="rounded-xl border border-border bg-soft/30 px-4 py-3 text-sm text-muted">Hanya unit yang dipilih, tidak termasuk sub-unit di bawahnya. Keanggotaan unit diambil dari riwayat jabatan terkini pegawai. Chain yang sudah ada akan ditimpa, chain lama dinonaktifkan bukan dihapus.</p>
+
+                @if ($selectedEmployee === null)
+                    <p class="rounded-xl border border-border bg-soft/30 px-4 py-3 text-sm text-muted">Pilih pegawai pada panel Chain Approval Pegawai terlebih dahulu untuk dipakai sebagai sumber.</p>
+                @elseif (! $templateSourceHasActiveChain)
+                    <p class="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-ink">{{ $selectedEmployee->nama_lengkap }} belum memiliki chain aktif, jadi belum ada yang dapat disalin. Simpan chain pegawai ini lebih dulu.</p>
+                @else
+                    <form method="POST" action="{{ route('cuti.config.unit-template.apply') }}" class="space-y-3">
+                        @csrf
+                        <input type="hidden" name="source_employee_id" value="{{ $selectedEmployee->id }}">
+
+                        <div class="rounded-xl border border-border bg-soft/30 px-4 py-3">
+                            <p class="text-xs font-semibold uppercase tracking-wider text-muted">Sumber Chain</p>
+                            <p class="mt-1 text-sm font-semibold text-ink">{{ $selectedEmployee->nama_lengkap }}</p>
+                            @if ($selectedEmployee->nip)
+                                <p class="text-xs text-muted">NIP {{ $selectedEmployee->nip }}</p>
+                            @endif
+                        </div>
+
+                        <div>
+                            <label for="unit-kerja-id" class="mb-1.5 block text-sm font-semibold text-ink">Unit Kerja Tujuan <span class="text-danger">*</span></label>
+                            <select
+                                name="unit_kerja_id"
+                                id="unit-kerja-id"
+                                required
+                                aria-describedby="unit-kerja-id-hint"
+                                class="w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm text-ink shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                            >
+                                <option value="">Pilih unit kerja</option>
+                                @foreach ($unitKerjaOptions as $unitKerja)
+                                    <option value="{{ $unitKerja->id }}" @selected(old('unit_kerja_id', $templateSourceUnitKerjaId) === $unitKerja->id)>{{ $unitKerja->nama }}</option>
+                                @endforeach
+                            </select>
+                            <p id="unit-kerja-id-hint" class="mt-1 text-xs text-muted">Unit kerja pegawai sumber dipilih otomatis bila tersedia.</p>
+                            @error('unit_kerja_id')
+                                <p class="mt-1 text-xs text-danger">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        @error('source_employee_id')
+                            <p class="text-xs text-danger">{{ $message }}</p>
+                        @enderror
+
+                        <x-form.textarea name="template_reason" id="template-reason" label="Alasan Penerapan" :required="true" rows="3" placeholder="Contoh: Menyeragamkan chain approval Bagian Keuangan" />
+
+                        <button type="submit" class="inline-flex w-full items-center justify-center rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Terapkan ke Unit Kerja</button>
+                    </form>
+                @endif
+            </div>
+        </section>
+
         </div>
         </div>
 

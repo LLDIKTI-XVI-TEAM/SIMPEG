@@ -251,6 +251,34 @@ class CutiExcelExportTest extends TestCase
         }
     }
 
+    public function test_sheet_saldo_memuat_pegawai_bersaldo_tanpa_pengajuan_pada_periode_filter(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $pegawaiBertransaksi = Employee::factory()->create(['nama_lengkap' => 'Pegawai Bertransaksi']);
+        $pegawaiTanpaPengajuan = Employee::factory()->create(['nama_lengkap' => 'Pegawai Tanpa Pengajuan']);
+        $jenis = RefJenisCuti::create(['nama' => 'Cuti Tahunan']);
+
+        $this->createLeaveRequest($pegawaiBertransaksi, $jenis, '2026-06-10', 'disetujui', 2);
+        LeaveBalance::create(['employee_id' => $pegawaiBertransaksi->id, 'tahun' => 2026, 'sisa' => 10]);
+        // Saldo bersifat state materialized, bukan turunan transaksi. Pegawai yang belum
+        // punya pengajuan pada periode filter tetap punya hak cuti yang wajib terlapor.
+        LeaveBalance::create(['employee_id' => $pegawaiTanpaPengajuan->id, 'tahun' => 2026, 'sisa' => 12]);
+
+        $spreadsheet = $this->loadWorkbook($this->actingAs($user)
+            ->get(route('cuti.laporan.excel', ['periode' => '2026']))
+            ->streamedContent());
+
+        try {
+            $balance = $spreadsheet->getSheetByName('Saldo Cuti');
+            $this->assertNotNull($balance);
+            $namaTerekspor = collect($balance->rangeToArray('A2:C'.$balance->getHighestDataRow()))->pluck(2);
+            $this->assertContains('Pegawai Bertransaksi', $namaTerekspor);
+            $this->assertContains('Pegawai Tanpa Pengajuan', $namaTerekspor);
+        } finally {
+            $spreadsheet->disconnectWorksheets();
+        }
+    }
+
     public function test_nama_file_excel_mengikuti_periode_filter(): void
     {
         $user = User::factory()->superAdmin()->create();

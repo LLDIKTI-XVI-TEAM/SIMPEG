@@ -352,7 +352,7 @@ class KepalaBagianFrontendTest extends TestCase
             'action' => 'APPROVE',
         ]);
         $this->assertDatabaseHas('audit_logs', [
-            'event' => 'APPROVE',
+            'event' => 'DECIDE',
             'auditable_type' => 'LeaveRequest',
             'auditable_id' => $leave->id,
         ]);

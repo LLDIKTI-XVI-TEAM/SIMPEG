@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\EmployeeStatusHistory;
 use App\Models\RefStatusPegawai;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -229,6 +231,72 @@ class DataMasterStatusPegawaiTest extends TestCase
             ->assertSessionHasErrors();
 
         $this->assertDatabaseHas('ref_status_pegawai', ['id' => $status->id]);
+    }
+
+    public function test_status_yang_dipakai_riwayat_status_tidak_dapat_dihapus(): void
+    {
+        // Riwayat status bersifat append-only: pegawai yang sudah berpindah
+        // status meninggalkan baris lama sebagai satu-satunya perujuk status
+        // tersebut. Kolom status terkini pegawai sengaja dibiarkan menunjuk
+        // status lain supaya penolakan benar-benar berasal dari pemeriksaan
+        // riwayat, bukan dari pemeriksaan data pegawai yang sudah ada.
+        $status = RefStatusPegawai::create([
+            'kode' => 'UJI_RIWAYAT',
+            'nama' => 'Uji Riwayat',
+            'kelompok' => 'Nonaktif',
+        ]);
+        $employee = Employee::factory()->create();
+        EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_pegawai_id' => $status->id,
+            'status_nama' => 'Uji Riwayat',
+            'tanggal_efektif' => '2026-01-01',
+            'is_latest' => false,
+        ]);
+
+        $this->assertNotSame($status->id, $employee->refresh()->status_pegawai_id);
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->postWithCsrf(route('data-master.status-pegawai.destroy', $status), [])
+            ->assertSessionHasErrors();
+
+        $this->assertDatabaseHas('ref_status_pegawai', ['id' => $status->id]);
+        $this->assertDatabaseHas('employee_status_histories', [
+            'employee_id' => $employee->id,
+            'status_pegawai_id' => $status->id,
+        ]);
+    }
+
+    public function test_fk_status_pegawai_menolak_penghapusan_langsung_saat_dipakai_riwayat(): void
+    {
+        $status = RefStatusPegawai::create([
+            'kode' => 'UJI_FK_RIWAYAT',
+            'nama' => 'Uji FK Riwayat',
+            'kelompok' => 'Nonaktif',
+        ]);
+        $employee = Employee::factory()->create();
+        EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_pegawai_id' => $status->id,
+            'status_nama' => 'Uji FK Riwayat',
+            'tanggal_efektif' => '2026-01-01',
+            'is_latest' => false,
+        ]);
+
+        try {
+            DB::transaction(function () use ($status): void {
+                RefStatusPegawai::query()->whereKey($status->id)->delete();
+                self::fail('Basis data harus menolak penghapusan status yang masih dirujuk riwayat.');
+            });
+        } catch (QueryException) {
+            // FK RESTRICT adalah lapisan terakhir saat penghapusan tidak melewati Action.
+        }
+
+        $this->assertDatabaseHas('ref_status_pegawai', ['id' => $status->id]);
+        $this->assertDatabaseHas('employee_status_histories', [
+            'employee_id' => $employee->id,
+            'status_pegawai_id' => $status->id,
+        ]);
     }
 
     public function test_status_yang_belum_dipakai_dapat_dihapus_permanen(): void

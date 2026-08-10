@@ -8,10 +8,14 @@ use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\RankHistory;
 use App\Models\User;
+use App\Queries\Dashboards\EmployeeTrendQuery;
 
 class BuildPimpinanDashboardAction
 {
-    public function __construct(private readonly ListActiveEwsAlertsAction $ewsAlerts) {}
+    public function __construct(
+        private readonly ListActiveEwsAlertsAction $ewsAlerts,
+        private readonly EmployeeTrendQuery $trenPegawai,
+    ) {}
 
     public function execute(User $user): array
     {
@@ -22,22 +26,7 @@ class BuildPimpinanDashboardAction
         $now = now();
         $pendingLeaves = $this->pendingLeaves($user->employee_id);
         $ews = $this->ewsAlerts->execute(null, null)['alerts'];
-        $trenPegawai = collect(range(11, 0))
-            ->map(function (int $offset) use ($now): array {
-                $targetDate = $now->copy()->subMonths($offset)->endOfMonth();
-
-                return [
-                    'label' => $now->copy()->subMonths($offset)->translatedFormat('M Y'),
-                    'jumlah' => Employee::query()
-                        ->where('status_aktif', 'Aktif')
-                        ->whereDate('created_at', '<=', $targetDate)
-                        ->where(function ($q) use ($targetDate): void {
-                            $q->whereNull('tanggal_pensiun')
-                                ->orWhereDate('tanggal_pensiun', '>', $targetDate);
-                        })
-                        ->count(),
-                ];
-            });
+        $trenPegawai = collect($this->trenPegawai->monthlyActiveCounts($now));
 
         $chartWidth = 440;
         $chartHeight = 100;

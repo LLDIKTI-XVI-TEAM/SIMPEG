@@ -2,6 +2,7 @@
 
 namespace App\Actions\Documents;
 
+use App\Actions\Documents\Concerns\BuildsDocumentAuditPayload;
 use App\Models\Appointment;
 use App\Models\DisciplineRecord;
 use App\Models\Document;
@@ -10,6 +11,7 @@ use App\Models\EmployeeStatusHistory;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\SalaryHistory;
+use App\Services\AuditService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +20,8 @@ use Illuminate\Validation\ValidationException;
 
 class DeleteDocumentAction
 {
+    use BuildsDocumentAuditPayload;
+
     /**
      * Periksa seluruh riwayat pegawai yang menggunakan file dokumen.
      *
@@ -111,6 +115,17 @@ class DeleteDocumentAction
             }
 
             $filePath = $lockedDocument->file_path;
+
+            // Audit ditulis sebelum baris dihapus supaya metadata dokumen masih dapat direkam,
+            // dan memakai logOrFail agar penghapusan tidak pernah terjadi tanpa jejak.
+            AuditService::logOrFail(
+                'DELETE',
+                'Document',
+                $lockedDocument->id,
+                $this->auditPayload($lockedDocument),
+                null,
+            );
+
             $lockedDocument->delete();
 
             return $filePath;

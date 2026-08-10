@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Employee;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -28,7 +29,13 @@ return new class extends Migration
             ->chunkById(200, function ($employees) use ($appKey): void {
                 foreach ($employees as $employee) {
                     /** @var Employee $employee */
-                    $plainNik = $employee->nik; // didekripsi oleh 'encrypted' cast
+                    try {
+                        $plainNik = $employee->nik; // didekripsi oleh 'encrypted' cast
+                    } catch (DecryptException $e) {
+                        Log::warning("[Migration] Gagal mendekripsi NIK untuk pegawai ID: {$employee->id} karena APP_KEY berubah. Melewati hash.");
+
+                        continue;
+                    }
 
                     if ($plainNik === null || trim((string) $plainNik) === '') {
                         continue;
@@ -93,6 +100,8 @@ return new class extends Migration
     {
         Schema::table('employees', function (Blueprint $table): void {
             $table->dropUnique('employees_nik_hash_unique');
+        });
+        Schema::table('employees', function (Blueprint $table): void {
             $table->dropColumn('nik_hash');
         });
     }

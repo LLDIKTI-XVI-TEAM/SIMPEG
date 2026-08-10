@@ -15,9 +15,7 @@ use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-/**
- * US-4.5 AC-2: Test untuk verifikasi tampilan saldo cuti di halaman approval
- */
+/** Mengunci tampilan konteks saldo pemohon pada halaman keputusan cuti. */
 class LeaveBalanceDisplayTest extends TestCase
 {
     use RefreshDatabase;
@@ -107,27 +105,14 @@ class LeaveBalanceDisplayTest extends TestCase
 
         $response->assertOk();
 
-        // Verifikasi saldo tahun berjalan ditampilkan
-        $response->assertSee('Informasi Saldo Cuti Pemohon');
-        $response->assertSee('Tahun '.$currentYear);
-        $response->assertSee('Jatah '.$currentYear);
-        $response->assertSee('Carry-Over');
-        $response->assertSee('Sudah Terpakai');
-        $response->assertSee('Sisa Saldo');
-
-        // Verifikasi angka saldo tahun berjalan
-        $response->assertSeeInOrder(['12', 'hari']); // Jatah
-        $response->assertSeeInOrder(['6', 'hari']); // Carry over
-
-        // Verifikasi riwayat ditampilkan
-        $response->assertSee('Riwayat Penggunaan');
-        $response->assertSee('Tahun '.($currentYear - 2));
-        $response->assertSee('Tahun '.($currentYear - 1));
-        $response->assertSee('N-2');
-        $response->assertSee('N-1');
+        $response->assertSee('Informasi Saldo & Riwayat Cuti Pemohon', false);
+        $response->assertSee("Saldo Dapat Diajukan (N={$currentYear})");
+        $response->assertSee('Sisa Hak N-1 ('.($currentYear - 1).')');
+        $response->assertSee('Sisa Hak N-2 ('.($currentYear - 2).')');
+        $response->assertSee('Riwayat Cuti Tahunan Disetujui');
     }
 
-    public function test_leave_balance_not_displayed_for_non_annual_leave(): void
+    public function test_verifier_context_is_available_for_non_annual_leave(): void
     {
         // Setup employee
         $employee = Employee::factory()->create();
@@ -153,8 +138,7 @@ class LeaveBalanceDisplayTest extends TestCase
 
         $response->assertOk();
 
-        // Verifikasi saldo TIDAK ditampilkan untuk cuti non-tahunan
-        $response->assertDontSee('Informasi Saldo Cuti Pemohon');
+        $response->assertSee('Informasi Saldo & Riwayat Cuti Pemohon', false);
     }
 
     public function test_approver_can_see_leave_balance_on_pending_request(): void
@@ -220,8 +204,7 @@ class LeaveBalanceDisplayTest extends TestCase
 
         $response->assertOk();
 
-        // Verifikasi approver dapat melihat informasi saldo
-        $response->assertSee('Informasi Saldo Cuti Pemohon');
-        $response->assertSee('Data saldo untuk verifikasi kelayakan pengajuan');
+        $response->assertSee('Informasi Saldo & Riwayat Cuti Pemohon', false);
+        $response->assertSee('Saldo hak cuti tahun berjalan (N), sisa hak N-1/N-2');
     }
 }

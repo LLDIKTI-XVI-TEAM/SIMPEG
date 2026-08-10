@@ -23,14 +23,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        // Disable foreign keys temporarily for SQLite
-        if (DB::connection()->getDriverName() === 'sqlite') {
-            DB::statement('PRAGMA foreign_keys = OFF');
-            DB::statement('DROP TABLE IF EXISTS ref_notification_channels');
-            DB::statement('PRAGMA foreign_keys = ON');
-        } else {
-            Schema::dropIfExists('ref_notification_channels');
-        }
+        Schema::dropIfExists('ref_notification_channels');
 
         Schema::table('ref_status_pegawai', function (Blueprint $table): void {
             $table->dropUnique('ref_status_pegawai_kode_unique');
@@ -42,17 +35,12 @@ return new class extends Migration
             $table->dropColumn(['default_bup', 'is_active']);
         });
 
-        // SQLite requires table rebuild to drop columns with foreign keys
-        if (DB::connection()->getDriverName() === 'sqlite') {
-            $this->rollbackUnitKerjaHierarchySqlite();
-        } else {
-            Schema::table('ref_unit_kerja', function (Blueprint $table): void {
-                $table->dropForeign('ref_unit_kerja_parent_id_foreign');
-                $table->dropIndex('ref_unit_kerja_parent_level_index');
-                $table->dropIndex('ref_unit_kerja_is_active_index');
-                $table->dropColumn(['parent_id', 'level', 'jenis_unit', 'is_active']);
-            });
-        }
+        Schema::table('ref_unit_kerja', function (Blueprint $table): void {
+            $table->dropForeign(['parent_id']);
+            $table->dropIndex('ref_unit_kerja_parent_level_index');
+            $table->dropIndex('ref_unit_kerja_is_active_index');
+            $table->dropColumn(['parent_id', 'level', 'jenis_unit', 'is_active']);
+        });
     }
 
     private function addUnitKerjaHierarchy(): void
@@ -264,39 +252,5 @@ return new class extends Migration
                 'updated_at' => $now,
             ]);
         }
-    }
-
-    /**
-     * Rollback unit kerja hierarchy columns for SQLite using table rebuild pattern.
-     * SQLite doesn't support dropping columns with foreign keys, so we recreate the table.
-     */
-    private function rollbackUnitKerjaHierarchySqlite(): void
-    {
-        // Disable foreign keys temporarily
-        DB::statement('PRAGMA foreign_keys = OFF');
-
-        // Backup existing data (only columns that exist in original schema)
-        // Original schema: id, nama, keterangan, timestamps
-        DB::statement('CREATE TEMPORARY TABLE ref_unit_kerja_backup AS SELECT id, nama, keterangan, created_at, updated_at FROM ref_unit_kerja');
-
-        // Drop original table
-        DB::statement('DROP TABLE IF EXISTS ref_unit_kerja');
-
-        // Recreate table without hierarchy columns (matching original schema)
-        Schema::create('ref_unit_kerja', function (Blueprint $table): void {
-            $table->uuid('id')->primary();
-            $table->string('nama', 100);
-            $table->string('keterangan', 255)->nullable();
-            $table->timestamps();
-        });
-
-        // Restore data
-        DB::statement('INSERT INTO ref_unit_kerja (id, nama, keterangan, created_at, updated_at) SELECT id, nama, keterangan, created_at, updated_at FROM ref_unit_kerja_backup');
-
-        // Drop temporary table
-        DB::statement('DROP TABLE ref_unit_kerja_backup');
-
-        // Re-enable foreign keys
-        DB::statement('PRAGMA foreign_keys = ON');
     }
 };

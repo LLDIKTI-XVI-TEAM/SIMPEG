@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Actions\Cuti\ApproveLeaveAction;
+use App\Actions\Cuti\BuildVerifierLeaveContextAction;
 use App\Actions\Cuti\DeclineLeaveAction;
 use App\Actions\Cuti\DownloadOfficialLeavePdfAction;
 use App\Actions\Cuti\ListLeaveRequestsAction;
@@ -72,7 +73,7 @@ class CutiController extends Controller
      * Menampilkan detail satu pengajuan cuti.
      * Pegawai tanpa hak memantau hanya boleh membuka pengajuan miliknya sendiri (cegah akses lintas pegawai).
      */
-    public function show($id, LeaveApprovalService $approvals, DownloadOfficialLeavePdfAction $pdfAction, PreviewLeaveBalanceAction $balancePreview)
+    public function show($id, LeaveApprovalService $approvals, DownloadOfficialLeavePdfAction $pdfAction, PreviewLeaveBalanceAction $balancePreview, BuildVerifierLeaveContextAction $verifierContextAction)
     {
         $user = request()->user();
 
@@ -97,56 +98,25 @@ class CutiController extends Controller
         }
 
         $isRolloverReturn = $cuti->status === LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER;
+        $isVerifierContext = $canAct || $user->hasPermission('cuti.read_all');
         $targetBalance = $isRolloverReturn && $cuti->employee !== null && $cuti->rollover_target_year !== null
             ? $balancePreview->execute($cuti->employee, Carbon::create($cuti->rollover_target_year, 1, 1)->startOfDay())
             : null;
-
-        // US-4.5 AC-2: Saldo cuti pemohon untuk verifikator (tahun berjalan + riwayat N-1/N-2)
-        // Gunakan tahun pengajuan ($cuti->tanggal_mulai), bukan tahun kalender saat halaman dibuka,
-        // agar verifikator melihat saldo dari tahun yang sesuai dengan pengajuan.
-        $leaveBalance = null;
-        if ($cuti->employee !== null && $cuti->jenisCuti?->code === 'tahunan' && $cuti->tanggal_mulai !== null) {
-            $requestYear = $cuti->tanggal_mulai->year;
-            $currentYearBalance = $balancePreview->execute($cuti->employee, Carbon::create($requestYear, 12, 31));
-            $nMinus1Balance = $balancePreview->execute($cuti->employee, Carbon::create($requestYear - 1, 12, 31));
-            $nMinus2Balance = $balancePreview->execute($cuti->employee, Carbon::create($requestYear - 2, 12, 31));
-
-            $leaveBalance = [
-                'current' => [
-                    'year' => $requestYear,
-                    'entitlement' => $currentYearBalance['jatah_dasar'] ?? 0,
-                    'carry_over' => $currentYearBalance['carry_over'] ?? 0,
-                    'used' => $currentYearBalance['terpakai_final'] ?? 0,
-                    'reserved' => $currentYearBalance['dialokasikan_aktif'] ?? 0,
-                    'protected' => $currentYearBalance['dilindungi_penangguhan_dinas'] ?? 0,
-                    'available' => $currentYearBalance['saldo_dapat_diajukan'] ?? 0,
-                    'total_available' => $currentYearBalance['saldo_aktual'] ?? 0,
-                ],
-                'n_minus_1' => [
-                    'year' => $requestYear - 1,
-                    'entitlement' => $nMinus1Balance['jatah_dasar'] ?? 0,
-                    'used' => $nMinus1Balance['terpakai_final'] ?? 0,
-                    'total_available' => ($nMinus1Balance['jatah_dasar'] ?? 0) + ($nMinus1Balance['carry_over'] ?? 0),
-                ],
-                'n_minus_2' => [
-                    'year' => $requestYear - 2,
-                    'entitlement' => $nMinus2Balance['jatah_dasar'] ?? 0,
-                    'used' => $nMinus2Balance['terpakai_final'] ?? 0,
-                    'total_available' => ($nMinus2Balance['jatah_dasar'] ?? 0) + ($nMinus2Balance['carry_over'] ?? 0),
-                ],
-            ];
-        }
+        $verifierContext = $isVerifierContext && $cuti->employee !== null
+            ? $verifierContextAction->execute($cuti->employee, $cuti->tanggal_mulai ?? now(), $cuti)
+            : null;
 
         return view('admin.cuti.show', [
             'cuti' => $cuti,
             'canAct' => $canAct,
+            'isVerifierContext' => $isVerifierContext,
             'canDownloadFormulir' => $canDownloadFormulir,
             'canResubmit' => in_array($cuti->status, ['perlu_perubahan', LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER], true)
                 && $cuti->employee_id === $user->employee_id,
             'isRolloverReturn' => $isRolloverReturn,
             'targetBalance' => $targetBalance,
+            'verifierContext' => $verifierContext,
             'activeStep' => $stage === null ? null : $cuti->steps->firstWhere('step_order', $stage),
-            'leaveBalance' => $leaveBalance, // US-4.5 AC-2
         ]);
     }
 

@@ -124,17 +124,15 @@ class EmployeeValidationRules
     }
 
     /**
-     * Relaxed rules for import from Excel/CSV.
-     * Only fields available in the Excel are validated; the rest are nullable.
+     * Aturan validasi untuk data utama hasil pemetaan Excel/CSV.
      *
      * - nama_dengan_gelar : wajib diisi, diambil dari kolom 'Nama Pegawai' (termasuk gelar).
      * - nama_lengkap      : opsional, diambil dari kolom 'Person' (nama tanpa gelar).
      *                       Diisi nullable agar file yang tidak memiliki kolom Person
      *                       tetap dapat di-import tanpa error.
      *
-     * NOTE: unique constraints dihapus dari validasi Laravel agar pengecekan database
-     * dapat dilakukan manual setelah duplicate-in-file detection. Ini memastikan
-     * duplicate dalam file tetap dilaporkan sebagai error walaupun data sudah ada di DB.
+     * Pengecekan unik dilakukan setelah deteksi duplikasi antarbaris agar prioritas
+     * error email/duplikasi dan skip NIP database tetap konsisten.
      */
     public static function import(): array
     {
@@ -144,7 +142,8 @@ class EmployeeValidationRules
             'nip' => ['required', 'string', 'size:18'],
             'email_pribadi' => ['required', 'email', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
-            'tanggal_lahir' => ['nullable', 'date', 'before:today'],
+            // Tanggal lahir wajib pada import karena menjadi dasar kalkulasi BUP/pensiun.
+            'tanggal_lahir' => ['required', 'date', 'before:today'],
             'jenis_pegawai' => ['required', 'in:PNS,PPPK,CPNS'],
             'golongan_terakhir' => ['required', 'string', 'max:20'],
             'pangkat_terakhir' => ['nullable', 'string', 'max:100'],
@@ -155,7 +154,6 @@ class EmployeeValidationRules
             'prodi_pendidikan_terakhir' => ['required', 'string', 'max:255'],
             'tanggal_pensiun' => ['nullable', 'date'],
             'no_hp' => ['required', 'string', 'max:20'],
-            'role' => ['required', 'in:admin_kepegawaian,pimpinan,kepala_bagian,pegawai'],
         ];
     }
 
@@ -196,7 +194,6 @@ class EmployeeValidationRules
             'email' => 'Email Pegawai',
             'email_pribadi' => 'Email Pegawai',
             'no_telepon_rumah' => 'No. Telepon Rumah',
-            'role' => 'Role',
         ];
     }
 }

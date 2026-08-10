@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -16,60 +15,11 @@ return new class extends Migration
 
     public function down(): void
     {
-        // SQLite requires table rebuild to properly drop columns with constraints
-        if (DB::connection()->getDriverName() === 'sqlite') {
-            $this->rebuildTableForSQLite();
-
-            return;
-        }
-
+        Schema::table('users', function (Blueprint $table): void {
+            $table->dropUnique(['keycloak_username']);
+        });
         Schema::table('users', function (Blueprint $table): void {
             $table->dropColumn('keycloak_username');
         });
-    }
-
-    private function rebuildTableForSQLite(): void
-    {
-        // Disable foreign keys temporarily
-        DB::statement('PRAGMA foreign_keys = OFF');
-
-        // Get all users data
-        $users = DB::table('users')->get();
-
-        // Drop and recreate table without keycloak_username
-        DB::statement('DROP TABLE IF EXISTS users');
-
-        Schema::create('users', function (Blueprint $table): void {
-            $table->uuid('id')->primary();
-            $table->string('name');
-            $table->string('email')->unique();
-            $table->timestamp('email_verified_at')->nullable();
-            $table->string('password')->nullable(); // Nullable for SSO users
-            $table->string('role')->nullable();
-            $table->string('keycloak_id')->nullable()->unique();
-            // keycloak_username NOT added back (this is what we're rolling back)
-            $table->rememberToken();
-            $table->timestamps();
-        });
-
-        // Restore data
-        foreach ($users as $user) {
-            DB::table('users')->insert([
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'email_verified_at' => $user->email_verified_at,
-                'password' => $user->password,
-                'role' => $user->role,
-                'keycloak_id' => $user->keycloak_id,
-                // keycloak_username omitted - this column is being removed
-                'remember_token' => $user->remember_token,
-                'created_at' => $user->created_at,
-                'updated_at' => $user->updated_at,
-            ]);
-        }
-
-        // Re-enable foreign keys
-        DB::statement('PRAGMA foreign_keys = ON');
     }
 };

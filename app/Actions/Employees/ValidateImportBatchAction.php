@@ -6,11 +6,13 @@ use App\Models\Employee;
 use App\Models\RefJenisPegawai;
 use App\Models\User;
 use App\Support\EmployeeImport\EmployeeRowMapper;
+use App\Support\EmployeeImport\ImportColumnMapping;
 use App\Support\EmployeeValidationRules;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
 class ValidateImportBatchAction
@@ -33,10 +35,29 @@ class ValidateImportBatchAction
         }
 
         if ($updatedRows !== null) {
-            $batch['rows'] = $updatedRows;
-            $batch['total_rows'] = count($updatedRows);
+            $batch['rows'] = $this->mergeEditedRows($batch['rows'], $updatedRows);
+            $batch['total_rows'] = count($batch['rows']);
             Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $batch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
         }
+
+        // Pemetaan aktif batch adalah sumber kebenaran tafsir kolom. Field wajib yang belum
+        // dipetakan menolak seluruh validasi lebih dulu dengan pesan yang menyebut field-nya,
+        // agar admin memperbaiki pemetaan sebelum menilai baris.
+        $mapping = $batch['mapping'] ?? ImportColumnMapping::autoMap($batch['headers']);
+        $missingRequired = ImportColumnMapping::missingRequired($mapping);
+
+        if ($missingRequired !== []) {
+            throw ValidationException::withMessages([
+                'mapping' => array_map(
+                    fn (string $target): string => "Field wajib {$target} belum dipetakan ke kolom mana pun.",
+                    $missingRequired,
+                ),
+            ]);
+        }
+
+        // Setelah admin menyimpan mapping manual, heuristik kolom bergeser dimatikan
+        // agar pilihan admin tidak ditimpa tebakan positional.
+        $allowShiftDetection = ($batch['mapping_source'] ?? 'auto') !== 'manual';
 
         $type = $batch['type'] ?? 'utama';
         $results = [];
@@ -47,7 +68,7 @@ class ValidateImportBatchAction
         $seenEmails = [];
 
         foreach ($batch['rows'] as $row) {
-            $rowResult = $this->validateTemplateRow($type, $row, $seenNips, $seenEmails);
+            $rowResult = $this->validateTemplateRow($type, $row, $seenNips, $seenEmails, $mapping, $allowShiftDetection);
             $results[] = $rowResult;
 
             match ($rowResult['status']) {
@@ -77,16 +98,54 @@ class ValidateImportBatchAction
         ];
     }
 
-    private function validateTemplateRow(string $type, array $row, array &$seenNips, array &$seenEmails): array
+    /**
+     * Gabungkan baris yang diedit admin ke state batch berdasarkan nomor baris.
+     *
+     * Preview hanya memuat 10 baris pertama, sehingga payload berisi subset baris hasil
+     * edit, bukan seluruh baris. Nomor baris yang tidak dikenal ditolak agar client tidak
+     * bisa menyuntikkan baris baru di luar isi file.
+     *
+     * @param  list<array{row:int, data:array<string, mixed>}>  $batchRows
+     * @param  list<array{row:int, data:array<string, mixed>}>  $editedRows
+     * @return list<array{row:int, data:array<string, mixed>}>
+     */
+    private function mergeEditedRows(array $batchRows, array $editedRows): array
     {
-        return $this->validateRow($row, $seenNips, $seenEmails);
+        $indexByRowNumber = [];
+        foreach ($batchRows as $index => $row) {
+            $indexByRowNumber[$row['row']] = $index;
+        }
+
+        foreach ($editedRows as $edited) {
+            $rowNumber = (int) $edited['row'];
+
+            if (! isset($indexByRowNumber[$rowNumber])) {
+                throw ValidationException::withMessages([
+                    'rows' => ["Baris {$rowNumber} tidak ditemukan pada batch import ini."],
+                ]);
+            }
+
+            $batchRows[$indexByRowNumber[$rowNumber]]['data'] = $edited['data'];
+        }
+
+        return $batchRows;
     }
 
-    private function validateRow(array $row, array &$seenNips, array &$seenEmails): array
+    private function validateTemplateRow(string $type, array $row, array &$seenNips, array &$seenEmails, array $mapping, bool $allowShiftDetection): array
     {
-        $data = $row['data'];
-        $nama = $data['Nama Pegawai'] ?? ($data['nama_dengan_gelar'] ?? '-');
-        $mappedData = app(EmployeeRowMapper::class)->map($data);
+        return $this->validateRow($row, $seenNips, $seenEmails, $mapping, $allowShiftDetection);
+    }
+
+    private function validateRow(array $row, array &$seenNips, array &$seenEmails, array $mapping, bool $allowShiftDetection): array
+    {
+        // Key baris sumber dinormalkan ke header kanonis memakai mapping aktif batch;
+        // kolom bertanda tidak dipakai dibuang sebelum mapper membaca nilai apa pun.
+        $sourceData = $allowShiftDetection
+            ? app(EmployeeRowMapper::class)->alignShiftedOptionalIdentityColumns($row['data'])
+            : $row['data'];
+        $data = ImportColumnMapping::apply($sourceData, $mapping);
+        $nama = $data['Nama Pegawai'] ?? '-';
+        $mappedData = app(EmployeeRowMapper::class)->map($data, allowShiftDetection: false);
         $validator = Validator::make($mappedData, EmployeeValidationRules::import(), [], EmployeeValidationRules::attributes());
 
         if ($validator->fails()) {
@@ -107,50 +166,42 @@ class ValidateImportBatchAction
                 'prodi_pendidikan_terakhir' => 'Prodi Pendidikan Terakhir',
                 'jenis_pegawai' => 'Status Kepegawaian',
                 'tanggal_lahir' => 'Tanggal Lahir',
-                'role' => 'Role',
             ]));
         }
 
         $validated = $validator->validated();
         $referenceErrors = $this->resolveReferences($validated);
 
-        // K-US-02: Prioritas validasi
-        // 1. Duplicate dalam file → ERROR (tertinggi)
-        // 2. Email existing DB → ERROR
-        // 3. NIP existing DB → SKIP (terendah, hanya jika tidak ada error lain)
+        // Duplikasi dalam file harus dilaporkan sebagai error sebelum pemeriksaan database.
+        // Email yang sudah terdaftar tetap error, sedangkan NIP database menjadi skip
+        // hanya bila baris tidak memiliki error yang lebih kuat.
 
-        // Cek duplikasi dalam file terlebih dahulu
         $duplicateErrors = $this->mapErrors($this->duplicateErrors($validated, $row['row'], $seenNips, $seenEmails), [
             'nip' => 'NIP',
             'email_pribadi' => 'Email Pegawai',
         ]);
 
-        // Cek email existing di database (prioritas ERROR)
         $databaseErrors = [];
         if (! empty($validated['email_pribadi']) && Employee::whereRaw('LOWER(email_pribadi) = ?', [strtolower($validated['email_pribadi'])])->exists()) {
             $databaseErrors['Email Pegawai'][] = 'Email pegawai sudah terdaftar di database.';
         }
 
-        // Cek NIP existing di database (prioritas SKIP, tapi hanya jika tidak ada error duplicate in-file)
         $shouldSkip = $this->shouldSkipNip($validated, $seenNips, $row['row']);
         $skipErrors = [];
         if ($shouldSkip) {
             $skipErrors['NIP'][] = 'NIP sudah terdaftar di database.';
         }
 
-        // Gabungkan semua errors dengan prioritas
         $allErrors = array_merge_recursive(
             $this->mapErrors($referenceErrors, ['jenis_pegawai' => 'Status Kepegawaian']),
             $duplicateErrors,
             $databaseErrors,
         );
 
-        // Jika ada error (duplicate atau email), return ERROR
         if ($allErrors !== []) {
             return $this->rowError($row, $nama, $allErrors);
         }
 
-        // Jika hanya ada skip (NIP existing tanpa error lain), return SKIP
         if ($skipErrors !== []) {
             return [
                 'row' => $row['row'],
@@ -260,13 +311,10 @@ class ValidateImportBatchAction
     }
 
     /**
-     * Check if NIP should be skipped (exists in database).
-     * Only returns skip if no in-file duplicate error exists.
+     * Menentukan apakah NIP database dapat dilewati tanpa menutupi duplikasi dalam file.
      *
-     * @param array $data Validated row data
-     * @param array $seenNips Tracking array for in-file duplicates
-     * @param int $row Current row number
-     * @return bool True if should skip (NIP exists and no in-file duplicate)
+     * @param  array<string, mixed>  $data
+     * @param  array<string, int>  $seenNips
      */
     private function shouldSkipNip(array $data, array $seenNips, int $row): bool
     {
@@ -276,14 +324,11 @@ class ValidateImportBatchAction
 
         $nip = $data['nip'];
 
-        // Only skip if this is the FIRST occurrence in file (no in-file duplicate)
-        // and it exists in database
+        // Kemunculan berikutnya harus tetap dilaporkan sebagai duplikasi dalam file.
         if (isset($seenNips[$nip]) && $seenNips[$nip] !== $row) {
-            // This is a duplicate within file, don't skip (will be error)
             return false;
         }
 
-        // Check database
         return Employee::where('nip', $nip)->exists();
     }
 

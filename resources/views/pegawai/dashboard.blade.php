@@ -51,7 +51,7 @@
                 <div>
                     <p class="text-[10px] font-bold uppercase tracking-widest text-white/70 mb-0.5">Selamat datang kembali</p>
                     <h2 class="text-xl sm:text-2xl font-extrabold text-white leading-tight drop-shadow-sm mb-2">
-                        {{ auth()->user()->name }}
+                        {{ preg_replace('/\s*\(.*?\)/', '', auth()->user()->name) }}
                     </h2>
                     
                     <div class="flex flex-wrap items-center gap-2 sm:gap-3 text-[11px] sm:text-xs text-white/90 font-sans">
@@ -152,17 +152,17 @@
         <div class="lg:col-span-2 space-y-6">
             {{-- Card Saldo Cuti --}}
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <x-ui.stat-card label="Jatah Tahunan ({{ date('Y') }})" value="{{ $saldoCuti['jatah_dasar'] ?? 0 }}" variant="primary" size="md" accent>
+                <x-ui.stat-card label="Jatah Tahunan ({{ date('Y') }})" value="{{ $saldoCuti['jatah_dasar'] ?? '-' }}" description="{{ !empty($saldoCuti) ? 'Jatah cuti tahunan berjalan.' : 'Data belum tersedia.' }}" variant="primary" size="md" accent>
                     <x-slot:icon>
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                     </x-slot:icon>
                 </x-ui.stat-card>
-                <x-ui.stat-card label="Carry Over (N-1)" value="{{ $saldoCuti['carry_over'] ?? 0 }}" variant="info" size="md" accent>
+                <x-ui.stat-card label="Carry Over (N-1)" value="{{ $saldoCuti['carry_over'] ?? '-' }}" description="{{ !empty($saldoCuti) ? 'Sisa cuti tahun ' . (date('Y') - 1) . '.' : 'Data belum tersedia.' }}" variant="info" size="md" accent>
                     <x-slot:icon>
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                     </x-slot:icon>
                 </x-ui.stat-card>
-                <x-ui.stat-card label="Hak Efektif Tahun Ini" value="{{ $saldoCuti['saldo_dapat_diajukan'] ?? 0 }}" unit="Hari" variant="success" size="md" accent role="group" aria-label="{{ $saldoCuti['saldo_dapat_diajukan'] ?? 0 }} Hari">
+                <x-ui.stat-card label="Hak Efektif Tahun Ini" value="{{ $saldoCuti['saldo_dapat_diajukan'] ?? '-' }}" description="{{ !empty($saldoCuti) ? 'Total sisa saldo cuti aktif.' : 'Saldo belum diinput.' }}" unit="Hari" variant="success" size="md" accent role="group" aria-label="{{ $saldoCuti['saldo_dapat_diajukan'] ?? '-' }} Hari">
                     <x-slot:icon>
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     </x-slot:icon>

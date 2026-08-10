@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
+use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenjangPendidikan;
 use App\Models\RefStatusPegawai;
@@ -49,6 +50,11 @@ class DataMasterController extends Controller
             'golonganUsage' => $usage->usageCountMap(RefGolongan::class),
             'jenisJabatan' => RefJenisJabatan::query()->orderBy('nama')->get(),
             'jenisJabatanUsage' => $usage->usageCountMap(RefJenisJabatan::class),
+            // Relasi jenis jabatan dan eselon tidak di-eager-load karena tab menyelesaikan
+            // namanya dari koleksi pilihan yang sudah dikirim di atas, sehingga menambah
+            // eager load hanya akan menghasilkan query yang tidak terpakai.
+            'jabatan' => RefJabatan::query()->orderBy('nama')->get(),
+            'jabatanUsage' => $usage->usageCountMap(RefJabatan::class),
             'eselon' => RefEselon::query()->orderBy('kode')->get(),
             'eselonUsage' => $usage->usageCountMap(RefEselon::class),
             'jenjangPendidikan' => RefJenjangPendidikan::query()->orderBy('urutan')->orderBy('nama')->get(),

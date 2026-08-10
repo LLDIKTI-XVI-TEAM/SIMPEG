@@ -25,6 +25,17 @@ class Rule5PostgresConcurrencyTest extends TestCase
 
     protected function setUp(): void
     {
+        // Worker race berjalan sebagai proses terpisah dengan koneksi database sendiri,
+        // sehingga fixture harus ter-commit (DatabaseMigrations). RefreshDatabase
+        // membungkus test dalam transaksi dan membuat fixture tidak terlihat worker.
+        // Cek driver dilakukan sebelum parent::setUp() agar driver non-pgsql tidak
+        // menanggung migrate:fresh yang percuma.
+        $driver = $_SERVER['DB_CONNECTION'] ?? $_ENV['DB_CONNECTION'] ?? getenv('DB_CONNECTION');
+
+        if ($driver !== 'pgsql') {
+            $this->markTestSkipped('Race Rule 5 wajib dijalankan pada PostgreSQL.');
+        }
+
         parent::setUp();
         $this->seed(ReferenceSeeder::class);
     }
@@ -164,8 +175,26 @@ class Rule5PostgresConcurrencyTest extends TestCase
         } finally {
             // Evidence worker hanya hidup dalam database test; bersihkan sebelum hook migration
             // agar guard rollback produksi tetap melindungi data nyata.
-            DB::table('audit_logs')->delete();
+            $this->kosongkanAuditSebelumPenurunanMigrasi();
             DB::table('leave_balance_reservation_events')->delete();
         }
+    }
+
+    /**
+     * Membuang baris audit yang ditulis proses pekerja sebelum penurunan migrasi dijalankan.
+     *
+     * Proses pekerja berjalan di luar transaksi test sehingga barisnya benar-benar tersimpan,
+     * sedangkan penurunan migrasi menolak berjalan selama audit masih memuat event saldo cuti.
+     * Penjaga append-only dilepas lebih dahulu karena tabel ini memang akan dibuang seketika
+     * setelahnya, dan penjaga dipasang kembali oleh migrasi pada test berikutnya.
+     */
+    private function kosongkanAuditSebelumPenurunanMigrasi(): void
+    {
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::unprepared('drop trigger if exists audit_logs_append_only on audit_logs;');
+            DB::unprepared('drop trigger if exists audit_logs_append_only_truncate on audit_logs;');
+        }
+
+        DB::table('audit_logs')->delete();
     }
 }

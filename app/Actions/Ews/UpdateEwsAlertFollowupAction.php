@@ -80,16 +80,47 @@ class UpdateEwsAlertFollowupAction
         $alert->refresh();
         AuditService::log('UPDATE', 'EwsAlert', $alert->id, $before, $this->alertSnapshot($alert), $request);
 
-        if ($followupStatus === EwsAlert::FOLLOWUP_STATUS_NOT_NEEDED && $employee instanceof Employee) {
+        if ($employee instanceof Employee) {
+            $typeLabel = EwsAlert::typeLabels()[$alert->type] ?? $alert->type;
+
+            if ($followupStatus === EwsAlert::FOLLOWUP_STATUS_HANDLED) {
+                // Pakai prefix ews.followup.* agar tidak masuk logika additionalRecipients
+                // yang mengirim ke semua admin_kepegawaian. Notifikasi hasil follow-up
+                // hanya ditujukan kepada pegawai target, bukan admin.
+                $notificationType = match ($alert->type) {
+                    'KENAIKAN_PANGKAT' => 'ews.followup.kenaikan_pangkat',
+                    'KGB' => 'ews.followup.kgb',
+                    'PENSIUN' => 'ews.followup.pensiun',
+                    'KONTRAK_PPPK' => 'ews.followup.kontrak_pppk',
+                    'SATYALANCANA' => 'ews.followup.satyalancana',
+                    default => 'ews.followup.'.strtolower($alert->type),
+                };
+                $title = 'Tindak Lanjut EWS: Disetujui';
+                $body = trim($handledNote) !== ''
+                    ? $handledNote
+                    : "Tindak lanjut EWS {$typeLabel} Anda telah disetujui / ditangani oleh Admin.";
+            } else {
+                // Prefix ews.followup.* agar tidak dikirim ke admin_kepegawaian
+                $notificationType = 'ews.followup.tidak_perlu';
+                $title = 'Tindak Lanjut EWS: Tidak Perlu';
+                $body = trim($handledNote) !== ''
+                    ? $handledNote
+                    : "Tindak lanjut EWS {$typeLabel} Anda telah ditandai tidak perlu oleh Admin.";
+            }
+
             $this->notifications->createForEmployee(
                 $employee,
-                'ews.tidak_perlu',
-                'Tindak Lanjut EWS: Tidak Perlu',
-                $handledNote,
+                $notificationType,
+                $title,
+                $body,
                 [
                     'ews_alert_id' => $alert->id,
-                    'followup_status' => EwsAlert::FOLLOWUP_STATUS_NOT_NEEDED,
+                    'followup_status' => $followupStatus,
                     'event_type' => $alert->type,
+                    'handled_note' => $handledNote,
+                    // Klik notifikasi membawa pegawai ke halaman EWS Saya agar hasil
+                    // tindak lanjut langsung terlihat pada konteks alert miliknya.
+                    'url' => route('ews.saya', [], false),
                 ],
             );
         }
