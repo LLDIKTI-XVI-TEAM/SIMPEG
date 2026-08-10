@@ -32,13 +32,33 @@ class TmtCalculatorService
         ];
 
         // Tanggal pensiun manual/import adalah data resmi sehingga kalkulasi hanya mengisi nilai yang masih kosong.
-        $hadManualPensionDate = $employee->tanggal_pensiun !== null;
+        // US-5.5 AC-3: Bedakan manual/import (authoritative) vs calculated (dapat di-override)
+        //
+        // Logic provenance:
+        // 1. Jika milestone exists dengan is_manual=true → manual (preserve)
+        // 2. Jika tanggal_pensiun exists tapi milestone belum pernah dibuat → manual (import/manual entry)
+        // 3. Otherwise → calculated (dapat di-recalculate)
+        $existingPensionMilestone = EmployeeMilestone::where('employee_id', $employee->id)
+            ->where('type', EmployeeMilestone::TYPE_PENSIUN)
+            ->first(); // Include inactive to detect if milestone ever existed
 
-        if ($employee->tanggal_pensiun === null) {
+        $hadManualPensionDate = $employee->tanggal_pensiun !== null
+            && (
+                // Case 1: Milestone explicitly marked as manual
+                ($existingPensionMilestone !== null && ($existingPensionMilestone->metadata['is_manual'] ?? false))
+                // Case 2: Has pension date but milestone never created (manual/import entry)
+                || $existingPensionMilestone === null
+            );
+
+        if (! $hadManualPensionDate) {
+            // Always recalculate if not manual (even if tanggal_pensiun is non-null from previous calculation)
             $pensionDate = $this->pensionDate($employee);
 
             if ($pensionDate !== null) {
                 $updates['tanggal_pensiun'] = $pensionDate;
+            } elseif ($employee->tanggal_pensiun !== null) {
+                // Clear calculated pension date if source data (position/BUP) is gone
+                $updates['tanggal_pensiun'] = null;
             }
         }
 
