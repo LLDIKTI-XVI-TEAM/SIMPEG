@@ -7,6 +7,7 @@ use App\Models\ImportBatch;
 use App\Models\RefStatusPegawai;
 use App\Models\User;
 use App\Services\AuditService;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -45,6 +46,10 @@ class ExecuteImportBatchAction
         ));
         $totalRows = count($validRows);
         $processedCount = 0;
+        $insertedCount = 0;
+        $skippedCount = (int) ($batch['validation']['skip_count'] ?? 0);
+        $failedCount = (int) ($batch['validation']['error_count'] ?? 0);
+        $rowIssues = $this->collectRowIssues($batch['validation']['results']);
 
         // Update status to processing
         $batch['status'] = 'processing';
@@ -61,9 +66,9 @@ class ExecuteImportBatchAction
             'total_rows' => $batch['total_rows'] ?? count($batch['rows'] ?? []),
             'valid_count' => $batch['validation']['valid_count'] ?? $totalRows,
             'inserted_count' => 0,
-            'skipped_count' => $batch['validation']['skip_count'] ?? 0,
-            'failed_count' => $batch['validation']['error_count'] ?? 0,
-            'row_issues' => $this->collectRowIssues($batch['validation']['results']),
+            'skipped_count' => $skippedCount,
+            'failed_count' => $failedCount,
+            'row_issues' => $rowIssues,
             'error_message' => null,
             'started_at' => now(),
             'finished_at' => null,
@@ -72,11 +77,19 @@ class ExecuteImportBatchAction
         try {
             if ($validRows !== []) {
                 foreach ($validRows as $result) {
-                    DB::transaction(function () use ($type, $result): void {
-                        $this->executeValidatedRow($type, $result['validated_data']);
-                    });
+                    $outcome = DB::transaction(
+                        fn (): array => $this->executeValidatedRow($type, $result),
+                    );
 
                     $processedCount++;
+                    if ($outcome['status'] === 'inserted') {
+                        $insertedCount++;
+                    } else {
+                        $skippedCount++;
+                        if (isset($outcome['issue'])) {
+                            $rowIssues[] = $outcome['issue'];
+                        }
+                    }
 
                     // Update progress in cache (di luar transaction agar terlihat real-time)
                     $currentBatch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
@@ -88,6 +101,12 @@ class ExecuteImportBatchAction
                 }
             }
 
+            $finalCounts = [
+                'inserted' => $insertedCount,
+                'skipped' => $skippedCount,
+                'failed' => $failedCount,
+            ];
+
             AuditService::logAs(
                 $user?->id ?? 'system',
                 $user?->name ?? 'System Queue',
@@ -98,10 +117,10 @@ class ExecuteImportBatchAction
                 [
                     'template_type' => $type,
                     'template_label' => UploadImportBatchAction::TEMPLATE_LABELS[$type] ?? UploadImportBatchAction::TEMPLATE_LABELS['utama'],
-                    'total_inserted' => $processedCount,
+                    'total_inserted' => $finalCounts['inserted'],
                     'total_processed' => $processedCount,
-                    'total_skipped' => $batch['validation']['skip_count'] ?? 0,
-                    'total_failed' => $batch['validation']['error_count'] ?? 0,
+                    'total_skipped' => $finalCounts['skipped'],
+                    'total_failed' => $finalCounts['failed'],
                     'filename' => $batch['filename'],
                 ],
                 null,
@@ -112,7 +131,10 @@ class ExecuteImportBatchAction
             // Persist hasil akhir sebelum file sumber dihapus supaya laporan tidak pernah hilang.
             ImportBatch::whereKey($batchId)->update([
                 'status' => 'completed',
-                'inserted_count' => $processedCount,
+                'inserted_count' => $finalCounts['inserted'],
+                'skipped_count' => $finalCounts['skipped'],
+                'failed_count' => $finalCounts['failed'],
+                'row_issues' => $rowIssues,
                 'finished_at' => now(),
             ]);
 
@@ -124,11 +146,8 @@ class ExecuteImportBatchAction
                 $finalBatch['status'] = 'completed';
                 $finalBatch['progress'] = 100;
                 $finalBatch['processed_count'] = $processedCount;
-                $finalBatch['result'] = [
-                    'inserted' => $processedCount,
-                    'skipped' => $batch['validation']['skip_count'] ?? 0,
-                    'failed' => $batch['validation']['error_count'] ?? 0,
-                ];
+                $finalBatch['result'] = $finalCounts;
+                $finalBatch['row_issues'] = $rowIssues;
                 // Keep completed state for 10 minutes so user has time to view the result screen
                 Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $finalBatch, now()->addMinutes(10));
             }
@@ -136,7 +155,10 @@ class ExecuteImportBatchAction
         } catch (\Throwable $exception) {
             ImportBatch::whereKey($batchId)->update([
                 'status' => 'failed',
-                'inserted_count' => $processedCount,
+                'inserted_count' => $insertedCount,
+                'skipped_count' => $skippedCount,
+                'failed_count' => $failedCount,
+                'row_issues' => $rowIssues,
                 'error_message' => $exception->getMessage(),
                 'finished_at' => now(),
             ]);
@@ -152,41 +174,98 @@ class ExecuteImportBatchAction
 
         return [
             'message' => 'Import selesai.',
-            'inserted' => $processedCount,
+            'inserted' => $finalCounts['inserted'],
+            'inserted_count' => $finalCounts['inserted'],
             'processed' => $processedCount,
-            'skipped' => $batch['validation']['skip_count'] ?? 0,
-            'failed' => $batch['validation']['error_count'] ?? 0,
+            'skipped' => $finalCounts['skipped'],
+            'skipped_count' => $finalCounts['skipped'],
+            'failed' => $finalCounts['failed'],
+            'failed_count' => $finalCounts['failed'],
         ];
     }
 
-    private function executeValidatedRow(string $type, array $data): void
+    /**
+     * Menjalankan satu baris tervalidasi dan mengembalikan outcome aktual untuk rekonsiliasi counter.
+     *
+     * @param  array<string, mixed>  $row
+     * @return array{status: 'inserted'|'skipped', issue?: array<string, mixed>}
+     */
+    private function executeValidatedRow(string $type, array $row): array
     {
         if ($type === 'utama') {
+            $data = $row['validated_data'];
+
             // Fallback: jika kolom 'Person' (nama_lengkap tanpa gelar) tidak diisi pada file Excel,
             // gunakan nilai nama_dengan_gelar agar kolom wajib nama_lengkap tetap terisi.
             if (empty($data['nama_lengkap']) && ! empty($data['nama_dengan_gelar'])) {
                 $data['nama_lengkap'] = $data['nama_dengan_gelar'];
             }
 
-            // K-US-02: Insert-time duplicate guard untuk race condition protection
-            // Jika NIP sudah exists (race condition antara validasi dan insert),
-            // skip insertion secara graceful daripada fail entire batch
+            // Validasi dan eksekusi terpisah waktu; NIP dapat muncul setelah preview dinyatakan valid.
             if (! empty($data['nip']) && Employee::where('nip', $data['nip'])->exists()) {
-                // Skip silently - sudah dicatat sebagai 'skip' di validation phase
-                // Atau jika race condition terjadi, treat as skip
-                return;
+                return $this->duplicateNipOutcome($row);
             }
 
             $aktifId = RefStatusPegawai::where('nama', 'Aktif')->value('id')
                 ?? RefStatusPegawai::where('is_default', true)->value('id');
 
-            Employee::create($data + [
-                'status_pegawai_id' => $aktifId,
-                'status_aktif' => 'Aktif',
-                'profil_status' => 'belum_lengkap',
-                'is_kinerja_baik' => true,
-            ]);
+            try {
+                Employee::create($data + [
+                    'status_pegawai_id' => $aktifId,
+                    'status_aktif' => 'Aktif',
+                    'profil_status' => 'belum_lengkap',
+                    'is_kinerja_baik' => true,
+                ]);
+            } catch (QueryException $exception) {
+                // Hanya tabrakan constraint NIP yang merupakan outcome skip; pelanggaran lain
+                // harus tetap gagal agar masalah integritas data tidak tersamarkan.
+                if (! $this->isDuplicateNipViolation($exception)) {
+                    throw $exception;
+                }
+
+                return $this->duplicateNipOutcome($row);
+            }
+
+            return ['status' => 'inserted'];
         }
+
+        return ['status' => 'skipped'];
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return array{status: 'skipped', issue: array<string, mixed>}
+     */
+    private function duplicateNipOutcome(array $row): array
+    {
+        return [
+            'status' => 'skipped',
+            'issue' => [
+                'row' => $row['row'] ?? null,
+                'nama' => $row['nama'] ?? '-',
+                'kategori' => 'dilewati',
+                'errors' => [
+                    'NIP' => ['NIP sudah terdaftar saat proses import dijalankan.'],
+                ],
+            ],
+        ];
+    }
+
+    /** Memastikan unique violation berasal dari constraint NIP pegawai, bukan kolom unik lain. */
+    private function isDuplicateNipViolation(QueryException $exception): bool
+    {
+        $sqlState = (string) ($exception->errorInfo[0] ?? $exception->getCode());
+        $message = strtolower($exception->getMessage());
+        $isUniqueViolation = $sqlState === '23505'
+            || ($sqlState === '23000' && str_contains($message, 'unique'));
+
+        if (! $isUniqueViolation) {
+            return false;
+        }
+
+        return str_contains($message, 'employees_nip_unique')
+            || (str_contains($message, 'unique constraint failed')
+                && str_contains($message, 'employees.nip'));
     }
 
     /**

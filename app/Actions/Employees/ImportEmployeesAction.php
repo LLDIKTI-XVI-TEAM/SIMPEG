@@ -65,12 +65,6 @@ class ImportEmployeesAction
             $referenceErrors = $this->resolveReferences($data);
             $duplicateResult = $this->duplicateErrors($data, $row['row'], $seenNips, $seenEmails);
 
-            // K-US-02: Handle skip status from duplicate check (NIP existing in DB)
-            if ($duplicateResult['skip']) {
-                $skippedCount++;
-                continue;
-            }
-
             $rowErrors = array_merge_recursive($referenceErrors, $duplicateResult['errors']);
 
             if ($rowErrors !== []) {
@@ -78,6 +72,13 @@ class ImportEmployeesAction
                     'row' => $row['row'],
                     'errors' => $rowErrors,
                 ];
+
+                continue;
+            }
+
+            // Skip NIP hanya berlaku bila baris tidak memiliki error yang harus diperbaiki admin.
+            if ($duplicateResult['skip']) {
+                $skippedCount++;
 
                 continue;
             }
@@ -159,11 +160,11 @@ class ImportEmployeesAction
     }
 
     /**
-     * K-US-02: Menjaga file import tidak berisi NIP/email ganda sebelum transaksi insert dimulai.
+     * Menjaga file import tidak berisi NIP/email ganda sebelum transaksi insert dimulai.
      * - NIP ganda dalam satu berkas → error (highest priority)
      * - Email existing DB → error
-     * - Email ganda dalam berkas → error  
-     * - NIP sudah ada di database → SKIP (aligned with K-US-02 canonical contract)
+     * - Email ganda dalam berkas → error
+     * - NIP sudah ada di database → skip bila baris tidak memiliki error lain
      *
      * @param  array<string, mixed>  $data
      * @param  array<string, int>  $seenNips
@@ -184,8 +185,7 @@ class ImportEmployeesAction
             } else {
                 $seenNips[$nip] = $row;
 
-                // K-US-02: NIP sudah ada di database → SKIP (bukan error)
-                // Only check database if no in-file duplicate (in-file duplicate takes priority)
+                // NIP database menjadi skip hanya bila tidak ada duplikasi dalam berkas.
                 if (Employee::where('nip', $nip)->exists()) {
                     $skip = true;
                 }
@@ -218,7 +218,7 @@ class ImportEmployeesAction
     private function failedSummary(array $errors, int $skippedCount = 0): array
     {
         $message = 'Import gagal. Perbaiki baris bermasalah lalu unggah ulang.';
-        
+
         if ($skippedCount > 0) {
             $message .= " {$skippedCount} baris dilewati karena NIP sudah terdaftar.";
         }

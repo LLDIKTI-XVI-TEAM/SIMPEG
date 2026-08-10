@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
-use App\Models\RefJenisPegawai;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
@@ -129,6 +128,36 @@ class LegacyEmployeeImportKus02Test extends TestCase
 
         // No new employees created
         $this->assertDatabaseCount('employees', 1); // Only the original
+    }
+
+    /**
+     * Error email tidak boleh tertutup oleh status skip saat NIP pada baris yang sama sudah terdaftar.
+     */
+    public function test_legacy_endpoint_prioritizes_existing_email_error_over_existing_nip_skip(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        Employee::factory()->create([
+            'nip' => '198001012006041001',
+            'email_pribadi' => 'budi@example.com',
+        ]);
+
+        $this->actingAs($user);
+
+        $response = $this->postJsonWithCsrf(self::LEGACY_ENDPOINT, [
+            'file' => $this->csvFile($this->buildCsv([
+                ['Budi Santoso', 'budi@example.com', '198001012006041001'],
+            ])),
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonPath('inserted', 0);
+        $response->assertJsonPath('skipped', 0);
+        $response->assertJsonPath('failed', 1);
+        $response->assertJsonPath(
+            'errors.0.errors.email_pribadi.0',
+            'Email pegawai sudah terdaftar di database.',
+        );
+        $this->assertDatabaseCount('employees', 1);
     }
 
     /**
