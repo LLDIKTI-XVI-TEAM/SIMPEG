@@ -45,7 +45,7 @@ Route::middleware($employeeGroupMiddleware)
             ->name('backup');
 
         Route::delete('/{employee}', [EmployeeController::class, 'destroy'])
-            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.deactivate', 'role:super_admin'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.deactivate'])
             ->whereUuid('employee')
             ->name('destroy');
 

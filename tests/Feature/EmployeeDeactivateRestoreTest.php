@@ -41,9 +41,9 @@ class EmployeeDeactivateRestoreTest extends TestCase
         $this->assertTrue($admin->hasPermission('employees.restore'));
     }
 
-    public function test_admin_can_deactivate_employee_via_api_and_audit_is_written(): void
+    public function test_admin_kepegawaian_can_deactivate_employee_via_api_and_audit_is_written(): void
     {
-        $user = User::factory()->superAdmin()->create();
+        $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create([
             'nama_lengkap' => 'Pegawai Nonaktif API',
             'status_aktif' => 'Aktif',
@@ -60,6 +60,28 @@ class EmployeeDeactivateRestoreTest extends TestCase
             'auditable_type' => 'Employee',
             'auditable_id' => $employee->id,
         ]);
+    }
+
+    public function test_super_admin_can_deactivate_employee_via_api(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
+
+        $this->actingAs($user)
+            ->deleteJsonWithCsrf("/api/v1/pegawai/{$employee->id}")
+            ->assertOk();
+
+        $this->assertSoftDeleted('employees', ['id' => $employee->id]);
+    }
+
+    public function test_admin_kepegawaian_melihat_aksi_nonaktifkan_di_daftar_pegawai(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user)
+            ->get(route('data-pegawai'))
+            ->assertOk()
+            ->assertSee('Nonaktifkan', false);
     }
 
     public function test_admin_can_restore_employee_via_api_and_audit_is_written(): void

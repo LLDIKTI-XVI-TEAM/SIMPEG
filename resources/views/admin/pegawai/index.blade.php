@@ -683,10 +683,11 @@
                                 </x-ui.tooltip>
                                 @endif
 
-                                @if(auth()->user()->role === 'super_admin')
-                                    {{-- Hapus → masuk Backup (Super Admin Only) --}}
-                                    <x-ui.tooltip text="Hapus ke Backup" position="top-end">
+                                @if(auth()->user()->hasPermission('employees.deactivate'))
+                                    {{-- Nonaktifkan → masuk Backup sesuai permission soft delete --}}
+                                    <x-ui.tooltip text="Nonaktifkan" position="top-end">
                                         <button type="button" @click="deletePegawai(p.id, p.nama_lengkap)"
+                                            :aria-label="'Nonaktifkan pegawai ' + p.nama_lengkap"
                                             class="flex h-8 w-8 items-center justify-center rounded-lg border border-danger/30 bg-surface text-danger transition hover:bg-danger/10 shadow-sm">
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
                                                 viewBox="0 0 24 24" stroke-width="1.5">
