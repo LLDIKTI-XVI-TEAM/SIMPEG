@@ -9,6 +9,7 @@ use App\Models\LeaveRequest;
 use App\Models\RefHariLibur;
 use App\Models\RefJenisCuti;
 use App\Models\User;
+use App\Services\Cuti\LeaveBalanceReservationService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -134,6 +135,79 @@ class CutiVerifierContextTest extends TestCase
         // Tanpa baris saldo sama sekali, panel tetap jujur menampilkan keadaan kosong.
         $response->assertSee('Tidak ada cuti bersama terdaftar pada tahun ini.', false);
         $response->assertSee('Belum ada riwayat cuti tahunan yang disetujui.', false);
+    }
+
+    public function test_saldo_verifikator_mengecualikan_reservasi_pengajuan_yang_sedang_diperiksa(): void
+    {
+        $jenis = $this->jenisTahunan();
+        $employee = Employee::factory()->create();
+        $approver = Employee::factory()->create();
+        $approverUser = User::factory()->kepalaBagian()->create(['employee_id' => $approver->id]);
+
+        LeaveBalance::create([
+            'employee_id' => $employee->id,
+            'tahun' => 2026,
+            'jatah_awal' => 12,
+            'carry_over' => 0,
+            'terpakai' => 0,
+            'sisa' => 12,
+            'sisa_n2' => 0,
+            'sisa_n1' => 0,
+            'sisa_tahun_berjalan' => 12,
+            'terpakai_tahun_berjalan' => 0,
+            'hangus' => 0,
+        ]);
+
+        $otherLeaveRequest = LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $jenis->id,
+            'tanggal_mulai' => '2026-09-07',
+            'tanggal_selesai' => '2026-09-08',
+            'jumlah_hari_kerja' => 2,
+            'alasan' => 'Pengajuan aktif lain',
+            'status' => 'menunggu_approval',
+        ]);
+        $leaveRequest = LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $jenis->id,
+            'tanggal_mulai' => '2026-08-10',
+            'tanggal_selesai' => '2026-08-21',
+            'jumlah_hari_kerja' => 10,
+            'alasan' => 'Pengajuan dengan reservasi aktif',
+            'status' => 'menunggu_approval',
+        ]);
+        $leaveRequest->steps()->create([
+            'step_order' => 1,
+            'step_type' => 'kepala_bagian',
+            'role_label' => 'Kepala Bagian',
+            'approver_employee_id' => $approver->id,
+            'status' => 'active',
+            'is_final' => true,
+        ]);
+
+        // Gunakan service produksi agar regresi mencakup event reservasi yang dibuat saat submit.
+        $reservations = app(LeaveBalanceReservationService::class);
+        $reservations->reserveForNewRequest($otherLeaveRequest);
+        $reservations->reserveForNewRequest($leaveRequest);
+
+        $response = $this->actingAs($approverUser)->get(route('cuti.show', $leaveRequest->id));
+
+        $response->assertOk();
+        $response->assertViewHas('verifierContext', function (array $context): bool {
+            return $context['balance']['saldo_aktual'] === 12
+                && $context['balance']['dialokasikan_aktif'] === 2
+                && $context['balance']['saldo_dapat_diajukan'] === 10;
+        });
+        $response->assertSee('Saldo aktual 12 · 2 dialokasikan · 0 terpakai', false);
+
+        $this->assertDatabaseHas('leave_balance_reservation_events', [
+            'leave_request_id' => $leaveRequest->id,
+            'amount' => 10,
+        ]);
+        $this->assertDatabaseHas('leave_balance_reservation_events', [
+            'leave_request_id' => $otherLeaveRequest->id,
+            'amount' => 2,
+        ]);
     }
 
     public function test_pemohon_biasa_tidak_melihat_panel_konteks_verifikator(): void

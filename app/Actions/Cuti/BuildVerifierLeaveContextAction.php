@@ -28,10 +28,13 @@ class BuildVerifierLeaveContextAction
      *     riwayatTahunan: Collection<int, LeaveRequest>
      * }
      */
-    public function execute(Employee $employee, Carbon $asOf): array
-    {
+    public function execute(
+        Employee $employee,
+        Carbon $asOf,
+        ?LeaveRequest $leaveRequest = null,
+    ): array {
         return [
-            'balance' => $this->balancePreview->execute($employee, $asOf),
+            'balance' => $this->balancePreview->execute($employee, $asOf, $leaveRequest),
             'cutiBersama' => RefHariLibur::query()
                 ->where('tahun', $asOf->year)
                 ->where('is_cuti_bersama', true)

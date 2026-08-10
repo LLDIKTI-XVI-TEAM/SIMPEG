@@ -103,7 +103,7 @@ class CutiController extends Controller
             ? $balancePreview->execute($cuti->employee, Carbon::create($cuti->rollover_target_year, 1, 1)->startOfDay())
             : null;
         $verifierContext = $isVerifierContext && $cuti->employee !== null
-            ? $verifierContextAction->execute($cuti->employee, $cuti->tanggal_mulai ?? now())
+            ? $verifierContextAction->execute($cuti->employee, $cuti->tanggal_mulai ?? now(), $cuti)
             : null;
 
         return view('admin.cuti.show', [
