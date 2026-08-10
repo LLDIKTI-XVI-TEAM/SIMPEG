@@ -11,7 +11,8 @@ class BackfillEmployeeMilestonesCommand extends Command
     /** @var string Menetapkan ukuran batch agar rekonsiliasi tidak memuat semua pegawai ke memori. */
     protected $signature = 'milestone:backfill
                             {--chunk=100 : Number of employees to process per chunk}
-                            {--only-active : Only backfill for active employees}';
+                            {--only-active : Only backfill for active employees}
+                            {--recalculate-legacy-pension : Recalculate only unverified legacy pension dates from current BUP sources}';
 
     /** @var string Menjelaskan bahwa perintah merekonsiliasi milestone pegawai yang sudah ada. */
     protected $description = 'Rekonsiliasi milestone pegawai yang sudah ada';
@@ -21,10 +22,21 @@ class BackfillEmployeeMilestonesCommand extends Command
     {
         $chunkSize = (int) $this->option('chunk');
         $onlyActive = $this->option('only-active');
+        $recalculateLegacyPension = (bool) $this->option('recalculate-legacy-pension');
+
+        if ($chunkSize < 1) {
+            $this->error('Chunk size must be at least 1.');
+
+            return self::INVALID;
+        }
 
         $this->info('Starting employee milestone backfill...');
         $this->info('Chunk size: '.$chunkSize);
         $this->info('Only active: '.($onlyActive ? 'YES' : 'NO'));
+        if ($recalculateLegacyPension) {
+            $this->warn('WARNING: Legacy pension dates will be recalculated from current BUP sources.');
+            $this->warn('Verified manual/import pension dates with explicit milestone provenance will be preserved.');
+        }
         $this->newLine();
 
         $query = Employee::query();
@@ -61,14 +73,17 @@ class BackfillEmployeeMilestonesCommand extends Command
 
         // Rekonsiliasi wajib dijalankan untuk setiap pegawai karena satu milestone aktif
         // tidak membuktikan bahwa seluruh tipe milestone sudah lengkap atau masih berlaku.
-        $query->chunkById($chunkSize, function ($employees) use ($tmtCalculator, &$processedCount, &$errorCount, $progressBar): void {
+        $query->chunkById($chunkSize, function ($employees) use ($tmtCalculator, $recalculateLegacyPension, &$processedCount, &$errorCount, $progressBar): void {
             foreach ($employees as $employee) {
                 try {
-                    $tmtCalculator->syncForEmployee($employee);
+                    $tmtCalculator->syncForEmployee(
+                        $employee,
+                        recalculateLegacyPension: $recalculateLegacyPension,
+                    );
                     $processedCount++;
                 } catch (\Throwable $e) {
                     $errorCount++;
-                    $this->error("\nError processing employee {$employee->id} ({$employee->nama}): {$e->getMessage()}");
+                    $this->error("\nError processing employee {$employee->id} ({$employee->nama_lengkap}): {$e->getMessage()}");
                 }
 
                 $progressBar->advance();

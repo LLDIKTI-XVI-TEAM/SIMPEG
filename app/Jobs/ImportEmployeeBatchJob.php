@@ -8,15 +8,19 @@ use App\Models\ImportBatch;
 use App\Models\User;
 use App\Services\NotificationService;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
 
-class ImportEmployeeBatchJob implements ShouldQueue
+class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    /** Batasi lock dispatch agar kegagalan worker tidak menahan batch tanpa batas. */
+    public int $uniqueFor = 3600;
 
     /**
      * Create a new job instance.
@@ -35,6 +39,10 @@ class ImportEmployeeBatchJob implements ShouldQueue
     {
         $user = $this->userId ? User::find($this->userId) : null;
         $result = $action->execute($this->batchId, $user, $this->ipAddress, $this->userAgent);
+
+        if (($result['executed'] ?? false) !== true) {
+            return;
+        }
 
         // Kirim notifikasi in-app melalui NotificationService jika user memiliki employee record
         $employee = $user?->employee;
@@ -59,17 +67,32 @@ class ImportEmployeeBatchJob implements ShouldQueue
         }
     }
 
+    /** Batch id menjadi identitas unik job untuk lapisan deduplikasi antrean. */
+    public function uniqueId(): string
+    {
+        return $this->batchId;
+    }
+
     /**
      * Handle job failure – update cache status and notify user.
      */
     public function failed(\Throwable $exception): void
     {
+        $batchRecord = ImportBatch::query()->find($this->batchId);
+
+        // Callback redelivery yang terlambat tidak boleh menimpa hasil batch yang sudah terminal.
+        if ($batchRecord === null || ! in_array($batchRecord->status, ['queued', 'processing', 'failed'], true)) {
+            return;
+        }
+
         // Pastikan laporan permanen ikut menandai kegagalan (no-op bila record belum ada).
-        ImportBatch::whereKey($this->batchId)->update([
-            'status' => 'failed',
-            'error_message' => $exception->getMessage(),
-            'finished_at' => now(),
-        ]);
+        ImportBatch::whereKey($this->batchId)
+            ->whereIn('status', ['queued', 'processing', 'failed'])
+            ->update([
+                'status' => 'failed',
+                'error_message' => $exception->getMessage(),
+                'finished_at' => now(),
+            ]);
 
         // Update cache status ke failed jika job gagal sepenuhnya
         $batch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$this->batchId);

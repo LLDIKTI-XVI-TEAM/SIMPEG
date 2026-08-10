@@ -51,28 +51,29 @@ class ExecuteImportBatchAction
         $failedCount = (int) ($batch['validation']['error_count'] ?? 0);
         $rowIssues = $this->collectRowIssues($batch['validation']['results']);
 
-        // Update status to processing
+        // Hanya satu worker boleh memindahkan batch queued ke processing.
+        $claimed = ImportBatch::query()
+            ->whereKey($batchId)
+            ->where('status', 'queued')
+            ->update([
+                'status' => 'processing',
+                'valid_count' => $batch['validation']['valid_count'] ?? $totalRows,
+                'skipped_count' => $skippedCount,
+                'failed_count' => $failedCount,
+                'row_issues' => $rowIssues,
+                'error_message' => null,
+                'started_at' => now(),
+                'finished_at' => null,
+            ]);
+
+        if ($claimed !== 1) {
+            return $this->existingExecutionResult($batchId);
+        }
+
         $batch['status'] = 'processing';
         $batch['progress'] = 0;
         $batch['processed_count'] = 0;
         Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $batch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
-
-        // Rekam batch ke database agar laporan hasil tetap tersedia setelah cache kedaluwarsa.
-        ImportBatch::updateOrCreate(['id' => $batchId], [
-            'user_id' => $user?->id,
-            'filename' => $batch['filename'],
-            'type' => $type,
-            'status' => 'processing',
-            'total_rows' => $batch['total_rows'] ?? count($batch['rows'] ?? []),
-            'valid_count' => $batch['validation']['valid_count'] ?? $totalRows,
-            'inserted_count' => 0,
-            'skipped_count' => $skippedCount,
-            'failed_count' => $failedCount,
-            'row_issues' => $rowIssues,
-            'error_message' => null,
-            'started_at' => now(),
-            'finished_at' => null,
-        ]);
 
         try {
             if ($validRows !== []) {
@@ -173,6 +174,8 @@ class ExecuteImportBatchAction
         }
 
         return [
+            'executed' => true,
+            'status' => 'completed',
             'message' => 'Import selesai.',
             'inserted' => $finalCounts['inserted'],
             'inserted_count' => $finalCounts['inserted'],
@@ -181,6 +184,31 @@ class ExecuteImportBatchAction
             'skipped_count' => $finalCounts['skipped'],
             'failed' => $finalCounts['failed'],
             'failed_count' => $finalCounts['failed'],
+        ];
+    }
+
+    /** Mengembalikan hasil pertama tanpa menjalankan ulang side effect batch. */
+    private function existingExecutionResult(string $batchId): array
+    {
+        $batch = ImportBatch::query()->find($batchId);
+
+        if ($batch === null) {
+            throw ValidationException::withMessages([
+                'message' => ['Batch import belum diklaim untuk antrean.'],
+            ]);
+        }
+
+        return [
+            'executed' => false,
+            'status' => $batch->status,
+            'message' => 'Batch import sudah diproses atau sedang diproses oleh worker lain.',
+            'inserted' => $batch->inserted_count,
+            'inserted_count' => $batch->inserted_count,
+            'processed' => $batch->inserted_count + $batch->skipped_count,
+            'skipped' => $batch->skipped_count,
+            'skipped_count' => $batch->skipped_count,
+            'failed' => $batch->failed_count,
+            'failed_count' => $batch->failed_count,
         ];
     }
 

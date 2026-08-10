@@ -273,6 +273,7 @@ class TmtCalculatorMilestoneTest extends TestCase
         // Employee tanpa riwayat apapun
         $employee = Employee::factory()->create([
             'tanggal_lahir' => null,
+            'tanggal_pensiun' => null,
         ]);
 
         $service = app(TmtCalculatorService::class);

@@ -6,6 +6,8 @@ use App\Models\Employee;
 use App\Models\EmployeeMilestone;
 use App\Models\EwsConfig;
 use App\Models\RankHistory;
+use App\Models\RefJabatan;
+use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\SalaryHistory;
 use App\Services\EwsEngineService;
@@ -262,12 +264,57 @@ class EwsSchedulerMilestoneOptimizationTest extends TestCase
         ]);
     }
 
-    /**
-     * Skip this test due to transaction issues with refreshDatabase in SQLite.
-     * Query reduction is verified by the other tests showing milestone usage.
-     */
-    public function test_milestone_integration_reduces_query_count_significantly(): void
+    /** Fallback pensiun tanpa milestone harus memuat sumber BUP sekali per chunk, bukan per pegawai. */
+    public function test_pension_fallback_queries_position_sources_once_per_chunk(): void
     {
-        $this->markTestSkipped('Query counting test skipped due to SQLite transaction limitations');
+        EwsConfig::updateOrCreate(['key' => 'pensiun_required_age_years'], ['value' => '0']);
+
+        $jenisJabatan = RefJenisJabatan::create([
+            'nama' => 'Jenis Jabatan Uji Query EWS',
+            'maks_usia_pensiun' => 58,
+            'is_active' => true,
+        ]);
+        $jabatan = RefJabatan::create([
+            'nama' => 'Jabatan Uji Query EWS',
+            'jenis_jabatan_id' => $jenisJabatan->id,
+            'default_bup' => null,
+            'is_active' => true,
+        ]);
+
+        $employees = Employee::factory()->count(8)->create([
+            'status_aktif' => 'Aktif',
+            'tanggal_lahir' => now()->subYears(58)->addDays(90)->toDateString(),
+            'tanggal_pensiun' => null,
+        ]);
+
+        foreach ($employees as $employee) {
+            $employee->positionHistories()->create([
+                'jabatan_id' => $jabatan->id,
+                'jenis_jabatan_id' => $jenisJabatan->id,
+                'nama_jabatan' => $jabatan->nama,
+                'tmt_jabatan' => '2020-01-01',
+                'is_latest' => true,
+            ]);
+        }
+
+        $this->assertDatabaseCount('employee_milestones', 0);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        app(EwsEngineService::class)->run();
+        $queries = collect(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $positionQueries = $queries->filter(
+            fn (array $query): bool => str_contains(strtolower($query['query']), 'position_histories'),
+        );
+        $positionReferenceQueries = $queries->filter(function (array $query): bool {
+            $sql = strtolower($query['query']);
+
+            return str_contains($sql, 'ref_jabatan') || str_contains($sql, 'ref_jenis_jabatan');
+        });
+
+        $this->assertCount(1, $positionQueries, 'Riwayat jabatan harus dimuat satu kali untuk satu chunk.');
+        $this->assertLessThanOrEqual(2, $positionReferenceQueries->count(), 'Referensi BUP harus eager-loaded secara terbatas.');
     }
 }

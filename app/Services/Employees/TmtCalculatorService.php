@@ -13,12 +13,21 @@ use Illuminate\Support\Carbon;
 
 class TmtCalculatorService
 {
+    private const PENSION_SOURCE_CALCULATED = 'calculated_from_bup';
+
+    private const PENSION_SOURCE_LEGACY_UNVERIFIED = 'legacy_unverified';
+
+    private const PENSION_SOURCE_OFFICIAL = 'employees.tanggal_pensiun';
+
     /**
      * Menyinkronkan snapshot tanggal turunan dari riwayat bertanggal terbaru tanpa mengubah riwayat sumber.
      * Hint provenance dipakai saat tanggal pensiun resmi diubah atau dikosongkan oleh Admin.
      */
-    public function syncForEmployee(Employee $employee, ?bool $pensionDateIsAuthoritative = null): void
-    {
+    public function syncForEmployee(
+        Employee $employee,
+        ?bool $pensionDateIsAuthoritative = null,
+        bool $recalculateLegacyPension = false,
+    ): void {
         $latestRank = $this->latestRank($employee);
         $latestSalary = $this->latestSalary($employee);
 
@@ -36,15 +45,18 @@ class TmtCalculatorService
             ->where('type', EmployeeMilestone::TYPE_PENSIUN)
             ->first();
 
-        $hadManualPensionDate = $pensionDateIsAuthoritative ?? (
-            $employee->tanggal_pensiun !== null
-            && (
-                ($existingPensionMilestone !== null && ($existingPensionMilestone->metadata['is_manual'] ?? false))
-                || $existingPensionMilestone === null
-            )
+        $pensionSource = $this->resolvePensionSource(
+            $employee,
+            $existingPensionMilestone,
+            $pensionDateIsAuthoritative,
+            $recalculateLegacyPension,
         );
+        $preservePensionDate = in_array($pensionSource, [
+            self::PENSION_SOURCE_OFFICIAL,
+            self::PENSION_SOURCE_LEGACY_UNVERIFIED,
+        ], true);
 
-        if (! $hadManualPensionDate) {
+        if (! $preservePensionDate) {
             $pensionDate = $this->pensionDate($employee);
 
             if ($pensionDate !== null) {
@@ -57,7 +69,7 @@ class TmtCalculatorService
 
         $employee->update($updates);
 
-        $this->storeMilestones($employee, $latestRank, $latestSalary, $hadManualPensionDate);
+        $this->storeMilestones($employee, $latestRank, $latestSalary, $pensionSource);
     }
 
     /**
@@ -67,9 +79,9 @@ class TmtCalculatorService
      * Milestone yang tidak lagi dihasilkan akan dinonaktifkan
      * untuk mencegah scheduler memproses data yang sudah tidak berlaku.
      *
-     * @param  bool  $hadManualPensionDate  Apakah tanggal_pensiun resmi sudah ada sebelum sinkronisasi
+     * @param  string  $pensionSource  Provenance eksplisit untuk melindungi tanggal resmi dan legacy
      */
-    private function storeMilestones(Employee $employee, ?RankHistory $latestRank, ?SalaryHistory $latestSalary, bool $hadManualPensionDate = false): void
+    private function storeMilestones(Employee $employee, ?RankHistory $latestRank, ?SalaryHistory $latestSalary, string $pensionSource): void
     {
         $today = now()->startOfDay();
         $pangkatRequiredYears = $this->configYears('pangkat_required_years', 4);
@@ -139,11 +151,11 @@ class TmtCalculatorService
         $pensionDate = null;
         $metadata = ['tanggal_lahir' => $employee->tanggal_lahir?->toDateString()];
 
-        if ($hadManualPensionDate) {
-            // Prioritaskan tanggal pensiun manual/impor (sumber resmi)
+        if (in_array($pensionSource, [self::PENSION_SOURCE_OFFICIAL, self::PENSION_SOURCE_LEGACY_UNVERIFIED], true)) {
+            // Nilai resmi dan legacy yang belum diverifikasi diperlakukan authoritative agar tidak tertimpa diam-diam.
             $pensionDate = $employee->tanggal_pensiun;
             $metadata['is_manual'] = true;
-            $metadata['source'] = 'employees.tanggal_pensiun';
+            $metadata['source'] = $pensionSource;
             $metadata['bup'] = null;
             $metadata['jabatan'] = null;
         } else {
@@ -153,7 +165,7 @@ class TmtCalculatorService
                 $position = $this->latestPosition($employee);
                 $bup = $position?->jabatan?->default_bup ?? $position?->jenisJabatan?->maks_usia_pensiun;
                 $metadata['is_manual'] = false;
-                $metadata['source'] = 'calculated_from_bup';
+                $metadata['source'] = self::PENSION_SOURCE_CALCULATED;
                 $metadata['bup'] = $bup;
                 $metadata['jabatan'] = $position?->jabatan?->nama ?? null;
             }
@@ -262,6 +274,41 @@ class TmtCalculatorService
             ->first();
 
         return $appointment?->tmt_pengangkatan;
+    }
+
+    /**
+     * Menentukan provenance tanpa menebak apakah tanggal legacy kebetulan sama dengan hasil BUP.
+     * Nilai lama tanpa milestone dipertahankan sampai operator memilih kalkulasi ulang secara eksplisit.
+     */
+    private function resolvePensionSource(
+        Employee $employee,
+        ?EmployeeMilestone $existingMilestone,
+        ?bool $pensionDateIsAuthoritative,
+        bool $recalculateLegacyPension,
+    ): string {
+        if ($employee->tanggal_pensiun === null || $pensionDateIsAuthoritative === false) {
+            return self::PENSION_SOURCE_CALCULATED;
+        }
+
+        if ($pensionDateIsAuthoritative === true) {
+            return self::PENSION_SOURCE_OFFICIAL;
+        }
+
+        $existingSource = $existingMilestone?->metadata['source'] ?? null;
+        $isLegacy = $existingMilestone === null
+            || $existingSource === self::PENSION_SOURCE_LEGACY_UNVERIFIED;
+
+        if ($isLegacy) {
+            return $recalculateLegacyPension
+                ? self::PENSION_SOURCE_CALCULATED
+                : self::PENSION_SOURCE_LEGACY_UNVERIFIED;
+        }
+
+        if (($existingMilestone->metadata['is_manual'] ?? false) === true) {
+            return self::PENSION_SOURCE_OFFICIAL;
+        }
+
+        return self::PENSION_SOURCE_CALCULATED;
     }
 
     private function configYears(string $key, int $default): int

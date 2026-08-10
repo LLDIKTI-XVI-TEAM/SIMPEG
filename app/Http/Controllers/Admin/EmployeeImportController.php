@@ -4,13 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Actions\Employees\DownloadImportReportAction;
 use App\Actions\Employees\GenerateImportTemplateAction;
+use App\Actions\Employees\QueueImportBatchAction;
 use App\Actions\Employees\SaveImportMappingAction;
 use App\Actions\Employees\UploadImportBatchAction;
 use App\Actions\Employees\ValidateImportBatchAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Import\ImportEmployeesRequest;
 use App\Http\Requests\Import\SaveImportMappingRequest;
-use App\Jobs\ImportEmployeeBatchJob;
 use App\Models\ImportBatch;
 use App\Support\EmployeeImport\ImportColumnMapping;
 use App\Support\EmployeeImport\ImportTemplateWriter;
@@ -102,34 +102,14 @@ class EmployeeImportController extends Controller
     /**
      * Menangani eksekusi impor dengan memasukkan job ke antrean.
      */
-    public function execute(Request $request, string $batchId): JsonResponse
+    public function execute(Request $request, string $batchId, QueueImportBatchAction $action): JsonResponse
     {
-        $batch = $this->getBatchOrFail($batchId, $request);
-
-        if ($batch['validation'] === null) {
-            return response()->json([
-                'message' => 'Data belum divalidasi. Jalankan validasi terlebih dahulu.',
-            ], 422);
-        }
-
-        // Status cache diubah sebelum job diproses agar UI segera menampilkan antrean.
-        $batch['status'] = 'queued';
-        $batch['progress'] = 0;
-        $batch['processed_count'] = 0;
-        Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $batch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
-
-        // Job menyimpan konteks user/IP untuk audit impor pegawai.
-        ImportEmployeeBatchJob::dispatch(
+        return response()->json($action->execute(
             $batchId,
-            $request->user()?->id,
+            $request->user(),
             $request->ip(),
-            $request->userAgent()
-        );
-
-        return response()->json([
-            'status' => 'queued',
-            'message' => 'Proses impor telah dimasukkan ke dalam antrean. Anda dapat meninggalkan halaman ini.',
-        ]);
+            $request->userAgent(),
+        ));
     }
 
     /**

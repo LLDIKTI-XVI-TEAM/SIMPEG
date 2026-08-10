@@ -7,8 +7,8 @@ use App\Models\EwsAlert;
 use App\Models\EwsConfig;
 use App\Models\EwsSchedulerRun;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Database\QueryException;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
 class EwsEngineService
@@ -99,6 +99,22 @@ class EwsEngineService
                     $pppkContractYears, $satyalancanaYears,
                     &$alertsCreated, &$employeesChecked
                 ): void {
+                    // Hanya pegawai yang benar-benar memerlukan fallback BUP yang memuat riwayat jabatan.
+                    // Jalur milestone normal tetap membaca snapshot terhitung tanpa query riwayat tambahan.
+                    $employees
+                        ->filter(fn (Employee $employee): bool => $this->needsPositionPensionFallback(
+                            $employee,
+                            $pensiunRequiredAgeYears,
+                        ))
+                        ->load([
+                            'positionHistories' => fn ($query) => $query
+                                ->with(['jabatan', 'jenisJabatan'])
+                                ->whereNotNull('tmt_jabatan')
+                                ->orderByDesc('tmt_jabatan')
+                                ->orderByDesc('created_at')
+                                ->orderByDesc('id'),
+                        ]);
+
                     foreach ($employees as $employee) {
                         $employeesChecked++;
 
@@ -471,13 +487,7 @@ class EwsEngineService
             return null;
         }
 
-        $position = $employee->positionHistories()
-            ->with(['jabatan', 'jenisJabatan'])
-            ->whereNotNull('tmt_jabatan')
-            ->orderByDesc('tmt_jabatan')
-            ->orderByDesc('created_at')
-            ->orderByDesc('id')
-            ->first();
+        $position = $employee->positionHistories->first();
 
         if ($position === null) {
             return null;
@@ -491,6 +501,18 @@ class EwsEngineService
         }
 
         return $employee->tanggal_lahir->copy()->addYearsNoOverflow($bup);
+    }
+
+    /** Menentukan apakah scheduler perlu memuat sumber BUP untuk fallback pensiun. */
+    private function needsPositionPensionFallback(Employee $employee, int $pensiunRequiredAgeYears): bool
+    {
+        $hasPensionMilestone = $employee->milestones
+            ->contains(fn ($milestone): bool => $milestone->type === 'pensiun');
+
+        return ! $hasPensionMilestone
+            && $employee->tanggal_pensiun === null
+            && $pensiunRequiredAgeYears <= 0
+            && $employee->tanggal_lahir !== null;
     }
 
     /**

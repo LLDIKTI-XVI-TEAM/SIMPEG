@@ -6,7 +6,9 @@ use App\Models\Appointment;
 use App\Models\Employee;
 use App\Models\EmployeeMilestone;
 use App\Models\RefGolongan;
+use App\Models\RefJabatan;
 use Database\Seeders\ReferenceSeeder;
+use Illuminate\Console\Command;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -346,5 +348,99 @@ class BackfillEmployeeMilestonesCommandTest extends TestCase
                 ->sortKeys()
                 ->all()
         );
+    }
+
+    /** Nilai chunk nol tidak boleh diteruskan ke chunkById sebagai eksekusi semu. */
+    public function test_backfill_command_rejects_zero_chunk_size(): void
+    {
+        $this->artisan('milestone:backfill', ['--chunk' => 0, '--no-interaction' => true])
+            ->expectsOutput('Chunk size must be at least 1.')
+            ->assertExitCode(Command::INVALID);
+    }
+
+    /** Nilai chunk negatif harus ditolak sebelum query pegawai dijalankan. */
+    public function test_backfill_command_rejects_negative_chunk_size(): void
+    {
+        $this->artisan('milestone:backfill', ['--chunk' => -10, '--no-interaction' => true])
+            ->expectsOutput('Chunk size must be at least 1.')
+            ->assertExitCode(Command::INVALID);
+    }
+
+    /** Backfill biasa menjaga nilai pensiun lama yang provenance-nya belum dapat diverifikasi. */
+    public function test_backfill_preserves_legacy_pension_date_by_default(): void
+    {
+        $employee = $this->employeeWithLegacyPensionDate();
+
+        $this->artisan('milestone:backfill', ['--no-interaction' => true])
+            ->expectsQuestion('Do you want to proceed with the backfill?', true)
+            ->assertSuccessful();
+
+        $employee->refresh();
+        $milestone = EmployeeMilestone::query()
+            ->where('employee_id', $employee->id)
+            ->where('type', EmployeeMilestone::TYPE_PENSIUN)
+            ->sole();
+
+        $this->assertSame('2035-06-30', $employee->tanggal_pensiun?->toDateString());
+        $this->assertSame('2035-06-30', $milestone->milestone_date->toDateString());
+        $this->assertSame('legacy_unverified', $milestone->metadata['source']);
+        $this->assertTrue($milestone->metadata['is_manual']);
+    }
+
+    /** Operator dapat menghitung ulang nilai legacy secara eksplisit tanpa menebak kesamaan tanggal BUP. */
+    public function test_backfill_can_explicitly_recalculate_legacy_pension_date(): void
+    {
+        $employee = $this->employeeWithLegacyPensionDate();
+
+        $this->artisan('milestone:backfill', ['--no-interaction' => true])
+            ->expectsQuestion('Do you want to proceed with the backfill?', true)
+            ->assertSuccessful();
+
+        $this->assertSame('legacy_unverified', EmployeeMilestone::query()
+            ->where('employee_id', $employee->id)
+            ->where('type', EmployeeMilestone::TYPE_PENSIUN)
+            ->sole()
+            ->metadata['source']);
+
+        $this->artisan('milestone:backfill', [
+            '--recalculate-legacy-pension' => true,
+            '--no-interaction' => true,
+        ])
+            ->expectsOutputToContain('WARNING: Legacy pension dates will be recalculated from current BUP sources.')
+            ->expectsQuestion('Do you want to proceed with the backfill?', true)
+            ->assertSuccessful();
+
+        $employee->refresh();
+        $milestone = EmployeeMilestone::query()
+            ->where('employee_id', $employee->id)
+            ->where('type', EmployeeMilestone::TYPE_PENSIUN)
+            ->sole();
+
+        $this->assertSame('2028-01-15', $employee->tanggal_pensiun?->toDateString());
+        $this->assertSame('2028-01-15', $milestone->milestone_date->toDateString());
+        $this->assertSame('calculated_from_bup', $milestone->metadata['source']);
+        $this->assertFalse($milestone->metadata['is_manual']);
+    }
+
+    private function employeeWithLegacyPensionDate(): Employee
+    {
+        $employee = Employee::factory()->create([
+            'status_aktif' => 'Aktif',
+            'tanggal_lahir' => '1970-01-15',
+            'tanggal_pensiun' => '2035-06-30',
+        ]);
+        $jabatan = RefJabatan::create([
+            'nama' => 'Jabatan Uji Backfill Legacy',
+            'default_bup' => 58,
+            'is_active' => true,
+        ]);
+        $employee->positionHistories()->create([
+            'jabatan_id' => $jabatan->id,
+            'nama_jabatan' => $jabatan->nama,
+            'tmt_jabatan' => '2020-01-01',
+            'is_latest' => true,
+        ]);
+
+        return $employee;
     }
 }
