@@ -15,9 +15,9 @@ class TmtCalculatorService
 {
     /**
      * Menyinkronkan snapshot tanggal turunan dari riwayat bertanggal terbaru tanpa mengubah riwayat sumber.
-     * US-5.5 AC-4,5: Juga menyimpan hasil kalkulasi ke tabel employee_milestones untuk optimisasi scheduler.
+     * Hint provenance dipakai saat tanggal pensiun resmi diubah atau dikosongkan oleh Admin.
      */
-    public function syncForEmployee(Employee $employee): void
+    public function syncForEmployee(Employee $employee, ?bool $pensionDateIsAuthoritative = null): void
     {
         $latestRank = $this->latestRank($employee);
         $latestSalary = $this->latestSalary($employee);
@@ -31,40 +31,33 @@ class TmtCalculatorService
             'tanggal_kgb_berikutnya' => $latestSalary?->tmt_kgb?->copy()->addYearsNoOverflow($kgbRequiredYears),
         ];
 
-        // Tanggal pensiun manual/import adalah data resmi sehingga kalkulasi hanya mengisi nilai yang masih kosong.
-        // US-5.5 AC-3: Bedakan manual/import (authoritative) vs calculated (dapat di-override)
-        //
-        // Logic provenance:
-        // 1. Jika milestone exists dengan is_manual=true → manual (preserve)
-        // 2. Jika tanggal_pensiun exists tapi milestone belum pernah dibuat → manual (import/manual entry)
-        // 3. Otherwise → calculated (dapat di-recalculate)
+        // Tanggal resmi dari form/import harus dipertahankan, sedangkan tanggal calculated
+        // boleh dihitung ulang. Hint dari flow mutasi mengatasi perubahan calculated ke resmi.
         $existingPensionMilestone = EmployeeMilestone::where('employee_id', $employee->id)
             ->where('type', EmployeeMilestone::TYPE_PENSIUN)
-            ->first(); // Include inactive to detect if milestone ever existed
+            ->first();
 
-        $hadManualPensionDate = $employee->tanggal_pensiun !== null
+        $hadManualPensionDate = $pensionDateIsAuthoritative ?? (
+            $employee->tanggal_pensiun !== null
             && (
-                // Case 1: Milestone explicitly marked as manual
                 ($existingPensionMilestone !== null && ($existingPensionMilestone->metadata['is_manual'] ?? false))
-                // Case 2: Has pension date but milestone never created (manual/import entry)
                 || $existingPensionMilestone === null
-            );
+            )
+        );
 
         if (! $hadManualPensionDate) {
-            // Always recalculate if not manual (even if tanggal_pensiun is non-null from previous calculation)
             $pensionDate = $this->pensionDate($employee);
 
             if ($pensionDate !== null) {
                 $updates['tanggal_pensiun'] = $pensionDate;
             } elseif ($employee->tanggal_pensiun !== null) {
-                // Clear calculated pension date if source data (position/BUP) is gone
+                // Snapshot calculated harus dikosongkan ketika sumber jabatan/BUP hilang.
                 $updates['tanggal_pensiun'] = null;
             }
         }
 
         $employee->update($updates);
 
-        // US-5.5 AC-5: Simpan hasil kalkulasi ke tabel milestones untuk optimisasi scheduler
         $this->storeMilestones($employee, $latestRank, $latestSalary, $hadManualPensionDate);
     }
 

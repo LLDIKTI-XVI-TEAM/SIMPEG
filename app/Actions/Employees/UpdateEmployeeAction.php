@@ -37,9 +37,12 @@ class UpdateEmployeeAction
             $pppkContractChanged = array_key_exists('tanggal_akhir_kontrak', $validated)
                 && ($oldValues['tanggal_akhir_kontrak'] ?? null) !== $validated['tanggal_akhir_kontrak'];
 
-            // Deteksi perubahan field yang mempengaruhi milestone pensiun
-            $pensionFieldsChanged = (array_key_exists('tanggal_pensiun', $validated) && ($oldValues['tanggal_pensiun'] ?? null) !== $validated['tanggal_pensiun'])
-                || (array_key_exists('tanggal_lahir', $validated) && ($oldValues['tanggal_lahir'] ?? null) !== $validated['tanggal_lahir']);
+            $oldPensionDate = $employee->tanggal_pensiun?->toDateString();
+            $oldBirthDate = $employee->tanggal_lahir?->toDateString();
+            $pensionDateChanged = array_key_exists('tanggal_pensiun', $validated)
+                && $oldPensionDate !== $validated['tanggal_pensiun'];
+            $pensionFieldsChanged = $pensionDateChanged
+                || (array_key_exists('tanggal_lahir', $validated) && $oldBirthDate !== $validated['tanggal_lahir']);
 
             $rankHistoryChanged = false;
             $positionHistoryChanged = false;
@@ -218,7 +221,12 @@ class UpdateEmployeeAction
 
             // Sinkronkan milestone jika ada perubahan history ATAU field pensiun/lahir ATAU kontrak PPPK
             if ($rankHistoryChanged || $positionHistoryChanged || $salaryHistoryChanged || $pensionFieldsChanged || $pppkContractChanged) {
-                $this->tmtCalculator->syncForEmployee($employee);
+                if ($pensionDateChanged) {
+                    // Nilai non-null adalah keputusan resmi Admin; null mengembalikan sumber ke kalkulasi BUP.
+                    $this->tmtCalculator->syncForEmployee($employee, $employee->tanggal_pensiun !== null);
+                } else {
+                    $this->tmtCalculator->syncForEmployee($employee);
+                }
             }
 
             // 4. Pengangkatan (Appointment)
