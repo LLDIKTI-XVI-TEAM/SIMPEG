@@ -8,7 +8,10 @@ use Illuminate\Database\Seeder;
 
 class DemoSsoUserSeeder extends Seeder
 {
-    public function run(): void
+    /**
+     * Menanam seluruh akun demo atau satu akun yang dipilih berdasarkan role internalnya.
+     */
+    public function run(?string $onlyRole = null): void
     {
         // Akun demo hanya untuk pengembangan/pengujian. Jika ditanam di produksi,
         // akun demo ini akan mengisi role internal yang seharusnya dikelola admin.
@@ -18,6 +21,10 @@ class DemoSsoUserSeeder extends Seeder
         }
 
         foreach (config('services.keycloak.demo_users', []) as $demoUser) {
+            if ($onlyRole !== null && ($demoUser['role'] ?? null) !== $onlyRole) {
+                continue;
+            }
+
             $username = trim((string) ($demoUser['username'] ?? ''));
             $email = trim((string) ($demoUser['email'] ?? ''));
 

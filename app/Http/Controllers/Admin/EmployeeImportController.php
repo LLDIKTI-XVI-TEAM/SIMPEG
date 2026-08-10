@@ -4,12 +4,15 @@ namespace App\Http\Controllers\Admin;
 
 use App\Actions\Employees\DownloadImportReportAction;
 use App\Actions\Employees\GenerateImportTemplateAction;
+use App\Actions\Employees\SaveImportMappingAction;
 use App\Actions\Employees\UploadImportBatchAction;
 use App\Actions\Employees\ValidateImportBatchAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Import\ImportEmployeesRequest;
+use App\Http\Requests\Import\SaveImportMappingRequest;
 use App\Jobs\ImportEmployeeBatchJob;
 use App\Models\ImportBatch;
+use App\Support\EmployeeImport\ImportColumnMapping;
 use App\Support\EmployeeImport\ImportTemplateWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -40,6 +43,23 @@ class EmployeeImportController extends Controller
     {
         $batch = $this->getBatchOrFail($batchId, $request);
 
+        $rows = array_slice($batch['rows'], 0, 10);
+        if ($request->has('row')) {
+            $rowNumber = (int) $request->validate([
+                'row' => ['required', 'integer', 'min:2'],
+            ])['row'];
+            $row = collect($batch['rows'])->first(
+                fn (array $candidate): bool => (int) ($candidate['row'] ?? 0) === $rowNumber,
+            );
+
+            abort_if($row === null, 404, 'Baris import tidak ditemukan pada batch ini.');
+            $rows = [$row];
+        }
+
+        // Respons preview dibatasi server ke 10 baris pertama sesuai kontrak wizard;
+        // seluruh baris tetap tersimpan pada batch untuk validasi dan eksekusi.
+        // Mapping aktif ikut dikembalikan agar UI menampilkan state server,
+        // bukan tebakan client.
         return response()->json([
             'batch_id' => $batchId,
             'filename' => $batch['filename'],
@@ -47,8 +67,20 @@ class EmployeeImportController extends Controller
             'type_label' => $batch['type_label'] ?? UploadImportBatchAction::TEMPLATE_LABELS['utama'],
             'total_rows' => $batch['total_rows'],
             'headers' => $batch['headers'],
-            'rows' => $batch['rows'],
+            'rows' => $rows,
+            'mapping' => $batch['mapping'] ?? ImportColumnMapping::autoMap($batch['headers']),
+            'warnings' => $batch['warnings'] ?? ImportColumnMapping::warnings($batch['mapping'] ?? []),
+            'required_targets' => ImportColumnMapping::requiredTargets(),
         ]);
+    }
+
+    /**
+     * Menyimpan pemetaan kolom pilihan admin pada batch import.
+     * Controller hanya meneruskan request tervalidasi ke Action.
+     */
+    public function saveMapping(SaveImportMappingRequest $request, string $batchId, SaveImportMappingAction $action): JsonResponse
+    {
+        return response()->json($action->execute($batchId, $request->validated()['mapping'], $request->user()));
     }
 
     /**

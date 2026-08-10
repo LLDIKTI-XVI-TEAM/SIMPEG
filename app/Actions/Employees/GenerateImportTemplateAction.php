@@ -10,8 +10,8 @@ class GenerateImportTemplateAction
     /**
      * Bangun definisi template (header + dua baris contoh) untuk satu tipe import.
      * Header diambil dari UploadImportBatchAction::TEMPLATE_HEADERS (sumber tunggal)
-     * agar tidak terjadi drift dengan validasi importer yang menyebabkan kolom
-     * wajib seperti Role hilang dari template.
+     * agar tidak terjadi drift dengan validasi importer. Role sengaja tidak menjadi
+     * kolom template: penetapan role aplikasi berjalan lewat Kelola Akses User.
      *
      * @return array{headers: array<int, string>, examples: array<int, array<string, string|null>>}
      */
@@ -86,7 +86,6 @@ class GenerateImportTemplateAction
                     'Prodi Pendidikan Terakhir' => 'Manajemen',
                     'Status Kepegawaian' => 'PNS',
                     'Tanggal Lahir' => '1980-01-01',
-                    'Role' => 'pegawai',
                 ],
                 [
                     'No' => '2',
@@ -105,7 +104,6 @@ class GenerateImportTemplateAction
                     'Prodi Pendidikan Terakhir' => 'Administrasi Perkantoran',
                     'Status Kepegawaian' => 'PPPK',
                     'Tanggal Lahir' => '1990-05-15',
-                    'Role' => 'pegawai',
                 ],
             ],
             default => [],

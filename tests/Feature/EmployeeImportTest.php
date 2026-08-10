@@ -142,7 +142,6 @@ class EmployeeImportTest extends TestCase
             'Teknik Informatika',
             'PNS',
             '1986-02-12',
-            'pegawai',
         ])."\n";
 
         $this->actingAs($user);
@@ -314,6 +313,422 @@ class EmployeeImportTest extends TestCase
             ->assertJsonPath('result.failed', 0);
     }
 
+    public function test_import_wizard_applies_saved_column_mapping_end_to_end(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        // Upload file Excel dengan header non-standar / kustom
+        $customHeaders = [
+            'Nama Pegawai Custom',
+            'Person Custom',
+            'Email Utama',
+            'No NIP',
+            'Status Pegawai Custom',
+            'Telepon',
+            'Tgl Lahir',
+            'Jabatan Custom',
+            'Golongan Custom',
+            'Kelas Jabatan',
+            'Pangkat',
+            'Pendidikan',
+            'Prodi',
+            'Pensiun',
+        ];
+
+        $customRowValues = [
+            'Ahmad Subandi, S.T.',
+            'Ahmad Subandi',
+            'ahmad.subandi@example.com',
+            '199001012015031001',
+            'PNS',
+            '081234567890',
+            '1990-01-01',
+            'Analis Kepegawaian',
+            'III/a',
+            '7',
+            'Penata Muda',
+            'S1',
+            'Teknik Informatika',
+            '2048-01-01',
+        ];
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFileWithHeaders($customHeaders, [$customRowValues], 'custom_headers.xlsx'),
+            'type' => 'utama',
+        ]);
+
+        $upload->assertOk();
+        $batchId = $upload->json('batch_id');
+        $this->assertContains('No NIP', $upload->json('headers'));
+        // Header kustom tidak dikenali otomatis sehingga masuk daftar peringatan kolom ekstra.
+        $this->assertContains('No NIP', $upload->json('warnings.unmatched_columns'));
+
+        // Admin menyimpan pemetaan manual; mapping menjadi state batch yang dipakai validasi.
+        $mapping = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/mapping", [
+            'mapping' => [
+                'Nama Pegawai Custom' => 'Nama Pegawai',
+                'Person Custom' => 'Person',
+                'Email Utama' => 'Email Pegawai',
+                'No NIP' => 'NIP',
+                'Status Pegawai Custom' => 'Status Kepegawaian',
+                'Telepon' => 'Nomor Telepon',
+                'Tgl Lahir' => 'Tanggal Lahir',
+                'Jabatan Custom' => 'Jabatan',
+                'Golongan Custom' => 'Golongan',
+                'Kelas Jabatan' => 'Kelas Jabatan',
+                'Pangkat' => 'Pangkat',
+                'Pendidikan' => 'Pendidikan Terakhir',
+                'Prodi' => 'Prodi Pendidikan Terakhir',
+                'Pensiun' => 'Pensiun',
+            ],
+        ]);
+
+        $mapping->assertOk();
+        $mapping->assertJsonPath('mapping.No NIP', 'NIP');
+
+        $validation = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", []);
+
+        $validation->assertOk();
+        $validation->assertJsonPath('valid_count', 1);
+        $validation->assertJsonPath('error_count', 0);
+
+        $execute = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", []);
+        $execute->assertOk();
+
+        $status = $this->getJson("/api/pegawai/import/{$batchId}/status");
+        $status->assertOk();
+        $status->assertJsonPath('status', 'completed');
+        $status->assertJsonPath('result.inserted', 1);
+
+        $this->assertDatabaseHas('employees', [
+            'nip' => '199001012015031001',
+            'nama_lengkap' => 'Ahmad Subandi',
+            'nama_dengan_gelar' => 'Ahmad Subandi, S.T.',
+            'email_pribadi' => 'ahmad.subandi@example.com',
+            'status_aktif' => 'Aktif',
+        ]);
+    }
+
+    public function test_manual_mapping_imports_original_source_values_that_resemble_shifted_columns(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        $headers = [
+            'Nama Pegawai',
+            'Person',
+            'Email Pegawai',
+            'NIP',
+            'Status Kepegawaian',
+            'NIK',
+            'Tanggal Lahir',
+            'Jabatan',
+            'Golongan',
+            'Kelas Jabatan',
+            'Pangkat',
+            'Nomor Telepon',
+            'Prodi Pendidikan Terakhir',
+            'Pensiun',
+        ];
+        $sourceRow = [
+            'Rina Hartati, S.Kom.',
+            'Rina Hartati',
+            'rina.hartati@example.com',
+            '199101012016032001',
+            'PNS',
+            '081298761234',
+            '1991-01-01',
+            'Pranata Komputer',
+            'III/b',
+            '8',
+            'Penata Muda Tingkat I',
+            'S1',
+            'Teknik Informatika',
+            '2049-01-01',
+        ];
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFileWithHeaders($headers, [$sourceRow], 'manual_mapping.xlsx'),
+            'type' => 'utama',
+        ]);
+
+        $upload->assertOk();
+        $batchId = $upload->json('batch_id');
+
+        $this->getJson("/api/pegawai/import/{$batchId}/preview")
+            ->assertOk()
+            ->assertJsonPath('rows.0.data.NIK', '081298761234')
+            ->assertJsonPath('rows.0.data.Nomor Telepon', 'S1')
+            ->assertJsonPath('rows.0.data.Tanggal Lahir', '1991-01-01');
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/mapping", [
+            'mapping' => [
+                'NIK' => 'Nomor Telepon',
+                'Nomor Telepon' => 'Pendidikan Terakhir',
+            ],
+        ])->assertOk();
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])
+            ->assertOk()
+            ->assertJsonPath('valid_count', 1)
+            ->assertJsonPath('error_count', 0);
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", [])
+            ->assertOk()
+            ->assertJsonPath('status', 'queued');
+
+        $this->assertDatabaseHas('employees', [
+            'nip' => '199101012016032001',
+            'no_hp' => '081298761234',
+            'pendidikan_terakhir' => 'S1',
+        ]);
+        $this->assertSame(
+            '1991-01-01',
+            Employee::where('nip', '199101012016032001')->firstOrFail()->tanggal_lahir->format('Y-m-d'),
+        );
+    }
+
+    public function test_upload_memperingatkan_kolom_role_sebagai_kolom_ekstra(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        // File dengan kolom Role warisan: Role tidak boleh menjadi target import dan harus
+        // muncul sebagai peringatan kolom ekstra, bukan field yang dapat dipetakan.
+        $headers = array_merge($this->headers(), ['Role']);
+        $rows = array_map(fn (array $row): array => array_merge($row, ['pegawai']), $this->validRows());
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFileWithHeaders($headers, $rows, 'dengan_role.xlsx'),
+        ]);
+
+        $upload->assertOk();
+        $upload->assertJsonPath('mapping.Role', 'tidak_dipakai');
+        $this->assertContains('Role', $upload->json('warnings.unmatched_columns'));
+        $this->assertNotContains('Role', $upload->json('required_targets'));
+    }
+
+    public function test_preview_membatasi_respons_sepuluh_baris_di_sisi_server(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        $rows = [];
+        foreach (range(1, 15) as $i) {
+            $rows[] = [
+                "Pegawai Nomor {$i}",
+                "pegawai{$i}@example.com",
+                'III/a',
+                'Analis Kepegawaian',
+                '7',
+                sprintf('%018d', $i),
+                '081234567890',
+                'Penata Muda',
+                'S1',
+                '2038-01-01',
+                "Pegawai {$i}",
+                "Pegawai {$i}",
+                'Manajemen',
+                'PNS',
+                '1990-01-01',
+            ];
+        }
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFileWithHeaders($this->headers(), $rows, 'lima_belas_baris.xlsx'),
+        ]);
+
+        $upload->assertOk();
+        $upload->assertJsonPath('total_rows', 15);
+        $batchId = $upload->json('batch_id');
+
+        $preview = $this->getJson("/api/pegawai/import/{$batchId}/preview");
+        $preview->assertOk();
+        $preview->assertJsonPath('total_rows', 15);
+        $this->assertCount(10, $preview->json('rows'));
+    }
+
+    public function test_preview_dapat_memuat_satu_baris_di_luar_batas_awal_untuk_diperbaiki(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        $rows = [];
+        foreach (range(1, 15) as $i) {
+            $rows[] = [
+                "Pegawai Nomor {$i}",
+                "pegawai{$i}@example.com",
+                'III/a',
+                'Analis Kepegawaian',
+                '7',
+                sprintf('%018d', $i),
+                '081234567890',
+                'Penata Muda',
+                'S1',
+                '2038-01-01',
+                "Pegawai {$i}",
+                "Pegawai {$i}",
+                'Manajemen',
+                'PNS',
+                '1990-01-01',
+            ];
+        }
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFileWithHeaders($this->headers(), $rows, 'baris_di_luar_preview.xlsx'),
+        ]);
+
+        $upload->assertOk();
+        $batchId = $upload->json('batch_id');
+
+        $preview = $this->getJson("/api/pegawai/import/{$batchId}/preview?row=12");
+
+        $preview->assertOk();
+        $this->assertCount(1, $preview->json('rows'));
+        $preview->assertJsonPath('rows.0.row', 12);
+        $preview->assertJsonPath('rows.0.data.Nama Pegawai', 'Pegawai Nomor 11');
+
+        $this->getJson("/api/pegawai/import/{$batchId}/preview?row=999")
+            ->assertNotFound();
+    }
+
+    public function test_validasi_menolak_field_wajib_yang_belum_terpetakan_dengan_nama_field(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        // File tanpa kolom NIP: auto-mapping tidak dapat menemukan target wajib NIP.
+        $headers = $this->headers();
+        $nipIndex = array_search('NIP', $headers, true);
+        unset($headers[$nipIndex]);
+
+        $rows = array_map(function (array $row) use ($nipIndex): array {
+            unset($row[$nipIndex]);
+
+            return array_values($row);
+        }, $this->validRows());
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFileWithHeaders(array_values($headers), $rows, 'tanpa_nip.xlsx'),
+        ]);
+
+        $upload->assertOk();
+        $this->assertContains('NIP', $upload->json('warnings.missing_required'));
+
+        $validation = $this->postJsonWithCsrf("/api/pegawai/import/{$upload->json('batch_id')}/validate", []);
+
+        $validation->assertUnprocessable();
+        $validation->assertJsonValidationErrors('mapping');
+        $this->assertStringContainsString('NIP', (string) $validation->json('errors.mapping.0'));
+    }
+
+    public function test_mapping_endpoint_menyimpan_pemetaan_manual_parsial(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($this->validRows()),
+        ]);
+        $upload->assertOk();
+        $batchId = $upload->json('batch_id');
+
+        // Menandai kolom opsional sebagai tidak dipakai: tersimpan tanpa missing required.
+        $response = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/mapping", [
+            'mapping' => ['Pangkat' => 'tidak_dipakai'],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('mapping.Pangkat', 'tidak_dipakai');
+        // Header lain mempertahankan mapping otomatisnya (penyimpanan parsial aman).
+        $response->assertJsonPath('mapping.NIP', 'NIP');
+        $this->assertSame([], $response->json('warnings.missing_required'));
+    }
+
+    public function test_mapping_endpoint_menolak_target_ganda(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($this->validRows()),
+        ]);
+        $batchId = $upload->json('batch_id');
+
+        // 'Nama Pegawai' sudah terpetakan otomatis dari kolomnya — target ganda ditolak.
+        $response = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/mapping", [
+            'mapping' => ['Person' => 'Nama Pegawai'],
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors('mapping');
+        $this->assertStringContainsString('Nama Pegawai', (string) $response->json('errors.mapping.0'));
+    }
+
+    public function test_mapping_endpoint_menolak_kolom_sumber_di_luar_batch(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($this->validRows()),
+        ]);
+        $batchId = $upload->json('batch_id');
+
+        $response = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/mapping", [
+            'mapping' => ['Kolom Hantu' => 'NIP'],
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors('mapping');
+    }
+
+    public function test_mapping_endpoint_menolak_target_yang_tidak_dikenal(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($this->validRows()),
+        ]);
+        $batchId = $upload->json('batch_id');
+
+        $response = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/mapping", [
+            'mapping' => ['NIP' => 'Field Hantu'],
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors('mapping.NIP');
+    }
+
+    public function test_mapping_endpoint_menolak_batch_milik_pengguna_lain(): void
+    {
+        $owner = User::factory()->adminKepegawaian()->create();
+        $other = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($owner);
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($this->validRows()),
+        ]);
+        $batchId = $upload->json('batch_id');
+
+        $this->actingAs($other);
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/mapping", [
+            'mapping' => ['Pangkat' => 'tidak_dipakai'],
+        ])->assertForbidden();
+    }
+
     public function test_import_wizard_persists_data_utama_snapshots_without_histories_or_tmt_calculation(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -374,15 +789,19 @@ class EmployeeImportTest extends TestCase
 
         $preview = $this->getJson("/api/pegawai/import/{$batchId}/preview");
         $preview->assertOk();
-        $preview->assertJsonPath('rows.0.data.NIK', null);
-        $preview->assertJsonPath('rows.0.data.No KK', null);
-        $preview->assertJsonPath('rows.0.data.Nomor Telepon', '081234567890');
-        $preview->assertJsonPath('rows.0.data.Pangkat', 'Penata Muda');
-        $preview->assertJsonPath('rows.0.data.Pendidikan Terakhir', 'S1');
-        $preview->assertJsonPath('rows.0.data.Pensiun', '2038-01-01');
-        $preview->assertJsonPath('rows.0.data.Prodi Pendidikan Terakhir', 'Manajemen');
-        $preview->assertJsonPath('rows.0.data.Status Kepegawaian', 'PNS');
-        $preview->assertJsonPath('rows.0.data.Tanggal Lahir', '1980-01-01');
+        // Preview mempertahankan nilai sumber; heuristik legacy baru diterapkan saat
+        // validasi dengan mapping otomatis, bukan saat batch raw dibentuk.
+        $preview->assertJsonPath('rows.0.data.NIK', '081234567890');
+        $preview->assertJsonPath('rows.0.data.No KK', 'Penata Muda');
+        $preview->assertJsonPath('rows.0.data.Nomor Telepon', 'S1');
+        $preview->assertJsonPath('rows.0.data.Status Kepegawaian', 'pegawai');
+        $preview->assertJsonPath('rows.0.data.Tanggal Lahir', null);
+
+        // Browser selalu menyimpan mapping yang sedang tampil sebelum validasi.
+        // Mapping otomatis yang tidak diubah tidak boleh dianggap sebagai mapping manual.
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/mapping", [
+            'mapping' => $upload->json('mapping'),
+        ])->assertOk();
 
         $validation = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", []);
         $validation->assertOk();
@@ -471,6 +890,60 @@ class EmployeeImportTest extends TestCase
         $response->assertNotFound();
     }
 
+    public function test_perubahan_mapping_menginvalidasi_hasil_validasi_lama(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($this->validRows()),
+        ]);
+        $upload->assertOk();
+        $batchId = $upload->json('batch_id');
+
+        // Validasi awal dengan mapping otomatis
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])
+            ->assertOk()
+            ->assertJsonPath('valid_count', 2);
+
+        // Ubah mapping: hasil validasi lama harus kedaluwarsa
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/mapping", [
+            'mapping' => ['Pangkat' => 'tidak_dipakai'],
+        ])->assertOk();
+
+        // Eksekusi wajib menolak karena validasi tidak lagi mewakili mapping aktif
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", [])
+            ->assertUnprocessable()
+            ->assertJson(['message' => 'Data belum divalidasi. Jalankan validasi terlebih dahulu.']);
+    }
+
+    public function test_mapping_identik_tidak_menginvalidasi_validasi(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($this->validRows()),
+        ]);
+        $upload->assertOk();
+        $batchId = $upload->json('batch_id');
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])
+            ->assertOk();
+
+        // Simpan mapping dengan nilai yang persis sama dengan auto-map (tidak berubah)
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/mapping", [
+            'mapping' => ['Pangkat' => 'Pangkat'],
+        ])->assertOk();
+
+        // Validasi tidak kedaluwarsa — eksekusi tetap berjalan
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", [])
+            ->assertOk()
+            ->assertJsonPath('status', 'queued');
+    }
+
     private function validCsv(): string
     {
         return implode(',', $this->headers())."\n".
@@ -540,7 +1013,6 @@ class EmployeeImportTest extends TestCase
             'Prodi Pendidikan Terakhir',
             'Status Kepegawaian',
             'Tanggal Lahir',
-            'Role',
         ];
 
         return $includeNoColumn ? array_merge(['No'], $headers) : $headers;
@@ -565,7 +1037,6 @@ class EmployeeImportTest extends TestCase
                 'Manajemen',
                 'PNS',
                 '1980-01-01',
-                'pegawai',
             ],
             [
                 'Siti Aminah',
@@ -583,7 +1054,6 @@ class EmployeeImportTest extends TestCase
                 'Teknik Informatika',
                 'PNS',
                 '12/02/1985',
-                'pegawai',
             ],
         ];
 

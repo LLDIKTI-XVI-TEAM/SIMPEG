@@ -148,7 +148,8 @@ class EmployeeValidationRules
             'nip' => $nipRules,
             'email_pribadi' => ['required', 'email', 'max:255', 'unique:employees,email_pribadi'],
             'email' => ['nullable', 'email', 'max:255', 'unique:employees,email'],
-            'tanggal_lahir' => ['nullable', 'date', 'before:today'],
+            // Tanggal lahir wajib pada import karena menjadi dasar kalkulasi BUP/pensiun.
+            'tanggal_lahir' => ['required', 'date', 'before:today'],
             'jenis_pegawai' => ['required', 'in:PNS,PPPK,CPNS'],
             'golongan_terakhir' => ['required', 'string', 'max:20'],
             'pangkat_terakhir' => ['nullable', 'string', 'max:100'],
@@ -159,7 +160,6 @@ class EmployeeValidationRules
             'prodi_pendidikan_terakhir' => ['required', 'string', 'max:255'],
             'tanggal_pensiun' => ['nullable', 'date'],
             'no_hp' => ['required', 'string', 'max:20'],
-            'role' => ['required', 'in:admin_kepegawaian,pimpinan,kepala_bagian,pegawai'],
         ];
     }
 
@@ -200,7 +200,6 @@ class EmployeeValidationRules
             'email' => 'Email Pegawai',
             'email_pribadi' => 'Email Pegawai',
             'no_telepon_rumah' => 'No. Telepon Rumah',
-            'role' => 'Role',
         ];
     }
 }
