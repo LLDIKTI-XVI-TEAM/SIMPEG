@@ -186,8 +186,7 @@ class EwsSchedulerMilestoneOptimizationTest extends TestCase
 
         // Notification should NOT be created (sendNotification: false for non-eligible)
         $this->assertDatabaseMissing('notifications', [
-            'notifiable_type' => Employee::class,
-            'notifiable_id' => $employee->id,
+            'user_id' => $employee->id,
             'type' => 'ews.kenaikan_pangkat',
         ]);
     }

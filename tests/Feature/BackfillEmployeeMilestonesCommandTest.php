@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Appointment;
 use App\Models\Employee;
 use App\Models\EmployeeMilestone;
 use App\Models\RefGolongan;
@@ -74,10 +75,7 @@ class BackfillEmployeeMilestonesCommandTest extends TestCase
         $this->assertGreaterThan(0, $employee2Milestones, 'Employee 2 should have milestones after backfill');
     }
 
-    /**
-     * Test: backfill command skips employees that already have milestones.
-     */
-    public function test_backfill_command_skips_employees_with_existing_milestones(): void
+    public function test_backfill_command_is_idempotent_for_existing_milestones(): void
     {
         $this->seed(ReferenceSeeder::class);
 
@@ -94,32 +92,31 @@ class BackfillEmployeeMilestonesCommandTest extends TestCase
             'is_latest' => true,
         ]);
 
-        // Pre-create a milestone
-        EmployeeMilestone::create([
-            'employee_id' => $employee->id,
-            'type' => 'kenaikan_pangkat',
-            'milestone_date' => '2024-01-01',
-            'calculated_at' => now(),
-            'is_active' => true,
-            'metadata' => ['required_years' => 4],
-        ]);
-
-        $initialMilestoneCount = EmployeeMilestone::where('employee_id', $employee->id)->count();
-
-        // Run backfill without --force
         $this->artisan('milestone:backfill', ['--no-interaction' => true])
             ->expectsQuestion('Do you want to proceed with the backfill?', true)
             ->assertSuccessful();
 
-        // Verify: No new milestones created (skipped)
-        $finalMilestoneCount = EmployeeMilestone::where('employee_id', $employee->id)->count();
-        $this->assertEquals($initialMilestoneCount, $finalMilestoneCount, 'Should skip employee with existing milestones');
+        $milestoneCountAfterFirstRun = EmployeeMilestone::where('employee_id', $employee->id)->count();
+
+        $this->artisan('milestone:backfill', ['--no-interaction' => true])
+            ->expectsQuestion('Do you want to proceed with the backfill?', true)
+            ->assertSuccessful();
+
+        $this->assertSame(
+            $milestoneCountAfterFirstRun,
+            EmployeeMilestone::where('employee_id', $employee->id)->count()
+        );
+
+        $duplicateIdentities = EmployeeMilestone::where('employee_id', $employee->id)
+            ->selectRaw('type, milestone_date, COUNT(*) AS aggregate')
+            ->groupBy('type', 'milestone_date')
+            ->havingRaw('COUNT(*) > 1')
+            ->count();
+
+        $this->assertSame(0, $duplicateIdentities);
     }
 
-    /**
-     * Test: backfill command with --force flag recreates milestones.
-     */
-    public function test_backfill_command_with_force_recreates_milestones(): void
+    public function test_backfill_command_reconciles_existing_milestone_by_default(): void
     {
         $this->seed(ReferenceSeeder::class);
 
@@ -136,26 +133,22 @@ class BackfillEmployeeMilestonesCommandTest extends TestCase
             'is_latest' => true,
         ]);
 
-        // Pre-create an old milestone with old config
         $oldMilestone = EmployeeMilestone::create([
             'employee_id' => $employee->id,
             'type' => 'kenaikan_pangkat',
-            'milestone_date' => '2023-01-01', // Old calculation
+            'milestone_date' => '2023-01-01',
             'calculated_at' => now()->subDays(30),
             'is_active' => true,
-            'metadata' => ['required_years' => 3], // ← Old config (wrong)
+            'metadata' => ['required_years' => 3],
         ]);
 
         $oldMilestoneId = $oldMilestone->id;
         $oldCalculatedAt = $oldMilestone->calculated_at;
 
-        // Run backfill with --force
-        $this->artisan('milestone:backfill', ['--force' => true, '--no-interaction' => true])
+        $this->artisan('milestone:backfill', ['--no-interaction' => true])
             ->expectsQuestion('Do you want to proceed with the backfill?', true)
             ->assertSuccessful();
 
-        // Verify: Milestone updated with correct config
-        // updateOrCreate will update the same record (same employee_id + type)
         $updatedMilestone = EmployeeMilestone::find($oldMilestoneId);
 
         $this->assertNotNull($updatedMilestone, 'Milestone should still exist (updated, not replaced)');
@@ -312,7 +305,7 @@ class BackfillEmployeeMilestonesCommandTest extends TestCase
             'metadata' => ['required_years' => 3],
         ]);
 
-        // Run backfill without --force
+        // Milestone yang tidak aktif tidak boleh membuat pegawai dilewati.
         $this->artisan('milestone:backfill', ['--no-interaction' => true])
             ->expectsQuestion('Do you want to proceed with the backfill?', true)
             ->assertSuccessful();
@@ -326,81 +319,50 @@ class BackfillEmployeeMilestonesCommandTest extends TestCase
         $this->assertGreaterThan(0, $activeMilestones, 'Employee with only inactive milestones should be synced');
     }
 
-    /**
-     * Test: backfill command syncs employees with partial milestone set.
-     *
-     * Issue: If employee has only one milestone type (e.g., only rank promotion),
-     * exists() returns true so other milestone types are never backfilled.
-     */
-    public function test_backfill_command_syncs_employees_with_partial_milestones(): void
+    public function test_backfill_command_completes_partial_satyalancana_milestones(): void
     {
-        $this->seed(ReferenceSeeder::class);
-
         $employee = Employee::factory()->create([
             'status_aktif' => 'Aktif',
-            'tanggal_lahir' => '1980-01-01',
         ]);
 
-        $employee->rankHistories()->create([
-            'golongan_id' => RefGolongan::first()->id,
-            'tmt_pangkat' => '2020-01-01',
-            'no_sk' => 'SK-001',
-            'tanggal_sk' => '2019-12-15',
-            'is_latest' => true,
+        Appointment::create([
+            'employee_id' => $employee->id,
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2015-01-01',
         ]);
 
-        $employee->salaryHistories()->create([
-            'tmt_kgb' => '2022-01-01',
-            'gaji_pokok' => 3000000,
-        ]);
-
-        // Create only one milestone type (partial set)
         EmployeeMilestone::create([
             'employee_id' => $employee->id,
-            'type' => 'kenaikan_pangkat',
-            'milestone_date' => '2024-01-01',
+            'type' => EmployeeMilestone::TYPE_SATYALANCANA,
+            'milestone_date' => '2025-01-01',
             'calculated_at' => now(),
             'is_active' => true,
-            'metadata' => ['required_years' => 4],
+            'metadata' => [
+                'tmt_pengangkatan' => '2015-01-01',
+                'satyalancana_years' => 10,
+                'years_of_service' => 10,
+            ],
         ]);
 
-        $initialMilestoneTypes = EmployeeMilestone::where('employee_id', $employee->id)
-            ->where('is_active', true)
-            ->pluck('type')
-            ->toArray();
-
-        $this->assertCount(1, $initialMilestoneTypes, 'Should have only 1 milestone type initially');
-        $this->assertContains('kenaikan_pangkat', $initialMilestoneTypes);
-
-        // Run backfill without --force
-        // Since syncForEmployee is idempotent, it should add missing milestone types
-        $this->artisan('milestone:backfill', ['--no-interaction' => true])
+        $this->artisan('milestone:backfill', [
+            '--only-active' => true,
+            '--no-interaction' => true,
+        ])
             ->expectsQuestion('Do you want to proceed with the backfill?', true)
             ->assertSuccessful();
 
-        // Note: The current implementation skips employees with active milestones
-        // This is a known limitation - for complete sync, use --force
-        // Verify: Employee was skipped (existing active milestone present)
-        $finalMilestoneTypes = EmployeeMilestone::where('employee_id', $employee->id)
+        $activeSatyalancana = EmployeeMilestone::where('employee_id', $employee->id)
+            ->where('type', EmployeeMilestone::TYPE_SATYALANCANA)
             ->where('is_active', true)
-            ->pluck('type')
-            ->toArray();
+            ->get();
 
-        // With current implementation, employee is skipped
-        $this->assertCount(1, $finalMilestoneTypes, 'Employee with active milestones is skipped');
-
-        // But with --force, all milestones are synced
-        $this->artisan('milestone:backfill', ['--force' => true, '--no-interaction' => true])
-            ->expectsQuestion('Do you want to proceed with the backfill?', true)
-            ->assertSuccessful();
-
-        $forcedMilestoneTypes = EmployeeMilestone::where('employee_id', $employee->id)
-            ->where('is_active', true)
-            ->pluck('type')
-            ->unique()
-            ->toArray();
-
-        // After force sync, multiple milestone types should exist
-        $this->assertGreaterThan(1, count($forcedMilestoneTypes), 'Force sync should create all milestone types');
+        $this->assertCount(3, $activeSatyalancana);
+        $this->assertSame(
+            [10 => 1, 20 => 1, 30 => 1],
+            $activeSatyalancana
+                ->countBy(fn (EmployeeMilestone $milestone): int => (int) $milestone->metadata['satyalancana_years'])
+                ->sortKeys()
+                ->all()
+        );
     }
 }
