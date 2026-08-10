@@ -36,6 +36,11 @@ class UpdateEmployeeAction
             $validated = $this->normalizeEmployeeContract($validated);
             $pppkContractChanged = array_key_exists('tanggal_akhir_kontrak', $validated)
                 && ($oldValues['tanggal_akhir_kontrak'] ?? null) !== $validated['tanggal_akhir_kontrak'];
+
+            // Deteksi perubahan field yang mempengaruhi milestone pensiun
+            $pensionFieldsChanged = (array_key_exists('tanggal_pensiun', $validated) && ($oldValues['tanggal_pensiun'] ?? null) !== $validated['tanggal_pensiun'])
+                || (array_key_exists('tanggal_lahir', $validated) && ($oldValues['tanggal_lahir'] ?? null) !== $validated['tanggal_lahir']);
+
             $rankHistoryChanged = false;
             $positionHistoryChanged = false;
             $salaryHistoryChanged = false;
@@ -209,7 +214,9 @@ class UpdateEmployeeAction
             if ($salaryHistoryChanged) {
                 $this->rebuildLatestSalary($employee);
             }
-            if ($rankHistoryChanged || $positionHistoryChanged || $salaryHistoryChanged) {
+
+            // Sinkronkan milestone jika ada perubahan history ATAU field pensiun/lahir
+            if ($rankHistoryChanged || $positionHistoryChanged || $salaryHistoryChanged || $pensionFieldsChanged) {
                 $this->tmtCalculator->syncForEmployee($employee);
             }
 
