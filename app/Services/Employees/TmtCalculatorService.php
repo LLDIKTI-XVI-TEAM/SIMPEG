@@ -32,6 +32,8 @@ class TmtCalculatorService
         ];
 
         // Tanggal pensiun manual/import adalah data resmi sehingga kalkulasi hanya mengisi nilai yang masih kosong.
+        $hadManualPensionDate = $employee->tanggal_pensiun !== null;
+
         if ($employee->tanggal_pensiun === null) {
             $pensionDate = $this->pensionDate($employee);
 
@@ -43,7 +45,7 @@ class TmtCalculatorService
         $employee->update($updates);
 
         // US-5.5 AC-5: Simpan hasil kalkulasi ke tabel milestones untuk optimisasi scheduler
-        $this->storeMilestones($employee, $latestRank, $latestSalary);
+        $this->storeMilestones($employee, $latestRank, $latestSalary, $hadManualPensionDate);
     }
 
     /**
@@ -52,8 +54,10 @@ class TmtCalculatorService
      *
      * Reconciliation: Milestone yang tidak lagi dihasilkan akan dinonaktifkan
      * untuk mencegah scheduler memproses data yang sudah tidak berlaku.
+     *
+     * @param  bool  $hadManualPensionDate  Apakah tanggal_pensiun sudah ada sebelum sync (manual/import)
      */
-    private function storeMilestones(Employee $employee, ?RankHistory $latestRank, ?SalaryHistory $latestSalary): void
+    private function storeMilestones(Employee $employee, ?RankHistory $latestRank, ?SalaryHistory $latestSalary, bool $hadManualPensionDate = false): void
     {
         $today = now()->startOfDay();
         $pangkatRequiredYears = $this->configYears('pangkat_required_years', 4);
@@ -119,12 +123,31 @@ class TmtCalculatorService
                 ->update(['is_active' => false]);
         }
 
-        // 3. Pensiun
-        $pensionDate = $this->pensionDate($employee);
-        if ($pensionDate !== null) {
-            $position = $this->latestPosition($employee);
-            $bup = $position?->jabatan?->default_bup ?? $position?->jenisJabatan?->maks_usia_pensiun;
+        // 3. Pensiun: Prioritaskan tanggal_pensiun manual, fallback ke kalkulasi BUP
+        $pensionDate = null;
+        $metadata = ['tanggal_lahir' => $employee->tanggal_lahir?->toDateString()];
 
+        if ($hadManualPensionDate) {
+            // Prioritaskan tanggal pensiun manual/impor (sumber resmi)
+            $pensionDate = $employee->tanggal_pensiun;
+            $metadata['is_manual'] = true;
+            $metadata['source'] = 'employees.tanggal_pensiun';
+            $metadata['bup'] = null;
+            $metadata['jabatan'] = null;
+        } else {
+            // Fallback: hitung dari BUP jabatan (tanggal_pensiun baru saja dikalkulasi oleh sync)
+            $pensionDate = $employee->tanggal_pensiun;
+            if ($pensionDate !== null) {
+                $position = $this->latestPosition($employee);
+                $bup = $position?->jabatan?->default_bup ?? $position?->jenisJabatan?->maks_usia_pensiun;
+                $metadata['is_manual'] = false;
+                $metadata['source'] = 'calculated_from_bup';
+                $metadata['bup'] = $bup;
+                $metadata['jabatan'] = $position?->jabatan?->nama ?? null;
+            }
+        }
+
+        if ($pensionDate !== null) {
             $milestone = EmployeeMilestone::updateOrCreate(
                 [
                     'employee_id' => $employee->id,
@@ -133,11 +156,7 @@ class TmtCalculatorService
                 [
                     'milestone_date' => $pensionDate,
                     'calculated_at' => $today,
-                    'metadata' => [
-                        'tanggal_lahir' => $employee->tanggal_lahir?->toDateString(),
-                        'bup' => $bup,
-                        'jabatan' => $position?->jabatan?->nama,
-                    ],
+                    'metadata' => $metadata,
                     'is_active' => true,
                 ]
             );

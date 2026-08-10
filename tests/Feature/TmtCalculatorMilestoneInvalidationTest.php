@@ -6,7 +6,10 @@ use App\Models\Appointment;
 use App\Models\Employee;
 use App\Models\EmployeeMilestone;
 use App\Models\EwsConfig;
+use App\Models\PositionHistory;
 use App\Models\RankHistory;
+use App\Models\RefJabatan;
+use App\Models\RefJenisJabatan;
 use App\Models\SalaryHistory;
 use App\Services\Employees\TmtCalculatorService;
 use Database\Seeders\ReferenceSeeder;
@@ -331,5 +334,147 @@ class TmtCalculatorMilestoneInvalidationTest extends TestCase
             ->where('type', EmployeeMilestone::TYPE_SATYALANCANA)
             ->where('is_active', true)
             ->count(), 'Satyalancana should be invalidated');
+    }
+
+    public function test_pension_milestone_prioritizes_manual_tanggal_pensiun_over_calculated_bup(): void
+    {
+        $this->seed(ReferenceSeeder::class);
+
+        $manualPensionDate = '2032-06-15';
+        $employee = Employee::factory()->create([
+            'status_aktif' => 'Aktif',
+            'tanggal_lahir' => '1967-03-20',
+            'tanggal_pensiun' => $manualPensionDate, // Manual/imported pension date
+        ]);
+
+        // Create position history with BUP that would calculate different date
+        $jenisJabatan = RefJenisJabatan::create([
+            'nama' => 'Fungsional',
+            'maks_usia_pensiun' => 60, // Would be 2027-03-20 (different from manual)
+            'is_active' => true,
+        ]);
+
+        $jabatan = RefJabatan::create([
+            'nama' => 'Pengawas',
+            'jenis_jabatan_id' => $jenisJabatan->id,
+            'default_bup' => 58, // Would be 2025-03-20 (even more different)
+            'is_active' => true,
+        ]);
+
+        PositionHistory::create([
+            'employee_id' => $employee->id,
+            'jabatan_id' => $jabatan->id,
+            'jenis_jabatan_id' => $jenisJabatan->id,
+            'tmt_jabatan' => '2020-01-01',
+        ]);
+
+        app(TmtCalculatorService::class)->syncForEmployee($employee);
+
+        // Verify milestone uses manual tanggal_pensiun, NOT calculated BUP
+        $milestone = EmployeeMilestone::where('employee_id', $employee->id)
+            ->where('type', EmployeeMilestone::TYPE_PENSIUN)
+            ->where('is_active', true)
+            ->first();
+
+        $this->assertNotNull($milestone, 'Pension milestone should be created');
+        $this->assertEquals($manualPensionDate, $milestone->milestone_date->toDateString(),
+            'Milestone should use manual tanggal_pensiun');
+        $this->assertTrue($milestone->metadata['is_manual'] ?? false,
+            'Metadata should indicate manual source');
+        $this->assertEquals('employees.tanggal_pensiun', $milestone->metadata['source'] ?? null,
+            'Source should be employees.tanggal_pensiun');
+    }
+
+    public function test_pension_milestone_falls_back_to_bup_calculation_when_manual_date_absent(): void
+    {
+        $this->seed(ReferenceSeeder::class);
+
+        $employee = Employee::factory()->create([
+            'status_aktif' => 'Aktif',
+            'tanggal_lahir' => '1967-03-20',
+            'tanggal_pensiun' => null, // No manual date
+        ]);
+
+        // Create position history with BUP
+        $jenisJabatan = RefJenisJabatan::create([
+            'nama' => 'Fungsional',
+            'maks_usia_pensiun' => 60,
+            'is_active' => true,
+        ]);
+
+        $jabatan = RefJabatan::create([
+            'nama' => 'Pengawas',
+            'jenis_jabatan_id' => $jenisJabatan->id,
+            'default_bup' => 58,
+            'is_active' => true,
+        ]);
+
+        PositionHistory::create([
+            'employee_id' => $employee->id,
+            'jabatan_id' => $jabatan->id,
+            'jenis_jabatan_id' => $jenisJabatan->id,
+            'tmt_jabatan' => '2020-01-01',
+        ]);
+
+        // Refresh to ensure no cached data
+        $employee->refresh();
+
+        // Ensure tanggal_pensiun is truly null before sync
+        $this->assertNull($employee->tanggal_pensiun, 'Tanggal pensiun should be null before sync');
+
+        app(TmtCalculatorService::class)->syncForEmployee($employee);
+
+        // Verify milestone uses calculated BUP
+        $milestone = EmployeeMilestone::where('employee_id', $employee->id)
+            ->where('type', EmployeeMilestone::TYPE_PENSIUN)
+            ->where('is_active', true)
+            ->first();
+
+        $this->assertNotNull($milestone, 'Pension milestone should be created');
+        $this->assertEquals('2025-03-20', $milestone->milestone_date->toDateString(),
+            'Milestone should use calculated BUP (birth + 58 years)');
+        $this->assertFalse($milestone->metadata['is_manual'] ?? false,
+            'Metadata should indicate calculated source');
+        $this->assertEquals('calculated_from_bup', $milestone->metadata['source'] ?? null,
+            'Source should be calculated_from_bup');
+        $this->assertEquals(58, $milestone->metadata['bup'] ?? null,
+            'BUP should be stored in metadata');
+    }
+
+    public function test_pension_milestone_updates_when_manual_date_changes(): void
+    {
+        $this->seed(ReferenceSeeder::class);
+
+        $employee = Employee::factory()->create([
+            'status_aktif' => 'Aktif',
+            'tanggal_lahir' => '1967-03-20',
+            'tanggal_pensiun' => '2032-06-15',
+        ]);
+
+        app(TmtCalculatorService::class)->syncForEmployee($employee);
+
+        $milestone = EmployeeMilestone::where('employee_id', $employee->id)
+            ->where('type', EmployeeMilestone::TYPE_PENSIUN)
+            ->first();
+
+        $this->assertEquals('2032-06-15', $milestone->milestone_date->toDateString());
+        $milestoneId = $milestone->id;
+
+        // Update manual pension date
+        $employee->update(['tanggal_pensiun' => '2033-12-31']);
+        app(TmtCalculatorService::class)->syncForEmployee($employee);
+
+        // Verify same milestone record updated with new date
+        $updatedMilestone = EmployeeMilestone::find($milestoneId);
+        $this->assertEquals('2033-12-31', $updatedMilestone->milestone_date->toDateString(),
+            'Milestone date should be updated');
+        $this->assertTrue($updatedMilestone->metadata['is_manual'] ?? false,
+            'Should still be marked as manual');
+
+        // Verify only one active pension milestone
+        $this->assertEquals(1, EmployeeMilestone::where('employee_id', $employee->id)
+            ->where('type', EmployeeMilestone::TYPE_PENSIUN)
+            ->where('is_active', true)
+            ->count());
     }
 }

@@ -94,8 +94,8 @@ class EwsEngineService
                     foreach ($employees as $employee) {
                         $employeesChecked++;
 
-                        // 1. Kenaikan Pangkat: baca dari milestone, fallback ke perhitungan jika belum ada
-                        $targetDate = $this->getMilestoneDate($employee, 'kenaikan_pangkat')
+                        // 1. Kenaikan Pangkat: baca dari milestone, fallback ke perhitungan jika belum ada atau versi config berubah
+                        $targetDate = $this->getMilestoneDate($employee, 'kenaikan_pangkat', $pangkatRequiredYears)
                             ?? $this->calculatePangkatDate($employee, $pangkatRequiredYears);
 
                         if ($targetDate) {
@@ -121,8 +121,8 @@ class EwsEngineService
                             }
                         }
 
-                        // 2. KGB: baca dari milestone, fallback ke perhitungan jika belum ada
-                        $targetDate = $this->getMilestoneDate($employee, 'kgb')
+                        // 2. KGB: baca dari milestone, fallback ke perhitungan jika belum ada atau versi config berubah
+                        $targetDate = $this->getMilestoneDate($employee, 'kgb', $kgbRequiredYears)
                             ?? $this->calculateKgbDate($employee, $kgbRequiredYears);
 
                         if ($targetDate) {
@@ -267,16 +267,37 @@ class EwsEngineService
     }
 
     /**
-     * Ambil milestone date dari employee_milestones jika tersedia.
+     * Ambil milestone date dari employee_milestones jika tersedia dan versi konfigurasi cocok.
+     * Milestone dengan versi konfigurasi yang berbeda akan diabaikan untuk memaksa recalculation.
+     *
+     * @param  int|null  $currentRequiredYears  Versi konfigurasi saat ini (null jika tipe milestone tidak bergantung pada config)
      */
-    private function getMilestoneDate(Employee $employee, string $type): ?Carbon
+    private function getMilestoneDate(Employee $employee, string $type, ?int $currentRequiredYears = null): ?Carbon
     {
         $milestone = $employee->milestones
             ->where('type', $type)
             ->where('is_active', true)
             ->first();
 
-        return $milestone ? $milestone->milestone_date : null;
+        if ($milestone === null) {
+            return null;
+        }
+
+        // Untuk milestone yang bergantung pada konfigurasi (pangkat, KGB),
+        // validasi bahwa required_years di metadata cocok dengan konfigurasi saat ini.
+        // Jika tidak cocok, abaikan milestone lama dan paksa recalculation.
+        if ($currentRequiredYears !== null && isset($milestone->metadata['required_years'])) {
+            $storedRequiredYears = (int) $milestone->metadata['required_years'];
+
+            if ($storedRequiredYears !== $currentRequiredYears) {
+                // Milestone dibuat dengan konfigurasi lama, abaikan dan gunakan fallback
+                Log::info("Milestone '{$type}' for employee {$employee->id} uses outdated config (stored: {$storedRequiredYears}, current: {$currentRequiredYears}). Using fallback calculation.");
+
+                return null;
+            }
+        }
+
+        return $milestone->milestone_date;
     }
 
     /**
