@@ -36,6 +36,7 @@ class EmployeeImportMappingUiTest extends TestCase
         $response->assertSee('aria-describedby="mapping-readiness-message"', false);
         $response->assertSee('isLockedIgnoredHeader(header)', false);
         $response->assertSee('value="tidak_dipakai"', false);
+        $response->assertSee("'Nama Lengkap (Person)': 'Person'", false);
         $response->assertSee('dusk="mapping-required-warning"', false);
         $response->assertSee('dusk="mapping-duplicate-warning"', false);
         $response->assertSee('dusk="mapping-continue"', false);

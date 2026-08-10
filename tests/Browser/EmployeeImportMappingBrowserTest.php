@@ -12,6 +12,60 @@ class EmployeeImportMappingBrowserTest extends DuskTestCase
 {
     use DatabaseMigrations;
 
+    public function test_person_validation_error_highlights_the_custom_source_header(): void
+    {
+        $this->seed(RbacSeeder::class);
+        $admin = User::factory()->adminKepegawaian()->create();
+
+        $this->browse(function (Browser $browser) use ($admin): void {
+            $browser->loginAs($admin)
+                ->visit('/pegawai/import-data')
+                ->waitForText('Import Data Pegawai');
+
+            $browser->script(<<<'JS'
+                const component = Alpine.$data(document.querySelector('[x-data*="simpegTargetFields"]'));
+
+                component.mainHeaders = ['Full Name', 'NIP'];
+                component.columnMapping = {
+                    'Full Name': 'Person',
+                    NIP: 'NIP',
+                };
+                component.allRows = [{
+                    row: 2,
+                    data: {
+                        'Full Name': '',
+                        NIP: '999999999999999999',
+                    },
+                }];
+                component.validations = [{
+                    row: 2,
+                    name: '-',
+                    status: 'error',
+                    col: component.sourceHeadersForErrors(['Nama Lengkap (Person)']).join(', '),
+                    error: 'Nama Lengkap wajib diisi.',
+                    dataIndex: 0,
+                }];
+                component.step = 3;
+            JS);
+
+            $browser->pause(200)
+                ->waitForText('Hasil Validasi');
+
+            $mappedSourceHeaders = $browser->script(<<<'JS'
+                const component = Alpine.$data(document.querySelector('[x-data*="simpegTargetFields"]'));
+                return component.sourceHeadersForErrors(['Nama Lengkap (Person)']);
+            JS)[0];
+            $isHighlighted = $browser->script(<<<'JS'
+                return document
+                    .querySelector('input[aria-label="Baris 2, Full Name"]')
+                    ?.classList.contains('border-danger/50') ?? false;
+            JS)[0];
+
+            $this->assertSame(['Full Name'], $mappedSourceHeaders);
+            $this->assertTrue($isHighlighted);
+        });
+    }
+
     public function test_mapping_controls_block_invalid_selection_and_persist_before_validation(): void
     {
         $this->seed(RbacSeeder::class);

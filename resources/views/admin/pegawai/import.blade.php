@@ -104,7 +104,13 @@
             return ['no', 'role'].includes(String(header).trim().toLowerCase());
         },
         sourceHeadersForErrors(errorTargets) {
-            const targets = new Set(errorTargets);
+            // Key error backend mengikuti label atribut validasi, sedangkan mapping
+            // memakai header kanonis. Person perlu dinormalisasi agar error tetap
+            // menunjuk dan menyorot kolom sumber yang dipetakan secara manual.
+            const errorTargetAliases = {
+                'Nama Lengkap (Person)': 'Person',
+            };
+            const targets = new Set(errorTargets.map(target => errorTargetAliases[target] ?? target));
             const sources = Object.entries(this.columnMapping)
                 .filter(([, target]) => targets.has(target))
                 .map(([source]) => source);
