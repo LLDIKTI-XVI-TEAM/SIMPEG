@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasUuid;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -13,8 +14,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $id
  * @property string $employee_id
  * @property string $type (kenaikan_pangkat, kgb, pensiun, satyalancana, pppk_contract_end)
- * @property \Carbon\Carbon $milestone_date
- * @property \Carbon\Carbon $calculated_at
+ * @property Carbon $milestone_date
+ * @property Carbon $calculated_at
  * @property array|null $metadata
  * @property bool $is_active
  * @property-read Employee $employee

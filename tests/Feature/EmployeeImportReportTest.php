@@ -40,12 +40,12 @@ class EmployeeImportReportTest extends TestCase
         $upload->assertOk();
         $batchId = $upload->json('batch_id');
 
-        // NIP duplikat database tertangkap rule unique sehingga berkategori error, bukan skip.
+        // K-US-02: NIP duplikat database sekarang di-skip, bukan error.
         $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])
             ->assertOk()
             ->assertJsonPath('valid_count', 1)
-            ->assertJsonPath('skip_count', 0)
-            ->assertJsonPath('error_count', 2);
+            ->assertJsonPath('skip_count', 1)  // Baris 2 di-skip karena NIP ada di DB
+            ->assertJsonPath('error_count', 1); // Hanya baris 3 yang error (tanggal lahir invalid)
 
         $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", [])->assertOk();
 
@@ -60,8 +60,8 @@ class EmployeeImportReportTest extends TestCase
             'total_rows' => 3,
             'valid_count' => 1,
             'inserted_count' => 1,
-            'skipped_count' => 0,
-            'failed_count' => 2,
+            'skipped_count' => 1,  // Baris 2 di-skip
+            'failed_count' => 1,   // Hanya baris 3 yang gagal
         ]);
         $this->assertDatabaseHas('employees', ['nip' => '198001012006041001']);
 
@@ -75,10 +75,10 @@ class EmployeeImportReportTest extends TestCase
         $csv = $report->streamedContent();
         $this->assertStringContainsString('Laporan Hasil Import Pegawai', $csv);
         $this->assertStringContainsString('"Berhasil ditambahkan",1', $csv);
-        $this->assertStringContainsString('"Gagal validasi",2', $csv);
+        $this->assertStringContainsString('"Gagal validasi",1', $csv);  // Hanya 1 error
+        $this->assertStringContainsString('"Dilewati (NIP terdaftar)",1', $csv);  // 1 skip
         $this->assertStringContainsString('gagal', $csv);
-        $this->assertStringContainsString('Siti Aminah', $csv);
-        $this->assertStringContainsString('NIP', $csv);
+        $this->assertStringContainsString('Joko Tidak Valid', $csv);  // Baris error
         $this->assertStringContainsString('Tanggal Lahir', $csv);
     }
 

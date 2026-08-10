@@ -35,12 +35,16 @@ return new class extends Migration
             $table->dropColumn(['default_bup', 'is_active']);
         });
 
-        Schema::table('ref_unit_kerja', function (Blueprint $table): void {
-            $table->dropForeign('ref_unit_kerja_parent_id_foreign');
-            $table->dropIndex('ref_unit_kerja_parent_level_index');
-            $table->dropIndex('ref_unit_kerja_is_active_index');
-            $table->dropColumn(['parent_id', 'level', 'jenis_unit', 'is_active']);
-        });
+        // SQLite memiliki keterbatasan dalam drop column dengan foreign key
+        // Migration down biasanya tidak digunakan di production, jadi kita skip untuk SQLite
+        if (DB::connection()->getDriverName() !== 'sqlite') {
+            Schema::table('ref_unit_kerja', function (Blueprint $table): void {
+                $table->dropForeign('ref_unit_kerja_parent_id_foreign');
+                $table->dropIndex('ref_unit_kerja_parent_level_index');
+                $table->dropIndex('ref_unit_kerja_is_active_index');
+                $table->dropColumn(['parent_id', 'level', 'jenis_unit', 'is_active']);
+            });
+        }
     }
 
     private function addUnitKerjaHierarchy(): void

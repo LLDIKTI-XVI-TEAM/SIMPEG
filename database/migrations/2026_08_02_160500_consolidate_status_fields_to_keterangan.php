@@ -89,21 +89,25 @@ return new class extends Migration
             $table->text('status_deskripsi')->nullable()->after('status_alasan');
         });
 
-        // Pisahkan keterangan kembali (ambil sebelum " - " sebagai alasan, sisanya deskripsi)
-        DB::statement("
-            UPDATE employees
-            SET status_alasan = CASE
-                WHEN status_keterangan LIKE '% - %'
-                THEN SUBSTRING(status_keterangan, 1, POSITION(' - ' IN status_keterangan) - 1)
-                ELSE status_keterangan
-            END,
-            status_deskripsi = CASE
-                WHEN status_keterangan LIKE '% - %'
-                THEN SUBSTRING(status_keterangan, POSITION(' - ' IN status_keterangan) + 3)
-                ELSE NULL
-            END
-            WHERE status_keterangan IS NOT NULL
-        ");
+        // Pisahkan keterangan kembali menggunakan Eloquent untuk database-agnostic
+        DB::table('employees')
+            ->whereNotNull('status_keterangan')
+            ->orderBy('id')
+            ->chunk(100, function ($employees) {
+                foreach ($employees as $employee) {
+                    $keterangan = $employee->status_keterangan;
+                    $parts = explode(' - ', $keterangan, 2);
+                    $alasan = $parts[0] ?? $keterangan;
+                    $deskripsi = $parts[1] ?? null;
+
+                    DB::table('employees')
+                        ->where('id', $employee->id)
+                        ->update([
+                            'status_alasan' => $alasan,
+                            'status_deskripsi' => $deskripsi,
+                        ]);
+                }
+            });
 
         Schema::table('employees', function (Blueprint $table) {
             $table->dropColumn('status_keterangan');
@@ -115,20 +119,24 @@ return new class extends Migration
             $table->text('deskripsi')->nullable()->after('alasan');
         });
 
-        DB::statement("
-            UPDATE employee_status_histories
-            SET alasan = CASE
-                WHEN keterangan LIKE '% - %'
-                THEN SUBSTRING(keterangan, 1, POSITION(' - ' IN keterangan) - 1)
-                ELSE keterangan
-            END,
-            deskripsi = CASE
-                WHEN keterangan LIKE '% - %'
-                THEN SUBSTRING(keterangan, POSITION(' - ' IN keterangan) + 3)
-                ELSE NULL
-            END
-            WHERE keterangan IS NOT NULL
-        ");
+        DB::table('employee_status_histories')
+            ->whereNotNull('keterangan')
+            ->orderBy('id')
+            ->chunk(100, function ($histories) {
+                foreach ($histories as $history) {
+                    $keterangan = $history->keterangan;
+                    $parts = explode(' - ', $keterangan, 2);
+                    $alasan = $parts[0] ?? $keterangan;
+                    $deskripsi = $parts[1] ?? null;
+
+                    DB::table('employee_status_histories')
+                        ->where('id', $history->id)
+                        ->update([
+                            'alasan' => $alasan,
+                            'deskripsi' => $deskripsi,
+                        ]);
+                }
+            });
 
         Schema::table('employee_status_histories', function (Blueprint $table) {
             $table->dropColumn('keterangan');

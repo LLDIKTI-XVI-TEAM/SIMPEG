@@ -109,8 +109,8 @@ class LeaveBalanceDisplayTest extends TestCase
 
         // Verifikasi saldo tahun berjalan ditampilkan
         $response->assertSee('Informasi Saldo Cuti Pemohon');
-        $response->assertSee('Tahun ' . $currentYear);
-        $response->assertSee('Jatah ' . $currentYear);
+        $response->assertSee('Tahun '.$currentYear);
+        $response->assertSee('Jatah '.$currentYear);
         $response->assertSee('Carry-Over');
         $response->assertSee('Sudah Terpakai');
         $response->assertSee('Sisa Saldo');
@@ -121,8 +121,8 @@ class LeaveBalanceDisplayTest extends TestCase
 
         // Verifikasi riwayat ditampilkan
         $response->assertSee('Riwayat Penggunaan');
-        $response->assertSee('Tahun ' . ($currentYear - 2));
-        $response->assertSee('Tahun ' . ($currentYear - 1));
+        $response->assertSee('Tahun '.($currentYear - 2));
+        $response->assertSee('Tahun '.($currentYear - 1));
         $response->assertSee('N-2');
         $response->assertSee('N-1');
     }

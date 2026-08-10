@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -15,6 +16,12 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            // SQLite memiliki keterbatasan dalam drop constrained foreign key dengan unique index
+            // Migration down tidak digunakan di production
+            return;
+        }
+
         Schema::table('users', function (Blueprint $table): void {
             $table->dropConstrainedForeignId('employee_id');
         });
