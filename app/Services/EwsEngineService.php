@@ -542,6 +542,13 @@ class EwsEngineService
                     throw $exception;
                 }
             }
+        } else {
+            // Update eligibility status on existing alert if it has changed
+            // This handles cases where employee conditions change (performance, discipline)
+            // after the alert was initially created
+            if ($alert->is_eligible !== $isEligible) {
+                $alert->update(['is_eligible' => $isEligible]);
+            }
         }
 
         $timeLabel = $days.' hari';
@@ -580,22 +587,29 @@ class EwsEngineService
             ],
         );
 
-        if ($notification !== null && ! $notification->is_read) {
-            $updates = ['notified_at' => now()];
+        if ($notification !== null) {
+            $updates = [];
 
-            // Alert kedaluwarsa dari lifecycle lama tidak boleh menyembunyikan
-            // reminder yang masih belum dibaca. Status manual tetap dihormati.
-            if ($alert->followup_status === EwsAlert::FOLLOWUP_STATUS_EXPIRED) {
-                $updates += [
-                    'followup_status' => EwsAlert::FOLLOWUP_STATUS_ACTIVE,
-                    'is_processed' => false,
-                    'handled_at' => null,
-                    'handled_by' => null,
-                    'handled_note' => null,
-                ];
+            // Update notified_at only for unread notifications
+            if (! $notification->is_read) {
+                $updates['notified_at'] = now();
+
+                // Alert kedaluwarsa dari lifecycle lama tidak boleh menyembunyikan
+                // reminder yang masih belum dibaca. Status manual tetap dihormati.
+                if ($alert->followup_status === EwsAlert::FOLLOWUP_STATUS_EXPIRED) {
+                    $updates += [
+                        'followup_status' => EwsAlert::FOLLOWUP_STATUS_ACTIVE,
+                        'is_processed' => false,
+                        'handled_at' => null,
+                        'handled_by' => null,
+                        'handled_note' => null,
+                    ];
+                }
             }
 
-            $alert->forceFill($updates)->save();
+            if (! empty($updates)) {
+                $alert->forceFill($updates)->save();
+            }
         }
 
         return $wasCreated;
