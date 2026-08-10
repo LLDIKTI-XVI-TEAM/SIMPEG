@@ -40,6 +40,7 @@ class ListLeaveRequestsAction
         $jenis = (string) $request->query('jenis', '');
         $unit = $isPegawai ? '' : (string) $request->query('unit', '');
         $periode = (string) $request->query('periode', '');
+        $tahun = (string) $request->query('tahun', '');
         $perPage = min(max((int) $request->query('per_page', 10), 10), 50);
 
         $query = LeaveRequest::query()
@@ -87,6 +88,9 @@ class ListLeaveRequestsAction
         if ($periode !== '') {
             CutiPeriodFilter::parse($periode)?->applyToDateColumn($query, 'tanggal_mulai');
         }
+        if ($tahun !== '' && ctype_digit($tahun) && strlen($tahun) === 4) {
+            $query->whereYear('tanggal_mulai', (int) $tahun);
+        }
         if ($search !== '') {
             $query->whereHas('employee', function ($employeeQuery) use ($search): void {
                 $employeeQuery->where('nama_lengkap', 'like', "%{$search}%")
@@ -96,6 +100,9 @@ class ListLeaveRequestsAction
 
         $riwayatCuti = $query->paginate($perPage)->withQueryString();
         $riwayatCuti->getCollection()->transform(fn (LeaveRequest $r): array => $this->mapRow($r));
+
+        $currentYear = (int) date('Y');
+        $optTahuns = collect(range($currentYear + 1, $currentYear - 3))->map(fn ($y) => (string) $y);
 
         return [
             'riwayatCuti' => $riwayatCuti,
@@ -121,6 +128,7 @@ class ListLeaveRequestsAction
             'jenis' => $jenis,
             'unit' => $unit,
             'periode' => $periode,
+            'tahun' => $tahun,
             'isPegawai' => $isPegawai,
         ];
     }

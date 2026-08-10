@@ -131,6 +131,43 @@ class CutiListPeriodFilterTest extends TestCase
         $this->assertSame(4, $response->viewData('riwayatCuti')->total());
     }
 
+    /**
+     * Dropdown tahun memakai parameter tersendiri di samping filter periode;
+     * keduanya harus menghasilkan irisan tahun yang sama.
+     */
+    public function test_filter_tahun_memuat_hanya_pengajuan_pada_tahun_tersebut(): void
+    {
+        $this->seedThreeYears();
+
+        $response = $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('cuti', ['tahun' => '2025']));
+
+        $response->assertOk();
+        $rows = $response->viewData('riwayatCuti');
+
+        $this->assertSame(2, $rows->total());
+        foreach ($rows->getCollection() as $row) {
+            $this->assertStringStartsWith('2025', (string) $row['periode']);
+        }
+    }
+
+    /**
+     * Nilai tahun tidak sah diabaikan seperti perilaku filter periode: halaman tetap
+     * termuat penuh dan nilai tersebut tidak pernah mencapai query database.
+     */
+    public function test_filter_tahun_tidak_sah_diabaikan_tanpa_menggagalkan_halaman(): void
+    {
+        $this->seedThreeYears();
+
+        foreach (['abc', '202', '20255'] as $tahunTidakSah) {
+            $response = $this->actingAs(User::factory()->superAdmin()->create())
+                ->get(route('cuti', ['tahun' => $tahunTidakSah]));
+
+            $response->assertOk();
+            $this->assertSame(4, $response->viewData('riwayatCuti')->total(), "Tahun {$tahunTidakSah} seharusnya diabaikan.");
+        }
+    }
+
     public function test_opsi_tahun_disediakan_untuk_dropdown_dan_terurut_menurun(): void
     {
         $this->seedThreeYears();

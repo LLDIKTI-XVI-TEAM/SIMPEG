@@ -75,19 +75,6 @@ if (app()->environment(['local', 'testing'])) {
     Route::get('/dev-login', [KeycloakAuthController::class, 'defaultDemoLogin']);
     Route::post('/dev-login', [KeycloakAuthController::class, 'demoLogin'])->name('dev-login');
 
-    Route::get('/set-super-admin', function () {
-        $user = auth()->user();
-        if ($user) {
-            $user->role = 'super_admin';
-            $user->save();
-            session(['active_role' => 'super_admin']);
-
-            return redirect()->route('dashboard')->with('success', 'Role Anda telah diubah menjadi super_admin');
-        }
-
-        return 'Silakan login terlebih dahulu';
-    });
-
     Route::get('/map-dummy-employee', function () {
         $user = auth()->user();
         if ($user) {
@@ -166,6 +153,11 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::post('/api/pegawai/import/{batchId}/validate', [EmployeeImportController::class, 'validate'])
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
         ->name('pegawai.import.validate');
+
+    // Pemetaan kolom disimpan sebagai state batch agar dipakai ulang oleh preview/validasi/eksekusi.
+    Route::post('/api/pegawai/import/{batchId}/mapping', [EmployeeImportController::class, 'saveMapping'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->name('pegawai.import.mapping');
 
     Route::post('/api/pegawai/import/{batchId}/execute', [EmployeeImportController::class, 'execute'])
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])

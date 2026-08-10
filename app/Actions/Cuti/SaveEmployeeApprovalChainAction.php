@@ -7,9 +7,10 @@ use App\Models\LeaveApprovalChain;
 use App\Models\LeavePybmcGlobalConfig;
 use App\Models\User;
 use App\Services\AuditService;
+use App\Services\Cuti\ApprovalChainConfigurationLockService;
+use App\Services\Cuti\ApprovalChainInvariantService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use RuntimeException;
 
 /**
  * Menyimpan konfigurasi rantai approval cuti per pegawai sebagai chain aktif baru.
@@ -17,16 +18,30 @@ use RuntimeException;
  */
 class SaveEmployeeApprovalChainAction
 {
+    public function __construct(
+        private readonly ApprovalChainInvariantService $invariants,
+        private readonly ApprovalChainConfigurationLockService $configurationLock,
+    ) {}
+
     /**
-     * @param  list<array{step_type:string, role_label:string, approver_employee_id:string, approver_role_key?:string|null, is_final:bool}>  $steps
+     * @param  list<array{
+     *     step_type:mixed,
+     *     role_label:mixed,
+     *     approver_employee_id:mixed,
+     *     approver_role_key?:mixed,
+     *     is_final:mixed
+     * }>  $steps
      */
     public function execute(Employee $employee, array $steps, User $actor, string $reason, ?Request $request = null): LeaveApprovalChain
     {
-        $steps = $this->appendGlobalPybmcWhenNeeded($steps);
-        $this->ensureOneFinalStep($steps);
-        $this->ensureFinalStepIsLast($steps);
-
         return DB::transaction(function () use ($employee, $steps, $actor, $reason, $request): LeaveApprovalChain {
+            $this->configurationLock->acquire();
+            $steps = $this->appendGlobalPybmcWhenNeeded($steps);
+
+            // Kandidat wajib sah dan seluruh approver dikunci sebelum chain aktif lama disentuh,
+            // supaya kegagalan konfigurasi tidak meninggalkan pergantian kewenangan secara parsial.
+            $this->invariants->validate($steps);
+
             $oldChain = LeaveApprovalChain::query()
                 ->where('employee_id', $employee->id)
                 ->where('is_active', true)
@@ -68,7 +83,9 @@ class SaveEmployeeApprovalChainAction
             // Audit konfigurasi chain dicatat per chain baru agar perubahan approver dapat ditelusuri.
             // Ditulis fail-closed di dalam transaksi supaya kewenangan persetujuan tidak pernah
             // berpindah tanpa baris audit yang menerangkan siapa mengubahnya dan dari perangkat mana.
-            AuditService::logOrFail(
+            AuditService::logAsOrFail(
+                $actor->id,
+                $actor->name,
                 'CREATE',
                 'LeaveApprovalChain',
                 $chain->id,
@@ -86,7 +103,20 @@ class SaveEmployeeApprovalChainAction
     }
 
     /**
-     * @param  list<array{step_type:string, role_label:string, approver_employee_id:string, is_final:bool}>  $steps
+     * @param  list<array{
+     *     step_type:mixed,
+     *     role_label:mixed,
+     *     approver_employee_id:mixed,
+     *     approver_role_key?:mixed,
+     *     is_final:mixed
+     * }>  $steps
+     * @return list<array{
+     *     step_type:mixed,
+     *     role_label:mixed,
+     *     approver_employee_id:mixed,
+     *     approver_role_key?:mixed,
+     *     is_final:mixed
+     * }>
      */
     private function appendGlobalPybmcWhenNeeded(array $steps): array
     {
@@ -111,29 +141,5 @@ class SaveEmployeeApprovalChainAction
         ];
 
         return $steps;
-    }
-
-    /**
-     * @param  list<array{step_type:string, role_label:string, approver_employee_id:string, is_final:bool}>  $steps
-     */
-    private function ensureOneFinalStep(array $steps): void
-    {
-        $finalCount = collect($steps)->where('is_final', true)->count();
-
-        if ($finalCount !== 1) {
-            throw new RuntimeException('Rantai approval cuti wajib memiliki tepat satu approver final.');
-        }
-    }
-
-    /**
-     * @param  list<array{step_type:string, role_label:string, approver_employee_id:string, is_final:bool}>  $steps
-     */
-    private function ensureFinalStepIsLast(array $steps): void
-    {
-        $lastStep = collect($steps)->last();
-
-        if (($lastStep['is_final'] ?? false) !== true) {
-            throw new RuntimeException('Approver final cuti wajib berada pada urutan terakhir.');
-        }
     }
 }

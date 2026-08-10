@@ -283,6 +283,75 @@
                     </div>
                 @endif
 
+            {{-- Konteks keputusan verifikator: saldo berjalan, sisa hak N-1/N-2, cuti bersama,
+                 dan riwayat cuti tahunan pemohon wajib terlihat sebelum keputusan diambil. --}}
+            @if (($isVerifierContext ?? false) && ($verifierContext ?? null) !== null)
+                @php($saldoPemohon = $verifierContext['balance'])
+                <div class="border-t border-border pt-6 space-y-4">
+                    <x-ui.card padding="md" class="border-primary/20 bg-primary/5 space-y-4">
+                        <div class="flex items-center justify-between border-b border-border pb-3">
+                            <div>
+                                <h4 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
+                                    Informasi Saldo & Riwayat Cuti Pemohon
+                                </h4>
+                                <p class="text-xs text-muted font-sans mt-0.5">Saldo hak cuti tahun berjalan (N), sisa hak N-1/N-2, cuti bersama, dan riwayat cuti tahunan pemohon.</p>
+                            </div>
+                            <x-ui.badge variant="{{ $saldoPemohon['eligible'] ? 'success' : 'danger' }}" size="sm">
+                                {{ $saldoPemohon['eligible'] ? 'Hak Cuti Aktif' : 'Tidak Eligible' }}
+                            </x-ui.badge>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div class="p-3 bg-surface rounded-lg border border-border space-y-1">
+                                <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Saldo Dapat Diajukan (N={{ $saldoPemohon['tahun'] }})</span>
+                                <p class="text-lg font-bold text-primary font-sans">{{ $saldoPemohon['saldo_dapat_diajukan'] }} Hari</p>
+                                <p class="text-[10px] text-muted">Saldo aktual {{ $saldoPemohon['saldo_aktual'] }} · {{ $saldoPemohon['dialokasikan_aktif'] }} dialokasikan · {{ $saldoPemohon['terpakai_final'] }} terpakai</p>
+                            </div>
+
+                            <div class="p-3 bg-surface rounded-lg border border-border space-y-1">
+                                <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Sisa Hak N-1 ({{ $saldoPemohon['tahun'] - 1 }})</span>
+                                <p class="text-lg font-bold text-warning font-sans">{{ $saldoPemohon['bucket']['n1'] }} Hari</p>
+                                <p class="text-[10px] text-muted">Terpakai pada N-1: {{ $saldoPemohon['used_n1'] }} hari</p>
+                            </div>
+
+                            <div class="p-3 bg-surface rounded-lg border border-border space-y-1">
+                                <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Sisa Hak N-2 ({{ $saldoPemohon['tahun'] - 2 }})</span>
+                                <p class="text-lg font-bold text-ink font-sans">{{ $saldoPemohon['bucket']['n2'] }} Hari</p>
+                                <p class="text-[10px] text-muted">Terpakai pada N-2: {{ $saldoPemohon['used_n2'] }} hari</p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="p-3 bg-surface rounded-lg border border-border space-y-1.5">
+                                <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Cuti Bersama {{ $saldoPemohon['tahun'] }}</span>
+                                @if ($verifierContext['cutiBersama']->isEmpty())
+                                    <p class="text-xs text-muted font-sans">Tidak ada cuti bersama terdaftar pada tahun ini.</p>
+                                @else
+                                    <ul class="space-y-1">
+                                        @foreach ($verifierContext['cutiBersama'] as $hariBersama)
+                                            <li class="text-xs text-ink font-sans">{{ $hariBersama->tanggal?->translatedFormat('d M Y') }} — {{ $hariBersama->nama }}</li>
+                                        @endforeach
+                                    </ul>
+                                @endif
+                            </div>
+
+                            <div class="p-3 bg-surface rounded-lg border border-border space-y-1.5">
+                                <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Riwayat Cuti Tahunan Disetujui</span>
+                                @if ($verifierContext['riwayatTahunan']->isEmpty())
+                                    <p class="text-xs text-muted font-sans">Belum ada riwayat cuti tahunan yang disetujui.</p>
+                                @else
+                                    <ul class="space-y-1">
+                                        @foreach ($verifierContext['riwayatTahunan'] as $riwayat)
+                                            <li class="text-xs text-ink font-sans">{{ $riwayat->tanggal_mulai?->translatedFormat('d M Y') }} – {{ $riwayat->tanggal_selesai?->translatedFormat('d M Y') }} · {{ $riwayat->jumlah_hari_kerja }} hari kerja</li>
+                                        @endforeach
+                                    </ul>
+                                @endif
+                            </div>
+                        </div>
+                    </x-ui.card>
+                </div>
+            @endif
+
                 @if ($canAct)
                     {{-- Catatan keputusan wajib untuk tindakan selain setuju agar pemohon memahami dasar keputusan. --}}
                     @foreach ([
