@@ -234,6 +234,17 @@ class EmployeeShowTest extends TestCase
             ->assertSee("unit: h.unit_kerja?.nama ?? '-',", false);
     }
 
+    public function test_detail_page_formats_position_history_dates_in_table(): void
+    {
+        $employee = $this->employeeWithReferences();
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSee('x-text="formatDate(j.tgl_sk)"', false)
+            ->assertSee('x-text="formatDate(j.tmt)"', false);
+    }
+
     public function test_employee_detail_response_includes_kepala_lembaga_marker(): void
     {
         $user = User::factory()->adminKepegawaian()->create();

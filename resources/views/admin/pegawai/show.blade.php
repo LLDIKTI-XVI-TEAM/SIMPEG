@@ -1385,8 +1385,8 @@
                                     <td class="px-4 py-3 font-bold" x-text="j.jabatan"></td>
                                     <td class="px-4 py-3" x-text="j.unit"></td>
                                     <td class="px-4 py-3" x-text="j.no_sk"></td>
-                                    <td class="px-4 py-3" x-text="j.tgl_sk"></td>
-                                    <td class="px-4 py-3" x-text="j.tmt"></td>
+                                    <td class="px-4 py-3" x-text="formatDate(j.tgl_sk)"></td>
+                                    <td class="px-4 py-3" x-text="formatDate(j.tmt)"></td>
                                 </tr>
                             </template>
                         </tbody>
