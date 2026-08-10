@@ -83,7 +83,15 @@ class EwsEngineService
 
             // US-5.5: Scan pegawai aktif menggunakan milestone yang sudah diprekomputasi.
             // Optimisasi ~70-80% query dengan membaca employee_milestones, fallback ke perhitungan real-time jika belum ada.
-            Employee::with(['milestones' => fn ($q) => $q->where('is_active', true), 'jenisPegawai', 'disciplineRecords'])
+            // Eager-load relasi yang dipakai fallback untuk menghindari N+1 pada deployment awal (sebelum milestone backfill).
+            Employee::with([
+                'milestones' => fn ($q) => $q->where('is_active', true),
+                'jenisPegawai',
+                'disciplineRecords',
+                'rankHistories',
+                'salaryHistories',
+                'appointments',
+            ])
                 ->where('status_aktif', 'Aktif')
                 ->chunkById(100, function ($employees) use (
                     $pangkatDays, $kgbDays, $pensiunDays, $pppkDays, $satyalancanaDays,
@@ -305,11 +313,6 @@ class EwsEngineService
      */
     private function calculatePangkatDate(Employee $employee, int $requiredYears): ?Carbon
     {
-        // Lazy-load hanya jika milestone tidak tersedia
-        if (! $employee->relationLoaded('rankHistories')) {
-            $employee->load('rankHistories');
-        }
-
         $latestRank = $employee->rankHistories
             ->filter(fn ($history): bool => $history->tmt_pangkat !== null)
             ->sortByDesc('tmt_pangkat')
@@ -329,11 +332,6 @@ class EwsEngineService
      */
     private function calculateKgbDate(Employee $employee, int $requiredYears): ?Carbon
     {
-        // Lazy-load hanya jika milestone tidak tersedia
-        if (! $employee->relationLoaded('salaryHistories')) {
-            $employee->load('salaryHistories');
-        }
-
         $latestKgb = $employee->salaryHistories
             ->filter(fn ($history): bool => $history->tmt_kgb !== null)
             ->sortByDesc('tmt_kgb')
@@ -374,11 +372,6 @@ class EwsEngineService
         // Baca dari employees.tanggal_akhir_kontrak terlebih dahulu
         if ($employee->tanggal_akhir_kontrak) {
             return Carbon::parse($employee->tanggal_akhir_kontrak);
-        }
-
-        // Lazy-load hanya jika milestone tidak tersedia
-        if (! $employee->relationLoaded('appointments')) {
-            $employee->load('appointments');
         }
 
         // Fallback: TMT pengangkatan PPPK terbaru + masa kontrak global
@@ -427,10 +420,6 @@ class EwsEngineService
         }
 
         // Fallback: hitung dari TMT pengangkatan pertama
-        if (! $employee->relationLoaded('appointments')) {
-            $employee->load('appointments');
-        }
-
         $firstAppointment = $employee->appointments
             ->filter(fn ($appointment): bool => $appointment->tmt_pengangkatan !== null)
             ->sortBy('tmt_pengangkatan')
