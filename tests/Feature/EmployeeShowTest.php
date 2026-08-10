@@ -222,6 +222,18 @@ class EmployeeShowTest extends TestCase
             ->assertDontSee('Tambah Riwayat KGB', false);
     }
 
+    public function test_detail_page_uses_created_history_payload_for_rank_and_position_rows(): void
+    {
+        $employee = $this->employeeWithReferences();
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSee("golongan: h.golongan?.nama ?? '-',", false)
+            ->assertSee("jabatan: h.jabatan?.nama ?? h.nama_jabatan ?? '-',", false)
+            ->assertSee("unit: h.unit_kerja?.nama ?? '-',", false);
+    }
+
     public function test_employee_detail_response_includes_kepala_lembaga_marker(): void
     {
         $user = User::factory()->adminKepegawaian()->create();

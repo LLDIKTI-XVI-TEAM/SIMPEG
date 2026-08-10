@@ -683,21 +683,23 @@
                         });
                         this.newKgb = { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '' };
                     } else if (this.modalType === 'jabatan') {
+                        const h = result.history;
                         this.jabatanList.unshift({
-                            jabatan: '-',
-                            unit: '-',
-                            kelas_jabatan: this.newJabatan.kelas_jabatan,
-                            no_sk: this.newJabatan.no_sk,
-                            tgl_sk: this.newJabatan.tanggal_sk,
-                            tmt: this.newJabatan.tmt_jabatan
+                            jabatan: h.jabatan?.nama ?? h.nama_jabatan ?? '-',
+                            unit: h.unit_kerja?.nama ?? '-',
+                            kelas_jabatan: h.kelas_jabatan,
+                            no_sk: h.no_sk,
+                            tgl_sk: h.tanggal_sk,
+                            tmt: h.tmt_jabatan
                         });
                         this.newJabatan = { jabatan_id: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', kelas_jabatan: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '' };
                     } else if (this.modalType === 'pangkat') {
+                        const h = result.history;
                         this.pangkatList.unshift({
-                            golongan: '-', // Idealnya ini ambil dari nama referensi golongan
-                            no_sk: this.newPangkat.no_sk,
-                            tgl_sk: this.newPangkat.tanggal_sk,
-                            tmt: this.newPangkat.tmt_pangkat
+                            golongan: h.golongan?.nama ?? '-',
+                            no_sk: h.no_sk,
+                            tgl_sk: h.tanggal_sk,
+                            tmt: h.tmt_pangkat
                         });
                         this.newPangkat = { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '' };
                     } else if (this.modalType === 'keluarga') {
