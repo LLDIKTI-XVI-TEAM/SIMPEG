@@ -631,7 +631,7 @@
                                 <span x-show="downloadingType === 'utama'">Menyiapkan Template...</span>
                                 <span x-show="downloadingType !== 'utama'">Unduh Template Utama Pegawai</span>
                             </span>
-                            <span class="text-xs text-muted block mt-0.5 font-sans">Berisi kolom NIP, NIK, No KK, Golongan, Jabatan, Role, dll.</span>
+                            <span class="text-xs text-muted block mt-0.5 font-sans">Berisi data pegawai seperti NIP, NIK, No. KK, golongan, dan jabatan. Role tidak diimpor; kelola Role melalui menu Kelola Akses User.</span>
                         </div>
                     </button>
                 </div>
