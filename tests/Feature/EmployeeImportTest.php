@@ -106,7 +106,11 @@ class EmployeeImportTest extends TestCase
         $this->assertDatabaseCount('employees', 0);
     }
 
-    public function test_import_rejects_row_errors_without_creating_any_rows(): void
+    /**
+     * K-US-02: NIP existing in database should be skipped, not error.
+     * When one row has NIP existing, it gets skipped but other valid rows are still inserted.
+     */
+    public function test_import_skips_nip_existing_and_inserts_other_valid_rows(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
         Employee::factory()->create(['nip' => '198001012006041001']);
@@ -116,11 +120,14 @@ class EmployeeImportTest extends TestCase
             'file' => $this->csvFile($this->validCsv()),
         ]);
 
-        $response->assertUnprocessable();
-        $response->assertJsonPath('inserted', 0);
-        $response->assertJsonPath('failed', 1);
-        $response->assertJsonPath('errors.0.row', 2);
-        $this->assertDatabaseMissing('employees', ['nama_lengkap' => 'Siti', 'nama_dengan_gelar' => 'Siti Aminah']);
+        // Should succeed with 1 inserted (Siti) and 1 skipped (Budi)
+        $response->assertOk();
+        $response->assertJsonPath('inserted', 1);
+        $response->assertJsonPath('skipped', 1);
+        $response->assertJsonPath('failed', 0);
+        
+        // Siti should be inserted
+        $this->assertDatabaseHas('employees', ['nama_lengkap' => 'Siti', 'nama_dengan_gelar' => 'Siti Aminah']);
     }
 
     /**

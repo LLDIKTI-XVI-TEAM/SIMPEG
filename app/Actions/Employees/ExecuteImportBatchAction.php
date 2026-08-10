@@ -168,6 +168,15 @@ class ExecuteImportBatchAction
                 $data['nama_lengkap'] = $data['nama_dengan_gelar'];
             }
 
+            // K-US-02: Insert-time duplicate guard untuk race condition protection
+            // Jika NIP sudah exists (race condition antara validasi dan insert),
+            // skip insertion secara graceful daripada fail entire batch
+            if (! empty($data['nip']) && Employee::where('nip', $data['nip'])->exists()) {
+                // Skip silently - sudah dicatat sebagai 'skip' di validation phase
+                // Atau jika race condition terjadi, treat as skip
+                return;
+            }
+
             $aktifId = RefStatusPegawai::where('nama', 'Aktif')->value('id')
                 ?? RefStatusPegawai::where('is_default', true)->value('id');
 

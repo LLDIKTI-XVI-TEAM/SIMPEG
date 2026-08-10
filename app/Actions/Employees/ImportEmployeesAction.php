@@ -38,6 +38,7 @@ class ImportEmployeesAction
 
         $validatedRows = [];
         $errors = [];
+        $skippedCount = 0;
         /** @var array<string, int> $seenNips */
         $seenNips = [];
         /** @var array<string, int> $seenEmails */
@@ -62,18 +63,15 @@ class ImportEmployeesAction
 
             $data = $validator->validated();
             $referenceErrors = $this->resolveReferences($data);
-            $duplicateErrors = $this->duplicateErrors($data, $row['row'], $seenNips, $seenEmails);
+            $duplicateResult = $this->duplicateErrors($data, $row['row'], $seenNips, $seenEmails);
 
-            // Cek database untuk NIP dan email yang sudah terdaftar
-            $databaseErrors = [];
-            if (! empty($data['nip']) && Employee::where('nip', $data['nip'])->exists()) {
-                $databaseErrors['nip'] = ['NIP tersebut sudah digunakan/terdaftar.'];
-            }
-            if (! empty($data['email_pribadi']) && Employee::whereRaw('LOWER(email_pribadi) = ?', [strtolower($data['email_pribadi'])])->exists()) {
-                $databaseErrors['email_pribadi'] = ['Email pegawai tersebut sudah digunakan/terdaftar.'];
+            // K-US-02: Handle skip status from duplicate check (NIP existing in DB)
+            if ($duplicateResult['skip']) {
+                $skippedCount++;
+                continue;
             }
 
-            $rowErrors = array_merge_recursive($referenceErrors, $duplicateErrors, $databaseErrors);
+            $rowErrors = array_merge_recursive($referenceErrors, $duplicateResult['errors']);
 
             if ($rowErrors !== []) {
                 $errors[] = [
@@ -88,7 +86,7 @@ class ImportEmployeesAction
         }
 
         if ($errors !== []) {
-            return $this->failedSummary($errors);
+            return $this->failedSummary($errors, $skippedCount);
         }
 
         DB::transaction(function () use ($validatedRows): void {
@@ -107,12 +105,14 @@ class ImportEmployeesAction
 
         AuditService::log('IMPORT', 'Employee', null, null, [
             'total_inserted' => count($validatedRows),
+            'total_skipped' => $skippedCount,
             'filename' => $request->file('file')->getClientOriginalName(),
         ], $request);
 
         return [
             'message' => 'Import selesai.',
             'inserted' => count($validatedRows),
+            'skipped' => $skippedCount,
             'failed' => 0,
             'errors' => [],
         ];
@@ -160,32 +160,35 @@ class ImportEmployeesAction
 
     /**
      * K-US-02: Menjaga file import tidak berisi NIP/email ganda sebelum transaksi insert dimulai.
-     * - NIP ganda dalam satu berkas → error
-     * - NIP sudah ada di database → error (karena ini legacy endpoint yang tidak support skip)
-     * - Email ganda → error
+     * - NIP ganda dalam satu berkas → error (highest priority)
+     * - Email existing DB → error
+     * - Email ganda dalam berkas → error  
+     * - NIP sudah ada di database → SKIP (aligned with K-US-02 canonical contract)
      *
      * @param  array<string, mixed>  $data
      * @param  array<string, int>  $seenNips
      * @param  array<string, int>  $seenEmails
-     * @return array<string, array<int, string>>
+     * @return array{errors: array<string, array<int, string>>, skip: bool}
      */
     private function duplicateErrors(array $data, int $row, array &$seenNips, array &$seenEmails): array
     {
         $errors = [];
+        $skip = false;
 
         if (! empty($data['nip'])) {
             $nip = (string) $data['nip'];
 
-            // NIP ganda dalam berkas → error
+            // NIP ganda dalam berkas → error (highest priority)
             if (isset($seenNips[$nip])) {
                 $errors['nip'][] = "NIP sudah ada pada baris {$seenNips[$nip]}.";
             } else {
                 $seenNips[$nip] = $row;
-            }
 
-            // NIP sudah ada di database → error (legacy endpoint tidak support skip)
-            if (Employee::where('nip', $nip)->exists()) {
-                $errors['nip'][] = 'NIP sudah terdaftar di database.';
+                // K-US-02: NIP sudah ada di database → SKIP (bukan error)
+                // Only check database if no in-file duplicate (in-file duplicate takes priority)
+                if (Employee::where('nip', $nip)->exists()) {
+                    $skip = true;
+                }
             }
         }
 
@@ -205,18 +208,25 @@ class ImportEmployeesAction
             }
         }
 
-        return $errors;
+        return ['errors' => $errors, 'skip' => $skip];
     }
 
     /**
      * @param  array<int, array{row: int, errors: array<string, mixed>}>  $errors
-     * @return array{message: string, inserted: int, failed: int, errors: array<int, array{row: int, errors: array<string, mixed>}>}
+     * @return array{message: string, inserted: int, skipped: int, failed: int, errors: array<int, array{row: int, errors: array<string, mixed>}>}
      */
-    private function failedSummary(array $errors): array
+    private function failedSummary(array $errors, int $skippedCount = 0): array
     {
+        $message = 'Import gagal. Perbaiki baris bermasalah lalu unggah ulang.';
+        
+        if ($skippedCount > 0) {
+            $message .= " {$skippedCount} baris dilewati karena NIP sudah terdaftar.";
+        }
+
         return [
-            'message' => 'Import gagal. Perbaiki baris bermasalah lalu unggah ulang.',
+            'message' => $message,
             'inserted' => 0,
+            'skipped' => $skippedCount,
             'failed' => count($errors),
             'errors' => $errors,
         ];

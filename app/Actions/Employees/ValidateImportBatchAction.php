@@ -131,9 +131,10 @@ class ValidateImportBatchAction
             $databaseErrors['Email Pegawai'][] = 'Email pegawai sudah terdaftar di database.';
         }
 
-        // Cek NIP existing di database (prioritas SKIP, tapi hanya jika tidak ada error lain)
+        // Cek NIP existing di database (prioritas SKIP, tapi hanya jika tidak ada error duplicate in-file)
+        $shouldSkip = $this->shouldSkipNip($validated, $seenNips, $row['row']);
         $skipErrors = [];
-        if (! empty($validated['nip']) && Employee::where('nip', $validated['nip'])->exists()) {
+        if ($shouldSkip) {
             $skipErrors['NIP'][] = 'NIP sudah terdaftar di database.';
         }
 
@@ -256,6 +257,34 @@ class ValidateImportBatchAction
         }
 
         return $errors;
+    }
+
+    /**
+     * Check if NIP should be skipped (exists in database).
+     * Only returns skip if no in-file duplicate error exists.
+     *
+     * @param array $data Validated row data
+     * @param array $seenNips Tracking array for in-file duplicates
+     * @param int $row Current row number
+     * @return bool True if should skip (NIP exists and no in-file duplicate)
+     */
+    private function shouldSkipNip(array $data, array $seenNips, int $row): bool
+    {
+        if (empty($data['nip'])) {
+            return false;
+        }
+
+        $nip = $data['nip'];
+
+        // Only skip if this is the FIRST occurrence in file (no in-file duplicate)
+        // and it exists in database
+        if (isset($seenNips[$nip]) && $seenNips[$nip] !== $row) {
+            // This is a duplicate within file, don't skip (will be error)
+            return false;
+        }
+
+        // Check database
+        return Employee::where('nip', $nip)->exists();
     }
 
     private function mapErrors(array $errors, array $fieldMap): array

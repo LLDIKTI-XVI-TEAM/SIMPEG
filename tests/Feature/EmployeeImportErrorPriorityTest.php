@@ -33,7 +33,7 @@ class EmployeeImportErrorPriorityTest extends TestCase
         Employee::factory()->create([
             'nip' => '199001012020121001',
             'email_pribadi' => 'existing@example.com',
-            'nama' => 'Existing Employee',
+            'nama_lengkap' => 'Existing Employee',
         ]);
 
         // Prepare import batch with same NIP and same Email
