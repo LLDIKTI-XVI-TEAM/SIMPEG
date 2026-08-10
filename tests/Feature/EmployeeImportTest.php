@@ -228,6 +228,16 @@ class EmployeeImportTest extends TestCase
             ->assertSeeText('III/b')
             ->assertSeeText('Penata Muda Tingkat I')
             ->assertSeeText('8');
+
+        // Memanggil eksekusi ulang pada batch yang sudah completed tetap mengembalikan statistik asli secara idempoten.
+        $reExecute = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", []);
+        $reExecute->assertOk();
+
+        $reStatus = $this->getJson("/api/pegawai/import/{$batchId}/status");
+        $reStatus->assertOk();
+        $reStatus->assertJsonPath('status', 'completed');
+        $reStatus->assertJsonPath('result.inserted', 2);
+        $reStatus->assertJsonPath('result.skipped', 0);
     }
 
     public function test_import_wizard_skips_nip_already_registered_in_database(): void

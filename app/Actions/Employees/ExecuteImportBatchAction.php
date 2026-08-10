@@ -33,6 +33,17 @@ class ExecuteImportBatchAction
             abort(403, 'Anda tidak memiliki akses ke batch import ini.');
         }
 
+        $existingBatchModel = ImportBatch::find($batchId);
+        if ($existingBatchModel?->status === 'completed' || ($batch['status'] ?? null) === 'completed') {
+            return [
+                'message' => 'Import selesai.',
+                'inserted' => $existingBatchModel?->inserted_count ?? $batch['result']['inserted'] ?? 0,
+                'processed' => $existingBatchModel?->valid_count ?? $batch['processed_count'] ?? 0,
+                'skipped' => $existingBatchModel?->skipped_count ?? $batch['result']['skipped'] ?? 0,
+                'failed' => $existingBatchModel?->failed_count ?? $batch['result']['failed'] ?? 0,
+            ];
+        }
+
         if ($batch['validation'] === null) {
             throw ValidationException::withMessages([
                 'message' => ['Data belum divalidasi. Jalankan validasi terlebih dahulu.'],
@@ -72,6 +83,19 @@ class ExecuteImportBatchAction
             'finished_at' => null,
         ]);
 
+        // Catat snapshot NIP yang sudah terdaftar di DB sebelum batch ini dieksekusi pertama kali.
+        if (! isset($batch['nips_before_execution'])) {
+            $validNips = array_filter(array_map(
+                fn (array $result) => $result['validated_data']['nip'] ?? null,
+                $validRows
+            ));
+
+            $batch['nips_before_execution'] = $validNips !== []
+                ? Employee::withTrashed()->whereIn('nip', $validNips)->pluck('nip')->toArray()
+                : [];
+        }
+        $nipsBeforeExecution = array_flip($batch['nips_before_execution']);
+
         try {
             if ($validRows !== []) {
                 foreach ($validRows as $result) {
@@ -79,6 +103,7 @@ class ExecuteImportBatchAction
                         $inserted = DB::transaction(fn (): bool => $this->executeValidatedRow(
                             $type,
                             $result['validated_data'],
+                            $nipsBeforeExecution,
                         ));
                     } catch (QueryException $exception) {
                         if (! $this->isDuplicateNipException($exception)) {
@@ -185,14 +210,23 @@ class ExecuteImportBatchAction
         ];
     }
 
-    private function executeValidatedRow(string $type, array $data): bool
+    private function executeValidatedRow(string $type, array $data, array $nipsBeforeExecution): bool
     {
         if ($type === 'utama') {
-            // Validasi dan job berjalan terpisah; periksa ulang agar NIP yang baru
-            // tersimpan setelah validasi tetap tercatat sebagai SKIP, bukan gagal.
-            // withTrashed() agar selaras dengan unique index yang mencakup baris soft-deleted.
-            if (! empty($data['nip']) && Employee::withTrashed()->where('nip', $data['nip'])->exists()) {
-                return false;
+            if (! empty($data['nip'])) {
+                $nip = $data['nip'];
+
+                // Jika NIP sudah terdaftar SEBELUM eksekusi batch ini dimulai (misal ditambahkan admin lain pasca validasi),
+                // tandai sebagai SKIP.
+                if (isset($nipsBeforeExecution[$nip])) {
+                    return false;
+                }
+
+                // Jika NIP sudah ada di database saat ini (tetapi tidak ada sebelum eksekusi batch dimulai),
+                // berarti NIP ini dibuat oleh eksekusi/retry batch ini sendiri -> idempotent success.
+                if (Employee::withTrashed()->where('nip', $nip)->exists()) {
+                    return true;
+                }
             }
 
             // Fallback: jika kolom 'Person' (nama_lengkap tanpa gelar) tidak diisi pada file Excel,

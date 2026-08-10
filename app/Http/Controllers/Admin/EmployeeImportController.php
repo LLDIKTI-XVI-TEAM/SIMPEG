@@ -106,6 +106,14 @@ class EmployeeImportController extends Controller
     {
         $batch = $this->getBatchOrFail($batchId, $request);
 
+        $existingBatchModel = ImportBatch::find($batchId);
+        if (($batch['status'] ?? null) === 'completed' || $existingBatchModel?->status === 'completed') {
+            return response()->json([
+                'status' => 'completed',
+                'message' => 'Proses impor sudah selesai.',
+            ]);
+        }
+
         if ($batch['validation'] === null) {
             return response()->json([
                 'message' => 'Data belum divalidasi. Jalankan validasi terlebih dahulu.',
