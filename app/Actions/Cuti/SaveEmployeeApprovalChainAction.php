@@ -83,7 +83,9 @@ class SaveEmployeeApprovalChainAction
             // Audit konfigurasi chain dicatat per chain baru agar perubahan approver dapat ditelusuri.
             // Ditulis fail-closed di dalam transaksi supaya kewenangan persetujuan tidak pernah
             // berpindah tanpa baris audit yang menerangkan siapa mengubahnya dan dari perangkat mana.
-            AuditService::logOrFail(
+            AuditService::logAsOrFail(
+                $actor->id,
+                $actor->name,
                 'CREATE',
                 'LeaveApprovalChain',
                 $chain->id,

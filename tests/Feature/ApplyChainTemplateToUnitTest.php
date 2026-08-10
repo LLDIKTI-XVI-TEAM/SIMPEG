@@ -17,6 +17,7 @@ use Database\Seeders\RbacSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Tests\TestCase;
@@ -613,6 +614,26 @@ class ApplyChainTemplateToUnitTest extends TestCase
         $this->assertSame([$anggota->id], $audit->new_values['applied_employee_ids']);
         $this->assertSame(1, $audit->new_values['applied_count']);
         $this->assertSame(0, $audit->new_values['overwritten_count']);
+    }
+
+    public function test_audit_penerapan_unit_mencatat_aktor_eksplisit_tanpa_sesi_autentikasi(): void
+    {
+        $aktor = User::factory()->superAdmin()->create();
+        $unit = $this->unit('Bagian Keuangan');
+        $pybmc = Employee::factory()->create();
+        $verifikator = Employee::factory()->create();
+        $sumber = $this->pegawaiUnit($unit, 'Pegawai Sumber');
+
+        $this->rantaiAwal($sumber, $aktor, $verifikator, $pybmc);
+        Auth::logout();
+
+        $this->app->make(ApplyChainTemplateToUnitAction::class)
+            ->execute($unit, $sumber, $aktor, 'Menguji aktor eksplisit tanpa sesi autentikasi.');
+
+        $audit = AuditLog::query()->where('event', 'CONFIG_UPDATE')->sole();
+
+        $this->assertSame($aktor->id, $audit->user_id);
+        $this->assertSame($aktor->name, $audit->user_name);
     }
 
     public function test_audit_aksi_menyimpan_jejak_forensik_permintaan(): void

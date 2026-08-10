@@ -161,7 +161,9 @@ class ApplyChainTemplateToUnitAction
                     }
                 });
 
-            AuditService::logOrFail(
+            AuditService::logAsOrFail(
+                $actor->id,
+                $actor->name,
                 'CONFIG_UPDATE',
                 'RefUnitKerja',
                 $unitKerja->id,

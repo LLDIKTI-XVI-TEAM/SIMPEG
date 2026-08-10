@@ -82,6 +82,32 @@ class EmployeeApprovalChainConfigTest extends TestCase
         $this->assertSame('Penetapan chain awal pegawai.', $audit->new_values['reason']);
     }
 
+    public function test_save_action_mencatat_aktor_eksplisit_tanpa_sesi_autentikasi(): void
+    {
+        $actor = User::factory()->superAdmin()->create();
+        $kepalaBagian = Employee::factory()->create();
+        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $pybmc = Employee::factory()->create();
+
+        $chain = $this->app->make(SaveEmployeeApprovalChainAction::class)->execute(
+            $pegawai,
+            [
+                ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $kepalaBagian->id, 'is_final' => false],
+                ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $pybmc->id, 'is_final' => true],
+            ],
+            $actor,
+            'Menguji aktor eksplisit tanpa sesi autentikasi.',
+        );
+
+        $audit = AuditLog::query()
+            ->where('auditable_type', 'LeaveApprovalChain')
+            ->where('auditable_id', $chain->id)
+            ->sole();
+
+        $this->assertSame($actor->id, $audit->user_id);
+        $this->assertSame($actor->name, $audit->user_name);
+    }
+
     public function test_update_chain_menonaktifkan_chain_lama(): void
     {
         $actor = User::factory()->superAdmin()->create();
