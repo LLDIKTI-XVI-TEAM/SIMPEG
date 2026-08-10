@@ -29,10 +29,10 @@ class EmployeeImportMappingUiTest extends TestCase
         $response->assertSee('Pemetaan Kolom');
         $response->assertSee('Kolom tidak dikenal ditemukan');
         $response->assertSee('Field wajib belum dipetakan');
-        $response->assertSee('mappingEngine: window.employeeImportMapping', false);
-        $response->assertSee('const body = { rows: this.buildMappedRows() };', false);
+        $response->assertSee('simpegTargetFields:', false);
+        $response->assertSee('await this.persistMapping();', false);
         $response->assertSee('aria-describedby="mapping-readiness-message"', false);
         $response->assertSee('isLockedIgnoredHeader(header)', false);
-        $response->assertSee(':selected="columnMapping[header] === target.key"', false);
+        $response->assertSee('value="tidak_dipakai"', false);
     }
 }

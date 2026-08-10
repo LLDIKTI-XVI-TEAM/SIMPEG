@@ -26,57 +26,89 @@
         mainHeaders: [],
         allRows: [],
         
-        // Pure frontend mapping engine. Nilai mapping diterapkan ke baris sebelum
-        // request validasi, sehingga backend menerima header kanonis tanpa perlu diubah.
-        mappingEngine: window.employeeImportMapping,
+        // Mapping merupakan state batch server: satu sumber untuk preview,
+        // validasi, dan eksekusi import.
+        simpegTargetFields: [
+            { key: 'Nama Pegawai', label: 'Nama & Gelar (Nama Pegawai)' },
+            { key: 'Person', label: 'Nama Lengkap Tanpa Gelar (Person)' },
+            { key: 'NIP', label: 'NIP' },
+            { key: 'Email Pegawai', label: 'Email Pegawai' },
+            { key: 'Status Kepegawaian', label: 'Status Kepegawaian (PNS/PPPK/CPNS)' },
+            { key: 'Nomor Telepon', label: 'Nomor Telepon / No HP' },
+            { key: 'Tanggal Lahir', label: 'Tanggal Lahir' },
+            { key: 'Jabatan', label: 'Jabatan Terakhir' },
+            { key: 'Golongan', label: 'Golongan Terakhir' },
+            { key: 'Kelas Jabatan', label: 'Kelas Jabatan' },
+            { key: 'Pangkat', label: 'Pangkat Terakhir' },
+            { key: 'Pendidikan Terakhir', label: 'Pendidikan Terakhir' },
+            { key: 'Prodi Pendidikan Terakhir', label: 'Prodi Pendidikan Terakhir' },
+            { key: 'Pensiun', label: 'Tanggal Pensiun' },
+            { key: 'NIK', label: 'NIK (Opsional)' },
+            { key: 'No KK', label: 'No KK (Opsional)' },
+        ],
         columnMapping: {},
-        targetFields: window.employeeImportMapping.IMPORT_TARGET_FIELDS,
         requiredTargetFields: [],
         serverWarnings: { unmatched_columns: [], missing_required: [] },
-        initColumnMapping(headers) {
-            this.columnMapping = this.mappingEngine.createInitialColumnMapping(headers);
+        get unmappedHeaders() {
+            return this.mainHeaders.filter(header => !this.columnMapping[header] || this.columnMapping[header] === 'tidak_dipakai');
+        },
+        get unmappedHeadersCount() {
+            return this.unmappedHeaders.length;
         },
         get skippedSourceHeaders() {
-            return this.mappingEngine.skippedSourceHeaders(this.mainHeaders, this.columnMapping);
+            return this.unmappedHeaders;
         },
         get unknownSourceHeaders() {
-            return this.mappingEngine.unknownSourceHeaders(this.mainHeaders, this.columnMapping);
+            return this.unmappedHeaders.filter(header => !this.isKnownIgnoredHeader(header));
         },
         get knownIgnoredSourceHeaders() {
-            return this.mappingEngine.knownIgnoredSourceHeaders(this.mainHeaders, this.columnMapping);
+            return this.unmappedHeaders.filter(header => this.isKnownIgnoredHeader(header));
         },
         get mappedColumnCount() {
-            return Object.values(this.columnMapping).filter(target => target && target !== 'skip').length;
+            return this.mainHeaders.length - this.unmappedHeadersCount;
+        },
+        get hasDuplicateMapping() {
+            return this.duplicateMappedFields.length > 0;
         },
         get duplicateMappedFields() {
-            return this.mappingEngine.duplicateMappedFields(this.columnMapping);
+            const counts = {};
+
+            Object.values(this.columnMapping).forEach(target => {
+                if (target && target !== 'tidak_dipakai') {
+                    counts[target] = (counts[target] || 0) + 1;
+                }
+            });
+
+            return Object.keys(counts).filter(target => counts[target] > 1);
         },
-        get missingMandatoryFields() {
-            return this.mappingEngine.missingMandatoryFields(this.columnMapping);
+        get missingRequiredTargets() {
+            const selectedTargets = Object.values(this.columnMapping).filter(target => target && target !== 'tidak_dipakai');
+            return this.requiredTargetFields.filter(target => !selectedTargets.includes(target));
         },
         get canProceedToValidation() {
-            return this.duplicateMappedFields.length === 0 && this.missingMandatoryFields.length === 0;
-        },
-        mappingControlId(header, index) {
-            return this.mappingEngine.mappingControlId(header, index);
+            return !this.hasDuplicateMapping && this.missingRequiredTargets.length === 0;
         },
         mappingTargetLabel(target) {
-            return this.targetFields.find(field => field.key === target)?.label || 'Tidak dipakai / Skip';
+            if (!target || target === 'tidak_dipakai') return 'Tidak dipakai';
+
+            return this.simpegTargetFields.find(field => field.key === target)?.label || target;
+        },
+        mappingControlId(header, index) {
+            const slug = String(header).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'kolom';
+            return `mapping-${index}-${slug}`;
+        },
+        isKnownIgnoredHeader(header) {
+            return ['no', 'personformula', 'role'].includes(String(header).trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
         },
         isLockedIgnoredHeader(header) {
-            return this.mappingEngine.isLockedIgnoredHeader(header);
-        },
-        buildMappedRows() {
-            // Role dari file sengaja diabaikan sesuai PRD. Nilai pegawai hanya
-            // menjadi default kompatibilitas untuk kontrak validasi lama.
-            return this.mappingEngine.buildMappedRows(
-                this.allRows,
-                this.columnMapping,
-                { Role: 'pegawai' },
-            );
+            return ['no', 'role'].includes(String(header).trim().toLowerCase());
         },
         sourceHeadersForErrors(errorTargets) {
-            const sources = this.mappingEngine.sourceHeadersForTargets(this.columnMapping, errorTargets);
+            const targets = new Set(errorTargets);
+            const sources = Object.entries(this.columnMapping)
+                .filter(([, target]) => targets.has(target))
+                .map(([source]) => source);
+
             return sources.length > 0 ? sources : errorTargets;
         },
         onMappingChange() {
@@ -85,26 +117,23 @@
         async persistMapping() {
             if (!this.batchId) return;
 
-            try {
-                const res = await fetch('/api/pegawai/import/' + this.batchId + '/mapping', {
-                    method: 'POST',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
-                    },
-                    body: JSON.stringify({ mapping: this.columnMapping }),
-                });
+            const res = await fetch('/api/pegawai/import/' + this.batchId + '/mapping', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
+                },
+                body: JSON.stringify({ mapping: this.columnMapping }),
+            });
 
-                const data = await res.json();
-                if (!res.ok) {
-                    throw new Error(data.errors ? Object.values(data.errors).flat().join(' ') : (data.message || 'Gagal menyimpan pemetaan kolom.'));
-                }
-
-                this.serverWarnings = data.warnings || this.serverWarnings;
-            } catch (e) {
-                // Ignore API mapping persistence errors if pure frontend engine handles row transformation
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.errors ? Object.values(data.errors).flat().join(' ') : (data.message || 'Gagal menyimpan pemetaan kolom.'));
             }
+
+            this.columnMapping = data.mapping || this.columnMapping;
+            this.serverWarnings = data.warnings || this.serverWarnings;
         },
         getEditedRows() {
             return this.allRows.filter((rowObj, index) => this.editedRowIndices.has(index));
@@ -328,7 +357,6 @@
                 this.validationRowLoads = {};
                 this.totalRows = previewData.total_rows;
                 this.previewPage = 1;
-                this.initColumnMapping(this.mainHeaders);
                 this.hasEdits = false;
                 this.editedRowIndices = new Set();
                 // Pemetaan awal dan peringatan kolom berasal dari state batch server,
@@ -355,24 +383,15 @@
                 return;
             }
             
-            if (this.hasDuplicateMapping) {
-                this.apiError = 'Terdapat target kolom SIMPEG yang dipetakan lebih dari sekali (' + this.duplicateMappedFields.join(', ') + '). Setiap target SIMPEG hanya boleh dipilih oleh satu kolom sumber.';
-                return;
-            }
-
-            if (this.missingRequiredTargets.length > 0) {
-                this.apiError = 'Field wajib belum dipetakan: ' + this.missingRequiredTargets.join(', ') + '. Petakan setiap field wajib ke kolom sumber sebelum melanjutkan.';
-                return;
-            }
-
             this.isValidating = true;
             this.apiError = '';
 
             try {
-                // Mapping wajib tersimpan di server sebelum validasi dijalankan,
-                // dan mapping aktif diterapkan untuk setiap baris data.
+                // Simpan mapping batch sebelum validasi. Baris yang tidak diedit
+                // tetap dibaca server dari batch dengan mapping yang sama.
                 await this.persistMapping();
-                const body = { rows: this.buildMappedRows() };
+                const editedRows = this.getEditedRows();
+                const body = editedRows.length > 0 ? { rows: editedRows } : {};
                 
                 const res = await fetch('/api/pegawai/import/' + this.batchId + '/validate', {
                     method: 'POST',
@@ -711,7 +730,6 @@
                 </div>
             </div>
 
-<<<<<<< HEAD
             {{-- Column Mapping Card (US-3.2 AC-4, AC-5) --}}
             <x-ui.card padding="lg" class="space-y-5">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -782,7 +800,7 @@
                     </div>
                 </div>
 
-                <div x-show="missingMandatoryFields.length > 0" x-cloak role="alert" aria-live="assertive"
+                <div x-show="missingRequiredTargets.length > 0" x-cloak role="alert" aria-live="assertive"
                     class="flex items-start gap-3 rounded-lg border border-danger/20 bg-danger/10 p-4 text-danger" x-transition>
                     <svg class="mt-0.5 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -791,8 +809,8 @@
                         <p class="font-semibold">Field wajib belum dipetakan</p>
                         <p class="mt-1 leading-relaxed">
                             Pilih kolom sumber untuk
-                            <template x-for="(field, index) in missingMandatoryFields" :key="field">
-                                <strong x-text="field + (index < missingMandatoryFields.length - 1 ? ', ' : '')"></strong>
+                            <template x-for="(field, index) in missingRequiredTargets" :key="field">
+                                <strong x-text="field + (index < missingRequiredTargets.length - 1 ? ', ' : '')"></strong>
                             </template>
                             sebelum melanjutkan.
                         </p>
@@ -808,80 +826,26 @@
                                 <div class="flex items-start justify-between gap-3">
                                     <label :for="mappingControlId(header, index)" class="min-w-0 text-sm font-semibold leading-snug text-ink" x-text="header"></label>
                                     <span class="shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold"
-                                        :class="columnMapping[header] === 'skip' ? 'border-warning/20 bg-warning/10 text-warning-dark' : 'border-primary/20 bg-primary/10 text-primary'"
-                                        x-text="columnMapping[header] === 'skip' ? 'Tidak dipakai' : 'Dipetakan'">
+                                        :class="columnMapping[header] === 'tidak_dipakai' ? 'border-warning/20 bg-warning/10 text-warning-dark' : 'border-primary/20 bg-primary/10 text-primary'"
+                                        x-text="columnMapping[header] === 'tidak_dipakai' ? 'Tidak dipakai' : 'Dipetakan'">
                                     </span>
                                 </div>
                                 <select :id="mappingControlId(header, index)" x-model="columnMapping[header]"
                                     :disabled="isLockedIgnoredHeader(header)" @change="onMappingChange()"
                                     :aria-describedby="mappingControlId(header, index) + '-help'"
                                     class="min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-soft disabled:text-muted">
-                                    <template x-for="target in targetFields" :key="target.key">
+                                    <option value="tidak_dipakai">Tidak dipakai / Skip (nilai diabaikan)</option>
+                                    <template x-for="target in simpegTargetFields" :key="target.key">
                                         <option :value="target.key" :selected="columnMapping[header] === target.key" x-text="target.label"></option>
                                     </template>
                                 </select>
                                 <p :id="mappingControlId(header, index) + '-help'" class="text-xs leading-relaxed text-muted"
-                                    x-text="isLockedIgnoredHeader(header) ? 'Kolom ini dikunci sebagai Tidak dipakai sesuai PRD.' : (columnMapping[header] === 'skip' ? 'Nilai kolom ini tidak akan disimpan.' : 'Target: ' + mappingTargetLabel(columnMapping[header]))">
+                                    x-text="isLockedIgnoredHeader(header) ? 'Kolom ini dikunci sebagai Tidak dipakai sesuai PRD.' : (columnMapping[header] === 'tidak_dipakai' ? 'Nilai kolom ini tidak akan disimpan.' : 'Target: ' + mappingTargetLabel(columnMapping[header]))">
                                 </p>
                             </div>
                         </template>
                     </div>
                 </fieldset>
-=======
-            {{-- Peringatan non-blocking: kolom tak terpetakan tetap diabaikan, tetapi admin wajib sadar data kolom itu tidak ikut terimport. --}}
-            <div x-show="unmappedHeadersCount > 0" class="transition">
-                <x-ui.alert variant="warning" size="md">
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div>
-                            <strong class="font-sans">Peringatan Kolom Tidak Cocok:</strong>
-                            Terdapat <span class="font-bold" x-text="unmappedHeadersCount"></span> kolom dari file yang belum terpetakan ke field SIMPEG (<span class="italic font-medium" x-text="unmappedHeaders.join(', ')"></span>). Nilai kolom yang dipetakan ke "Tidak Dipakai" tidak akan disimpan.
-                        </div>
-                    </div>
-                </x-ui.alert>
-            </div>
-
-            {{-- Header wajib yang belum terpetakan diperingatkan lebih awal; server tetap menolak validasi bila ini lolos. --}}
-            <div x-show="missingRequiredTargets.length > 0" x-cloak class="transition">
-                <x-ui.alert variant="danger" size="md">
-                    <strong class="font-sans">Field Wajib Belum Terpetakan:</strong>
-                    <span x-text="missingRequiredTargets.join(', ')"></span>. Petakan setiap field wajib ke kolom sumber sebelum validasi dapat dijalankan.
-                </x-ui.alert>
-            </div>
-
-            {{-- Pemetaan kolom manual: satu target SIMPEG hanya boleh dipilih oleh satu kolom sumber agar nilai tidak tertimpa. --}}
-            <x-ui.card padding="md" class="space-y-4">
-                <div class="flex items-center justify-between border-b border-border pb-3">
-                    <div>
-                        <h3 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Pemetaan Kolom (Excel/CSV → SIMPEG)</h3>
-                        <p class="text-xs text-muted font-sans mt-0.5">Sistem telah memetakan header secara otomatis. Anda dapat mengubah pasangan kolom secara manual menggunakan pilihan di bawah.</p>
-                    </div>
-                    <x-ui.badge variant="info" size="sm">
-                        <span x-text="mainHeaders.length - unmappedHeadersCount"></span> / <span x-text="mainHeaders.length"></span> Terpetakan
-                    </x-ui.badge>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    <template x-for="header in mainHeaders" :key="header">
-                        <div class="rounded-lg border border-border p-2.5 bg-soft/30 space-y-1.5">
-                            <div class="flex items-center justify-between text-xs">
-                                <span class="font-semibold text-ink truncate font-sans" :title="header" x-text="header"></span>
-                                <span x-show="columnMapping[header] && columnMapping[header] !== 'tidak_dipakai'" class="text-[10px] font-bold text-success">✓ Matched</span>
-                                <span x-show="!columnMapping[header] || columnMapping[header] === 'tidak_dipakai'" class="text-[10px] font-bold text-warning">! Unmatched</span>
-                            </div>
-                            <x-form.select x-model="columnMapping[header]" class="w-full text-xs py-1">
-                                <option value="tidak_dipakai">-- Tidak Dipakai --</option>
-                                <template x-for="field in simpegTargetFields" :key="field.key">
-                                    <option :value="field.key" x-text="field.label" :selected="columnMapping[header] === field.key"></option>
-                                </template>
-                            </x-form.select>
-                        </div>
-                    </template>
-                </div>
-                <div x-show="hasDuplicateMapping" x-cloak>
-                    <x-ui.alert variant="warning" size="sm">
-                        <strong>Konflik Pemetaan Kolom:</strong> Target <span class="font-bold underline" x-text="duplicateMappedFields.join(', ')"></span> dipilih lebih dari sekali. Setiap target SIMPEG hanya boleh dipetakan dari satu kolom sumber agar data tidak tertimpa.
-                    </x-ui.alert>
-                </div>
->>>>>>> origin/development
             </x-ui.card>
 
             {{-- Editable Preview Table --}}
@@ -905,7 +869,7 @@
                                     <x-ui.table-th padding="xs" class="border-r min-w-[200px]">
                                         <span class="block" x-text="header"></span>
                                         <span class="mt-0.5 block text-[10px] font-medium normal-case tracking-normal text-muted"
-                                            x-text="columnMapping[header] === 'skip' ? 'Tidak dipakai' : '→ ' + mappingTargetLabel(columnMapping[header])"></span>
+                                            x-text="columnMapping[header] === 'tidak_dipakai' ? 'Tidak dipakai' : '→ ' + mappingTargetLabel(columnMapping[header])"></span>
                                     </x-ui.table-th>
                                 </template>
                             </x-ui.table-row>
@@ -948,7 +912,6 @@
                     <x-ui.button type="button" variant="muted" @click="resetAll()">
                         Batal & Upload Ulang
                     </x-ui.button>
-<<<<<<< HEAD
                     <div class="flex flex-col items-stretch gap-2 sm:items-end">
                         <p id="mapping-readiness-message" aria-live="polite" class="text-xs"
                             :class="canProceedToValidation ? 'text-success' : 'text-danger'"
@@ -961,14 +924,6 @@
                             <span x-text="isValidating ? 'Memvalidasi...' : 'Lanjutkan ke Validasi'"></span>
                         </button>
                     </div>
-=======
-                    <button type="button" @click="runValidation()" :disabled="isValidating || hasDuplicateMapping || missingRequiredTargets.length > 0"
-                        :class="(isValidating || hasDuplicateMapping || missingRequiredTargets.length > 0) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'"
-                        class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition font-sans gap-2">
-                        <x-ui.loading x-show="isValidating" size="md" />
-                        <span x-text="isValidating ? 'Memvalidasi...' : 'Lanjutkan ke Validasi'"></span>
-                    </button>
->>>>>>> origin/development
                 </div>
             </x-ui.card>
         </div>
@@ -1026,7 +981,7 @@
                                     <x-ui.table-th padding="xs" class="border-r min-w-[200px]">
                                         <span class="block" x-text="header"></span>
                                         <span class="mt-0.5 block text-[10px] font-medium normal-case tracking-normal text-muted"
-                                            x-text="columnMapping[header] === 'skip' ? 'Tidak dipakai' : '→ ' + mappingTargetLabel(columnMapping[header])"></span>
+                                            x-text="columnMapping[header] === 'tidak_dipakai' ? 'Tidak dipakai' : '→ ' + mappingTargetLabel(columnMapping[header])"></span>
                                     </x-ui.table-th>
                                 </template>
                                 <x-ui.table-th padding="xs" class="min-w-[200px]">Keterangan</x-ui.table-th>
