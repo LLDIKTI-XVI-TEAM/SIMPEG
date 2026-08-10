@@ -248,6 +248,12 @@ class Employee extends Model
         return $this->hasMany(LeaveBalance::class);
     }
 
+    /** @return HasMany<EmployeeMilestone, $this> */
+    public function milestones(): HasMany
+    {
+        return $this->hasMany(EmployeeMilestone::class);
+    }
+
     /** @return HasMany<EwsAlert, $this> */
     public function ewsAlerts(): HasMany
     {

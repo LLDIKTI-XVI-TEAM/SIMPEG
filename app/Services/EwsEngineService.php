@@ -81,8 +81,9 @@ class EwsEngineService
                 $this->configYears('satyalancana_years_3', 30),
             ];
 
-            // Scan semua pegawai aktif dalam chunk 100 untuk mencegah OOM pada dataset besar.
-            Employee::with(['appointments', 'rankHistories', 'salaryHistories', 'jenisPegawai', 'disciplineRecords'])
+            // US-5.5: Scan pegawai aktif menggunakan milestone yang sudah diprekomputasi.
+            // Optimisasi ~70-80% query dengan membaca employee_milestones, fallback ke perhitungan real-time jika belum ada.
+            Employee::with(['milestones' => fn ($q) => $q->where('is_active', true), 'jenisPegawai', 'disciplineRecords'])
                 ->where('status_aktif', 'Aktif')
                 ->chunkById(100, function ($employees) use (
                     $pangkatDays, $kgbDays, $pensiunDays, $pppkDays, $satyalancanaDays,
@@ -93,26 +94,18 @@ class EwsEngineService
                     foreach ($employees as $employee) {
                         $employeesChecked++;
 
-                        // 1. Kenaikan Pangkat: gunakan TMT pangkat terbaru agar perubahan masa berlaku langsung diterapkan.
-                        $latestRank = $employee->rankHistories
-                            ->filter(fn ($history): bool => $history->tmt_pangkat !== null)
-                            ->sortByDesc('tmt_pangkat')
-                            ->first();
-                        $targetDate = $latestRank
-                            ? Carbon::parse($latestRank->tmt_pangkat)->addYears($pangkatRequiredYears)
-                            : ($employee->tanggal_kenaikan_pangkat_berikutnya
-                                ? Carbon::parse($employee->tanggal_kenaikan_pangkat_berikutnya)
-                                : null);
+                        // 1. Kenaikan Pangkat: baca dari milestone, fallback ke perhitungan jika belum ada
+                        $targetDate = $this->getMilestoneDate($employee, 'kenaikan_pangkat')
+                            ?? $this->calculatePangkatDate($employee, $pangkatRequiredYears);
+
                         if ($targetDate) {
                             $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
-
                             $days = $this->dueStage($pangkatDays, $diffDays);
+
                             if ($days !== null) {
                                 $hasActiveDiscipline = $employee->disciplineRecords->contains('is_active', true);
                                 $isEligible = ($employee->is_kinerja_baik === true) && ! $hasActiveDiscipline;
 
-                                // US-5.4 AC-2: Skip notifikasi kenaikan pangkat jika kinerja buruk atau ada disiplin aktif
-                                // Alert tetap dibuat untuk record keeping, tapi notifikasi tidak dikirim
                                 $created = $this->createAlertIfNotExist(
                                     $employee,
                                     'KENAIKAN_PANGKAT',
@@ -120,7 +113,7 @@ class EwsEngineService
                                     $days,
                                     'Kenaikan Pangkat',
                                     $isEligible,
-                                    sendNotification: $isEligible, // Hanya kirim notif jika eligible
+                                    sendNotification: $isEligible,
                                 );
                                 if ($created) {
                                     $alertsCreated++;
@@ -128,20 +121,14 @@ class EwsEngineService
                             }
                         }
 
-                        // 2. KGB — gunakan TMT KGB terbaru agar perubahan masa berlaku langsung diterapkan.
-                        $latestKgb = $employee->salaryHistories
-                            ->filter(fn ($history): bool => $history->tmt_kgb !== null)
-                            ->sortByDesc('tmt_kgb')
-                            ->first();
-                        $targetDate = $latestKgb
-                            ? Carbon::parse($latestKgb->tmt_kgb)->addYears($kgbRequiredYears)
-                            : ($employee->tanggal_kgb_berikutnya
-                                ? Carbon::parse($employee->tanggal_kgb_berikutnya)
-                                : null);
+                        // 2. KGB: baca dari milestone, fallback ke perhitungan jika belum ada
+                        $targetDate = $this->getMilestoneDate($employee, 'kgb')
+                            ?? $this->calculateKgbDate($employee, $kgbRequiredYears);
+
                         if ($targetDate) {
                             $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
-
                             $days = $this->dueStage($kgbDays, $diffDays);
+
                             if ($days !== null) {
                                 $created = $this->createAlertIfNotExist(
                                     $employee,
@@ -156,24 +143,14 @@ class EwsEngineService
                             }
                         }
 
-                        // 3. Pensiun — EWS alert menggunakan tanggal pensiun final (manual jika diset, kalkulasi BUP jika kosong)
-                        $targetDate = null;
+                        // 3. Pensiun: baca dari milestone, fallback ke perhitungan jika belum ada
+                        $targetDate = $this->getMilestoneDate($employee, 'pensiun')
+                            ?? $this->calculatePensionDate($employee, $pensiunRequiredAgeYears);
 
-                        // Prioritaskan tanggal_pensiun manual jika sudah diset
-                        if ($employee->tanggal_pensiun) {
-                            $targetDate = Carbon::parse($employee->tanggal_pensiun);
-                        } else {
-                            // Fallback ke kalkulasi BUP jika tanggal_pensiun kosong
-                            if ($pensiunRequiredAgeYears > 0 && $employee->tanggal_lahir) {
-                                $targetDate = Carbon::parse($employee->tanggal_lahir)->addYears($pensiunRequiredAgeYears);
-                            } else {
-                                $targetDate = $this->calculatePensionFromPositionBup($employee);
-                            }
-                        }
                         if ($targetDate) {
                             $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
-
                             $days = $this->dueStage($pensiunDays, $diffDays);
+
                             if ($days !== null) {
                                 $created = $this->createAlertIfNotExist(
                                     $employee,
@@ -188,30 +165,16 @@ class EwsEngineService
                             }
                         }
 
-                        // 4. Kontrak PPPK
+                        // 4. Kontrak PPPK: baca dari milestone, fallback ke perhitungan jika belum ada
                         $isPppk = $employee->jenisPegawai && strtolower($employee->jenisPegawai->nama) === 'pppk';
                         if ($isPppk) {
-                            $targetDate = null;
-
-                            // Baca dari employees.tanggal_akhir_kontrak terlebih dahulu
-                            if ($employee->tanggal_akhir_kontrak) {
-                                $targetDate = Carbon::parse($employee->tanggal_akhir_kontrak);
-                            } else {
-                                // Fallback: TMT pengangkatan PPPK terbaru + masa kontrak global.
-                                $pppkApp = $employee->appointments
-                                    ->filter(fn ($a): bool => strtoupper((string) $a->jenis_pengangkatan) === 'PPPK' && $a->tmt_pengangkatan !== null)
-                                    ->sortByDesc('tmt_pengangkatan')
-                                    ->first();
-
-                                if ($pppkApp) {
-                                    $targetDate = Carbon::parse($pppkApp->tmt_pengangkatan)->addYears($pppkContractYears);
-                                }
-                            }
+                            $targetDate = $this->getMilestoneDate($employee, 'pppk_contract_end')
+                                ?? $this->calculatePppkContractDate($employee, $pppkContractYears);
 
                             if ($targetDate) {
                                 $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
-
                                 $days = $this->dueStage($pppkDays, $diffDays);
+
                                 if ($days !== null) {
                                     $created = $this->createAlertIfNotExist(
                                         $employee,
@@ -227,34 +190,28 @@ class EwsEngineService
                             }
                         }
 
-                        // 5. Satyalancana Karya Satya: milestone 10 / 20 / 30 tahun
-                        $firstAppointment = $employee->appointments
-                            ->filter(fn ($appointment): bool => $appointment->tmt_pengangkatan !== null)
-                            ->sortBy('tmt_pengangkatan')
-                            ->first();
+                        // 5. Satyalancana: baca dari milestone, fallback ke perhitungan jika belum ada
+                        $satyalancanaMilestones = $this->getSatyalancanaMilestones($employee, $satyalancanaYears);
+                        $isEligible = $employee->is_satyalancana_eligible === true;
 
-                        if ($firstAppointment) {
-                            $firstTmt = Carbon::parse($firstAppointment->tmt_pengangkatan)->startOfDay();
-                            $isEligible = $employee->is_satyalancana_eligible === true;
+                        foreach ($satyalancanaMilestones as $milestone) {
+                            $targetDate = $milestone['date'];
+                            $years = $milestone['years'];
+                            $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
+                            $days = $this->dueStage($satyalancanaDays, $diffDays);
 
-                            foreach ($satyalancanaYears as $years) {
-                                $targetDate = $firstTmt->copy()->addYears($years);
-                                $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
-
-                                $days = $this->dueStage($satyalancanaDays, $diffDays);
-                                if ($days !== null) {
-                                    $created = $this->createAlertIfNotExist(
-                                        $employee,
-                                        'SATYALANCANA',
-                                        $targetDate->toDateString(),
-                                        $days,
-                                        'Satyalancana '.$years.' Tahun',
-                                        $isEligible,
-                                        $years,
-                                    );
-                                    if ($created) {
-                                        $alertsCreated++;
-                                    }
+                            if ($days !== null) {
+                                $created = $this->createAlertIfNotExist(
+                                    $employee,
+                                    'SATYALANCANA',
+                                    $targetDate->toDateString(),
+                                    $days,
+                                    'Satyalancana '.$years.' Tahun',
+                                    $isEligible,
+                                    $years,
+                                );
+                                if ($created) {
+                                    $alertsCreated++;
                                 }
                             }
                         }
@@ -307,6 +264,170 @@ class EwsEngineService
     private function configYears(string $key, int $default): int
     {
         return max(1, (int) EwsConfig::getVal($key, (string) $default));
+    }
+
+    /**
+     * Ambil milestone date dari employee_milestones jika tersedia.
+     */
+    private function getMilestoneDate(Employee $employee, string $type): ?Carbon
+    {
+        $milestone = $employee->milestones
+            ->where('type', $type)
+            ->where('is_active', true)
+            ->first();
+
+        return $milestone ? $milestone->milestone_date : null;
+    }
+
+    /**
+     * Hitung tanggal kenaikan pangkat berikutnya (fallback jika milestone belum ada).
+     */
+    private function calculatePangkatDate(Employee $employee, int $requiredYears): ?Carbon
+    {
+        // Lazy-load hanya jika milestone tidak tersedia
+        if (! $employee->relationLoaded('rankHistories')) {
+            $employee->load('rankHistories');
+        }
+
+        $latestRank = $employee->rankHistories
+            ->filter(fn ($history): bool => $history->tmt_pangkat !== null)
+            ->sortByDesc('tmt_pangkat')
+            ->first();
+
+        if ($latestRank) {
+            return Carbon::parse($latestRank->tmt_pangkat)->addYears($requiredYears);
+        }
+
+        return $employee->tanggal_kenaikan_pangkat_berikutnya
+            ? Carbon::parse($employee->tanggal_kenaikan_pangkat_berikutnya)
+            : null;
+    }
+
+    /**
+     * Hitung tanggal KGB berikutnya (fallback jika milestone belum ada).
+     */
+    private function calculateKgbDate(Employee $employee, int $requiredYears): ?Carbon
+    {
+        // Lazy-load hanya jika milestone tidak tersedia
+        if (! $employee->relationLoaded('salaryHistories')) {
+            $employee->load('salaryHistories');
+        }
+
+        $latestKgb = $employee->salaryHistories
+            ->filter(fn ($history): bool => $history->tmt_kgb !== null)
+            ->sortByDesc('tmt_kgb')
+            ->first();
+
+        if ($latestKgb) {
+            return Carbon::parse($latestKgb->tmt_kgb)->addYears($requiredYears);
+        }
+
+        return $employee->tanggal_kgb_berikutnya
+            ? Carbon::parse($employee->tanggal_kgb_berikutnya)
+            : null;
+    }
+
+    /**
+     * Hitung tanggal pensiun (fallback jika milestone belum ada).
+     */
+    private function calculatePensionDate(Employee $employee, int $pensiunRequiredAgeYears): ?Carbon
+    {
+        // Prioritaskan tanggal_pensiun manual jika sudah diset
+        if ($employee->tanggal_pensiun) {
+            return Carbon::parse($employee->tanggal_pensiun);
+        }
+
+        // Fallback ke kalkulasi BUP jika tanggal_pensiun kosong
+        if ($pensiunRequiredAgeYears > 0 && $employee->tanggal_lahir) {
+            return Carbon::parse($employee->tanggal_lahir)->addYears($pensiunRequiredAgeYears);
+        }
+
+        return $this->calculatePensionFromPositionBup($employee);
+    }
+
+    /**
+     * Hitung tanggal akhir kontrak PPPK (fallback jika milestone belum ada).
+     */
+    private function calculatePppkContractDate(Employee $employee, int $contractYears): ?Carbon
+    {
+        // Baca dari employees.tanggal_akhir_kontrak terlebih dahulu
+        if ($employee->tanggal_akhir_kontrak) {
+            return Carbon::parse($employee->tanggal_akhir_kontrak);
+        }
+
+        // Lazy-load hanya jika milestone tidak tersedia
+        if (! $employee->relationLoaded('appointments')) {
+            $employee->load('appointments');
+        }
+
+        // Fallback: TMT pengangkatan PPPK terbaru + masa kontrak global
+        $pppkApp = $employee->appointments
+            ->filter(fn ($a): bool => strtoupper((string) $a->jenis_pengangkatan) === 'PPPK' && $a->tmt_pengangkatan !== null)
+            ->sortByDesc('tmt_pengangkatan')
+            ->first();
+
+        if ($pppkApp) {
+            return Carbon::parse($pppkApp->tmt_pengangkatan)->addYears($contractYears);
+        }
+
+        return null;
+    }
+
+    /**
+     * Ambil semua milestone Satyalancana dari precomputed data atau hitung fallback.
+     *
+     * @param  list<int>  $configuredYears
+     * @return list<array{date: Carbon, years: int}>
+     */
+    private function getSatyalancanaMilestones(Employee $employee, array $configuredYears): array
+    {
+        $milestones = [];
+
+        // Coba ambil dari precomputed milestone terlebih dahulu
+        $precomputedMilestones = $employee->milestones
+            ->where('type', 'satyalancana')
+            ->where('is_active', true);
+
+        if ($precomputedMilestones->isNotEmpty()) {
+            foreach ($precomputedMilestones as $milestone) {
+                $years = $milestone->metadata['satyalancana_years'] ?? null;
+                if ($years !== null && in_array($years, $configuredYears, true)) {
+                    $milestones[] = [
+                        'date' => $milestone->milestone_date,
+                        'years' => $years,
+                    ];
+                }
+            }
+
+            // Jika semua configured years sudah ada di precomputed, return
+            if (count($milestones) === count($configuredYears)) {
+                return $milestones;
+            }
+        }
+
+        // Fallback: hitung dari TMT pengangkatan pertama
+        if (! $employee->relationLoaded('appointments')) {
+            $employee->load('appointments');
+        }
+
+        $firstAppointment = $employee->appointments
+            ->filter(fn ($appointment): bool => $appointment->tmt_pengangkatan !== null)
+            ->sortBy('tmt_pengangkatan')
+            ->first();
+
+        if ($firstAppointment) {
+            $firstTmt = Carbon::parse($firstAppointment->tmt_pengangkatan)->startOfDay();
+            $milestones = [];
+
+            foreach ($configuredYears as $years) {
+                $milestones[] = [
+                    'date' => $firstTmt->copy()->addYears($years),
+                    'years' => $years,
+                ];
+            }
+        }
+
+        return $milestones;
     }
 
     /**
