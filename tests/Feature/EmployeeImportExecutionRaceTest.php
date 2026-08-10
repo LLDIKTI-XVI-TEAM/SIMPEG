@@ -92,7 +92,7 @@ class EmployeeImportExecutionRaceTest extends TestCase
     {
         $user = User::factory()->adminKepegawaian()->create();
         $batch = app(UploadImportBatchAction::class)->execute(
-            $this->csvFile($this->validCsv()),
+            $this->csvFile($this->validCsv('Budi employees_nip_unique Santoso')),
             'utama',
             $user,
         );
@@ -123,7 +123,7 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $this->assertSame(0, $persistedBatch->skipped_count);
     }
 
-    private function validCsv(): string
+    private function validCsv(string $namaDenganGelar = 'Budi Santoso'): string
     {
         $headers = [
             'Nama Pegawai', 'Email Pegawai', 'Golongan', 'Jabatan', 'Kelas Jabatan', 'NIP',
@@ -131,7 +131,7 @@ class EmployeeImportExecutionRaceTest extends TestCase
             'Prodi Pendidikan Terakhir', 'Status Kepegawaian', 'Tanggal Lahir',
         ];
         $row = [
-            'Budi Santoso', 'budi@example.com', 'III/a', 'Analis Kepegawaian', '7',
+            $namaDenganGelar, 'budi@example.com', 'III/a', 'Analis Kepegawaian', '7',
             '198001012006041001', '081234567890', 'Penata Muda', 'S1', '2038-01-01',
             'Budi Santoso', 'Budi Santoso', 'Manajemen', 'PNS', '1980-01-01',
         ];

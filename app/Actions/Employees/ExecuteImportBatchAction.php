@@ -255,17 +255,16 @@ class ExecuteImportBatchAction
     private function isDuplicateNipViolation(QueryException $exception): bool
     {
         $sqlState = (string) ($exception->errorInfo[0] ?? $exception->getCode());
-        $message = strtolower($exception->getMessage());
-        $isUniqueViolation = $sqlState === '23505'
-            || ($sqlState === '23000' && str_contains($message, 'unique'));
+        $driverDiagnostic = (string) ($exception->errorInfo[2] ?? '');
 
-        if (! $isUniqueViolation) {
-            return false;
+        if ($sqlState === '23505') {
+            preg_match('/unique constraint ["\']([^"\']+)["\']/i', $driverDiagnostic, $matches);
+
+            return ($matches[1] ?? null) === 'employees_nip_unique';
         }
 
-        return str_contains($message, 'employees_nip_unique')
-            || (str_contains($message, 'unique constraint failed')
-                && str_contains($message, 'employees.nip'));
+        return $sqlState === '23000'
+            && preg_match('/unique constraint failed:\s*employees\.nip\b/i', $driverDiagnostic) === 1;
     }
 
     /**
