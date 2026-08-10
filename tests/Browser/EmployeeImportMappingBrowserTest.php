@@ -122,10 +122,17 @@ class EmployeeImportMappingBrowserTest extends DuskTestCase
                         const alert = document.querySelector(`[dusk="${name}"]`);
                         return !alert || getComputedStyle(alert).display === 'none';
                     })
-                JS)
-                ->assertMissing('@mapping-duplicate-warning')
-                ->assertMissing('@mapping-required-warning')
-                ->assertEnabled('@mapping-continue');
+                JS);
+
+            $alertsRemainHidden = $browser->script(<<<'JS'
+                return ['mapping-duplicate-warning', 'mapping-required-warning'].every((name) => {
+                    const alert = document.querySelector(`[dusk="${name}"]`);
+                    return alert !== null && getComputedStyle(alert).display === 'none';
+                });
+            JS)[0];
+
+            $this->assertTrue($alertsRemainHidden);
+            $browser->assertEnabled('@mapping-continue');
 
             $browser->script(<<<'JS'
                 window.__mappingRequests = [];
