@@ -195,6 +195,33 @@ class EmployeeShowTest extends TestCase
             ->assertDontSee('window.xss = true', false);
     }
 
+    public function test_detail_page_menampilkan_kontrol_tambah_riwayat_untuk_admin_yang_berizin(): void
+    {
+        $employee = $this->employeeWithReferences();
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSee('Tambah Riwayat Kepangkatan', false)
+            ->assertSee('Tambah Riwayat Jabatan', false)
+            ->assertSee('Tambah Riwayat KGB', false);
+    }
+
+    public function test_detail_page_menyembunyikan_kontrol_tambah_riwayat_tanpa_permission(): void
+    {
+        $employee = $this->employeeWithReferences();
+        $role = Role::where('name', 'admin_kepegawaian')->firstOrFail();
+        $permissionId = Permission::where('name', 'employee_histories.create')->firstOrFail()->id;
+        $role->permissions()->detach($permissionId);
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertDontSee('Tambah Riwayat Kepangkatan', false)
+            ->assertDontSee('Tambah Riwayat Jabatan', false)
+            ->assertDontSee('Tambah Riwayat KGB', false);
+    }
+
     public function test_employee_detail_response_includes_kepala_lembaga_marker(): void
     {
         $user = User::factory()->adminKepegawaian()->create();

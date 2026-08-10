@@ -35,6 +35,9 @@
         $canAssignSupervisor = auth()->check()
             && in_array(auth()->user()->role, ['super_admin', 'admin_kepegawaian'], true)
             && auth()->user()->hasPermission('employees.update');
+
+        $canCreateEmployeeHistory = auth()->check()
+            && auth()->user()->hasPermission('employee_histories.create');
     @endphp
 
     <div x-data="{
@@ -1314,6 +1317,14 @@
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Kepangkatan & Golongan</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Catatan kenaikan pangkat reguler maupun pilihan selama masa dinas.</p>
                     </div>
+                    @if($canCreateEmployeeHistory)
+                        <button type="button" @click="openModal('pangkat', 'Tambah Riwayat Kepangkatan')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
+                            <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                            Tambah Riwayat Kepangkatan
+                        </button>
+                    @endif
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-border">
                     <table class="w-full">
@@ -1346,6 +1357,14 @@
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Jabatan & Struktural</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Catatan penugasan jabatan fungsional maupun struktural.</p>
                     </div>
+                    @if($canCreateEmployeeHistory)
+                        <button type="button" @click="openModal('jabatan', 'Tambah Riwayat Jabatan')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
+                            <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                            Tambah Riwayat Jabatan
+                        </button>
+                    @endif
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-border">
                     <table class="w-full">
@@ -1380,6 +1399,14 @@
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Kenaikan Gaji Berkala (KGB)</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Catatan penyesuaian gaji berkala setiap 2 tahun sekali.</p>
                     </div>
+                    @if($canCreateEmployeeHistory)
+                        <button type="button" @click="openModal('kgb', 'Tambah Riwayat KGB')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
+                            <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                            Tambah Riwayat KGB
+                        </button>
+                    @endif
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-border">
                     <table class="w-full">
