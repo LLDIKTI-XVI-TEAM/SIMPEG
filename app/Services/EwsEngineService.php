@@ -569,12 +569,8 @@ class EwsEngineService
             $eligibilityNote,
         );
 
-        // US-5.4 AC-2: Jika sendNotification = false, skip pembuatan notifikasi
-        // Alert tetap dibuat untuk record keeping, tapi notifikasi tidak dikirim
-        if (! $sendNotification) {
-            return $wasCreated;
-        }
-
+        // Always update existing notification if alert eligibility changed
+        // Even when sendNotification=false, we need to sync notification data
         $notification = $this->notificationService->upsertEwsReminder(
             $employee,
             $alert,
@@ -585,6 +581,7 @@ class EwsEngineService
                 'ews_alert_id' => $alert->id,
                 'is_eligible' => $isEligible,
             ],
+            createIfMissing: $sendNotification,  // Only create NEW notification if eligible
         );
 
         if ($notification !== null) {
