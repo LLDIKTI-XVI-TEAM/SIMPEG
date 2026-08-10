@@ -16,14 +16,56 @@ return new class extends Migration
 
     public function down(): void
     {
+        // SQLite requires table rebuild to properly drop foreign key columns with constraints
         if (DB::connection()->getDriverName() === 'sqlite') {
-            // SQLite memiliki keterbatasan dalam drop constrained foreign key dengan unique index
-            // Migration down tidak digunakan di production
+            $this->rebuildTableForSQLite();
+
             return;
         }
 
         Schema::table('users', function (Blueprint $table): void {
             $table->dropConstrainedForeignId('employee_id');
         });
+    }
+
+    private function rebuildTableForSQLite(): void
+    {
+        // Get all users data
+        $users = DB::table('users')->get();
+
+        // Drop and recreate table without employee_id
+        Schema::drop('users');
+
+        Schema::create('users', function (Blueprint $table): void {
+            $table->uuid('id')->primary();
+            $table->string('name');
+            $table->string('email')->unique();
+            $table->timestamp('email_verified_at')->nullable();
+            $table->string('password');
+            $table->string('role')->nullable();
+            $table->string('keycloak_id')->nullable()->unique();
+            $table->string('keycloak_username')->nullable()->unique();
+            // employee_id NOT added back (this is what we're rolling back)
+            $table->rememberToken();
+            $table->timestamps();
+        });
+
+        // Restore data
+        foreach ($users as $user) {
+            DB::table('users')->insert([
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'email_verified_at' => $user->email_verified_at,
+                'password' => $user->password,
+                'role' => $user->role,
+                'keycloak_id' => $user->keycloak_id,
+                'keycloak_username' => $user->keycloak_username,
+                // employee_id omitted - this column is being removed
+                'remember_token' => $user->remember_token,
+                'created_at' => $user->created_at,
+                'updated_at' => $user->updated_at,
+            ]);
+        }
     }
 };
