@@ -35,9 +35,10 @@ return new class extends Migration
             $table->dropColumn(['default_bup', 'is_active']);
         });
 
-        // SQLite memiliki keterbatasan dalam drop column dengan foreign key
-        // Migration down biasanya tidak digunakan di production, jadi kita skip untuk SQLite
-        if (DB::connection()->getDriverName() !== 'sqlite') {
+        // SQLite requires table rebuild to drop columns with foreign keys
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            $this->rollbackUnitKerjaHierarchySqlite();
+        } else {
             Schema::table('ref_unit_kerja', function (Blueprint $table): void {
                 $table->dropForeign('ref_unit_kerja_parent_id_foreign');
                 $table->dropIndex('ref_unit_kerja_parent_level_index');
@@ -256,5 +257,33 @@ return new class extends Migration
                 'updated_at' => $now,
             ]);
         }
+    }
+
+    /**
+     * Rollback unit kerja hierarchy columns for SQLite using table rebuild pattern.
+     * SQLite doesn't support dropping columns with foreign keys, so we recreate the table.
+     */
+    private function rollbackUnitKerjaHierarchySqlite(): void
+    {
+        // Backup existing data
+        DB::statement('CREATE TEMPORARY TABLE ref_unit_kerja_backup AS SELECT id, nama, kode, keterangan, created_at, updated_at FROM ref_unit_kerja');
+
+        // Drop original table
+        Schema::dropIfExists('ref_unit_kerja');
+
+        // Recreate table without hierarchy columns
+        Schema::create('ref_unit_kerja', function (Blueprint $table): void {
+            $table->uuid('id')->primary();
+            $table->string('nama', 200);
+            $table->string('kode', 50)->nullable();
+            $table->text('keterangan')->nullable();
+            $table->timestamps();
+        });
+
+        // Restore data
+        DB::statement('INSERT INTO ref_unit_kerja (id, nama, kode, keterangan, created_at, updated_at) SELECT id, nama, kode, keterangan, created_at, updated_at FROM ref_unit_kerja_backup');
+
+        // Drop temporary table
+        DB::statement('DROP TABLE ref_unit_kerja_backup');
     }
 };

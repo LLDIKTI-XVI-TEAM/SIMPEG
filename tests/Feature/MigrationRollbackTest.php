@@ -166,4 +166,120 @@ class MigrationRollbackTest extends TestCase
         $this->assertEquals('super_admin', $userAfter->role);
         $this->assertEquals('kc-123', $userAfter->keycloak_id);
     }
+
+    /**
+     * Test: Hierarchy columns (parent_id, level, jenis_unit, is_active) can be rolled back on SQLite.
+     *
+     * Issue: down() in complete_phase_one_reference_tables migration skipped column
+     * removal for SQLite, causing rollback to succeed but columns remain. Re-running
+     * migration would fail because hierarchy columns still exist.
+     */
+    public function test_unit_kerja_hierarchy_migration_rollback_on_sqlite(): void
+    {
+        if (DB::connection()->getDriverName() !== 'sqlite') {
+            $this->markTestSkipped('This test is specific to SQLite rollback behavior.');
+        }
+
+        // Verify hierarchy columns exist after migration
+        $this->assertTrue(
+            Schema::hasColumn('ref_unit_kerja', 'parent_id'),
+            'parent_id should exist after migration'
+        );
+        $this->assertTrue(
+            Schema::hasColumn('ref_unit_kerja', 'level'),
+            'level should exist after migration'
+        );
+        $this->assertTrue(
+            Schema::hasColumn('ref_unit_kerja', 'jenis_unit'),
+            'jenis_unit should exist after migration'
+        );
+        $this->assertTrue(
+            Schema::hasColumn('ref_unit_kerja', 'is_active'),
+            'is_active should exist after migration'
+        );
+
+        // Rollback the migration
+        Artisan::call('migrate:rollback', [
+            '--path' => 'database/migrations/2026_07_20_000000_complete_phase_one_reference_tables.php',
+            '--force' => true,
+        ]);
+
+        // Verify hierarchy columns are removed
+        $this->assertFalse(
+            Schema::hasColumn('ref_unit_kerja', 'parent_id'),
+            'parent_id should be removed after rollback'
+        );
+        $this->assertFalse(
+            Schema::hasColumn('ref_unit_kerja', 'level'),
+            'level should be removed after rollback'
+        );
+        $this->assertFalse(
+            Schema::hasColumn('ref_unit_kerja', 'jenis_unit'),
+            'jenis_unit should be removed after rollback'
+        );
+        $this->assertFalse(
+            Schema::hasColumn('ref_unit_kerja', 'is_active'),
+            'is_active should be removed after rollback'
+        );
+
+        // Verify we can re-run the migration
+        Artisan::call('migrate', [
+            '--path' => 'database/migrations/2026_07_20_000000_complete_phase_one_reference_tables.php',
+            '--force' => true,
+        ]);
+
+        // Verify hierarchy columns exist again
+        $this->assertTrue(
+            Schema::hasColumn('ref_unit_kerja', 'parent_id'),
+            'parent_id should exist after re-running migration'
+        );
+        $this->assertTrue(
+            Schema::hasColumn('ref_unit_kerja', 'level'),
+            'level should exist after re-running migration'
+        );
+        $this->assertTrue(
+            Schema::hasColumn('ref_unit_kerja', 'jenis_unit'),
+            'jenis_unit should exist after re-running migration'
+        );
+        $this->assertTrue(
+            Schema::hasColumn('ref_unit_kerja', 'is_active'),
+            'is_active should exist after re-running migration'
+        );
+    }
+
+    /**
+     * Test: Data is preserved after rollback and re-migration of unit_kerja hierarchy.
+     */
+    public function test_unit_kerja_data_preserved_after_hierarchy_rollback(): void
+    {
+        if (DB::connection()->getDriverName() !== 'sqlite') {
+            $this->markTestSkipped('This test is specific to SQLite rollback behavior.');
+        }
+
+        // Insert test data
+        DB::table('ref_unit_kerja')->insert([
+            'id' => '123e4567-e89b-12d3-a456-426614174000',
+            'nama' => 'Test Unit Kerja',
+            'kode' => 'TEST',
+            'keterangan' => 'Test keterangan',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Rollback the migration
+        Artisan::call('migrate:rollback', [
+            '--path' => 'database/migrations/2026_07_20_000000_complete_phase_one_reference_tables.php',
+            '--force' => true,
+        ]);
+
+        // Verify data is preserved after rollback
+        $unit = DB::table('ref_unit_kerja')
+            ->where('id', '123e4567-e89b-12d3-a456-426614174000')
+            ->first();
+
+        $this->assertNotNull($unit, 'Data should be preserved after rollback');
+        $this->assertEquals('Test Unit Kerja', $unit->nama);
+        $this->assertEquals('TEST', $unit->kode);
+        $this->assertEquals('Test keterangan', $unit->keterangan);
+    }
 }
