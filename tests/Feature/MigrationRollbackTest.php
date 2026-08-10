@@ -282,4 +282,96 @@ class MigrationRollbackTest extends TestCase
         $this->assertEquals('TEST', $unit->kode);
         $this->assertEquals('Test keterangan', $unit->keterangan);
     }
+
+    /**
+     * Test: SSO users with null password can be rolled back successfully.
+     *
+     * Issue: Rebuild table schema defined password as NOT NULL, but original
+     * schema allows null for SSO users. Rollback would fail when trying to
+     * restore SSO user data with null password.
+     */
+    public function test_keycloak_username_rollback_preserves_sso_users_with_null_password(): void
+    {
+        if (DB::connection()->getDriverName() !== 'sqlite') {
+            $this->markTestSkipped('This test is specific to SQLite rollback behavior.');
+        }
+
+        // Fresh migrate
+        Artisan::call('migrate:fresh');
+
+        // Insert SSO user with null password
+        $ssoUserId = fake()->uuid();
+        DB::table('users')->insert([
+            'id' => $ssoUserId,
+            'name' => 'SSO User',
+            'email' => 'sso@example.com',
+            'password' => null, // ← SSO user has no password
+            'role' => 'pegawai',
+            'keycloak_id' => 'kc-sso-123',
+            'keycloak_username' => 'sso_user',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Rollback keycloak_username migration
+        Artisan::call('migrate:rollback', ['--step' => 1]);
+
+        // Verify SSO user is preserved with null password
+        $user = DB::table('users')->where('id', $ssoUserId)->first();
+        $this->assertNotNull($user, 'SSO user should be preserved after rollback');
+        $this->assertEquals('SSO User', $user->name);
+        $this->assertEquals('sso@example.com', $user->email);
+        $this->assertNull($user->password, 'Password should remain null for SSO user');
+        $this->assertEquals('kc-sso-123', $user->keycloak_id);
+    }
+
+    /**
+     * Test: employee_id rollback preserves SSO users with null password.
+     */
+    public function test_employee_id_rollback_preserves_sso_users_with_null_password(): void
+    {
+        if (DB::connection()->getDriverName() !== 'sqlite') {
+            $this->markTestSkipped('This test is specific to SQLite rollback behavior.');
+        }
+
+        // Fresh migrate
+        Artisan::call('migrate:fresh');
+
+        // Insert SSO user with null password and employee_id
+        $ssoUserId = fake()->uuid();
+        $employeeId = fake()->uuid();
+
+        // Create employee first (for foreign key)
+        DB::table('employees')->insert([
+            'id' => $employeeId,
+            'nip' => '199001012020121001',
+            'nama' => 'Test Employee',
+            'email' => 'employee@example.com',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('users')->insert([
+            'id' => $ssoUserId,
+            'name' => 'SSO Employee User',
+            'email' => 'sso.employee@example.com',
+            'password' => null, // ← SSO user has no password
+            'role' => 'pegawai',
+            'keycloak_id' => 'kc-sso-emp-456',
+            'keycloak_username' => 'sso_employee',
+            'employee_id' => $employeeId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Rollback employee_id migration (2 steps: employee_id, then keycloak_username)
+        Artisan::call('migrate:rollback', ['--step' => 2]);
+
+        // Verify SSO user is preserved with null password
+        $user = DB::table('users')->where('id', $ssoUserId)->first();
+        $this->assertNotNull($user, 'SSO user should be preserved after rollback');
+        $this->assertEquals('SSO Employee User', $user->name);
+        $this->assertNull($user->password, 'Password should remain null for SSO user');
+        $this->assertEquals('kc-sso-emp-456', $user->keycloak_id);
+    }
 }

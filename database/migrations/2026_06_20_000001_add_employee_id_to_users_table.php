@@ -41,7 +41,7 @@ return new class extends Migration
             $table->string('name');
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
-            $table->string('password');
+            $table->string('password')->nullable(); // Nullable for SSO users
             $table->string('role')->nullable();
             $table->string('keycloak_id')->nullable()->unique();
             $table->string('keycloak_username')->nullable()->unique();
