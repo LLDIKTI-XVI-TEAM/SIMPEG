@@ -165,13 +165,8 @@ class EmployeePppkContractMilestoneUpdateTest extends TestCase
         $this->assertEquals($newContractDate, $activeMilestones->first()->milestone_date->toDateString());
     }
 
-    /**
-     * Test: Scheduler tidak membuat alert ulang dengan tanggal lama setelah update.
-     *
-     * Scenario: Bug sebelum fix - milestone lama tetap aktif, scheduler membuat
-     * alert baru dengan tanggal lama meskipun alert sudah di-expire.
-     */
-    public function test_scheduler_does_not_recreate_alert_with_old_contract_date(): void
+    /** Memastikan perubahan kontrak menutup alert lama dan menyisakan milestone aktif terbaru. */
+    public function test_contract_update_expires_old_alert_and_keeps_new_active_milestone(): void
     {
         $this->seed(ReferenceSeeder::class);
         $this->seed(RbacSeeder::class);
@@ -200,7 +195,7 @@ class EmployeePppkContractMilestoneUpdateTest extends TestCase
         app(TmtCalculatorService::class)->syncForEmployee($employee);
 
         // Create alert for old date
-        EwsAlert::create([
+        $alert = EwsAlert::create([
             'employee_id' => $employee->id,
             'type' => 'KONTRAK_PPPK',
             'target_date' => '2027-06-30',
@@ -217,7 +212,7 @@ class EmployeePppkContractMilestoneUpdateTest extends TestCase
         ]);
         $response->assertSessionHasNoErrors()->assertRedirect();
 
-        // Simulate scheduler running (would use milestone)
+        // Scheduler hanya boleh melihat milestone aktif dengan tanggal kontrak terbaru.
         $activeMilestone = EmployeeMilestone::where('employee_id', $employee->id)
             ->where('type', 'pppk_contract_end')
             ->where('is_active', true)
@@ -228,14 +223,10 @@ class EmployeePppkContractMilestoneUpdateTest extends TestCase
         $this->assertEquals('2028-12-31', $activeMilestone->milestone_date->toDateString());
         $this->assertNotEquals('2027-06-30', $activeMilestone->milestone_date->toDateString(), 'Active milestone should NOT use old contract date');
 
-        // Verify: Old alert still expired (doesn't get reactivated)
-        $expiredAlerts = EwsAlert::where('employee_id', $employee->id)
-            ->where('type', 'KONTRAK_PPPK')
-            ->where('target_date', '2027-06-30')
-            ->where('followup_status', EwsAlert::FOLLOWUP_STATUS_EXPIRED)
-            ->count();
-
-        $this->assertGreaterThan(0, $expiredAlerts, 'Old alert should remain expired');
+        // Alert lama harus tetap kedaluwarsa agar scheduler tidak mengaktifkannya kembali.
+        $alert->refresh();
+        $this->assertSame(EwsAlert::FOLLOWUP_STATUS_EXPIRED, $alert->followup_status);
+        $this->assertTrue($alert->is_processed);
     }
 
     /**

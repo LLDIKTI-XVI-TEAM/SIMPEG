@@ -219,16 +219,6 @@ class UpdateEmployeeAction
                 $this->rebuildLatestSalary($employee);
             }
 
-            // Sinkronkan milestone jika ada perubahan history ATAU field pensiun/lahir ATAU kontrak PPPK
-            if ($rankHistoryChanged || $positionHistoryChanged || $salaryHistoryChanged || $pensionFieldsChanged || $pppkContractChanged) {
-                if ($pensionDateChanged) {
-                    // Nilai non-null adalah keputusan resmi Admin; null mengembalikan sumber ke kalkulasi BUP.
-                    $this->tmtCalculator->syncForEmployee($employee, $employee->tanggal_pensiun !== null);
-                } else {
-                    $this->tmtCalculator->syncForEmployee($employee);
-                }
-            }
-
             // 4. Pengangkatan (Appointment)
             if ($request->filled('pengangkatan_jenis_pengangkatan')) {
                 $appointmentData = [
@@ -317,9 +307,14 @@ class UpdateEmployeeAction
                 }
             }
 
-            // Sinkronisasi dijalankan setelah seluruh perubahan tersimpan agar TMT pengangkatan terbaru ikut dihitung.
-            if ($appointmentChanged) {
-                $this->tmtCalculator->syncForEmployee($employee);
+            // Satu sinkronisasi setelah seluruh penulisan memastikan semua sumber TMT direkonsiliasi bersama.
+            if ($rankHistoryChanged || $positionHistoryChanged || $salaryHistoryChanged || $pensionFieldsChanged || $pppkContractChanged || $appointmentChanged) {
+                if ($pensionDateChanged) {
+                    // Nilai non-null adalah keputusan resmi Admin; null mengembalikan sumber ke kalkulasi BUP.
+                    $this->tmtCalculator->syncForEmployee($employee, $employee->tanggal_pensiun !== null);
+                } else {
+                    $this->tmtCalculator->syncForEmployee($employee);
+                }
             }
 
             $employee->refresh();
