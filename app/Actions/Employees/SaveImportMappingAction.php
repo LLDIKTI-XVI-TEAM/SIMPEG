@@ -49,6 +49,14 @@ class SaveImportMappingAction
         $merged = array_merge($batch['mapping'] ?? [], $mapping);
         $merged = ImportColumnMapping::normalizeReservedSources($merged);
 
+        $reservedSources = ImportColumnMapping::reservedSourcesMappedToTargets($merged);
+
+        if ($reservedSources !== []) {
+            throw ValidationException::withMessages([
+                'mapping' => ['Kolom sumber berikut tidak boleh dipetakan ke field SIMPEG: '.implode(', ', $reservedSources).'. Pilih opsi tidak dipakai.'],
+            ]);
+        }
+
         $duplicates = ImportColumnMapping::duplicateTargets($merged);
 
         if ($duplicates !== []) {

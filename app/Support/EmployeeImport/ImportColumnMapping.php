@@ -17,6 +17,9 @@ class ImportColumnMapping
     /** Penanda kolom sumber yang nilainya tidak dipakai. */
     public const IGNORE = 'tidak_dipakai';
 
+    /** Header sumber yang dikelola oleh domain lain dan tidak boleh masuk import pegawai. */
+    private const RESERVED_SOURCES = ['Role'];
+
     /**
      * Header sumber yang tidak boleh menjadi input data apapun, terlepas dari
      * pilihan admin. Kolom ini selalu dipaksa ke IGNORE sebelum mapping disimpan
@@ -146,6 +149,28 @@ class ImportColumnMapping
         ));
 
         return array_values(array_keys(array_filter($counts, fn (int $count): bool => $count > 1)));
+    }
+
+    /**
+     * Source reserved yang dipetakan ke target aktif.
+     *
+     * Normalisasi disamakan dengan auto-map agar variasi spasi dan kapitalisasi tidak
+     * dapat melewati batas domain, sementara pilihan tidak dipakai tetap diizinkan.
+     *
+     * @param  array<string, string>  $mapping
+     * @return list<string>
+     */
+    public static function reservedSourcesMappedToTargets(array $mapping): array
+    {
+        $invalidSources = [];
+
+        foreach ($mapping as $sourceHeader => $target) {
+            if ($target !== self::IGNORE && self::isReservedSource($sourceHeader)) {
+                $invalidSources[] = $sourceHeader;
+            }
+        }
+
+        return $invalidSources;
     }
 
     /**
