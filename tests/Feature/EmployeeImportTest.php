@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Jobs\ImportEmployeeBatchJob;
 use App\Models\Employee;
+use App\Models\ImportBatch;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\RefJenisPegawai;
@@ -15,6 +16,7 @@ use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -409,6 +411,61 @@ class EmployeeImportTest extends TestCase
             ->assertJsonPath('result.inserted', 0)
             ->assertJsonPath('result.skipped', 1)
             ->assertJsonPath('result.failed', 0);
+    }
+
+    public function test_import_wizard_persists_employee_identity_for_inserted_row(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile([$this->validRows()[0]]),
+        ]);
+        $batchId = $upload->json('batch_id');
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])->assertOk();
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", [])->assertOk();
+
+        $batch = ImportBatch::findOrFail($batchId);
+        $executionState = $batch->execution_state;
+        if (! is_array($executionState) || ! is_array($executionState['outcomes'] ?? null)) {
+            $this->fail('Outcome eksekusi batch tidak tersimpan.');
+        }
+
+        $outcome = $executionState['outcomes']['2'] ?? null;
+        if (! is_array($outcome)) {
+            $this->fail('Outcome baris import tidak tersimpan.');
+        }
+
+        $this->assertSame('inserted', $outcome['status'] ?? null);
+        $this->assertSame(
+            Employee::where('nip', '198001012006041001')->value('id'),
+            $outcome['employee_id'] ?? null,
+        );
+    }
+
+    public function test_import_wizard_skips_nip_created_after_execution_snapshot(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile([$this->validRows()[0]]),
+        ]);
+        $batchId = $upload->json('batch_id');
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])->assertOk();
+
+        $batch = Cache::get('employee-import-batch:'.$batchId);
+        $batch['nips_before_execution'] = [];
+        Cache::put('employee-import-batch:'.$batchId, $batch, now()->addMinutes(10));
+        Employee::factory()->create(['nip' => '198001012006041001']);
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", [])->assertOk();
+
+        $this->getJson("/api/pegawai/import/{$batchId}/status")
+            ->assertOk()
+            ->assertJsonPath('result.inserted', 0)
+            ->assertJsonPath('result.skipped', 1);
     }
 
     public function test_import_wizard_applies_saved_column_mapping_end_to_end(): void

@@ -119,7 +119,7 @@ class ExecuteImportBatchAction
                         $inserted = ($outcomes[$rowKey]['status'] ?? null) === 'inserted';
                     } else {
                         try {
-                            $inserted = DB::transaction(fn (): bool => $this->executeValidatedRow(
+                            $outcome = DB::transaction(fn (): array => $this->executeValidatedRow(
                                 $type,
                                 $result['validated_data'],
                                 $nipsBeforeExecution,
@@ -129,12 +129,13 @@ class ExecuteImportBatchAction
                                 throw $exception;
                             }
 
-                            $inserted = false;
+                            $outcome = ['status' => 'skip', 'employee_id' => null];
                         }
 
-                        $outcomes[$rowKey] = ['status' => $inserted ? 'inserted' : 'skip'];
+                        $outcomes[$rowKey] = $outcome;
                         $executionState['outcomes'] = $outcomes;
                         ImportBatch::whereKey($batchId)->update(['execution_state' => $executionState]);
+                        $inserted = $outcome['status'] === 'inserted';
                     }
 
                     $processedCount++;
@@ -234,7 +235,10 @@ class ExecuteImportBatchAction
         ];
     }
 
-    private function executeValidatedRow(string $type, array $data, array $nipsBeforeExecution): bool
+    /**
+     * @return array{status: 'inserted'|'skip', employee_id: string|null}
+     */
+    private function executeValidatedRow(string $type, array $data, array $nipsBeforeExecution): array
     {
         if ($type === 'utama') {
             if (! empty($data['nip'])) {
@@ -243,13 +247,13 @@ class ExecuteImportBatchAction
                 // Jika NIP sudah terdaftar SEBELUM eksekusi batch ini dimulai (misal ditambahkan admin lain pasca validasi),
                 // tandai sebagai SKIP.
                 if (isset($nipsBeforeExecution[$nip])) {
-                    return false;
+                    return ['status' => 'skip', 'employee_id' => null];
                 }
 
                 // NIP yang muncul setelah snapshot tidak membuktikan bahwa batch ini yang membuatnya.
                 // Outcome retry berasal dari execution_state per baris, bukan dari keberadaan NIP.
                 if (Employee::withTrashed()->where('nip', $nip)->exists()) {
-                    return false;
+                    return ['status' => 'skip', 'employee_id' => null];
                 }
             }
 
@@ -262,17 +266,17 @@ class ExecuteImportBatchAction
             $aktifId = RefStatusPegawai::where('nama', 'Aktif')->value('id')
                 ?? RefStatusPegawai::where('is_default', true)->value('id');
 
-            Employee::create($data + [
+            $employee = Employee::create($data + [
                 'status_pegawai_id' => $aktifId,
                 'status_aktif' => 'Aktif',
                 'profil_status' => 'belum_lengkap',
                 'is_kinerja_baik' => true,
             ]);
 
-            return true;
+            return ['status' => 'inserted', 'employee_id' => $employee->id];
         }
 
-        return false;
+        return ['status' => 'skip', 'employee_id' => null];
     }
 
     /**
