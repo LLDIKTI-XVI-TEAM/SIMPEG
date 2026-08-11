@@ -44,11 +44,10 @@ class SaveImportMappingAction
         // Kolom source yang reserved selalu dipaksa ke tidak_dipakai — ini adalah domain
         // invariant, bukan pilihan UI. Normalisasi dilakukan sebelum merge agar pilihan
         // admin sebelumnya (bila ada) juga tidak dapat mewariskan mapping terlarang.
-        $mapping = ImportColumnMapping::normalizeReservedSources($mapping);
-
         // Header yang tidak dikirim client dipertahankan pada mapping sebelumnya agar
         // penyimpanan parsial (admin baru mengubah sebagian dropdown) tetap aman.
         $merged = array_merge($batch['mapping'] ?? [], $mapping);
+        $merged = ImportColumnMapping::normalizeReservedSources($merged);
 
         $duplicates = ImportColumnMapping::duplicateTargets($merged);
 

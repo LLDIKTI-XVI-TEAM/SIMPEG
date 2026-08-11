@@ -71,6 +71,12 @@
             });
             return duplicates;
         },
+        normalizeSourceHeader(header) {
+            return String(header).trim().replace(/\s+/g, ' ').toLowerCase();
+        },
+        isLockedIgnoredHeader(header) {
+            return this.normalizeSourceHeader(header) === 'role';
+        },
         get missingRequiredTargets() {
             const selected = Object.values(this.columnMapping).filter(val => val && val !== 'tidak_dipakai');
             return this.requiredTargetFields.filter(t => !selected.includes(t));
@@ -742,7 +748,10 @@
                                 <span x-show="columnMapping[header] && columnMapping[header] !== 'tidak_dipakai'" class="text-[10px] font-bold text-success">✓ Matched</span>
                                 <span x-show="!columnMapping[header] || columnMapping[header] === 'tidak_dipakai'" class="text-[10px] font-bold text-warning">! Unmatched</span>
                             </div>
-                            <x-form.select x-model="columnMapping[header]" class="w-full text-xs py-1">
+                            <template x-if="isLockedIgnoredHeader(header)">
+                                <div class="rounded-md border border-border bg-soft px-3 py-1.5 text-xs text-muted" role="status">Tidak Dipakai</div>
+                            </template>
+                            <x-form.select x-show="!isLockedIgnoredHeader(header)" x-model="columnMapping[header]" class="w-full text-xs py-1">
                                 <option value="tidak_dipakai">-- Tidak Dipakai --</option>
                                 <template x-for="field in simpegTargetFields" :key="field.key">
                                     <option :value="field.key" x-text="field.label" :selected="columnMapping[header] === field.key"></option>

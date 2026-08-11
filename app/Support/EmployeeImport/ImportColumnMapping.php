@@ -39,9 +39,9 @@ class ImportColumnMapping
      */
     public static function normalizeReservedSources(array $mapping): array
     {
-        foreach (self::RESERVED_SOURCES as $reserved) {
-            if (array_key_exists($reserved, $mapping)) {
-                $mapping[$reserved] = self::IGNORE;
+        foreach ($mapping as $sourceHeader => $target) {
+            if (self::isReservedSource($sourceHeader)) {
+                $mapping[$sourceHeader] = self::IGNORE;
             }
         }
 
@@ -182,7 +182,7 @@ class ImportColumnMapping
             // Fail-closed: source reserved tidak boleh lolos meski mapping cache rusak/stale.
             // Lapisan kedua setelah normalizeReservedSources() agar invariant ini tidak bergantung
             // pada siapa yang memanggil, termasuk jalur legacy yang melewati SaveImportMappingAction.
-            if (in_array($sourceHeader, self::RESERVED_SOURCES, true)) {
+            if (self::isReservedSource($sourceHeader)) {
                 continue;
             }
 
@@ -201,6 +201,17 @@ class ImportColumnMapping
         }
 
         return $mapped;
+    }
+
+    private static function isReservedSource(string $sourceHeader): bool
+    {
+        foreach (self::RESERVED_SOURCES as $reservedSource) {
+            if (self::normalize($sourceHeader) === self::normalize($reservedSource)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static function normalize(string $value): string
