@@ -9,12 +9,14 @@ use App\Models\RefJenisPegawai;
 use App\Models\SalaryHistory;
 use App\Models\User;
 use App\Services\Employees\TmtCalculatorService;
+use App\Support\EmployeeImport\ImportColumnMapping;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class EmployeeImportTest extends TestCase
@@ -427,6 +429,54 @@ class EmployeeImportTest extends TestCase
         $upload->assertJsonPath('mapping.Role', 'tidak_dipakai');
         $this->assertContains('Role', $upload->json('warnings.unmatched_columns'));
         $this->assertNotContains('Role', $upload->json('required_targets'));
+    }
+
+    #[DataProvider('reservedRoleHeaderProvider')]
+    public function test_mapping_endpoint_menolak_source_role_setelah_normalisasi(string $sourceHeader): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        $headers = array_merge($this->headers(), [$sourceHeader]);
+        $rows = array_map(fn (array $row): array => array_merge($row, ['admin_kepegawaian']), $this->validRows());
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFileWithHeaders($headers, $rows, 'source_role_reserved.xlsx'),
+        ]);
+
+        $upload->assertOk();
+        $batchId = $upload->json('batch_id');
+
+        // Target asli dilepas lebih dulu agar penolakan membuktikan invariant source reserved,
+        // bukan sekadar terpicu oleh validasi target ganda.
+        $response = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/mapping", [
+            'mapping' => [
+                'Pangkat' => 'tidak_dipakai',
+                $sourceHeader => 'Pangkat',
+            ],
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors('mapping');
+    }
+
+    #[DataProvider('reservedRoleHeaderProvider')]
+    public function test_apply_mapping_mengabaikan_source_role_sebagai_pertahanan_domain(string $sourceHeader): void
+    {
+        $mapped = ImportColumnMapping::apply(
+            [
+                $sourceHeader => 'admin_kepegawaian',
+                'Pangkat' => 'Penata Muda',
+            ],
+            [
+                $sourceHeader => 'NIP',
+                'Pangkat' => 'Pangkat',
+            ],
+        );
+
+        $this->assertSame([
+            'Pangkat' => 'Penata Muda',
+        ], $mapped, "Source reserved {$sourceHeader} tidak boleh diterapkan ke target import.");
     }
 
     public function test_preview_membatasi_respons_sepuluh_baris_di_sisi_server(): void
@@ -866,6 +916,15 @@ class EmployeeImportTest extends TestCase
         return implode(',', $this->headers())."\n".
         implode(',', $this->validRows()[0])."\n".
         implode(',', $this->validRows()[1])."\n";
+    }
+
+    public static function reservedRoleHeaderProvider(): array
+    {
+        return [
+            'kanonis' => ['Role'],
+            'spasi dan huruf besar' => ['  ROLE  '],
+            'huruf campuran' => ['rOlE'],
+        ];
     }
 
     private function legacyShiftedCsv(): string

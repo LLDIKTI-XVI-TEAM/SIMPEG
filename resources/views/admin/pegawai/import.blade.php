@@ -59,7 +59,12 @@
             return this.unmappedHeaders;
         },
         get unknownSourceHeaders() {
-            return this.unmappedHeaders.filter(header => !this.isKnownIgnoredHeader(header));
+            return this.unmappedHeaders.filter(header =>
+                !this.isCanonicalSourceHeader(header) && !this.isKnownIgnoredHeader(header)
+            );
+        },
+        get intentionallySkippedSourceHeaders() {
+            return this.unmappedHeaders.filter(header => this.isCanonicalSourceHeader(header));
         },
         get knownIgnoredSourceHeaders() {
             return this.unmappedHeaders.filter(header => this.isKnownIgnoredHeader(header));
@@ -97,11 +102,23 @@
             const slug = String(header).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'kolom';
             return `mapping-${index}-${slug}`;
         },
+        normalizeSourceHeader(header) {
+            // Samakan dengan ImportColumnMapping::normalize(): hanya normalisasi
+            // spasi dan huruf besar-kecil. Tanda baca tetap bermakna agar
+            // klasifikasi UI sesuai dengan mapping yang diproses server.
+            return String(header).trim().replace(/\s+/g, ' ').toLowerCase();
+        },
+        isCanonicalSourceHeader(header) {
+            const normalizedHeader = this.normalizeSourceHeader(header);
+
+            return this.simpegTargetFields.some(field => this.normalizeSourceHeader(field.key) === normalizedHeader);
+        },
         isKnownIgnoredHeader(header) {
-            return ['no', 'personformula', 'role'].includes(String(header).trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
+            return ['no', 'person formula', 'role'].includes(this.normalizeSourceHeader(header));
         },
         isLockedIgnoredHeader(header) {
-            return ['no', 'role'].includes(String(header).trim().toLowerCase());
+            return ['no', 'role'].includes(this.normalizeSourceHeader(header));
+        },
         },
         sourceHeadersForErrors(errorTargets) {
             // Key error backend mengikuti label atribut validasi, sedangkan mapping
@@ -775,6 +792,23 @@
                                 <strong x-text="header + (index < unknownSourceHeaders.length - 1 ? ', ' : '')"></strong>
                             </template>
                             tidak disimpan selama tetap dipetakan ke <strong>Tidak dipakai</strong>. Peringatan ini tidak memblokir import jika seluruh field wajib sudah dipetakan.
+                        </p>
+                    </div>
+                </div>
+
+                {{-- Canonical SIMPEG headers may be skipped by the administrator without becoming unknown. --}}
+                <div x-show="intentionallySkippedSourceHeaders.length > 0" x-cloak role="note"
+                    class="flex items-start gap-3 rounded-lg border border-border bg-soft/60 p-4 text-ink">
+                    <svg class="mt-0.5 h-5 w-5 shrink-0 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                    </svg>
+                    <div class="space-y-1 text-sm">
+                        <p class="font-semibold">Kolom SIMPEG sengaja tidak dipakai</p>
+                        <p class="leading-relaxed text-muted">
+                            <template x-for="(header, index) in intentionallySkippedSourceHeaders" :key="header">
+                                <strong class="text-ink" x-text="header + (index < intentionallySkippedSourceHeaders.length - 1 ? ', ' : '')"></strong>
+                            </template>
+                            adalah kolom yang didukung SIMPEG, tetapi nilainya tidak akan disimpan karena dipilih sebagai <strong class="text-ink">Tidak dipakai</strong>. Kondisi ini tidak memblokir import selama field wajib sudah dipetakan.
                         </p>
                     </div>
                 </div>

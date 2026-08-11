@@ -141,13 +141,15 @@ class EmployeeImportMappingBrowserTest extends DuskTestCase
 
                 component.batchId = 'browser-test-batch';
                 component.step = 2;
-                component.mainHeaders = ['No', 'Role', 'NIP', 'Email Pegawai', 'Kolom Cadangan'];
+                component.mainHeaders = ['No', 'Role', 'NIK', 'NIP', 'Email Pegawai', 'Kolom Cadangan', 'Email-Pegawai'];
                 component.columnMapping = {
                     No: 'tidak_dipakai',
                     Role: 'tidak_dipakai',
+                    NIK: 'tidak_dipakai',
                     NIP: 'NIP',
                     'Email Pegawai': 'Email Pegawai',
                     'Kolom Cadangan': 'tidak_dipakai',
+                    'Email-Pegawai': 'tidak_dipakai',
                 };
                 component.requiredTargetFields = ['NIP', 'Email Pegawai'];
                 component.allRows = [{
@@ -155,9 +157,11 @@ class EmployeeImportMappingBrowserTest extends DuskTestCase
                     data: {
                         No: '1',
                         Role: 'pegawai',
+                        NIK: '7171000000000001',
                         NIP: '999999999999999999',
                         'Email Pegawai': 'mapping@example.test',
                         'Kolom Cadangan': 'diabaikan',
+                        'Email-Pegawai': 'email-lama@example.test',
                     },
                 }];
                 component.previewRowCount = 1;
@@ -165,18 +169,19 @@ class EmployeeImportMappingBrowserTest extends DuskTestCase
             JS);
 
             $browser->pause(200)
+                ->waitForText('Kolom SIMPEG sengaja tidak dipakai')
                 ->assertDisabled('#mapping-0-no')
                 ->assertSelected('#mapping-0-no', 'tidak_dipakai')
                 ->assertDisabled('#mapping-1-role')
                 ->assertSelected('#mapping-1-role', 'tidak_dipakai')
-                ->select('#mapping-2-nip', 'tidak_dipakai')
+                ->select('#mapping-3-nip', 'tidak_dipakai')
                 ->waitFor('@mapping-required-warning')
                 ->assertDisabled('@mapping-continue')
-                ->select('#mapping-2-nip', 'NIP')
-                ->select('#mapping-4-kolom-cadangan', 'NIP')
+                ->select('#mapping-3-nip', 'NIP')
+                ->select('#mapping-5-kolom-cadangan', 'NIP')
                 ->waitFor('@mapping-duplicate-warning')
                 ->assertDisabled('@mapping-continue')
-                ->select('#mapping-4-kolom-cadangan', 'tidak_dipakai')
+                ->select('#mapping-5-kolom-cadangan', 'tidak_dipakai')
                 ->waitUntil(<<<'JS'
                     ['mapping-duplicate-warning', 'mapping-required-warning'].every((name) => {
                         const alert = document.querySelector(`[dusk="${name}"]`);
@@ -194,6 +199,21 @@ class EmployeeImportMappingBrowserTest extends DuskTestCase
             $this->assertTrue($alertsRemainHidden);
             $browser->assertEnabled('@mapping-continue');
 
+            $skippedHeaderCategories = $browser->script(<<<'JS'
+                const component = Alpine.$data(document.querySelector('[x-data*="simpegTargetFields"]'));
+
+                return {
+                    unknown: component.unknownSourceHeaders,
+                    intentionallySkipped: component.intentionallySkippedSourceHeaders,
+                    alwaysIgnored: component.knownIgnoredSourceHeaders,
+                };
+            JS)[0];
+
+            $this->assertSame([
+                'unknown' => ['Kolom Cadangan', 'Email-Pegawai'],
+                'intentionallySkipped' => ['NIK'],
+                'alwaysIgnored' => ['No', 'Role'],
+            ], $skippedHeaderCategories);
             $browser->script(<<<'JS'
                 window.__mappingRequests = [];
                 window.fetch = (url, options = {}) => {

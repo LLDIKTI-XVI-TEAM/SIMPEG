@@ -30,11 +30,15 @@ class EmployeeImportMappingUiTest extends TestCase
         $response->assertDontSee('Berisi kolom NIP, NIK, No KK, Golongan, Jabatan, Role, dll.');
         $response->assertSee('Pemetaan Kolom');
         $response->assertSee('Kolom tidak dikenal ditemukan');
+        $response->assertSee('Kolom SIMPEG sengaja tidak dipakai');
         $response->assertSee('Field wajib belum dipetakan');
         $response->assertSee('simpegTargetFields:', false);
         $response->assertSee('await this.persistMapping();', false);
         $response->assertSee('aria-describedby="mapping-readiness-message"', false);
         $response->assertSee('isLockedIgnoredHeader(header)', false);
+        $response->assertSee('isCanonicalSourceHeader(header)', false);
+        $response->assertSee('replace(/\\s+/g, \' \')', false);
+        $response->assertSee('intentionallySkippedSourceHeaders', false);
         $response->assertSee('value="tidak_dipakai"', false);
         $response->assertSee("'Nama Lengkap (Person)': 'Person'", false);
         $response->assertSee('errorSourceHeaders,', false);
