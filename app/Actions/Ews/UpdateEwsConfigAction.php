@@ -119,7 +119,7 @@ class UpdateEwsConfigAction
 
                         // Versi lama dipertahankan nonaktif sebagai jejak kalkulasi BUP sebelumnya.
                         $milestone->update(['is_active' => false]);
-                        $this->tmtCalculator->syncForEmployee($employee, false);
+                        $this->tmtCalculator->syncPensionForEmployee($employee, false);
                     }
                 },
                 'employees.id',

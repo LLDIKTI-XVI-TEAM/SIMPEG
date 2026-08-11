@@ -17,8 +17,10 @@ use App\Services\EwsEngineService;
 use Carbon\Carbon;
 use Database\Seeders\EwsConfigSeeder;
 use Database\Seeders\ReferenceSeeder;
+use Illuminate\Events\Dispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -82,6 +84,46 @@ class EwsGlobalPensionConfigSyncTest extends TestCase
 
         $this->assertSame('2026-09-10', $alert->target_date->toDateString());
         $this->assertSame(90, $alert->interval_days);
+    }
+
+    public function test_global_pension_age_change_does_not_mutate_non_pension_snapshots_or_milestones(): void
+    {
+        EwsConfig::setVal('pensiun_required_age_years', '60');
+
+        $employee = Employee::factory()->create([
+            'tanggal_lahir' => '1965-09-10',
+            'tanggal_pensiun' => null,
+        ]);
+        app(TmtCalculatorService::class)->syncForEmployee($employee);
+
+        $employee->update([
+            'tanggal_kenaikan_pangkat_berikutnya' => '2040-01-02',
+            'tanggal_kgb_berikutnya' => '2041-03-04',
+        ]);
+        $sentinelMilestone = EmployeeMilestone::create([
+            'employee_id' => $employee->id,
+            'type' => EmployeeMilestone::TYPE_KENAIKAN_PANGKAT,
+            'milestone_key' => EmployeeMilestone::KEY_DEFAULT,
+            'milestone_date' => '2040-01-02',
+            'calculated_at' => '2026-08-01',
+            'metadata' => [
+                'source' => 'sentinel_stale_non_pension',
+                'required_years' => 99,
+            ],
+            'is_active' => true,
+        ]);
+
+        app(UpdateEwsConfigAction::class)->execute($this->configRequest(61));
+
+        $employee->refresh();
+        $sentinelMilestone->refresh();
+
+        $this->assertSame('2040-01-02', $employee->tanggal_kenaikan_pangkat_berikutnya?->toDateString());
+        $this->assertSame('2041-03-04', $employee->tanggal_kgb_berikutnya?->toDateString());
+        $this->assertTrue($sentinelMilestone->is_active);
+        $this->assertSame('2040-01-02', $sentinelMilestone->milestone_date->toDateString());
+        $this->assertSame('sentinel_stale_non_pension', $sentinelMilestone->metadata['source']);
+        $this->assertSame(99, $sentinelMilestone->metadata['required_years']);
     }
 
     public function test_global_pension_age_change_preserves_higher_priority_and_authoritative_provenance(): void
@@ -192,29 +234,59 @@ class EwsGlobalPensionConfigSyncTest extends TestCase
         $oldMilestone = $this->activePensionMilestone($employee);
         $auditCount = AuditLog::count();
 
-        $this->app->instance(TmtCalculatorService::class, new class extends TmtCalculatorService
-        {
-            public function syncForEmployee(
-                Employee $employee,
-                ?bool $pensionDateIsAuthoritative = null,
-                bool $recalculateLegacyPension = false,
-            ): void {
-                throw new RuntimeException('Simulasi kegagalan sinkronisasi pensiun global.');
+        $eventName = 'eloquent.created: '.EmployeeMilestone::class;
+        $eventDispatcher = app(Dispatcher::class);
+        $existingListeners = $eventDispatcher->getRawListeners()[$eventName] ?? [];
+        $afterWriteStateObserved = false;
+        $listener = function (EmployeeMilestone $milestone) use ($employee, &$afterWriteStateObserved): void {
+            if (
+                $milestone->type !== EmployeeMilestone::TYPE_PENSIUN
+                || ($milestone->metadata['source'] ?? null) !== 'calculated_from_global_config'
+                || ($milestone->metadata['bup'] ?? null) !== 61
+            ) {
+                return;
             }
-        });
+
+            $afterWriteStateObserved = Employee::findOrFail($employee->id)
+                ->tanggal_pensiun?->toDateString() === '2026-09-10'
+                && EmployeeMilestone::query()
+                    ->whereKey($milestone->id)
+                    ->where('is_active', true)
+                    ->exists();
+
+            throw new RuntimeException('Simulasi kegagalan setelah snapshot dan milestone baru ditulis.');
+        };
+        Event::listen($eventName, $listener);
+
+        $caughtException = null;
 
         try {
             app(UpdateEwsConfigAction::class)->execute($this->configRequest(61));
-            $this->fail('Perubahan konfigurasi harus gagal ketika sinkronisasi milestone gagal.');
         } catch (RuntimeException $exception) {
-            $this->assertSame('Simulasi kegagalan sinkronisasi pensiun global.', $exception->getMessage());
+            $caughtException = $exception;
+        } finally {
+            Event::forget($eventName);
+
+            foreach ($existingListeners as $existingListener) {
+                Event::listen($eventName, $existingListener);
+            }
         }
 
+        $this->assertNotNull($caughtException);
+        $this->assertSame(
+            'Simulasi kegagalan setelah snapshot dan milestone baru ditulis.',
+            $caughtException->getMessage(),
+        );
+        $this->assertTrue($afterWriteStateObserved);
         $this->assertSame('60', EwsConfig::getVal('pensiun_required_age_years'));
         $this->assertSame($auditCount, AuditLog::count());
         $this->assertSame('2025-09-10', $employee->refresh()->tanggal_pensiun?->toDateString());
         $this->assertTrue($oldMilestone->refresh()->is_active);
         $this->assertSame($oldMilestone->id, $this->activePensionMilestone($employee)->id);
+        $this->assertSame(1, EmployeeMilestone::query()
+            ->where('employee_id', $employee->id)
+            ->where('type', EmployeeMilestone::TYPE_PENSIUN)
+            ->count());
     }
 
     private function activePensionMilestone(Employee $employee): EmployeeMilestone
