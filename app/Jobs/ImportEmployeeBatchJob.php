@@ -34,7 +34,7 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue
     private const FAILURE_MESSAGE = 'Proses import pegawai gagal. Silakan coba kembali atau hubungi administrator.';
 
     /** Token ini ikut diserialisasi bersama job agar seluruh redelivery memiliki ownership yang sama. */
-    protected string $processingToken;
+    protected ?string $processingToken = null;
 
     /**
      * Create a new job instance.
@@ -60,7 +60,7 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue
             $user,
             $this->ipAddress,
             $this->userAgent,
-            $this->processingToken,
+            $this->processingToken(),
         );
 
         if (($result['executed'] ?? false) !== true && in_array($result['status'] ?? null, ['queued', 'processing'], true)) {
@@ -84,12 +84,24 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue
     public function failed(\Throwable $exception): void
     {
         $user = $this->userId ? User::find($this->userId) : null;
-        $transitioned = DB::transaction(function () use ($user): bool {
+        $isLegacyPayload = ! isset($this->processingToken);
+        $processingToken = $this->processingToken();
+        $transitioned = DB::transaction(function () use ($user, $isLegacyPayload, $processingToken): bool {
             // CAS ini memastikan callback gagal yang kalah race dari completion tidak memiliki side effect.
             $updated = ImportBatch::query()
                 ->whereKey($this->batchId)
                 ->whereIn('status', ['queued', 'processing'])
-                ->where('processing_token', $this->processingToken)
+                ->where(function ($owner) use ($isLegacyPayload, $processingToken): void {
+                    $owner->where('processing_token', $processingToken);
+
+                    // Payload lama dapat gagal sebelum claim pertama, saat batch queued belum memiliki token.
+                    if ($isLegacyPayload) {
+                        $owner->orWhere(function ($unowned): void {
+                            $unowned->where('status', 'queued')
+                                ->whereNull('processing_token');
+                        });
+                    }
+                })
                 ->update([
                     'status' => 'failed',
                     'processing_token' => null,
@@ -138,6 +150,16 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue
         $batch['status'] = 'failed';
         $batch['error_message'] = self::FAILURE_MESSAGE;
         Cache::put(UploadImportBatchAction::CACHE_PREFIX.$this->batchId, $batch, now()->addMinutes(10));
+    }
+
+    /** Payload lama memakai batch id agar ownership stabil pada setiap fresh unserialize dan redelivery. */
+    private function processingToken(): string
+    {
+        if (! isset($this->processingToken)) {
+            $this->processingToken = $this->batchId;
+        }
+
+        return $this->processingToken;
     }
 
     /** Marker dan record notifikasi completion commit bersama agar redelivery tidak menggandakan notifikasi. */

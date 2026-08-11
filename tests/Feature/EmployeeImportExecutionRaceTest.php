@@ -272,6 +272,81 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $this->assertDatabaseHas('employees', ['nip' => '198101012007041002']);
     }
 
+    /** Payload job versi lama harus memakai ownership stabil ketika di-unserialize ulang setelah retry. */
+    public function test_legacy_serialized_job_resumes_with_stable_fallback_token_after_transient_failure(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $batch = app(UploadImportBatchAction::class)->execute(
+            $this->csvFile($this->twoRowCsv()),
+            'utama',
+            $user,
+        );
+        $batchId = $batch['batch_id'];
+        app(ValidateImportBatchAction::class)->execute($batchId, null, $user);
+        $this->persistQueuedBatch($batchId, $user);
+
+        $temporaryConflict = Employee::factory()->create([
+            'nip' => '199001012015041003',
+            'email_pribadi' => 'siti@example.com',
+        ]);
+        DB::statement(
+            'CREATE UNIQUE INDEX employee_import_legacy_retry_email_unique '
+            .'ON employees (LOWER(email_pribadi)) WHERE email_pribadi IS NOT NULL',
+        );
+
+        $legacyPayload = $this->legacySerializedJobPayload($batchId, $user->id);
+        $this->assertStringNotContainsString('processingToken', $legacyPayload);
+
+        $firstDelivery = unserialize($legacyPayload);
+        $this->assertInstanceOf(ImportEmployeeBatchJob::class, $firstDelivery);
+
+        $caught = null;
+        try {
+            $firstDelivery->handle(app(ExecuteImportBatchAction::class), app(NotificationService::class));
+        } catch (\Throwable $exception) {
+            $caught = $exception;
+        }
+
+        $this->assertInstanceOf(QueryException::class, $caught);
+        $retryable = ImportBatch::query()->findOrFail($batchId);
+        $this->assertSame('queued', $retryable->status);
+        $this->assertSame(1, $retryable->processed_valid_count);
+        $this->assertNotNull($retryable->processing_token);
+
+        $temporaryConflict->forceDelete();
+        Cache::flush();
+
+        $redelivery = unserialize($legacyPayload);
+        $this->assertInstanceOf(ImportEmployeeBatchJob::class, $redelivery);
+        $redelivery->handle(app(ExecuteImportBatchAction::class), app(NotificationService::class));
+
+        $completed = ImportBatch::query()->findOrFail($batchId);
+        $this->assertSame('completed', $completed->status);
+        $this->assertSame(2, $completed->inserted_count);
+        $this->assertSame(2, $completed->processed_valid_count);
+    }
+
+    /** Callback gagal payload lama boleh menutup batch queued yang belum memiliki token. */
+    public function test_legacy_serialized_job_failed_callback_claims_unowned_queued_batch(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $batchId = $this->validatedBatchId($user);
+        $this->persistQueuedBatch($batchId, $user);
+
+        $legacyPayload = $this->legacySerializedJobPayload($batchId, $user->id);
+        $legacyJob = unserialize($legacyPayload);
+        $this->assertInstanceOf(ImportEmployeeBatchJob::class, $legacyJob);
+
+        $legacyJob->failed(new \RuntimeException('worker legacy gagal'));
+
+        $failed = ImportBatch::query()->findOrFail($batchId);
+        $this->assertSame('failed', $failed->status);
+        $this->assertSame(
+            'Proses import pegawai gagal. Silakan coba kembali atau hubungi administrator.',
+            $failed->error_message,
+        );
+    }
+
     /** Delivery dengan token lain tidak boleh ACK batch yang masih dimiliki attempt aktif. */
     public function test_foreign_job_token_does_not_ack_active_processing_batch(): void
     {
@@ -675,6 +750,21 @@ class EmployeeImportExecutionRaceTest extends TestCase
                 'validation' => $batch['validation'],
             ],
         ]);
+    }
+
+    private function legacySerializedJobPayload(string $batchId, string $userId): string
+    {
+        $job = new ImportEmployeeBatchJob($batchId, $userId);
+        $unsetProcessingToken = \Closure::bind(
+            static function (ImportEmployeeBatchJob $legacyJob): void {
+                unset($legacyJob->processingToken);
+            },
+            null,
+            ImportEmployeeBatchJob::class,
+        );
+        $unsetProcessingToken($job);
+
+        return serialize($job);
     }
 
     private function postJsonWithCsrf(string $uri, array $data)
