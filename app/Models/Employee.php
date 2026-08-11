@@ -24,6 +24,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $jenis_pegawai_id
  * @property string|null $status_aktif
  * @property string|null $status_pegawai_id
+ * @property Carbon|null $status_tanggal
  * @property string|null $kepala_bagian_id
  * @property string|null $kelas_jabatan
  * @property string|null $kelas_jabatan_terakhir
