@@ -18,6 +18,38 @@ if (-not (Get-Command podman -ErrorAction SilentlyContinue)) {
     }
 }
 
+# Pastikan Podman machine berjalan
+$null = podman ps 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[INFO] Menyalakan Podman machine..." -ForegroundColor Yellow
+    podman machine start
+}
+
+# Tambahkan path ke Python Scripts jika podman-compose ada di sana
+$pythonDirs = Get-ChildItem "$env:USERPROFILE\AppData\Roaming\Python" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
+if ($pythonDirs) {
+    foreach ($dir in $pythonDirs) {
+        $scriptsPath = Join-Path $dir "Scripts"
+        if ((Test-Path $scriptsPath) -and (-not ($env:Path -split ';' -contains $scriptsPath))) {
+            $env:Path = "$scriptsPath;$env:Path"
+        }
+    }
+}
+
+function Invoke-PodmanCompose {
+    param(
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]]$ScriptArgs
+    )
+    if (Get-Command podman-compose -ErrorAction SilentlyContinue) {
+        & podman-compose @ScriptArgs
+    } elseif (Get-Command python -ErrorAction SilentlyContinue) {
+        & python -m podman_compose @ScriptArgs
+    } else {
+        & podman compose @ScriptArgs
+    }
+}
+
 Write-Host "`n=== SIMPEG - Podman Compose ===" -ForegroundColor Cyan
 Write-Host "Podman version: $(podman --version)" -ForegroundColor DarkGray
 
@@ -32,35 +64,38 @@ switch ($action) {
         }
 
         Write-Host "`n[1/3] Building containers..." -ForegroundColor Cyan
-        podman compose build
+        podman build -t simpeg-app:latest -f docker/php/Dockerfile .
+        if ($LASTEXITCODE -ne 0) {
+            throw "Build container simpeg-app gagal."
+        }
 
         Write-Host "`n[2/3] Starting containers..." -ForegroundColor Cyan
-        podman compose up -d
+        Invoke-PodmanCompose up -d --no-build
 
         Write-Host "`n[3/3] Installing dependencies & setup Laravel..." -ForegroundColor Cyan
-        podman compose exec app composer install --no-interaction
+        Invoke-PodmanCompose exec app composer install --no-interaction
         if ($LASTEXITCODE -ne 0) {
             throw "composer install gagal. Setup Laravel dihentikan."
         }
 
-        podman compose exec app php artisan key:generate --force
+        Invoke-PodmanCompose exec app php artisan key:generate --force
         if ($LASTEXITCODE -ne 0) {
             throw "key:generate gagal. Setup Laravel dihentikan."
         }
 
-        podman compose exec app php artisan migrate --force
+        Invoke-PodmanCompose exec app php artisan migrate --force
         if ($LASTEXITCODE -ne 0) {
             throw "migrate gagal. Setup Laravel dihentikan."
         }
 
         # --force membuat symlink yang valid dapat dibuat ulang dengan aman.
         # Hentikan setup jika pembuatan atau validasi link storage gagal.
-        podman compose exec app php artisan storage:link --force
+        Invoke-PodmanCompose exec app php artisan storage:link --force
         if ($LASTEXITCODE -ne 0) {
             throw "storage:link gagal. Setup Laravel dihentikan."
         }
 
-        podman compose exec app sh -lc "test -L public/storage -a -e public/storage"
+        Invoke-PodmanCompose exec app sh -lc "test -L public/storage -a -e public/storage"
         if ($LASTEXITCODE -ne 0) {
             throw "Link public/storage tidak valid atau target storage tidak tersedia. Setup Laravel dihentikan."
         }
@@ -69,27 +104,27 @@ switch ($action) {
         Write-Host "  SIMPEG berjalan di: http://localhost:8000" -ForegroundColor Green
         Write-Host "============================================" -ForegroundColor Green
         Write-Host "`nContainers:" -ForegroundColor Cyan
-        podman compose ps
+        Invoke-PodmanCompose ps
     }
     "down" {
         Write-Host "Stopping containers..." -ForegroundColor Yellow
-        podman compose down
+        Invoke-PodmanCompose down
         Write-Host "[OK] Containers stopped." -ForegroundColor Green
     }
     "restart" {
         Write-Host "Restarting containers..." -ForegroundColor Yellow
-        podman compose restart
-        podman compose ps
+        Invoke-PodmanCompose restart
+        Invoke-PodmanCompose ps
     }
     "logs" {
-        podman compose logs -f
+        Invoke-PodmanCompose logs -f
     }
     "shell" {
-        podman compose exec app bash
+        Invoke-PodmanCompose exec app bash
     }
     "artisan" {
         $artisanArgs = $args[1..($args.Count - 1)] -join " "
-        podman compose exec app php artisan $artisanArgs
+        Invoke-PodmanCompose exec app php artisan $artisanArgs
     }
     default {
         Write-Host "Usage: .\podman-up.ps1 [command]" -ForegroundColor Yellow

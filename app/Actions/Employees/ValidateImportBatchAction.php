@@ -6,11 +6,13 @@ use App\Models\Employee;
 use App\Models\RefJenisPegawai;
 use App\Models\User;
 use App\Support\EmployeeImport\EmployeeRowMapper;
+use App\Support\EmployeeImport\ImportColumnMapping;
 use App\Support\EmployeeValidationRules;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
 class ValidateImportBatchAction
@@ -33,10 +35,29 @@ class ValidateImportBatchAction
         }
 
         if ($updatedRows !== null) {
-            $batch['rows'] = $updatedRows;
-            $batch['total_rows'] = count($updatedRows);
+            $batch['rows'] = $this->mergeEditedRows($batch['rows'], $updatedRows);
+            $batch['total_rows'] = count($batch['rows']);
             Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $batch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
         }
+
+        // Pemetaan aktif batch adalah sumber kebenaran tafsir kolom. Field wajib yang belum
+        // dipetakan menolak seluruh validasi lebih dulu dengan pesan yang menyebut field-nya,
+        // agar admin memperbaiki pemetaan sebelum menilai baris.
+        $mapping = $batch['mapping'] ?? ImportColumnMapping::autoMap($batch['headers']);
+        $missingRequired = ImportColumnMapping::missingRequired($mapping);
+
+        if ($missingRequired !== []) {
+            throw ValidationException::withMessages([
+                'mapping' => array_map(
+                    fn (string $target): string => "Field wajib {$target} belum dipetakan ke kolom mana pun.",
+                    $missingRequired,
+                ),
+            ]);
+        }
+
+        // Setelah admin menyimpan mapping manual, heuristik kolom bergeser dimatikan
+        // agar pilihan admin tidak ditimpa tebakan positional.
+        $allowShiftDetection = ($batch['mapping_source'] ?? 'auto') !== 'manual';
 
         $type = $batch['type'] ?? 'utama';
         $results = [];
@@ -47,7 +68,7 @@ class ValidateImportBatchAction
         $seenEmails = [];
 
         foreach ($batch['rows'] as $row) {
-            $rowResult = $this->validateTemplateRow($type, $row, $seenNips, $seenEmails);
+            $rowResult = $this->validateTemplateRow($type, $row, $seenNips, $seenEmails, $mapping, $allowShiftDetection);
             $results[] = $rowResult;
 
             match ($rowResult['status']) {
@@ -77,16 +98,54 @@ class ValidateImportBatchAction
         ];
     }
 
-    private function validateTemplateRow(string $type, array $row, array &$seenNips, array &$seenEmails): array
+    /**
+     * Gabungkan baris yang diedit admin ke state batch berdasarkan nomor baris.
+     *
+     * Preview hanya memuat 10 baris pertama, sehingga payload berisi subset baris hasil
+     * edit, bukan seluruh baris. Nomor baris yang tidak dikenal ditolak agar client tidak
+     * bisa menyuntikkan baris baru di luar isi file.
+     *
+     * @param  list<array{row:int, data:array<string, mixed>}>  $batchRows
+     * @param  list<array{row:int, data:array<string, mixed>}>  $editedRows
+     * @return list<array{row:int, data:array<string, mixed>}>
+     */
+    private function mergeEditedRows(array $batchRows, array $editedRows): array
     {
-        return $this->validateRow($row, $seenNips, $seenEmails);
+        $indexByRowNumber = [];
+        foreach ($batchRows as $index => $row) {
+            $indexByRowNumber[$row['row']] = $index;
+        }
+
+        foreach ($editedRows as $edited) {
+            $rowNumber = (int) $edited['row'];
+
+            if (! isset($indexByRowNumber[$rowNumber])) {
+                throw ValidationException::withMessages([
+                    'rows' => ["Baris {$rowNumber} tidak ditemukan pada batch import ini."],
+                ]);
+            }
+
+            $batchRows[$indexByRowNumber[$rowNumber]]['data'] = $edited['data'];
+        }
+
+        return $batchRows;
     }
 
-    private function validateRow(array $row, array &$seenNips, array &$seenEmails): array
+    private function validateTemplateRow(string $type, array $row, array &$seenNips, array &$seenEmails, array $mapping, bool $allowShiftDetection): array
     {
-        $data = $row['data'];
-        $nama = $data['Nama Pegawai'] ?? ($data['nama_dengan_gelar'] ?? '-');
-        $mappedData = app(EmployeeRowMapper::class)->map($data);
+        return $this->validateRow($row, $seenNips, $seenEmails, $mapping, $allowShiftDetection);
+    }
+
+    private function validateRow(array $row, array &$seenNips, array &$seenEmails, array $mapping, bool $allowShiftDetection): array
+    {
+        // Key baris sumber dinormalkan ke header kanonis memakai mapping aktif batch;
+        // kolom bertanda tidak dipakai dibuang sebelum mapper membaca nilai apa pun.
+        $sourceData = $allowShiftDetection
+            ? app(EmployeeRowMapper::class)->alignShiftedOptionalIdentityColumns($row['data'])
+            : $row['data'];
+        $data = ImportColumnMapping::apply($sourceData, $mapping);
+        $nama = $data['Nama Pegawai'] ?? '-';
+        $mappedData = app(EmployeeRowMapper::class)->map($data, allowShiftDetection: false);
         $validator = Validator::make($mappedData, EmployeeValidationRules::import(), [], EmployeeValidationRules::attributes());
 
         if ($validator->fails()) {
@@ -107,7 +166,6 @@ class ValidateImportBatchAction
                 'prodi_pendidikan_terakhir' => 'Prodi Pendidikan Terakhir',
                 'jenis_pegawai' => 'Status Kepegawaian',
                 'tanggal_lahir' => 'Tanggal Lahir',
-                'role' => 'Role',
             ]));
         }
 

@@ -82,8 +82,11 @@ class LeaveBalanceService
      *     bucket:array{n2:int,n1:int,current:int}
      * }
      */
-    public function previewFor(Employee|string $employee, Carbon $asOf): array
-    {
+    public function previewFor(
+        Employee|string $employee,
+        Carbon $asOf,
+        ?LeaveRequest $excludingLeaveRequest = null,
+    ): array {
         $employeeModel = $this->resolveEmployee($employee);
         $tahun = $asOf->year;
         $balance = LeaveBalance::query()
@@ -91,6 +94,15 @@ class LeaveBalanceService
             ->where('tahun', $tahun)
             ->first();
         $rule5Active = $this->hasApprovedCutiBesar($employeeModel->id, $tahun);
+
+        $usedN1 = (int) (LeaveBalance::query()
+            ->where('employee_id', $employeeModel->id)
+            ->where('tahun', $tahun - 1)
+            ->value('terpakai') ?? 0);
+        $usedN2 = (int) (LeaveBalance::query()
+            ->where('employee_id', $employeeModel->id)
+            ->where('tahun', $tahun - 2)
+            ->value('terpakai') ?? 0);
 
         if ($rule5Active) {
             // Cuti Besar final menonaktifkan hak efektif tanpa mengubah summary atau ledger,
@@ -102,6 +114,8 @@ class LeaveBalanceService
                 'jatah_dasar' => 0,
                 'carry_over' => 0,
                 'terpakai_final' => (int) ($balance?->terpakai ?? 0),
+                'used_n1' => $usedN1,
+                'used_n2' => $usedN2,
                 'koreksi_administratif' => (int) LeaveBalanceLedger::query()
                     ->where('employee_id', $employeeModel->id)
                     ->where('tahun', $tahun)
@@ -123,11 +137,19 @@ class LeaveBalanceService
                 : ['n2' => 0, 'n1' => 0, 'current' => 0])
             : $this->bucketsFromBalance($balance);
         $saldoAktual = $this->calculator->availableTotal($buckets);
-        $dialokasikanAktif = max(0, (int) LeaveBalanceReservationEvent::query()
+        $activeReservations = LeaveBalanceReservationEvent::query()
             ->forActiveRequests()
             ->where('employee_id', $employeeModel->id)
-            ->where('tahun', $tahun)
-            ->sum('amount'));
+            ->where('tahun', $tahun);
+
+        // Panel verifikator menilai kelayakan pengajuan yang sudah mereservasi saldo.
+        // Reservasi pengajuan itu sendiri dikecualikan agar tidak mengurangi haknya dua kali,
+        // sedangkan reservasi pengajuan aktif lain tetap mengurangi saldo yang tersedia.
+        if ($excludingLeaveRequest !== null && $excludingLeaveRequest->employee_id === $employeeModel->id) {
+            $activeReservations->where('leave_request_id', '!=', $excludingLeaveRequest->id);
+        }
+
+        $dialokasikanAktif = max(0, (int) $activeReservations->sum('amount'));
         $dilindungiPenangguhanDinas = $this->calculator->availableTotal(
             $this->protectedAllocations($employeeModel->id, $tahun),
         );
@@ -141,6 +163,8 @@ class LeaveBalanceService
                 : (int) $balance->jatah_awal,
             'carry_over' => $buckets['n2'] + $buckets['n1'],
             'terpakai_final' => (int) ($balance?->terpakai ?? 0),
+            'used_n1' => $usedN1,
+            'used_n2' => $usedN2,
             'koreksi_administratif' => (int) LeaveBalanceLedger::query()
                 ->where('employee_id', $employeeModel->id)
                 ->where('tahun', $tahun)
