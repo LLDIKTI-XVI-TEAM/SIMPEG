@@ -12,10 +12,14 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class ExecuteImportBatchAction
 {
+    /** Lease berakhir sebelum pesan boleh dikirim ulang oleh semua backend queue yang didukung. */
+    private const LEASE_SECONDS = 150;
+
     public function __construct(private readonly TmtCalculatorService $tmtCalculator) {}
 
     /**
@@ -26,39 +30,54 @@ class ExecuteImportBatchAction
      */
     public function execute(string $batchId, ?User $user, ?string $ipAddress = null, ?string $userAgent = null): array
     {
-        $batch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
+        $executionBatch = ImportBatch::query()->find($batchId);
 
-        if ($batch === null) {
-            abort(404, 'Batch import tidak ditemukan atau sudah kedaluwarsa. Silakan upload ulang.');
-        }
-
-        if ($batch['user_id'] !== null && ($user === null || $batch['user_id'] !== $user->id)) {
-            abort(403, 'Anda tidak memiliki akses ke batch import ini.');
-        }
-
-        if ($batch['validation'] === null) {
+        if ($executionBatch === null) {
             throw ValidationException::withMessages([
-                'message' => ['Data belum divalidasi. Jalankan validasi terlebih dahulu.'],
+                'message' => ['Batch import belum diklaim untuk antrean.'],
             ]);
         }
 
-        $type = $batch['type'] ?? 'utama';
+        if ($executionBatch->user_id !== null && ($user === null || $executionBatch->user_id !== $user->id)) {
+            abort(403, 'Anda tidak memiliki akses ke batch import ini.');
+        }
+
+        if ($executionBatch->status === 'completed') {
+            return $this->existingExecutionResult($batchId);
+        }
+
+        $executionPayload = $executionBatch->execution_payload;
+        if (! is_array($executionPayload) || ! is_array($executionPayload['validation'] ?? null)) {
+            throw ValidationException::withMessages([
+                'message' => ['Payload eksekusi batch import tidak tersedia.'],
+            ]);
+        }
+
+        $validation = $executionPayload['validation'];
+        $type = (string) ($executionPayload['type'] ?? $executionBatch->type ?? 'utama');
         $validRows = array_values(array_filter(
-            $batch['validation']['results'],
-            fn (array $result) => $result['status'] === 'valid' && isset($result['validated_data']),
+            $validation['results'] ?? [],
+            fn (array $result): bool => ($result['status'] ?? null) === 'valid' && isset($result['validated_data']),
         ));
         $totalRows = count($validRows);
-        $validationSkippedCount = (int) ($batch['validation']['skip_count'] ?? 0);
-        $validationFailedCount = (int) ($batch['validation']['error_count'] ?? 0);
-        $validationRowIssues = $this->collectRowIssues($batch['validation']['results']);
+        $attemptToken = (string) Str::uuid();
 
-        // Hanya satu worker boleh memindahkan batch queued ke processing.
+        // Token attempt dan lease membuat worker baru dapat memulihkan hard crash tanpa mengambil alih worker aktif.
         $claimed = ImportBatch::query()
             ->whereKey($batchId)
-            ->where('status', 'queued')
+            ->where(function ($query): void {
+                $query->where('status', 'queued')
+                    ->orWhere(function ($expired): void {
+                        $expired->where('status', 'processing')
+                            ->whereNotNull('lease_expires_at')
+                            ->where('lease_expires_at', '<=', now());
+                    });
+            })
             ->update([
                 'status' => 'processing',
-                'valid_count' => $batch['validation']['valid_count'] ?? $totalRows,
+                'processing_token' => $attemptToken,
+                'lease_expires_at' => now()->addSeconds(self::LEASE_SECONDS),
+                'valid_count' => $validation['valid_count'] ?? $totalRows,
                 'error_message' => null,
                 'finished_at' => null,
             ]);
@@ -67,50 +86,26 @@ class ExecuteImportBatchAction
             return $this->existingExecutionResult($batchId);
         }
 
-        $executionBatch = ImportBatch::query()->findOrFail($batchId);
-        if ($executionBatch->started_at === null || $executionBatch->row_issues === null) {
-            $executionBatch->started_at ??= now();
-            $executionBatch->row_issues ??= $validationRowIssues;
+        $executionBatch->refresh();
+        if ($executionBatch->started_at === null) {
+            $executionBatch->started_at = now();
             $executionBatch->save();
         }
 
         $insertedCount = (int) $executionBatch->inserted_count;
-        $skippedCount = max($validationSkippedCount, (int) $executionBatch->skipped_count);
-        $failedCount = max($validationFailedCount, (int) $executionBatch->failed_count);
-        $rowIssues = $executionBatch->row_issues ?? $validationRowIssues;
-        $processedCount = $insertedCount + max(0, $skippedCount - $validationSkippedCount);
-
-        $batch['status'] = 'processing';
-        $batch['progress'] = $totalRows === 0 ? 100 : (int) (($processedCount / $totalRows) * 100);
-        $batch['processed_count'] = $processedCount;
-        Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $batch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
+        $skippedCount = (int) $executionBatch->skipped_count;
+        $failedCount = (int) $executionBatch->failed_count;
+        $processedCount = (int) $executionBatch->processed_valid_count;
+        $this->projectCache($executionBatch, $validation);
 
         try {
-            if ($validRows !== []) {
-                foreach (array_slice($validRows, $processedCount) as $result) {
-                    $checkpoint = $this->executeAndCheckpointRow(
-                        $batchId,
-                        $type,
-                        $result,
-                        $processedCount,
-                        $insertedCount,
-                        $skippedCount,
-                        $failedCount,
-                        $rowIssues,
-                    );
-                    $processedCount = $checkpoint['processed'];
-                    $insertedCount = $checkpoint['inserted'];
-                    $skippedCount = $checkpoint['skipped'];
-                    $rowIssues = $checkpoint['row_issues'];
-
-                    // Update progress in cache (di luar transaction agar terlihat real-time)
-                    $currentBatch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
-                    if ($currentBatch) {
-                        $currentBatch['processed_count'] = $processedCount;
-                        $currentBatch['progress'] = (int) (($processedCount / $totalRows) * 100);
-                        Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $currentBatch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
-                    }
-                }
+            foreach (array_slice($validRows, $processedCount) as $result) {
+                $checkpoint = $this->executeAndCheckpointRow($batchId, $attemptToken, $type, $result);
+                $processedCount = $checkpoint['processed'];
+                $insertedCount = $checkpoint['inserted'];
+                $skippedCount = $checkpoint['skipped'];
+                $failedCount = $checkpoint['failed'];
+                $this->projectCache(ImportBatch::query()->findOrFail($batchId), $validation);
             }
 
             $finalCounts = [
@@ -126,11 +121,15 @@ class ExecuteImportBatchAction
                 $type,
                 $finalCounts,
                 $processedCount,
-                $batch,
+                $attemptToken,
                 $ipAddress,
                 $userAgent,
-                $rowIssues,
             ): void {
+                $batch = ImportBatch::query()->lockForUpdate()->findOrFail($batchId);
+                if ($batch->status !== 'processing' || $batch->processing_token !== $attemptToken) {
+                    throw new \RuntimeException('Attempt import kehilangan kepemilikan sebelum penyelesaian.');
+                }
+
                 AuditService::logAsOrFail(
                     $user?->id ?? 'system',
                     $user?->name ?? 'System Queue',
@@ -145,63 +144,42 @@ class ExecuteImportBatchAction
                         'total_processed' => $processedCount,
                         'total_skipped' => $finalCounts['skipped'],
                         'total_failed' => $finalCounts['failed'],
-                        'filename' => $batch['filename'],
+                        'filename' => $batch->filename,
                     ],
                     null,
                     $ipAddress,
                     $userAgent
                 );
 
-                $completed = ImportBatch::query()
-                    ->whereKey($batchId)
-                    ->where('status', 'processing')
-                    ->update([
-                        'status' => 'completed',
-                        'inserted_count' => $finalCounts['inserted'],
-                        'skipped_count' => $finalCounts['skipped'],
-                        'failed_count' => $finalCounts['failed'],
-                        'row_issues' => $rowIssues,
-                        'finished_at' => now(),
-                    ]);
-
-                if ($completed !== 1) {
-                    throw new \RuntimeException('Status batch import berubah sebelum penyelesaian dapat dicatat.');
-                }
+                $batch->forceFill([
+                    'status' => 'completed',
+                    'processing_token' => null,
+                    'lease_expires_at' => null,
+                    'execution_payload' => null,
+                    'finished_at' => now(),
+                    'error_message' => null,
+                ])->save();
             });
 
-            $this->cleanupBatch($batchId, $batch['filename']);
-
-            // Set final completed status
-            $finalBatch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
-            if ($finalBatch) {
-                $finalBatch['status'] = 'completed';
-                $finalBatch['progress'] = 100;
-                $finalBatch['processed_count'] = $processedCount;
-                $finalBatch['result'] = $finalCounts;
-                $finalBatch['row_issues'] = $rowIssues;
-                // Keep completed state for 10 minutes so user has time to view the result screen
-                Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $finalBatch, now()->addMinutes(10));
-            }
+            $this->recoverCompletedSideEffects(ImportBatch::query()->findOrFail($batchId));
 
         } catch (\Throwable $exception) {
-            // Exception masih dapat dicoba ulang oleh queue; hanya callback failed() yang terminal.
+            // Hanya pemilik token attempt yang boleh melepas claim; worker lama tidak boleh menimpa attempt baru.
             ImportBatch::query()
                 ->whereKey($batchId)
                 ->where('status', 'processing')
+                ->where('processing_token', $attemptToken)
                 ->update([
                     'status' => 'queued',
+                    'processing_token' => null,
+                    'lease_expires_at' => null,
                     'error_message' => $exception->getMessage(),
                     'finished_at' => null,
                 ]);
 
-            $failedBatch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
-            if ($failedBatch) {
-                $checkpoint = ImportBatch::query()->find($batchId);
-                $failedBatch['status'] = 'queued';
-                $failedBatch['processed_count'] = $checkpoint?->inserted_count
-                    + max(0, ($checkpoint?->skipped_count ?? 0) - $validationSkippedCount);
-                $failedBatch['error_message'] = $exception->getMessage();
-                Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $failedBatch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
+            $retryableBatch = ImportBatch::query()->find($batchId);
+            if ($retryableBatch !== null && $retryableBatch->status === 'queued') {
+                $this->projectCache($retryableBatch, $validation);
             }
             throw $exception;
         }
@@ -224,31 +202,30 @@ class ExecuteImportBatchAction
      * Menyatukan mutasi pegawai dan checkpoint batch agar retry selalu mulai setelah baris yang sudah commit.
      *
      * @param  array<string, mixed>  $row
-     * @param  array<int, array<string, mixed>>  $rowIssues
-     * @return array{processed: int, inserted: int, skipped: int, row_issues: array<int, array<string, mixed>>}
+     * @return array{processed: int, inserted: int, skipped: int, failed: int}
      */
     private function executeAndCheckpointRow(
         string $batchId,
+        string $attemptToken,
         string $type,
         array $row,
-        int $processedCount,
-        int $insertedCount,
-        int $skippedCount,
-        int $failedCount,
-        array $rowIssues,
     ): array {
         return DB::transaction(function () use (
             $batchId,
+            $attemptToken,
             $type,
             $row,
-            $processedCount,
-            $insertedCount,
-            $skippedCount,
-            $failedCount,
-            $rowIssues,
         ): array {
+            $batch = ImportBatch::query()->lockForUpdate()->findOrFail($batchId);
+            if ($batch->status !== 'processing' || $batch->processing_token !== $attemptToken) {
+                throw new \RuntimeException('Attempt import tidak lagi memiliki batch ini.');
+            }
+
             $outcome = $this->executeValidatedRow($type, $row);
-            $processedCount++;
+            $processedCount = (int) $batch->processed_valid_count + 1;
+            $insertedCount = (int) $batch->inserted_count;
+            $skippedCount = (int) $batch->skipped_count;
+            $rowIssues = $batch->row_issues ?? [];
 
             if ($outcome['status'] === 'inserted') {
                 $insertedCount++;
@@ -259,25 +236,19 @@ class ExecuteImportBatchAction
                 }
             }
 
-            $checkpointed = ImportBatch::query()
-                ->whereKey($batchId)
-                ->where('status', 'processing')
-                ->update([
-                    'inserted_count' => $insertedCount,
-                    'skipped_count' => $skippedCount,
-                    'failed_count' => $failedCount,
-                    'row_issues' => $rowIssues,
-                ]);
-
-            if ($checkpointed !== 1) {
-                throw new \RuntimeException('Checkpoint batch import gagal disimpan.');
-            }
+            $batch->forceFill([
+                'processed_valid_count' => $processedCount,
+                'inserted_count' => $insertedCount,
+                'skipped_count' => $skippedCount,
+                'row_issues' => $rowIssues,
+                'lease_expires_at' => now()->addSeconds(self::LEASE_SECONDS),
+            ])->save();
 
             return [
                 'processed' => $processedCount,
                 'inserted' => $insertedCount,
                 'skipped' => $skippedCount,
-                'row_issues' => $rowIssues,
+                'failed' => (int) $batch->failed_count,
             ];
         });
     }
@@ -293,18 +264,58 @@ class ExecuteImportBatchAction
             ]);
         }
 
+        if ($batch->status === 'completed') {
+            $this->recoverCompletedSideEffects($batch);
+        }
+
         return [
             'executed' => false,
             'status' => $batch->status,
             'message' => 'Batch import sudah diproses atau sedang diproses oleh worker lain.',
             'inserted' => $batch->inserted_count,
             'inserted_count' => $batch->inserted_count,
-            'processed' => $batch->inserted_count + $batch->skipped_count,
+            'processed' => $batch->processed_valid_count,
             'skipped' => $batch->skipped_count,
             'skipped_count' => $batch->skipped_count,
             'failed' => $batch->failed_count,
             'failed_count' => $batch->failed_count,
         ];
+    }
+
+    /** Cache hanya proyeksi status; seluruh nilai pemulihan tetap berasal dari database. */
+    private function projectCache(ImportBatch $batch, ?array $validation = null): void
+    {
+        $cacheKey = UploadImportBatchAction::CACHE_PREFIX.$batch->id;
+        $cached = Cache::get($cacheKey) ?? [
+            'filename' => $batch->filename,
+            'user_id' => $batch->user_id,
+            'type' => $batch->type,
+            'total_rows' => $batch->total_rows,
+            'validation' => $validation,
+        ];
+        $cached['status'] = $batch->status;
+        $cached['processed_count'] = $batch->processed_valid_count;
+        $cached['progress'] = $batch->status === 'completed'
+            ? 100
+            : ($batch->valid_count === 0 ? 100 : (int) (($batch->processed_valid_count / $batch->valid_count) * 100));
+        $cached['row_issues'] = $batch->row_issues ?? [];
+
+        if ($batch->status === 'completed') {
+            $cached['result'] = [
+                'inserted' => $batch->inserted_count,
+                'skipped' => $batch->skipped_count,
+                'failed' => $batch->failed_count,
+            ];
+        }
+
+        Cache::put($cacheKey, $cached, now()->addMinutes($batch->status === 'completed' ? 10 : UploadImportBatchAction::CACHE_TTL_MINUTES));
+    }
+
+    /** Memulihkan cleanup file dan cache jika worker crash setelah commit status completed. */
+    private function recoverCompletedSideEffects(ImportBatch $batch): void
+    {
+        $this->cleanupBatch($batch->id, $batch->filename);
+        $this->projectCache($batch);
     }
 
     /**
@@ -394,32 +405,6 @@ class ExecuteImportBatchAction
 
         return $sqlState === '23000'
             && preg_match('/unique constraint failed:\s*employees\.nip\b/i', $driverDiagnostic) === 1;
-    }
-
-    /**
-     * Kumpulkan baris bermasalah dari hasil validasi untuk laporan permanen:
-     * baris gagal validasi dan baris yang dilewati (NIP sudah terdaftar).
-     *
-     * @param  array<int, array<string, mixed>>  $results
-     * @return array<int, array<string, mixed>>
-     */
-    private function collectRowIssues(array $results): array
-    {
-        $issues = [];
-        foreach ($results as $result) {
-            if (! in_array($result['status'], ['error', 'skip'], true)) {
-                continue;
-            }
-
-            $issues[] = [
-                'row' => $result['row'] ?? null,
-                'nama' => $result['nama'] ?? '-',
-                'kategori' => $result['status'] === 'skip' ? 'dilewati' : 'gagal',
-                'errors' => $result['errors'] ?? [],
-            ];
-        }
-
-        return $issues;
     }
 
     private function cleanupBatch(string $batchId, string $filename): void

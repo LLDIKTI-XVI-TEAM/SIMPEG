@@ -10,16 +10,22 @@ use App\Jobs\ImportEmployeeBatchJob;
 use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\ImportBatch;
+use App\Models\SimpegNotification;
 use App\Models\User;
+use App\Services\NotificationService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Queue\WorkerOptions;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class EmployeeImportExecutionRaceTest extends TestCase
@@ -181,6 +187,7 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $this->assertSame([], $retryableBatch->row_issues);
 
         $temporaryConflict->forceDelete();
+        Cache::flush();
 
         app('queue.worker')->runNextJob('database', 'default', new WorkerOptions(maxTries: 3));
 
@@ -193,6 +200,76 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $this->assertSame(1, Employee::query()->where('nip', '198101012007041002')->count());
         $this->assertSame(1, AuditLog::query()->where('event', 'IMPORT')->count());
         $this->assertDatabaseCount('jobs', 0);
+    }
+
+    /** Worker baru harus dapat mengambil alih batch jika worker lama melewati batas lease. */
+    public function test_expired_processing_lease_is_reclaimed_by_a_new_attempt(): void
+    {
+        $this->assertTrue(
+            Schema::hasColumn('import_batches', 'lease_expires_at'),
+            'Batch import belum memiliki lease durable untuk pemulihan setelah hard crash.',
+        );
+        $this->assertTrue(
+            Schema::hasColumn('import_batches', 'processing_token'),
+            'Batch import belum memiliki token attempt untuk compare-and-swap.',
+        );
+
+        $user = User::factory()->adminKepegawaian()->create();
+        $batchId = $this->validatedBatchId($user);
+        $this->persistQueuedBatch($batchId, $user);
+        ImportBatch::query()->whereKey($batchId)->update([
+            'status' => 'processing',
+            'processing_token' => (string) Str::uuid(),
+            'lease_expires_at' => now()->subSecond(),
+        ]);
+
+        $result = app(ExecuteImportBatchAction::class)->execute($batchId, $user);
+
+        $this->assertTrue($result['executed']);
+        $this->assertSame('completed', $result['status']);
+        $this->assertDatabaseHas('employees', ['nip' => '198001012006041001']);
+        $this->assertSame('completed', ImportBatch::query()->findOrFail($batchId)->status);
+    }
+
+    /** Payload sensitif tetap dapat dibaca model, tetapi tidak tampak sebagai plaintext di database. */
+    public function test_queued_execution_payload_is_encrypted_at_rest(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $batchId = $this->validatedBatchId($user);
+        Queue::fake();
+
+        app(QueueImportBatchAction::class)->execute($batchId, $user);
+
+        $rawPayload = DB::table('import_batches')->where('id', $batchId)->value('execution_payload');
+        $this->assertIsString($rawPayload);
+        $this->assertStringNotContainsString('budi@example.com', $rawPayload);
+        $this->assertSame(
+            'budi@example.com',
+            ImportBatch::query()->findOrFail($batchId)->execution_payload['validation']['results'][0]['validated_data']['email_pribadi'],
+        );
+    }
+
+    /** Redelivery completed memulihkan file/cache dan hanya membuat satu notifikasi. */
+    public function test_completed_redelivery_recovers_cleanup_cache_and_notifies_once(): void
+    {
+        $user = $this->notifiableAdmin();
+        $batchId = $this->validatedBatchId($user);
+        $this->persistQueuedBatch($batchId, $user);
+        app(ExecuteImportBatchAction::class)->execute($batchId, $user);
+
+        $storedPath = UploadImportBatchAction::STORAGE_DIR.'/'.$batchId.'_employees.csv';
+        Storage::disk('local')->put($storedPath, 'sisa file setelah crash');
+        Cache::flush();
+
+        $job = new ImportEmployeeBatchJob($batchId, $user->id);
+        $job->handle(app(ExecuteImportBatchAction::class), app(NotificationService::class));
+        $job->handle(app(ExecuteImportBatchAction::class), app(NotificationService::class));
+
+        $this->assertFalse(Storage::disk('local')->exists($storedPath));
+        $this->assertSame('completed', Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId)['status']);
+        $this->assertSame(1, Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId)['result']['inserted']);
+        $this->assertNotNull(ImportBatch::query()->findOrFail($batchId)->completion_notified_at);
+        $this->assertCount(1, $this->batchNotifications($batchId, 'import_pegawai'));
     }
 
     /** Dua request eksekusi untuk batch sama hanya boleh menghasilkan satu dispatch antrean. */
@@ -258,14 +335,17 @@ class EmployeeImportExecutionRaceTest extends TestCase
     /** Callback gagal dari redelivery tidak boleh menimpa cache atau laporan batch yang sudah selesai. */
     public function test_late_failure_callback_preserves_completed_batch_result(): void
     {
-        $user = User::factory()->adminKepegawaian()->create();
+        $user = $this->notifiableAdmin();
         $batchId = $this->validatedBatchId($user);
         $this->persistQueuedBatch($batchId, $user);
         app(ExecuteImportBatchAction::class)->execute($batchId, $user);
 
-        $completedCache = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
-
         $job = new ImportEmployeeBatchJob($batchId, $user->id);
+        $job->handle(app(ExecuteImportBatchAction::class), app(NotificationService::class));
+
+        $completedCache = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
+        $completionNotificationCount = $this->batchNotifications($batchId, 'import_pegawai')->count();
+
         $job->failed(new \RuntimeException('Kegagalan redelivery terlambat'));
 
         $persistedBatch = ImportBatch::query()->findOrFail($batchId);
@@ -275,6 +355,10 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $this->assertNull($persistedBatch->error_message);
         $this->assertSame('completed', $currentCache['status']);
         $this->assertSame($completedCache['result'], $currentCache['result']);
+        $this->assertNotNull($persistedBatch->completion_notified_at);
+        $this->assertNull($persistedBatch->failure_notified_at);
+        $this->assertSame($completionNotificationCount, $this->batchNotifications($batchId, 'import_pegawai')->count());
+        $this->assertCount(0, $this->batchNotifications($batchId, 'import_pegawai_gagal'));
     }
 
     /** Kegagalan worker sebelum claim processing tetap harus membuat batch queued dapat diinspeksi sebagai gagal. */
@@ -295,6 +379,48 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $this->assertSame('failed', Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId)['status']);
     }
 
+    /** Callback terminal menyimpan counter parsial dan tidak membocorkan exception ke notifikasi pengguna. */
+    public function test_terminal_failure_preserves_partial_counters_and_uses_generic_notification(): void
+    {
+        $user = $this->notifiableAdmin();
+        $batch = app(UploadImportBatchAction::class)->execute(
+            $this->csvFile($this->twoRowCsv()),
+            'utama',
+            $user,
+        );
+        $batchId = $batch['batch_id'];
+        app(ValidateImportBatchAction::class)->execute($batchId, null, $user);
+        $this->persistQueuedBatch($batchId, $user);
+        ImportBatch::query()->whereKey($batchId)->update([
+            'status' => 'processing',
+            'processed_valid_count' => 1,
+            'inserted_count' => 1,
+            'skipped_count' => 2,
+            'failed_count' => 3,
+            'processing_token' => (string) Str::uuid(),
+            'lease_expires_at' => now()->addMinute(),
+        ]);
+
+        (new ImportEmployeeBatchJob($batchId, $user->id))
+            ->failed(new \RuntimeException('detail internal sangat rahasia'));
+
+        $terminal = ImportBatch::query()->findOrFail($batchId);
+        $this->assertSame('failed', $terminal->status);
+        $this->assertSame(1, $terminal->processed_valid_count);
+        $this->assertSame(1, $terminal->inserted_count);
+        $this->assertSame(2, $terminal->skipped_count);
+        $this->assertSame(3, $terminal->failed_count);
+        $this->assertSame('detail internal sangat rahasia', $terminal->error_message);
+        $this->assertNotNull($terminal->failure_notified_at);
+
+        $notification = $this->batchNotifications($batchId, 'import_pegawai_gagal')->sole();
+        $this->assertStringNotContainsString('detail internal sangat rahasia', $notification->body);
+        $this->assertStringNotContainsString(
+            'detail internal sangat rahasia',
+            Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId)['error_message'],
+        );
+    }
+
     private function validatedBatchId(User $user): string
     {
         $batch = app(UploadImportBatchAction::class)->execute(
@@ -305,6 +431,23 @@ class EmployeeImportExecutionRaceTest extends TestCase
         app(ValidateImportBatchAction::class)->execute($batch['batch_id'], null, $user);
 
         return $batch['batch_id'];
+    }
+
+    private function notifiableAdmin(): User
+    {
+        $employee = Employee::factory()->create();
+
+        return User::factory()->adminKepegawaian()->create(['employee_id' => $employee->id]);
+    }
+
+    /** @return Collection<int, SimpegNotification> */
+    private function batchNotifications(string $batchId, string $type)
+    {
+        return SimpegNotification::query()
+            ->where('type', $type)
+            ->get()
+            ->filter(fn (SimpegNotification $notification): bool => ($notification->data['batch_id'] ?? null) === $batchId)
+            ->values();
     }
 
     private function persistQueuedBatch(string $batchId, User $user): void
@@ -322,7 +465,13 @@ class EmployeeImportExecutionRaceTest extends TestCase
             'inserted_count' => 0,
             'skipped_count' => $batch['validation']['skip_count'],
             'failed_count' => $batch['validation']['error_count'],
+            'processed_valid_count' => 0,
             'row_issues' => [],
+            'execution_payload' => [
+                'filename' => $batch['filename'],
+                'type' => $batch['type'],
+                'validation' => $batch['validation'],
+            ],
         ]);
     }
 

@@ -54,7 +54,7 @@ class QueueImportBatchAction
                 &$claimed,
             ): void {
                 $now = now();
-                $claimed = ImportBatch::query()->insertOrIgnore([
+                $importBatch = new ImportBatch([
                     'id' => $batchId,
                     'user_id' => $user?->id,
                     'filename' => $batch['filename'],
@@ -65,13 +65,20 @@ class QueueImportBatchAction
                     'inserted_count' => 0,
                     'skipped_count' => $batch['validation']['skip_count'] ?? 0,
                     'failed_count' => $batch['validation']['error_count'] ?? 0,
-                    'row_issues' => null,
+                    'processed_valid_count' => 0,
+                    'row_issues' => $this->collectRowIssues($batch['validation']['results'] ?? []),
                     'error_message' => null,
+                    // Payload tervalidasi berisi data pegawai sensitif, sehingga wajib melewati encrypted cast model.
+                    'execution_payload' => [
+                        'filename' => $batch['filename'],
+                        'type' => $batch['type'] ?? 'utama',
+                        'validation' => $batch['validation'],
+                    ],
                     'started_at' => null,
                     'finished_at' => null,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]) === 1;
+                ]);
+                $importBatch->forceFill(['created_at' => $now, 'updated_at' => $now]);
+                $claimed = ImportBatch::query()->insertOrIgnore($importBatch->getAttributes()) === 1;
 
                 if (! $claimed) {
                     return;
@@ -102,6 +109,24 @@ class QueueImportBatchAction
             'status' => 'queued',
             'message' => 'Proses impor telah dimasukkan ke dalam antrean. Anda dapat meninggalkan halaman ini.',
         ];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $results
+     * @return array<int, array<string, mixed>>
+     */
+    private function collectRowIssues(array $results): array
+    {
+        return collect($results)
+            ->filter(fn (array $result): bool => in_array($result['status'] ?? null, ['error', 'skip'], true))
+            ->map(fn (array $result): array => [
+                'row' => $result['row'] ?? null,
+                'nama' => $result['nama'] ?? '-',
+                'kategori' => ($result['status'] ?? null) === 'skip' ? 'dilewati' : 'gagal',
+                'errors' => $result['errors'] ?? [],
+            ])
+            ->values()
+            ->all();
     }
 
     /** @param array<string, mixed> $cachedBatch */

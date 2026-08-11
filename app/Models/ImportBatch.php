@@ -27,8 +27,14 @@ class ImportBatch extends Model
         'inserted_count',
         'skipped_count',
         'failed_count',
+        'processed_valid_count',
         'row_issues',
         'error_message',
+        'execution_payload',
+        'processing_token',
+        'lease_expires_at',
+        'completion_notified_at',
+        'failure_notified_at',
         'started_at',
         'finished_at',
     ];
@@ -37,6 +43,11 @@ class ImportBatch extends Model
     {
         return [
             'row_issues' => 'array',
+            'execution_payload' => 'encrypted:array',
+            'processed_valid_count' => 'integer',
+            'lease_expires_at' => 'datetime',
+            'completion_notified_at' => 'datetime',
+            'failure_notified_at' => 'datetime',
             'started_at' => 'datetime',
             'finished_at' => 'datetime',
         ];

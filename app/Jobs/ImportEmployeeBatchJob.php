@@ -14,6 +14,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue
 {
@@ -44,33 +45,10 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue
     public function handle(ExecuteImportBatchAction $action, NotificationService $notificationService): void
     {
         $user = $this->userId ? User::find($this->userId) : null;
-        $result = $action->execute($this->batchId, $user, $this->ipAddress, $this->userAgent);
+        $action->execute($this->batchId, $user, $this->ipAddress, $this->userAgent);
 
-        if (($result['executed'] ?? false) !== true) {
-            return;
-        }
-
-        // Kirim notifikasi in-app melalui NotificationService jika user memiliki employee record
-        $employee = $user?->employee;
-        if ($employee) {
-            $inserted = $result['inserted'] ?? 0;
-            $skipped = $result['skipped'] ?? 0;
-            $failed = $result['failed'] ?? 0;
-
-            $notificationService->createForEmployee(
-                $employee,
-                'import_pegawai',
-                'Import Pegawai Selesai',
-                "Import selesai: {$inserted} berhasil ditambahkan, {$skipped} di-skip (duplikat), {$failed} gagal.",
-                [
-                    'inserted' => $inserted,
-                    'skipped' => $skipped,
-                    'failed' => $failed,
-                    'batch_id' => $this->batchId,
-                    'url' => route('data-pegawai'),
-                ]
-            );
-        }
+        // Redelivery completed tetap masuk jalur ini untuk memulihkan crash setelah commit completion.
+        $this->notifyCompletionOnce($user, $notificationService);
     }
 
     /** Batch id menjadi identitas unik job untuk lapisan deduplikasi antrean. */
@@ -84,45 +62,83 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue
      */
     public function failed(\Throwable $exception): void
     {
-        $batchRecord = ImportBatch::query()->find($this->batchId);
+        $user = $this->userId ? User::find($this->userId) : null;
+        $transitioned = DB::transaction(function () use ($exception, $user): bool {
+            // CAS ini memastikan callback gagal yang kalah race dari completion tidak memiliki side effect.
+            $updated = ImportBatch::query()
+                ->whereKey($this->batchId)
+                ->whereIn('status', ['queued', 'processing'])
+                ->update([
+                    'status' => 'failed',
+                    'processing_token' => null,
+                    'lease_expires_at' => null,
+                    'error_message' => $exception->getMessage(),
+                    'finished_at' => now(),
+                ]);
 
-        // Callback redelivery yang terlambat tidak boleh menimpa hasil batch yang sudah terminal.
-        if ($batchRecord === null || ! in_array($batchRecord->status, ['queued', 'processing', 'failed'], true)) {
+            if ($updated !== 1) {
+                return false;
+            }
+
+            $batch = ImportBatch::query()->lockForUpdate()->findOrFail($this->batchId);
+            if ($batch->failure_notified_at === null) {
+                $employee = $user?->employee;
+                if ($employee !== null) {
+                    app(NotificationService::class)->createForEmployee(
+                        $employee,
+                        'import_pegawai_gagal',
+                        'Import Pegawai Gagal',
+                        'Proses import pegawai gagal. Silakan periksa laporan import atau hubungi administrator.',
+                        [
+                            'batch_id' => $this->batchId,
+                            'url' => route('pegawai.import'),
+                        ]
+                    );
+                }
+
+                $batch->forceFill(['failure_notified_at' => now()])->save();
+            }
+
+            return true;
+        });
+
+        if (! $transitioned) {
             return;
         }
 
-        // Pastikan laporan permanen ikut menandai kegagalan (no-op bila record belum ada).
-        ImportBatch::whereKey($this->batchId)
-            ->whereIn('status', ['queued', 'processing', 'failed'])
-            ->update([
-                'status' => 'failed',
-                'error_message' => $exception->getMessage(),
-                'finished_at' => now(),
-            ]);
+        $batch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$this->batchId) ?? [];
+        $batch['status'] = 'failed';
+        $batch['error_message'] = 'Proses import pegawai gagal. Silakan coba kembali atau hubungi administrator.';
+        Cache::put(UploadImportBatchAction::CACHE_PREFIX.$this->batchId, $batch, now()->addMinutes(10));
+    }
 
-        // Update cache status ke failed jika job gagal sepenuhnya
-        $batch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$this->batchId);
-        if ($batch) {
-            $batch['status'] = 'failed';
-            $batch['error_message'] = $exception->getMessage();
-            Cache::put(UploadImportBatchAction::CACHE_PREFIX.$this->batchId, $batch, now()->addMinutes(10));
-        }
+    /** Marker dan record notifikasi completion commit bersama agar redelivery tidak menggandakan notifikasi. */
+    private function notifyCompletionOnce(?User $user, NotificationService $notificationService): void
+    {
+        DB::transaction(function () use ($user, $notificationService): void {
+            $batch = ImportBatch::query()->lockForUpdate()->find($this->batchId);
+            if ($batch === null || $batch->status !== 'completed' || $batch->completion_notified_at !== null) {
+                return;
+            }
 
-        // Kirim notifikasi error in-app via NotificationService
-        $user = $this->userId ? User::find($this->userId) : null;
-        $employee = $user?->employee;
-        if ($employee) {
-            $notificationService = app(NotificationService::class);
-            $notificationService->createForEmployee(
-                $employee,
-                'import_pegawai_gagal',
-                'Import Pegawai Gagal',
-                'Proses import pegawai gagal: '.$exception->getMessage(),
-                [
-                    'batch_id' => $this->batchId,
-                    'url' => route('pegawai.import'),
-                ]
-            );
-        }
+            $employee = $user?->employee;
+            if ($employee !== null) {
+                $notificationService->createForEmployee(
+                    $employee,
+                    'import_pegawai',
+                    'Import Pegawai Selesai',
+                    "Import selesai: {$batch->inserted_count} berhasil ditambahkan, {$batch->skipped_count} di-skip (duplikat), {$batch->failed_count} gagal.",
+                    [
+                        'inserted' => $batch->inserted_count,
+                        'skipped' => $batch->skipped_count,
+                        'failed' => $batch->failed_count,
+                        'batch_id' => $this->batchId,
+                        'url' => route('data-pegawai'),
+                    ]
+                );
+            }
+
+            $batch->forceFill(['completion_notified_at' => now()])->save();
+        });
     }
 }
