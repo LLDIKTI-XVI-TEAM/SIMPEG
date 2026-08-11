@@ -4,6 +4,7 @@ namespace App\Support\Histories;
 
 use App\Models\EducationHistory;
 use App\Models\RefJenjangPendidikan;
+use App\Models\RefProgramStudi;
 
 class EducationHistoryPayload
 {
@@ -16,6 +17,8 @@ class EducationHistoryPayload
     {
         /** @var RefJenjangPendidikan|null $jenjang */
         $jenjang = $history->jenjang;
+        /** @var RefProgramStudi|null $programStudi */
+        $programStudi = $history->programStudi;
 
         return [
             'id' => $history->id,
@@ -23,7 +26,9 @@ class EducationHistoryPayload
             'jenjang_id' => $history->jenjang_id,
             'tingkat' => $jenjang?->nama ?? '-',
             'nama_institusi' => $history->nama_institusi,
-            'jurusan' => $history->jurusan,
+            'program_studi_id' => $history->program_studi_id,
+            'program_studi' => $programStudi?->nama,
+            'jurusan' => $programStudi?->nama ?? $history->jurusan,
             'tahun_lulus' => $history->tahun_lulus,
             'no_ijazah' => $history->no_ijazah,
         ];

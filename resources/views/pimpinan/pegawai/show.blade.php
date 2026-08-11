@@ -452,7 +452,7 @@
                                             <tr>
                                                 <td class="px-4 py-3 font-semibold">{{ $edu->jenjang?->urutan ?? $edu->tingkat ?? '-' }}</td>
                                                 <td class="px-4 py-3">{{ $edu->nama_institusi ?? '-' }}</td>
-                                                <td class="px-4 py-3">{{ $edu->jurusan ?? '-' }}</td>
+                                                <td class="px-4 py-3">{{ $edu->programStudi?->nama ?? $edu->jurusan ?? '-' }}</td>
                                                 <td class="px-4 py-3">{{ $edu->tahun_lulus ?? '-' }}</td>
                                             </tr>
                                         @endforeach

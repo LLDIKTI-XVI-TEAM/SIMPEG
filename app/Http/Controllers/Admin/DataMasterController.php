@@ -8,6 +8,7 @@ use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenjangPendidikan;
+use App\Models\RefProgramStudi;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
 use App\Services\Referensi\ReferenceTableCatalog;
@@ -59,6 +60,8 @@ class DataMasterController extends Controller
             'eselonUsage' => $usage->usageCountMap(RefEselon::class),
             'jenjangPendidikan' => RefJenjangPendidikan::query()->orderBy('urutan')->orderBy('nama')->get(),
             'jenjangPendidikanUsage' => $usage->usageCountMap(RefJenjangPendidikan::class),
+            'programStudi' => RefProgramStudi::query()->orderBy('nama')->get(),
+            'programStudiUsage' => $usage->usageCountMap(RefProgramStudi::class),
             'unitKerja' => $unitKerja,
             'unitKerjaUsage' => $usage->usageCountMap(RefUnitKerja::class),
             'unitKerjaJenisOptions' => self::JENIS_UNIT_LABELS,

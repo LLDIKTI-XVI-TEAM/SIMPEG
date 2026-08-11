@@ -4,6 +4,7 @@ namespace App\Actions\Histories;
 
 use App\Models\EducationHistory;
 use App\Models\Employee;
+use App\Models\RefProgramStudi;
 use App\Services\AuditService;
 use App\Support\Histories\EducationHistoryPayload;
 use Illuminate\Http\Request;
@@ -25,9 +26,12 @@ class UpdateEducationHistoryAction
 
         // Coerce null ke string kosong sebagai safety net sebelum migration dijalankan.
         $data['no_ijazah'] = $data['no_ijazah'] ?? '';
+        if (! empty($data['program_studi_id'])) {
+            $data['jurusan'] = RefProgramStudi::find($data['program_studi_id'])?->nama;
+        }
 
         $history->update($data);
-        $history->load('jenjang');
+        $history->load(['jenjang', 'programStudi']);
 
         AuditService::log(
             'UPDATE',

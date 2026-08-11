@@ -8,6 +8,7 @@ use App\Models\EwsAlert;
 use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisPegawai;
+use App\Models\RefProgramStudi;
 use App\Models\RefStatusPegawai;
 use App\Models\SimpegNotification;
 use App\Services\AuditService;
@@ -327,6 +328,12 @@ class UpdateEmployeeAction
             $data['status_aktif'] = RefStatusPegawai::whereKey($data['status_pegawai_id'])->value('nama') ?? 'Aktif';
         } elseif (empty($data['status_pegawai_id']) && ! empty($data['status_aktif'])) {
             $data['status_pegawai_id'] = RefStatusPegawai::where('nama', $data['status_aktif'])->value('id');
+        }
+
+        if (array_key_exists('program_studi_id', $data)) {
+            $data['prodi_pendidikan_terakhir'] = $data['program_studi_id']
+                ? RefProgramStudi::find($data['program_studi_id'])?->nama
+                : null;
         }
 
         return $data;

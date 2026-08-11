@@ -1,6 +1,6 @@
 <div>
     <div class="mx-auto max-w-7xl space-y-6">
-        
+
         <x-admin.page-header title="Tambah Pegawai Baru">
             <x-slot:breadcrumb>
                 <a href="{{ route('dashboard') }}" wire:navigate class="transition-colors hover:text-ink">Dashboard</a>
@@ -95,7 +95,7 @@
                             maxlength="18"
                             x-model="nip"
                             x-on:input="validateNip"
-                            
+
                         >
                             <p x-show="nipError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="nipError"></p>
                             <p x-show="!nipError" class="text-[11px] text-muted mt-1 font-sans">Format: 18 digit angka.</p>
@@ -107,7 +107,7 @@
                             name="jenis_pegawai_id"
                             label="Jenis Pegawai"
                             id="jenis_pegawai_id"
-                            
+
                         >
                             <option value="" disabled selected>Pilih Jenis Pegawai</option>
                             @foreach($jenisPegawai as $jenis)
@@ -121,7 +121,7 @@
                             label="Status Pegawai"
                             id="status_pegawai_id"
                             value="{{ old('status_pegawai_id', $statusPegawai->firstWhere('is_default', true)?->id) }}"
-                            
+
                         >
                             <option value="" disabled>Pilih Status Pegawai</option>
                             @foreach($statusPegawai as $status)
@@ -153,7 +153,7 @@
                             name="pendidikan_terakhir"
                             label="Pendidikan Terakhir"
                             id="pendidikan_terakhir"
-                            
+
                         >
                             <option value="">-- Kosong --</option>
                             <option value="Diploma III (D3)">Diploma III (D3)</option>
@@ -165,16 +165,14 @@
 
 
                         {{-- Program Studi --}}
-                        <x-form.input
-                            name="prodi_pendidikan_terakhir"
-                            label="Program Studi"
-                            type="text"
-                            id="prodi_pendidikan_terakhir"
-                            placeholder="Teknik Informatika"
-                            
-                        />
+                        <x-form.select name="program_studi_id" label="Program Studi" id="program_studi_id">
+                            <option value="">-- Pilih Program Studi --</option>
+                            @foreach($programStudiOptions as $programStudi)
+                                <option value="{{ $programStudi->id }}" @selected(old('program_studi_id') === $programStudi->id)>{{ $programStudi->nama }}</option>
+                            @endforeach
+                        </x-form.select>
 
-                        
+
 
 
                         {{-- Penanda ini dipakai cuti untuk membedakan Kepala Lembaga dari jabatan biasa. --}}
@@ -204,7 +202,7 @@
                             maxlength="16"
                             x-model="nik"
                             x-on:input="validateNik"
-                            
+
                         >
                             <p x-show="nikError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="nikError"></p>
                             <p x-show="!nikError" class="text-[11px] text-muted mt-1 font-sans">Format: 16 digit angka.</p>
@@ -315,7 +313,7 @@
                             type="tel"
                             id="no_hp"
                             placeholder="081234567890"
-                            
+
                         />
 
                         {{-- Telepon Rumah --}}
@@ -345,7 +343,7 @@
                             rows="3"
                             placeholder="Jl. Buah Batu No. 120, Lengkong, Bandung"
                             wrapper-class="sm:col-span-2"
-                            
+
                         />
                     </div>
                 </div>
@@ -383,9 +381,9 @@
 
                     {{-- SUB-TAB A: PANGKAT --}}
                     <div x-show="subTab === 'pangkat'" class="space-y-6" x-transition>
-                        
-                        
-                        
+
+
+
 
                         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                             {{-- Golongan --}}
@@ -399,9 +397,7 @@
                                         @endforeach
                                     </select>
                                     <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                        </svg>
+
                                     </div>
                                 </div>
                             </div>
@@ -428,11 +424,11 @@
                             <div class="space-y-2 sm:col-span-2 border-t border-border pt-4">
                                 <div class="flex items-center justify-between">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">File SK Pangkat</label>
-                                    
-                                    
+
+
                                 </div>
 
-                                
+
                                 <div  class="mt-1">
                                     <div class="border-2 border-dashed border-border rounded-lg p-6 bg-soft/50 text-center relative hover:border-primary transition">
                                         <input type="file" id="file_sk_pangkat" name="file_sk_pangkat" accept=".pdf,image/*" @change="handleSkPangkatChange" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
@@ -447,21 +443,21 @@
                                                 <span class="text-muted" x-show="skPangkatSize" x-text="'(' + skPangkatSize + ')'"></span>
                                             </div>
                                         </template>
-                                        
+
                                         <p x-show="skPangkatError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skPangkatError"></p>
                                     </div>
                                 </div>
 
-                                
+
                             </div>
                         </div>
                     </div>
 
                     {{-- SUB-TAB B: JABATAN --}}
                     <div x-show="subTab === 'jabatan'" class="space-y-6" x-transition>
-                        
-                        
-                        
+
+
+
 
                         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                             {{-- Jabatan --}}
@@ -475,9 +471,7 @@
                                         @endforeach
                                     </select>
                                     <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                        </svg>
+
                                     </div>
                                 </div>
                             </div>
@@ -493,9 +487,7 @@
                                         @endforeach
                                     </select>
                                     <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                        </svg>
+
                                     </div>
                                 </div>
                             </div>
@@ -517,9 +509,7 @@
                                         @endforeach
                                     </select>
                                     <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                        </svg>
+
                                     </div>
                                 </div>
                             </div>
@@ -535,9 +525,7 @@
                                         @endforeach
                                     </select>
                                     <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                        </svg>
+
                                     </div>
                                 </div>
                             </div>
@@ -564,7 +552,7 @@
                             <div class="space-y-2 sm:col-span-2 border-t border-border pt-4">
                                 <div class="flex items-center justify-between">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">File SK Jabatan</label>
-                                    
+
                                 </div>
                                 <div  class="mt-1">
                                     <div class="border-2 border-dashed border-border rounded-lg p-6 bg-soft/50 text-center relative hover:border-primary transition">
@@ -578,7 +566,7 @@
                                                 <span class="text-muted" x-show="skJabatanSize" x-text="'(' + skJabatanSize + ')'"></span>
                                             </div>
                                         </template>
-                                        
+
                                         <p x-show="skJabatanError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skJabatanError"></p>
                                     </div>
                                 </div>
@@ -589,9 +577,9 @@
 
                     {{-- SUB-TAB C: KGB --}}
                     <div x-show="subTab === 'kgb'" class="space-y-6" x-transition>
-                        
-                        
-                        
+
+
+
 
                         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                             {{-- Gaji Pokok --}}
@@ -627,7 +615,7 @@
                             <div class="space-y-2 sm:col-span-2 border-t border-border pt-4">
                                 <div class="flex items-center justify-between">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">File SK KGB</label>
-                                    
+
                                 </div>
                                 <div  class="mt-1">
                                     <div class="border-2 border-dashed border-border rounded-lg p-6 bg-soft/50 text-center relative hover:border-primary transition">
@@ -641,7 +629,7 @@
                                                 <span class="text-muted" x-show="skKgbSize" x-text="'(' + skKgbSize + ')'"></span>
                                             </div>
                                         </template>
-                                        
+
                                         <p x-show="skKgbError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skKgbError"></p>
                                     </div>
                                 </div>
@@ -664,9 +652,7 @@
                                         <option value="PPPK" >PPPK</option>
                                     </select>
                                     <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                        </svg>
+
                                     </div>
                                 </div>
                             </div>
@@ -693,7 +679,7 @@
                             <div class="space-y-2 sm:col-span-2 border-t border-border pt-4">
                                 <div class="flex items-center justify-between">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">File SK Pengangkatan</label>
-                                    
+
                                 </div>
                                 <div  class="mt-1">
                                     <div class="border-2 border-dashed border-border rounded-lg p-6 bg-soft/50 text-center relative hover:border-primary transition">
@@ -707,7 +693,7 @@
                                                 <span class="text-muted" x-show="skPengangkatanSize" x-text="'(' + skPengangkatanSize + ')'"></span>
                                             </div>
                                         </template>
-                                        
+
                                         <p x-show="skPengangkatanError" class="text-xs text-danger font-semibold mt-2 font-sans" x-text="skPengangkatanError"></p>
                                     </div>
                                 </div>
@@ -734,9 +720,7 @@
                                         <option value="Lainnya">Lainnya...</option>
                                     </select>
                                     <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                        </svg>
+
                                     </div>
                                 </div>
                             </div>
@@ -789,7 +773,7 @@
                     </div>
                 </div>
 
-                
+
                 {{-- Action Buttons --}}
                 <div class="border-t border-border pt-6 flex justify-between items-center gap-3">
                     <div>
@@ -802,19 +786,19 @@
                     </div>
                     <div class="flex items-center gap-3">
                         {{-- Tombol Sebelumnya --}}
-                        <button type="button" 
-                                x-show="activeTab !== 'utama'" 
-                                @click="activeTab = activeTab === 'pengangkatan' ? 'kontak' : (activeTab === 'kontak' ? 'pelengkap' : 'utama')" 
+                        <button type="button"
+                                x-show="activeTab !== 'utama'"
+                                @click="activeTab = activeTab === 'pengangkatan' ? 'kontak' : (activeTab === 'kontak' ? 'pelengkap' : 'utama')"
                                 class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft shadow-sm font-sans cursor-pointer">
                             <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                             </svg>
                             Sebelumnya
                         </button>
-                        
+
                         {{-- Tombol Selanjutnya --}}
-                        <button type="button" 
-                                x-show="activeTab !== 'pengangkatan'" 
+                        <button type="button"
+                                x-show="activeTab !== 'pengangkatan'"
                                 @click="
                                     if (activeTab === 'utama') {
                                         if (!validateUtama()) return;
@@ -826,7 +810,7 @@
                                         if (!validateKontak()) return;
                                         activeTab = 'pengangkatan';
                                     }
-                                " 
+                                "
                                 class="inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm font-sans cursor-pointer">
                             <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
@@ -835,8 +819,8 @@
                         </button>
 
                         {{-- Tombol Simpan --}}
-                        <button type="submit" 
-                                x-show="activeTab === 'pengangkatan'" 
+                        <button type="submit"
+                                x-show="activeTab === 'pengangkatan'"
                                 :disabled="isSubmitting || skPangkatError !== '' || skJabatanError !== '' || skKgbError !== '' || skPengangkatanError !== ''"
                                 :class="(isSubmitting || skPangkatError !== '' || skJabatanError !== '' || skKgbError !== '' || skPengangkatanError !== '') ? 'opacity-50 cursor-not-allowed' : ''"
                                 class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 font-sans cursor-pointer">
@@ -865,7 +849,7 @@
                 nikError: '',
                 kkError: '',
                 fotoPreview: null,
-                
+
                 skPangkatName: '',
                 skPangkatSize: '',
                 skPangkatError: '',
@@ -875,7 +859,7 @@
                     tanggal_sk: '',
                     tmt_pangkat: '',
                 },
-                
+
                 skJabatanName: '',
                 skJabatanSize: '',
                 skJabatanError: '',
@@ -889,7 +873,7 @@
                     tanggal_sk: '',
                     tmt_jabatan: '',
                 },
-                
+
                 skKgbName: '',
                 skKgbSize: '',
                 skKgbError: '',
@@ -899,11 +883,11 @@
                     tanggal_sk: '',
                     tmt_kgb: '',
                 },
-                
+
                 skPengangkatanName: '',
                 skPengangkatanSize: '',
                 skPengangkatanError: '',
-                
+
                 berkasLainnyaName: '',
                 berkasLainnyaSize: '',
                 berkasLainnyaError: '',
@@ -1032,7 +1016,7 @@
                     const allowedTypes = ['application/pdf', 'application/x-pdf', 'image/jpeg', 'image/png', 'image/jpg'];
                     const allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png'];
                     const sizeInMb = (file.size / (1024 * 1024)).toFixed(2);
-                    
+
                     let isValidType = allowedTypes.includes(file.type);
                     if (!isValidType) {
                         const ext = file.name.split('.').pop().toLowerCase();
@@ -1040,7 +1024,7 @@
                             isValidType = true;
                         }
                     }
-                    
+
                     if (!isValidType) {
                         return { name: '', size: '', error: 'Format berkas harus PDF, JPG, JPEG, atau PNG!' };
                     }

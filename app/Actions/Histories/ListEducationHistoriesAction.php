@@ -19,7 +19,7 @@ class ListEducationHistoriesAction
     public function execute(Employee $employee): Collection
     {
         return $employee->educationHistories()
-            ->with('jenjang')
+            ->with(['jenjang', 'programStudi'])
             ->orderByDesc('tahun_lulus')
             ->orderByDesc('created_at')
             ->get()

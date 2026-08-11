@@ -12,6 +12,7 @@ use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
+use App\Models\RefProgramStudi;
 use App\Models\RefUnitKerja;
 use App\Models\SalaryHistory;
 use App\Models\User;
@@ -230,6 +231,24 @@ class EmployeeUpdateTest extends TestCase
 
         $response->assertRedirect(route('data-pegawai'));
         $this->assertSame('2030-01-01', $employee->fresh()->tanggal_pensiun?->toDateString());
+    }
+
+    public function test_edit_page_loads_current_inactive_program_studi(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $programStudi = RefProgramStudi::create([
+            'nama' => 'Teknik Lingkungan',
+            'is_active' => false,
+        ]);
+        $employee = Employee::factory()->create([
+            'program_studi_id' => $programStudi->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('pegawai.edit', $employee->id))
+            ->assertOk()
+            ->assertSee('name="program_studi_id"', false)
+            ->assertSee($programStudi->nama);
     }
 
     public function test_pppk_contract_dates_are_shown_saved_and_reset_active_contract_alerts(): void

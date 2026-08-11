@@ -106,12 +106,13 @@ class PimpinanEmployeeController extends Controller
             'agama',
             'jenisPegawai',
             'statusPegawai',
+            'programStudi',
             'appointment',
             'rankHistories' => fn ($query) => $query->with('golongan')->orderByDesc('tmt_pangkat'),
             'positionHistories' => fn ($query) => $query->with(['jabatan', 'unitKerja'])->orderByDesc('tmt_jabatan'),
             'salaryHistories' => fn ($query) => $query->orderByDesc('tmt_kgb'),
             'disciplineRecords' => fn ($query) => $query->orderByDesc('tanggal_mulai'),
-            'educationHistories' => fn ($query) => $query->with('jenjang')->orderByDesc('tahun_lulus'),
+            'educationHistories' => fn ($query) => $query->with(['jenjang', 'programStudi'])->orderByDesc('tahun_lulus'),
             'documents' => fn ($query) => $query->orderByDesc('tanggal_dokumen'),
             'families' => fn ($query) => $query
                 ->select([

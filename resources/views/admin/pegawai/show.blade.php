@@ -79,13 +79,13 @@
         jabatanList: {{ $p->positionHistories->map(fn($j) => ['jabatan' => $j->jabatan?->nama ?? $j->nama_jabatan, 'unit' => $j->unitKerja->nama ?? '-', 'kelas_jabatan' => $j->kelas_jabatan, 'no_sk' => $j->no_sk, 'tgl_sk' => $j->tanggal_sk, 'tmt' => $j->tmt_jabatan])->toJson() }},
         kgbList: {{ $p->salaryHistories->map(fn($s) => ['gaji' => 'Rp ' . number_format($s->gaji_pokok, 0, ',', '.'), 'no_sk' => $s->no_sk, 'tgl_sk' => $s->tanggal_sk, 'tmt' => $s->tmt_kgb])->toJson() }},
         disiplinList: {{ $p->disciplineRecords->map(fn($d) => ['id' => $d->id, 'jenis' => $d->jenis_hukuman, 'alasan' => $d->deskripsi, 'no_sk' => $d->no_sk, 'tgl_sk' => $d->tanggal_sk ? \Carbon\Carbon::parse($d->tanggal_sk)->format('d-m-Y') : '-', 'masa' => ($d->tanggal_mulai ? \Carbon\Carbon::parse($d->tanggal_mulai)->format('d-m-Y') : '-') . ' s/d ' . ($d->tanggal_berakhir ? \Carbon\Carbon::parse($d->tanggal_berakhir)->format('d-m-Y') : 'Sekarang'), 'is_active' => $d->is_active])->toJson() }},
-        pendidikanList: {{ ($p->educationHistories ?? collect())->map(fn($e) => ['id' => $e->id, 'jenjang_id' => $e->jenjang_id, 'tingkat' => $e->jenjang?->urutan ?? $e->tingkat ?? '-', 'institusi' => $e->nama_institusi ?? '-', 'prodi' => $e->jurusan ?? '-', 'lulus' => $e->tahun_lulus ?? '-', 'no_ijazah' => $e->no_ijazah ?? '-'])->toJson() }},
+        pendidikanList: {{ ($p->educationHistories ?? collect())->map(fn($e) => ['id' => $e->id, 'jenjang_id' => $e->jenjang_id, 'program_studi_id' => $e->program_studi_id, 'tingkat' => $e->jenjang?->nama ?? '-', 'institusi' => $e->nama_institusi ?? '-', 'prodi' => $e->programStudi?->nama ?? $e->jurusan ?? '-', 'lulus' => $e->tahun_lulus ?? '-', 'no_ijazah' => $e->no_ijazah ?? '-'])->toJson() }},
         pendidikanLoading: false,
         showEditPendidikan: false,
         showRiwayatStatus: false,
         editingPendidikan: null,
         editPendidikanError: '',
-        editPendidikanForm: { jenjang_id: '', nama_institusi: '', jurusan: '', tahun_lulus: '', no_ijazah: '' },
+        editPendidikanForm: { jenjang_id: '', nama_institusi: '', program_studi_id: '', tahun_lulus: '', no_ijazah: '' },
         isUpdatingPendidikan: false,
         isDeletingPendidikan: false,
         
@@ -95,7 +95,7 @@
         newJabatan: { jabatan_id: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', kelas_jabatan: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '', file_sk: null },
         newKgb: { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '', file_sk: null },
         newDisiplin: { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '', file_sk: null, dokumen_id: '' },
-        newPendidikan: { jenjang_id: '', nama_institusi: '', jurusan: '', tahun_lulus: '', no_ijazah: '' },
+        newPendidikan: { jenjang_id: '', nama_institusi: '', program_studi_id: '', tahun_lulus: '', no_ijazah: '' },
 
         // Upload berkas lainnya (KTP/KK, Ijazah, Lainnya) langsung dari tab Dokumen SK
         showUploadBerkas: false,
@@ -522,7 +522,7 @@
             this.editPendidikanForm = {
                 jenjang_id:     edu.jenjang_id ?? '',
                 nama_institusi: edu.institusi ?? '',
-                jurusan:        edu.prodi ?? '',
+                program_studi_id: edu.program_studi_id ?? '',
                 tahun_lulus:    edu.lulus ?? '',
                 no_ijazah:      edu.no_ijazah ?? '',
             };
@@ -557,9 +557,10 @@
                     this.pendidikanList[idx] = {
                         id:        h.id,
                         jenjang_id: h.jenjang_id,
+                        program_studi_id: h.program_studi_id,
                         tingkat:   h.tingkat,
                         institusi: h.nama_institusi,
-                        prodi:     h.jurusan ?? '-',
+                        prodi:     h.program_studi ?? h.jurusan ?? '-',
                         lulus:     h.tahun_lulus,
                         no_ijazah: h.no_ijazah ?? '-',
                     };
@@ -744,13 +745,14 @@
                             id:             h.id,
                             tingkat:        h.tingkat,
                             institusi:      h.nama_institusi,
-                            prodi:          h.jurusan ?? '-',
+                            program_studi_id: h.program_studi_id,
+                            prodi:          h.program_studi ?? h.jurusan ?? '-',
                             lulus:          h.tahun_lulus,
                             no_ijazah:      h.no_ijazah ?? '-',
                         });
                         // Perbarui cache sessionStorage agar navigasi kembali tetap sinkron.
                         sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify(this.pendidikanList));
-                        this.newPendidikan = { jenjang_id: '', nama_institusi: '', jurusan: '', tahun_lulus: '', no_ijazah: '' };
+                        this.newPendidikan = { jenjang_id: '', nama_institusi: '', program_studi_id: '', tahun_lulus: '', no_ijazah: '' };
                     }
                     
                     this.showModal = false;
@@ -1259,7 +1261,6 @@
                     </button>
                             @endif
                 </div>
-
                 {{-- Loading skeleton --}}
                 <div x-show="keluargaLoading" class="flex items-center justify-center py-10 text-xs text-muted font-sans gap-2">
                     <svg class="w-4 h-4 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
@@ -1520,7 +1521,17 @@
                         </svg>
                         Tambah Pendidikan
                     </button>
-                            @endif
+                    @endif
+                </div>
+                <div class="grid gap-3 rounded-lg border border-border bg-soft/30 p-4 sm:grid-cols-2">
+                    <div>
+                        <p class="text-[10px] font-bold uppercase tracking-wide text-muted">Pendidikan Terakhir</p>
+                        <p class="mt-1 text-sm font-semibold text-ink">{{ $p->pendidikan_terakhir ?? '-' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-bold uppercase tracking-wide text-muted">Program Studi</p>
+                        <p class="mt-1 text-sm font-semibold text-ink">{{ $p->programStudi?->nama ?? $p->prodi_pendidikan_terakhir ?? '-' }}</p>
+                    </div>
                 </div>
                 {{-- Loading skeleton --}}
                 <div x-show="pendidikanLoading" class="flex items-center justify-center py-10 text-xs text-muted font-sans gap-2">
@@ -2240,7 +2251,12 @@
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Program Studi</label>
-                                    <input type="text" x-model="newPendidikan.jurusan" placeholder="Manajemen Keuangan" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <select x-model="newPendidikan.program_studi_id" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                        <option value="">-- Pilih Program Studi --</option>
+                                        @foreach($programStudiOptions as $programStudi)
+                                            <option value="{{ $programStudi->id }}">{{ $programStudi->nama }}</option>
+                                        @endforeach
+                                    </select>
                                 </div>
                                 <div class="grid grid-cols-2 gap-3">
                                     <div class="space-y-1">
@@ -2344,7 +2360,12 @@
 
                 <div class="space-y-1">
                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Program Studi</label>
-                    <input type="text" x-model="editPendidikanForm.jurusan" placeholder="Manajemen Keuangan" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                    <select x-model="editPendidikanForm.program_studi_id" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                        <option value="">-- Pilih Program Studi --</option>
+                        @foreach($programStudiOptions as $programStudi)
+                            <option value="{{ $programStudi->id }}">{{ $programStudi->nama }}</option>
+                        @endforeach
+                    </select>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\EducationHistory;
 use App\Models\Employee;
 use App\Models\RefJenjangPendidikan;
+use App\Models\RefProgramStudi;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
@@ -51,6 +52,28 @@ class EducationHistoryTest extends TestCase
             'employee_id' => $employee->id,
             'nama_institusi' => 'Universitas Baru',
         ]);
+    }
+
+    public function test_education_history_uses_program_studi_reference(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $programStudi = RefProgramStudi::create(['nama' => 'Administrasi Publik']);
+
+        $response = $this->actingAs($user)->postJsonWithCsrf($this->endpoint($employee), $this->validPayload([
+            'program_studi_id' => $programStudi->id,
+            'jurusan' => 'Data lama yang harus ditimpa',
+        ]));
+
+        $response->assertCreated()
+            ->assertJsonPath('history.program_studi_id', $programStudi->id)
+            ->assertJsonPath('history.program_studi', 'Administrasi Publik');
+        $this->assertDatabaseHas('education_histories', [
+            'employee_id' => $employee->id,
+            'program_studi_id' => $programStudi->id,
+            'jurusan' => 'Administrasi Publik',
+        ]);
+        $this->assertSame($programStudi->id, $employee->refresh()->program_studi_id);
     }
 
     public function test_admin_can_update_employee_education_history(): void

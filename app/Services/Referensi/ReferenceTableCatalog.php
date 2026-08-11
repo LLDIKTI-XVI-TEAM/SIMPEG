@@ -7,6 +7,7 @@ use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenjangPendidikan;
+use App\Models\RefProgramStudi;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
 use Illuminate\Database\Eloquent\Model;
@@ -46,6 +47,13 @@ final class ReferenceTableCatalog
                 ['table' => 'education_histories', 'column' => 'jenjang_id', 'label' => 'riwayat pendidikan'],
             ],
             'cache_keys' => [],
+        ],
+        RefProgramStudi::class => [
+            'usage' => [
+                ['table' => 'employees', 'column' => 'program_studi_id', 'label' => 'data pegawai'],
+                ['table' => 'education_histories', 'column' => 'program_studi_id', 'label' => 'riwayat pendidikan'],
+            ],
+            'cache_keys' => ['ref.program_studi'],
         ],
         RefGolongan::class => [
             'usage' => [

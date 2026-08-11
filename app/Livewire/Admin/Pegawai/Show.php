@@ -9,6 +9,7 @@ use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenjangPendidikan;
+use App\Models\RefProgramStudi;
 use App\Models\RefUnitKerja;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
@@ -35,12 +36,14 @@ class Show extends Component
             'positionHistories.unitKerja',
             'salaryHistories',
             'disciplineRecords',
-            'educationHistories',
+            'educationHistories.jenjang',
+            'educationHistories.programStudi',
             'documents',
             'agama',
             'statusKawin',
             'jenisPegawai',
             'statusPegawai',
+            'programStudi',
             'supervisorAssignments.supervisor.positionHistories' => fn ($query) => $query->where('is_latest', true),
         ])->findOrFail($this->pegawaiId);
 
@@ -50,6 +53,7 @@ class Show extends Component
         $unitKerjaOptions = RefUnitKerja::all();
         $eselonOptions = RefEselon::all();
         $jenjangOptions = RefJenjangPendidikan::orderBy('urutan')->get();
+        $programStudiOptions = RefProgramStudi::where('is_active', true)->orderBy('nama')->get();
 
         // Prioritaskan tanggal_pensiun manual jika diset, fallback ke kalkulasi BUP
         $estimasiTanggalPensiun = $p->tanggal_pensiun;
@@ -76,6 +80,6 @@ class Show extends Component
         $selectedSupervisorId = $selectedSupervisor?->id ?? $currentSupervisor?->supervisor?->id;
         $selectedSupervisorName = $selectedSupervisor?->nama_lengkap ?? $currentSupervisor?->supervisor?->nama_lengkap;
 
-        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions', 'estimasiTanggalPensiun', 'currentSupervisor', 'currentSupervisorPosition', 'selectedSupervisorId', 'selectedSupervisorName'));
+        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions', 'programStudiOptions', 'estimasiTanggalPensiun', 'currentSupervisor', 'currentSupervisorPosition', 'selectedSupervisorId', 'selectedSupervisorName'));
     }
 }

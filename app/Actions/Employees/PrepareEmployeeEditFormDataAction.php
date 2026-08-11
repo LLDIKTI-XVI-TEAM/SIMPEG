@@ -9,6 +9,7 @@ use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
+use App\Models\RefProgramStudi;
 use App\Models\RefStatusPegawai;
 use App\Models\RefStatusPerkawinan;
 use App\Models\RefUnitKerja;
@@ -44,6 +45,10 @@ class PrepareEmployeeEditFormDataAction
         $statusPegawai = RefStatusPegawai::where('is_active', true)->orderByDesc('is_default')->orderBy('nama')->get();
         $golonganRefOptions = RefGolongan::orderBy('kode')->get();
         $eselonOptions = RefEselon::orderBy('nama')->get();
+        $programStudiOptions = RefProgramStudi::query()
+            ->where(fn ($query) => $query->where('is_active', true)->orWhere('id', $p->program_studi_id))
+            ->orderBy('nama')
+            ->get();
 
         // Dokumen arsip per kategori untuk fitur "Pilih dari Arsip"
         $arsipPangkat = $p->documents()
@@ -109,6 +114,7 @@ class PrepareEmployeeEditFormDataAction
             'statusPegawai',
             'golonganRefOptions',
             'eselonOptions',
+            'programStudiOptions',
             'arsipPangkat',
             'arsipJabatan',
             'arsipKgb',

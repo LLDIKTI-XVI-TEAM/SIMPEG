@@ -24,6 +24,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $jenis_pegawai_id
  * @property string|null $status_aktif
  * @property string|null $status_pegawai_id
+ * @property string|null $program_studi_id
  * @property string|null $kepala_bagian_id
  * @property string|null $kelas_jabatan
  * @property string|null $kelas_jabatan_terakhir
@@ -86,6 +87,7 @@ class Employee extends Model
         // Pendidikan snapshot
         'pendidikan_terakhir',
         'prodi_pendidikan_terakhir',
+        'program_studi_id',
 
         // Pensiun
         'tanggal_pensiun',
@@ -166,6 +168,12 @@ class Employee extends Model
     public function statusPegawai(): BelongsTo
     {
         return $this->belongsTo(RefStatusPegawai::class, 'status_pegawai_id');
+    }
+
+    /** @return BelongsTo<RefProgramStudi, $this> */
+    public function programStudi(): BelongsTo
+    {
+        return $this->belongsTo(RefProgramStudi::class, 'program_studi_id');
     }
 
     // --- Child Relations ---
