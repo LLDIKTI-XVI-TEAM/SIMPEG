@@ -91,9 +91,9 @@
         
         // Form states
         newKeluarga: { nama_anggota: '', hubungan: 'Istri', nik: '', tempat_lahir: '', tanggal_lahir: '', jenis_kelamin: 'P', status_tunjangan: '0', pekerjaan: '' },
-        newPangkat: { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '' },
-        newJabatan: { jabatan_id: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', kelas_jabatan: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '' },
-        newKgb: { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '' },
+        newPangkat: { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '', file_sk: null },
+        newJabatan: { jabatan_id: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', kelas_jabatan: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '', file_sk: null },
+        newKgb: { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '', file_sk: null },
         newDisiplin: { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '', file_sk: null, dokumen_id: '' },
         newPendidikan: { jenjang_id: '', nama_institusi: '', jurusan: '', tahun_lulus: '', no_ijazah: '' },
 
@@ -648,6 +648,23 @@
                         headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                         body:    fd,
                     };
+                } else if (['pangkat', 'jabatan', 'kgb'].includes(this.modalType)) {
+                    const history = this.modalType === 'pangkat'
+                        ? this.newPangkat
+                        : (this.modalType === 'jabatan' ? this.newJabatan : this.newKgb);
+                    const fd = new FormData();
+
+                    Object.entries(history).forEach(([key, value]) => {
+                        if (value !== null && value !== '') {
+                            fd.append(key, value);
+                        }
+                    });
+
+                    fetchOptions = {
+                        method:  'POST',
+                        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                        body:    fd,
+                    };
                 } else {
                     fetchOptions = {
                         method:  'POST',
@@ -681,7 +698,8 @@
                             tgl_sk: this.newKgb.tanggal_sk,
                             tmt: this.newKgb.tmt_kgb
                         });
-                        this.newKgb = { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '' };
+                        this.newKgb = { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '', file_sk: null };
+                        document.getElementById('file_sk_kgb').value = '';
                     } else if (this.modalType === 'jabatan') {
                         const h = result.history;
                         this.jabatanList.unshift({
@@ -692,7 +710,8 @@
                             tgl_sk: h.tanggal_sk,
                             tmt: h.tmt_jabatan
                         });
-                        this.newJabatan = { jabatan_id: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', kelas_jabatan: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '' };
+                        this.newJabatan = { jabatan_id: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', kelas_jabatan: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '', file_sk: null };
+                        document.getElementById('file_sk_jabatan').value = '';
                     } else if (this.modalType === 'pangkat') {
                         const h = result.history;
                         this.pangkatList.unshift({
@@ -701,7 +720,8 @@
                             tgl_sk: h.tanggal_sk,
                             tmt: h.tmt_pangkat
                         });
-                        this.newPangkat = { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '' };
+                        this.newPangkat = { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '', file_sk: null };
+                        document.getElementById('file_sk_pangkat').value = '';
                     } else if (this.modalType === 'keluarga') {
                         const f = result.family;
                         this.keluargaList.unshift({
@@ -1948,6 +1968,24 @@
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Golongan</label>
                                     <input type="date" x-model="newPangkat.tmt_pangkat" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
+                                <div class="space-y-1">
+                                    <label for="file_sk_pangkat" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
+                                        Upload SK <span class="font-normal normal-case text-muted">(opsional)</span>
+                                    </label>
+                                    <div class="flex items-center gap-2">
+                                        <label for="file_sk_pangkat" class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 font-sans">
+                                            Pilih File
+                                        </label>
+                                        <input type="file" id="file_sk_pangkat" class="hidden" accept=".pdf,.jpg,.jpeg,.png"
+                                            @change="newPangkat.file_sk = $event.target.files[0] || null">
+                                        <span class="min-w-0 flex-1 truncate text-xs font-sans" :class="newPangkat.file_sk ? 'text-ink' : 'text-muted'"
+                                            x-text="newPangkat.file_sk ? newPangkat.file_sk.name : 'Belum ada file dipilih'"></span>
+                                        <button x-show="newPangkat.file_sk" type="button"
+                                            @click="newPangkat.file_sk = null; document.getElementById('file_sk_pangkat').value = ''"
+                                            class="shrink-0 text-xs text-danger hover:underline font-sans">Hapus</button>
+                                    </div>
+                                    <p class="text-[10px] text-muted italic font-sans">Format PDF/JPG/JPEG/PNG, maks. 10 MB.</p>
+                                </div>
                             </div>
                         </template>
 
@@ -2006,6 +2044,24 @@
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Jabatan</label>
                                     <input type="date" x-model="newJabatan.tmt_jabatan" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
+                                <div class="space-y-1">
+                                    <label for="file_sk_jabatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
+                                        Upload SK <span class="font-normal normal-case text-muted">(opsional)</span>
+                                    </label>
+                                    <div class="flex items-center gap-2">
+                                        <label for="file_sk_jabatan" class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 font-sans">
+                                            Pilih File
+                                        </label>
+                                        <input type="file" id="file_sk_jabatan" class="hidden" accept=".pdf,.jpg,.jpeg,.png"
+                                            @change="newJabatan.file_sk = $event.target.files[0] || null">
+                                        <span class="min-w-0 flex-1 truncate text-xs font-sans" :class="newJabatan.file_sk ? 'text-ink' : 'text-muted'"
+                                            x-text="newJabatan.file_sk ? newJabatan.file_sk.name : 'Belum ada file dipilih'"></span>
+                                        <button x-show="newJabatan.file_sk" type="button"
+                                            @click="newJabatan.file_sk = null; document.getElementById('file_sk_jabatan').value = ''"
+                                            class="shrink-0 text-xs text-danger hover:underline font-sans">Hapus</button>
+                                    </div>
+                                    <p class="text-[10px] text-muted italic font-sans">Format PDF/JPG/JPEG/PNG, maks. 10 MB.</p>
+                                </div>
                             </div>
                         </template>
 
@@ -2027,6 +2083,24 @@
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT KGB</label>
                                     <input type="date" x-model="newKgb.tmt_kgb" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                </div>
+                                <div class="space-y-1">
+                                    <label for="file_sk_kgb" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
+                                        Upload SK <span class="font-normal normal-case text-muted">(opsional)</span>
+                                    </label>
+                                    <div class="flex items-center gap-2">
+                                        <label for="file_sk_kgb" class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 font-sans">
+                                            Pilih File
+                                        </label>
+                                        <input type="file" id="file_sk_kgb" class="hidden" accept=".pdf,.jpg,.jpeg,.png"
+                                            @change="newKgb.file_sk = $event.target.files[0] || null">
+                                        <span class="min-w-0 flex-1 truncate text-xs font-sans" :class="newKgb.file_sk ? 'text-ink' : 'text-muted'"
+                                            x-text="newKgb.file_sk ? newKgb.file_sk.name : 'Belum ada file dipilih'"></span>
+                                        <button x-show="newKgb.file_sk" type="button"
+                                            @click="newKgb.file_sk = null; document.getElementById('file_sk_kgb').value = ''"
+                                            class="shrink-0 text-xs text-danger hover:underline font-sans">Hapus</button>
+                                    </div>
+                                    <p class="text-[10px] text-muted italic font-sans">Format PDF/JPG/JPEG/PNG, maks. 10 MB.</p>
                                 </div>
                             </div>
                         </template>

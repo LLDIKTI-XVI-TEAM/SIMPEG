@@ -245,6 +245,19 @@ class EmployeeShowTest extends TestCase
             ->assertSee('x-text="formatDate(j.tmt)"', false);
     }
 
+    public function test_detail_page_provides_optional_sk_upload_controls_for_each_history_modal(): void
+    {
+        $employee = $this->employeeWithReferences();
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSee('id="file_sk_pangkat"', false)
+            ->assertSee('id="file_sk_jabatan"', false)
+            ->assertSee('id="file_sk_kgb"', false)
+            ->assertSee('accept=".pdf,.jpg,.jpeg,.png"', false);
+    }
+
     public function test_employee_detail_response_includes_kepala_lembaga_marker(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
