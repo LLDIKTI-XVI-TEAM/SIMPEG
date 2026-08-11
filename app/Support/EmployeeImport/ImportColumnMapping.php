@@ -17,6 +17,9 @@ class ImportColumnMapping
     /** Penanda kolom sumber yang nilainya tidak dipakai. */
     public const IGNORE = 'tidak_dipakai';
 
+    /** Header sumber yang dikelola oleh domain lain dan tidak boleh masuk import pegawai. */
+    private const RESERVED_SOURCES = ['Role'];
+
     /**
      * Header kanonis yang menjadi target pemetaan valid, yaitu header yang
      * benar-benar dibaca mapper menjadi field model.
@@ -118,6 +121,28 @@ class ImportColumnMapping
     }
 
     /**
+     * Source reserved yang dipetakan ke target aktif.
+     *
+     * Normalisasi disamakan dengan auto-map agar variasi spasi dan kapitalisasi tidak
+     * dapat melewati batas domain, sementara pilihan tidak dipakai tetap diizinkan.
+     *
+     * @param  array<string, string>  $mapping
+     * @return list<string>
+     */
+    public static function reservedSourcesMappedToTargets(array $mapping): array
+    {
+        $invalidSources = [];
+
+        foreach ($mapping as $sourceHeader => $target) {
+            if ($target !== self::IGNORE && self::isReservedSource($sourceHeader)) {
+                $invalidSources[] = $sourceHeader;
+            }
+        }
+
+        return $invalidSources;
+    }
+
+    /**
      * Peringatan non-blocking: kolom sumber yang tidak terpakai (nilainya tidak
      * disimpan) dan header wajib yang belum ditemukan pada file.
      *
@@ -148,6 +173,12 @@ class ImportColumnMapping
         $mapped = [];
 
         foreach ($data as $sourceHeader => $value) {
+            // Pertahanan terakhir: source reserved tidak boleh masuk pipeline walaupun
+            // mapping berbahaya melewati endpoint atau state batch rusak.
+            if (self::isReservedSource($sourceHeader)) {
+                continue;
+            }
+
             $target = $mapping[$sourceHeader] ?? null;
 
             if ($target === null) {
@@ -163,6 +194,17 @@ class ImportColumnMapping
         }
 
         return $mapped;
+    }
+
+    private static function isReservedSource(string $sourceHeader): bool
+    {
+        foreach (self::RESERVED_SOURCES as $reservedSource) {
+            if (self::normalize($sourceHeader) === self::normalize($reservedSource)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static function normalize(string $value): string
