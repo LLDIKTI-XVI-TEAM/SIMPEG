@@ -568,6 +568,11 @@ class EmployeeImportExecutionRaceTest extends TestCase
         }
 
         $this->assertSame(0, $observer->publishedCount());
+
+        $retry = app(QueueImportBatchAction::class)->execute($batchId, $user);
+
+        $this->assertSame('queued', $retry['status']);
+        $this->assertSame(1, $observer->publishedCount());
     }
 
     /** Redelivery job setelah batch selesai tidak boleh mengubah hasil, audit, atau cache pertama. */

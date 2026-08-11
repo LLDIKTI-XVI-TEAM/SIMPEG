@@ -53,7 +53,6 @@ class QueueImportBatchAction
                 $cacheKey,
                 $batch,
                 $processingToken,
-                $job,
                 &$claimed,
             ): void {
                 $now = now();
@@ -93,10 +92,12 @@ class QueueImportBatchAction
                 $queuedBatch['progress'] = 0;
                 $queuedBatch['processed_count'] = 0;
                 Cache::put($cacheKey, $queuedBatch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
-
-                // Dispatch berada dalam transaksi claim agar database queue dan status batch commit bersama.
-                dispatch($job);
             });
+
+            if ($claimed) {
+                // Dispatch setelah transaksi internal agar unique lock mengikuti transaksi caller terluar.
+                dispatch($job);
+            }
         } catch (\Throwable $exception) {
             if ($claimed) {
                 Cache::put($cacheKey, $originalBatch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
