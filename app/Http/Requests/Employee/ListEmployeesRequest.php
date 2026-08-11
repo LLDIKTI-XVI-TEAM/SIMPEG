@@ -33,6 +33,7 @@ class ListEmployeesRequest extends FormRequest
                 }
             }],
             'status_aktif' => ['nullable', 'in:Aktif,Non-Aktif,Pensiun,Mutasi'],
+            'show_nonaktif' => ['nullable', 'boolean'],
             'sort' => [
                 'nullable',
                 'in:nama_lengkap,nip,golongan_terakhir,jabatan_terakhir,jenis_pegawai_id,status_pegawai_id,status_aktif,created_at',
@@ -51,6 +52,7 @@ class ListEmployeesRequest extends FormRequest
             'jenis_pegawai_id' => 'Jenis Pegawai',
             'status_pegawai_id' => 'Status Pegawai',
             'status_aktif' => 'Status Aktif',
+            'show_nonaktif' => 'Tampilkan Pegawai Non-Aktif',
             'sort' => 'Kolom Urutan',
             'direction' => 'Arah Urutan',
             'per_page' => 'Jumlah Data per Halaman',

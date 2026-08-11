@@ -91,6 +91,7 @@ class PegawaiController extends Controller
             'jenis_pegawai_id' => trim((string) $request->query('jenis_pegawai_id', '')),
             'status_pegawai_id' => trim((string) $request->query('status_pegawai_id', 'all')),
             'status_aktif' => trim((string) $request->query('status_aktif', '')),
+            'show_nonaktif' => $request->boolean('show_nonaktif'),
         ];
 
         // Backward-compatible query params from the pagination branch.
@@ -454,7 +455,7 @@ class PegawaiController extends Controller
         $action->execute($employee, $request);
 
         return redirect()->route('data-pegawai')
-            ->with('success', 'Data pegawai '.$nama.' berhasil dihapus ke backup.')
+            ->with('success', 'Data pegawai '.$nama.' berhasil dinonaktifkan.')
             ->with('employee_data_changed', true)
             ->with('backup_data_changed', true);
     }
@@ -553,7 +554,7 @@ class PegawaiController extends Controller
         });
 
         return back()
-            ->with('success', $count.' pegawai berhasil dihapus ke backup.')
+            ->with('success', $count.' pegawai berhasil dinonaktifkan.')
             ->with('employee_data_changed', true)
             ->with('backup_data_changed', true);
     }

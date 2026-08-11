@@ -21,7 +21,13 @@ class ListEmployeesAction
         $direction = $validated['direction'] ?? 'asc';
         $perPage = (int) ($validated['per_page'] ?? 10);
 
-        return Employee::query()
+        $employees = Employee::query();
+
+        if (filter_var($validated['show_nonaktif'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            $employees->onlyTrashed();
+        }
+
+        return $employees
             ->select([
                 'id',
                 'nama_lengkap',

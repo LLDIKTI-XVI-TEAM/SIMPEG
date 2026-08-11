@@ -81,7 +81,42 @@ class EmployeeDeactivateRestoreTest extends TestCase
         $this->actingAs($user)
             ->get(route('data-pegawai'))
             ->assertOk()
-            ->assertSee('Nonaktifkan', false);
+            ->assertSee('Nonaktifkan', false)
+            ->assertSee('Tampilkan Pegawai Non-Aktif', false)
+            ->assertSee('Data tidak dihapus dan bisa diaktifkan kembali.', false)
+            ->assertDontSee('30 hari', false)
+            ->assertDontSee('dihapus permanen otomatis', false);
+    }
+
+    public function test_admin_kepegawaian_melihat_aksi_nonaktifkan_di_detail_pegawai(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Detail Nonaktif']);
+
+        $this->actingAs($user)
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSee('Nonaktifkan', false)
+            ->assertSee('Apakah Anda yakin ingin menonaktifkan pegawai', false)
+            ->assertSee('Data tidak dihapus dan bisa diaktifkan kembali.', false);
+    }
+
+    public function test_tombol_nonaktifkan_tidak_tampil_tanpa_permission(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $role = Role::where('name', 'admin_kepegawaian')->firstOrFail();
+        $permissionId = Permission::where('name', 'employees.deactivate')->value('id');
+        $role->permissions()->detach($permissionId);
+        $employee = Employee::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('data-pegawai'))
+            ->assertOk()
+            ->assertDontSee('aria-label="Nonaktifkan pegawai', false);
+
+        $this->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertDontSee('Nonaktifkan', false);
     }
 
     public function test_admin_can_restore_employee_via_api_and_audit_is_written(): void
@@ -129,6 +164,20 @@ class EmployeeDeactivateRestoreTest extends TestCase
         $response->assertJsonMissingPath('employees.data.0.no_kk');
         $response->assertJsonMissingPath('employees.data.0.keycloak_id');
         $response->assertJsonMissing(['nama_lengkap' => 'Pegawai Aktif']);
+    }
+
+    public function test_api_employee_list_can_filter_nonaktif_employees(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        Employee::factory()->create(['nama_lengkap' => 'Pegawai Aktif Filter']);
+        $inactive = Employee::factory()->create(['nama_lengkap' => 'Pegawai Nonaktif Filter']);
+        $inactive->delete();
+
+        $this->actingAs($user)
+            ->getJson('/api/v1/pegawai?show_nonaktif=1')
+            ->assertOk()
+            ->assertJsonPath('employees.data.0.nama_lengkap', 'Pegawai Nonaktif Filter')
+            ->assertJsonMissing(['nama_lengkap' => 'Pegawai Aktif Filter']);
     }
 
     public function test_web_deactivate_redirects_and_writes_soft_delete_audit(): void

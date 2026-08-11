@@ -19,7 +19,7 @@
     newKgb: { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '', file_sk: null },
 
 
-    // ===== State Modal Delete / Backup =====
+    // ===== State Modal Nonaktifkan Pegawai =====
     showDeleteModal: false,
     deletePegawaiId: null,
     deletePegawaiName: '',
@@ -49,6 +49,7 @@
         unit_kerja_id:     '{{ $filters['unit_kerja_id'] }}',
         jenis_pegawai_id:  '{{ $filters['jenis_pegawai_id'] }}',
         status_pegawai_id: '{{ $filters['status_pegawai_id'] ?: 'all' }}',
+        show_nonaktif: {{ $filters['show_nonaktif'] ? 'true' : 'false' }},
     },
     searchTimer: null,
 
@@ -58,7 +59,7 @@
 
     get cacheKey() {
         const f = this.filters;
-        return `pegawai_pp${this.perPage}_s${f.search}_g${f.golongan}_u${f.unit_kerja_id}_j${f.jenis_pegawai_id}_st${f.status_pegawai_id}_sort${this.sort}_dir${this.direction}`;
+        return `pegawai_pp${this.perPage}_s${f.search}_g${f.golongan}_u${f.unit_kerja_id}_j${f.jenis_pegawai_id}_st${f.status_pegawai_id}_na${f.show_nonaktif}_sort${this.sort}_dir${this.direction}`;
     },
 
     clearCache() {
@@ -91,7 +92,7 @@
                 per_page: this.perPage,
                 sort: this.sort,
                 direction: this.direction,
-                ...Object.fromEntries(Object.entries(this.filters).filter(([, v]) => v !== '')),
+                ...Object.fromEntries(Object.entries(this.filters).filter(([, v]) => v !== '' && v !== false)),
             });
             const res = await fetch(`/api/v1/pegawai?${params}`, {
                 headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
@@ -178,7 +179,7 @@
         if (!this.deletePegawaiId) return;
         this.isDeleting = true;
         try {
-            // Soft delete — data masuk backup 30 hari, bisa dipulihkan
+            // Soft delete menonaktifkan data dan dapat dipulihkan melalui daftar nonaktif.
             const res = await fetch(`/api/v1/pegawai/${this.deletePegawaiId}`, {
                 method: 'DELETE',
                 headers: {
@@ -489,9 +490,15 @@
             isLoading="isLoading" perPage="perPage" setPerPage="setPerPage($event.target.value)" sort="sort"
             direction="direction" setSort="setSort(col)" searchModel="filters.search"
             searchPlaceholder="Cari nama atau NIP" emptyTitle="Tidak ada data pegawai yang sesuai."
-            emptyIcon="search" :colspanCount="count($tableColumns)" :checkAllId="!($isReadOnly ?? false) ? 'check-all' : null" filterClass="lg:grid-cols-5">
+            emptyIcon="search" :colspanCount="count($tableColumns)" :checkAllId="!($isReadOnly ?? false) ? 'check-all' : null" filterClass="lg:grid-cols-6">
             {{-- ---- Filter Slots ---- --}}
             <x-slot:filters>
+                <label class="flex min-h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-xs font-semibold text-ink cursor-pointer">
+                    <input type="checkbox" x-model="filters.show_nonaktif" @change="applyFilter()"
+                        aria-label="Tampilkan Pegawai Non-Aktif"
+                        class="h-4 w-4 rounded border-border text-primary focus:ring-primary">
+                    Tampilkan Pegawai Non-Aktif
+                </label>
                 {{-- Filter Golongan --}}
                 <div>
                     <x-form.select x-model="filters.golongan" @change="applyFilter()" size="md" aria-label="Filter golongan">
@@ -651,7 +658,7 @@
 
                         {{-- Aksi --}}
                         <td class="px-4 py-3">
-                            <div class="flex items-center justify-start gap-1.5">
+                            <div x-show="!filters.show_nonaktif" class="flex items-center justify-start gap-1.5">
                                 {{-- Detail --}}
                                 <x-ui.tooltip text="Detail" position="top">
                                     @if ($isReadOnly)
@@ -672,7 +679,7 @@
                                 @if (!$isReadOnly)
                                 {{-- Edit --}}
                                 <x-ui.tooltip text="Edit" position="top">
-                                    <a :href="`/pegawai/${p.id}/edit`" wire:navigate
+                                    <a x-show="!filters.show_nonaktif" :href="`/pegawai/${p.id}/edit`" wire:navigate
                                         class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
                                             viewBox="0 0 24 24" stroke-width="1.5">
@@ -686,7 +693,7 @@
                                 @if(auth()->user()->hasPermission('employees.deactivate'))
                                     {{-- Nonaktifkan → masuk Backup sesuai permission soft delete --}}
                                     <x-ui.tooltip text="Nonaktifkan" position="top-end">
-                                        <button type="button" @click="deletePegawai(p.id, p.nama_lengkap)"
+                                        <button x-show="!filters.show_nonaktif" type="button" @click="deletePegawai(p.id, p.nama_lengkap)"
                                             :aria-label="'Nonaktifkan pegawai ' + p.nama_lengkap"
                                             class="flex h-8 w-8 items-center justify-center rounded-lg border border-danger/30 bg-surface text-danger transition hover:bg-danger/10 shadow-sm">
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
@@ -725,14 +732,14 @@
             <button @click="
             const count = document.querySelectorAll('.row-check:checked').length;
             if (count === 0) { window.alert('Tidak ada data pegawai yang dipilih.'); return; }
-            document.getElementById('modal-title-bulk-delete').innerText = 'Hapus ' + count + ' Pegawai ke Backup';
+            document.getElementById('modal-title-bulk-delete').innerText = 'Nonaktifkan ' + count + ' Pegawai';
             $dispatch('open-confirm-bulk-delete');
         " class="inline-flex items-center gap-1.5 text-xs font-semibold text-danger hover:underline transition-colors cursor-pointer">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
                 </svg>
-                Hapus ke Backup
+                Nonaktifkan Terpilih
             </button>
             <button
                 onclick="document.querySelectorAll(\'.row-check\').forEach(c => c.checked = false); updateBulkBar();"
@@ -859,7 +866,7 @@
         {{-- ============================================================ --}}
         {{-- MODAL HAPUS PEGAWAI → BACKUP (Super Admin Only) --}}
         {{-- ============================================================ --}}
-        <x-ui.modal show="showDeleteModal" title="Hapus Pegawai ke Backup" closeAction="showDeleteModal = false"
+        <x-ui.modal show="showDeleteModal" title="Nonaktifkan Pegawai" closeAction="showDeleteModal = false"
             maxWidth="sm">
             <div class="space-y-4">
                 {{-- Info backup --}}
@@ -871,15 +878,12 @@
                     </svg>
                     <div>
                         <p class="text-sm font-semibold text-ink font-sans">
-                            Data akan dipindahkan ke Backup
+                            Konfirmasi Nonaktifkan Pegawai
                         </p>
                         <p class="text-xs text-muted font-sans mt-1">
-                            Pegawai <strong x-text="deletePegawaiName" class="text-ink"></strong> akan dihapus dari
-                            daftar aktif
-                            dan disimpan di <strong>Data Backup</strong> selama <strong>30 hari</strong>.
-                            Dalam masa tersebut data masih bisa dipulihkan.
-                            Setelah 30 hari, data beserta semua riwayat dan file akan <span
-                                class="text-danger font-semibold">dihapus permanen otomatis</span>.
+                            Apakah Anda yakin ingin menonaktifkan pegawai
+                            <strong x-text="deletePegawaiName" class="text-ink"></strong>?
+                            Data tidak dihapus dan bisa diaktifkan kembali.
                         </p>
                     </div>
                 </div>
@@ -903,7 +907,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
                         </svg>
-                        <span x-text="isDeleting ? 'Memproses...' : 'Ya, Hapus ke Backup'"></span>
+                        <span x-text="isDeleting ? 'Memproses...' : 'Ya, Nonaktifkan'"></span>
                     </button>
                 </div>
             </div>
@@ -915,7 +919,7 @@
         <div x-data="{ open: false, isBulkDeleting: false }" @open-confirm-bulk-delete.window="open = true">
             <x-ui.modal show="open" title="" closeAction="open = false" maxWidth="sm">
                 <div class="space-y-4">
-                    <p id="modal-title-bulk-delete" class="text-sm font-bold text-ink font-sans">Hapus Pegawai ke Backup
+                    <p id="modal-title-bulk-delete" class="text-sm font-bold text-ink font-sans">Nonaktifkan Pegawai
                     </p>
                     <div class="flex items-start gap-3 rounded-lg bg-warning/10 border border-warning/20 p-3">
                         <svg class="w-5 h-5 mt-0.5 shrink-0 text-warning" fill="none" stroke="currentColor"
@@ -924,11 +928,8 @@
                                 d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
                         </svg>
                         <p class="text-xs text-muted font-sans">
-                            Pegawai terpilih akan dipindahkan ke <strong class="text-ink">Data Backup</strong> selama
-                            <strong class="text-ink">30 hari</strong>.
-                            Dalam masa tersebut data masih bisa dipulihkan.
-                            Setelah 30 hari, data beserta semua riwayat dan file akan
-                            <span class="text-danger font-semibold">dihapus permanen otomatis</span>.
+                            Apakah Anda yakin ingin menonaktifkan pegawai terpilih?
+                            Data tidak dihapus dan bisa diaktifkan kembali.
                         </p>
                     </div>
 
@@ -966,7 +967,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
                             </svg>
-                            <span x-text="isBulkDeleting ? 'Memproses...' : 'Ya, Hapus ke Backup'"></span>
+                            <span x-text="isBulkDeleting ? 'Memproses...' : 'Ya, Nonaktifkan'"></span>
                         </button>
                     </div>
                 </div>
