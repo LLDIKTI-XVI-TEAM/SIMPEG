@@ -474,6 +474,10 @@ class EmployeeImportExecutionRaceTest extends TestCase
     /** Kegagalan audit row harus rollback mutasi pegawai dan checkpoint pada transaksi yang sama. */
     public function test_row_audit_failure_rolls_back_employee_and_checkpoint(): void
     {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Rollback audit row import diverifikasi khusus pada PostgreSQL.');
+        }
+
         DB::unprepared(<<<'SQL'
             CREATE OR REPLACE FUNCTION reject_import_row_audit() RETURNS trigger AS $$
             BEGIN

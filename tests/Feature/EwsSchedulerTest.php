@@ -417,14 +417,15 @@ class EwsSchedulerTest extends TestCase
             'is_latest' => true,
         ]);
 
+        $expectedTargetDate = now()->addDays(90)->toDateString();
         app(EwsEngineService::class)->run();
 
-        $this->assertDatabaseHas('ews_alerts', [
-            'employee_id' => $employee->id,
-            'type' => 'PENSIUN',
-            'target_date' => now()->addDays(90)->toDateString(),
-            'interval_days' => 90,
-        ]);
+        $alert = EwsAlert::query()
+            ->where('employee_id', $employee->id)
+            ->where('type', 'PENSIUN')
+            ->firstOrFail();
+        $this->assertSame($expectedTargetDate, $alert->target_date->toDateString());
+        $this->assertSame(90, $alert->interval_days);
     }
 
     public function test_scheduler_checks_pppk_contract_using_tanggal_akhir_kontrak(): void
