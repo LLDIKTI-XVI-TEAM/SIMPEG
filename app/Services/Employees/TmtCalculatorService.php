@@ -265,6 +265,7 @@ class TmtCalculatorService
                     'is_active' => true,
                 ],
                 [
+                    'milestone_date' => $pensionDate,
                     'calculated_at' => $today,
                     'metadata' => $metadata,
                 ]
@@ -352,6 +353,7 @@ class TmtCalculatorService
                     'is_active' => true,
                 ],
                 [
+                    'milestone_date' => $employee->tanggal_akhir_kontrak,
                     'calculated_at' => $today,
                     'metadata' => [
                         'contract_type' => 'PPPK',

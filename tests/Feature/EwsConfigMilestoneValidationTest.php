@@ -7,7 +7,11 @@ use App\Models\Employee;
 use App\Models\EmployeeMilestone;
 use App\Models\EwsAlert;
 use App\Models\EwsConfig;
+use App\Models\PositionHistory;
 use App\Models\RankHistory;
+use App\Models\RefJabatan;
+use App\Models\RefJenisJabatan;
+use App\Models\RefUnitKerja;
 use App\Models\SalaryHistory;
 use App\Models\User;
 use App\Services\Employees\TmtCalculatorService;
@@ -299,5 +303,133 @@ class EwsConfigMilestoneValidationTest extends TestCase
         // Verify milestone still active
         $milestone = EmployeeMilestone::find($milestoneId);
         $this->assertTrue($milestone->is_active, 'Milestone should remain active when config unchanged');
+    }
+
+    public function test_pension_config_change_invalidates_global_config_milestones(): void
+    {
+        EwsConfig::updateOrCreate(['key' => 'pensiun_required_age_years'], ['value' => '58']);
+
+        $employee = Employee::factory()->create([
+            'status_aktif' => 'Aktif',
+            'tanggal_lahir' => '1967-03-20',
+            'tanggal_pensiun' => null,
+        ]);
+
+        app(TmtCalculatorService::class)->syncForEmployee($employee);
+
+        $milestone = EmployeeMilestone::where('employee_id', $employee->id)
+            ->where('type', EmployeeMilestone::TYPE_PENSIUN)
+            ->where('is_active', true)
+            ->first();
+
+        $this->assertNotNull($milestone);
+        $this->assertEquals('calculated_from_global_config', $milestone->metadata['source']);
+        $this->assertEquals('pensiun_required_age_years', $milestone->metadata['config_key']);
+
+        $request = Request::create('/ews/config', 'POST', [
+            'pangkat_required_years' => '4',
+            'kgb_required_years' => '2',
+            'pensiun_required_age_years' => '60',
+            'reason' => 'Extend retirement age',
+        ]);
+        $request->setUserResolver(fn () => User::factory()->create(['role' => 'super_admin']));
+
+        (new UpdateEwsConfigAction)->execute($request);
+
+        $milestone->refresh();
+        $this->assertFalse($milestone->is_active);
+        $this->assertEquals('60', EwsConfig::getVal('pensiun_required_age_years'));
+    }
+
+    public function test_pension_config_change_does_not_invalidate_position_bup_milestones(): void
+    {
+        EwsConfig::updateOrCreate(['key' => 'pensiun_required_age_years'], ['value' => '58']);
+
+        $employee = Employee::factory()->create([
+            'status_aktif' => 'Aktif',
+            'tanggal_lahir' => '1967-03-20',
+            'tanggal_pensiun' => null,
+        ]);
+
+        $jenisJabatan = RefJenisJabatan::create([
+            'nama' => 'Fungsional Uji',
+            'maks_usia_pensiun' => 60,
+            'is_active' => true,
+        ]);
+        $jabatan = RefJabatan::create([
+            'nama' => 'Jabatan Uji BUP',
+            'jenis_jabatan_id' => $jenisJabatan->id,
+            'default_bup' => 58,
+            'is_active' => true,
+        ]);
+
+        PositionHistory::create([
+            'employee_id' => $employee->id,
+            'jabatan_id' => $jabatan->id,
+            'jenis_jabatan_id' => $jenisJabatan->id,
+            'nama_jabatan' => $jabatan->nama,
+            'unit_kerja_id' => RefUnitKerja::query()->firstOrFail()->id,
+            'tmt_jabatan' => '2020-01-01',
+            'no_sk' => 'SK-BUP-001',
+            'tanggal_sk' => '2019-12-15',
+            'is_latest' => true,
+        ]);
+
+        app(TmtCalculatorService::class)->syncForEmployee($employee);
+
+        $milestone = EmployeeMilestone::where('employee_id', $employee->id)
+            ->where('type', EmployeeMilestone::TYPE_PENSIUN)
+            ->where('is_active', true)
+            ->first();
+
+        $this->assertNotNull($milestone);
+        $this->assertEquals('calculated_from_bup', $milestone->metadata['source']);
+
+        $request = Request::create('/ews/config', 'POST', [
+            'pangkat_required_years' => '4',
+            'kgb_required_years' => '2',
+            'pensiun_required_age_years' => '65',
+            'reason' => 'Extend retirement age',
+        ]);
+        $request->setUserResolver(fn () => User::factory()->create(['role' => 'super_admin']));
+
+        (new UpdateEwsConfigAction)->execute($request);
+
+        $milestone->refresh();
+        $this->assertTrue($milestone->is_active);
+    }
+
+    public function test_pension_config_change_does_not_invalidate_manual_pension_milestones(): void
+    {
+        EwsConfig::updateOrCreate(['key' => 'pensiun_required_age_years'], ['value' => '58']);
+
+        $employee = Employee::factory()->create([
+            'status_aktif' => 'Aktif',
+            'tanggal_lahir' => '1967-03-20',
+            'tanggal_pensiun' => '2030-06-15',
+        ]);
+
+        app(TmtCalculatorService::class)->syncForEmployee($employee, pensionDateIsAuthoritative: true);
+
+        $milestone = EmployeeMilestone::where('employee_id', $employee->id)
+            ->where('type', EmployeeMilestone::TYPE_PENSIUN)
+            ->where('is_active', true)
+            ->first();
+
+        $this->assertNotNull($milestone);
+        $this->assertEquals('employees.tanggal_pensiun', $milestone->metadata['source']);
+
+        $request = Request::create('/ews/config', 'POST', [
+            'pangkat_required_years' => '4',
+            'kgb_required_years' => '2',
+            'pensiun_required_age_years' => '65',
+            'reason' => 'Extend retirement age',
+        ]);
+        $request->setUserResolver(fn () => User::factory()->create(['role' => 'super_admin']));
+
+        (new UpdateEwsConfigAction)->execute($request);
+
+        $milestone->refresh();
+        $this->assertTrue($milestone->is_active);
     }
 }

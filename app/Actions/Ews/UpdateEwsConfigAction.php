@@ -24,6 +24,7 @@ class UpdateEwsConfigAction
         $milestoneImpactingKeys = [
             'pangkat_required_years' => EmployeeMilestone::TYPE_KENAIKAN_PANGKAT,
             'kgb_required_years' => EmployeeMilestone::TYPE_KGB,
+            'pensiun_required_age_years' => EmployeeMilestone::TYPE_PENSIUN,
         ];
 
         DB::transaction(function () use ($request, $reason, $milestoneImpactingKeys): void {
@@ -69,11 +70,18 @@ class UpdateEwsConfigAction
         mixed $oldValue,
         mixed $newValue,
     ): void {
-        $invalidatedCount = EmployeeMilestone::query()
+        $query = EmployeeMilestone::query()
             ->where('type', $milestoneType)
-            ->where('is_active', true)
-            ->whereJsonContains('metadata->required_years', (int) $oldValue)
-            ->update(['is_active' => false]);
+            ->where('is_active', true);
+
+        if ($milestoneType === EmployeeMilestone::TYPE_PENSIUN) {
+            $query->where('metadata->config_key', $configKey)
+                ->where('metadata->source', 'calculated_from_global_config');
+        } else {
+            $query->whereJsonContains('metadata->required_years', (int) $oldValue);
+        }
+
+        $invalidatedCount = $query->update(['is_active' => false]);
 
         if ($invalidatedCount > 0) {
             Log::info('Milestone EWS dinonaktifkan setelah konfigurasi berubah.', [
