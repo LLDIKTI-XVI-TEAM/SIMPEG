@@ -34,7 +34,7 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue
     private const FAILURE_MESSAGE = 'Proses import pegawai gagal. Silakan coba kembali atau hubungi administrator.';
 
     /** Token ini ikut diserialisasi bersama job agar seluruh redelivery memiliki ownership yang sama. */
-    protected ?string $processingToken = null;
+    final protected ?string $processingToken = null;
 
     /**
      * Create a new job instance.

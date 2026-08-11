@@ -14,6 +14,7 @@ use App\Models\ImportBatch;
 use App\Models\SimpegNotification;
 use App\Models\User;
 use App\Services\NotificationService;
+use Carbon\CarbonInterface;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Database\QueryException;
@@ -260,7 +261,9 @@ class EmployeeImportExecutionRaceTest extends TestCase
 
         // Pesan muncul lagi pada retry_after detik ke-180; lease masih aktif selama 89 detik.
         $this->travel(61)->seconds();
-        $this->assertTrue(ImportBatch::query()->findOrFail($batchId)->lease_expires_at->isFuture());
+        $leaseExpiresAt = ImportBatch::query()->findOrFail($batchId)->lease_expires_at;
+        $this->assertInstanceOf(CarbonInterface::class, $leaseExpiresAt);
+        $this->assertTrue($leaseExpiresAt->isFuture());
 
         $job = new ImportEmployeeBatchJob($batchId, $user->id, null, null, $jobToken);
         $job->handle(app(ExecuteImportBatchAction::class), app(NotificationService::class));
@@ -635,7 +638,7 @@ class EmployeeImportExecutionRaceTest extends TestCase
             'lease_expires_at' => now()->addMinute(),
         ]);
 
-        Log::spy();
+        $logSpy = Log::spy();
         (new ImportEmployeeBatchJob($batchId, $user->id, null, null, $jobToken))
             ->failed(new \RuntimeException('detail internal sangat rahasia'));
 
@@ -665,7 +668,8 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $this->assertStringContainsString('Proses import pegawai gagal.', $csv);
         $this->assertStringNotContainsString('detail internal sangat rahasia', $csv);
 
-        Log::shouldHaveReceived('error')->once()->withArgs(
+        $logSpy->shouldHaveReceived(
+            'error',
             fn (string $message, array $context): bool => $message === 'Job import pegawai gagal setelah retry maksimum.'
                 && ($context['batch_id'] ?? null) === $batchId
                 && ($context['exception_class'] ?? null) === \RuntimeException::class
