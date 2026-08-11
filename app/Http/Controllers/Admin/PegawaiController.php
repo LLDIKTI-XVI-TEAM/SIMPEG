@@ -388,7 +388,13 @@ class PegawaiController extends Controller
         $selectedSupervisorId = $selectedSupervisor?->id ?? $currentSupervisor?->supervisor?->id;
         $selectedSupervisorName = $selectedSupervisor?->nama_lengkap ?? $currentSupervisor?->supervisor?->nama_lengkap;
 
-        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions', 'estimasiTanggalPensiun', 'currentSupervisor', 'currentSupervisorPosition', 'selectedSupervisorId', 'selectedSupervisorName'));
+        // Snapshot status adalah sumber utama. Riwayat latest hanya menjadi fallback
+        // untuk data lama yang belum memiliki status_tanggal tersinkron.
+        $latestStatusHistory = $p->statusHistories->firstWhere('is_latest', true)
+            ?? $p->statusHistories->sortByDesc('tanggal_efektif')->first();
+        $statusEffectiveDate = $p->status_tanggal ?? $latestStatusHistory?->tanggal_efektif;
+
+        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions', 'estimasiTanggalPensiun', 'currentSupervisor', 'currentSupervisorPosition', 'selectedSupervisorId', 'selectedSupervisorName', 'statusEffectiveDate'));
     }
 
     public function edit($id, PrepareEmployeeEditFormDataAction $action)
