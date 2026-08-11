@@ -49,7 +49,7 @@
         unit_kerja_id:     '{{ $filters['unit_kerja_id'] }}',
         jenis_pegawai_id:  '{{ $filters['jenis_pegawai_id'] }}',
         status_pegawai_id: '{{ $filters['status_pegawai_id'] ?: 'all' }}',
-        show_nonaktif: {{ $filters['show_nonaktif'] ? 'true' : 'false' }},
+        show_nonaktif: {{ ($filters['show_nonaktif'] ?? false) ? 'true' : 'false' }},
     },
     searchTimer: null,
 
@@ -409,7 +409,7 @@
                     Refresh
                 </button>
                 @if(!$isReadOnly)
-                <button onclick="exportFilteredData()" id="export-btn"
+                <button x-show="!filters.show_nonaktif" onclick="exportFilteredData()" id="export-btn"
                     class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm cursor-pointer">
                     <svg class="w-4 h-4 mr-1.5 text-primary shrink-0" fill="none" stroke="currentColor"
                         viewBox="0 0 24 24" stroke-width="1.5">
@@ -418,7 +418,7 @@
                     </svg>
                     Export Excel
                 </button>
-                <button onclick="exportFilteredDataPdf()" id="export-pdf-btn"
+                <button x-show="!filters.show_nonaktif" onclick="exportFilteredDataPdf()" id="export-pdf-btn"
                     class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm cursor-pointer">
                     <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.617 0-1.11-.476-1.12-1.09l-.23-2.523M19.5 10.5v.375c0 .621-.504 1.125-1.125 1.125H5.625A1.125 1.125 0 0 1 4.5 11.25v-.375m15 0V9a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 9v1.5m15 0A1.5 1.5 0 0 0 18 9h-3V6a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3H6a1.5 1.5 0 0 0-1.5 1.5" />
@@ -553,7 +553,7 @@
 
                         {{-- Checkbox --}}
                         @if (! ($isReadOnly ?? false))
-                            <td class="px-4 py-3">
+                            <td x-show="!filters.show_nonaktif" class="px-4 py-3">
                                 <x-form.checkbox size="sm" class="row-check" />
                             </td>
                         @endif
@@ -563,9 +563,9 @@
                             <div class="flex items-center gap-3">
                                 <x-ui.tooltip dynamicText="'Buka detail ' + p.nama_lengkap" position="right">
                                     @if ($isReadOnly)
-                                        <a :href="detailUrl(p)" wire:navigate
+                                        <a :href="filters.show_nonaktif ? null : detailUrl(p)" @click="if (filters.show_nonaktif) $event.preventDefault()" wire:navigate
                                     @else
-                                        <a :href="`/pegawai/${p.id}`" wire:navigate
+                                        <a :href="filters.show_nonaktif ? null : `/pegawai/${p.id}`" @click="if (filters.show_nonaktif) $event.preventDefault()" wire:navigate
                                     @endif
                                         class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-sm font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20">
                                         <img x-show="p.foto_url" :src="p.foto_url" :alt="'Foto ' + p.nama_lengkap"
@@ -578,9 +578,9 @@
                                 <div class="min-w-0">
                                     <x-ui.tooltip dynamicText="'Buka detail ' + p.nama_lengkap" position="right">
                                         @if ($isReadOnly)
-                                            <a :href="detailUrl(p)"
+                                            <a :href="filters.show_nonaktif ? null : detailUrl(p)" @click="if (filters.show_nonaktif) $event.preventDefault()"
                                         @else
-                                            <a :href="`/pegawai/${p.id}`"
+                                            <a :href="filters.show_nonaktif ? null : `/pegawai/${p.id}`" @click="if (filters.show_nonaktif) $event.preventDefault()"
                                         @endif
                                             class="block truncate text-sm font-semibold text-ink transition hover:text-primary"
                                             x-text="p.nama_lengkap"></a>

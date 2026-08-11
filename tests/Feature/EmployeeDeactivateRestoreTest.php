@@ -79,10 +79,14 @@ class EmployeeDeactivateRestoreTest extends TestCase
         $user = User::factory()->adminKepegawaian()->create();
 
         $this->actingAs($user)
-            ->get(route('data-pegawai'))
+            ->get(route('data-pegawai', ['show_nonaktif' => 1]))
             ->assertOk()
             ->assertSee('Nonaktifkan', false)
             ->assertSee('Tampilkan Pegawai Non-Aktif', false)
+            ->assertSee('show_nonaktif: true', false)
+            ->assertSee('filters.show_nonaktif ? null : `/pegawai/${p.id}`', false)
+            ->assertSee('x-show="!filters.show_nonaktif" onclick="exportFilteredData()"', false)
+            ->assertSee('x-show="!filters.show_nonaktif" onclick="exportFilteredDataPdf()"', false)
             ->assertSee('Data tidak dihapus dan bisa diaktifkan kembali.', false)
             ->assertDontSee('30 hari', false)
             ->assertDontSee('dihapus permanen otomatis', false);
