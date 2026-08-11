@@ -22,6 +22,12 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue
     /** Batasi lock dispatch agar kegagalan worker tidak menahan batch tanpa batas. */
     public int $uniqueFor = 3600;
 
+    /** Import boleh dicoba ulang untuk kegagalan sementara; checkpoint mencegah duplikasi baris. */
+    public int $tries = 3;
+
+    /** Harus lebih pendek dari retry_after koneksi queue agar dua worker tidak memproses batch bersamaan. */
+    public int $timeout = 120;
+
     /**
      * Create a new job instance.
      */

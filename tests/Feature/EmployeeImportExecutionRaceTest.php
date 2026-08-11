@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Actions\Employees\ExecuteImportBatchAction;
+use App\Actions\Employees\QueueImportBatchAction;
 use App\Actions\Employees\UploadImportBatchAction;
 use App\Actions\Employees\ValidateImportBatchAction;
 use App\Jobs\ImportEmployeeBatchJob;
@@ -15,6 +16,7 @@ use Database\Seeders\ReferenceSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Queue\WorkerOptions;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -97,7 +99,7 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $this->assertStringContainsString('"Dilewati (NIP terdaftar)",1', $csv);
     }
 
-    /** Pelanggaran unique selain NIP harus tetap menggagalkan batch dan tidak disamarkan sebagai skip. */
+    /** Pelanggaran unique selain NIP harus dilempar ulang dan baru terminal setelah retry habis. */
     public function test_execution_does_not_classify_another_unique_constraint_as_duplicate_nip(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -121,17 +123,76 @@ class EmployeeImportExecutionRaceTest extends TestCase
         ]);
         $this->persistQueuedBatch($batchId, $user);
 
+        $caughtException = null;
         try {
             app(ExecuteImportBatchAction::class)->execute($batchId, $user);
             $this->fail('Unique violation email seharusnya dilempar ulang.');
         } catch (QueryException $exception) {
+            $caughtException = $exception;
             $this->assertStringContainsString('employee_import_race_email_unique', $exception->getMessage());
         }
 
         $persistedBatch = ImportBatch::query()->findOrFail($batchId);
-        $this->assertSame('failed', $persistedBatch->status);
+        $this->assertSame('queued', $persistedBatch->status);
         $this->assertSame(0, $persistedBatch->inserted_count);
         $this->assertSame(0, $persistedBatch->skipped_count);
+
+        (new ImportEmployeeBatchJob($batchId, $user->id))->failed($caughtException);
+
+        $this->assertSame('failed', ImportBatch::query()->findOrFail($batchId)->status);
+    }
+
+    /** Retry worker melanjutkan baris yang belum commit tanpa mengubah hasil attempt pertama menjadi skip. */
+    public function test_transient_failure_after_committed_row_resumes_from_durable_checkpoint(): void
+    {
+        config([
+            'queue.default' => 'database',
+            'queue.connections.database.connection' => config('database.default'),
+        ]);
+        app()->forgetInstance('queue.worker');
+
+        $user = User::factory()->adminKepegawaian()->create();
+        $batch = app(UploadImportBatchAction::class)->execute(
+            $this->csvFile($this->twoRowCsv()),
+            'utama',
+            $user,
+        );
+        $batchId = $batch['batch_id'];
+        app(ValidateImportBatchAction::class)->execute($batchId, null, $user);
+
+        $temporaryConflict = Employee::factory()->create([
+            'nip' => '199001012015041003',
+            'email_pribadi' => 'siti@example.com',
+        ]);
+        DB::statement(
+            'CREATE UNIQUE INDEX employee_import_retry_email_unique '
+            .'ON employees (LOWER(email_pribadi)) WHERE email_pribadi IS NOT NULL',
+        );
+
+        app(QueueImportBatchAction::class)->execute($batchId, $user);
+        app('queue.worker')->runNextJob('database', 'default', new WorkerOptions(maxTries: 3));
+
+        $this->assertDatabaseHas('employees', ['nip' => '198001012006041001']);
+        $retryableBatch = ImportBatch::query()->findOrFail($batchId);
+        $this->assertSame('queued', $retryableBatch->status);
+        $this->assertSame(1, $retryableBatch->inserted_count);
+        $this->assertSame(0, $retryableBatch->skipped_count);
+        $this->assertSame(0, $retryableBatch->failed_count);
+        $this->assertSame([], $retryableBatch->row_issues);
+
+        $temporaryConflict->forceDelete();
+
+        app('queue.worker')->runNextJob('database', 'default', new WorkerOptions(maxTries: 3));
+
+        $persistedBatch = ImportBatch::query()->findOrFail($batchId);
+        $this->assertSame('completed', $persistedBatch->status);
+        $this->assertSame(2, $persistedBatch->inserted_count);
+        $this->assertSame(0, $persistedBatch->skipped_count);
+        $this->assertSame(0, $persistedBatch->failed_count);
+        $this->assertSame(1, Employee::query()->where('nip', '198001012006041001')->count());
+        $this->assertSame(1, Employee::query()->where('nip', '198101012007041002')->count());
+        $this->assertSame(1, AuditLog::query()->where('event', 'IMPORT')->count());
+        $this->assertDatabaseCount('jobs', 0);
     }
 
     /** Dua request eksekusi untuk batch sama hanya boleh menghasilkan satu dispatch antrean. */
@@ -285,6 +346,26 @@ class EmployeeImportExecutionRaceTest extends TestCase
         ];
 
         return implode(',', $headers)."\n".implode(',', $row)."\n";
+    }
+
+    private function twoRowCsv(): string
+    {
+        $firstRow = [
+            'Budi Santoso', 'budi@example.com', 'III/a', 'Analis Kepegawaian', '7',
+            '198001012006041001', '081234567890', 'Penata Muda', 'S1', '2038-01-01',
+            'Budi Santoso', 'Budi Santoso', 'Manajemen', 'PNS', '1980-01-01',
+        ];
+        $secondRow = [
+            'Siti Aminah', 'siti@example.com', 'III/b', 'Analis Kepegawaian', '8',
+            '198101012007041002', '081234567891', 'Penata Muda Tk. I', 'S1', '2039-01-01',
+            'Siti Aminah', 'Siti Aminah', 'Administrasi Negara', 'PNS', '1981-01-01',
+        ];
+
+        return implode(',', [
+            'Nama Pegawai', 'Email Pegawai', 'Golongan', 'Jabatan', 'Kelas Jabatan', 'NIP',
+            'Nomor Telepon', 'Pangkat', 'Pendidikan Terakhir', 'Pensiun', 'Person', 'Person Formula',
+            'Prodi Pendidikan Terakhir', 'Status Kepegawaian', 'Tanggal Lahir',
+        ])."\n".implode(',', $firstRow)."\n".implode(',', $secondRow)."\n";
     }
 
     private function csvFile(string $content): UploadedFile
