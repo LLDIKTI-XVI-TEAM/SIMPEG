@@ -17,9 +17,12 @@ use App\Services\NotificationService;
 use Carbon\CarbonInterface;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
+use Illuminate\Contracts\Queue\Queue as QueueContract;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Queue\Connectors\ConnectorInterface;
+use Illuminate\Queue\Queue as BaseQueue;
 use Illuminate\Queue\WorkerOptions;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -531,6 +534,42 @@ class EmployeeImportExecutionRaceTest extends TestCase
         ]);
     }
 
+    /** Queue eksternal tidak boleh menerima job sebelum seluruh transaksi claim commit. */
+    public function test_import_job_dispatch_waits_for_outer_transaction_commit(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $batchId = $this->validatedBatchId($user);
+        $observer = $this->observeImportJobPublications();
+
+        DB::transaction(function () use ($batchId, $user, $observer): void {
+            app(QueueImportBatchAction::class)->execute($batchId, $user);
+
+            $this->assertSame(0, $observer->publishedCount());
+        });
+
+        $this->assertSame(1, $observer->publishedCount());
+    }
+
+    /** Rollback claim harus membuang callback dispatch agar tidak ada job yatim. */
+    public function test_outer_transaction_rollback_discards_import_job_dispatch(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $batchId = $this->validatedBatchId($user);
+        $observer = $this->observeImportJobPublications();
+
+        try {
+            DB::transaction(function () use ($batchId, $user): void {
+                app(QueueImportBatchAction::class)->execute($batchId, $user);
+
+                throw new \RuntimeException('Paksa rollback claim import.');
+            });
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Paksa rollback claim import.', $exception->getMessage());
+        }
+
+        $this->assertSame(0, $observer->publishedCount());
+    }
+
     /** Redelivery job setelah batch selesai tidak boleh mengubah hasil, audit, atau cache pertama. */
     public function test_repeated_execution_preserves_first_completed_result(): void
     {
@@ -762,17 +801,45 @@ class EmployeeImportExecutionRaceTest extends TestCase
 
     private function legacySerializedJobPayload(string $batchId, string $userId): string
     {
-        $job = new ImportEmployeeBatchJob($batchId, $userId);
-        $unsetProcessingToken = \Closure::bind(
-            static function (ImportEmployeeBatchJob $legacyJob): void {
-                unset($legacyJob->processingToken);
-            },
-            null,
-            ImportEmployeeBatchJob::class,
+        $processingToken = 'legacy-payload-processing-token';
+        $payload = serialize(new ImportEmployeeBatchJob(
+            $batchId,
+            $userId,
+            processingToken: $processingToken,
+        ));
+        $propertyFragment = serialize("\0*\0processingToken").serialize($processingToken);
+        $legacyPayload = str_replace($propertyFragment, '', $payload, $propertyReplacementCount);
+        $legacyPayload = preg_replace_callback(
+            '/^(O:\d+:"[^"]+":)(\d+)(:\{)/',
+            /** @param array<int, string> $matches */
+            static fn (array $matches): string => $matches[1].((int) $matches[2] - 1).$matches[3],
+            $legacyPayload,
+            1,
+            $headerReplacementCount,
         );
-        $unsetProcessingToken($job);
 
-        return serialize($job);
+        if ($propertyReplacementCount !== 1 || $headerReplacementCount !== 1 || $legacyPayload === null) {
+            throw new \LogicException('Fixture payload job legacy gagal dibentuk.');
+        }
+
+        return $legacyPayload;
+    }
+
+    private function observeImportJobPublications(): ImportJobPublishObserverQueue
+    {
+        $connection = 'import-publish-observer-'.Str::uuid();
+        $observer = new ImportJobPublishObserverQueue;
+
+        Queue::extend(
+            $connection,
+            static fn (): ConnectorInterface => new ImportJobPublishObserverConnector($observer),
+        );
+        config([
+            'queue.default' => $connection,
+            "queue.connections.{$connection}" => ['driver' => $connection],
+        ]);
+
+        return $observer;
     }
 
     private function postJsonWithCsrf(string $uri, array $data)
@@ -823,5 +890,75 @@ class EmployeeImportExecutionRaceTest extends TestCase
         file_put_contents($path, $content);
 
         return new UploadedFile($path, 'employees.csv', 'text/csv', null, true);
+    }
+}
+
+/** Queue test-only yang mempertahankan pipeline enqueue after-commit Laravel. */
+final class ImportJobPublishObserverQueue extends BaseQueue implements QueueContract
+{
+    /** @var list<string> */
+    private array $publishedPayloads = [];
+
+    public function publishedCount(): int
+    {
+        return count($this->publishedPayloads);
+    }
+
+    public function size($queue = null): int
+    {
+        return $this->publishedCount();
+    }
+
+    public function push($job, $data = '', $queue = null): mixed
+    {
+        return $this->enqueueUsing(
+            $job,
+            $this->createPayload($job, $queue ?? 'default', $data),
+            $queue,
+            null,
+            function (string $payload): int {
+                $this->publishedPayloads[] = $payload;
+
+                return $this->publishedCount();
+            },
+        );
+    }
+
+    public function pushRaw($payload, $queue = null, array $options = []): int
+    {
+        $this->publishedPayloads[] = $payload;
+
+        return $this->publishedCount();
+    }
+
+    public function later($delay, $job, $data = '', $queue = null): mixed
+    {
+        return $this->enqueueUsing(
+            $job,
+            $this->createPayload($job, $queue ?? 'default', $data, $delay),
+            $queue,
+            $delay,
+            function (string $payload): int {
+                $this->publishedPayloads[] = $payload;
+
+                return $this->publishedCount();
+            },
+        );
+    }
+
+    public function pop($queue = null): null
+    {
+        return null;
+    }
+}
+
+/** Connector test-only yang mengekspos observer tanpa mengganti perilaku transaksi queue. */
+final class ImportJobPublishObserverConnector implements ConnectorInterface
+{
+    public function __construct(private readonly ImportJobPublishObserverQueue $queue) {}
+
+    public function connect(array $config): QueueContract
+    {
+        return $this->queue;
     }
 }

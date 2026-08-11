@@ -10,6 +10,7 @@ use App\Services\NotificationService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -18,7 +19,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
-class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue
+class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue, ShouldQueueAfterCommit
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -34,7 +35,7 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue
     private const FAILURE_MESSAGE = 'Proses import pegawai gagal. Silakan coba kembali atau hubungi administrator.';
 
     /** Token ini ikut diserialisasi bersama job agar seluruh redelivery memiliki ownership yang sama. */
-    final protected ?string $processingToken = null;
+    protected ?string $processingToken = null;
 
     /**
      * Create a new job instance.
