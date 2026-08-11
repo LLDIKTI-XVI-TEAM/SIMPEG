@@ -119,7 +119,6 @@
         isLockedIgnoredHeader(header) {
             return ['no', 'role'].includes(this.normalizeSourceHeader(header));
         },
-        },
         sourceHeadersForErrors(errorTargets) {
             // Key error backend mengikuti label atribut validasi, sedangkan mapping
             // memakai header kanonis. Person perlu dinormalisasi agar error tetap
