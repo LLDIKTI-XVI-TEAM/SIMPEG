@@ -16,6 +16,8 @@ class TmtCalculatorService
 {
     private const PENSION_SOURCE_CALCULATED = 'calculated_from_bup';
 
+    private const PENSION_SOURCE_GLOBAL_CONFIG = 'calculated_from_global_config';
+
     private const PENSION_SOURCE_IMPORT = 'employee_import';
 
     private const PENSION_SOURCE_LEGACY_UNVERIFIED = 'legacy_unverified';
@@ -83,8 +85,11 @@ class TmtCalculatorService
             self::PENSION_SOURCE_LEGACY_UNVERIFIED,
         ], true);
 
+        $pensionCalculation = null;
+
         if (! $preservePensionDate) {
-            $pensionDate = $this->pensionDate($employee);
+            $pensionCalculation = $this->pensionCalculation($employee);
+            $pensionDate = $pensionCalculation['date'] ?? null;
 
             if ($pensionDate !== null) {
                 $updates['tanggal_pensiun'] = $pensionDate;
@@ -96,7 +101,13 @@ class TmtCalculatorService
 
         $employee->update($updates);
 
-        $this->storeMilestones($employee, $latestRank, $latestSalary, $pensionSource);
+        $this->storeMilestones(
+            $employee,
+            $latestRank,
+            $latestSalary,
+            $pensionSource,
+            $pensionCalculation,
+        );
     }
 
     /**
@@ -138,9 +149,15 @@ class TmtCalculatorService
      * untuk mencegah scheduler memproses data yang sudah tidak berlaku.
      *
      * @param  string  $pensionSource  Provenance eksplisit untuk melindungi tanggal resmi dan legacy
+     * @param  array{date: Carbon, bup: int, source: string, bup_source: string, jabatan: ?string, config_key: ?string}|null  $pensionCalculation
      */
-    private function storeMilestones(Employee $employee, ?RankHistory $latestRank, ?SalaryHistory $latestSalary, string $pensionSource): void
-    {
+    private function storeMilestones(
+        Employee $employee,
+        ?RankHistory $latestRank,
+        ?SalaryHistory $latestSalary,
+        string $pensionSource,
+        ?array $pensionCalculation,
+    ): void {
         $today = now()->startOfDay();
         $pangkatRequiredYears = $this->configYears('pangkat_required_years', 4);
         $kgbRequiredYears = $this->configYears('kgb_required_years', 2);
@@ -219,15 +236,15 @@ class TmtCalculatorService
             $metadata['bup'] = null;
             $metadata['jabatan'] = null;
         } else {
-            // Hitung dari BUP jabatan ketika belum ada tanggal pensiun resmi.
-            $pensionDate = $employee->tanggal_pensiun;
-            if ($pensionDate !== null) {
-                $position = $this->latestPosition($employee);
-                $bup = $position?->jabatan?->default_bup ?? $position?->jenisJabatan?->maks_usia_pensiun;
+            // Simpan sumber kalkulasi yang sama dengan snapshot agar scheduler dapat mengaudit fallback-nya.
+            $pensionDate = $pensionCalculation['date'] ?? null;
+            if ($pensionCalculation !== null) {
                 $metadata['is_manual'] = false;
-                $metadata['source'] = self::PENSION_SOURCE_CALCULATED;
-                $metadata['bup'] = $bup;
-                $metadata['jabatan'] = $position?->jabatan?->nama ?? null;
+                $metadata['source'] = $pensionCalculation['source'];
+                $metadata['bup_source'] = $pensionCalculation['bup_source'];
+                $metadata['bup'] = $pensionCalculation['bup'];
+                $metadata['jabatan'] = $pensionCalculation['jabatan'];
+                $metadata['config_key'] = $pensionCalculation['config_key'];
             }
         }
 
@@ -422,16 +439,51 @@ class TmtCalculatorService
             ->first();
     }
 
-    private function pensionDate(Employee $employee): ?Carbon
+    /**
+     * Menentukan tanggal dan provenance BUP dengan urutan jabatan, jenis jabatan,
+     * lalu konfigurasi global sebagai fallback paling akhir.
+     *
+     * @return array{date: Carbon, bup: int, source: string, bup_source: string, jabatan: ?string, config_key: ?string}|null
+     */
+    private function pensionCalculation(Employee $employee): ?array
     {
-        $position = $this->latestPosition($employee);
-        $bup = $position?->jabatan?->default_bup
-            ?? $position?->jenisJabatan?->maks_usia_pensiun;
-
-        if ($employee->tanggal_lahir === null || $bup === null) {
+        if ($employee->tanggal_lahir === null) {
             return null;
         }
 
-        return $employee->tanggal_lahir->copy()->addYearsNoOverflow($bup);
+        $position = $this->latestPosition($employee);
+        $positionBup = (int) ($position?->jabatan?->default_bup ?? 0);
+        $positionBupSource = 'ref_jabatan.default_bup';
+
+        if ($positionBup <= 0) {
+            $positionBup = (int) ($position?->jenisJabatan?->maks_usia_pensiun ?? 0);
+            $positionBupSource = 'ref_jenis_jabatan.maks_usia_pensiun';
+        }
+
+        if ($positionBup > 0) {
+            return [
+                'date' => $employee->tanggal_lahir->copy()->addYearsNoOverflow($positionBup),
+                'bup' => $positionBup,
+                'source' => self::PENSION_SOURCE_CALCULATED,
+                'bup_source' => $positionBupSource,
+                'jabatan' => $position?->jabatan?->nama,
+                'config_key' => null,
+            ];
+        }
+
+        $globalBup = max(0, (int) EwsConfig::getVal('pensiun_required_age_years', '0'));
+
+        if ($globalBup === 0) {
+            return null;
+        }
+
+        return [
+            'date' => $employee->tanggal_lahir->copy()->addYearsNoOverflow($globalBup),
+            'bup' => $globalBup,
+            'source' => self::PENSION_SOURCE_GLOBAL_CONFIG,
+            'bup_source' => 'ews_configs.value',
+            'jabatan' => null,
+            'config_key' => 'pensiun_required_age_years',
+        ];
     }
 }

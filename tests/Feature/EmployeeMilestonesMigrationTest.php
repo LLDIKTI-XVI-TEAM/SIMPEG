@@ -150,4 +150,45 @@ class EmployeeMilestonesMigrationTest extends TestCase
             'is_active' => true,
         ]);
     }
+
+    /** CHECK database harus menolak key non-default untuk milestone scalar. */
+    public function test_invalid_scalar_milestone_key_is_rejected(): void
+    {
+        $employee = Employee::factory()->create();
+
+        $this->expectException(QueryException::class);
+
+        DB::table('employee_milestones')->insert([
+            'id' => (string) Str::uuid(),
+            'employee_id' => $employee->id,
+            'type' => EmployeeMilestone::TYPE_PENSIUN,
+            'milestone_key' => 'foo',
+            'milestone_date' => '2038-01-01',
+            'calculated_at' => '2026-08-11',
+            'is_active' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    /** CHECK database harus membatasi Satyalancana pada slot resmi 10, 20, dan 30 tahun. */
+    public function test_invalid_satyalancana_slot_is_rejected(): void
+    {
+        $employee = Employee::factory()->create();
+
+        $this->expectException(QueryException::class);
+
+        DB::table('employee_milestones')->insert([
+            'id' => (string) Str::uuid(),
+            'employee_id' => $employee->id,
+            'type' => EmployeeMilestone::TYPE_SATYALANCANA,
+            'milestone_key' => '15',
+            'milestone_date' => '2041-01-01',
+            'calculated_at' => '2026-08-11',
+            'metadata' => json_encode(['satyalancana_years' => 15], JSON_THROW_ON_ERROR),
+            'is_active' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
 }

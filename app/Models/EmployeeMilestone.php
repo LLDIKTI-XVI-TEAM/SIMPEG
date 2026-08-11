@@ -6,6 +6,7 @@ use App\Models\Concerns\HasUuid;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use InvalidArgumentException;
 
 /**
  * Model untuk menyimpan milestone kepegawaian yang sudah dikalkulasi.
@@ -63,18 +64,27 @@ class EmployeeMilestone extends Model
 
     public const KEY_DEFAULT = 'default';
 
+    /** @var list<string> */
+    public const SATYALANCANA_KEYS = ['10', '20', '30'];
+
     /**
      * Menetapkan slot stabil agar constraint database dapat membedakan milestone scalar
      * dari tiga milestone masa kerja Satyalancana.
      */
     protected static function booted(): void
     {
-        static::creating(function (EmployeeMilestone $milestone): void {
-            if (! empty($milestone->milestone_key)) {
+        static::saving(function (EmployeeMilestone $milestone): void {
+            $expectedKey = self::keyFor($milestone->type, $milestone->metadata);
+
+            if (empty($milestone->milestone_key)) {
+                $milestone->milestone_key = $expectedKey;
+
                 return;
             }
 
-            $milestone->milestone_key = self::keyFor($milestone->type, $milestone->metadata);
+            if ((string) $milestone->milestone_key !== $expectedKey) {
+                throw new InvalidArgumentException("Milestone key tidak valid untuk tipe {$milestone->type}.");
+            }
         });
     }
 
@@ -86,7 +96,14 @@ class EmployeeMilestone extends Model
         }
 
         $years = $metadata['satyalancana_years'] ?? $metadata['years_of_service'] ?? null;
+        $key = is_numeric($years) && (float) $years === (float) (int) $years
+            ? (string) (int) $years
+            : null;
 
-        return is_numeric($years) ? (string) (int) $years : self::KEY_DEFAULT;
+        if ($key === null || ! in_array($key, self::SATYALANCANA_KEYS, true)) {
+            throw new InvalidArgumentException('Milestone Satyalancana hanya mendukung masa kerja 10, 20, atau 30 tahun.');
+        }
+
+        return $key;
     }
 }
