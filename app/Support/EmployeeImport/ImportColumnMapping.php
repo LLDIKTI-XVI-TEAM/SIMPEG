@@ -18,6 +18,37 @@ class ImportColumnMapping
     public const IGNORE = 'tidak_dipakai';
 
     /**
+     * Header sumber yang tidak boleh menjadi input data apapun, terlepas dari
+     * pilihan admin. Kolom ini selalu dipaksa ke IGNORE sebelum mapping disimpan
+     * dan diblokir kembali di apply() sebagai pertahanan berlapis.
+     *
+     * 'Role' dikecualikan karena penetapan role aplikasi berjalan lewat
+     * Kelola Akses User, bukan melalui proses import pegawai.
+     *
+     * @var list<string>
+     */
+    public const RESERVED_SOURCES = ['Role'];
+
+    /**
+     * Paksakan semua source reserved menjadi IGNORE sebelum mapping disimpan.
+     * Ini adalah domain invariant: meski client mengirim {"Role": "Pangkat"},
+     * nilai tersebut direplace menjadi {"Role": "tidak_dipakai"} sebelum cache write.
+     *
+     * @param  array<string, string>  $mapping
+     * @return array<string, string>
+     */
+    public static function normalizeReservedSources(array $mapping): array
+    {
+        foreach (self::RESERVED_SOURCES as $reserved) {
+            if (array_key_exists($reserved, $mapping)) {
+                $mapping[$reserved] = self::IGNORE;
+            }
+        }
+
+        return $mapping;
+    }
+
+    /**
      * Header kanonis yang menjadi target pemetaan valid, yaitu header yang
      * benar-benar dibaca mapper menjadi field model.
      *
@@ -148,6 +179,13 @@ class ImportColumnMapping
         $mapped = [];
 
         foreach ($data as $sourceHeader => $value) {
+            // Fail-closed: source reserved tidak boleh lolos meski mapping cache rusak/stale.
+            // Lapisan kedua setelah normalizeReservedSources() agar invariant ini tidak bergantung
+            // pada siapa yang memanggil, termasuk jalur legacy yang melewati SaveImportMappingAction.
+            if (in_array($sourceHeader, self::RESERVED_SOURCES, true)) {
+                continue;
+            }
+
             $target = $mapping[$sourceHeader] ?? null;
 
             if ($target === null) {

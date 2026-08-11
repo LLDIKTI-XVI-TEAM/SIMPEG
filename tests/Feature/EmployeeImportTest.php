@@ -478,25 +478,93 @@ class EmployeeImportTest extends TestCase
         );
     }
 
-    public function test_upload_memperingatkan_kolom_role_sebagai_kolom_ekstra(): void
+    /**
+     * US-3.2 AC-5: Remapping kolom Role ke field SIMPEG manapun via endpoint harus
+     * dinormalisasi paksa menjadi tidak_dipakai — bukan sekedar tidak tersedia di auto-map.
+     *
+     * Skenario ini membuktikan bahwa request langsung Role → Pangkat ditolak/dinormalisasi
+     * bahkan ketika client mengirim JSON secara manual, tanpa melalui UI.
+     */
+    public function test_save_mapping_normalizes_role_source_ke_tidak_dipakai(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
 
         $this->actingAs($user);
 
-        // File dengan kolom Role warisan: Role tidak boleh menjadi target import dan harus
-        // muncul sebagai peringatan kolom ekstra, bukan field yang dapat dipetakan.
+        // Upload file dengan kolom Role.
         $headers = array_merge($this->headers(), ['Role']);
         $rows = array_map(fn (array $row): array => array_merge($row, ['pegawai']), $this->validRows());
 
         $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
             'file' => $this->xlsxFileWithHeaders($headers, $rows, 'dengan_role.xlsx'),
+        ])->assertOk();
+
+        $batchId = $upload->json('batch_id');
+
+        // Admin mencoba memetakan Role → Pangkat secara langsung melalui endpoint.
+        // Backend harus menormalisasi Role menjadi tidak_dipakai tanpa mengembalikan error,
+        // karena normalisasi adalah pilihan yang lebih UX-friendly dari penolakan keras.
+        $mapping = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/mapping", [
+            'mapping' => [
+                'Pangkat' => 'tidak_dipakai',
+                'Role' => 'Pangkat', // <-- skenario exploit yang harus dinormalisasi
+            ],
         ]);
 
-        $upload->assertOk();
-        $upload->assertJsonPath('mapping.Role', 'tidak_dipakai');
-        $this->assertContains('Role', $upload->json('warnings.unmatched_columns'));
-        $this->assertNotContains('Role', $upload->json('required_targets'));
+        $mapping->assertOk();
+
+        // Role harus dipaksa kembali ke tidak_dipakai — bukan Pangkat.
+        $mapping->assertJsonPath('mapping.Role', 'tidak_dipakai');
+
+        // Pangkat masih tidak_dipakai sebagaimana dikirim admin (duplikasi tidak terjadi).
+        $mapping->assertJsonPath('mapping.Pangkat', 'tidak_dipakai');
+    }
+
+    /**
+     * US-3.2 AC-5: Fail-closed defense di ImportColumnMapping::apply() — nilai kolom Role
+     * tidak boleh lolos ke field SIMPEG manapun meski mapping cache dimanipulasi.
+     *
+     * Membuktikan bahwa lapisan kedua (apply) independen dari SaveImportMappingAction.
+     */
+    public function test_apply_fail_closed_mengabaikan_nilai_kolom_role(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        // Upload file dengan kolom Role.
+        $headers = array_merge($this->headers(), ['Role']);
+        $rows = array_map(fn (array $row): array => array_merge($row, ['pegawai']), $this->validRows());
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFileWithHeaders($headers, $rows, 'role_apply_test.xlsx'),
+        ])->assertOk();
+
+        $batchId = $upload->json('batch_id');
+
+        // Simpan mapping lewat endpoint — normalisasi sudah berjalan di sini.
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/mapping", [
+            'mapping' => [
+                'Role' => 'Pangkat', // akan dinormalisasi menjadi tidak_dipakai
+            ],
+        ])->assertOk();
+
+        // Jalankan validasi dan eksekusi — nilai kolom Role ('pegawai') tidak boleh
+        // tersimpan ke field apapun pada pegawai yang diimpor.
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])
+            ->assertOk()
+            ->assertJsonPath('valid_count', 2);
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", [])
+            ->assertOk()
+            ->assertJsonPath('status', 'queued');
+
+        // Semua pegawai berhasil diimpor tanpa data Role masuk ke kolom manapun.
+        $this->assertDatabaseHas('employees', ['nip' => '198001012006041001']);
+        $this->assertDatabaseHas('employees', ['nip' => '198502122010042002']);
+
+        // Field pangkat_terakhir tidak boleh berisi nilai 'pegawai' (nilai kolom Role).
+        $this->assertDatabaseMissing('employees', ['pangkat_terakhir' => 'pegawai']);
     }
 
     public function test_preview_membatasi_respons_sepuluh_baris_di_sisi_server(): void
