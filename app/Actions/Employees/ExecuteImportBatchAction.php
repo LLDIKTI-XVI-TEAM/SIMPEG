@@ -83,6 +83,11 @@ class ExecuteImportBatchAction
             'finished_at' => null,
         ]);
 
+        $persistedExecutionState = ImportBatch::find($batchId)?->execution_state ?? [];
+        if (! isset($batch['nips_before_execution']) && isset($persistedExecutionState['nips_before_execution'])) {
+            $batch['nips_before_execution'] = $persistedExecutionState['nips_before_execution'];
+        }
+
         // Catat snapshot NIP yang sudah terdaftar di DB sebelum batch ini dieksekusi pertama kali.
         if (! isset($batch['nips_before_execution'])) {
             $validNips = array_filter(array_map(
@@ -93,24 +98,43 @@ class ExecuteImportBatchAction
             $batch['nips_before_execution'] = $validNips !== []
                 ? Employee::withTrashed()->whereIn('nip', $validNips)->pluck('nip')->toArray()
                 : [];
+
+            ImportBatch::whereKey($batchId)->update([
+                'execution_state' => [
+                    'nips_before_execution' => $batch['nips_before_execution'],
+                    'outcomes' => [],
+                ],
+            ]);
+            Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $batch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
         }
+        $executionState = ImportBatch::find($batchId)?->execution_state ?? [];
+        $outcomes = $executionState['outcomes'] ?? [];
         $nipsBeforeExecution = array_flip($batch['nips_before_execution']);
 
         try {
             if ($validRows !== []) {
                 foreach ($validRows as $result) {
-                    try {
-                        $inserted = DB::transaction(fn (): bool => $this->executeValidatedRow(
-                            $type,
-                            $result['validated_data'],
-                            $nipsBeforeExecution,
-                        ));
-                    } catch (QueryException $exception) {
-                        if (! $this->isDuplicateNipException($exception)) {
-                            throw $exception;
+                    $rowKey = (string) $result['row'];
+                    if (isset($outcomes[$rowKey])) {
+                        $inserted = ($outcomes[$rowKey]['status'] ?? null) === 'inserted';
+                    } else {
+                        try {
+                            $inserted = DB::transaction(fn (): bool => $this->executeValidatedRow(
+                                $type,
+                                $result['validated_data'],
+                                $nipsBeforeExecution,
+                            ));
+                        } catch (QueryException $exception) {
+                            if (! $this->isDuplicateNipException($exception)) {
+                                throw $exception;
+                            }
+
+                            $inserted = false;
                         }
 
-                        $inserted = false;
+                        $outcomes[$rowKey] = ['status' => $inserted ? 'inserted' : 'skip'];
+                        $executionState['outcomes'] = $outcomes;
+                        ImportBatch::whereKey($batchId)->update(['execution_state' => $executionState]);
                     }
 
                     $processedCount++;
@@ -222,10 +246,10 @@ class ExecuteImportBatchAction
                     return false;
                 }
 
-                // Jika NIP sudah ada di database saat ini (tetapi tidak ada sebelum eksekusi batch dimulai),
-                // berarti NIP ini dibuat oleh eksekusi/retry batch ini sendiri -> idempotent success.
+                // NIP yang muncul setelah snapshot tidak membuktikan bahwa batch ini yang membuatnya.
+                // Outcome retry berasal dari execution_state per baris, bukan dari keberadaan NIP.
                 if (Employee::withTrashed()->where('nip', $nip)->exists()) {
-                    return true;
+                    return false;
                 }
             }
 

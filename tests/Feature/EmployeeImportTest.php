@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\ImportEmployeeBatchJob;
 use App\Models\Employee;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
@@ -13,6 +14,7 @@ use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Queue;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Tests\TestCase;
@@ -243,8 +245,8 @@ class EmployeeImportTest extends TestCase
     public function test_import_wizard_skips_nip_already_registered_in_database(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
-        // Pegawai sudah terdaftar dengan NIP dan email yang sama (skenario impor ulang file lama).
-        Employee::factory()->create(['nip' => '198001012006041001', 'email_pribadi' => 'budi@example.com']);
+        // NIP existing tanpa konflik email harus dilewati (K-US-02).
+        Employee::factory()->create(['nip' => '198001012006041001', 'email_pribadi' => 'email-lama@example.com']);
 
         $this->actingAs($user);
 
@@ -264,6 +266,63 @@ class EmployeeImportTest extends TestCase
         $validation->assertJsonPath('results.0.status', 'skip');
         $validation->assertJsonPath('results.0.errors.NIP.0', 'NIP sudah terdaftar di database.');
         $validation->assertJsonPath('results.1.status', 'valid');
+    }
+
+    public function test_import_wizard_rejects_email_even_when_nip_belongs_to_same_employee(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        Employee::factory()->create(['nip' => '198001012006041001', 'email_pribadi' => 'budi@example.com']);
+
+        $this->actingAs($user);
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($this->validRows()),
+        ]);
+
+        $validation = $this->postJsonWithCsrf("/api/pegawai/import/{$upload->json('batch_id')}/validate", []);
+
+        $validation->assertOk()
+            ->assertJsonPath('results.0.status', 'error')
+            ->assertJsonPath('results.0.errors.Email Pegawai.0', 'Email pegawai sudah terdaftar di database.');
+    }
+
+    public function test_import_wizard_rejects_email_owned_by_employee_without_nip(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        Employee::factory()->create(['nip' => null, 'email_pribadi' => 'budi@example.com']);
+
+        $this->actingAs($user);
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($this->validRows()),
+        ]);
+
+        $validation = $this->postJsonWithCsrf("/api/pegawai/import/{$upload->json('batch_id')}/validate", []);
+
+        $validation->assertOk()
+            ->assertJsonPath('results.0.status', 'error')
+            ->assertJsonPath('results.0.errors.Email Pegawai.0', 'Email pegawai sudah terdaftar di database.');
+    }
+
+    public function test_import_execute_claims_batch_once_when_requested_repeatedly(): void
+    {
+        Queue::fake();
+        $user = User::factory()->adminKepegawaian()->create();
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($this->validRows()),
+        ]);
+        $batchId = $upload->json('batch_id');
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])->assertOk();
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", [])
+            ->assertOk()
+            ->assertJsonPath('status', 'queued');
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", [])
+            ->assertOk()
+            ->assertJsonPath('status', 'queued');
+
+        Queue::assertPushed(ImportEmployeeBatchJob::class, 1);
+        $this->assertDatabaseHas('import_batches', ['id' => $batchId, 'status' => 'queued']);
     }
 
     public function test_import_wizard_rejects_email_belonging_to_different_employee(): void

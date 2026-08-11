@@ -8,13 +8,14 @@ use App\Models\ImportBatch;
 use App\Models\User;
 use App\Services\NotificationService;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
 
-class ImportEmployeeBatchJob implements ShouldQueue
+class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -27,6 +28,13 @@ class ImportEmployeeBatchJob implements ShouldQueue
         protected ?string $ipAddress = null,
         protected ?string $userAgent = null
     ) {}
+
+    public int $uniqueFor = 3600;
+
+    public function uniqueId(): string
+    {
+        return $this->batchId;
+    }
 
     /**
      * Execute the job.

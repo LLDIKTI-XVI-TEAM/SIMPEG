@@ -183,10 +183,6 @@ class ValidateImportBatchAction
             $emailQuery = Employee::withTrashed()
                 ->whereRaw('LOWER(email_pribadi) = ?', [strtolower($validated['email_pribadi'])]);
 
-            if (! empty($validated['nip'])) {
-                $emailQuery->where('nip', '!=', $validated['nip']);
-            }
-
             if ($emailQuery->exists()) {
                 $databaseErrors['Email Pegawai'][] = 'Email pegawai sudah terdaftar di database.';
             }

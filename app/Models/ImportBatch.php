@@ -28,6 +28,7 @@ class ImportBatch extends Model
         'skipped_count',
         'failed_count',
         'row_issues',
+        'execution_state',
         'error_message',
         'started_at',
         'finished_at',
@@ -37,6 +38,7 @@ class ImportBatch extends Model
     {
         return [
             'row_issues' => 'array',
+            'execution_state' => 'array',
             'started_at' => 'datetime',
             'finished_at' => 'datetime',
         ];

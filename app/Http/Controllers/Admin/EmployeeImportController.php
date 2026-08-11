@@ -17,6 +17,7 @@ use App\Support\EmployeeImport\ImportTemplateWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -106,21 +107,49 @@ class EmployeeImportController extends Controller
     {
         $batch = $this->getBatchOrFail($batchId, $request);
 
-        $existingBatchModel = ImportBatch::find($batchId);
-        if (($batch['status'] ?? null) === 'completed' || $existingBatchModel?->status === 'completed') {
-            return response()->json([
-                'status' => 'completed',
-                'message' => 'Proses impor sudah selesai.',
-            ]);
-        }
-
         if ($batch['validation'] === null) {
             return response()->json([
                 'message' => 'Data belum divalidasi. Jalankan validasi terlebih dahulu.',
             ], 422);
         }
 
-        // Status cache diubah sebelum job diproses agar UI segera menampilkan antrean.
+        $claimed = Cache::lock("import-batch-dispatch:{$batchId}", 10)->block(3, function () use ($batchId, $batch, $request): bool {
+            return DB::transaction(function () use ($batchId, $batch, $request): bool {
+                $model = ImportBatch::query()->lockForUpdate()->find($batchId);
+
+                if ($model === null) {
+                    $model = ImportBatch::create([
+                        'id' => $batchId,
+                        'user_id' => $request->user()?->id,
+                        'filename' => $batch['filename'],
+                        'type' => $batch['type'] ?? 'utama',
+                        'status' => 'validated',
+                        'total_rows' => $batch['total_rows'] ?? 0,
+                        'valid_count' => $batch['validation']['valid_count'] ?? 0,
+                        'skipped_count' => $batch['validation']['skip_count'] ?? 0,
+                        'failed_count' => $batch['validation']['error_count'] ?? 0,
+                        'row_issues' => [],
+                    ]);
+                }
+
+                if (in_array($model->status, ['queued', 'processing', 'completed'], true)) {
+                    return false;
+                }
+
+                $model->update(['status' => 'queued', 'started_at' => null, 'finished_at' => null, 'error_message' => null]);
+
+                return true;
+            });
+        });
+
+        if (! $claimed) {
+            return response()->json([
+                'status' => ImportBatch::find($batchId)?->status ?? 'queued',
+                'message' => 'Batch import sudah sedang diproses atau telah selesai.',
+            ]);
+        }
+
+        // Status cache diubah setelah claim database berhasil agar UI segera menampilkan antrean.
         $batch['status'] = 'queued';
         $batch['progress'] = 0;
         $batch['processed_count'] = 0;
