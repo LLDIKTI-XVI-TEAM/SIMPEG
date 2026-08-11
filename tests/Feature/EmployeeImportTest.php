@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Employees\UploadImportBatchAction;
 use App\Models\Employee;
 use App\Models\EmployeeMilestone;
 use App\Models\PositionHistory;
@@ -10,10 +11,12 @@ use App\Models\RefJenisPegawai;
 use App\Models\SalaryHistory;
 use App\Models\User;
 use App\Services\Employees\TmtCalculatorService;
+use App\Support\EmployeeImport\ImportColumnMapping;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Mockery\MockInterface;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -535,6 +538,30 @@ class EmployeeImportTest extends TestCase
      *
      * Membuktikan bahwa lapisan kedua (apply) independen dari SaveImportMappingAction.
      */
+    public function test_mapping_endpoint_normalizes_role_header_variations(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $this->actingAs($user);
+
+        foreach (['Role', 'ROLE', 'role', '  rOlE  '] as $sourceHeader) {
+            $headers = array_merge($this->headers(), [$sourceHeader]);
+            $rows = array_map(fn (array $row): array => array_merge($row, ['pegawai']), $this->validRows());
+            $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+                'file' => $this->xlsxFileWithHeaders($headers, $rows, 'role_variants.xlsx'),
+            ])->assertOk();
+
+            $storedHeader = collect(array_keys($upload->json('mapping')))
+                ->first(fn (string $header): bool => mb_strtolower(trim($header)) === 'role');
+
+            $this->assertNotNull($storedHeader);
+            $this->postJsonWithCsrf("/api/pegawai/import/{$upload->json('batch_id')}/mapping", [
+                'mapping' => ['Pangkat' => 'tidak_dipakai', $storedHeader => 'Pangkat'],
+            ])
+                ->assertOk()
+                ->assertJsonPath("mapping.{$storedHeader}", 'tidak_dipakai');
+        }
+    }
+
     public function test_apply_fail_closed_mengabaikan_nilai_kolom_role(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -574,6 +601,42 @@ class EmployeeImportTest extends TestCase
 
         // Field pangkat_terakhir tidak boleh berisi nilai 'pegawai' (nilai kolom Role).
         $this->assertDatabaseMissing('employees', ['pangkat_terakhir' => 'pegawai']);
+    }
+
+    public function test_partial_mapping_save_cleans_legacy_role_mapping(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $this->actingAs($user);
+
+        $headers = array_merge($this->headers(), ['Role']);
+        $rows = array_map(fn (array $row): array => array_merge($row, ['pegawai']), $this->validRows());
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFileWithHeaders($headers, $rows, 'legacy_role_mapping.xlsx'),
+        ])->assertOk();
+
+        $batchId = $upload->json('batch_id');
+        $cacheKey = UploadImportBatchAction::CACHE_PREFIX.$batchId;
+        $batch = Cache::get($cacheKey);
+        $batch['mapping']['Role'] = 'Pangkat';
+        Cache::put($cacheKey, $batch, now()->addMinutes(30));
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/mapping", [
+            'mapping' => ['Pangkat' => 'tidak_dipakai'],
+        ])
+            ->assertOk()
+            ->assertJsonPath('mapping.Role', 'tidak_dipakai');
+    }
+
+    public function test_apply_ignores_role_header_variations(): void
+    {
+        foreach (['Role', 'ROLE', 'role', '  rOlE  '] as $sourceHeader) {
+            $mapped = ImportColumnMapping::apply(
+                [$sourceHeader => 'pegawai', 'Pangkat' => 'Penata Muda'],
+                [$sourceHeader => 'Pangkat', 'Pangkat' => 'Pangkat'],
+            );
+
+            $this->assertSame(['Pangkat' => 'Penata Muda'], $mapped);
+        }
     }
 
     public function test_preview_membatasi_respons_sepuluh_baris_di_sisi_server(): void
