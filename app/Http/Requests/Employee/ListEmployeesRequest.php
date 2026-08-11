@@ -7,6 +7,23 @@ use Illuminate\Support\Str;
 
 class ListEmployeesRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if (! $this->has('show_nonaktif')) {
+            return;
+        }
+
+        $showNonaktif = filter_var(
+            $this->input('show_nonaktif'),
+            FILTER_VALIDATE_BOOLEAN,
+            FILTER_NULL_ON_FAILURE,
+        );
+
+        if ($showNonaktif !== null) {
+            $this->merge(['show_nonaktif' => $showNonaktif ? 1 : 0]);
+        }
+    }
+
     public function authorize(): bool
     {
         if (app()->environment('local')

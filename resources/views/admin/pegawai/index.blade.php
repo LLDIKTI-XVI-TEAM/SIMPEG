@@ -92,7 +92,10 @@
                 per_page: this.perPage,
                 sort: this.sort,
                 direction: this.direction,
-                ...Object.fromEntries(Object.entries(this.filters).filter(([, v]) => v !== '' && v !== false)),
+                ...Object.fromEntries(Object.entries({
+                    ...this.filters,
+                    show_nonaktif: this.filters.show_nonaktif ? '1' : '0',
+                }).filter(([, v]) => v !== '')),
             });
             const res = await fetch(`/api/v1/pegawai?${params}`, {
                 headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
@@ -191,21 +194,8 @@
                 const data = await res.json();
                 throw new Error(data.message || `HTTP ${res.status}`);
             }
-            // Hapus pegawai dari semua halaman di cache sessionStorage
-            for (let i = 0; i < sessionStorage.length; i++) {
-                const key = sessionStorage.key(i);
-                if (key && key.startsWith('pegawai_')) {
-                    try {
-                        const cached = JSON.parse(sessionStorage.getItem(key));
-                        const idx = cached.rows.findIndex(r => r.id === this.deletePegawaiId);
-                        if (idx !== -1) {
-                            cached.rows.splice(idx, 1);
-                            cached.meta.total = Math.max(0, cached.meta.total - 1);
-                            sessionStorage.setItem(key, JSON.stringify(cached));
-                        }
-                    } catch(e) {}
-                }
-            }
+            // Cache daftar aktif dan nonaktif harus dimuat ulang agar kedua mode konsisten.
+            this.clearCache();
             
             // Hapus dari data yang tampil sekarang
             const idx = this.pegawaiRows.findIndex(r => r.id === this.deletePegawaiId);
@@ -553,8 +543,8 @@
 
                         {{-- Checkbox --}}
                         @if (! ($isReadOnly ?? false))
-                            <td x-show="!filters.show_nonaktif" class="px-4 py-3">
-                                <x-form.checkbox size="sm" class="row-check" />
+                            <td class="px-4 py-3">
+                                <x-form.checkbox x-show="!filters.show_nonaktif" size="sm" class="row-check" />
                             </td>
                         @endif
 
@@ -629,7 +619,7 @@
 
                         {{-- Dokumen --}}
                         <td class="px-4 py-3">
-                            <button type="button" @click="openDocumentStatus(p)"
+                            <button x-show="!filters.show_nonaktif" type="button" @click="openDocumentStatus(p)"
                                 class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30"
                                 :class="{
                                 'bg-success/10 text-success hover:bg-success/15': p.is_lengkap === 'lengkap',
