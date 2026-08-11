@@ -67,7 +67,7 @@ class UpdateEwsConfigAction
                 }
 
                 if (isset($milestoneImpactingKeys[$key])) {
-                    $this->invalidateMilestonesForConfigChange(
+                    $this->invalidateAndResyncMilestonesForConfigChange(
                         $milestoneImpactingKeys[$key],
                         $key,
                         $oldValue,
@@ -129,14 +129,23 @@ class UpdateEwsConfigAction
     }
 
     /**
-     * Menonaktifkan milestone berversi lama supaya scheduler memakai kalkulasi terbaru.
+     * Menonaktifkan milestone berversi lama dan langsung mempersistensikan ulang milestone
+     * baru berdasarkan konfigurasi terkini, per pegawai terdampak.
+     *
+     * Urutan: bulk-invalidate terlebih dahulu (satu query), kemudian kumpulkan employee
+     * terdampak lalu recalculate per-employee via TmtCalculatorService — persis seperti
+     * syncGlobalPensionMilestones() untuk menjaga konsistensi pola lock ordering.
+     *
+     * Setelah method ini selesai, milestone baru sudah tersimpan di database sehingga
+     * scheduler tidak perlu menghitung ulang dari nol setiap hari (US-5.5 AC-5).
      */
-    private function invalidateMilestonesForConfigChange(
+    private function invalidateAndResyncMilestonesForConfigChange(
         string $milestoneType,
         string $configKey,
         mixed $oldValue,
         mixed $newValue,
     ): void {
+        // 1. Kumpulkan employee_id yang milestonenya akan dinonaktifkan (sebelum update).
         $query = EmployeeMilestone::query()
             ->where('type', $milestoneType)
             ->where('is_active', true);
@@ -148,6 +157,9 @@ class UpdateEwsConfigAction
             $query->whereJsonContains('metadata->required_years', (int) $oldValue);
         }
 
+        $affectedEmployeeIds = (clone $query)->pluck('employee_id')->unique()->values();
+
+        // 2. Bulk-invalidate milestone lama.
         $invalidatedCount = $query->update(['is_active' => false]);
 
         if ($invalidatedCount > 0) {
@@ -159,5 +171,40 @@ class UpdateEwsConfigAction
                 'invalidated_count' => $invalidatedCount,
             ]);
         }
+
+        if ($affectedEmployeeIds->isEmpty()) {
+            return;
+        }
+
+        // 3. Rekalkulasi dan persist milestone baru per pegawai terdampak.
+        // Menggunakan chunkById agar tidak memuat seluruh employee ke memori sekaligus.
+        Employee::query()
+            ->select('employees.id')
+            ->whereIn('employees.id', $affectedEmployeeIds)
+            ->orderBy('employees.id')
+            ->chunkById(
+                self::PENSION_SYNC_CHUNK_SIZE,
+                function (Collection $employees): void {
+                    /** @var Employee $candidate */
+                    foreach ($employees as $candidate) {
+                        $employee = Employee::query()
+                            ->whereKey($candidate->getKey())
+                            ->lockForUpdate()
+                            ->firstOrFail();
+
+                        // Sinkronisasi penuh: milestone non-pensiun termasuk pangkat/KGB diperbarui.
+                        // syncForEmployee sudah mem-persist milestone baru dalam transaksi yang sama.
+                        $this->tmtCalculator->syncForEmployee($employee);
+                    }
+                },
+                'employees.id',
+                'id',
+            );
+
+        Log::info('Milestone EWS direkalsulasi dan dipersistensikan setelah konfigurasi berubah.', [
+            'milestone_type' => $milestoneType,
+            'config_key' => $configKey,
+            'resynced_count' => $affectedEmployeeIds->count(),
+        ]);
     }
 }

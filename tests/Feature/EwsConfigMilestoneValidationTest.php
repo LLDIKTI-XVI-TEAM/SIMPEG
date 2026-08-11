@@ -169,17 +169,114 @@ class EwsConfigMilestoneValidationTest extends TestCase
         $action = app(UpdateEwsConfigAction::class);
         $action->execute($request);
 
-        // Verify all pangkat milestones with old config invalidated
+        // Verify: milestone lama dengan required_years=4 menjadi inactive.
         $this->assertEquals(0, EmployeeMilestone::where('type', EmployeeMilestone::TYPE_KENAIKAN_PANGKAT)
             ->where('is_active', true)
-            ->count(), 'All pangkat milestones should be invalidated');
+            ->whereJsonContains('metadata->required_years', 4)
+            ->count(), 'Milestone lama (required_years=4) harus tidak aktif');
 
         $this->assertEquals(3, EmployeeMilestone::where('type', EmployeeMilestone::TYPE_KENAIKAN_PANGKAT)
             ->where('is_active', false)
-            ->count(), 'All pangkat milestones should be marked inactive');
+            ->count(), 'Semua milestone lama harus ditandai inactive');
+
+        // Verify: milestone baru dengan required_years=5 langsung dibuat (US-5.5 AC-5).
+        $this->assertEquals(3, EmployeeMilestone::where('type', EmployeeMilestone::TYPE_KENAIKAN_PANGKAT)
+            ->where('is_active', true)
+            ->whereJsonContains('metadata->required_years', 5)
+            ->count(), 'Milestone baru (required_years=5) harus langsung ada setelah config change');
 
         // Verify config updated
         $this->assertEquals('5', EwsConfig::getVal('pangkat_required_years'));
+    }
+
+    /**
+     * US-5.5 AC-5: Setelah konfigurasi pangkat/KGB diubah, rekalkulasi milestone harus
+     * langsung dipersistensikan — scheduler tidak boleh dibutuhkan untuk eksekusi awal.
+     *
+     * Membuktikan bahwa invalidateAndResyncMilestonesForConfigChange() tidak hanya
+     * menonaktifkan milestone lama, tapi juga langsung menyimpan milestone baru.
+     */
+    public function test_update_config_immediately_persists_recalculated_milestones(): void
+    {
+        $tmtService = app(TmtCalculatorService::class);
+
+        // Buat 3 employee dengan RankHistory dan milestone awal (required_years = 4).
+        $employees = Employee::factory()->count(3)->create(['status_aktif' => 'Aktif']);
+
+        foreach ($employees as $employee) {
+            RankHistory::create([
+                'employee_id' => $employee->id,
+                'tmt_pangkat' => now()->subYears(2)->toDateString(),
+                'golongan' => 'III/a',
+                'pangkat' => 'Penata Muda',
+            ]);
+            $tmtService->syncForEmployee($employee);
+        }
+
+        // Semua 3 milestone awal: is_active = true, required_years = 4.
+        $this->assertEquals(3, EmployeeMilestone::where('type', EmployeeMilestone::TYPE_KENAIKAN_PANGKAT)
+            ->where('is_active', true)
+            ->whereJsonContains('metadata->required_years', 4)
+            ->count(), 'Setup: 3 milestone awal dengan required_years = 4');
+
+        // Catat tanggal milestone lama untuk dibandingkan nanti.
+        $oldDates = EmployeeMilestone::where('type', EmployeeMilestone::TYPE_KENAIKAN_PANGKAT)
+            ->where('is_active', true)
+            ->pluck('milestone_date', 'employee_id')
+            ->map(fn ($d) => is_string($d) ? $d : $d->toDateString());
+
+        // Ubah konfigurasi dari 4 → 5 tahun via action (bukan hanya setVal langsung).
+        $request = Request::create('/ews/config', 'POST', [
+            'pangkat_required_years' => '5',
+            'kgb_required_years' => '2',
+            'reason' => 'US-5.5 AC-5 test: persist milestone baru',
+        ]);
+        $request->setUserResolver(fn () => User::factory()->create(['role' => 'super_admin']));
+
+        app(UpdateEwsConfigAction::class)->execute($request);
+
+        // === Assertion utama US-5.5 AC-5 ===
+        // Milestone baru harus sudah ada TANPA perlu scheduler run berikutnya.
+
+        // 1. Milestone lama tetap tersimpan sebagai jejak (is_active = false).
+        $this->assertEquals(3, EmployeeMilestone::where('type', EmployeeMilestone::TYPE_KENAIKAN_PANGKAT)
+            ->where('is_active', false)
+            ->whereJsonContains('metadata->required_years', 4)
+            ->count(), 'Milestone lama harus tetap ada sebagai jejak (is_active = false)');
+
+        // 2. Milestone baru sudah langsung dipersistensikan dengan required_years = 5.
+        $this->assertEquals(3, EmployeeMilestone::where('type', EmployeeMilestone::TYPE_KENAIKAN_PANGKAT)
+            ->where('is_active', true)
+            ->whereJsonContains('metadata->required_years', 5)
+            ->count(), 'Milestone baru dengan required_years = 5 harus sudah ada tanpa scheduler run');
+
+        // 3. Tanggal milestone baru harus berbeda dari yang lama (shifted +1 tahun dari tmt_pangkat).
+        $newDates = EmployeeMilestone::where('type', EmployeeMilestone::TYPE_KENAIKAN_PANGKAT)
+            ->where('is_active', true)
+            ->pluck('milestone_date', 'employee_id')
+            ->map(fn ($d) => is_string($d) ? $d : $d->toDateString());
+
+        foreach ($employees as $employee) {
+            $this->assertNotEquals(
+                $oldDates[$employee->id] ?? null,
+                $newDates[$employee->id] ?? null,
+                "Tanggal milestone employee {$employee->id} harus bergeser ke required_years = 5",
+            );
+        }
+
+        // 4. Snapshot kolom employees juga harus diperbarui (bukan hanya tabel milestones).
+        foreach ($employees as $employee) {
+            $fresh = $employee->fresh();
+            $this->assertNotNull(
+                $fresh->tanggal_kenaikan_pangkat_berikutnya,
+                "tanggal_kenaikan_pangkat_berikutnya employee {$employee->id} harus diupdate",
+            );
+            // Tanggal baru = tmt_pangkat + 5 tahun, yakni subYears(2) dari sekarang + 5 tahun = +3 tahun dari sekarang.
+            $this->assertTrue(
+                $fresh->tanggal_kenaikan_pangkat_berikutnya->isFuture(),
+                'Tanggal KP berikutnya harus di masa depan (3 tahun dari sekarang)',
+            );
+        }
     }
 
     public function test_update_config_does_not_invalidate_unaffected_milestones(): void
@@ -224,12 +321,21 @@ class EwsConfigMilestoneValidationTest extends TestCase
         $action = app(UpdateEwsConfigAction::class);
         $action->execute($request);
 
-        // Verify only pangkat invalidated, KGB remains active
+        // Verify: milestone pangkat LAMA (required_years=4) menjadi inactive.
         $this->assertFalse(EmployeeMilestone::where('employee_id', $employee->id)
             ->where('type', EmployeeMilestone::TYPE_KENAIKAN_PANGKAT)
             ->where('is_active', true)
-            ->exists(), 'Pangkat milestone should be invalidated');
+            ->whereJsonContains('metadata->required_years', 4)
+            ->exists(), 'Pangkat milestone lama (required_years=4) harus dinonaktifkan');
 
+        // Verify: milestone pangkat BARU (required_years=5) langsung dibuat.
+        $this->assertTrue(EmployeeMilestone::where('employee_id', $employee->id)
+            ->where('type', EmployeeMilestone::TYPE_KENAIKAN_PANGKAT)
+            ->where('is_active', true)
+            ->whereJsonContains('metadata->required_years', 5)
+            ->exists(), 'Pangkat milestone baru (required_years=5) harus langsung ada');
+
+        // Verify: KGB tidak tersentuh — config KGB tidak berubah.
         $this->assertTrue(EmployeeMilestone::where('employee_id', $employee->id)
             ->where('type', EmployeeMilestone::TYPE_KGB)
             ->where('is_active', true)
@@ -334,7 +440,7 @@ class EwsConfigMilestoneValidationTest extends TestCase
         ]);
         $request->setUserResolver(fn () => User::factory()->create(['role' => 'super_admin']));
 
-        (new UpdateEwsConfigAction)->execute($request);
+        app(UpdateEwsConfigAction::class)->execute($request);
 
         $milestone->refresh();
         $this->assertFalse($milestone->is_active);
@@ -393,7 +499,7 @@ class EwsConfigMilestoneValidationTest extends TestCase
         ]);
         $request->setUserResolver(fn () => User::factory()->create(['role' => 'super_admin']));
 
-        (new UpdateEwsConfigAction)->execute($request);
+        app(UpdateEwsConfigAction::class)->execute($request);
 
         $milestone->refresh();
         $this->assertTrue($milestone->is_active);
@@ -427,7 +533,7 @@ class EwsConfigMilestoneValidationTest extends TestCase
         ]);
         $request->setUserResolver(fn () => User::factory()->create(['role' => 'super_admin']));
 
-        (new UpdateEwsConfigAction)->execute($request);
+        app(UpdateEwsConfigAction::class)->execute($request);
 
         $milestone->refresh();
         $this->assertTrue($milestone->is_active);
