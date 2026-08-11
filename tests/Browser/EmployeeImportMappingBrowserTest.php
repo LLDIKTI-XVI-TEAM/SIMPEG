@@ -126,6 +126,138 @@ class EmployeeImportMappingBrowserTest extends DuskTestCase
         });
     }
 
+    public function test_skip_result_is_informational_read_only_and_separate_from_errors(): void
+    {
+        $this->seed(RbacSeeder::class);
+        $admin = User::factory()->adminKepegawaian()->create();
+
+        $this->browse(function (Browser $browser) use ($admin): void {
+            $browser->loginAs($admin)
+                ->visit('/pegawai/import-data')
+                ->waitForText('Import Data Pegawai');
+
+            $browser->script(<<<'JS'
+                const component = Alpine.$data(document.querySelector('[x-data*="simpegTargetFields"]'));
+
+                component.batchId = 'browser-skip-batch';
+                component.mainHeaders = ['NIP', 'Email Pegawai'];
+                component.columnMapping = { NIP: 'NIP', 'Email Pegawai': 'Email Pegawai' };
+                component.requiredTargetFields = ['NIP', 'Email Pegawai'];
+                component.allRows = [
+                    { row: 2, data: { NIP: '123456789012345678', 'Email Pegawai': 'existing@example.test' } },
+                    { row: 3, data: { NIP: '123456789012345679', 'Email Pegawai': 'duplicate@example.test' } },
+                    { row: 4, data: { NIP: '123456789012345680', 'Email Pegawai': 'email-used@example.test' } },
+                ];
+                window.fetch = (url, options = {}) => {
+                    const path = new URL(url, window.location.origin).pathname;
+                    const response = path.endsWith('/mapping')
+                        ? { mapping: component.columnMapping, warnings: { unmatched_columns: [], missing_required: [] } }
+                        : {
+                            total_rows: 3,
+                            valid_count: 0,
+                            skip_count: 1,
+                            error_count: 2,
+                            results: [
+                                { row: 2, status: 'skip', errors: { NIP: ['NIP sudah terdaftar di database.'] } },
+                                { row: 3, status: 'error', errors: { NIP: ['NIP ganda dalam file.'] } },
+                                { row: 4, status: 'error', errors: { 'Email Pegawai': ['Email sudah terdaftar.'] } },
+                            ],
+                        };
+
+                    return Promise.resolve({ ok: true, json: () => Promise.resolve(response) });
+                };
+                component.runValidation();
+            JS);
+
+            $browser->waitForText('Sudah ada — akan dilewati')
+                ->assertSee('Terlewat (sudah ada)')
+                ->assertSee('NIP sudah terdaftar di database. Baris ini tidak akan diimpor.')
+                ->assertSeeIn('@validation-skip-count', '1')
+                ->assertPresent('@validation-value-2-nip')
+                ->assertMissing('@validation-input-2-nip')
+                ->assertPresent('@validation-input-3-nip')
+                ->assertPresent('@validation-input-4-email-pegawai');
+
+            $statusPresentation = $browser->script(<<<'JS'
+                return {
+                    skipRowIsDanger: document.querySelector('[dusk="validation-row-2"]')?.classList.contains('bg-danger/[0.03]') ?? true,
+                    skipInputIsDanger: document.querySelector('[dusk="validation-input-2-nip"]')?.classList.contains('border-danger/50') ?? false,
+                    duplicateNipIsDanger: document.querySelector('[dusk="validation-input-3-nip"]')?.classList.contains('border-danger/50') ?? false,
+                    existingEmailIsDanger: document.querySelector('[dusk="validation-input-4-email-pegawai"]')?.classList.contains('border-danger/50') ?? false,
+                };
+            JS)[0];
+
+            $this->assertSame([
+                'skipRowIsDanger' => false,
+                'skipInputIsDanger' => false,
+                'duplicateNipIsDanger' => true,
+                'existingEmailIsDanger' => true,
+            ], $statusPresentation);
+        });
+    }
+
+    public function test_import_is_blocked_until_an_edited_error_row_is_revalidated(): void
+    {
+        $this->seed(RbacSeeder::class);
+        $admin = User::factory()->adminKepegawaian()->create();
+
+        $this->browse(function (Browser $browser) use ($admin): void {
+            $browser->loginAs($admin)
+                ->visit('/pegawai/import-data')
+                ->waitForText('Import Data Pegawai');
+
+            $browser->script(<<<'JS'
+                const component = Alpine.$data(document.querySelector('[x-data*="simpegTargetFields"]'));
+
+                component.batchId = 'browser-edits-batch';
+                component.mainHeaders = ['NIP', 'Email Pegawai'];
+                component.columnMapping = { NIP: 'NIP', 'Email Pegawai': 'Email Pegawai' };
+                component.requiredTargetFields = ['NIP', 'Email Pegawai'];
+                component.allRows = [{
+                    row: 2,
+                    data: { NIP: '123456789012345678', 'Email Pegawai': 'invalid-email' },
+                }];
+                component.validations = [{
+                    row: 2,
+                    name: '-',
+                    status: 'error',
+                    errorSourceHeaders: ['Email Pegawai'],
+                    col: 'Email Pegawai',
+                    error: 'Email Pegawai tidak valid.',
+                    dataIndex: 0,
+                }];
+                component.totalRows = 1;
+                component.validRows = 1;
+                component.errorRows = 1;
+                component.skipRows = 0;
+                component.step = 3;
+                window.fetch = (url, options = {}) => {
+                    const path = new URL(url, window.location.origin).pathname;
+                    const response = path.endsWith('/mapping')
+                        ? { mapping: component.columnMapping, warnings: { unmatched_columns: [], missing_required: [] } }
+                        : {
+                            total_rows: 1,
+                            valid_count: 1,
+                            skip_count: 0,
+                            error_count: 0,
+                            results: [{ row: 2, status: 'valid', errors: {} }],
+                        };
+
+                    return Promise.resolve({ ok: true, json: () => Promise.resolve(response) });
+                };
+            JS);
+
+            $browser->waitFor('@validation-import')
+                ->assertEnabled('@validation-import')
+                ->type('@validation-input-2-email-pegawai', 'valid@example.test')
+                ->assertSee('Validasi ulang perubahan sebelum mengimpor.')
+                ->assertDisabled('@validation-import')
+                ->click('@validation-revalidate')
+                ->waitForText('Siap diimpor')
+                ->assertEnabled('@validation-import');
+        });
+    }
+
     public function test_mapping_controls_block_invalid_selection_and_persist_before_validation(): void
     {
         $this->seed(RbacSeeder::class);

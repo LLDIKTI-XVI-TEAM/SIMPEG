@@ -44,6 +44,14 @@ class EmployeeImportMappingUiTest extends TestCase
         $response->assertSee('errorSourceHeaders,', false);
         $response->assertSee('item.errorSourceHeaders?.includes(header)', false);
         $response->assertSee("'Baris validasi ' + item.row + ', ' + header", false);
+        $response->assertSee('validationStatusLabel(status)', false);
+        $response->assertSee('Sudah ada — akan dilewati', false);
+        $response->assertSee('Terlewat (sudah ada)', false);
+        $response->assertSee("r.status === 'error'", false);
+        $response->assertSee("item.status !== 'error'", false);
+        $response->assertSee('validRows === 0 || hasEdits || isExecuting', false);
+        $response->assertSee('Validasi ulang perubahan sebelum mengimpor.', false);
+        $response->assertDontSee("item.status === 'error' || item.status === 'skip'", false);
         $response->assertSee('dusk="mapping-required-warning"', false);
         $response->assertSee('dusk="mapping-duplicate-warning"', false);
         $response->assertSee('dusk="mapping-continue"', false);

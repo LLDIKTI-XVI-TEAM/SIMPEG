@@ -192,6 +192,37 @@
             const start = (this.valPage - 1) * this.valPerPage;
             return this.filteredValidations.slice(start, start + this.valPerPage);
         },
+        validationStatusLabel(status) {
+            return {
+                valid: 'Siap diimpor',
+                skip: 'Sudah ada — akan dilewati',
+                error: 'Error',
+            }[status] || status;
+        },
+        validationFilterLabel(filter) {
+            return {
+                all: 'Semua',
+                valid: 'Valid (siap impor)',
+                skip: 'Terlewat (sudah ada)',
+                error: 'Error (bermasalah)',
+            }[filter] || filter;
+        },
+        validationStatusDescription(item) {
+            if (item.status === 'skip') {
+                return 'NIP sudah terdaftar di database. Baris ini tidak akan diimpor.';
+            }
+
+            return item.error || 'Siap impor';
+        },
+        validationCellHook(prefix, row, header) {
+            const normalizedHeader = String(header)
+                .trim()
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-|-$/g, '') || 'kolom';
+
+            return `${prefix}-${row}-${normalizedHeader}`;
+        },
         
         // Track edits
         hasEdits: false,
@@ -450,7 +481,11 @@
                             }
                         }
                     }
-                    const errorSourceHeaders = this.sourceHeadersForErrors(errorCols);
+                    // Respons skip membawa alasan dari server, tetapi bukan error
+                    // yang perlu disorot atau diperbaiki Admin.
+                    const errorSourceHeaders = r.status === 'error'
+                        ? this.sourceHeadersForErrors(errorCols)
+                        : [];
 
                     return {
                         row: r.row,
@@ -489,7 +524,7 @@
         
         // Step 3 → 4 → 5: Execute import
         async executeImport() {
-            if (!this.batchId) return;
+            if (!this.batchId || this.validRows === 0 || this.hasEdits || this.isExecuting) return;
             
             this.isExecuting = true;
             this.apiError = '';
@@ -984,23 +1019,35 @@
                     <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Total Baris</span>
                     <p class="text-2xl font-bold text-ink font-sans mt-1" x-text="totalRows"></p>
                 </x-ui.card>
-                <div class="rounded-lg border border-success/20 bg-success/5 p-4 shadow-sm text-center cursor-pointer" @click="valFilter = valFilter === 'valid' ? 'all' : 'valid'; valPage = 1">
+                <x-ui.button type="button" variant="ghost"
+                    @click="valFilter = valFilter === 'valid' ? 'all' : 'valid'; valPage = 1"
+                    x-bind:aria-pressed="valFilter === 'valid'"
+                    dusk="validation-filter-valid"
+                    class="h-full w-full flex-col rounded-lg border-success/20 bg-success/5 p-4 text-center hover:bg-success/10 focus:ring-success/30">
                     <x-ui.badge variant="success" size="sm" uppercase>Valid (Siap Impor)</x-ui.badge>
                     <p class="text-2xl font-bold text-success font-sans mt-1" x-text="validRows"></p>
-                </div>
-                <div class="rounded-lg border border-primary/20 bg-primary/5 p-4 shadow-sm text-center cursor-pointer" @click="valFilter = valFilter === 'skip' ? 'all' : 'skip'; valPage = 1">
-                    <x-ui.badge variant="primary" size="sm" uppercase>Di-skip (Duplikat)</x-ui.badge>
-                    <p class="text-2xl font-bold text-primary font-sans mt-1" x-text="skipRows"></p>
-                </div>
-                <div class="rounded-lg border border-danger/20 bg-danger/5 p-4 shadow-sm text-center cursor-pointer" @click="valFilter = valFilter === 'error' ? 'all' : 'error'; valPage = 1">
+                </x-ui.button>
+                <x-ui.button type="button" variant="ghost"
+                    @click="valFilter = valFilter === 'skip' ? 'all' : 'skip'; valPage = 1"
+                    x-bind:aria-pressed="valFilter === 'skip'"
+                    dusk="validation-filter-skip"
+                    class="h-full w-full flex-col rounded-lg border-primary/20 bg-primary/5 p-4 text-center hover:bg-primary/10 focus:ring-primary/30">
+                    <x-ui.badge variant="primary" size="sm">Terlewat (sudah ada)</x-ui.badge>
+                    <p dusk="validation-skip-count" class="text-2xl font-bold text-primary font-sans mt-1" x-text="skipRows"></p>
+                </x-ui.button>
+                <x-ui.button type="button" variant="ghost"
+                    @click="valFilter = valFilter === 'error' ? 'all' : 'error'; valPage = 1"
+                    x-bind:aria-pressed="valFilter === 'error'"
+                    dusk="validation-filter-error"
+                    class="h-full w-full flex-col rounded-lg border-danger/20 bg-danger/5 p-4 text-center hover:bg-danger/10 focus:ring-danger/30">
                     <x-ui.badge variant="danger" size="sm" uppercase>Error (Bermasalah)</x-ui.badge>
                     <p class="text-2xl font-bold text-danger font-sans mt-1" x-text="errorRows"></p>
-                </div>
+                </x-ui.button>
             </div>
 
             {{-- Filter indicator --}}
             <div x-show="valFilter !== 'all'" class="rounded-lg bg-soft border border-border p-3 flex items-center justify-between text-xs font-sans">
-                <span class="text-muted">Filter aktif: <span class="font-bold text-ink uppercase" x-text="valFilter"></span> (<span x-text="filteredValidations.length"></span> baris)</span>
+                <span class="text-muted">Filter aktif: <span class="font-bold text-ink" x-text="validationFilterLabel(valFilter)"></span> (<span x-text="filteredValidations.length"></span> baris)</span>
                 <button type="button" @click="valFilter = 'all'; valPage = 1" class="text-primary font-semibold hover:underline cursor-pointer">Tampilkan Semua</button>
             </div>
 
@@ -1034,7 +1081,7 @@
                         </x-ui.table-head>
                         <x-ui.table-body>
                             <template x-for="item in paginatedValidations" :key="item.row">
-                                <x-ui.table-row x-init="ensureValidationRow(item)" x-bind:class="{
+                                <x-ui.table-row x-init="ensureValidationRow(item)" x-bind:dusk="'validation-row-' + item.row" x-bind:class="{
                                     'bg-danger/[0.03]': item.status === 'error',
                                     'bg-primary/[0.03]': item.status === 'skip',
                                     '': item.status === 'valid'
@@ -1051,27 +1098,32 @@
                                                 'bg-danger/10 text-danger': item.status === 'error',
                                                 'bg-primary/10 text-primary': item.status === 'skip'
                                             }"
-                                            x-text="item.status"
+                                            x-bind:dusk="'validation-status-' + item.row"
+                                            x-text="validationStatusLabel(item.status)"
                                         ></x-ui.badge>
                                     </x-ui.table-td>
                                     <template x-for="header in mainHeaders" :key="'val-cell-' + item.row + '-' + header">
                                         <x-ui.table-td class="px-0.5 py-0.5 border-r border-border">
-                                            {{-- Error/skip rows: editable inputs --}}
-                                            <template x-if="item.status === 'error' || item.status === 'skip'">
+                                            {{-- Hanya error yang dapat diperbaiki Admin. --}}
+                                            <template x-if="item.status === 'error'">
                                                  <input
                                                      type="text"
                                                      :value="allRows[item.dataIndex]?.data[header] ?? ''"
                                                      :disabled="item.dataIndex < 0"
                                                      :aria-busy="rowLoadStatus(item.row) === 'loading'"
                                                      :aria-label="'Baris validasi ' + item.row + ', ' + header"
+                                                     x-bind:dusk="validationCellHook('validation-input', item.row, header)"
                                                      @input="if (item.dataIndex >= 0) { allRows[item.dataIndex].data[header] = $event.target.value; onCellEdit(item.dataIndex, header) }"
                                                      :class="item.errorSourceHeaders?.includes(header) ? 'border-danger/50 bg-danger/[0.03]' : 'border-transparent'"
                                                      class="w-full px-2 py-1.5 text-xs text-ink bg-transparent border rounded hover:border-border hover:bg-soft/10 focus:border-primary focus:bg-surface focus:outline-none focus:ring-1 focus:ring-primary/30 transition min-w-[200px] disabled:cursor-wait disabled:bg-soft disabled:text-muted"
                                                  >
                                             </template>
-                                            {{-- Valid rows: read-only --}}
-                                            <template x-if="item.status === 'valid'">
-                                                <span class="px-2 py-1.5 text-xs text-ink block min-w-[200px]" x-text="allRows[item.dataIndex]?.data[header] ?? '-'"></span>
+                                            {{-- Valid dan terlewat: hanya untuk dibaca. --}}
+                                            <template x-if="item.status !== 'error'">
+                                                <span x-bind:dusk="validationCellHook('validation-value', item.row, header)"
+                                                    :class="item.status === 'skip' ? 'text-primary' : 'text-ink'"
+                                                    class="px-2 py-1.5 text-xs block min-w-[200px]"
+                                                    x-text="allRows[item.dataIndex]?.data[header] ?? '-'"></span>
                                             </template>
                                         </x-ui.table-td>
                                      </template>
@@ -1085,11 +1137,11 @@
                                                  Muat ulang data baris
                                              </button>
                                          </div>
-                                         <span :class="{
+                                        <span :class="{
                                             'text-danger font-semibold': item.status === 'error',
                                             'text-primary': item.status === 'skip',
                                             'text-success': item.status === 'valid'
-                                        }" class="text-xs font-sans" x-text="item.error || 'Siap impor'"></span>
+                                        }" class="text-xs font-sans" x-text="validationStatusDescription(item)"></span>
                                     </x-ui.table-td>
                                 </x-ui.table-row>
                             </template>
@@ -1113,22 +1165,23 @@
                         Batalkan Semua
                     </x-ui.button>
                     <div class="flex items-center gap-3">
-                        <x-ui.button type="button" variant="muted" @click="step = 2; hasEdits = false;">
+                        <x-ui.button type="button" variant="muted" @click="step = 2">
                             ← Kembali ke Preview
                         </x-ui.button>
-                        <button type="button" @click="reValidate()" x-show="hasEdits" :disabled="isValidating"
-                            :class="isValidating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'"
-                            class="inline-flex items-center justify-center rounded-lg bg-warning px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition font-sans gap-2">
+                        <x-ui.button type="button" variant="warning" @click="reValidate()" x-show="hasEdits"
+                            x-bind:disabled="isValidating" dusk="validation-revalidate">
                             <x-ui.loading x-show="isValidating" size="md" />
-                            🔄 Validasi Ulang
-                        </button>
-                        <button type="button" @click="executeImport()" :disabled="validRows === 0 || isExecuting"
-                            :class="(validRows === 0 || isExecuting) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'"
-                            class="inline-flex items-center justify-center rounded-lg bg-success px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition font-sans">
+                            Validasi Ulang
+                        </x-ui.button>
+                        <x-ui.button type="button" variant="primary" @click="executeImport()"
+                            x-bind:disabled="validRows === 0 || hasEdits || isExecuting"
+                            aria-describedby="import-readiness-message" dusk="validation-import">
                             Import Valid (<span x-text="validRows"></span> baris)
-                        </button>
+                        </x-ui.button>
                     </div>
                 </div>
+                <p id="import-readiness-message" aria-live="polite" class="text-xs text-muted"
+                    x-text="hasEdits ? 'Validasi ulang perubahan sebelum mengimpor.' : (validRows === 0 ? 'Tidak ada baris valid untuk diimpor.' : '')"></p>
             </x-ui.card>
         </div>
 
@@ -1181,7 +1234,7 @@
                         <span class="text-[9px] text-muted font-sans mt-0.5 block">(Status Aktif di database)</span>
                     </div>
                     <div class="rounded-lg bg-primary/5 border border-primary/15 p-4">
-                        <x-ui.badge variant="primary" size="md" uppercase>Di-skip</x-ui.badge>
+                        <x-ui.badge variant="primary" size="md">Terlewat (sudah ada)</x-ui.badge>
                         <p class="text-2xl font-bold text-primary mt-1" x-text="skipRows"></p>
                         <span class="text-[9px] text-muted font-sans mt-0.5 block">(NIP terdaftar)</span>
                     </div>
