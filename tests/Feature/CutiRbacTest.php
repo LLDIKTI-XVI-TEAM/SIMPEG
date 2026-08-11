@@ -228,7 +228,7 @@ class CutiRbacTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Keperluan keluarga.');
-        $response->assertSee('Setujui');
+        $response->assertSee('Disetujui');
     }
 
     public function test_kepala_bagian_hanya_bisa_approve_stage1(): void

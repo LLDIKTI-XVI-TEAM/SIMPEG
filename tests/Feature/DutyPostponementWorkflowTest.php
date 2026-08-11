@@ -130,7 +130,7 @@ class DutyPostponementWorkflowTest extends TestCase
             ->assertOk()
             ->assertSeeInOrder([
                 'data-action-visual="temporary-secondary"',
-                'Tunda Sementara',
+                'Ditangguhkan',
                 'Penangguhan karena tugas dinas menutup pengajuan lama dan melindungi hak sesuai ketentuan.',
                 'data-action-visual="terminal-warning"',
                 'Tangguhkan karena Tugas Dinas',
@@ -164,7 +164,7 @@ class DutyPostponementWorkflowTest extends TestCase
         $this->actingAs($fixture['actingUser'])
             ->get(route('cuti.show', $fixture['request']))
             ->assertOk()
-            ->assertSee('Tunda Sementara')
+            ->assertSee('Ditangguhkan')
             ->assertDontSee(route('cuti.penangguhan-tugas-dinas', $fixture['request']), false);
 
         $fixture['request']->forceFill([
