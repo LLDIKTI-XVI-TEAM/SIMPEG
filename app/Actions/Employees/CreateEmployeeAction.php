@@ -164,14 +164,6 @@ class CreateEmployeeAction
                     $sourceHistoryChanged = true;
                 }
 
-                // Tanggal pensiun dari form adalah data resmi dan harus memiliki provenance meski belum ada riwayat.
-                // Hint authoritative mencegah backfill menganggap nilai baru sebagai tanggal kalkulasi legacy.
-                if ($hasAuthoritativePensionDate) {
-                    $this->tmtCalculator->syncForEmployee($employee, true);
-                } elseif ($sourceHistoryChanged) {
-                    $this->tmtCalculator->syncForEmployee($employee);
-                }
-
                 // 4. Pengangkatan (Appointment)
                 if ($request->filled('pengangkatan_jenis_pengangkatan') || $request->filled('pengangkatan_no_sk') || $request->filled('pengangkatan_tmt_pengangkatan') || $request->hasFile('file_sk_pengangkatan')) {
                     $appointmentData = [
@@ -198,6 +190,7 @@ class CreateEmployeeAction
                     }
 
                     $employee->appointment()->create($appointmentData);
+                    $sourceHistoryChanged = true;
 
                     $jenisPegawai = RefJenisPegawai::whereRaw('UPPER(nama) = ?', [
                         strtoupper($data['pengangkatan_jenis_pengangkatan']),
@@ -205,6 +198,14 @@ class CreateEmployeeAction
                     if ($jenisPegawai) {
                         $employee->update(['jenis_pegawai_id' => $jenisPegawai->id]);
                     }
+                }
+
+                // Sinkronisasi tunggal setelah seluruh riwayat sumber tersimpan mencegah kalkulasi memakai state parsial.
+                if ($hasAuthoritativePensionDate) {
+                    // Hint authoritative menjaga tanggal resmi dari form agar tidak ditimpa kalkulasi BUP.
+                    $this->tmtCalculator->syncForEmployee($employee, true);
+                } elseif ($sourceHistoryChanged) {
+                    $this->tmtCalculator->syncForEmployee($employee);
                 }
 
                 // 5. Berkas Lainnya (KTP, KK, SK Mutasi, SK Pensiun, atau jenis manual)
