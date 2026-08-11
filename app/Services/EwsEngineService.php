@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Employee;
+use App\Models\EmployeeMilestone;
 use App\Models\EwsAlert;
 use App\Models\EwsConfig;
 use App\Models\EwsSchedulerRun;
@@ -102,10 +103,7 @@ class EwsEngineService
                     // Hanya pegawai yang benar-benar memerlukan fallback BUP yang memuat riwayat jabatan.
                     // Jalur milestone normal tetap membaca snapshot terhitung tanpa query riwayat tambahan.
                     $employees
-                        ->filter(fn (Employee $employee): bool => $this->needsPositionPensionFallback(
-                            $employee,
-                            $pensiunRequiredAgeYears,
-                        ))
+                        ->filter(fn (Employee $employee): bool => $this->needsPositionPensionFallback($employee))
                         ->load([
                             'positionHistories' => fn ($query) => $query
                                 ->with(['jabatan', 'jenisJabatan'])
@@ -300,6 +298,7 @@ class EwsEngineService
     {
         $milestone = $employee->milestones
             ->where('type', $type)
+            ->where('milestone_key', EmployeeMilestone::KEY_DEFAULT)
             ->where('is_active', true)
             ->first();
 
@@ -372,12 +371,17 @@ class EwsEngineService
             return Carbon::parse($employee->tanggal_pensiun);
         }
 
-        // Fallback ke kalkulasi BUP jika tanggal_pensiun kosong
-        if ($pensiunRequiredAgeYears > 0 && $employee->tanggal_lahir) {
-            return Carbon::parse($employee->tanggal_lahir)->addYears($pensiunRequiredAgeYears);
+        // Presedensi BUP kanonik: jabatan detail, jenis jabatan, lalu konfigurasi global.
+        $positionPensionDate = $this->calculatePensionFromPositionBup($employee);
+        if ($positionPensionDate !== null) {
+            return $positionPensionDate;
         }
 
-        return $this->calculatePensionFromPositionBup($employee);
+        if ($pensiunRequiredAgeYears > 0 && $employee->tanggal_lahir) {
+            return Carbon::parse($employee->tanggal_lahir)->addYearsNoOverflow($pensiunRequiredAgeYears);
+        }
+
+        return null;
     }
 
     /**
@@ -421,7 +425,9 @@ class EwsEngineService
         if ($precomputedMilestones->isNotEmpty()) {
             foreach ($precomputedMilestones as $milestone) {
                 $years = $milestone->metadata['satyalancana_years'] ?? null;
-                if ($years !== null && in_array($years, $configuredYears, true)) {
+                if ($years !== null
+                    && $milestone->milestone_key === (string) $years
+                    && in_array($years, $configuredYears, true)) {
                     $milestones[] = [
                         'date' => $milestone->milestone_date,
                         'years' => $years,
@@ -504,14 +510,14 @@ class EwsEngineService
     }
 
     /** Menentukan apakah scheduler perlu memuat sumber BUP untuk fallback pensiun. */
-    private function needsPositionPensionFallback(Employee $employee, int $pensiunRequiredAgeYears): bool
+    private function needsPositionPensionFallback(Employee $employee): bool
     {
         $hasPensionMilestone = $employee->milestones
-            ->contains(fn ($milestone): bool => $milestone->type === 'pensiun');
+            ->contains(fn ($milestone): bool => $milestone->type === EmployeeMilestone::TYPE_PENSIUN
+                && $milestone->milestone_key === EmployeeMilestone::KEY_DEFAULT);
 
         return ! $hasPensionMilestone
             && $employee->tanggal_pensiun === null
-            && $pensiunRequiredAgeYears <= 0
             && $employee->tanggal_lahir !== null;
     }
 

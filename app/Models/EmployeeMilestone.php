@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $id
  * @property string $employee_id
  * @property string $type (kenaikan_pangkat, kgb, pensiun, satyalancana, pppk_contract_end)
+ * @property string $milestone_key
  * @property Carbon $milestone_date
  * @property Carbon $calculated_at
  * @property array|null $metadata
@@ -27,6 +28,7 @@ class EmployeeMilestone extends Model
     protected $fillable = [
         'employee_id',
         'type',
+        'milestone_key',
         'milestone_date',
         'calculated_at',
         'metadata',
@@ -58,4 +60,33 @@ class EmployeeMilestone extends Model
     public const TYPE_SATYALANCANA = 'satyalancana';
 
     public const TYPE_PPPK_CONTRACT_END = 'pppk_contract_end';
+
+    public const KEY_DEFAULT = 'default';
+
+    /**
+     * Menetapkan slot stabil agar constraint database dapat membedakan milestone scalar
+     * dari tiga milestone masa kerja Satyalancana.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (EmployeeMilestone $milestone): void {
+            if (! empty($milestone->milestone_key)) {
+                return;
+            }
+
+            $milestone->milestone_key = self::keyFor($milestone->type, $milestone->metadata);
+        });
+    }
+
+    /** @param  array<string, mixed>|null  $metadata */
+    public static function keyFor(string $type, ?array $metadata = null): string
+    {
+        if ($type !== self::TYPE_SATYALANCANA) {
+            return self::KEY_DEFAULT;
+        }
+
+        $years = $metadata['satyalancana_years'] ?? $metadata['years_of_service'] ?? null;
+
+        return is_numeric($years) ? (string) (int) $years : self::KEY_DEFAULT;
+    }
 }

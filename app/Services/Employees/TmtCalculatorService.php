@@ -10,6 +10,7 @@ use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\SalaryHistory;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class TmtCalculatorService
 {
@@ -30,6 +31,28 @@ class TmtCalculatorService
         ?bool $pensionDateIsAuthoritative = null,
         bool $recalculateLegacyPension = false,
     ): void {
+        DB::transaction(function () use ($employee, $pensionDateIsAuthoritative, $recalculateLegacyPension): void {
+            // Semua writer milestone berbagi kunci baris pegawai agar backfill dan mutasi
+            // profil tidak menghitung sumber yang sama secara bersamaan.
+            $lockedEmployee = Employee::query()
+                ->whereKey($employee->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->syncLockedEmployee(
+                $lockedEmployee,
+                $pensionDateIsAuthoritative,
+                $recalculateLegacyPension,
+            );
+        });
+    }
+
+    /** Menyinkronkan snapshot setelah baris pegawai terkunci dan sumber dimuat ulang. */
+    private function syncLockedEmployee(
+        Employee $employee,
+        ?bool $pensionDateIsAuthoritative,
+        bool $recalculateLegacyPension,
+    ): void {
         $latestRank = $this->latestRank($employee);
         $latestSalary = $this->latestSalary($employee);
 
@@ -45,6 +68,8 @@ class TmtCalculatorService
         // Tanggal resmi dari form atau impor harus dipertahankan; hasil kalkulasi boleh dihitung ulang.
         $existingPensionMilestone = EmployeeMilestone::where('employee_id', $employee->id)
             ->where('type', EmployeeMilestone::TYPE_PENSIUN)
+            ->where('milestone_key', EmployeeMilestone::KEY_DEFAULT)
+            ->where('is_active', true)
             ->first();
 
         $pensionSource = $this->resolvePensionSource(
@@ -88,6 +113,8 @@ class TmtCalculatorService
             [
                 'employee_id' => $employee->id,
                 'type' => EmployeeMilestone::TYPE_PENSIUN,
+                'milestone_key' => EmployeeMilestone::KEY_DEFAULT,
+                'is_active' => true,
             ],
             [
                 'milestone_date' => $employee->tanggal_pensiun,
@@ -99,7 +126,6 @@ class TmtCalculatorService
                     'bup' => null,
                     'jabatan' => null,
                 ],
-                'is_active' => true,
             ],
         );
     }
@@ -129,6 +155,8 @@ class TmtCalculatorService
                 [
                     'employee_id' => $employee->id,
                     'type' => EmployeeMilestone::TYPE_KENAIKAN_PANGKAT,
+                    'milestone_key' => EmployeeMilestone::KEY_DEFAULT,
+                    'is_active' => true,
                 ],
                 [
                     'milestone_date' => $nextPangkat,
@@ -138,7 +166,6 @@ class TmtCalculatorService
                         'golongan_id' => $latestRank->golongan_id,
                         'required_years' => $pangkatRequiredYears,
                     ],
-                    'is_active' => true,
                 ]
             );
             $activeMilestoneIds[] = $milestone->id;
@@ -158,6 +185,8 @@ class TmtCalculatorService
                 [
                     'employee_id' => $employee->id,
                     'type' => EmployeeMilestone::TYPE_KGB,
+                    'milestone_key' => EmployeeMilestone::KEY_DEFAULT,
+                    'is_active' => true,
                 ],
                 [
                     'milestone_date' => $nextKgb,
@@ -167,7 +196,6 @@ class TmtCalculatorService
                         'gaji_pokok' => $latestSalary->gaji_pokok,
                         'required_years' => $kgbRequiredYears,
                     ],
-                    'is_active' => true,
                 ]
             );
             $activeMilestoneIds[] = $milestone->id;
@@ -208,12 +236,13 @@ class TmtCalculatorService
                 [
                     'employee_id' => $employee->id,
                     'type' => EmployeeMilestone::TYPE_PENSIUN,
+                    'milestone_key' => EmployeeMilestone::KEY_DEFAULT,
+                    'is_active' => true,
                 ],
                 [
                     'milestone_date' => $pensionDate,
                     'calculated_at' => $today,
                     'metadata' => $metadata,
-                    'is_active' => true,
                 ]
             );
             $activeMilestoneIds[] = $milestone->id;
@@ -228,26 +257,39 @@ class TmtCalculatorService
         // Satyalancana dihitung dari TMT pengangkatan pertama.
         $tmtPengangkatan = $this->firstAppointmentDate($employee);
         if ($tmtPengangkatan !== null) {
-            $currentSatyalancanaDates = [];
             $currentSatyalancanaMilestoneIds = [];
 
             foreach ([10, 20, 30] as $years) {
                 $satyalancanaDate = $tmtPengangkatan->copy()->addYearsNoOverflow($years);
+                $milestoneKey = (string) $years;
+
+                $activeMilestone = EmployeeMilestone::query()
+                    ->where('employee_id', $employee->id)
+                    ->where('type', EmployeeMilestone::TYPE_SATYALANCANA)
+                    ->where('milestone_key', $milestoneKey)
+                    ->where('is_active', true)
+                    ->first();
+
+                if ($activeMilestone !== null && ! $activeMilestone->milestone_date->isSameDay($satyalancanaDate)) {
+                    // Perubahan TMT menghasilkan versi baru; versi lama tetap disimpan sebagai jejak kalkulasi.
+                    $activeMilestone->update(['is_active' => false]);
+                }
 
                 $milestone = EmployeeMilestone::updateOrCreate(
                     [
                         'employee_id' => $employee->id,
                         'type' => EmployeeMilestone::TYPE_SATYALANCANA,
-                        'milestone_date' => $satyalancanaDate,
+                        'milestone_key' => $milestoneKey,
+                        'is_active' => true,
                     ],
                     [
+                        'milestone_date' => $satyalancanaDate,
                         'calculated_at' => $today,
                         'metadata' => [
                             'tmt_pengangkatan' => $tmtPengangkatan->toDateString(),
                             'satyalancana_years' => $years,
                             'years_of_service' => $years, // Dipertahankan agar metadata lama tetap dapat dibaca.
                         ],
-                        'is_active' => true,
                     ]
                 );
                 $currentSatyalancanaMilestoneIds[] = $milestone->id;
@@ -274,6 +316,8 @@ class TmtCalculatorService
                 [
                     'employee_id' => $employee->id,
                     'type' => EmployeeMilestone::TYPE_PPPK_CONTRACT_END,
+                    'milestone_key' => EmployeeMilestone::KEY_DEFAULT,
+                    'is_active' => true,
                 ],
                 [
                     'milestone_date' => $employee->tanggal_akhir_kontrak,
@@ -281,7 +325,6 @@ class TmtCalculatorService
                     'metadata' => [
                         'contract_type' => 'PPPK',
                     ],
-                    'is_active' => true,
                 ]
             );
             $activeMilestoneIds[] = $milestone->id;
