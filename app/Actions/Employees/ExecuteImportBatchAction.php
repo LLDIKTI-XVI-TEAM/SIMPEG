@@ -11,6 +11,7 @@ use App\Services\Employees\TmtCalculatorService;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -28,8 +29,13 @@ class ExecuteImportBatchAction
      *
      * @throws ValidationException
      */
-    public function execute(string $batchId, ?User $user, ?string $ipAddress = null, ?string $userAgent = null): array
-    {
+    public function execute(
+        string $batchId,
+        ?User $user,
+        ?string $ipAddress = null,
+        ?string $userAgent = null,
+        ?string $processingToken = null,
+    ): array {
         $executionBatch = ImportBatch::query()->find($batchId);
 
         if ($executionBatch === null) {
@@ -60,13 +66,24 @@ class ExecuteImportBatchAction
             fn (array $result): bool => ($result['status'] ?? null) === 'valid' && isset($result['validated_data']),
         ));
         $totalRows = count($validRows);
-        $attemptToken = (string) Str::uuid();
+        $attemptToken = $processingToken ?? (string) Str::uuid();
 
         // Token attempt dan lease membuat worker baru dapat memulihkan hard crash tanpa mengambil alih worker aktif.
         $claimed = ImportBatch::query()
             ->whereKey($batchId)
-            ->where(function ($query): void {
-                $query->where('status', 'queued')
+            ->where(function ($query) use ($attemptToken): void {
+                $query->where(function ($queued) use ($attemptToken): void {
+                    $queued->where('status', 'queued')
+                        ->where(function ($owner) use ($attemptToken): void {
+                            $owner->whereNull('processing_token')
+                                ->orWhere('processing_token', $attemptToken);
+                        });
+                })
+                    // Redelivery pesan yang sama memakai token persisted dan boleh melanjutkan lease miliknya.
+                    ->orWhere(function ($owned) use ($attemptToken): void {
+                        $owned->where('status', 'processing')
+                            ->where('processing_token', $attemptToken);
+                    })
                     ->orWhere(function ($expired): void {
                         $expired->where('status', 'processing')
                             ->whereNotNull('lease_expires_at')
@@ -100,7 +117,15 @@ class ExecuteImportBatchAction
 
         try {
             foreach (array_slice($validRows, $processedCount) as $result) {
-                $checkpoint = $this->executeAndCheckpointRow($batchId, $attemptToken, $type, $result);
+                $checkpoint = $this->executeAndCheckpointRow(
+                    $batchId,
+                    $attemptToken,
+                    $type,
+                    $result,
+                    $user,
+                    $ipAddress,
+                    $userAgent,
+                );
                 $processedCount = $checkpoint['processed'];
                 $insertedCount = $checkpoint['inserted'];
                 $skippedCount = $checkpoint['skipped'];
@@ -138,6 +163,8 @@ class ExecuteImportBatchAction
                     null,
                     null,
                     [
+                        'batch_id' => $batchId,
+                        'scope' => 'batch_summary',
                         'template_type' => $type,
                         'template_label' => UploadImportBatchAction::TEMPLATE_LABELS[$type] ?? UploadImportBatchAction::TEMPLATE_LABELS['utama'],
                         'total_inserted' => $finalCounts['inserted'],
@@ -171,11 +198,15 @@ class ExecuteImportBatchAction
                 ->where('processing_token', $attemptToken)
                 ->update([
                     'status' => 'queued',
-                    'processing_token' => null,
                     'lease_expires_at' => null,
-                    'error_message' => $exception->getMessage(),
+                    'error_message' => 'Proses import belum selesai dan akan dicoba kembali.',
                     'finished_at' => null,
                 ]);
+
+            Log::warning('Attempt import pegawai gagal dan akan dicoba kembali.', [
+                'batch_id' => $batchId,
+                'exception_class' => $exception::class,
+            ]);
 
             $retryableBatch = ImportBatch::query()->find($batchId);
             if ($retryableBatch !== null && $retryableBatch->status === 'queued') {
@@ -209,12 +240,18 @@ class ExecuteImportBatchAction
         string $attemptToken,
         string $type,
         array $row,
+        ?User $user,
+        ?string $ipAddress,
+        ?string $userAgent,
     ): array {
         return DB::transaction(function () use (
             $batchId,
             $attemptToken,
             $type,
             $row,
+            $user,
+            $ipAddress,
+            $userAgent,
         ): array {
             $batch = ImportBatch::query()->lockForUpdate()->findOrFail($batchId);
             if ($batch->status !== 'processing' || $batch->processing_token !== $attemptToken) {
@@ -229,6 +266,26 @@ class ExecuteImportBatchAction
 
             if ($outcome['status'] === 'inserted') {
                 $insertedCount++;
+
+                // Payload audit hanya menyimpan metadata traceability, bukan data pribadi pegawai.
+                AuditService::logAsOrFail(
+                    $user?->id ?? 'system',
+                    $user?->name ?? 'System Queue',
+                    'CREATE',
+                    'Employee',
+                    $outcome['employee_id'],
+                    null,
+                    [
+                        'batch_id' => $batchId,
+                        'scope' => 'row',
+                        'template_type' => $type,
+                        'row' => $row['row'] ?? null,
+                        'outcome' => 'inserted',
+                    ],
+                    null,
+                    $ipAddress,
+                    $userAgent,
+                );
             } else {
                 $skippedCount++;
                 if (isset($outcome['issue'])) {
@@ -322,7 +379,7 @@ class ExecuteImportBatchAction
      * Menjalankan satu baris tervalidasi dan mengembalikan outcome aktual untuk rekonsiliasi counter.
      *
      * @param  array<string, mixed>  $row
-     * @return array{status: 'inserted'|'skipped', issue?: array<string, mixed>}
+     * @return array{status: 'inserted', employee_id: string}|array{status: 'skipped', issue?: array<string, mixed>}
      */
     private function executeValidatedRow(string $type, array $row): array
     {
@@ -366,7 +423,7 @@ class ExecuteImportBatchAction
                 return $this->duplicateNipOutcome($row);
             }
 
-            return ['status' => 'inserted'];
+            return ['status' => 'inserted', 'employee_id' => $employee->id];
         }
 
         return ['status' => 'skipped'];

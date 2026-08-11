@@ -15,6 +15,8 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue
 {
@@ -29,6 +31,11 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue
     /** Harus lebih pendek dari retry_after koneksi queue agar dua worker tidak memproses batch bersamaan. */
     public int $timeout = 120;
 
+    private const FAILURE_MESSAGE = 'Proses import pegawai gagal. Silakan coba kembali atau hubungi administrator.';
+
+    /** Token ini ikut diserialisasi bersama job agar seluruh redelivery memiliki ownership yang sama. */
+    protected string $processingToken;
+
     /**
      * Create a new job instance.
      */
@@ -36,8 +43,11 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue
         protected string $batchId,
         protected ?string $userId,
         protected ?string $ipAddress = null,
-        protected ?string $userAgent = null
-    ) {}
+        protected ?string $userAgent = null,
+        ?string $processingToken = null,
+    ) {
+        $this->processingToken = $processingToken ?? (string) Str::uuid();
+    }
 
     /**
      * Execute the job.
@@ -45,7 +55,18 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue
     public function handle(ExecuteImportBatchAction $action, NotificationService $notificationService): void
     {
         $user = $this->userId ? User::find($this->userId) : null;
-        $action->execute($this->batchId, $user, $this->ipAddress, $this->userAgent);
+        $result = $action->execute(
+            $this->batchId,
+            $user,
+            $this->ipAddress,
+            $this->userAgent,
+            $this->processingToken,
+        );
+
+        if (($result['executed'] ?? false) !== true && in_array($result['status'] ?? null, ['queued', 'processing'], true)) {
+            // Jangan ACK pesan ketika batch masih non-terminal dan dimiliki token lain.
+            throw new \RuntimeException('Batch import masih dimiliki worker lain.');
+        }
 
         // Redelivery completed tetap masuk jalur ini untuk memulihkan crash setelah commit completion.
         $this->notifyCompletionOnce($user, $notificationService);
@@ -63,16 +84,17 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue
     public function failed(\Throwable $exception): void
     {
         $user = $this->userId ? User::find($this->userId) : null;
-        $transitioned = DB::transaction(function () use ($exception, $user): bool {
+        $transitioned = DB::transaction(function () use ($user): bool {
             // CAS ini memastikan callback gagal yang kalah race dari completion tidak memiliki side effect.
             $updated = ImportBatch::query()
                 ->whereKey($this->batchId)
                 ->whereIn('status', ['queued', 'processing'])
+                ->where('processing_token', $this->processingToken)
                 ->update([
                     'status' => 'failed',
                     'processing_token' => null,
                     'lease_expires_at' => null,
-                    'error_message' => $exception->getMessage(),
+                    'error_message' => self::FAILURE_MESSAGE,
                     'finished_at' => now(),
                 ]);
 
@@ -106,9 +128,15 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
+        // Detail exception hanya berada di log server; laporan dan notifikasi pengguna memakai pesan generik.
+        Log::error('Job import pegawai gagal setelah retry maksimum.', [
+            'batch_id' => $this->batchId,
+            'exception_class' => $exception::class,
+        ]);
+
         $batch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$this->batchId) ?? [];
         $batch['status'] = 'failed';
-        $batch['error_message'] = 'Proses import pegawai gagal. Silakan coba kembali atau hubungi administrator.';
+        $batch['error_message'] = self::FAILURE_MESSAGE;
         Cache::put(UploadImportBatchAction::CACHE_PREFIX.$this->batchId, $batch, now()->addMinutes(10));
     }
 

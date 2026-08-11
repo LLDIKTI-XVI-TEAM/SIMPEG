@@ -7,6 +7,7 @@ use App\Models\ImportBatch;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class QueueImportBatchAction
@@ -42,15 +43,17 @@ class QueueImportBatchAction
 
         $originalBatch = $batch;
         $claimed = false;
+        $processingToken = (string) Str::uuid();
+        $job = new ImportEmployeeBatchJob($batchId, $user?->id, $ipAddress, $userAgent, $processingToken);
 
         try {
             DB::transaction(function () use (
                 $batchId,
                 $user,
-                $ipAddress,
-                $userAgent,
                 $cacheKey,
                 $batch,
+                $processingToken,
+                $job,
                 &$claimed,
             ): void {
                 $now = now();
@@ -66,6 +69,7 @@ class QueueImportBatchAction
                     'skipped_count' => $batch['validation']['skip_count'] ?? 0,
                     'failed_count' => $batch['validation']['error_count'] ?? 0,
                     'processed_valid_count' => 0,
+                    'processing_token' => $processingToken,
                     'row_issues' => $this->collectRowIssues($batch['validation']['results'] ?? []),
                     'error_message' => null,
                     // Payload tervalidasi berisi data pegawai sensitif, sehingga wajib melewati encrypted cast model.
@@ -91,7 +95,7 @@ class QueueImportBatchAction
                 Cache::put($cacheKey, $queuedBatch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
 
                 // Dispatch berada dalam transaksi claim agar database queue dan status batch commit bersama.
-                ImportEmployeeBatchJob::dispatch($batchId, $user?->id, $ipAddress, $userAgent);
+                dispatch($job);
             });
         } catch (\Throwable $exception) {
             if ($claimed) {
