@@ -4,6 +4,7 @@ namespace App\Queries\Cuti;
 
 use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
+use App\Support\Cuti\CutiPeriodFilter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -44,13 +45,8 @@ class CutiRekapQuery
                 ->where('employee_id', $pegawai))
             ->when($this->stringFilter($filters, 'jenis'), fn (Builder $query, string $jenis) => $query
                 ->where('jenis_cuti_id', $jenis))
-            ->when($period !== null, function (Builder $query) use ($period): void {
-                $query->whereYear('tanggal_mulai', $period['year']);
-
-                if ($period['month'] !== null) {
-                    $query->whereMonth('tanggal_mulai', $period['month']);
-                }
-            })
+            ->when($period, fn (Builder $query, CutiPeriodFilter $periodFilter) => $periodFilter
+                ->applyToDateColumn($query, 'tanggal_mulai'))
             ->orderByDesc('tanggal_mulai')
             ->orderBy('id');
     }
@@ -78,7 +74,8 @@ class CutiRekapQuery
             })
             ->when($this->stringFilter($filters, 'pegawai'), fn (Builder $query, string $pegawai) => $query
                 ->where('employee_id', $pegawai))
-            ->when($period !== null, fn (Builder $query) => $query->where('tahun', $period['year']))
+            ->when($period, fn (Builder $query, CutiPeriodFilter $periodFilter) => $query
+                ->where('tahun', $periodFilter->year))
             ->orderByDesc('tahun')
             ->orderBy('employee_id')
             ->orderBy('id');
@@ -138,7 +135,7 @@ class CutiRekapQuery
      */
     public function saldoYear(array $filters): int
     {
-        return $this->parsePeriod($filters['periode'] ?? null)['year'] ?? (int) now()->year;
+        return $this->parsePeriod($filters['periode'] ?? null)?->year ?? (int) now()->year;
     }
 
     /**
@@ -148,15 +145,7 @@ class CutiRekapQuery
      */
     public function periodLabel(array $filters): string
     {
-        $period = $this->parsePeriod($filters['periode'] ?? null);
-
-        if ($period === null) {
-            return 'Semua_Tahun';
-        }
-
-        return $period['month'] === null
-            ? (string) $period['year']
-            : sprintf('%04d-%02d', $period['year'], $period['month']);
+        return $this->parsePeriod($filters['periode'] ?? null)?->label() ?? 'Semua_Tahun';
     }
 
     /**
@@ -187,45 +176,10 @@ class CutiRekapQuery
     }
 
     /**
-     * Format dikenal dibatasi pada tahun, tahun-bulan, atau nama bulan Indonesia dan tahun.
-     * Nilai lain sengaja tidak memfilter agar kontrak lama tidak berubah diam-diam.
-     *
-     * @return array{year: int, month: int|null}|null
+     * Tafsir periode dipusatkan pada helper bersama agar rekap dan daftar pengajuan tidak berbeda hasil.
      */
-    private function parsePeriod(mixed $period): ?array
+    private function parsePeriod(mixed $period): ?CutiPeriodFilter
     {
-        if (! is_string($period)) {
-            return null;
-        }
-
-        if (preg_match('/^(\d{4})$/', $period, $matches) === 1) {
-            return ['year' => (int) $matches[1], 'month' => null];
-        }
-
-        if (preg_match('/^(\d{4})-(0[1-9]|1[0-2])$/', $period, $matches) === 1) {
-            return ['year' => (int) $matches[1], 'month' => (int) $matches[2]];
-        }
-
-        $months = [
-            'Januari' => 1,
-            'Februari' => 2,
-            'Maret' => 3,
-            'April' => 4,
-            'Mei' => 5,
-            'Juni' => 6,
-            'Juli' => 7,
-            'Agustus' => 8,
-            'September' => 9,
-            'Oktober' => 10,
-            'November' => 11,
-            'Desember' => 12,
-        ];
-
-        if (preg_match('/^([A-Za-z]+) (\d{4})$/', $period, $matches) !== 1
-            || ! array_key_exists($matches[1], $months)) {
-            return null;
-        }
-
-        return ['year' => (int) $matches[2], 'month' => $months[$matches[1]]];
+        return CutiPeriodFilter::parse($period);
     }
 }

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Appointment;
 use App\Models\Employee;
 use App\Models\EmployeeMilestone;
+use App\Models\EwsConfig;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\RefGolongan;
@@ -18,9 +19,7 @@ use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-/**
- * US-5.5 AC-4,5: Test untuk verifikasi kalkulasi Satyalancana dan penyimpanan milestones
- */
+/** Menguji kalkulasi dan penyimpanan milestone Satyalancana. */
 class TmtCalculatorMilestoneTest extends TestCase
 {
     use RefreshDatabase;
@@ -285,5 +284,32 @@ class TmtCalculatorMilestoneTest extends TestCase
         $count = EmployeeMilestone::where('employee_id', $employee->id)->count();
 
         $this->assertEquals(0, $count);
+    }
+
+    /** Konfigurasi global hanya menjadi fallback terakhir ketika referensi BUP tidak tersedia. */
+    public function test_calculator_persists_global_pension_fallback_with_provenance(): void
+    {
+        EwsConfig::setVal('pensiun_required_age_years', '60');
+
+        $employee = Employee::factory()->create([
+            'tanggal_lahir' => Carbon::create(1990, 5, 15),
+            'tanggal_pensiun' => null,
+        ]);
+
+        app(TmtCalculatorService::class)->syncForEmployee($employee);
+
+        $this->assertSame('2050-05-15', $employee->refresh()->tanggal_pensiun?->toDateString());
+
+        $milestone = EmployeeMilestone::query()
+            ->where('employee_id', $employee->id)
+            ->where('type', EmployeeMilestone::TYPE_PENSIUN)
+            ->where('is_active', true)
+            ->sole();
+
+        $this->assertSame('2050-05-15', $milestone->milestone_date->toDateString());
+        $this->assertSame('calculated_from_global_config', $milestone->metadata['source']);
+        $this->assertSame('pensiun_required_age_years', $milestone->metadata['config_key']);
+        $this->assertSame(60, $milestone->metadata['bup']);
+        $this->assertNull($milestone->metadata['jabatan']);
     }
 }

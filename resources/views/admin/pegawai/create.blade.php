@@ -470,7 +470,7 @@
                                 <div class="relative">
                                     <select id="jabatan_jabatan_id" name="jabatan_jabatan_id"  x-model="jabatanForm.jabatan_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
                                         <option value="" disabled>Pilih Jabatan</option>
-                                        @foreach($jabatanOptions as $jabatan)
+                                        @foreach($jabatanOptions->where('is_active', true) as $jabatan)
                                             <option value="{{ $jabatan->id }}">{{ $jabatan->nama }}{{ $jabatan->jenisJabatan ? ' - '.$jabatan->jenisJabatan->nama : '' }}</option>
                                         @endforeach
                                     </select>

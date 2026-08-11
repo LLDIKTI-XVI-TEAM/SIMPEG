@@ -12,6 +12,7 @@ use App\Services\Employees\TmtCalculatorService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class EmployeePppkContractMilestoneUpdateTest extends TestCase
@@ -35,6 +36,8 @@ class EmployeePppkContractMilestoneUpdateTest extends TestCase
      */
     public function test_updating_tanggal_akhir_kontrak_syncs_pppk_milestone(): void
     {
+        $this->seed(ReferenceSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $user = User::factory()->create(['role' => 'super_admin']);
 
@@ -89,28 +92,24 @@ class EmployeePppkContractMilestoneUpdateTest extends TestCase
         ]);
 
         // Update tanggal_akhir_kontrak via UpdateEmployeeAction
-        $response = $this->actingAs($user)->post(route('pegawai.update', $employee->id), [
+        $response = $this->actingAs($user)->postWithCsrf(route('pegawai.update', $employee->id), [
             'nama_lengkap' => $employee->nama_lengkap,
             'nip' => $employee->nip,
-            'email' => $employee->email,
+            'email_pribadi' => $employee->email_pribadi,
             'tanggal_akhir_kontrak' => '2028-12-31', // ← Changed!
         ]);
 
-        $response->assertRedirect();
+        $response->assertSessionHasNoErrors()->assertRedirect();
 
-        // Verify: Old milestone invalidated
+        // Identitas milestone kontrak tetap sama agar update berulang tidak membuat duplikat.
         $oldMilestone->refresh();
-        $this->assertFalse($oldMilestone->is_active, 'Old PPPK milestone should be invalidated');
-
-        // Verify: New milestone created with updated date
-        $newMilestone = EmployeeMilestone::where('employee_id', $employee->id)
+        $this->assertTrue($oldMilestone->is_active);
+        $this->assertSame($oldMilestoneId, $oldMilestone->id);
+        $this->assertEquals('2028-12-31', $oldMilestone->milestone_date->toDateString());
+        $this->assertSame(1, EmployeeMilestone::where('employee_id', $employee->id)
             ->where('type', 'pppk_contract_end')
             ->where('is_active', true)
-            ->where('id', '!=', $oldMilestoneId)
-            ->first();
-
-        $this->assertNotNull($newMilestone, 'New PPPK milestone should be created');
-        $this->assertEquals('2028-12-31', $newMilestone->milestone_date->toDateString());
+            ->count());
 
         // Verify: Old alert expired (existing behavior)
         $alert->refresh();
@@ -128,6 +127,8 @@ class EmployeePppkContractMilestoneUpdateTest extends TestCase
      */
     public function test_scheduler_uses_updated_pppk_milestone_not_stale_one(): void
     {
+        $this->seed(ReferenceSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $user = User::factory()->create(['role' => 'super_admin']);
 
@@ -154,12 +155,13 @@ class EmployeePppkContractMilestoneUpdateTest extends TestCase
 
         // Update to further future
         $newContractDate = now()->addYears(2)->toDateString();
-        $this->actingAs($user)->post(route('pegawai.update', $employee->id), [
+        $response = $this->actingAs($user)->postWithCsrf(route('pegawai.update', $employee->id), [
             'nama_lengkap' => $employee->nama_lengkap,
             'nip' => $employee->nip,
-            'email' => $employee->email,
+            'email_pribadi' => $employee->email_pribadi,
             'tanggal_akhir_kontrak' => $newContractDate,
         ]);
+        $response->assertSessionHasNoErrors()->assertRedirect();
 
         // Verify: Only one active PPPK milestone
         $activeMilestones = EmployeeMilestone::where('employee_id', $employee->id)
@@ -171,14 +173,11 @@ class EmployeePppkContractMilestoneUpdateTest extends TestCase
         $this->assertEquals($newContractDate, $activeMilestones->first()->milestone_date->toDateString());
     }
 
-    /**
-     * Test: Scheduler tidak membuat alert ulang dengan tanggal lama setelah update.
-     *
-     * Scenario: Bug sebelum fix - milestone lama tetap aktif, scheduler membuat
-     * alert baru dengan tanggal lama meskipun alert sudah di-expire.
-     */
-    public function test_scheduler_does_not_recreate_alert_with_old_contract_date(): void
+    /** Memastikan perubahan kontrak menutup alert lama dan menyisakan milestone aktif terbaru. */
+    public function test_contract_update_expires_old_alert_and_keeps_new_active_milestone(): void
     {
+        $this->seed(ReferenceSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $user = User::factory()->create(['role' => 'super_admin']);
 
@@ -203,20 +202,25 @@ class EmployeePppkContractMilestoneUpdateTest extends TestCase
         // Initial sync
         app(TmtCalculatorService::class)->syncForEmployee($employee);
 
+        // Create alert for old date
+        $alert = EwsAlert::create([
+            'employee_id' => $employee->id,
+            'type' => 'KONTRAK_PPPK',
+            'target_date' => '2027-06-30',
+            'interval_days' => 180,
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_ACTIVE,
+        ]);
+
         // Update contract date
-        $response = $this->actingAs($user)
-            ->withSession(['_token' => 'test-token'])
-            ->post(route('pegawai.update', $employee->id), [
-                'nama_lengkap' => $employee->nama_lengkap,
-                'nip' => $employee->nip,
-                'email' => $employee->email,
-                'tanggal_akhir_kontrak' => '2028-12-31',
-            ], ['X-CSRF-TOKEN' => 'test-token']);
+        $response = $this->actingAs($user)->postWithCsrf(route('pegawai.update', $employee->id), [
+            'nama_lengkap' => $employee->nama_lengkap,
+            'nip' => $employee->nip,
+            'email_pribadi' => $employee->email_pribadi,
+            'tanggal_akhir_kontrak' => '2028-12-31', // ← New date
+        ]);
+        $response->assertSessionHasNoErrors()->assertRedirect();
 
-        // Ensure the update succeeded (no validation/server errors)
-        $response->assertRedirect(route('data-pegawai'));
-
-        // Simulate scheduler running (would use milestone)
+        // Scheduler hanya boleh melihat milestone aktif dengan tanggal kontrak terbaru.
         $activeMilestone = EmployeeMilestone::where('employee_id', $employee->id)
             ->where('type', 'pppk_contract_end')
             ->where('is_active', true)
@@ -227,6 +231,10 @@ class EmployeePppkContractMilestoneUpdateTest extends TestCase
         $this->assertEquals('2028-12-31', $activeMilestone->milestone_date->toDateString());
         $this->assertNotEquals('2027-06-30', $activeMilestone->milestone_date->toDateString(), 'Active milestone should NOT use old contract date');
 
+        // Alert lama harus tetap kedaluwarsa agar scheduler tidak mengaktifkannya kembali.
+        $alert->refresh();
+        $this->assertSame(EwsAlert::FOLLOWUP_STATUS_EXPIRED, $alert->followup_status);
+        $this->assertTrue($alert->is_processed);
     }
 
     /**
@@ -234,6 +242,8 @@ class EmployeePppkContractMilestoneUpdateTest extends TestCase
      */
     public function test_non_pppk_employee_contract_change_does_not_affect_milestones(): void
     {
+        $this->seed(ReferenceSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $user = User::factory()->create(['role' => 'super_admin']);
 
@@ -258,16 +268,25 @@ class EmployeePppkContractMilestoneUpdateTest extends TestCase
         $this->assertEquals(0, $pppkMilestones, 'PNS employee should not have PPPK milestone');
 
         // Update employee (shouldn't create PPPK milestone)
-        $this->actingAs($user)->post(route('pegawai.update', $employee->id), [
+        $response = $this->actingAs($user)->postWithCsrf(route('pegawai.update', $employee->id), [
             'nama_lengkap' => 'Updated Name',
             'nip' => $employee->nip,
-            'email' => $employee->email,
+            'email_pribadi' => $employee->email_pribadi,
         ]);
+        $response->assertSessionHasNoErrors()->assertRedirect();
 
         $pppkMilestonesAfter = EmployeeMilestone::where('employee_id', $employee->id)
             ->where('type', 'pppk_contract_end')
             ->count();
 
         $this->assertEquals(0, $pppkMilestonesAfter, 'PNS employee still should not have PPPK milestone');
+    }
+
+    private function postWithCsrf(string $uri, array $data): TestResponse
+    {
+        $token = 'employee-pppk-milestone-token';
+
+        return $this->withSession(['_token' => $token])
+            ->post($uri, [...$data, '_token' => $token]);
     }
 }

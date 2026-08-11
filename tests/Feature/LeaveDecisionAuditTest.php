@@ -51,7 +51,7 @@ class LeaveDecisionAuditTest extends TestCase
         $audit = AuditLog::query()
             ->where('auditable_type', 'LeaveRequest')
             ->where('auditable_id', $cuti->id)
-            ->where('event', 'UPDATE')
+            ->where('event', 'NOT_APPROVED')
             ->firstOrFail();
 
         $this->assertSame([
@@ -96,7 +96,7 @@ class LeaveDecisionAuditTest extends TestCase
         $audit = AuditLog::query()
             ->where('auditable_type', 'LeaveRequest')
             ->where('auditable_id', $cuti->id)
-            ->where('event', 'UPDATE')
+            ->where('event', 'CHANGE_REQUESTED')
             ->firstOrFail();
 
         $this->assertSame([
@@ -116,13 +116,94 @@ class LeaveDecisionAuditTest extends TestCase
             'leave_request_id' => $cuti->id,
             'employee_id' => $pemohon->id,
             'status' => 'perlu_perubahan',
-            'decision' => 'REQUEST_CHANGES',
+            'decision' => 'CHANGE_REQUESTED',
             'step_order' => 1,
             'step_label' => 'Verifikator',
             'approver_id' => $approver->id,
             'acted_at' => $audit->new_values['acted_at'],
             'komentar' => $komentar,
         ], $audit->new_values);
+    }
+
+    public function test_persetujuan_tahap_non_final_tercatat_sebagai_verifikasi(): void
+    {
+        [$user, $approver, $pemohon, $cuti] = $this->buatPengajuanDuaTahap('cuti_sakit_verify_audit');
+
+        $response = $this->actingAs($user)->post(route('cuti.approve', ['id' => $cuti->id]), [
+            'komentar' => 'Diteruskan ke tahap berikutnya.',
+        ]);
+
+        $response->assertRedirect(route('cuti.approval'));
+        // Tahap pertama bukan tahap akhir sehingga pengajuan masih menunggu keputusan berikutnya.
+        $this->assertSame('menunggu_approval', $cuti->fresh()->status);
+
+        $audit = $this->auditKeputusan($cuti->id, 'VERIFY');
+        $this->assertSame('VERIFY', $audit->new_values['decision']);
+        $this->assertSame($pemohon->id, $audit->new_values['employee_id']);
+        $this->assertSame($approver->id, $audit->new_values['approver_id']);
+    }
+
+    public function test_persetujuan_tahap_final_tercatat_sebagai_keputusan(): void
+    {
+        [$user, , , $cuti] = $this->buatPengajuanMenungguApproval('cuti_sakit_decide_audit');
+
+        $response = $this->actingAs($user)->post(route('cuti.approve', ['id' => $cuti->id]), [
+            'komentar' => 'Disetujui.',
+        ]);
+
+        $response->assertRedirect(route('cuti.approval'));
+        $this->assertSame('disetujui', $cuti->fresh()->status);
+
+        $audit = $this->auditKeputusan($cuti->id, 'DECIDE');
+        $this->assertSame('DECIDE', $audit->new_values['decision']);
+        $this->assertSame('disetujui', $audit->new_values['status']);
+    }
+
+    public function test_penangguhan_tercatat_sebagai_penangguhan(): void
+    {
+        [$user, , , $cuti] = $this->buatPengajuanMenungguApproval('cuti_sakit_defer_audit');
+
+        $response = $this->actingAs($user)->post(route('cuti.postpone', ['id' => $cuti->id]), [
+            'komentar' => 'Ditangguhkan karena kebutuhan unit kerja.',
+        ]);
+
+        $response->assertRedirect(route('cuti.approval'));
+        $this->assertSame('ditangguhkan', $cuti->fresh()->status);
+
+        $audit = $this->auditKeputusan($cuti->id, 'DEFER');
+        $this->assertSame('DEFER', $audit->new_values['decision']);
+    }
+
+    public function test_perubahan_dan_tidak_disetujui_terpisah_lewat_filter_event(): void
+    {
+        [$userPerubahan, , , $cutiPerubahan] = $this->buatPengajuanMenungguApproval('cuti_sakit_filter_ubah');
+        $this->actingAs($userPerubahan)->post(route('cuti.request-changes', ['id' => $cutiPerubahan->id]), [
+            'komentar' => 'Mohon perbaiki tanggal pengajuan.',
+        ]);
+
+        [$userTolak, , , $cutiTolak] = $this->buatPengajuanMenungguApproval('cuti_sakit_filter_tolak');
+        $this->actingAs($userTolak)->post(route('cuti.decline', ['id' => $cutiTolak->id]), [
+            'komentar' => 'Kuota unit kerja tidak memungkinkan.',
+        ]);
+
+        // Kedua keputusan wajib memakai kosakata berbeda supaya penyaringan audit tidak mencampur
+        // permintaan perubahan dengan penolakan.
+        $idPerubahan = AuditLog::query()->where('event', 'CHANGE_REQUESTED')->pluck('auditable_id');
+        $idTolak = AuditLog::query()->where('event', 'NOT_APPROVED')->pluck('auditable_id');
+
+        $this->assertTrue($idPerubahan->contains($cutiPerubahan->id));
+        $this->assertFalse($idPerubahan->contains($cutiTolak->id));
+        $this->assertTrue($idTolak->contains($cutiTolak->id));
+        $this->assertFalse($idTolak->contains($cutiPerubahan->id));
+    }
+
+    private function auditKeputusan(string $leaveRequestId, string $event): AuditLog
+    {
+        return AuditLog::query()
+            ->where('auditable_type', 'LeaveRequest')
+            ->where('auditable_id', $leaveRequestId)
+            ->where('event', $event)
+            ->firstOrFail();
     }
 
     /**
@@ -161,6 +242,31 @@ class LeaveDecisionAuditTest extends TestCase
             'role_label' => 'Verifikator',
             'approver_employee_id' => $approver->id,
             'status' => 'active',
+            'is_final' => true,
+        ]);
+
+        return [$user, $approver, $pemohon, $cuti];
+    }
+
+    /**
+     * Menyiapkan pengajuan dengan dua tahap approval sehingga tahap pertama bukan tahap akhir.
+     * Dipakai untuk memisahkan persetujuan antara yang meneruskan berkas dan yang memutus final.
+     *
+     * @return array{0: User, 1: Employee, 2: Employee, 3: LeaveRequest}
+     */
+    private function buatPengajuanDuaTahap(string $jenisCode): array
+    {
+        [$user, $approver, $pemohon, $cuti] = $this->buatPengajuanMenungguApproval($jenisCode);
+
+        $cuti->steps()->where('step_order', 1)->update(['is_final' => false]);
+
+        LeaveRequestStep::create([
+            'leave_request_id' => $cuti->id,
+            'step_order' => 2,
+            'step_type' => 'pybmc',
+            'role_label' => 'PYBMC',
+            'approver_employee_id' => Employee::factory()->create()->id,
+            'status' => 'pending',
             'is_final' => true,
         ]);
 

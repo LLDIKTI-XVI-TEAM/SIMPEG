@@ -27,7 +27,7 @@
             <div class="relative z-10 w-full lg:w-[70%] flex flex-col justify-center">
                 <p class="text-[10px] font-bold uppercase tracking-widest text-white/70 mb-0.5">Selamat datang kembali</p>
                 <h2 class="text-xl sm:text-2xl font-extrabold text-white leading-tight">
-                    {{ auth()->user()->name }}
+                    {{ preg_replace('/\s*\(.*?\)/', '', auth()->user()->name) }}
                 </h2>
                 
                 <p class="mt-1 text-[12px] text-white/80 font-sans max-w-lg">

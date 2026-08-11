@@ -39,6 +39,7 @@ class EmployeeImportErrorPriorityTest extends TestCase
      * @group skip
      * @group enhancement
      */
+    /** Email terdaftar tidak boleh tertutupi outcome skip dari NIP yang sudah ada. */
     public function test_email_existing_db_takes_priority_over_nip_existing_db(): void
     {
         $this->seed(ReferenceSeeder::class);
@@ -57,6 +58,7 @@ class EmployeeImportErrorPriorityTest extends TestCase
             'user_id' => null,
             'filename' => 'test.xlsx',
             'type' => 'utama',
+            'headers' => $this->importHeaders(),
             'total_rows' => 1,
             'rows' => [
                 [
@@ -76,6 +78,8 @@ class EmployeeImportErrorPriorityTest extends TestCase
                         'Prodi Pendidikan Terakhir' => 'Teknik Informatika',
                         'Nomor Telepon' => '081234567890',
                         'Role' => 'pegawai',
+                        'Prodi Pendidikan Terakhir' => 'Manajemen',
+                        'Nomor Telepon' => '081234567890',
                     ],
                 ],
             ],
@@ -94,9 +98,9 @@ class EmployeeImportErrorPriorityTest extends TestCase
     }
 
     /**
-     * Test: Duplicate NIP within file takes priority over NIP existing DB.
+     * Kemunculan pertama NIP database tetap skip; kemunculan berikutnya error karena duplikat berkas.
      */
-    public function test_duplicate_nip_in_file_takes_priority_over_nip_existing_db(): void
+    public function test_second_duplicate_nip_in_file_is_error_when_first_nip_exists_in_database(): void
     {
         $this->seed(ReferenceSeeder::class);
 
@@ -113,6 +117,7 @@ class EmployeeImportErrorPriorityTest extends TestCase
             'user_id' => null,
             'filename' => 'test.xlsx',
             'type' => 'utama',
+            'headers' => $this->importHeaders(),
             'total_rows' => 2,
             'rows' => [
                 [
@@ -132,6 +137,8 @@ class EmployeeImportErrorPriorityTest extends TestCase
                         'Prodi Pendidikan Terakhir' => 'Teknik Informatika',
                         'Nomor Telepon' => '081234567890',
                         'Role' => 'pegawai',
+                        'Prodi Pendidikan Terakhir' => 'Manajemen',
+                        'Nomor Telepon' => '081234567890',
                     ],
                 ],
                 [
@@ -151,6 +158,8 @@ class EmployeeImportErrorPriorityTest extends TestCase
                         'Prodi Pendidikan Terakhir' => 'Manajemen',
                         'Nomor Telepon' => '081234567891',
                         'Role' => 'pegawai',
+                        'Prodi Pendidikan Terakhir' => 'Teknik Informatika',
+                        'Nomor Telepon' => '081298765432',
                     ],
                 ],
             ],
@@ -161,40 +170,35 @@ class EmployeeImportErrorPriorityTest extends TestCase
         // Execute validation
         $result = app(ValidateImportBatchAction::class)->execute($batchId, null, null);
 
-        // Assert: Both rows should be ERROR (not SKIP)
-        $this->assertEquals(2, $result['error_count'], 'Should have 2 errors');
-        $this->assertEquals(0, $result['skip_count'], 'Should have 0 skips');
-        $this->assertEquals('error', $result['results'][0]['status'], 'First row should be ERROR');
-        $this->assertEquals('error', $result['results'][1]['status'], 'Second row should be ERROR due to duplicate');
+        $this->assertSame(1, $result['error_count']);
+        $this->assertSame(1, $result['skip_count']);
+        $this->assertSame('skip', $result['results'][0]['status']);
+        $this->assertSame('error', $result['results'][1]['status']);
+        $this->assertArrayHasKey('NIP', $result['results'][1]['errors']);
     }
 
     /**
-     * Test: NIP existing DB only results in SKIP when no other errors exist.
+     * Kemunculan pertama NIP baru valid; kemunculan berikutnya error karena duplikat berkas.
      */
-    public function test_nip_existing_db_results_in_skip_when_no_other_errors(): void
+    public function test_second_duplicate_new_nip_in_file_is_error_after_first_valid_row(): void
     {
         $this->seed(ReferenceSeeder::class);
 
-        // Create existing employee
-        Employee::factory()->create([
-            'nip' => '199001012020121001',
-            'email_pribadi' => 'existing@example.com',
-        ]);
-
-        // Prepare import batch with only NIP existing (email different)
+        // Siapkan dua kemunculan NIP baru yang sama dalam berkas.
         $batchId = 'test-batch-'.uniqid();
         $batch = [
             'id' => $batchId,
             'user_id' => null,
             'filename' => 'test.xlsx',
             'type' => 'utama',
-            'total_rows' => 1,
+            'headers' => $this->importHeaders(),
+            'total_rows' => 2,
             'rows' => [
                 [
                     'row' => 2,
                     'data' => [
                         'Nama Pegawai' => 'Test Import',
-                        'NIP' => '199001012020121001', // ← Same NIP (existing DB)
+                        'NIP' => '199004012020121004',
                         'NIK' => '1234567890123456',
                         'Email Pegawai' => 'newemail@example.com', // ← Different Email
                         'Tanggal Lahir' => '1990-01-01',
@@ -207,6 +211,26 @@ class EmployeeImportErrorPriorityTest extends TestCase
                         'Prodi Pendidikan Terakhir' => 'Teknik Informatika',
                         'Nomor Telepon' => '081234567890',
                         'Role' => 'pegawai',
+                        'Prodi Pendidikan Terakhir' => 'Manajemen',
+                        'Nomor Telepon' => '081234567890',
+                    ],
+                ],
+                [
+                    'row' => 3,
+                    'data' => [
+                        'Nama Pegawai' => 'Second Import',
+                        'NIP' => '199004012020121004',
+                        'NIK' => '9876543210123456',
+                        'Email Pegawai' => 'second-new-nip@example.com',
+                        'Tanggal Lahir' => '1991-01-01',
+                        'Status Kepegawaian' => 'PNS',
+                        'Golongan' => 'III/b',
+                        'Pangkat' => 'Penata Muda Tingkat I',
+                        'Jabatan' => 'Staf Senior',
+                        'Kelas Jabatan' => '6',
+                        'Pendidikan Terakhir' => 'S2',
+                        'Prodi Pendidikan Terakhir' => 'Teknik Informatika',
+                        'Nomor Telepon' => '081298765432',
                     ],
                 ],
             ],
@@ -217,33 +241,29 @@ class EmployeeImportErrorPriorityTest extends TestCase
         // Execute validation
         $result = app(ValidateImportBatchAction::class)->execute($batchId, null, null);
 
-        // Assert: Should be SKIP (no other errors exist)
-        $this->assertEquals(0, $result['error_count'], 'Should have 0 errors');
-        $this->assertEquals(1, $result['skip_count'], 'Should have 1 skip');
-        $this->assertEquals('skip', $result['results'][0]['status'], 'Row should be SKIP');
-        $this->assertArrayHasKey('NIP', $result['results'][0]['errors'], 'Should have NIP skip reason');
+        $this->assertSame(1, $result['valid_count']);
+        $this->assertSame(1, $result['error_count']);
+        $this->assertSame(0, $result['skip_count']);
+        $this->assertSame('valid', $result['results'][0]['status']);
+        $this->assertSame('error', $result['results'][1]['status']);
+        $this->assertArrayHasKey('NIP', $result['results'][1]['errors']);
     }
 
     /**
-     * Test: Duplicate email within file takes priority over email existing DB.
+     * Kemunculan email pertama valid; kemunculan berikutnya error karena duplikat berkas.
      */
-    public function test_duplicate_email_in_file_takes_priority_over_email_existing_db(): void
+    public function test_second_duplicate_email_in_file_is_error_after_first_valid_row(): void
     {
         $this->seed(ReferenceSeeder::class);
 
-        // Create existing employee
-        Employee::factory()->create([
-            'nip' => '199001012020121001',
-            'email_pribadi' => 'existing@example.com',
-        ]);
-
-        // Prepare import batch with duplicate email within file
+        // Siapkan dua NIP baru dengan email yang sama dalam berkas.
         $batchId = 'test-batch-'.uniqid();
         $batch = [
             'id' => $batchId,
             'user_id' => null,
             'filename' => 'test.xlsx',
             'type' => 'utama',
+            'headers' => $this->importHeaders(),
             'total_rows' => 2,
             'rows' => [
                 [
@@ -263,6 +283,8 @@ class EmployeeImportErrorPriorityTest extends TestCase
                         'Prodi Pendidikan Terakhir' => 'Teknik Informatika',
                         'Nomor Telepon' => '081234567890',
                         'Role' => 'pegawai',
+                        'Prodi Pendidikan Terakhir' => 'Manajemen',
+                        'Nomor Telepon' => '081234567890',
                     ],
                 ],
                 [
@@ -282,6 +304,8 @@ class EmployeeImportErrorPriorityTest extends TestCase
                         'Prodi Pendidikan Terakhir' => 'Manajemen',
                         'Nomor Telepon' => '081234567891',
                         'Role' => 'pegawai',
+                        'Prodi Pendidikan Terakhir' => 'Teknik Informatika',
+                        'Nomor Telepon' => '081298765432',
                     ],
                 ],
             ],
@@ -292,18 +316,18 @@ class EmployeeImportErrorPriorityTest extends TestCase
         // Execute validation
         $result = app(ValidateImportBatchAction::class)->execute($batchId, null, null);
 
-        // Assert: Both rows should be ERROR due to duplicate within file
-        $this->assertEquals(2, $result['error_count'], 'Should have 2 errors');
-        $this->assertEquals(0, $result['skip_count'], 'Should have 0 skips');
-        $this->assertEquals('error', $result['results'][0]['status']);
-        $this->assertEquals('error', $result['results'][1]['status']);
+        $this->assertSame(1, $result['valid_count']);
+        $this->assertSame(1, $result['error_count']);
+        $this->assertSame(0, $result['skip_count']);
+        $this->assertSame('valid', $result['results'][0]['status']);
+        $this->assertSame('error', $result['results'][1]['status']);
         $this->assertStringContainsString('baris 2', $result['results'][1]['errors']['Email Pegawai'][0]);
     }
 
     /**
-     * Test: Complex scenario - NIP existing + Email duplicate in file = ERROR.
+     * NIP database pada kemunculan pertama tetap skip, sementara email duplikat berikutnya error.
      */
-    public function test_nip_existing_with_email_duplicate_in_file_is_error(): void
+    public function test_nip_existing_with_later_duplicate_email_in_file_keeps_occurrence_semantics(): void
     {
         $this->seed(ReferenceSeeder::class);
 
@@ -320,6 +344,7 @@ class EmployeeImportErrorPriorityTest extends TestCase
             'user_id' => null,
             'filename' => 'test.xlsx',
             'type' => 'utama',
+            'headers' => $this->importHeaders(),
             'total_rows' => 2,
             'rows' => [
                 [
@@ -339,6 +364,8 @@ class EmployeeImportErrorPriorityTest extends TestCase
                         'Prodi Pendidikan Terakhir' => 'Teknik Informatika',
                         'Nomor Telepon' => '081234567890',
                         'Role' => 'pegawai',
+                        'Prodi Pendidikan Terakhir' => 'Manajemen',
+                        'Nomor Telepon' => '081234567890',
                     ],
                 ],
                 [
@@ -358,6 +385,8 @@ class EmployeeImportErrorPriorityTest extends TestCase
                         'Prodi Pendidikan Terakhir' => 'Manajemen',
                         'Nomor Telepon' => '081234567891',
                         'Role' => 'pegawai',
+                        'Prodi Pendidikan Terakhir' => 'Teknik Informatika',
+                        'Nomor Telepon' => '081298765432',
                     ],
                 ],
             ],
@@ -368,10 +397,30 @@ class EmployeeImportErrorPriorityTest extends TestCase
         // Execute validation
         $result = app(ValidateImportBatchAction::class)->execute($batchId, null, null);
 
-        // Assert: Both should be ERROR (not SKIP)
-        // Row 1: Would be SKIP due to NIP, but email duplicate makes it ERROR
-        // Row 2: ERROR due to email duplicate
-        $this->assertEquals(2, $result['error_count'], 'Should have 2 errors');
-        $this->assertEquals(0, $result['skip_count'], 'Should have 0 skips - email duplicate overrides NIP skip');
+        $this->assertSame(1, $result['error_count']);
+        $this->assertSame(1, $result['skip_count']);
+        $this->assertSame('skip', $result['results'][0]['status']);
+        $this->assertSame('error', $result['results'][1]['status']);
+        $this->assertArrayHasKey('Email Pegawai', $result['results'][1]['errors']);
+    }
+
+    /** @return list<string> */
+    private function importHeaders(): array
+    {
+        return [
+            'Nama Pegawai',
+            'NIP',
+            'NIK',
+            'Email Pegawai',
+            'Tanggal Lahir',
+            'Status Kepegawaian',
+            'Golongan',
+            'Pangkat',
+            'Jabatan',
+            'Kelas Jabatan',
+            'Pendidikan Terakhir',
+            'Prodi Pendidikan Terakhir',
+            'Nomor Telepon',
+        ];
     }
 }

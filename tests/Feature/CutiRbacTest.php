@@ -170,7 +170,7 @@ class CutiRbacTest extends TestCase
         $audit = AuditLog::query()
             ->where('auditable_type', 'LeaveRequest')
             ->where('auditable_id', $cuti->id)
-            ->where('event', 'APPROVE')
+            ->where('event', 'DECIDE')
             ->firstOrFail();
 
         $this->assertSame([
@@ -185,7 +185,7 @@ class CutiRbacTest extends TestCase
             'leave_request_id' => $cuti->id,
             'employee_id' => $pemohon->id,
             'status' => 'disetujui',
-            'decision' => 'APPROVE',
+            'decision' => 'DECIDE',
             'step_order' => 1,
             'step_label' => 'Verifikator',
             'approver_id' => $approver->id,

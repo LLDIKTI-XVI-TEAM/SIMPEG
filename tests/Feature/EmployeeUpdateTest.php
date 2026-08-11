@@ -119,7 +119,7 @@ class EmployeeUpdateTest extends TestCase
 
     public function test_admin_can_replace_employee_photo_upload(): void
     {
-        Storage::fake('public');
+
         Storage::disk('public')->put('photos/foto-lama.jpg', 'old-photo');
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create([
@@ -379,7 +379,7 @@ class EmployeeUpdateTest extends TestCase
 
     public function test_admin_kepegawaian_can_update_employee_with_histories_via_web_form(): void
     {
-        Storage::fake('public');
+
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create();
 

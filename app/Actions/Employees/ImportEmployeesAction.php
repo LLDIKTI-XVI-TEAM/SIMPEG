@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Services\AuditService;
+use App\Services\Employees\TmtCalculatorService;
 use App\Support\EmployeeImport\CsvEmployeeReader;
 use App\Support\EmployeeValidationRules;
 use Illuminate\Http\Request;
@@ -19,7 +20,10 @@ class ImportEmployeesAction
     /** @var array<string, string>|null */
     private ?array $jenisPegawaiCache = null;
 
-    public function __construct(private readonly CsvEmployeeReader $reader) {}
+    public function __construct(
+        private readonly CsvEmployeeReader $reader,
+        private readonly TmtCalculatorService $tmtCalculator,
+    ) {}
 
     /**
      * Mengimpor pegawai secara all-or-nothing agar file bermasalah tidak membuat data parsial.
@@ -65,13 +69,6 @@ class ImportEmployeesAction
             $referenceErrors = $this->resolveReferences($data);
             $duplicateResult = $this->duplicateErrors($data, $row['row'], $seenNips, $seenEmails);
 
-            // K-US-02: Handle skip status from duplicate check (NIP existing in DB)
-            if ($duplicateResult['skip']) {
-                $skippedCount++;
-
-                continue;
-            }
-
             $rowErrors = array_merge_recursive($referenceErrors, $duplicateResult['errors']);
 
             if ($rowErrors !== []) {
@@ -79,6 +76,13 @@ class ImportEmployeesAction
                     'row' => $row['row'],
                     'errors' => $rowErrors,
                 ];
+
+                continue;
+            }
+
+            // Skip NIP hanya berlaku bila baris tidak memiliki error yang harus diperbaiki admin.
+            if ($duplicateResult['skip']) {
+                $skippedCount++;
 
                 continue;
             }
@@ -95,12 +99,18 @@ class ImportEmployeesAction
                 ?? RefStatusPegawai::where('is_default', true)->value('id');
 
             foreach ($validatedRows as $data) {
-                Employee::create($data + [
+                $employee = Employee::create($data + [
                     'status_pegawai_id' => $aktifId,
                     'status_aktif' => 'Aktif',
                     'profil_status' => 'belum_lengkap',
                     'is_kinerja_baik' => true,
                 ]);
+
+                // Endpoint import kompatibilitas mengikuti batas yang sama dengan wizard:
+                // catat provenance pensiun tanpa menghitung milestone lain dari snapshot massal.
+                if ($employee->tanggal_pensiun !== null) {
+                    $this->tmtCalculator->recordImportedPensionDate($employee);
+                }
             }
         });
 
@@ -160,11 +170,11 @@ class ImportEmployeesAction
     }
 
     /**
-     * K-US-02: Menjaga file import tidak berisi NIP/email ganda sebelum transaksi insert dimulai.
-     * - NIP ganda dalam satu berkas → error (highest priority)
-     * - Email existing DB → error
+     * Menjaga file import tidak berisi NIP/email ganda sebelum transaksi insert dimulai.
+     * - NIP ganda dalam satu berkas → error dengan prioritas tertinggi
+     * - Email yang telah terdaftar → error
      * - Email ganda dalam berkas → error
-     * - NIP sudah ada di database → SKIP (aligned with K-US-02 canonical contract)
+     * - NIP sudah ada di database → skip bila baris tidak memiliki error lain
      *
      * @param  array<string, mixed>  $data
      * @param  array<string, int>  $seenNips
@@ -179,14 +189,13 @@ class ImportEmployeesAction
         if (! empty($data['nip'])) {
             $nip = (string) $data['nip'];
 
-            // NIP ganda dalam berkas → error (highest priority)
+            // Duplikasi NIP dalam berkas diprioritaskan agar sumber konflik dapat diperbaiki.
             if (isset($seenNips[$nip])) {
                 $errors['nip'][] = "NIP sudah ada pada baris {$seenNips[$nip]}.";
             } else {
                 $seenNips[$nip] = $row;
 
-                // K-US-02: NIP sudah ada di database → SKIP (bukan error)
-                // Only check database if no in-file duplicate (in-file duplicate takes priority)
+                // NIP database menjadi skip hanya bila tidak ada duplikasi dalam berkas.
                 if (Employee::where('nip', $nip)->exists()) {
                     $skip = true;
                 }
@@ -196,14 +205,14 @@ class ImportEmployeesAction
         if (! empty($data['email_pribadi'])) {
             $email = strtolower((string) $data['email_pribadi']);
 
-            // Email ganda dalam berkas → error
+            // Duplikasi email dalam berkas harus diperbaiki sebelum data disimpan.
             if (isset($seenEmails[$email])) {
                 $errors['email_pribadi'][] = "Email pegawai sudah ada pada baris {$seenEmails[$email]}.";
             } else {
                 $seenEmails[$email] = $row;
             }
 
-            // Email sudah ada di database → error
+            // Email yang telah digunakan tidak boleh dipakai oleh pegawai lain.
             if (Employee::whereRaw('LOWER(email_pribadi) = ?', [$email])->exists()) {
                 $errors['email_pribadi'][] = 'Email pegawai sudah terdaftar di database.';
             }

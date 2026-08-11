@@ -25,7 +25,6 @@ class ChangeEmployeeStatusTest extends TestCase
         $this->seed(ReferenceSeeder::class);
         $this->seed(RbacSeeder::class);
 
-        Storage::fake('public');
     }
 
     public function test_super_admin_can_change_employee_status_without_attachment(): void

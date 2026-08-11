@@ -10,29 +10,19 @@ use App\Services\Employees\TmtCalculatorService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class EmployeeAppointmentMilestoneSyncTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->seed(ReferenceSeeder::class);
-        $this->seed(RbacSeeder::class);
-    }
-
-    /**
-     * Test: US-5.5 AC-4 - Appointment TMT changes trigger Satyalancana milestone sync.
-     *
-     * Issue: UpdateEmployeeAction called syncForEmployee() BEFORE appointment block
-     * was written. Changes to tmt_pengangkatan through form edit did not trigger
-     * milestone sync, leaving stale Satyalancana milestones until next history change.
-     */
+    /** Memastikan perubahan TMT pengangkatan menyegarkan milestone Satyalancana setelah riwayat tersimpan. */
     public function test_appointment_tmt_change_triggers_milestone_sync_via_update_action(): void
     {
+        $this->seed(ReferenceSeeder::class);
+        $this->seed(RbacSeeder::class);
+
         $user = User::factory()->create(['role' => 'super_admin']);
 
         $employee = Employee::factory()->create([
@@ -60,17 +50,17 @@ class EmployeeAppointmentMilestoneSyncTest extends TestCase
         $this->assertEquals('2030-01-01', $oldMilestone->milestone_date->toDateString(), 'Should be 10 years from 2020-01-01');
 
         // Update appointment TMT through UpdateEmployeeAction (production flow)
-        $response = $this->actingAs($user)->post(route('pegawai.update', $employee->id), [
+        $response = $this->actingAs($user)->postWithCsrf(route('pegawai.update', $employee->id), [
             'nama_lengkap' => $employee->nama_lengkap,
             'nip' => $employee->nip,
-            'email' => $employee->email,
+            'email_pribadi' => $employee->email_pribadi,
             'pengangkatan_jenis_pengangkatan' => 'PNS',
             'pengangkatan_tmt_pengangkatan' => '2018-06-15', // ← Changed TMT
             'pengangkatan_no_sk' => 'SK-001',
             'pengangkatan_tanggal_sk' => '2018-06-01',
         ]);
 
-        $response->assertRedirect();
+        $response->assertSessionHasNoErrors()->assertRedirect();
 
         // Verify: Old milestone should be invalidated
         $oldMilestone->refresh();
@@ -87,11 +77,12 @@ class EmployeeAppointmentMilestoneSyncTest extends TestCase
         $this->assertEquals('2028-06-15', $newMilestone->milestone_date->toDateString(), 'Should be 10 years from new TMT 2018-06-15');
     }
 
-    /**
-     * Test: PPPK TMT pengangkatan change triggers milestone sync.
-     */
+    /** Memastikan perubahan TMT pengangkatan PPPK menyegarkan milestone terkait. */
     public function test_pppk_tmt_change_triggers_milestone_sync(): void
     {
+        $this->seed(ReferenceSeeder::class);
+        $this->seed(RbacSeeder::class);
+
         $user = User::factory()->create(['role' => 'super_admin']);
 
         $jenisPegawai = RefJenisPegawai::firstOrCreate(
@@ -124,14 +115,14 @@ class EmployeeAppointmentMilestoneSyncTest extends TestCase
         $originalDate = $oldMilestone->milestone_date->toDateString();
 
         // Update PPPK TMT through form field
-        $response = $this->actingAs($user)->post(route('pegawai.update', $employee->id), [
+        $response = $this->actingAs($user)->postWithCsrf(route('pegawai.update', $employee->id), [
             'nama_lengkap' => $employee->nama_lengkap,
             'nip' => $employee->nip,
-            'email' => $employee->email,
+            'email_pribadi' => $employee->email_pribadi,
             'pppk_tmt_pengangkatan' => '2020-07-01', // ← Changed
         ]);
 
-        $response->assertRedirect();
+        $response->assertSessionHasNoErrors()->assertRedirect();
 
         // Verify: Milestone synced with new date
         $newMilestone = EmployeeMilestone::where('employee_id', $employee->id)
@@ -143,11 +134,12 @@ class EmployeeAppointmentMilestoneSyncTest extends TestCase
         $this->assertNotNull($newMilestone, 'Should create new milestone with updated TMT');
     }
 
-    /**
-     * Test: New appointment creation triggers milestone sync.
-     */
+    /** Memastikan pengangkatan baru membentuk milestone yang sebelumnya belum memiliki sumber data. */
     public function test_new_appointment_creation_triggers_milestone_sync(): void
     {
+        $this->seed(ReferenceSeeder::class);
+        $this->seed(RbacSeeder::class);
+
         $user = User::factory()->create(['role' => 'super_admin']);
 
         $employee = Employee::factory()->create([
@@ -163,17 +155,17 @@ class EmployeeAppointmentMilestoneSyncTest extends TestCase
         $this->assertEquals(0, $milestonesBeforeCount, 'Should have no Satyalancana milestone without appointment');
 
         // Create appointment through UpdateEmployeeAction
-        $response = $this->actingAs($user)->post(route('pegawai.update', $employee->id), [
+        $response = $this->actingAs($user)->postWithCsrf(route('pegawai.update', $employee->id), [
             'nama_lengkap' => $employee->nama_lengkap,
             'nip' => $employee->nip,
-            'email' => $employee->email,
+            'email_pribadi' => $employee->email_pribadi,
             'pengangkatan_jenis_pengangkatan' => 'PNS',
             'pengangkatan_tmt_pengangkatan' => '2015-03-01',
             'pengangkatan_no_sk' => 'SK-NEW-001',
             'pengangkatan_tanggal_sk' => '2015-02-15',
         ]);
 
-        $response->assertRedirect();
+        $response->assertSessionHasNoErrors()->assertRedirect();
 
         // Verify: Milestone created after appointment
         $milestonesAfterCount = EmployeeMilestone::where('employee_id', $employee->id)
@@ -184,11 +176,12 @@ class EmployeeAppointmentMilestoneSyncTest extends TestCase
         $this->assertGreaterThan(0, $milestonesAfterCount, 'Should have Satyalancana milestone after creating appointment');
     }
 
-    /**
-     * Test: Multiple appointment-related changes in single update trigger one final sync.
-     */
+    /** Memastikan satu pembaruan pengangkatan merekonsiliasi semua milestone yang terkait. */
     public function test_multiple_appointment_changes_trigger_single_final_sync(): void
     {
+        $this->seed(ReferenceSeeder::class);
+        $this->seed(RbacSeeder::class);
+
         $user = User::factory()->create(['role' => 'super_admin']);
 
         $jenisPegawai = RefJenisPegawai::firstOrCreate(
@@ -217,15 +210,15 @@ class EmployeeAppointmentMilestoneSyncTest extends TestCase
         $initialCount = EmployeeMilestone::where('employee_id', $employee->id)->count();
 
         // Update: Change BOTH PPPK TMT AND contract end date
-        $response = $this->actingAs($user)->post(route('pegawai.update', $employee->id), [
+        $response = $this->actingAs($user)->postWithCsrf(route('pegawai.update', $employee->id), [
             'nama_lengkap' => $employee->nama_lengkap,
             'nip' => $employee->nip,
-            'email' => $employee->email,
+            'email_pribadi' => $employee->email_pribadi,
             'tanggal_akhir_kontrak' => '2027-06-30', // ← Changed contract
             'pppk_tmt_pengangkatan' => '2021-06-01', // ← Changed TMT
         ]);
 
-        $response->assertRedirect();
+        $response->assertSessionHasNoErrors()->assertRedirect();
 
         // Verify: Milestones synced (both Satyalancana and PPPK contract)
         $satyalancanaMilestone = EmployeeMilestone::where('employee_id', $employee->id)
@@ -243,11 +236,12 @@ class EmployeeAppointmentMilestoneSyncTest extends TestCase
         $this->assertEquals('2027-06-30', $pppkMilestone->milestone_date->toDateString());
     }
 
-    /**
-     * Test: Non-appointment updates don't cause redundant milestone syncs.
-     */
+    /** Memastikan perubahan yang tidak memengaruhi milestone tidak membuat catatan duplikat. */
     public function test_non_appointment_updates_dont_cause_redundant_sync(): void
     {
+        $this->seed(ReferenceSeeder::class);
+        $this->seed(RbacSeeder::class);
+
         $user = User::factory()->create(['role' => 'super_admin']);
 
         $employee = Employee::factory()->create([
@@ -268,17 +262,25 @@ class EmployeeAppointmentMilestoneSyncTest extends TestCase
         $milestoneCountBefore = EmployeeMilestone::where('employee_id', $employee->id)->count();
 
         // Update: Only change non-milestone field (phone number)
-        $response = $this->actingAs($user)->post(route('pegawai.update', $employee->id), [
+        $response = $this->actingAs($user)->postWithCsrf(route('pegawai.update', $employee->id), [
             'nama_lengkap' => $employee->nama_lengkap,
             'nip' => $employee->nip,
-            'email' => $employee->email,
+            'email_pribadi' => $employee->email_pribadi,
             'no_hp' => '082987654321', // ← Only change phone
         ]);
 
-        $response->assertRedirect();
+        $response->assertSessionHasNoErrors()->assertRedirect();
 
         // Verify: No new milestones created (no redundant sync)
         $milestoneCountAfter = EmployeeMilestone::where('employee_id', $employee->id)->count();
         $this->assertEquals($milestoneCountBefore, $milestoneCountAfter, 'Should not create redundant milestones');
+    }
+
+    private function postWithCsrf(string $uri, array $data): TestResponse
+    {
+        $token = 'employee-appointment-milestone-token';
+
+        return $this->withSession(['_token' => $token])
+            ->post($uri, [...$data, '_token' => $token]);
     }
 }

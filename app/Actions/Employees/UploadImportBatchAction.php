@@ -5,6 +5,7 @@ namespace App\Actions\Employees;
 use App\Models\User;
 use App\Support\EmployeeImport\CsvEmployeeReader;
 use App\Support\EmployeeImport\EmployeeRowMapper;
+use App\Support\EmployeeImport\ImportColumnMapping;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -59,6 +60,11 @@ class UploadImportBatchAction
         $type = $this->detectTemplateType($headers, $requestedType);
         $batchId = (string) Str::uuid();
 
+        // Pemetaan kolom adalah state batch: auto-map dari nama header menjadi mapping awal
+        // yang masih boleh diubah admin, lalu dipakai ulang oleh preview, validasi, dan eksekusi.
+        $mapping = ImportColumnMapping::autoMap($headers);
+        $warnings = ImportColumnMapping::warnings($mapping);
+
         $file->storeAs(self::STORAGE_DIR, $batchId.'_'.$file->getClientOriginalName(), 'local');
 
         Cache::put(self::CACHE_PREFIX.$batchId, [
@@ -70,6 +76,9 @@ class UploadImportBatchAction
             'headers' => $headers,
             'total_rows' => count($rows),
             'rows' => $rows,
+            'mapping' => $mapping,
+            'mapping_source' => 'auto',
+            'warnings' => $warnings,
             'validation' => null,
         ], now()->addMinutes(self::CACHE_TTL_MINUTES));
 
@@ -80,6 +89,9 @@ class UploadImportBatchAction
             'type_label' => self::TEMPLATE_LABELS[$type],
             'total_rows' => count($rows),
             'headers' => $headers,
+            'mapping' => $mapping,
+            'warnings' => $warnings,
+            'required_targets' => ImportColumnMapping::requiredTargets(),
         ];
     }
 
@@ -94,17 +106,21 @@ class UploadImportBatchAction
         $requestedType = is_string($requestedType) ? trim($requestedType) : null;
 
         if ($requestedType !== null && isset(self::TEMPLATE_HEADERS[$requestedType])) {
-            $missing = array_values(array_diff(self::TEMPLATE_HEADERS[$requestedType], $headers));
-
-            if ($missing === []) {
-                return $requestedType;
-            }
+            return $requestedType;
         }
 
         foreach (self::TEMPLATE_HEADERS as $type => $requiredHeaders) {
             if (array_values(array_diff($requiredHeaders, $headers)) === []) {
                 return $type;
             }
+        }
+
+        // Header non-standar sengaja tetap diterima sebagai 'utama' karena admin masih dapat
+        // memetakan kolom secara manual pada langkah preview. Batas kepercayaan data tidak
+        // berada di sini, melainkan pada validasi per-baris di sisi server (field wajib, NIP,
+        // email, referensi), sehingga file yang salah total tetap ditolak di tahap itu.
+        if (count($headers) > 0) {
+            return 'utama';
         }
 
         throw ValidationException::withMessages([

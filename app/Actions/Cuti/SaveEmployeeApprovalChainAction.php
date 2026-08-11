@@ -7,8 +7,10 @@ use App\Models\LeaveApprovalChain;
 use App\Models\LeavePybmcGlobalConfig;
 use App\Models\User;
 use App\Services\AuditService;
+use App\Services\Cuti\ApprovalChainConfigurationLockService;
+use App\Services\Cuti\ApprovalChainInvariantService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use RuntimeException;
 
 /**
  * Menyimpan konfigurasi rantai approval cuti per pegawai sebagai chain aktif baru.
@@ -16,16 +18,30 @@ use RuntimeException;
  */
 class SaveEmployeeApprovalChainAction
 {
-    /**
-     * @param  list<array{step_type:string, role_label:string, approver_employee_id:string, is_final:bool}>  $steps
-     */
-    public function execute(Employee $employee, array $steps, User $actor, string $reason): LeaveApprovalChain
-    {
-        $steps = $this->appendGlobalPybmcWhenNeeded($steps);
-        $this->ensureOneFinalStep($steps);
-        $this->ensureFinalStepIsLast($steps);
+    public function __construct(
+        private readonly ApprovalChainInvariantService $invariants,
+        private readonly ApprovalChainConfigurationLockService $configurationLock,
+    ) {}
 
-        return DB::transaction(function () use ($employee, $steps, $actor, $reason): LeaveApprovalChain {
+    /**
+     * @param  list<array{
+     *     step_type:mixed,
+     *     role_label:mixed,
+     *     approver_employee_id:mixed,
+     *     approver_role_key?:mixed,
+     *     is_final:mixed
+     * }>  $steps
+     */
+    public function execute(Employee $employee, array $steps, User $actor, string $reason, ?Request $request = null): LeaveApprovalChain
+    {
+        return DB::transaction(function () use ($employee, $steps, $actor, $reason, $request): LeaveApprovalChain {
+            $this->configurationLock->acquire();
+            $steps = $this->appendGlobalPybmcWhenNeeded($steps);
+
+            // Kandidat wajib sah dan seluruh approver dikunci sebelum chain aktif lama disentuh,
+            // supaya kegagalan konfigurasi tidak meninggalkan pergantian kewenangan secara parsial.
+            $this->invariants->validate($steps);
+
             $oldChain = LeaveApprovalChain::query()
                 ->where('employee_id', $employee->id)
                 ->where('is_active', true)
@@ -57,12 +73,19 @@ class SaveEmployeeApprovalChainAction
                     'step_type' => $step['step_type'],
                     'role_label' => $step['role_label'],
                     'approver_employee_id' => $step['approver_employee_id'],
+                    // Kunci peran ikut disimpan supaya salinan rantai tidak kehilangan metadata langkah
+                    // yang sudah ada pada rantai sumber.
+                    'approver_role_key' => $step['approver_role_key'] ?? null,
                     'is_final' => $step['is_final'],
                 ]);
             }
 
             // Audit konfigurasi chain dicatat per chain baru agar perubahan approver dapat ditelusuri.
-            AuditService::log(
+            // Ditulis fail-closed di dalam transaksi supaya kewenangan persetujuan tidak pernah
+            // berpindah tanpa baris audit yang menerangkan siapa mengubahnya dan dari perangkat mana.
+            AuditService::logAsOrFail(
+                $actor->id,
+                $actor->name,
                 'CREATE',
                 'LeaveApprovalChain',
                 $chain->id,
@@ -72,6 +95,7 @@ class SaveEmployeeApprovalChainAction
                     'steps' => $steps,
                     'reason' => $reason,
                 ],
+                $request,
             );
 
             return $chain->load('steps');
@@ -79,7 +103,20 @@ class SaveEmployeeApprovalChainAction
     }
 
     /**
-     * @param  list<array{step_type:string, role_label:string, approver_employee_id:string, is_final:bool}>  $steps
+     * @param  list<array{
+     *     step_type:mixed,
+     *     role_label:mixed,
+     *     approver_employee_id:mixed,
+     *     approver_role_key?:mixed,
+     *     is_final:mixed
+     * }>  $steps
+     * @return list<array{
+     *     step_type:mixed,
+     *     role_label:mixed,
+     *     approver_employee_id:mixed,
+     *     approver_role_key?:mixed,
+     *     is_final:mixed
+     * }>
      */
     private function appendGlobalPybmcWhenNeeded(array $steps): array
     {
@@ -104,29 +141,5 @@ class SaveEmployeeApprovalChainAction
         ];
 
         return $steps;
-    }
-
-    /**
-     * @param  list<array{step_type:string, role_label:string, approver_employee_id:string, is_final:bool}>  $steps
-     */
-    private function ensureOneFinalStep(array $steps): void
-    {
-        $finalCount = collect($steps)->where('is_final', true)->count();
-
-        if ($finalCount !== 1) {
-            throw new RuntimeException('Rantai approval cuti wajib memiliki tepat satu approver final.');
-        }
-    }
-
-    /**
-     * @param  list<array{step_type:string, role_label:string, approver_employee_id:string, is_final:bool}>  $steps
-     */
-    private function ensureFinalStepIsLast(array $steps): void
-    {
-        $lastStep = collect($steps)->last();
-
-        if (($lastStep['is_final'] ?? false) !== true) {
-            throw new RuntimeException('Approver final cuti wajib berada pada urutan terakhir.');
-        }
     }
 }

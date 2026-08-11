@@ -7,92 +7,82 @@ use App\Models\EwsConfig;
 use App\Services\AuditService;
 use App\Services\Ews\EwsConfigCatalog;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class UpdateEwsConfigAction
 {
     /**
-     * Menyimpan perubahan konfigurasi EWS. Setiap kunci yang berubah dicatat ke
-     * audit log database beserta alasan perubahan agar tetap dapat ditelusuri,
-     * lalu dicerminkan ke session untuk kompatibilitas tampilan audit lama.
+     * Menyimpan konfigurasi dan audit dalam satu transaksi.
      *
-     * US-5.5: Jika konfigurasi yang memengaruhi kalkulasi milestone berubah
-     * (pangkat_required_years, kgb_required_years), invalidasi milestone terkait
-     * agar scheduler menggunakan konfigurasi terbaru.
+     * Milestone yang bergantung pada nilai lama ikut dinonaktifkan agar scheduler
+     * menghitung ulang tanggalnya dengan konfigurasi terbaru.
      */
     public function execute(Request $request): void
     {
-        $dynamicLogs = session('dynamic_audit_logs', []);
-        $operator = $request->user()?->name ?? 'super_admin';
-        $ip = $request->ip();
-        $userAgent = $request->userAgent();
         $reason = $request->input('reason');
-        $changed = false;
-
-        // Konfigurasi yang memengaruhi kalkulasi milestone
         $milestoneImpactingKeys = [
             'pangkat_required_years' => EmployeeMilestone::TYPE_KENAIKAN_PANGKAT,
             'kgb_required_years' => EmployeeMilestone::TYPE_KGB,
         ];
 
-        foreach (EwsConfigCatalog::LABELS as $key => $label) {
-            $oldVal = EwsConfig::getVal($key);
-            $newVal = $request->input($key);
+        DB::transaction(function () use ($request, $reason, $milestoneImpactingKeys): void {
+            foreach (array_keys(EwsConfigCatalog::LABELS) as $key) {
+                $oldValue = EwsConfig::getVal($key);
+                $newValue = $request->input($key);
 
-            if ((string) $oldVal !== (string) $newVal) {
-                // Audit log database adalah jejak permanen; auditable_id null karena
-                // kunci konfigurasi bukan UUID.
-                AuditService::log(
+                if ((string) $oldValue === (string) $newValue) {
+                    continue;
+                }
+
+                EwsConfig::setVal($key, $newValue);
+
+                // Kunci konfigurasi disimpan dalam payload karena targetnya tidak memiliki UUID.
+                // Audit wajib berhasil agar perubahan konfigurasi tidak berjalan tanpa jejak.
+                AuditService::logOrFail(
                     'UPDATE',
                     'EwsConfig',
                     null,
-                    ['key' => $key, 'value' => (string) $oldVal],
-                    ['key' => $key, 'value' => (string) $newVal, 'reason' => $reason],
+                    ['key' => $key, 'value' => (string) $oldValue],
+                    ['key' => $key, 'value' => (string) $newValue, 'reason' => $reason],
                     $request
                 );
 
-                $newId = count($dynamicLogs) + 1;
-                $dynamicLogs[] = [
-                    'id' => $newId,
-                    'timestamp' => now()->format('Y-m-d H:i:s'),
-                    'operator' => $operator,
-                    'event' => 'UPDATE_EWS_CONFIG',
-                    'kategori' => 'konfigurasi_sistem',
-                    'modul' => 'EwsConfig',
-                    'record_id' => $label,
-                    'ip_address' => $ip,
-                    'user_agent' => $userAgent,
-                    'old_values' => ['value' => (string) $oldVal],
-                    'new_values' => ['value' => (string) $newVal, 'reason' => $reason],
-                ];
-                EwsConfig::setVal($key, $newVal);
-                $changed = true;
-
-                // US-5.5: Invalidasi milestone yang terpengaruh oleh perubahan konfigurasi
                 if (isset($milestoneImpactingKeys[$key])) {
-                    $milestoneType = $milestoneImpactingKeys[$key];
-                    $this->invalidateMilestonesForConfigChange($milestoneType, $key, $oldVal, $newVal);
+                    $this->invalidateMilestonesForConfigChange(
+                        $milestoneImpactingKeys[$key],
+                        $key,
+                        $oldValue,
+                        $newValue,
+                    );
                 }
             }
-        }
-
-        if ($changed) {
-            session(['dynamic_audit_logs' => $dynamicLogs]);
-        }
+        });
     }
 
     /**
-     * Invalidasi milestone yang menggunakan versi konfigurasi lama.
-     * Scheduler akan otomatis menggunakan fallback calculation dengan config terbaru.
+     * Menonaktifkan milestone berversi lama supaya scheduler memakai kalkulasi terbaru.
      */
-    private function invalidateMilestonesForConfigChange(string $milestoneType, string $configKey, string $oldVal, string $newVal): void
-    {
-        $invalidatedCount = EmployeeMilestone::where('type', $milestoneType)
+    private function invalidateMilestonesForConfigChange(
+        string $milestoneType,
+        string $configKey,
+        mixed $oldValue,
+        mixed $newValue,
+    ): void {
+        $invalidatedCount = EmployeeMilestone::query()
+            ->where('type', $milestoneType)
             ->where('is_active', true)
-            ->whereJsonContains('metadata->required_years', (int) $oldVal)
+            ->whereJsonContains('metadata->required_years', (int) $oldValue)
             ->update(['is_active' => false]);
 
         if ($invalidatedCount > 0) {
-            \Log::info("Invalidated {$invalidatedCount} {$milestoneType} milestones due to config change: {$configKey} from {$oldVal} to {$newVal}");
+            Log::info('Milestone EWS dinonaktifkan setelah konfigurasi berubah.', [
+                'milestone_type' => $milestoneType,
+                'config_key' => $configKey,
+                'old_value' => $oldValue,
+                'new_value' => $newValue,
+                'invalidated_count' => $invalidatedCount,
+            ]);
         }
     }
 }

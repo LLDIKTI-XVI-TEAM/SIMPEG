@@ -145,7 +145,7 @@ class CutiFormulirPdfTest extends TestCase
 
     public function test_repeated_official_form_downloads_are_read_only_and_keep_issuance_snapshot(): void
     {
-        Storage::fake('local');
+
         $fixture = $this->makeOfficialFormFixture();
         $leaveRequest = $fixture['leave_request']->fresh();
         $proof = $fixture['proof']->fresh();

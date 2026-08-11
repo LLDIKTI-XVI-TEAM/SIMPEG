@@ -3,44 +3,28 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\View\View;
 
 class SettingsController extends Controller
 {
-    public function index()
+    public function index(): View
     {
-
         return view('admin.settings.index');
     }
 
-    public function update(Request $request)
+    /**
+     * Halaman pengaturan sistem belum memiliki penyimpanan.
+     *
+     * Seluruh input pada formulir hanya terikat ke state di peramban tanpa atribut name, sehingga
+     * tidak ada nilai yang sampai ke peladen dan tidak ada apa pun yang dapat disimpan. Karena itu
+     * jalur ini tidak menulis audit: mencatat perubahan yang tidak terjadi membuat jejak audit
+     * menyesatkan. Pesan berhasil juga tidak dikirim agar operator tidak menyangka konfigurasi
+     * sudah berlaku.
+     */
+    public function update(): RedirectResponse
     {
-
-        // Write Audit Log
-        $dynamicLogs = session('dynamic_audit_logs', []);
-        $newId = count($dynamicLogs) + 1;
-
-        $dynamicLogs[] = [
-            'id' => $newId,
-            'timestamp' => now()->format('Y-m-d H:i:s'),
-            'operator' => auth()->user()->name ?? 'super_admin',
-            'event' => 'UPDATE_SETTINGS',
-            'kategori' => 'konfigurasi_sistem',
-            'modul' => 'Settings',
-            'record_id' => 'System Config',
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-            'old_values' => [
-                'note' => 'Konfigurasi lama',
-            ],
-            'new_values' => [
-                'note' => 'Konfigurasi sistem diperbarui',
-            ],
-        ];
-
-        session(['dynamic_audit_logs' => $dynamicLogs]);
-
         return redirect()->route('pengaturan')
-            ->with('success', 'Konfigurasi sistem berhasil disimpan.');
+            ->with('info', 'Penyimpanan pengaturan sistem belum tersedia sehingga tidak ada perubahan yang disimpan.');
     }
 }

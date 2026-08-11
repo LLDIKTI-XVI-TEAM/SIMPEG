@@ -4,6 +4,7 @@ namespace App\Services\Referensi;
 
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
+use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenjangPendidikan;
 use App\Models\RefStatusPegawai;
@@ -62,6 +63,17 @@ final class ReferenceTableCatalog
             ],
             'cache_keys' => ['ref.jenis_jabatan', 'ref.jabatan_with_jenis'],
         ],
+        RefJabatan::class => [
+            // FK position_histories.jabatan_id memakai RESTRICT sebagai backstop
+            // basis data. Guard pemakaian tetap memberi pesan yang dapat ditindaklanjuti
+            // admin, sebelum penghapusan mencapai pelanggaran constraint.
+            'usage' => [
+                ['table' => 'position_histories', 'column' => 'jabatan_id', 'label' => 'riwayat jabatan'],
+            ],
+            // Snapshot relasi jabatan-jenis ikut dibuang agar dropdown tidak menyajikan
+            // nama jabatan yang sudah diubah atau sudah dinonaktifkan.
+            'cache_keys' => ['ref.jabatan_with_jenis'],
+        ],
         RefUnitKerja::class => [
             // Self-FK parent_id bersifat nullOnDelete: menghapus induk tidak
             // ditolak database, justru anaknya diam-diam menjadi root dengan
@@ -74,11 +86,17 @@ final class ReferenceTableCatalog
             'cache_keys' => ['ref.unit_kerja'],
         ],
         RefStatusPegawai::class => [
-            // FK employees.status_pegawai_id bersifat nullOnDelete; tanpa
-            // guard ini status pegawai bisa terhapus diam-diam dari data
-            // pegawai yang merujuknya.
+            // Status pegawai dirujuk dua tempat: kolom status terkini pada data
+            // pegawai dan baris riwayat status yang bersifat append-only. Riwayat
+            // wajib ikut dihitung karena pegawai yang sudah berpindah status
+            // membuat baris lamanya menjadi satu-satunya perujuk, sehingga tanpa
+            // entri ini status lama tampak belum terpakai dan boleh dihapus.
+            // FK employee_status_histories.status_pegawai_id memakai RESTRICT
+            // sebagai backstop basis data; guard ini yang memberi pesan yang
+            // dapat ditindaklanjuti admin sebelum constraint dilanggar.
             'usage' => [
                 ['table' => 'employees', 'column' => 'status_pegawai_id', 'label' => 'data pegawai'],
+                ['table' => 'employee_status_histories', 'column' => 'status_pegawai_id', 'label' => 'riwayat status pegawai'],
             ],
             'cache_keys' => ['ref.status_pegawai'],
             // Baris terproteksi: kode PENSIUN dicari langsung oleh proses

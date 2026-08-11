@@ -37,11 +37,12 @@ class UpdateEmployeeAction
             $pppkContractChanged = array_key_exists('tanggal_akhir_kontrak', $validated)
                 && $this->dateChanged($employee->tanggal_akhir_kontrak?->toDateString(), $validated['tanggal_akhir_kontrak']);
 
-            // Deteksi perubahan field yang mempengaruhi milestone pensiun.
-            // Bandingkan langsung ke Carbon property model agar tidak ada false-positive
-            // akibat perbedaan format antara toArray() dan validated input.
-            $pensionFieldsChanged = (array_key_exists('tanggal_pensiun', $validated) && $this->dateChanged($employee->tanggal_pensiun?->toDateString(), $validated['tanggal_pensiun']))
-                || (array_key_exists('tanggal_lahir', $validated) && $this->dateChanged($employee->tanggal_lahir?->toDateString(), $validated['tanggal_lahir']));
+            $oldPensionDate = $employee->tanggal_pensiun?->toDateString();
+            $oldBirthDate = $employee->tanggal_lahir?->toDateString();
+            $pensionDateChanged = array_key_exists('tanggal_pensiun', $validated)
+                && $oldPensionDate !== $validated['tanggal_pensiun'];
+            $pensionFieldsChanged = $pensionDateChanged
+                || (array_key_exists('tanggal_lahir', $validated) && $oldBirthDate !== $validated['tanggal_lahir']);
 
             $rankHistoryChanged = false;
             $positionHistoryChanged = false;
@@ -306,8 +307,14 @@ class UpdateEmployeeAction
                 }
             }
 
+            // Satu sinkronisasi setelah seluruh penulisan memastikan semua sumber TMT direkonsiliasi bersama.
             if ($rankHistoryChanged || $positionHistoryChanged || $salaryHistoryChanged || $pensionFieldsChanged || $pppkContractChanged || $appointmentChanged) {
-                $this->tmtCalculator->syncForEmployee($employee);
+                if ($pensionDateChanged) {
+                    // Nilai non-null adalah keputusan resmi Admin; null mengembalikan sumber ke kalkulasi BUP.
+                    $this->tmtCalculator->syncForEmployee($employee, $employee->tanggal_pensiun !== null);
+                } else {
+                    $this->tmtCalculator->syncForEmployee($employee);
+                }
             }
 
             $employee->refresh();

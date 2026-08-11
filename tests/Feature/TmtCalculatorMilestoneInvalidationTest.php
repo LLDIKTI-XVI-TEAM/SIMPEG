@@ -368,7 +368,7 @@ class TmtCalculatorMilestoneInvalidationTest extends TestCase
             'tmt_jabatan' => '2020-01-01',
         ]);
 
-        app(TmtCalculatorService::class)->syncForEmployee($employee);
+        app(TmtCalculatorService::class)->syncForEmployee($employee, true);
 
         // Verify milestone uses manual tanggal_pensiun, NOT calculated BUP
         $milestone = EmployeeMilestone::where('employee_id', $employee->id)

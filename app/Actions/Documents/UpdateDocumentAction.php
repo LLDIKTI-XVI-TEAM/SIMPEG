@@ -2,6 +2,7 @@
 
 namespace App\Actions\Documents;
 
+use App\Actions\Documents\Concerns\BuildsDocumentAuditPayload;
 use App\Models\Appointment;
 use App\Models\DisciplineRecord;
 use App\Models\Document;
@@ -10,6 +11,7 @@ use App\Models\EmployeeStatusHistory;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\SalaryHistory;
+use App\Services\AuditService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
@@ -20,6 +22,8 @@ use Throwable;
 
 class UpdateDocumentAction
 {
+    use BuildsDocumentAuditPayload;
+
     /**
      * Ganti metadata dokumen dan, jika ada, file fisiknya.
      *
@@ -45,6 +49,7 @@ class UpdateDocumentAction
                 $oldFilePath = $lockedDocument->file_path;
                 $oldNomorSk = $lockedDocument->nomor_dokumen;
                 $oldCategory = $lockedDocument->jenis_dokumen;
+                $auditSebelum = $this->auditPayload($lockedDocument);
                 $filePath = $replacementPath ?? $oldFilePath;
 
                 $lockedDocument->update([
@@ -61,6 +66,14 @@ class UpdateDocumentAction
                     $oldFilePath,
                     $oldNomorSk,
                     $oldCategory,
+                );
+
+                AuditService::logOrFail(
+                    'UPDATE',
+                    'Document',
+                    $lockedDocument->id,
+                    $auditSebelum,
+                    $this->auditPayload($lockedDocument->refresh()),
                 );
 
                 return [$lockedDocument->refresh(), $oldFilePath];

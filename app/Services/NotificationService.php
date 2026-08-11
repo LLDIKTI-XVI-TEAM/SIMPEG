@@ -62,7 +62,7 @@ class NotificationService
      * Pengiriman email hanya dilakukan ketika notifikasi pertama kali dibuat.
      *
      * @param  array<string, mixed>  $data
-     * @param  bool  $createIfMissing  Jika false, hanya update notifikasi yang sudah ada (tidak buat baru)
+     * @param  bool  $createIfMissing  Jika false, hanya perbarui notifikasi yang sudah ada.
      */
     public function upsertEwsReminder(
         Employee $employee,
@@ -124,8 +124,8 @@ class NotificationService
             return null;
         }
 
-        // If createIfMissing=false, don't create new notification (ineligible case)
-        // This prevents sending notification to ineligible employees
+        // Pegawai yang tidak memenuhi syarat tidak boleh menerima notifikasi baru,
+        // tetapi notifikasi belum dibaca yang sudah ada telah diselaraskan di atas.
         if (! $createIfMissing) {
             return null;
         }
@@ -216,6 +216,11 @@ class NotificationService
 
         return SimpegNotification::query()
             ->where('user_id', $employeeId)
+            // Notifikasi yang sudah dibaca lebih dari 5 menit lalu tidak lagi ditampilkan di lonceng header.
+            ->where(function ($query): void {
+                $query->where('is_read', false)
+                    ->orWhere('read_at', '>', now()->subMinutes(5));
+            })
             // Notifikasi belum dibaca tetap berada di atas, termasuk EWS yang sudah melewati targetnya.
             ->orderBy('is_read')
             ->orderByDesc('created_at')

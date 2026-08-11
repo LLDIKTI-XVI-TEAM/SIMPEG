@@ -16,7 +16,7 @@ class ProfileController extends Controller
 
     public function updatePassword(UpdatePasswordRequest $request, UpdatePasswordAction $action)
     {
-        $action->execute($request->user(), $request->validated());
+        $action->execute($request->user(), $request->validated(), $request);
 
         return redirect()->route('profil')
             ->with('success', 'Kata sandi Anda berhasil diperbarui.');

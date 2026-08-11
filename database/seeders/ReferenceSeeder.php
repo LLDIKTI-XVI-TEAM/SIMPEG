@@ -268,6 +268,8 @@ class ReferenceSeeder extends Seeder
             'ews.satyalancana',
             'ews.tidak_perlu',
             'status_pegawai.diubah',
+            'import_pegawai',
+            'import_pegawai_gagal',
         ];
         $notificationChannels = RefNotificationChannel::query()
             ->whereIn('code', ['in_app', 'email'])
@@ -286,16 +288,29 @@ class ReferenceSeeder extends Seeder
             }
         }
 
-        // Kegagalan scheduler adalah alert operasional terpisah; in-app mempertahankan perilaku lama tanpa mengada-adakan email.
+        // Kegagalan scheduler dan hasil tindak lanjut EWS adalah alert internal yang
+        // hanya memakai in-app; email tidak diaktifkan agar identitas channel setiap
+        // event konsisten antara seeder, migration, dan katalog event.
+        $inAppOnlyNotificationEvents = [
+            'ews.scheduler_failed',
+            'ews.followup.kenaikan_pangkat',
+            'ews.followup.kgb',
+            'ews.followup.pensiun',
+            'ews.followup.kontrak_pppk',
+            'ews.followup.satyalancana',
+            'ews.followup.tidak_perlu',
+        ];
         $inAppChannel = $notificationChannels->firstWhere('code', 'in_app');
         if ($inAppChannel !== null) {
-            NotificationEventChannel::firstOrCreate(
-                [
-                    'event_key' => 'ews.scheduler_failed',
-                    'notification_channel_id' => $inAppChannel->id,
-                ],
-                ['is_enabled' => true],
-            );
+            foreach ($inAppOnlyNotificationEvents as $eventKey) {
+                NotificationEventChannel::firstOrCreate(
+                    [
+                        'event_key' => $eventKey,
+                        'notification_channel_id' => $inAppChannel->id,
+                    ],
+                    ['is_enabled' => true],
+                );
+            }
         }
     }
 }

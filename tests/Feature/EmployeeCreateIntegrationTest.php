@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Actions\Employees\CreateEmployeeAction;
 use App\Models\Employee;
+use App\Models\EmployeeMilestone;
 use App\Models\RefAgama;
 use App\Models\RefGolongan;
 use App\Models\RefJabatan;
@@ -34,7 +35,6 @@ class EmployeeCreateIntegrationTest extends TestCase
 
     public function test_can_create_employee_via_ui_form()
     {
-        Storage::fake('public');
 
         // Arrange
         $user = User::factory()->create([
@@ -148,6 +148,75 @@ class EmployeeCreateIntegrationTest extends TestCase
         $editResponse->assertStatus(200);
         $editResponse->assertSee('Kepala Lembaga');
         $editResponse->assertSee('name="is_kepala_lembaga"', false);
+    }
+
+    /** Tanggal pensiun dari form adalah data resmi walau pegawai belum memiliki riwayat sumber. */
+    public function test_form_create_preserves_explicit_pension_date_during_legacy_recalculation(): void
+    {
+        $user = User::factory()->create(['role' => 'admin_kepegawaian']);
+
+        $this->actingAs($user)
+            ->post(route('pegawai.store'), [
+                'nama_lengkap' => 'Pegawai Pensiun Resmi Baru',
+                'nip' => '199001012024011099',
+                'tanggal_lahir' => '1990-01-01',
+                'tanggal_pensiun' => '2048-12-31',
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('data-pegawai'));
+
+        $employee = Employee::query()->where('nip', '199001012024011099')->firstOrFail();
+        $this->assertSame(1, $employee->milestones()->count());
+        $milestone = EmployeeMilestone::query()
+            ->where('employee_id', $employee->id)
+            ->where('type', EmployeeMilestone::TYPE_PENSIUN)
+            ->sole();
+
+        $this->assertSame('2048-12-31', $employee->tanggal_pensiun?->toDateString());
+        $this->assertSame('employees.tanggal_pensiun', $milestone->metadata['source']);
+        $this->assertTrue($milestone->metadata['is_manual']);
+        $this->assertSame(1, $employee->milestones()->count());
+
+        $this->artisan('milestone:backfill', [
+            '--recalculate-legacy-pension' => true,
+            '--no-interaction' => true,
+        ])
+            ->expectsQuestion('Do you want to proceed with the backfill?', true)
+            ->assertSuccessful();
+
+        $employee->refresh();
+        $milestone->refresh();
+        $this->assertSame('2048-12-31', $employee->tanggal_pensiun?->toDateString());
+        $this->assertSame('2048-12-31', $milestone->milestone_date->toDateString());
+        $this->assertNotSame('legacy_unverified', $milestone->metadata['source']);
+        $this->assertSame(1, $employee->milestones()->count());
+    }
+
+    public function test_form_penugasan_baru_tidak_menawarkan_jabatan_nonaktif(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'admin_kepegawaian',
+        ]);
+        $employee = Employee::factory()->create();
+        $jabatanAktif = RefJabatan::create([
+            'nama' => 'Jabatan Aktif Untuk Penugasan Baru',
+        ]);
+        $jabatanNonaktif = RefJabatan::create([
+            'nama' => 'Jabatan Nonaktif Tidak Boleh Dipilih',
+            'is_active' => false,
+        ]);
+
+        foreach ([
+            route('pegawai.create'),
+            route('pegawai.edit', $employee),
+            route('pegawai.show', $employee),
+        ] as $url) {
+            $this->actingAs($user)
+                ->get($url)
+                ->assertOk()
+                ->assertSee($jabatanAktif->nama)
+                ->assertDontSee($jabatanNonaktif->nama);
+        }
     }
 
     public function test_null_tmt_source_histories_are_not_latest_and_leave_derived_dates_null(): void

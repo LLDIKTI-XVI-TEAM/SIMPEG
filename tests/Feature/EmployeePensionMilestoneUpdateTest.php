@@ -12,6 +12,7 @@ use App\Services\Employees\TmtCalculatorService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class EmployeePensionMilestoneUpdateTest extends TestCase
@@ -26,212 +27,205 @@ class EmployeePensionMilestoneUpdateTest extends TestCase
         $this->seed(RbacSeeder::class);
     }
 
-    /**
-     * Test: Mengubah tanggal_pensiun manual memicu sinkronisasi milestone.
-     *
-     * Issue: UpdateEmployeeAction hanya memanggil syncForEmployee() saat ada
-     * perubahan history (rank/position/salary), tapi TIDAK saat tanggal_pensiun
-     * berubah. Akibatnya milestone pensiun lama tetap aktif.
-     */
-    public function test_updating_tanggal_pensiun_syncs_pension_milestone(): void
+    public function test_official_pension_update_overrides_calculated_milestone_and_survives_backfill(): void
     {
-
         $user = User::factory()->create(['role' => 'super_admin']);
         $employee = Employee::factory()->create([
             'status_aktif' => 'Aktif',
             'tanggal_lahir' => '1967-03-20',
-            'tanggal_pensiun' => '2032-06-15', // ← Manual pension date
-        ]);
-
-        // Initial sync to create milestone
-        app(TmtCalculatorService::class)->syncForEmployee($employee);
-
-        $oldMilestone = EmployeeMilestone::where('employee_id', $employee->id)
-            ->where('type', 'pensiun')
-            ->where('is_active', true)
-            ->first();
-
-        $this->assertNotNull($oldMilestone);
-        $this->assertEquals('2032-06-15', $oldMilestone->milestone_date->toDateString());
-        $this->assertTrue($oldMilestone->metadata['is_manual'] ?? false);
-        $oldMilestoneId = $oldMilestone->id;
-
-        // Update tanggal_pensiun via UpdateEmployeeAction (through controller)
-        $response = $this->actingAs($user)->post(route('pegawai.update', $employee->id), [
-            'nama_lengkap' => $employee->nama_lengkap,
-            'nip' => $employee->nip,
-            'email' => $employee->email,
-            'tanggal_lahir' => '1967-03-20',
-            'tanggal_pensiun' => '2033-12-31', // ← Changed!
-        ]);
-
-        $response->assertRedirect();
-
-        // Verify: Old milestone invalidated
-        $oldMilestone->refresh();
-        $this->assertFalse($oldMilestone->is_active, 'Old milestone should be invalidated');
-
-        // Verify: New milestone created with updated date
-        $newMilestone = EmployeeMilestone::where('employee_id', $employee->id)
-            ->where('type', 'pensiun')
-            ->where('is_active', true)
-            ->where('id', '!=', $oldMilestoneId)
-            ->first();
-
-        $this->assertNotNull($newMilestone, 'New milestone should be created');
-        $this->assertEquals('2033-12-31', $newMilestone->milestone_date->toDateString());
-        $this->assertTrue($newMilestone->metadata['is_manual'] ?? false);
-        $this->assertEquals('employees.tanggal_pensiun', $newMilestone->metadata['source'] ?? null);
-    }
-
-    /**
-     * Test: Mengubah tanggal_lahir memicu recalculation milestone pensiun (jika belum ada manual date).
-     */
-    public function test_updating_tanggal_lahir_syncs_calculated_pension_milestone(): void
-    {
-
-        $user = User::factory()->create(['role' => 'super_admin']);
-        $employee = Employee::factory()->create([
-            'status_aktif' => 'Aktif',
-            'tanggal_lahir' => '1967-03-20',
-            'tanggal_pensiun' => null, // ← No manual pension date
-        ]);
-
-        // Create position for BUP calculation
-        $jabatan = RefJabatan::first();
-        $jenisJabatan = RefJenisJabatan::first();
-        $unitKerja = RefUnitKerja::first();
-        $employee->positionHistories()->create([
-            'jabatan_id' => $jabatan?->id,
-            'jenis_jabatan_id' => $jenisJabatan?->id,
-            'nama_jabatan' => 'Test Position',
-            'unit_kerja_id' => $unitKerja?->id,
-            'tmt_jabatan' => now()->subYears(5)->toDateString(),
-            'no_sk' => 'SK-001',
-            'tanggal_sk' => now()->subYears(5)->toDateString(),
-            'is_latest' => true,
-        ]);
-
-        // Initial sync - will calculate from tanggal_lahir
-        app(TmtCalculatorService::class)->syncForEmployee($employee);
-
-        $oldMilestone = EmployeeMilestone::where('employee_id', $employee->id)
-            ->where('type', 'pensiun')
-            ->where('is_active', true)
-            ->first();
-
-        $this->assertNotNull($oldMilestone);
-        $oldMilestoneDate = $oldMilestone->milestone_date->toDateString();
-        $oldMilestoneId = $oldMilestone->id;
-
-        // Update tanggal_lahir (change birth year)
-        $response = $this->actingAs($user)->post(route('pegawai.update', $employee->id), [
-            'nama_lengkap' => $employee->nama_lengkap,
-            'nip' => $employee->nip,
-            'email' => $employee->email,
-            'tanggal_lahir' => '1968-03-20', // ← Changed birth year by 1 year
             'tanggal_pensiun' => null,
         ]);
+        $this->createPositionWithBup($employee, 58);
+        $employee->appointment()->create([
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2020-01-01',
+            'no_sk' => 'SK-PENGANGKATAN-001',
+            'tanggal_sk' => '2019-12-15',
+        ]);
 
-        $response->assertRedirect();
+        app(TmtCalculatorService::class)->syncForEmployee($employee);
 
-        // Verify: Old milestone invalidated
-        $oldMilestone->refresh();
-        $this->assertFalse($oldMilestone->is_active, 'Old milestone should be invalidated');
+        $calculatedMilestone = $this->activePensionMilestone($employee);
+        $this->assertSame('2025-03-20', $calculatedMilestone->milestone_date->toDateString());
+        $this->assertFalse($calculatedMilestone->metadata['is_manual']);
+        $this->assertSame('calculated_from_bup', $calculatedMilestone->metadata['source']);
 
-        // Verify: New milestone created with recalculated date
-        $newMilestone = EmployeeMilestone::where('employee_id', $employee->id)
-            ->where('type', 'pensiun')
-            ->where('is_active', true)
-            ->where('id', '!=', $oldMilestoneId)
-            ->first();
+        $response = $this->updateEmployee($user, $employee, [
+            'tanggal_pensiun' => '2033-12-31',
+            'pengangkatan_jenis_pengangkatan' => 'PNS',
+            'pengangkatan_tmt_pengangkatan' => '2019-06-01',
+            'pengangkatan_no_sk' => 'SK-PENGANGKATAN-001',
+            'pengangkatan_tanggal_sk' => '2019-05-15',
+        ]);
+        $response->assertSessionHasNoErrors()->assertRedirect();
 
-        $this->assertNotNull($newMilestone, 'New milestone should be created with recalculated date');
-        $this->assertNotEquals($oldMilestoneDate, $newMilestone->milestone_date->toDateString(), 'New milestone date should be different after birth date change');
-        $this->assertFalse($newMilestone->metadata['is_manual'] ?? true, 'Should be calculated, not manual');
+        $employee->refresh();
+        $calculatedMilestone->refresh();
+
+        $this->assertSame('2033-12-31', $employee->tanggal_pensiun?->toDateString());
+        $this->assertSame('2033-12-31', $calculatedMilestone->milestone_date->toDateString());
+        $this->assertTrue($calculatedMilestone->metadata['is_manual']);
+        $this->assertSame('employees.tanggal_pensiun', $calculatedMilestone->metadata['source']);
+
+        $this->artisan('milestone:backfill', [
+            '--only-active' => true,
+            '--no-interaction' => true,
+        ])
+            ->expectsQuestion('Do you want to proceed with the backfill?', true)
+            ->assertSuccessful();
+
+        $employee->refresh();
+        $calculatedMilestone->refresh();
+
+        $this->assertSame('2033-12-31', $employee->tanggal_pensiun?->toDateString());
+        $this->assertSame('2033-12-31', $calculatedMilestone->milestone_date->toDateString());
+        $this->assertSame(1, EmployeeMilestone::query()
+            ->where('employee_id', $employee->id)
+            ->where('type', EmployeeMilestone::TYPE_PENSIUN)
+            ->count());
     }
 
-    /**
-     * Test: Mengubah field lain (nama, email) TIDAK memicu sync milestone.
-     */
-    public function test_updating_non_pension_fields_does_not_trigger_milestone_sync(): void
+    public function test_clearing_official_pension_date_returns_to_calculated_provenance(): void
     {
-
         $user = User::factory()->create(['role' => 'super_admin']);
         $employee = Employee::factory()->create([
             'status_aktif' => 'Aktif',
-            'nama_lengkap' => 'Old Name',
-            'email' => 'old@example.com',
             'tanggal_lahir' => '1967-03-20',
-            'tanggal_pensiun' => '2032-06-15',
+            'tanggal_pensiun' => '2033-12-31',
         ]);
+        $this->createPositionWithBup($employee, 58);
 
-        // Initial sync
         app(TmtCalculatorService::class)->syncForEmployee($employee);
+        $manualMilestone = $this->activePensionMilestone($employee);
 
-        $milestone = EmployeeMilestone::where('employee_id', $employee->id)
-            ->where('type', 'pensiun')
+        $response = $this->updateEmployee($user, $employee, [
+            'tanggal_pensiun' => null,
+        ]);
+        $response->assertSessionHasNoErrors()->assertRedirect();
+
+        $employee->refresh();
+        $manualMilestone->refresh();
+
+        $this->assertSame('2025-03-20', $employee->tanggal_pensiun?->toDateString());
+        $this->assertSame('2025-03-20', $manualMilestone->milestone_date->toDateString());
+        $this->assertFalse($manualMilestone->metadata['is_manual']);
+        $this->assertSame('calculated_from_bup', $manualMilestone->metadata['source']);
+        $this->assertSame(1, EmployeeMilestone::query()
+            ->where('employee_id', $employee->id)
+            ->where('type', EmployeeMilestone::TYPE_PENSIUN)
             ->where('is_active', true)
-            ->first();
+            ->count());
+    }
 
-        $this->assertNotNull($milestone);
+    public function test_updating_birth_date_recalculates_calculated_pension_in_place(): void
+    {
+        $user = User::factory()->create(['role' => 'super_admin']);
+        $employee = Employee::factory()->create([
+            'status_aktif' => 'Aktif',
+            'tanggal_lahir' => '1967-03-20',
+            'tanggal_pensiun' => null,
+        ]);
+        $this->createPositionWithBup($employee, 58);
+
+        app(TmtCalculatorService::class)->syncForEmployee($employee);
+        $milestone = $this->activePensionMilestone($employee);
         $milestoneId = $milestone->id;
-        $milestoneCalculatedAt = $milestone->calculated_at;
 
-        // Wait a bit to ensure timestamp would be different if recalculated
-        sleep(1);
-
-        // Update non-pension fields only
-        $response = $this->actingAs($user)->post(route('pegawai.update', $employee->id), [
-            'nama_lengkap' => 'New Name', // ← Changed
-            'nip' => $employee->nip,
-            'email' => 'new@example.com', // ← Changed
-            'tanggal_lahir' => '1967-03-20', // ← Same
-            'tanggal_pensiun' => '2032-06-15', // ← Same
+        $response = $this->updateEmployee($user, $employee, [
+            'tanggal_lahir' => '1968-03-20',
         ]);
+        $response->assertSessionHasNoErrors()->assertRedirect();
 
-        $response->assertRedirect();
+        $employee->refresh();
+        $milestone->refresh();
 
-        // Verify: Milestone NOT recalculated
-        $milestoneAfter = EmployeeMilestone::find($milestoneId);
-        $this->assertNotNull($milestoneAfter);
-        $this->assertTrue($milestoneAfter->is_active);
-        $this->assertEquals($milestoneCalculatedAt->toDateTimeString(), $milestoneAfter->calculated_at->toDateTimeString(), 'Milestone should NOT be recalculated for non-pension field changes');
+        $this->assertSame($milestoneId, $milestone->id);
+        $this->assertSame('2026-03-20', $employee->tanggal_pensiun?->toDateString());
+        $this->assertSame('2026-03-20', $milestone->milestone_date->toDateString());
+        $this->assertFalse($milestone->metadata['is_manual']);
     }
 
-    /**
-     * Test: Scheduler menggunakan milestone terbaru setelah update.
-     */
-    public function test_scheduler_uses_updated_pension_milestone(): void
+    public function test_updating_non_pension_fields_does_not_recalculate_pension_milestone(): void
     {
+        $this->travelTo('2026-08-11 08:00:00');
 
         $user = User::factory()->create(['role' => 'super_admin']);
         $employee = Employee::factory()->create([
             'status_aktif' => 'Aktif',
+            'nama_lengkap' => 'Nama Lama',
+            'email_pribadi' => 'lama@example.com',
             'tanggal_lahir' => '1967-03-20',
-            'tanggal_pensiun' => now()->addYear()->toDateString(), // ← 1 year from now
+            'tanggal_pensiun' => '2033-12-31',
         ]);
 
-        // Initial sync
         app(TmtCalculatorService::class)->syncForEmployee($employee);
+        $milestone = $this->activePensionMilestone($employee);
+        $calculatedAt = $milestone->calculated_at->toDateString();
 
-        // Update to further future
-        $newPensionDate = now()->addYears(5)->toDateString();
-        $this->actingAs($user)->post(route('pegawai.update', $employee->id), [
+        $this->travelTo('2026-08-12 08:00:00');
+
+        $response = $this->updateEmployee($user, $employee, [
+            'nama_lengkap' => 'Nama Baru',
+            'email_pribadi' => 'baru@example.com',
+        ]);
+        $response->assertSessionHasNoErrors()->assertRedirect();
+
+        $milestone->refresh();
+
+        $this->assertSame($calculatedAt, $milestone->calculated_at->toDateString());
+        $this->assertSame('2033-12-31', $milestone->milestone_date->toDateString());
+
+        $this->travelBack();
+    }
+
+    private function createPositionWithBup(Employee $employee, int $bup): void
+    {
+        $jenisJabatan = RefJenisJabatan::create([
+            'nama' => 'Jenis Jabatan Uji Pensiun',
+            'maks_usia_pensiun' => 60,
+            'is_active' => true,
+        ]);
+        $jabatan = RefJabatan::create([
+            'nama' => 'Jabatan Uji Pensiun',
+            'jenis_jabatan_id' => $jenisJabatan->id,
+            'default_bup' => $bup,
+            'is_active' => true,
+        ]);
+
+        $employee->positionHistories()->create([
+            'jabatan_id' => $jabatan->id,
+            'jenis_jabatan_id' => $jenisJabatan->id,
+            'nama_jabatan' => $jabatan->nama,
+            'unit_kerja_id' => RefUnitKerja::query()->firstOrFail()->id,
+            'tmt_jabatan' => '2020-01-01',
+            'no_sk' => 'SK-PENSIUN-001',
+            'tanggal_sk' => '2019-12-15',
+            'is_latest' => true,
+        ]);
+    }
+
+    private function updateEmployee(User $user, Employee $employee, array $overrides): TestResponse
+    {
+        $payload = array_merge([
             'nama_lengkap' => $employee->nama_lengkap,
             'nip' => $employee->nip,
-            'email' => $employee->email,
-            'tanggal_lahir' => $employee->tanggal_lahir->toDateString(),
-            'tanggal_pensiun' => $newPensionDate,
-        ]);
+            'email_pribadi' => $employee->email_pribadi,
+            'tanggal_lahir' => $employee->tanggal_lahir?->toDateString(),
+            'tanggal_pensiun' => $employee->tanggal_pensiun?->toDateString(),
+        ], $overrides);
+        $token = 'employee-pension-milestone-token';
 
-        // Verify: Only one active pension milestone
-        $activeMilestones = EmployeeMilestone::where('employee_id', $employee->id)
-            ->where('type', 'pensiun')
+        return $this->actingAs($user)
+            ->withSession(['_token' => $token])
+            ->post(route('pegawai.update', $employee->id), [...$payload, '_token' => $token]);
+    }
+
+    private function activePensionMilestone(Employee $employee): EmployeeMilestone
+    {
+        return EmployeeMilestone::query()
+            ->where('employee_id', $employee->id)
+            ->where('type', EmployeeMilestone::TYPE_PENSIUN)
             ->where('is_active', true)
-            ->get();
-
-        $this->assertCount(1, $activeMilestones, 'Should have exactly one active pension milestone');
-        $this->assertEquals($newPensionDate, $activeMilestones->first()->milestone_date->toDateString());
+            ->sole();
     }
 }

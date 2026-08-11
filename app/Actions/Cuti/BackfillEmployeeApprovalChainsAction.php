@@ -6,6 +6,7 @@ use App\Models\ApprovalConfig;
 use App\Models\Employee;
 use App\Models\LeaveApprovalChain;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 
 /**
@@ -19,7 +20,7 @@ class BackfillEmployeeApprovalChainsAction
     /**
      * @return array{created_employee_ids:list<string>, skipped_employee_ids:list<string>, missing_kepala_bagian_employee_ids:list<string>, missing_final_approver_employee_ids:list<string>}
      */
-    public function execute(User $actor, string $reason): array
+    public function execute(User $actor, string $reason, ?Request $request = null): array
     {
         $legacyApprovers = $this->legacyApproverEmployees();
         $result = [
@@ -31,8 +32,7 @@ class BackfillEmployeeApprovalChainsAction
 
         Employee::query()
             ->where('status_aktif', 'Aktif')
-            ->orderBy('nama_lengkap')
-            ->chunkById(100, function (Collection $employees) use (&$result, $legacyApprovers, $actor, $reason): void {
+            ->chunkById(100, function (Collection $employees) use (&$result, $legacyApprovers, $actor, $reason, $request): void {
                 foreach ($employees as $employee) {
                     if (LeaveApprovalChain::where('employee_id', $employee->id)->where('is_active', true)->exists()) {
                         $result['skipped_employee_ids'][] = $employee->id;
@@ -63,7 +63,7 @@ class BackfillEmployeeApprovalChainsAction
                         continue;
                     }
 
-                    $this->saveChain->execute($employee, $steps, $actor, $reason);
+                    $this->saveChain->execute($employee, $steps, $actor, $reason, $request);
                     $result['created_employee_ids'][] = $employee->id;
                 }
             });

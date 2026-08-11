@@ -4,12 +4,15 @@ namespace App\Http\Controllers\Admin;
 
 use App\Actions\Employees\DownloadImportReportAction;
 use App\Actions\Employees\GenerateImportTemplateAction;
+use App\Actions\Employees\QueueImportBatchAction;
+use App\Actions\Employees\SaveImportMappingAction;
 use App\Actions\Employees\UploadImportBatchAction;
 use App\Actions\Employees\ValidateImportBatchAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Import\ImportEmployeesRequest;
-use App\Jobs\ImportEmployeeBatchJob;
+use App\Http\Requests\Import\SaveImportMappingRequest;
 use App\Models\ImportBatch;
+use App\Support\EmployeeImport\ImportColumnMapping;
 use App\Support\EmployeeImport\ImportTemplateWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -40,6 +43,23 @@ class EmployeeImportController extends Controller
     {
         $batch = $this->getBatchOrFail($batchId, $request);
 
+        $rows = array_slice($batch['rows'], 0, 10);
+        if ($request->has('row')) {
+            $rowNumber = (int) $request->validate([
+                'row' => ['required', 'integer', 'min:2'],
+            ])['row'];
+            $row = collect($batch['rows'])->first(
+                fn (array $candidate): bool => (int) ($candidate['row'] ?? 0) === $rowNumber,
+            );
+
+            abort_if($row === null, 404, 'Baris import tidak ditemukan pada batch ini.');
+            $rows = [$row];
+        }
+
+        // Respons preview dibatasi server ke 10 baris pertama sesuai kontrak wizard;
+        // seluruh baris tetap tersimpan pada batch untuk validasi dan eksekusi.
+        // Mapping aktif ikut dikembalikan agar UI menampilkan state server,
+        // bukan tebakan client.
         return response()->json([
             'batch_id' => $batchId,
             'filename' => $batch['filename'],
@@ -47,8 +67,20 @@ class EmployeeImportController extends Controller
             'type_label' => $batch['type_label'] ?? UploadImportBatchAction::TEMPLATE_LABELS['utama'],
             'total_rows' => $batch['total_rows'],
             'headers' => $batch['headers'],
-            'rows' => $batch['rows'],
+            'rows' => $rows,
+            'mapping' => $batch['mapping'] ?? ImportColumnMapping::autoMap($batch['headers']),
+            'warnings' => $batch['warnings'] ?? ImportColumnMapping::warnings($batch['mapping'] ?? []),
+            'required_targets' => ImportColumnMapping::requiredTargets(),
         ]);
+    }
+
+    /**
+     * Menyimpan pemetaan kolom pilihan admin pada batch import.
+     * Controller hanya meneruskan request tervalidasi ke Action.
+     */
+    public function saveMapping(SaveImportMappingRequest $request, string $batchId, SaveImportMappingAction $action): JsonResponse
+    {
+        return response()->json($action->execute($batchId, $request->validated()['mapping'], $request->user()));
     }
 
     /**
@@ -70,34 +102,14 @@ class EmployeeImportController extends Controller
     /**
      * Menangani eksekusi impor dengan memasukkan job ke antrean.
      */
-    public function execute(Request $request, string $batchId): JsonResponse
+    public function execute(Request $request, string $batchId, QueueImportBatchAction $action): JsonResponse
     {
-        $batch = $this->getBatchOrFail($batchId, $request);
-
-        if ($batch['validation'] === null) {
-            return response()->json([
-                'message' => 'Data belum divalidasi. Jalankan validasi terlebih dahulu.',
-            ], 422);
-        }
-
-        // Status cache diubah sebelum job diproses agar UI segera menampilkan antrean.
-        $batch['status'] = 'queued';
-        $batch['progress'] = 0;
-        $batch['processed_count'] = 0;
-        Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $batch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
-
-        // Job menyimpan konteks user/IP untuk audit impor pegawai.
-        ImportEmployeeBatchJob::dispatch(
+        return response()->json($action->execute(
             $batchId,
-            $request->user()?->id,
+            $request->user(),
             $request->ip(),
-            $request->userAgent()
-        );
-
-        return response()->json([
-            'status' => 'queued',
-            'message' => 'Proses impor telah dimasukkan ke dalam antrean. Anda dapat meninggalkan halaman ini.',
-        ]);
+            $request->userAgent(),
+        ));
     }
 
     /**
