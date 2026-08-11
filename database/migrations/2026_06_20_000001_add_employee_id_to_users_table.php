@@ -63,7 +63,7 @@ return new class extends Migration
                 'password' => $user->password,
                 'role' => $user->role,
                 'keycloak_id' => $user->keycloak_id,
-                'keycloak_username' => $user->keycloak_username,
+                'keycloak_username' => $user->keycloak_username ?? null,
                 // employee_id omitted - this column is being removed
                 'remember_token' => $user->remember_token,
                 'created_at' => $user->created_at,

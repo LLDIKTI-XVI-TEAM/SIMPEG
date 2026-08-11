@@ -35,11 +35,13 @@ class UpdateEmployeeAction
             $oldValues = $employee->toArray();
             $validated = $this->normalizeEmployeeContract($validated);
             $pppkContractChanged = array_key_exists('tanggal_akhir_kontrak', $validated)
-                && ($oldValues['tanggal_akhir_kontrak'] ?? null) !== $validated['tanggal_akhir_kontrak'];
+                && $this->dateChanged($employee->tanggal_akhir_kontrak?->toDateString(), $validated['tanggal_akhir_kontrak']);
 
-            // Deteksi perubahan field yang mempengaruhi milestone pensiun
-            $pensionFieldsChanged = (array_key_exists('tanggal_pensiun', $validated) && ($oldValues['tanggal_pensiun'] ?? null) !== $validated['tanggal_pensiun'])
-                || (array_key_exists('tanggal_lahir', $validated) && ($oldValues['tanggal_lahir'] ?? null) !== $validated['tanggal_lahir']);
+            // Deteksi perubahan field yang mempengaruhi milestone pensiun.
+            // Bandingkan langsung ke Carbon property model agar tidak ada false-positive
+            // akibat perbedaan format antara toArray() dan validated input.
+            $pensionFieldsChanged = (array_key_exists('tanggal_pensiun', $validated) && $this->dateChanged($employee->tanggal_pensiun?->toDateString(), $validated['tanggal_pensiun']))
+                || (array_key_exists('tanggal_lahir', $validated) && $this->dateChanged($employee->tanggal_lahir?->toDateString(), $validated['tanggal_lahir']));
 
             $rankHistoryChanged = false;
             $positionHistoryChanged = false;
@@ -216,11 +218,6 @@ class UpdateEmployeeAction
                 $this->rebuildLatestSalary($employee);
             }
 
-            // Sinkronkan milestone jika ada perubahan history ATAU field pensiun/lahir ATAU kontrak PPPK
-            if ($rankHistoryChanged || $positionHistoryChanged || $salaryHistoryChanged || $pensionFieldsChanged || $pppkContractChanged) {
-                $this->tmtCalculator->syncForEmployee($employee);
-            }
-
             // 4. Pengangkatan (Appointment)
             if ($request->filled('pengangkatan_jenis_pengangkatan')) {
                 $appointmentData = [
@@ -309,9 +306,7 @@ class UpdateEmployeeAction
                 }
             }
 
-            // Final milestone sync after ALL writes complete (including appointments)
-            // This ensures appointment TMT changes trigger Satyalancana milestone recalculation
-            if ($appointmentChanged) {
+            if ($rankHistoryChanged || $positionHistoryChanged || $salaryHistoryChanged || $pensionFieldsChanged || $pppkContractChanged || $appointmentChanged) {
                 $this->tmtCalculator->syncForEmployee($employee);
             }
 
@@ -320,6 +315,19 @@ class UpdateEmployeeAction
 
             return $employee;
         });
+    }
+
+    /**
+     * Compare two date values normalizing to Y-m-d to avoid false positives from
+     * format differences (e.g. toArray() returns Y-m-d H:i:s, validated sends Y-m-d).
+     */
+    private function dateChanged(mixed $old, mixed $new): bool
+    {
+        $normalize = fn (mixed $v): ?string => $v !== null
+            ? substr((string) $v, 0, 10)
+            : null;
+
+        return $normalize($old) !== $normalize($new);
     }
 
     private function normalizeEmployeeContract(array $data): array

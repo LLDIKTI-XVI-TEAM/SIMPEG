@@ -168,13 +168,21 @@ class TmtCalculatorService
         }
 
         if ($pensionDate !== null) {
+            // Deactivate any existing active pension milestone with a different date —
+            // this creates a new row instead of mutating the old one in-place.
+            EmployeeMilestone::where('employee_id', $employee->id)
+                ->where('type', EmployeeMilestone::TYPE_PENSIUN)
+                ->where('is_active', true)
+                ->where('milestone_date', '!=', $pensionDate->toDateString())
+                ->update(['is_active' => false]);
+
             $milestone = EmployeeMilestone::updateOrCreate(
                 [
                     'employee_id' => $employee->id,
                     'type' => EmployeeMilestone::TYPE_PENSIUN,
+                    'milestone_date' => $pensionDate,
                 ],
                 [
-                    'milestone_date' => $pensionDate,
                     'calculated_at' => $today,
                     'metadata' => $metadata,
                     'is_active' => true,
@@ -234,13 +242,21 @@ class TmtCalculatorService
 
         // 5. PPPK Contract End (jika ada)
         if ($employee->tanggal_akhir_kontrak !== null) {
+            // Deactivate any existing active PPPK milestone with a different date —
+            // this creates a new row instead of mutating the old one in-place.
+            EmployeeMilestone::where('employee_id', $employee->id)
+                ->where('type', EmployeeMilestone::TYPE_PPPK_CONTRACT_END)
+                ->where('is_active', true)
+                ->where('milestone_date', '!=', $employee->tanggal_akhir_kontrak->toDateString())
+                ->update(['is_active' => false]);
+
             $milestone = EmployeeMilestone::updateOrCreate(
                 [
                     'employee_id' => $employee->id,
                     'type' => EmployeeMilestone::TYPE_PPPK_CONTRACT_END,
+                    'milestone_date' => $employee->tanggal_akhir_kontrak,
                 ],
                 [
-                    'milestone_date' => $employee->tanggal_akhir_kontrak,
                     'calculated_at' => $today,
                     'metadata' => [
                         'contract_type' => 'PPPK',

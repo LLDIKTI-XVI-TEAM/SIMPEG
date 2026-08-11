@@ -305,7 +305,7 @@ class EwsEngineService
             }
         }
 
-        return $milestone->milestone_date;
+        return Carbon::parse($milestone->milestone_date);
     }
 
     /**
@@ -407,7 +407,7 @@ class EwsEngineService
                 $years = $milestone->metadata['satyalancana_years'] ?? null;
                 if ($years !== null && in_array($years, $configuredYears, true)) {
                     $milestones[] = [
-                        'date' => $milestone->milestone_date,
+                        'date' => Carbon::parse($milestone->milestone_date),
                         'years' => $years,
                     ];
                 }

@@ -45,9 +45,13 @@ class ValidateImportBatchAction
         $skipCount = 0;
         $seenNips = [];
         $seenEmails = [];
+        // Tracks NIP/email values that appeared more than once in the file,
+        // keyed by value → row number of the LATER duplicate occurrence.
+        $duplicatedNips = [];
+        $duplicatedEmails = [];
 
         foreach ($batch['rows'] as $row) {
-            $rowResult = $this->validateTemplateRow($type, $row, $seenNips, $seenEmails);
+            $rowResult = $this->validateTemplateRow($type, $row, $seenNips, $seenEmails, $duplicatedNips, $duplicatedEmails);
             $results[] = $rowResult;
 
             match ($rowResult['status']) {
@@ -55,6 +59,45 @@ class ValidateImportBatchAction
                 'error' => $errorCount++,
                 'skip' => $skipCount++,
             };
+        }
+
+        // Retroactive upgrade: the FIRST occurrence of a duplicate NIP/email was already
+        // stored as skip/valid/error before the later row revealed the collision.
+        // Upgrade those first-occurrence rows to error now.
+        if ($duplicatedNips !== [] || $duplicatedEmails !== []) {
+            foreach ($results as &$rowResult) {
+                if ($rowResult['status'] === 'error') {
+                    continue; // already an error — may already have the duplicate message
+                }
+
+                $data = $rowResult['validated_data'] ?? [];
+                $upgrades = [];
+
+                $nip = $data['nip'] ?? null;
+                if ($nip !== null && array_key_exists($nip, $duplicatedNips)) {
+                    $upgrades['NIP'][] = "NIP sudah ada pada baris {$duplicatedNips[$nip]}.";
+                }
+
+                $email = isset($data['email_pribadi']) ? strtolower($data['email_pribadi']) : null;
+                if ($email !== null && array_key_exists($email, $duplicatedEmails)) {
+                    $upgrades['Email Pegawai'][] = "Email pegawai sudah ada pada baris {$duplicatedEmails[$email]}.";
+                }
+
+                if ($upgrades !== []) {
+                    $prevStatus = $rowResult['status'];
+                    $rowResult['status'] = 'error';
+                    $rowResult['errors'] = array_merge_recursive($rowResult['errors'] ?? [], $upgrades);
+                    unset($rowResult['validated_data'], $rowResult['skip_reason']);
+
+                    if ($prevStatus === 'skip') {
+                        $skipCount--;
+                    } elseif ($prevStatus === 'valid') {
+                        $validCount--;
+                    }
+                    $errorCount++;
+                }
+            }
+            unset($rowResult);
         }
 
         $batch['validation'] = [
@@ -77,12 +120,12 @@ class ValidateImportBatchAction
         ];
     }
 
-    private function validateTemplateRow(string $type, array $row, array &$seenNips, array &$seenEmails): array
+    private function validateTemplateRow(string $type, array $row, array &$seenNips, array &$seenEmails, array &$duplicatedNips, array &$duplicatedEmails): array
     {
-        return $this->validateRow($row, $seenNips, $seenEmails);
+        return $this->validateRow($row, $seenNips, $seenEmails, $duplicatedNips, $duplicatedEmails);
     }
 
-    private function validateRow(array $row, array &$seenNips, array &$seenEmails): array
+    private function validateRow(array $row, array &$seenNips, array &$seenEmails, array &$duplicatedNips, array &$duplicatedEmails): array
     {
         $data = $row['data'];
         $nama = $data['Nama Pegawai'] ?? ($data['nama_dengan_gelar'] ?? '-');
@@ -120,7 +163,7 @@ class ValidateImportBatchAction
         // 3. NIP existing DB → SKIP (terendah, hanya jika tidak ada error lain)
 
         // Cek duplikasi dalam file terlebih dahulu
-        $duplicateErrors = $this->mapErrors($this->duplicateErrors($validated, $row['row'], $seenNips, $seenEmails), [
+        $duplicateErrors = $this->mapErrors($this->duplicateErrors($validated, $row['row'], $seenNips, $seenEmails, $duplicatedNips, $duplicatedEmails), [
             'nip' => 'NIP',
             'email_pribadi' => 'Email Pegawai',
         ]);
@@ -158,6 +201,7 @@ class ValidateImportBatchAction
                 'status' => 'skip',
                 'errors' => $skipErrors,
                 'skip_reason' => 'NIP sudah terdaftar di database — baris akan dilewati.',
+                'validated_data' => $validated,
             ];
         }
 
@@ -232,7 +276,7 @@ class ValidateImportBatchAction
         return $errors;
     }
 
-    private function duplicateErrors(array $data, int $row, array &$seenNips, array &$seenEmails): array
+    private function duplicateErrors(array $data, int $row, array &$seenNips, array &$seenEmails, array &$duplicatedNips, array &$duplicatedEmails): array
     {
         $errors = [];
 
@@ -241,6 +285,8 @@ class ValidateImportBatchAction
 
             if (isset($seenNips[$nip])) {
                 $errors['nip'][] = "NIP sudah ada pada baris {$seenNips[$nip]}.";
+                // Record this NIP as duplicated so the retroactive pass can upgrade row 1
+                $duplicatedNips[$nip] = $row;
             } else {
                 $seenNips[$nip] = $row;
             }
@@ -251,6 +297,8 @@ class ValidateImportBatchAction
 
             if (isset($seenEmails[$email])) {
                 $errors['email_pribadi'][] = "Email pegawai sudah ada pada baris {$seenEmails[$email]}.";
+                // Record this email as duplicated so the retroactive pass can upgrade row 1
+                $duplicatedEmails[$email] = $row;
             } else {
                 $seenEmails[$email] = $row;
             }
@@ -263,9 +311,9 @@ class ValidateImportBatchAction
      * Check if NIP should be skipped (exists in database).
      * Only returns skip if no in-file duplicate error exists.
      *
-     * @param array $data Validated row data
-     * @param array $seenNips Tracking array for in-file duplicates
-     * @param int $row Current row number
+     * @param  array  $data  Validated row data
+     * @param  array  $seenNips  Tracking array for in-file duplicates
+     * @param  int  $row  Current row number
      * @return bool True if should skip (NIP exists and no in-file duplicate)
      */
     private function shouldSkipNip(array $data, array $seenNips, int $row): bool

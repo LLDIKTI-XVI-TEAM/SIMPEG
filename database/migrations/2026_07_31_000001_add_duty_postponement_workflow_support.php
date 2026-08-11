@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 return new class extends Migration
@@ -81,12 +82,14 @@ return new class extends Migration
     {
         $this->stopRollbackWhenDutyPostponementEvidenceExists();
 
-        $channelIds = $this->requiredChannelIds();
+        if (Schema::hasTable('ref_notification_channels')) {
+            $channelIds = $this->requiredChannelIds();
 
-        DB::table('notification_event_channels')
-            ->where('event_key', 'cuti.ditangguhkan_tugas_dinas')
-            ->whereIn('notification_channel_id', $channelIds->values()->all())
-            ->delete();
+            DB::table('notification_event_channels')
+                ->where('event_key', 'cuti.ditangguhkan_tugas_dinas')
+                ->whereIn('notification_channel_id', $channelIds->values()->all())
+                ->delete();
+        }
 
         $this->applyAuditConstraint($this->auditEventsBeforeDutyPostponement);
     }

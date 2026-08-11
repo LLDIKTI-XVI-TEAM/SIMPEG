@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\Employee;
+use Database\Seeders\ReferenceSeeder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -27,9 +29,12 @@ class MigrationRollbackTest extends TestCase
 
     protected function tearDown(): void
     {
-        // Clean up after tests
+        // Re-run fresh migrations to restore clean state.
+        // Using migrate:fresh instead of migrate:reset because migrate:reset rolls back
+        // every migration one-by-one which can fail on SQLite when migrations have
+        // interdependencies (e.g. NOT NULL constraints on role during ALTER TABLE rebuild).
         if (DB::connection()->getDriverName() === 'sqlite') {
-            Artisan::call('migrate:reset');
+            Artisan::call('migrate:fresh');
         }
 
         parent::tearDown();
@@ -59,7 +64,7 @@ class MigrationRollbackTest extends TestCase
         );
 
         // Rollback the keycloak_username migration
-        Artisan::call('migrate:rollback', ['--step' => 1]);
+        Artisan::call('migrate:rollback', ['--path' => 'database/migrations/2026_06_20_000000_add_keycloak_username_to_users_table.php']);
 
         // Assert: keycloak_username column should be removed
         $this->assertFalse(
@@ -120,7 +125,7 @@ class MigrationRollbackTest extends TestCase
         );
 
         // Rollback the employee_id migration (need to rollback 2 steps: employee_id, then keycloak_username)
-        Artisan::call('migrate:rollback', ['--step' => 2]);
+        Artisan::call('migrate:rollback', ['--path' => 'database/migrations/2026_06_20_000001_add_employee_id_to_users_table.php']);
 
         // Assert: employee_id column should be removed
         $this->assertFalse(
@@ -164,7 +169,7 @@ class MigrationRollbackTest extends TestCase
         ]);
 
         // Rollback keycloak_username
-        Artisan::call('migrate:rollback', ['--step' => 1]);
+        Artisan::call('migrate:rollback', ['--path' => 'database/migrations/2026_06_20_000000_add_keycloak_username_to_users_table.php']);
 
         // Assert: User still exists but keycloak_username is gone
         $user = DB::table('users')->where('id', $testUserId)->first();
@@ -173,8 +178,8 @@ class MigrationRollbackTest extends TestCase
         $this->assertEquals('preserved@example.com', $user->email);
         $this->assertEquals('super_admin', $user->role);
         $this->assertFalse(
-            property_exists($user, 'keycloak_username'),
-            'keycloak_username should not exist in user record after rollback'
+            Schema::hasColumn('users', 'keycloak_username'),
+            'keycloak_username column should not exist after rollback'
         );
 
         // Re-migrate
@@ -357,20 +362,18 @@ class MigrationRollbackTest extends TestCase
 
         // Fresh migrate
         Artisan::call('migrate:fresh');
+        $this->seed(ReferenceSeeder::class);
 
         // Insert SSO user with null password and employee_id
         $ssoUserId = fake()->uuid();
-        $employeeId = fake()->uuid();
 
-        // Create employee first (for foreign key)
-        DB::table('employees')->insert([
-            'id' => $employeeId,
+        // Create employee using factory (ensures all required fields and references)
+        $employee = Employee::factory()->create([
             'nip' => '199001012020121001',
-            'nama' => 'Test Employee',
+            'nama_lengkap' => 'Test Employee',
             'email' => 'employee@example.com',
-            'created_at' => now(),
-            'updated_at' => now(),
         ]);
+        $employeeId = $employee->id;
 
         DB::table('users')->insert([
             'id' => $ssoUserId,

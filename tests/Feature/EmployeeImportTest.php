@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\ImportBatch;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\RefJenisPegawai;
@@ -125,7 +126,7 @@ class EmployeeImportTest extends TestCase
         $response->assertJsonPath('inserted', 1);
         $response->assertJsonPath('skipped', 1);
         $response->assertJsonPath('failed', 0);
-        
+
         // Siti should be inserted
         $this->assertDatabaseHas('employees', ['nama_lengkap' => 'Siti', 'nama_dengan_gelar' => 'Siti Aminah']);
     }
@@ -258,6 +259,9 @@ class EmployeeImportTest extends TestCase
 
     /**
      * K-US-02: Email yang sudah terdaftar → tetap error (tidak di-skip)
+     * NOTE: Validasi berjalan per-baris (single-pass), sehingga hanya deteksi
+     * email existing di database. Untuk duplikat email dalam file, lihat
+     * test_import_wizard_rejects_duplicate_email_within_file.
      */
     public function test_import_wizard_rejects_duplicate_email(): void
     {
@@ -275,13 +279,68 @@ class EmployeeImportTest extends TestCase
         $upload->assertOk();
         $batchId = $upload->json('batch_id');
 
-        // Validasi: harus error (email duplikat), bukan skip
+        // Validasi: harus error (email duplikat dari database), bukan skip
         $validation = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", []);
         $validation->assertOk();
         $validation->assertJsonPath('valid_count', 0);
-        $validation->assertJsonPath('error_count', 1);     // Error karena email duplikat
+        $validation->assertJsonPath('error_count', 1);     // Error karena email existing di DB
         $validation->assertJsonPath('skip_count', 0);      // Tidak di-skip
         $validation->assertJsonPath('results.0.status', 'error');
+        $validation->assertJsonPath('results.0.errors.Email Pegawai.0', 'Email pegawai sudah terdaftar di database.');
+    }
+
+    /**
+     * K-US-02: Email ganda dalam satu berkas → tetap error
+     * Validasi single-pass akan mendeteksi duplikat email dalam file.
+     */
+    public function test_import_wizard_rejects_duplicate_email_within_file(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        // Row 1 dan Row 2 punya email yang sama
+        $rows = [
+            $this->validRows()[0],
+            [
+                'Budi Duplikat',
+                'budi@example.com', // <- Email sama dengan row 1
+                'III/b',
+                'Analis',
+                '8',
+                '198502122010042002', // <- NIP berbeda
+                '081200000001',
+                'Penata Muda Tingkat I',
+                'S1',
+                '2043-01-01',
+                'Budi',
+                'Budi',
+                'Teknik Informatika',
+                'PNS',
+                '1985-02-12',
+                'pegawai',
+            ],
+        ];
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($rows),
+        ]);
+
+        $upload->assertOk();
+        $batchId = $upload->json('batch_id');
+        $upload->assertJsonPath('total_rows', 2);
+
+        // Validasi: row kedua harus error (duplikat email dalam file)
+        $validation = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", []);
+        $validation->assertOk();
+        $validation->assertJsonPath('valid_count', 1);     // Hanya row 1 valid
+        $validation->assertJsonPath('error_count', 1);     // Row 2 error (duplikat dalam file)
+        $validation->assertJsonPath('skip_count', 0);      // Tidak ada skip
+        $validation->assertJsonPath('results.0.status', 'valid');
+        $validation->assertJsonPath('results.0.row', 2);
+        $validation->assertJsonPath('results.1.status', 'error');
+        $validation->assertJsonPath('results.1.row', 3);
+        $validation->assertJsonPath('results.1.errors.Email Pegawai.0', 'Email pegawai sudah ada pada baris 2.');
     }
 
     public function test_import_rejects_duplicate_rows_without_creating_any_rows(): void
@@ -579,6 +638,67 @@ class EmployeeImportTest extends TestCase
         $validation->assertJsonPath('results.0.errors.NIP.0', 'NIP sudah terdaftar di database.');
         $validation->assertJsonPath('results.1.status', 'error'); // Baris 3
         $validation->assertJsonPath('results.1.errors.NIP.0', 'NIP sudah ada pada baris 2.');
+    }
+
+    /**
+     * K-US-02: Race condition - NIP muncul di database setelah validasi tetapi sebelum eksekusi
+     * Baris harus di-skip dan dihitung dengan benar dalam laporan.
+     */
+    public function test_import_handles_race_condition_skip_correctly(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        // Upload 2 baris, keduanya valid
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($this->validRows()),
+        ]);
+
+        $upload->assertOk();
+        $batchId = $upload->json('batch_id');
+        $upload->assertJsonPath('total_rows', 2);
+
+        // Validasi: kedua baris valid
+        $validation = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", []);
+        $validation->assertOk();
+        $validation->assertJsonPath('valid_count', 2);
+        $validation->assertJsonPath('error_count', 0);
+        $validation->assertJsonPath('skip_count', 0);
+
+        // RACE CONDITION: Buat employee dengan NIP yang sama SETELAH validasi
+        Employee::factory()->create(['nip' => '198001012006041001']);
+
+        // Execute: harus gracefully skip baris pertama
+        $execute = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", []);
+        $execute->assertOk();
+        $execute->assertJsonPath('status', 'queued');
+
+        $status = $this->getJson("/api/pegawai/import/{$batchId}/status");
+        $status->assertOk();
+        $status->assertJsonPath('status', 'completed');
+        $status->assertJsonPath('result.inserted', 1);     // Hanya Siti yang berhasil
+        $status->assertJsonPath('result.skipped', 1);      // Budi di-skip karena race condition
+        $status->assertJsonPath('result.failed', 0);
+
+        // Verifikasi database: hanya Siti yang di-insert, Budi sudah ada sebelumnya
+        $this->assertDatabaseHas('employees', [
+            'nama_lengkap' => 'Siti',
+            'nip' => '198502122010042002',
+        ]);
+        $this->assertDatabaseCount('employees', 2); // 1 existing (race) + 1 new (Siti)
+
+        // Verifikasi import batch record mencatat skip dengan benar
+        $importBatch = ImportBatch::find($batchId);
+        $this->assertSame(1, $importBatch->inserted_count);
+        $this->assertSame(1, $importBatch->skipped_count);
+        $this->assertSame(0, $importBatch->failed_count);
+
+        // Verifikasi audit log mencatat import event
+        $this->assertDatabaseHas('audit_logs', [
+            'event' => 'IMPORT',
+            'auditable_type' => 'Employee',
+        ]);
     }
 
     public function test_old_employee_import_endpoint_is_not_available(): void

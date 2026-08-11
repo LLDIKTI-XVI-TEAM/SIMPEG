@@ -7,6 +7,7 @@ use App\Models\EmployeeMilestone;
 use App\Models\RefJenisPegawai;
 use App\Models\User;
 use App\Services\Employees\TmtCalculatorService;
+use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -14,6 +15,14 @@ use Tests\TestCase;
 class EmployeeAppointmentMilestoneSyncTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(ReferenceSeeder::class);
+        $this->seed(RbacSeeder::class);
+    }
 
     /**
      * Test: US-5.5 AC-4 - Appointment TMT changes trigger Satyalancana milestone sync.
@@ -24,8 +33,6 @@ class EmployeeAppointmentMilestoneSyncTest extends TestCase
      */
     public function test_appointment_tmt_change_triggers_milestone_sync_via_update_action(): void
     {
-        $this->seed(ReferenceSeeder::class);
-
         $user = User::factory()->create(['role' => 'super_admin']);
 
         $employee = Employee::factory()->create([
@@ -53,8 +60,8 @@ class EmployeeAppointmentMilestoneSyncTest extends TestCase
         $this->assertEquals('2030-01-01', $oldMilestone->milestone_date->toDateString(), 'Should be 10 years from 2020-01-01');
 
         // Update appointment TMT through UpdateEmployeeAction (production flow)
-        $response = $this->actingAs($user)->put(route('admin.pegawai.update', $employee->id), [
-            'nama' => $employee->nama,
+        $response = $this->actingAs($user)->post(route('pegawai.update', $employee->id), [
+            'nama_lengkap' => $employee->nama_lengkap,
             'nip' => $employee->nip,
             'email' => $employee->email,
             'pengangkatan_jenis_pengangkatan' => 'PNS',
@@ -85,8 +92,6 @@ class EmployeeAppointmentMilestoneSyncTest extends TestCase
      */
     public function test_pppk_tmt_change_triggers_milestone_sync(): void
     {
-        $this->seed(ReferenceSeeder::class);
-
         $user = User::factory()->create(['role' => 'super_admin']);
 
         $jenisPegawai = RefJenisPegawai::firstOrCreate(
@@ -119,8 +124,8 @@ class EmployeeAppointmentMilestoneSyncTest extends TestCase
         $originalDate = $oldMilestone->milestone_date->toDateString();
 
         // Update PPPK TMT through form field
-        $response = $this->actingAs($user)->put(route('admin.pegawai.update', $employee->id), [
-            'nama' => $employee->nama,
+        $response = $this->actingAs($user)->post(route('pegawai.update', $employee->id), [
+            'nama_lengkap' => $employee->nama_lengkap,
             'nip' => $employee->nip,
             'email' => $employee->email,
             'pppk_tmt_pengangkatan' => '2020-07-01', // ← Changed
@@ -143,8 +148,6 @@ class EmployeeAppointmentMilestoneSyncTest extends TestCase
      */
     public function test_new_appointment_creation_triggers_milestone_sync(): void
     {
-        $this->seed(ReferenceSeeder::class);
-
         $user = User::factory()->create(['role' => 'super_admin']);
 
         $employee = Employee::factory()->create([
@@ -160,8 +163,8 @@ class EmployeeAppointmentMilestoneSyncTest extends TestCase
         $this->assertEquals(0, $milestonesBeforeCount, 'Should have no Satyalancana milestone without appointment');
 
         // Create appointment through UpdateEmployeeAction
-        $response = $this->actingAs($user)->put(route('admin.pegawai.update', $employee->id), [
-            'nama' => $employee->nama,
+        $response = $this->actingAs($user)->post(route('pegawai.update', $employee->id), [
+            'nama_lengkap' => $employee->nama_lengkap,
             'nip' => $employee->nip,
             'email' => $employee->email,
             'pengangkatan_jenis_pengangkatan' => 'PNS',
@@ -186,8 +189,6 @@ class EmployeeAppointmentMilestoneSyncTest extends TestCase
      */
     public function test_multiple_appointment_changes_trigger_single_final_sync(): void
     {
-        $this->seed(ReferenceSeeder::class);
-
         $user = User::factory()->create(['role' => 'super_admin']);
 
         $jenisPegawai = RefJenisPegawai::firstOrCreate(
@@ -216,8 +217,8 @@ class EmployeeAppointmentMilestoneSyncTest extends TestCase
         $initialCount = EmployeeMilestone::where('employee_id', $employee->id)->count();
 
         // Update: Change BOTH PPPK TMT AND contract end date
-        $response = $this->actingAs($user)->put(route('admin.pegawai.update', $employee->id), [
-            'nama' => $employee->nama,
+        $response = $this->actingAs($user)->post(route('pegawai.update', $employee->id), [
+            'nama_lengkap' => $employee->nama_lengkap,
             'nip' => $employee->nip,
             'email' => $employee->email,
             'tanggal_akhir_kontrak' => '2027-06-30', // ← Changed contract
@@ -247,8 +248,6 @@ class EmployeeAppointmentMilestoneSyncTest extends TestCase
      */
     public function test_non_appointment_updates_dont_cause_redundant_sync(): void
     {
-        $this->seed(ReferenceSeeder::class);
-
         $user = User::factory()->create(['role' => 'super_admin']);
 
         $employee = Employee::factory()->create([
@@ -269,8 +268,8 @@ class EmployeeAppointmentMilestoneSyncTest extends TestCase
         $milestoneCountBefore = EmployeeMilestone::where('employee_id', $employee->id)->count();
 
         // Update: Only change non-milestone field (phone number)
-        $response = $this->actingAs($user)->put(route('admin.pegawai.update', $employee->id), [
-            'nama' => $employee->nama,
+        $response = $this->actingAs($user)->post(route('pegawai.update', $employee->id), [
+            'nama_lengkap' => $employee->nama_lengkap,
             'nip' => $employee->nip,
             'email' => $employee->email,
             'no_hp' => '082987654321', // ← Only change phone

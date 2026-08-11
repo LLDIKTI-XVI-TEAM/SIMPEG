@@ -68,6 +68,7 @@ class ImportEmployeesAction
             // K-US-02: Handle skip status from duplicate check (NIP existing in DB)
             if ($duplicateResult['skip']) {
                 $skippedCount++;
+
                 continue;
             }
 
@@ -162,7 +163,7 @@ class ImportEmployeesAction
      * K-US-02: Menjaga file import tidak berisi NIP/email ganda sebelum transaksi insert dimulai.
      * - NIP ganda dalam satu berkas → error (highest priority)
      * - Email existing DB → error
-     * - Email ganda dalam berkas → error  
+     * - Email ganda dalam berkas → error
      * - NIP sudah ada di database → SKIP (aligned with K-US-02 canonical contract)
      *
      * @param  array<string, mixed>  $data
@@ -218,7 +219,7 @@ class ImportEmployeesAction
     private function failedSummary(array $errors, int $skippedCount = 0): array
     {
         $message = 'Import gagal. Perbaiki baris bermasalah lalu unggah ulang.';
-        
+
         if ($skippedCount > 0) {
             $message .= " {$skippedCount} baris dilewati karena NIP sudah terdaftar.";
         }

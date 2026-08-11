@@ -45,6 +45,7 @@ class ExecuteImportBatchAction
         ));
         $totalRows = count($validRows);
         $processedCount = 0;
+        $raceConditionSkipCount = 0;
 
         // Update status to processing
         $batch['status'] = 'processing';
@@ -72,17 +73,23 @@ class ExecuteImportBatchAction
         try {
             if ($validRows !== []) {
                 foreach ($validRows as $result) {
-                    DB::transaction(function () use ($type, $result): void {
-                        $this->executeValidatedRow($type, $result['validated_data']);
+                    $wasSkipped = false;
+                    DB::transaction(function () use ($type, $result, &$wasSkipped): void {
+                        $wasSkipped = $this->executeValidatedRow($type, $result['validated_data']);
                     });
 
-                    $processedCount++;
+                    if ($wasSkipped) {
+                        $raceConditionSkipCount++;
+                    } else {
+                        $processedCount++;
+                    }
 
                     // Update progress in cache (di luar transaction agar terlihat real-time)
                     $currentBatch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
                     if ($currentBatch) {
                         $currentBatch['processed_count'] = $processedCount;
-                        $currentBatch['progress'] = (int) (($processedCount / $totalRows) * 100);
+                        $currentBatch['race_skip_count'] = $raceConditionSkipCount;
+                        $currentBatch['progress'] = (int) ((($processedCount + $raceConditionSkipCount) / $totalRows) * 100);
                         Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $currentBatch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
                     }
                 }
@@ -99,8 +106,9 @@ class ExecuteImportBatchAction
                     'template_type' => $type,
                     'template_label' => UploadImportBatchAction::TEMPLATE_LABELS[$type] ?? UploadImportBatchAction::TEMPLATE_LABELS['utama'],
                     'total_inserted' => $processedCount,
-                    'total_processed' => $processedCount,
-                    'total_skipped' => $batch['validation']['skip_count'] ?? 0,
+                    'total_processed' => $processedCount + $raceConditionSkipCount,
+                    'total_skipped' => ($batch['validation']['skip_count'] ?? 0) + $raceConditionSkipCount,
+                    'total_race_skipped' => $raceConditionSkipCount,
                     'total_failed' => $batch['validation']['error_count'] ?? 0,
                     'filename' => $batch['filename'],
                 ],
@@ -113,6 +121,7 @@ class ExecuteImportBatchAction
             ImportBatch::whereKey($batchId)->update([
                 'status' => 'completed',
                 'inserted_count' => $processedCount,
+                'skipped_count' => ($batch['validation']['skip_count'] ?? 0) + $raceConditionSkipCount,
                 'finished_at' => now(),
             ]);
 
@@ -126,7 +135,7 @@ class ExecuteImportBatchAction
                 $finalBatch['processed_count'] = $processedCount;
                 $finalBatch['result'] = [
                     'inserted' => $processedCount,
-                    'skipped' => $batch['validation']['skip_count'] ?? 0,
+                    'skipped' => ($batch['validation']['skip_count'] ?? 0) + $raceConditionSkipCount,
                     'failed' => $batch['validation']['error_count'] ?? 0,
                 ];
                 // Keep completed state for 10 minutes so user has time to view the result screen
@@ -137,6 +146,7 @@ class ExecuteImportBatchAction
             ImportBatch::whereKey($batchId)->update([
                 'status' => 'failed',
                 'inserted_count' => $processedCount,
+                'skipped_count' => ($batch['validation']['skip_count'] ?? 0) + $raceConditionSkipCount,
                 'error_message' => $exception->getMessage(),
                 'finished_at' => now(),
             ]);
@@ -153,13 +163,18 @@ class ExecuteImportBatchAction
         return [
             'message' => 'Import selesai.',
             'inserted' => $processedCount,
-            'processed' => $processedCount,
-            'skipped' => $batch['validation']['skip_count'] ?? 0,
+            'processed' => $processedCount + $raceConditionSkipCount,
+            'skipped' => ($batch['validation']['skip_count'] ?? 0) + $raceConditionSkipCount,
             'failed' => $batch['validation']['error_count'] ?? 0,
         ];
     }
 
-    private function executeValidatedRow(string $type, array $data): void
+    /**
+     * Execute validated row and return skip status.
+     *
+     * @return bool True if row was skipped due to race condition, false if inserted
+     */
+    private function executeValidatedRow(string $type, array $data): bool
     {
         if ($type === 'utama') {
             // Fallback: jika kolom 'Person' (nama_lengkap tanpa gelar) tidak diisi pada file Excel,
@@ -172,9 +187,8 @@ class ExecuteImportBatchAction
             // Jika NIP sudah exists (race condition antara validasi dan insert),
             // skip insertion secara graceful daripada fail entire batch
             if (! empty($data['nip']) && Employee::where('nip', $data['nip'])->exists()) {
-                // Skip silently - sudah dicatat sebagai 'skip' di validation phase
-                // Atau jika race condition terjadi, treat as skip
-                return;
+                // Return true to indicate this row was skipped
+                return true;
             }
 
             $aktifId = RefStatusPegawai::where('nama', 'Aktif')->value('id')
@@ -187,6 +201,9 @@ class ExecuteImportBatchAction
                 'is_kinerja_baik' => true,
             ]);
         }
+
+        // Return false to indicate row was successfully inserted
+        return false;
     }
 
     /**

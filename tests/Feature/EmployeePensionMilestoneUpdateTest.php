@@ -4,8 +4,12 @@ namespace Tests\Feature;
 
 use App\Models\Employee;
 use App\Models\EmployeeMilestone;
+use App\Models\RefJabatan;
+use App\Models\RefJenisJabatan;
+use App\Models\RefUnitKerja;
 use App\Models\User;
 use App\Services\Employees\TmtCalculatorService;
+use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -13,6 +17,14 @@ use Tests\TestCase;
 class EmployeePensionMilestoneUpdateTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(ReferenceSeeder::class);
+        $this->seed(RbacSeeder::class);
+    }
 
     /**
      * Test: Mengubah tanggal_pensiun manual memicu sinkronisasi milestone.
@@ -23,7 +35,6 @@ class EmployeePensionMilestoneUpdateTest extends TestCase
      */
     public function test_updating_tanggal_pensiun_syncs_pension_milestone(): void
     {
-        $this->seed(ReferenceSeeder::class);
 
         $user = User::factory()->create(['role' => 'super_admin']);
         $employee = Employee::factory()->create([
@@ -46,8 +57,8 @@ class EmployeePensionMilestoneUpdateTest extends TestCase
         $oldMilestoneId = $oldMilestone->id;
 
         // Update tanggal_pensiun via UpdateEmployeeAction (through controller)
-        $response = $this->actingAs($user)->put(route('admin.pegawai.update', $employee->id), [
-            'nama' => $employee->nama,
+        $response = $this->actingAs($user)->post(route('pegawai.update', $employee->id), [
+            'nama_lengkap' => $employee->nama_lengkap,
             'nip' => $employee->nip,
             'email' => $employee->email,
             'tanggal_lahir' => '1967-03-20',
@@ -78,7 +89,6 @@ class EmployeePensionMilestoneUpdateTest extends TestCase
      */
     public function test_updating_tanggal_lahir_syncs_calculated_pension_milestone(): void
     {
-        $this->seed(ReferenceSeeder::class);
 
         $user = User::factory()->create(['role' => 'super_admin']);
         $employee = Employee::factory()->create([
@@ -88,11 +98,14 @@ class EmployeePensionMilestoneUpdateTest extends TestCase
         ]);
 
         // Create position for BUP calculation
+        $jabatan = RefJabatan::first();
+        $jenisJabatan = RefJenisJabatan::first();
+        $unitKerja = RefUnitKerja::first();
         $employee->positionHistories()->create([
-            'jabatan_id' => 1,
-            'jenis_jabatan_id' => 1,
+            'jabatan_id' => $jabatan?->id,
+            'jenis_jabatan_id' => $jenisJabatan?->id,
             'nama_jabatan' => 'Test Position',
-            'unit_kerja_id' => 1,
+            'unit_kerja_id' => $unitKerja?->id,
             'tmt_jabatan' => now()->subYears(5)->toDateString(),
             'no_sk' => 'SK-001',
             'tanggal_sk' => now()->subYears(5)->toDateString(),
@@ -112,8 +125,8 @@ class EmployeePensionMilestoneUpdateTest extends TestCase
         $oldMilestoneId = $oldMilestone->id;
 
         // Update tanggal_lahir (change birth year)
-        $response = $this->actingAs($user)->put(route('admin.pegawai.update', $employee->id), [
-            'nama' => $employee->nama,
+        $response = $this->actingAs($user)->post(route('pegawai.update', $employee->id), [
+            'nama_lengkap' => $employee->nama_lengkap,
             'nip' => $employee->nip,
             'email' => $employee->email,
             'tanggal_lahir' => '1968-03-20', // ← Changed birth year by 1 year
@@ -143,12 +156,11 @@ class EmployeePensionMilestoneUpdateTest extends TestCase
      */
     public function test_updating_non_pension_fields_does_not_trigger_milestone_sync(): void
     {
-        $this->seed(ReferenceSeeder::class);
 
         $user = User::factory()->create(['role' => 'super_admin']);
         $employee = Employee::factory()->create([
             'status_aktif' => 'Aktif',
-            'nama' => 'Old Name',
+            'nama_lengkap' => 'Old Name',
             'email' => 'old@example.com',
             'tanggal_lahir' => '1967-03-20',
             'tanggal_pensiun' => '2032-06-15',
@@ -170,8 +182,8 @@ class EmployeePensionMilestoneUpdateTest extends TestCase
         sleep(1);
 
         // Update non-pension fields only
-        $response = $this->actingAs($user)->put(route('admin.pegawai.update', $employee->id), [
-            'nama' => 'New Name', // ← Changed
+        $response = $this->actingAs($user)->post(route('pegawai.update', $employee->id), [
+            'nama_lengkap' => 'New Name', // ← Changed
             'nip' => $employee->nip,
             'email' => 'new@example.com', // ← Changed
             'tanggal_lahir' => '1967-03-20', // ← Same
@@ -192,7 +204,6 @@ class EmployeePensionMilestoneUpdateTest extends TestCase
      */
     public function test_scheduler_uses_updated_pension_milestone(): void
     {
-        $this->seed(ReferenceSeeder::class);
 
         $user = User::factory()->create(['role' => 'super_admin']);
         $employee = Employee::factory()->create([
@@ -206,8 +217,8 @@ class EmployeePensionMilestoneUpdateTest extends TestCase
 
         // Update to further future
         $newPensionDate = now()->addYears(5)->toDateString();
-        $this->actingAs($user)->put(route('admin.pegawai.update', $employee->id), [
-            'nama' => $employee->nama,
+        $this->actingAs($user)->post(route('pegawai.update', $employee->id), [
+            'nama_lengkap' => $employee->nama_lengkap,
             'nip' => $employee->nip,
             'email' => $employee->email,
             'tanggal_lahir' => $employee->tanggal_lahir->toDateString(),
