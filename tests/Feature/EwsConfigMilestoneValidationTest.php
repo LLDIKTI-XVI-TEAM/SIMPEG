@@ -162,7 +162,7 @@ class EwsConfigMilestoneValidationTest extends TestCase
         ]);
         $request->setUserResolver(fn () => User::factory()->create(['role' => 'super_admin']));
 
-        $action = new UpdateEwsConfigAction;
+        $action = app(UpdateEwsConfigAction::class);
         $action->execute($request);
 
         // Verify all pangkat milestones with old config invalidated
@@ -217,7 +217,7 @@ class EwsConfigMilestoneValidationTest extends TestCase
         ]);
         $request->setUserResolver(fn () => User::factory()->create(['role' => 'super_admin']));
 
-        $action = new UpdateEwsConfigAction;
+        $action = app(UpdateEwsConfigAction::class);
         $action->execute($request);
 
         // Verify only pangkat invalidated, KGB remains active
@@ -259,7 +259,7 @@ class EwsConfigMilestoneValidationTest extends TestCase
         ]);
         $request->setUserResolver(fn () => User::factory()->create(['role' => 'super_admin']));
 
-        $action = new UpdateEwsConfigAction;
+        $action = app(UpdateEwsConfigAction::class);
         $action->execute($request);
 
         // Verify KGB milestone invalidated
@@ -293,7 +293,7 @@ class EwsConfigMilestoneValidationTest extends TestCase
         ]);
         $request->setUserResolver(fn () => User::factory()->create(['role' => 'super_admin']));
 
-        $action = new UpdateEwsConfigAction;
+        $action = app(UpdateEwsConfigAction::class);
         $action->execute($request);
 
         // Verify milestone still active
