@@ -243,10 +243,19 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $rawPayload = DB::table('import_batches')->where('id', $batchId)->value('execution_payload');
         $this->assertIsString($rawPayload);
         $this->assertStringNotContainsString('budi@example.com', $rawPayload);
-        $this->assertSame(
-            'budi@example.com',
-            ImportBatch::query()->findOrFail($batchId)->execution_payload['validation']['results'][0]['validated_data']['email_pribadi'],
-        );
+
+        $payload = ImportBatch::query()->findOrFail($batchId)->execution_payload;
+        $this->assertIsArray($payload);
+        $validation = $payload['validation'];
+        $this->assertIsArray($validation);
+        $results = $validation['results'];
+        $this->assertIsArray($results);
+        $this->assertNotEmpty($results);
+        $firstResult = $results[0];
+        $this->assertIsArray($firstResult);
+        $validatedData = $firstResult['validated_data'];
+        $this->assertIsArray($validatedData);
+        $this->assertSame('budi@example.com', $validatedData['email_pribadi']);
     }
 
     /** Redelivery completed memulihkan file/cache dan hanya membuat satu notifikasi. */
