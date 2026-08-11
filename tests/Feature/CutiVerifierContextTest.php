@@ -120,7 +120,7 @@ class CutiVerifierContextTest extends TestCase
         $response->assertDontSee('Tidak Setujui', false);
 
         $content = $response->getContent();
-        $verifierContextPosition = strpos($content, 'Informasi Saldo &amp; Riwayat Cuti Pemohon');
+        $verifierContextPosition = strpos($content, 'Informasi Saldo & Riwayat Cuti Pemohon');
         $decisionActionPosition = strpos($content, 'Ditangguhkan');
 
         $this->assertNotFalse($verifierContextPosition);
