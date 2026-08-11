@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Actions\Cuti\BuildVerifierLeaveContextAction;
 use App\Models\Employee;
+use App\Models\LeaveApproval;
 use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
 use App\Models\RefHariLibur;
@@ -89,6 +90,14 @@ class CutiVerifierContextTest extends TestCase
             'status' => 'active',
             'is_final' => true,
         ]);
+        LeaveApproval::create([
+            'leave_request_id' => $leaveRequest->id,
+            'approver_id' => $approver->id,
+            'stage' => 1,
+            'action' => 'APPROVE',
+            'komentar' => 'Persetujuan sebelumnya.',
+            'acted_at' => now(),
+        ]);
 
         $response = $this->actingAs($approverUser)->get(route('cuti.show', $leaveRequest->id));
 
@@ -101,6 +110,59 @@ class CutiVerifierContextTest extends TestCase
         $response->assertSee('Cuti Bersama Uji Verifikator', false);
         $response->assertSee('Riwayat Cuti Tahunan Disetujui', false);
         $response->assertSee('7 hari kerja', false);
+        $response->assertSee('Tidak ada lampiran yang dilampirkan pemohon.', false);
+        $response->assertSee('Ditangguhkan', false);
+        $response->assertSee('Perubahan', false);
+        $response->assertSee('Tidak Disetujui', false);
+        $response->assertSee('Disetujui', false);
+        $response->assertSee('Riwayat Tindakan Approval', false);
+        $response->assertDontSee('Tunda Sementara', false);
+        $response->assertDontSee('Tidak Setujui', false);
+
+        $content = $response->getContent();
+        $verifierContextPosition = strpos($content, 'Informasi Saldo &amp; Riwayat Cuti Pemohon');
+        $decisionActionPosition = strpos($content, 'Ditangguhkan');
+
+        $this->assertNotFalse($verifierContextPosition);
+        $this->assertNotFalse($decisionActionPosition);
+        $this->assertLessThan($decisionActionPosition, $verifierContextPosition);
+        $this->assertSame(3, preg_match_all('/<textarea\\b(?=[^>]*\\bname="komentar")(?=[^>]*\\brequired\\b)[^>]*>/', $content));
+        $this->assertMatchesRegularExpression('/>\\s*Disetujui\\s*</', $content);
+        $this->assertDoesNotMatchRegularExpression('/>\\s*Setuju\\s*</', $content);
+    }
+
+    public function test_verifikator_melihat_tautan_lampiran_bila_pemohon_mengunggahkannya(): void
+    {
+        $jenis = $this->jenisTahunan();
+        $employee = Employee::factory()->create();
+        $approver = Employee::factory()->create();
+        $approverUser = User::factory()->kepalaBagian()->create(['employee_id' => $approver->id]);
+
+        $leaveRequest = LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $jenis->id,
+            'tanggal_mulai' => '2026-08-10',
+            'tanggal_selesai' => '2026-08-11',
+            'jumlah_hari_kerja' => 2,
+            'alasan' => 'Pengajuan dengan lampiran.',
+            'lampiran_path' => 'cuti/lampiran-verifikator.pdf',
+            'status' => 'menunggu_approval',
+        ]);
+        $leaveRequest->steps()->create([
+            'step_order' => 1,
+            'step_type' => 'kepala_bagian',
+            'role_label' => 'Kepala Bagian',
+            'approver_employee_id' => $approver->id,
+            'status' => 'active',
+            'is_final' => true,
+        ]);
+
+        $response = $this->actingAs($approverUser)->get(route('cuti.show', $leaveRequest->id));
+
+        $response->assertOk();
+        $response->assertSee('Lihat lampiran', false);
+        $response->assertDontSee('Tidak ada lampiran yang dilampirkan pemohon.', false);
+        $response->assertSee('storage/cuti/lampiran-verifikator.pdf', false);
     }
 
     public function test_pemantau_berhak_baca_semua_tetap_melihat_konteks_meski_bukan_approver(): void

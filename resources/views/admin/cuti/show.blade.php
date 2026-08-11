@@ -109,6 +109,11 @@
                             Lihat lampiran
                         </a>
                     </div>
+                @else
+                    <div class="space-y-1 sm:col-span-2" data-testid="leave-attachment-empty">
+                        <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Lampiran</span>
+                        <p class="text-sm text-muted font-sans">Tidak ada lampiran yang dilampirkan pemohon.</p>
+                    </div>
                 @endif
                 @if ($cuti->proof !== null)
                     <div class="space-y-1 sm:col-span-2">
@@ -191,7 +196,7 @@
                                         default => 'muted',
                                     };
                                     $actionLabel = match ($approval->action) {
-                                        'APPROVE' => 'Setuju',
+                                        'APPROVE' => 'Disetujui',
                                         'POSTPONE' => 'Ditangguhkan',
                                         'DUTY_POSTPONEMENT' => 'Ditangguhkan karena Tugas Dinas',
                                         'REQUEST_CHANGES' => 'Perubahan',
@@ -355,8 +360,8 @@
                 @if ($canAct)
                     {{-- Catatan keputusan wajib untuk tindakan selain setuju agar pemohon memahami dasar keputusan. --}}
                     @foreach ([
-                        'postpone' => ['route' => 'cuti.postpone', 'label' => 'Alasan Penundaan', 'title' => 'Tunda Sementara', 'variant' => 'warning'],
-                        'requestChanges' => ['route' => 'cuti.request-changes', 'label' => 'Catatan Perubahan', 'title' => 'Minta Perubahan', 'variant' => 'danger'],
+                        'postpone' => ['route' => 'cuti.postpone', 'label' => 'Alasan Penundaan', 'title' => 'Ditangguhkan', 'variant' => 'warning'],
+                        'requestChanges' => ['route' => 'cuti.request-changes', 'label' => 'Catatan Perubahan', 'title' => 'Perubahan', 'variant' => 'danger'],
                         'decline' => ['route' => 'cuti.decline', 'label' => 'Alasan Tidak Disetujui', 'title' => 'Tidak Disetujui', 'variant' => 'danger'],
                     ] as $formKey => $form)
                     <div x-show="decisionForm === '{{ $formKey }}'" x-cloak
@@ -377,8 +382,8 @@
                                 required
                             />
                             <div class="flex justify-end gap-2">
-                                <button type="button" class="{{ $buttonStyles['muted'] }}" @click="close()">Batal</button>
-                                <button type="submit" class="{{ $buttonStyles[$form['variant']] }}">{{ $form['title'] }}</button>
+                                <x-ui.button type="button" variant="muted" @click="close()">Batal</x-ui.button>
+                                <x-ui.button type="submit" :variant="$form['variant']">{{ $form['title'] }}</x-ui.button>
                             </div>
                         </form>
                     </div>
@@ -418,7 +423,7 @@
 
                     @if ($canAct)
                         <x-ui.button type="button" variant="secondary" data-action-visual="temporary-secondary" @click="open('postpone', $event)">
-                            Tunda Sementara
+                            Ditangguhkan
                         </x-ui.button>
                         @if ($cuti->jenisCuti?->code === 'tahunan')
                             <div class="w-full sm:w-auto">
@@ -428,17 +433,15 @@
                                 </x-ui.button>
                             </div>
                         @endif
-                        <button type="button" class="{{ $buttonStyles['danger'] }}" @click="open('requestChanges', $event)">
+                        <x-ui.button type="button" variant="danger" @click="open('requestChanges', $event)">
                             Perubahan
-                        </button>
-                        <button type="button" class="{{ $buttonStyles['danger'] }}" @click="open('decline', $event)">
-                            Tidak Setujui
-                        </button>
+                        </x-ui.button>
+                        <x-ui.button type="button" variant="danger" @click="open('decline', $event)">
+                            Tidak Disetujui
+                        </x-ui.button>
                         <form action="{{ route('cuti.approve', $cuti->id) }}" method="POST" class="inline">
                             @csrf
-                            <button type="submit" class="{{ $buttonStyles['success'] }}">
-                                Setujui
-                            </button>
+                            <x-ui.button type="submit" variant="success">Disetujui</x-ui.button>
                         </form>
                     @endif
                 </div>
