@@ -35,6 +35,10 @@ class ImportBatch extends Model
         'lease_expires_at',
         'completion_notified_at',
         'failure_notified_at',
+        'job_publish_attempted_at',
+        'job_published_at',
+        'job_publish_lease_expires_at',
+        'job_publish_attempts',
         'started_at',
         'finished_at',
     ];
@@ -48,6 +52,10 @@ class ImportBatch extends Model
             'lease_expires_at' => 'datetime',
             'completion_notified_at' => 'datetime',
             'failure_notified_at' => 'datetime',
+            'job_publish_attempted_at' => 'datetime',
+            'job_published_at' => 'datetime',
+            'job_publish_lease_expires_at' => 'datetime',
+            'job_publish_attempts' => 'integer',
             'started_at' => 'datetime',
             'finished_at' => 'datetime',
         ];

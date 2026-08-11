@@ -2,9 +2,9 @@
 
 namespace App\Actions\Employees;
 
-use App\Jobs\ImportEmployeeBatchJob;
 use App\Models\ImportBatch;
 use App\Models\User;
+use App\Services\Import\ImportBatchJobPublisher;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -12,6 +12,8 @@ use Illuminate\Validation\ValidationException;
 
 class QueueImportBatchAction
 {
+    public function __construct(private readonly ImportBatchJobPublisher $publisher) {}
+
     /**
      * Mengklaim batch secara atomik sebelum dispatch agar request ganda tidak membuat job ganda.
      * Primary key batch menjadi idempotency key lintas proses pada PostgreSQL.
@@ -44,7 +46,6 @@ class QueueImportBatchAction
         $originalBatch = $batch;
         $claimed = false;
         $processingToken = (string) Str::uuid();
-        $job = new ImportEmployeeBatchJob($batchId, $user?->id, $ipAddress, $userAgent, $processingToken);
 
         try {
             DB::transaction(function () use (
@@ -95,8 +96,7 @@ class QueueImportBatchAction
             });
 
             if ($claimed) {
-                // Dispatch setelah transaksi internal agar unique lock mengikuti transaksi caller terluar.
-                dispatch($job);
+                $this->publisher->dispatchAfterCommit($batchId, $ipAddress, $userAgent);
             }
         } catch (\Throwable $exception) {
             if ($claimed) {
@@ -107,7 +107,12 @@ class QueueImportBatchAction
         }
 
         if (! $claimed) {
-            return $this->existingStatus($batchId, $cacheKey, $batch);
+            $result = $this->existingStatus($batchId, $cacheKey, $batch);
+
+            // Retry request juga boleh memulihkan claim queued yang belum memiliki marker publish.
+            $this->publisher->dispatchAfterCommit($batchId, $ipAddress, $userAgent);
+
+            return $result;
         }
 
         return [
