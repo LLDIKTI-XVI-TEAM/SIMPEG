@@ -458,7 +458,7 @@
                         status: r.status,
                         // Simpan nama sumber sebagai array untuk sorotan input. String `col`
                         // hanya dipakai sebagai keterangan; pencarian substring dapat membuat
-                        // header seperti "Email" ikut tersorot saat hanya "Email Address" error.
+                        // header Email ikut tersorot saat hanya Email Address yang error.
                         errorSourceHeaders,
                         col: errorSourceHeaders.join(', ') || '-',
                         error: errorMessages.join('; ') || '',
