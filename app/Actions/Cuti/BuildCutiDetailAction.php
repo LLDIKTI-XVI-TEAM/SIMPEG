@@ -45,9 +45,14 @@ class BuildCutiDetailAction
         $cuti->load(['employee', 'jenisCuti', 'proof', 'approvals.approver', 'steps.approver']);
 
         $stage = $this->approvals->pendingStage($cuti);
-        $isSnapshotApprover = $stage !== null
+        $isCurrentApprover = $stage !== null
             && $this->approvals->approverEmployeeIdForStage($cuti, $stage) === $user->employee_id;
-        $canAct = $isSnapshotApprover
+        // Snapshot menyimpan seluruh pihak yang berwenang menelusuri pengajuan,
+        // termasuk approver yang sudah selesai atau masih menunggu tahapnya.
+        $isAnySnapshotApprover = $cuti->steps->contains(
+            fn (LeaveRequestStep $step): bool => $step->approver_employee_id === $user->employee_id,
+        );
+        $canAct = $isCurrentApprover
             && in_array($cuti->status, LeaveApprovalService::ACTIONABLE_STATUSES, true);
         $canDownloadFormulir = $this->pdfAction->canDownload($cuti, $user);
         $canReadAll = $user->hasPermission('cuti.read_all');
@@ -56,9 +61,9 @@ class BuildCutiDetailAction
         // tetapi tidak memperoleh izin bertindak setelah tahapnya selesai.
         abort_if(
             ! $canReadAll
-                && $cuti->employee_id !== $user->employee_id
-                && ! $isSnapshotApprover
-                && ! $canDownloadFormulir,
+            && $cuti->employee_id !== $user->employee_id
+            && ! $isAnySnapshotApprover
+            && ! $canDownloadFormulir,
             403,
         );
 

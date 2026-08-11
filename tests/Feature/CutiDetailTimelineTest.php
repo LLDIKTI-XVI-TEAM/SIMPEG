@@ -287,6 +287,82 @@ class CutiDetailTimelineTest extends TestCase
             ->assertDontSee(route('cuti.decline', $leaveRequest->id), false);
     }
 
+    /**
+     * Setiap approver pada snapshot tetap dapat membaca riwayat pengajuan,
+     * tetapi hanya approver tahap aktif yang boleh menerima kontrol keputusan.
+     */
+    public function test_all_snapshot_approvers_can_view_detail_but_only_active_approver_can_act(): void
+    {
+        $jenis = RefJenisCuti::create([
+            'nama' => 'Cuti Snapshot Akses Detail',
+            'code' => 'snapshot-akses-detail',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+        $applicant = Employee::factory()->create();
+        $completedApprover = Employee::factory()->create();
+        $activeApprover = Employee::factory()->create();
+        $futureApprover = Employee::factory()->create();
+        $unrelatedEmployee = Employee::factory()->create();
+        $completedUser = User::factory()->kepalaBagian()->create(['employee_id' => $completedApprover->id]);
+        $activeUser = User::factory()->kepalaBagian()->create(['employee_id' => $activeApprover->id]);
+        $futureUser = User::factory()->kepalaBagian()->create(['employee_id' => $futureApprover->id]);
+        $unrelatedUser = User::factory()->kepalaBagian()->create(['employee_id' => $unrelatedEmployee->id]);
+        $leaveRequest = LeaveRequest::create([
+            'employee_id' => $applicant->id,
+            'jenis_cuti_id' => $jenis->id,
+            'tanggal_mulai' => '2026-08-10',
+            'tanggal_selesai' => '2026-08-12',
+            'jumlah_hari_kerja' => 3,
+            'alasan' => 'Uji pembacaan snapshot semua approver.',
+            'status' => 'menunggu_approval',
+        ]);
+        $leaveRequest->steps()->create([
+            'step_order' => 1,
+            'step_type' => 'kepala_bagian',
+            'role_label' => 'Kepala Bagian',
+            'approver_employee_id' => $completedApprover->id,
+            'status' => 'approved',
+            'is_final' => false,
+            'acted_at' => now()->subDay(),
+        ]);
+        $leaveRequest->steps()->create([
+            'step_order' => 2,
+            'step_type' => 'verifikator',
+            'role_label' => 'Verifikator Aktif',
+            'approver_employee_id' => $activeApprover->id,
+            'status' => 'active',
+            'is_final' => false,
+        ]);
+        $leaveRequest->steps()->create([
+            'step_order' => 3,
+            'step_type' => 'pybmc',
+            'role_label' => 'PYBMC',
+            'approver_employee_id' => $futureApprover->id,
+            'status' => 'pending',
+            'is_final' => true,
+        ]);
+
+        $this->actingAs($completedUser)
+            ->get(route('cuti.show', $leaveRequest->id))
+            ->assertOk()
+            ->assertDontSee(route('cuti.approve', $leaveRequest->id), false);
+
+        $this->actingAs($futureUser)
+            ->get(route('cuti.show', $leaveRequest->id))
+            ->assertOk()
+            ->assertDontSee(route('cuti.approve', $leaveRequest->id), false);
+
+        $this->actingAs($activeUser)
+            ->get(route('cuti.show', $leaveRequest->id))
+            ->assertOk()
+            ->assertSee(route('cuti.approve', $leaveRequest->id), false);
+
+        $this->actingAs($unrelatedUser)
+            ->get(route('cuti.show', $leaveRequest->id))
+            ->assertForbidden();
+    }
+
     public function test_employee_detail_marks_target_balance_unavailable_when_preview_is_null(): void
     {
         $jenis = RefJenisCuti::create([
