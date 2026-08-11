@@ -45,6 +45,14 @@ class SaveImportMappingAction
         // penyimpanan parsial (admin baru mengubah sebagian dropdown) tetap aman.
         $merged = array_merge($batch['mapping'] ?? [], $mapping);
 
+        $reservedSources = ImportColumnMapping::reservedSourcesMappedToTargets($merged);
+
+        if ($reservedSources !== []) {
+            throw ValidationException::withMessages([
+                'mapping' => ['Kolom sumber berikut tidak boleh dipetakan ke field SIMPEG: '.implode(', ', $reservedSources).'. Pilih opsi tidak dipakai.'],
+            ]);
+        }
+
         $duplicates = ImportColumnMapping::duplicateTargets($merged);
 
         if ($duplicates !== []) {
