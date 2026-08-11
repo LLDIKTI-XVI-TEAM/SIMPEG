@@ -49,6 +49,29 @@ class TmtCalculatorService
         });
     }
 
+    /**
+     * Menyinkronkan hanya snapshot dan milestone pensiun tanpa menyentuh state EWS lain.
+     * Jalur ini dipakai ketika sumber BUP berubah secara global untuk menjaga isolasi domain.
+     */
+    public function syncPensionForEmployee(
+        Employee $employee,
+        ?bool $pensionDateIsAuthoritative = null,
+        bool $recalculateLegacyPension = false,
+    ): void {
+        DB::transaction(function () use ($employee, $pensionDateIsAuthoritative, $recalculateLegacyPension): void {
+            $lockedEmployee = Employee::query()
+                ->whereKey($employee->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->syncLockedPension(
+                $lockedEmployee,
+                $pensionDateIsAuthoritative,
+                $recalculateLegacyPension,
+            );
+        });
+    }
+
     /** Menyinkronkan snapshot setelah baris pegawai terkunci dan sumber dimuat ulang. */
     private function syncLockedEmployee(
         Employee $employee,
@@ -67,11 +90,36 @@ class TmtCalculatorService
             'tanggal_kgb_berikutnya' => $latestSalary?->tmt_kgb?->copy()->addYearsNoOverflow($kgbRequiredYears),
         ];
 
+        $employee->update($updates);
+
+        $this->storeNonPensionMilestones(
+            $employee,
+            $latestRank,
+            $latestSalary,
+        );
+
+        $this->syncLockedPension(
+            $employee,
+            $pensionDateIsAuthoritative,
+            $recalculateLegacyPension,
+        );
+    }
+
+    /**
+     * Menyelaraskan snapshot dan satu slot milestone pensiun setelah pegawai dikunci.
+     * Semua pemanggil memakai kalkulasi dan aturan provenance yang sama agar tidak menyimpang.
+     */
+    private function syncLockedPension(
+        Employee $employee,
+        ?bool $pensionDateIsAuthoritative,
+        bool $recalculateLegacyPension,
+    ): void {
         // Tanggal resmi dari form atau impor harus dipertahankan; hasil kalkulasi boleh dihitung ulang.
         $existingPensionMilestone = EmployeeMilestone::where('employee_id', $employee->id)
             ->where('type', EmployeeMilestone::TYPE_PENSIUN)
             ->where('milestone_key', EmployeeMilestone::KEY_DEFAULT)
             ->where('is_active', true)
+            ->lockForUpdate()
             ->first();
 
         $pensionSource = $this->resolvePensionSource(
@@ -86,25 +134,26 @@ class TmtCalculatorService
         ], true);
 
         $pensionCalculation = null;
+        $pensionUpdates = [];
 
-        if (! $preservePensionDate) {
+        if (!$preservePensionDate) {
             $pensionCalculation = $this->pensionCalculation($employee);
             $pensionDate = $pensionCalculation['date'] ?? null;
 
             if ($pensionDate !== null) {
-                $updates['tanggal_pensiun'] = $pensionDate;
+                $pensionUpdates['tanggal_pensiun'] = $pensionDate;
             } elseif ($employee->tanggal_pensiun !== null) {
                 // Hasil kalkulasi sebelumnya dibersihkan ketika sumber jabatan atau BUP tidak lagi tersedia.
-                $updates['tanggal_pensiun'] = null;
+                $pensionUpdates['tanggal_pensiun'] = null;
             }
         }
 
-        $employee->update($updates);
+        if (array_key_exists('tanggal_pensiun', $pensionUpdates)) {
+            $employee->update($pensionUpdates);
+        }
 
-        $this->storeMilestones(
+        $this->storePensionMilestone(
             $employee,
-            $latestRank,
-            $latestSalary,
             $pensionSource,
             $pensionCalculation,
         );
@@ -142,21 +191,13 @@ class TmtCalculatorService
     }
 
     /**
-     * Menyimpan milestone yang sudah dikalkulasi ke tabel terpisah.
-     * Scheduler EWS dapat langsung query tabel ini tanpa perlu kalkulasi ulang.
-     *
-     * Milestone yang tidak lagi dihasilkan akan dinonaktifkan
-     * untuk mencegah scheduler memproses data yang sudah tidak berlaku.
-     *
-     * @param  string  $pensionSource  Provenance eksplisit untuk melindungi tanggal resmi dan legacy
-     * @param  array{date: Carbon, bup: int, source: string, bup_source: string, jabatan: ?string, config_key: ?string}|null  $pensionCalculation
+     * Menyimpan milestone non-pensiun yang sudah dikalkulasi ke tabel terpisah.
+     * Milestone yang kehilangan sumber dinonaktifkan agar scheduler tidak memakai data kedaluwarsa.
      */
-    private function storeMilestones(
+    private function storeNonPensionMilestones(
         Employee $employee,
         ?RankHistory $latestRank,
         ?SalaryHistory $latestSalary,
-        string $pensionSource,
-        ?array $pensionCalculation,
     ): void {
         $today = now()->startOfDay();
         $pangkatRequiredYears = $this->configYears('pangkat_required_years', 4);
@@ -224,61 +265,6 @@ class TmtCalculatorService
                 ->update(['is_active' => false]);
         }
 
-        // Tanggal pensiun resmi diprioritaskan; BUP hanya digunakan ketika tanggal tersebut belum ada.
-        $pensionDate = null;
-        $metadata = ['tanggal_lahir' => $employee->tanggal_lahir?->toDateString()];
-
-        if (in_array($pensionSource, [self::PENSION_SOURCE_OFFICIAL, self::PENSION_SOURCE_LEGACY_UNVERIFIED], true)) {
-            // Nilai resmi dan legacy yang belum diverifikasi diperlakukan authoritative agar tidak tertimpa diam-diam.
-            $pensionDate = $employee->tanggal_pensiun;
-            $metadata['is_manual'] = true;
-            $metadata['source'] = $pensionSource;
-            $metadata['bup'] = null;
-            $metadata['jabatan'] = null;
-        } else {
-            // Simpan sumber kalkulasi yang sama dengan snapshot agar scheduler dapat mengaudit fallback-nya.
-            $pensionDate = $pensionCalculation['date'] ?? null;
-            if ($pensionCalculation !== null) {
-                $metadata['is_manual'] = false;
-                $metadata['source'] = $pensionCalculation['source'];
-                $metadata['bup_source'] = $pensionCalculation['bup_source'];
-                $metadata['bup'] = $pensionCalculation['bup'];
-                $metadata['jabatan'] = $pensionCalculation['jabatan'];
-                $metadata['config_key'] = $pensionCalculation['config_key'];
-            }
-        }
-
-        if ($pensionDate !== null) {
-            // Deactivate any existing active pension milestone with a different date —
-            // this creates a new row instead of mutating the old one in-place.
-            EmployeeMilestone::where('employee_id', $employee->id)
-                ->where('type', EmployeeMilestone::TYPE_PENSIUN)
-                ->where('is_active', true)
-                ->where('milestone_date', '!=', $pensionDate->toDateString())
-                ->update(['is_active' => false]);
-
-            $milestone = EmployeeMilestone::updateOrCreate(
-                [
-                    'employee_id' => $employee->id,
-                    'type' => EmployeeMilestone::TYPE_PENSIUN,
-                    'milestone_key' => EmployeeMilestone::KEY_DEFAULT,
-                    'is_active' => true,
-                ],
-                [
-                    'milestone_date' => $pensionDate,
-                    'calculated_at' => $today,
-                    'metadata' => $metadata,
-                ]
-            );
-            $activeMilestoneIds[] = $milestone->id;
-        } else {
-            // Sumber data hilang: nonaktifkan milestone lama agar scheduler tidak memakai tanggal kedaluwarsa.
-            EmployeeMilestone::where('employee_id', $employee->id)
-                ->where('type', EmployeeMilestone::TYPE_PENSIUN)
-                ->where('is_active', true)
-                ->update(['is_active' => false]);
-        }
-
         // Satyalancana dihitung dari TMT pengangkatan pertama.
         $tmtPengangkatan = $this->firstAppointmentDate($employee);
         if ($tmtPengangkatan !== null) {
@@ -295,7 +281,7 @@ class TmtCalculatorService
                     ->where('is_active', true)
                     ->first();
 
-                if ($activeMilestone !== null && ! $activeMilestone->milestone_date->isSameDay($satyalancanaDate)) {
+                if ($activeMilestone !== null && !$activeMilestone->milestone_date->isSameDay($satyalancanaDate)) {
                     // Perubahan TMT menghasilkan versi baru; versi lama tetap disimpan sebagai jejak kalkulasi.
                     $activeMilestone->update(['is_active' => false]);
                 }
@@ -368,6 +354,65 @@ class TmtCalculatorService
                 ->where('is_active', true)
                 ->update(['is_active' => false]);
         }
+    }
+
+    /**
+     * Menyimpan satu slot milestone pensiun dari provenance yang telah ditentukan.
+     *
+     * @param  string  $pensionSource  Provenance eksplisit untuk melindungi tanggal resmi dan legacy
+     * @param  array{date: Carbon, bup: int, source: string, bup_source: string, jabatan: ?string, config_key: ?string}|null  $pensionCalculation
+     */
+    private function storePensionMilestone(
+        Employee $employee,
+        string $pensionSource,
+        ?array $pensionCalculation,
+    ): void {
+        $pensionDate = null;
+        $metadata = ['tanggal_lahir' => $employee->tanggal_lahir?->toDateString()];
+
+        if (in_array($pensionSource, [self::PENSION_SOURCE_OFFICIAL, self::PENSION_SOURCE_LEGACY_UNVERIFIED], true)) {
+            // Nilai resmi dan legacy yang belum diverifikasi diperlakukan authoritative agar tidak tertimpa diam-diam.
+            $pensionDate = $employee->tanggal_pensiun;
+            $metadata['is_manual'] = true;
+            $metadata['source'] = $pensionSource;
+            $metadata['bup'] = null;
+            $metadata['jabatan'] = null;
+        } else {
+            // Simpan sumber kalkulasi yang sama dengan snapshot agar scheduler dapat mengaudit fallback-nya.
+            $pensionDate = $pensionCalculation['date'] ?? null;
+            if ($pensionCalculation !== null) {
+                $metadata['is_manual'] = false;
+                $metadata['source'] = $pensionCalculation['source'];
+                $metadata['bup_source'] = $pensionCalculation['bup_source'];
+                $metadata['bup'] = $pensionCalculation['bup'];
+                $metadata['jabatan'] = $pensionCalculation['jabatan'];
+                $metadata['config_key'] = $pensionCalculation['config_key'];
+            }
+        }
+
+        if ($pensionDate !== null) {
+            EmployeeMilestone::updateOrCreate(
+                [
+                    'employee_id' => $employee->id,
+                    'type' => EmployeeMilestone::TYPE_PENSIUN,
+                    'milestone_key' => EmployeeMilestone::KEY_DEFAULT,
+                    'is_active' => true,
+                ],
+                [
+                    'milestone_date' => $pensionDate,
+                    'calculated_at' => now()->startOfDay(),
+                    'metadata' => $metadata,
+                ]
+            );
+
+            return;
+        }
+
+        // Sumber data hilang: nonaktifkan milestone lama agar scheduler tidak memakai tanggal kedaluwarsa.
+        EmployeeMilestone::where('employee_id', $employee->id)
+            ->where('type', EmployeeMilestone::TYPE_PENSIUN)
+            ->where('is_active', true)
+            ->update(['is_active' => false]);
     }
 
     /**

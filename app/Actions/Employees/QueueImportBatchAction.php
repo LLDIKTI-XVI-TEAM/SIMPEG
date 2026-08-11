@@ -2,9 +2,9 @@
 
 namespace App\Actions\Employees;
 
-use App\Jobs\ImportEmployeeBatchJob;
 use App\Models\ImportBatch;
 use App\Models\User;
+use App\Services\Import\ImportBatchJobPublisher;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -12,6 +12,8 @@ use Illuminate\Validation\ValidationException;
 
 class QueueImportBatchAction
 {
+    public function __construct(private readonly ImportBatchJobPublisher $publisher) {}
+
     /**
      * Mengklaim batch secara atomik sebelum dispatch agar request ganda tidak membuat job ganda.
      * Primary key batch menjadi idempotency key lintas proses pada PostgreSQL.
@@ -44,7 +46,6 @@ class QueueImportBatchAction
         $originalBatch = $batch;
         $claimed = false;
         $processingToken = (string) Str::uuid();
-        $job = new ImportEmployeeBatchJob($batchId, $user?->id, $ipAddress, $userAgent, $processingToken);
 
         try {
             DB::transaction(function () use (
@@ -53,7 +54,6 @@ class QueueImportBatchAction
                 $cacheKey,
                 $batch,
                 $processingToken,
-                $job,
                 &$claimed,
             ): void {
                 $now = now();
@@ -93,10 +93,11 @@ class QueueImportBatchAction
                 $queuedBatch['progress'] = 0;
                 $queuedBatch['processed_count'] = 0;
                 Cache::put($cacheKey, $queuedBatch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
-
-                // Dispatch berada dalam transaksi claim agar database queue dan status batch commit bersama.
-                dispatch($job);
             });
+
+            if ($claimed) {
+                $this->publisher->dispatchAfterCommit($batchId, $ipAddress, $userAgent);
+            }
         } catch (\Throwable $exception) {
             if ($claimed) {
                 Cache::put($cacheKey, $originalBatch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
@@ -106,7 +107,12 @@ class QueueImportBatchAction
         }
 
         if (! $claimed) {
-            return $this->existingStatus($batchId, $cacheKey, $batch);
+            $result = $this->existingStatus($batchId, $cacheKey, $batch);
+
+            // Retry request juga boleh memulihkan claim queued yang belum memiliki marker publish.
+            $this->publisher->dispatchAfterCommit($batchId, $ipAddress, $userAgent);
+
+            return $result;
         }
 
         return [
