@@ -103,7 +103,10 @@
             return `mapping-${index}-${slug}`;
         },
         normalizeSourceHeader(header) {
-            return String(header).trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+            // Samakan dengan ImportColumnMapping::normalize(): hanya normalisasi
+            // spasi dan huruf besar-kecil. Tanda baca tetap bermakna agar
+            // klasifikasi UI sesuai dengan mapping yang diproses server.
+            return String(header).trim().replace(/\s+/g, ' ').toLowerCase();
         },
         isCanonicalSourceHeader(header) {
             const normalizedHeader = this.normalizeSourceHeader(header);
@@ -111,10 +114,10 @@
             return this.simpegTargetFields.some(field => this.normalizeSourceHeader(field.key) === normalizedHeader);
         },
         isKnownIgnoredHeader(header) {
-            return ['no', 'personformula', 'role'].includes(this.normalizeSourceHeader(header));
+            return ['no', 'person formula', 'role'].includes(this.normalizeSourceHeader(header));
         },
         isLockedIgnoredHeader(header) {
-            return ['no', 'role'].includes(String(header).trim().toLowerCase());
+            return ['no', 'role'].includes(this.normalizeSourceHeader(header));
         },
         sourceHeadersForErrors(errorTargets) {
             // Key error backend mengikuti label atribut validasi, sedangkan mapping

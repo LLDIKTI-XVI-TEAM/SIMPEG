@@ -37,6 +37,7 @@ class EmployeeImportMappingUiTest extends TestCase
         $response->assertSee('aria-describedby="mapping-readiness-message"', false);
         $response->assertSee('isLockedIgnoredHeader(header)', false);
         $response->assertSee('isCanonicalSourceHeader(header)', false);
+        $response->assertSee('replace(/\\s+/g, \' \')', false);
         $response->assertSee('intentionallySkippedSourceHeaders', false);
         $response->assertSee('value="tidak_dipakai"', false);
         $response->assertSee("'Nama Lengkap (Person)': 'Person'", false);

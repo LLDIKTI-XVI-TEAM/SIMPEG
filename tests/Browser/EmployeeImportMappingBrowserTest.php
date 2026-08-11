@@ -141,7 +141,7 @@ class EmployeeImportMappingBrowserTest extends DuskTestCase
 
                 component.batchId = 'browser-test-batch';
                 component.step = 2;
-                component.mainHeaders = ['No', 'Role', 'NIK', 'NIP', 'Email Pegawai', 'Kolom Cadangan'];
+                component.mainHeaders = ['No', 'Role', 'NIK', 'NIP', 'Email Pegawai', 'Kolom Cadangan', 'Email-Pegawai'];
                 component.columnMapping = {
                     No: 'tidak_dipakai',
                     Role: 'tidak_dipakai',
@@ -149,6 +149,7 @@ class EmployeeImportMappingBrowserTest extends DuskTestCase
                     NIP: 'NIP',
                     'Email Pegawai': 'Email Pegawai',
                     'Kolom Cadangan': 'tidak_dipakai',
+                    'Email-Pegawai': 'tidak_dipakai',
                 };
                 component.requiredTargetFields = ['NIP', 'Email Pegawai'];
                 component.allRows = [{
@@ -160,6 +161,7 @@ class EmployeeImportMappingBrowserTest extends DuskTestCase
                         NIP: '999999999999999999',
                         'Email Pegawai': 'mapping@example.test',
                         'Kolom Cadangan': 'diabaikan',
+                        'Email-Pegawai': 'email-lama@example.test',
                     },
                 }];
                 component.previewRowCount = 1;
@@ -208,7 +210,7 @@ class EmployeeImportMappingBrowserTest extends DuskTestCase
             JS)[0];
 
             $this->assertSame([
-                'unknown' => ['Kolom Cadangan'],
+                'unknown' => ['Kolom Cadangan', 'Email-Pegawai'],
                 'intentionallySkipped' => ['NIK'],
                 'alwaysIgnored' => ['No', 'Role'],
             ], $skippedHeaderCategories);
