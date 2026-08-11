@@ -72,7 +72,7 @@ class ValidateImportBatchAction
         $duplicatedEmails = [];
 
         foreach ($batch['rows'] as $row) {
-            $rowResult = $this->validateTemplateRow($type, $row, $seenNips, $seenEmails, $mapping, $allowShiftDetection);
+            $rowResult = $this->validateTemplateRow($type, $row, $seenNips, $seenEmails, $duplicatedNips, $duplicatedEmails, $mapping, $allowShiftDetection);
             $results[] = $rowResult;
 
             match ($rowResult['status']) {
@@ -174,12 +174,12 @@ class ValidateImportBatchAction
         return $batchRows;
     }
 
-    private function validateTemplateRow(string $type, array $row, array &$seenNips, array &$seenEmails, array $mapping, bool $allowShiftDetection): array
+    private function validateTemplateRow(string $type, array $row, array &$seenNips, array &$seenEmails, array &$duplicatedNips, array &$duplicatedEmails, array $mapping, bool $allowShiftDetection): array
     {
-        return $this->validateRow($row, $seenNips, $seenEmails, $mapping, $allowShiftDetection);
+        return $this->validateRow($row, $seenNips, $seenEmails, $duplicatedNips, $duplicatedEmails, $mapping, $allowShiftDetection);
     }
 
-    private function validateRow(array $row, array &$seenNips, array &$seenEmails, array $mapping, bool $allowShiftDetection): array
+    private function validateRow(array $row, array &$seenNips, array &$seenEmails, array &$duplicatedNips, array &$duplicatedEmails, array $mapping, bool $allowShiftDetection): array
     {
         // Key baris sumber dinormalkan ke header kanonis memakai mapping aktif batch;
         // kolom bertanda tidak dipakai dibuang sebelum mapper membaca nilai apa pun.
@@ -219,7 +219,7 @@ class ValidateImportBatchAction
         // Email yang sudah terdaftar tetap error, sedangkan NIP database menjadi skip
         // hanya bila baris tidak memiliki error yang lebih kuat.
 
-        $duplicateErrors = $this->mapErrors($this->duplicateErrors($validated, $row['row'], $seenNips, $seenEmails), [
+        $duplicateErrors = $this->mapErrors($this->duplicateErrors($validated, $row['row'], $seenNips, $seenEmails, $duplicatedNips, $duplicatedEmails), [
             'nip' => 'NIP',
             'email_pribadi' => 'Email Pegawai',
         ]);

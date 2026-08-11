@@ -838,7 +838,7 @@ class EwsSchedulerTest extends TestCase
         /** @var Expectation $kgbNotificationExpectation */
         $kgbNotificationExpectation = $notificationMock->shouldReceive('upsertEwsReminder');
         $kgbNotificationExpectation
-            ->with(\Mockery::any(), \Mockery::any(), 'ews.kgb', \Mockery::any(), \Mockery::any(), \Mockery::any(), \Mockery::any())
+            ->with(\Mockery::any(), \Mockery::any(), 'ews.kgb', \Mockery::any(), \Mockery::any(), \Mockery::any())
             ->once()
             ->andThrow(new \RuntimeException('Service failure simulation'));
 

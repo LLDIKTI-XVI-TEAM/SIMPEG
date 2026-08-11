@@ -101,15 +101,17 @@ class EmployeePppkContractMilestoneUpdateTest extends TestCase
 
         $response->assertSessionHasNoErrors()->assertRedirect();
 
-        // Identitas milestone kontrak tetap sama agar update berulang tidak membuat duplikat.
+        // Kontrak lama menjadi histori nonaktif; tanggal kontrak baru mendapat milestone aktif baru.
         $oldMilestone->refresh();
-        $this->assertTrue($oldMilestone->is_active);
+        $this->assertFalse($oldMilestone->is_active);
         $this->assertSame($oldMilestoneId, $oldMilestone->id);
-        $this->assertEquals('2028-12-31', $oldMilestone->milestone_date->toDateString());
-        $this->assertSame(1, EmployeeMilestone::where('employee_id', $employee->id)
+        $this->assertEquals('2027-06-30', $oldMilestone->milestone_date->toDateString());
+        $activeMilestone = EmployeeMilestone::where('employee_id', $employee->id)
             ->where('type', 'pppk_contract_end')
             ->where('is_active', true)
-            ->count());
+            ->sole();
+        $this->assertNotSame($oldMilestoneId, $activeMilestone->id);
+        $this->assertEquals('2028-12-31', $activeMilestone->milestone_date->toDateString());
 
         // Verify: Old alert expired (existing behavior)
         $alert->refresh();

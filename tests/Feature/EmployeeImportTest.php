@@ -187,12 +187,21 @@ class EmployeeImportTest extends TestCase
         $this->postJsonWithCsrf("/api/pegawai/import/{$upload->json('batch_id')}/validate", [])
             ->assertOk()
             ->assertJsonPath('valid_count', 0)
-            ->assertJsonPath('error_count', 1)
-            ->assertJsonPath('skip_count', 1)
-            ->assertJsonPath('results.0.status', 'skip')
+            // Kedua baris error: baris 1 di-upgrade secara retroactive (tadinya skip DB karena NIP
+            // sudah ada di database, tapi baris 2 menduplikasi NIP yang sama dalam file sehingga
+            // retroactive upgrade mengubah baris 1 menjadi error pula — lihat logika $duplicatedNips).
+            ->assertJsonPath('error_count', 2)
+            ->assertJsonPath('skip_count', 0)
+            ->assertJsonPath('results.0.status', 'error')
+            // Pesan skip database sudah tercatat sebelum validasi baris berikutnya
+            // menemukan duplikasi; upgrade retroaktif menambahkan pesan duplikasi sesudahnya.
+            ->assertJsonPath('results.0.errors.NIP.0', 'NIP sudah terdaftar di database.')
+            ->assertJsonPath('results.0.errors.NIP.1', 'NIP sudah ada pada baris 3.')
             ->assertJsonPath('results.1.status', 'error')
             ->assertJsonPath('results.1.errors.NIP.0', 'NIP sudah ada pada baris 2.');
+
     }
+
     public function test_import_rejects_duplicate_rows_without_creating_any_rows(): void
     {
         $user = User::factory()->adminKepegawaian()->create();

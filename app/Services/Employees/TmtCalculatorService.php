@@ -136,7 +136,7 @@ class TmtCalculatorService
         $pensionCalculation = null;
         $pensionUpdates = [];
 
-        if (!$preservePensionDate) {
+        if (! $preservePensionDate) {
             $pensionCalculation = $this->pensionCalculation($employee);
             $pensionDate = $pensionCalculation['date'] ?? null;
 
@@ -281,7 +281,7 @@ class TmtCalculatorService
                     ->where('is_active', true)
                     ->first();
 
-                if ($activeMilestone !== null && !$activeMilestone->milestone_date->isSameDay($satyalancanaDate)) {
+                if ($activeMilestone !== null && ! $activeMilestone->milestone_date->isSameDay($satyalancanaDate)) {
                     // Perubahan TMT menghasilkan versi baru; versi lama tetap disimpan sebagai jejak kalkulasi.
                     $activeMilestone->update(['is_active' => false]);
                 }

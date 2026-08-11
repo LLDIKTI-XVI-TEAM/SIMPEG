@@ -75,8 +75,6 @@ class EmployeeImportErrorPriorityTest extends TestCase
                         'Jabatan' => 'Staf',
                         'Kelas Jabatan' => '5',
                         'Pendidikan Terakhir' => 'S1',
-                        'Prodi Pendidikan Terakhir' => 'Teknik Informatika',
-                        'Nomor Telepon' => '081234567890',
                         'Role' => 'pegawai',
                         'Prodi Pendidikan Terakhir' => 'Manajemen',
                         'Nomor Telepon' => '081234567890',
@@ -98,7 +96,7 @@ class EmployeeImportErrorPriorityTest extends TestCase
     }
 
     /**
-     * Kemunculan pertama NIP database tetap skip; kemunculan berikutnya error karena duplikat berkas.
+     * Semua kemunculan NIP yang sama menjadi error ketika duplikasi berkas ditemukan.
      */
     public function test_second_duplicate_nip_in_file_is_error_when_first_nip_exists_in_database(): void
     {
@@ -134,8 +132,6 @@ class EmployeeImportErrorPriorityTest extends TestCase
                         'Jabatan' => 'Staf',
                         'Kelas Jabatan' => '5',
                         'Pendidikan Terakhir' => 'S1',
-                        'Prodi Pendidikan Terakhir' => 'Teknik Informatika',
-                        'Nomor Telepon' => '081234567890',
                         'Role' => 'pegawai',
                         'Prodi Pendidikan Terakhir' => 'Manajemen',
                         'Nomor Telepon' => '081234567890',
@@ -155,8 +151,6 @@ class EmployeeImportErrorPriorityTest extends TestCase
                         'Jabatan' => 'Staf Senior',
                         'Kelas Jabatan' => '6',
                         'Pendidikan Terakhir' => 'S2',
-                        'Prodi Pendidikan Terakhir' => 'Manajemen',
-                        'Nomor Telepon' => '081234567891',
                         'Role' => 'pegawai',
                         'Prodi Pendidikan Terakhir' => 'Teknik Informatika',
                         'Nomor Telepon' => '081298765432',
@@ -170,15 +164,15 @@ class EmployeeImportErrorPriorityTest extends TestCase
         // Execute validation
         $result = app(ValidateImportBatchAction::class)->execute($batchId, null, null);
 
-        $this->assertSame(1, $result['error_count']);
-        $this->assertSame(1, $result['skip_count']);
-        $this->assertSame('skip', $result['results'][0]['status']);
+        $this->assertSame(2, $result['error_count']);
+        $this->assertSame(0, $result['skip_count']);
+        $this->assertSame('error', $result['results'][0]['status']);
         $this->assertSame('error', $result['results'][1]['status']);
         $this->assertArrayHasKey('NIP', $result['results'][1]['errors']);
     }
 
     /**
-     * Kemunculan pertama NIP baru valid; kemunculan berikutnya error karena duplikat berkas.
+     * Semua kemunculan NIP baru yang sama menjadi error ketika duplikasi berkas ditemukan.
      */
     public function test_second_duplicate_new_nip_in_file_is_error_after_first_valid_row(): void
     {
@@ -208,8 +202,6 @@ class EmployeeImportErrorPriorityTest extends TestCase
                         'Jabatan' => 'Staf',
                         'Kelas Jabatan' => '5',
                         'Pendidikan Terakhir' => 'S1',
-                        'Prodi Pendidikan Terakhir' => 'Teknik Informatika',
-                        'Nomor Telepon' => '081234567890',
                         'Role' => 'pegawai',
                         'Prodi Pendidikan Terakhir' => 'Manajemen',
                         'Nomor Telepon' => '081234567890',
@@ -241,16 +233,16 @@ class EmployeeImportErrorPriorityTest extends TestCase
         // Execute validation
         $result = app(ValidateImportBatchAction::class)->execute($batchId, null, null);
 
-        $this->assertSame(1, $result['valid_count']);
-        $this->assertSame(1, $result['error_count']);
+        $this->assertSame(0, $result['valid_count']);
+        $this->assertSame(2, $result['error_count']);
         $this->assertSame(0, $result['skip_count']);
-        $this->assertSame('valid', $result['results'][0]['status']);
+        $this->assertSame('error', $result['results'][0]['status']);
         $this->assertSame('error', $result['results'][1]['status']);
         $this->assertArrayHasKey('NIP', $result['results'][1]['errors']);
     }
 
     /**
-     * Kemunculan email pertama valid; kemunculan berikutnya error karena duplikat berkas.
+     * Semua kemunculan email yang sama menjadi error ketika duplikasi berkas ditemukan.
      */
     public function test_second_duplicate_email_in_file_is_error_after_first_valid_row(): void
     {
@@ -280,8 +272,6 @@ class EmployeeImportErrorPriorityTest extends TestCase
                         'Jabatan' => 'Staf',
                         'Kelas Jabatan' => '5',
                         'Pendidikan Terakhir' => 'S1',
-                        'Prodi Pendidikan Terakhir' => 'Teknik Informatika',
-                        'Nomor Telepon' => '081234567890',
                         'Role' => 'pegawai',
                         'Prodi Pendidikan Terakhir' => 'Manajemen',
                         'Nomor Telepon' => '081234567890',
@@ -301,8 +291,6 @@ class EmployeeImportErrorPriorityTest extends TestCase
                         'Jabatan' => 'Staf Senior',
                         'Kelas Jabatan' => '6',
                         'Pendidikan Terakhir' => 'S2',
-                        'Prodi Pendidikan Terakhir' => 'Manajemen',
-                        'Nomor Telepon' => '081234567891',
                         'Role' => 'pegawai',
                         'Prodi Pendidikan Terakhir' => 'Teknik Informatika',
                         'Nomor Telepon' => '081298765432',
@@ -316,16 +304,16 @@ class EmployeeImportErrorPriorityTest extends TestCase
         // Execute validation
         $result = app(ValidateImportBatchAction::class)->execute($batchId, null, null);
 
-        $this->assertSame(1, $result['valid_count']);
-        $this->assertSame(1, $result['error_count']);
+        $this->assertSame(0, $result['valid_count']);
+        $this->assertSame(2, $result['error_count']);
         $this->assertSame(0, $result['skip_count']);
-        $this->assertSame('valid', $result['results'][0]['status']);
+        $this->assertSame('error', $result['results'][0]['status']);
         $this->assertSame('error', $result['results'][1]['status']);
         $this->assertStringContainsString('baris 2', $result['results'][1]['errors']['Email Pegawai'][0]);
     }
 
     /**
-     * NIP database pada kemunculan pertama tetap skip, sementara email duplikat berikutnya error.
+     * NIP database dan email duplikat membuat kedua baris berstatus error.
      */
     public function test_nip_existing_with_later_duplicate_email_in_file_keeps_occurrence_semantics(): void
     {
@@ -361,8 +349,6 @@ class EmployeeImportErrorPriorityTest extends TestCase
                         'Jabatan' => 'Staf',
                         'Kelas Jabatan' => '5',
                         'Pendidikan Terakhir' => 'S1',
-                        'Prodi Pendidikan Terakhir' => 'Teknik Informatika',
-                        'Nomor Telepon' => '081234567890',
                         'Role' => 'pegawai',
                         'Prodi Pendidikan Terakhir' => 'Manajemen',
                         'Nomor Telepon' => '081234567890',
@@ -382,8 +368,6 @@ class EmployeeImportErrorPriorityTest extends TestCase
                         'Jabatan' => 'Staf Senior',
                         'Kelas Jabatan' => '6',
                         'Pendidikan Terakhir' => 'S2',
-                        'Prodi Pendidikan Terakhir' => 'Manajemen',
-                        'Nomor Telepon' => '081234567891',
                         'Role' => 'pegawai',
                         'Prodi Pendidikan Terakhir' => 'Teknik Informatika',
                         'Nomor Telepon' => '081298765432',
@@ -397,9 +381,9 @@ class EmployeeImportErrorPriorityTest extends TestCase
         // Execute validation
         $result = app(ValidateImportBatchAction::class)->execute($batchId, null, null);
 
-        $this->assertSame(1, $result['error_count']);
-        $this->assertSame(1, $result['skip_count']);
-        $this->assertSame('skip', $result['results'][0]['status']);
+        $this->assertSame(2, $result['error_count']);
+        $this->assertSame(0, $result['skip_count']);
+        $this->assertSame('error', $result['results'][0]['status']);
         $this->assertSame('error', $result['results'][1]['status']);
         $this->assertArrayHasKey('Email Pegawai', $result['results'][1]['errors']);
     }

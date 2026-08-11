@@ -225,6 +225,10 @@ class MigrationRollbackTest extends TestCase
             'is_active should exist after migration'
         );
 
+        // Migration yang bergantung pada notification channel harus telah di-rollback
+        // lebih dulu. Test ini hanya memverifikasi rollback fase satu dan kolom hierarchy.
+        Schema::dropIfExists('notification_event_channels');
+
         // Rollback the migration
         Artisan::call('migrate:rollback', [
             '--path' => 'database/migrations/2026_07_20_000000_complete_phase_one_reference_tables.php',
@@ -291,6 +295,9 @@ class MigrationRollbackTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        // Simulasikan urutan rollback yang benar: tabel anak channel dihapus lebih dulu.
+        Schema::dropIfExists('notification_event_channels');
 
         // Rollback the migration
         Artisan::call('migrate:rollback', [
