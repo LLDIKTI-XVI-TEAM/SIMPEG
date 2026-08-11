@@ -125,6 +125,41 @@ class CutiDetailTimelineTest extends TestCase
             ->assertDontSee("@click=\"open('reject', \$event)\"", false);
     }
 
+    /** Akun tanpa mapping pegawai tidak boleh cocok dengan snapshot approver kosong. */
+    public function test_user_without_employee_mapping_cannot_view_or_act_as_null_approver(): void
+    {
+        $jenis = RefJenisCuti::create([
+            'nama' => 'Cuti Snapshot Approver Kosong',
+            'code' => 'snapshot-approver-kosong',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+        $applicant = Employee::factory()->create();
+        $unmappedUser = User::factory()->kepalaBagian()->create(['employee_id' => null]);
+        $leaveRequest = LeaveRequest::create([
+            'employee_id' => $applicant->id,
+            'jenis_cuti_id' => $jenis->id,
+            'tanggal_mulai' => '2026-08-10',
+            'tanggal_selesai' => '2026-08-12',
+            'jumlah_hari_kerja' => 3,
+            'alasan' => 'Uji otorisasi fail-closed untuk approver kosong.',
+            'status' => 'menunggu_approval',
+        ]);
+        $leaveRequest->steps()->create([
+            'step_order' => 1,
+            'step_type' => 'kepala_bagian',
+            'role_label' => 'Kepala Bagian',
+            'approver_employee_id' => null,
+            'status' => 'active',
+            'is_final' => true,
+        ]);
+
+        $this->actingAs($unmappedUser)
+            ->get(route('cuti.show', $leaveRequest->id))
+            ->assertForbidden()
+            ->assertDontSee(route('cuti.approve', $leaveRequest->id), false);
+    }
+
     public function test_active_approver_actions_wrap_on_small_screens(): void
     {
         $jenis = RefJenisCuti::create([
