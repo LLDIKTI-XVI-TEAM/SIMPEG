@@ -65,7 +65,7 @@ class EmployeeImportTemplateTest extends TestCase
         $this->assertStringContainsString('spreadsheetml', (string) $res->headers->get('content-type'));
     }
 
-    public function test_utama_csv_header_minus_no_matches_canonical_and_contains_role(): void
+    public function test_utama_csv_header_minus_no_matches_canonical_without_role(): void
     {
         $this->actingAs(User::factory()->adminKepegawaian()->create());
 
@@ -75,7 +75,8 @@ class EmployeeImportTemplateTest extends TestCase
         [$header] = $this->csvRows($res->streamedContent());
 
         $this->assertSame(UploadImportBatchAction::TEMPLATE_HEADERS['utama'], array_slice($header, 1));
-        $this->assertContains('Role', $header);
+        // Role tidak boleh menjadi kolom template/import; penetapan role lewat Kelola Akses User.
+        $this->assertNotContains('Role', $header);
     }
 
     public function test_downloaded_utama_template_passes_importer_header_validation(): void
@@ -86,7 +87,7 @@ class EmployeeImportTemplateTest extends TestCase
 
         $result = (new EmployeeRowMapper)->validateHeaders($header);
 
-        // Inti perbaikan bug Role: tidak ada header wajib yang hilang.
+        // Template yang diunduh harus lolos validasi header importer tanpa ada yang hilang.
         $this->assertSame([], $result['missing']);
     }
 

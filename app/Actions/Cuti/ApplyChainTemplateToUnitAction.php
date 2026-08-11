@@ -7,6 +7,7 @@ use App\Models\LeaveApprovalChain;
 use App\Models\RefUnitKerja;
 use App\Models\User;
 use App\Services\AuditService;
+use App\Services\Cuti\ApprovalChainConfigurationLockService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Request;
@@ -50,7 +51,10 @@ class ApplyChainTemplateToUnitAction
             ->exists();
     }
 
-    public function __construct(private readonly SaveEmployeeApprovalChainAction $saveChain) {}
+    public function __construct(
+        private readonly SaveEmployeeApprovalChainAction $saveChain,
+        private readonly ApprovalChainConfigurationLockService $configurationLock,
+    ) {}
 
     /**
      * @return array{
@@ -76,6 +80,7 @@ class ApplyChainTemplateToUnitAction
         // penerapan bersamaan ke unit yang sama dapat memakai snapshot sumber usang sehingga hasilnya
         // tidak setara dengan eksekusi berurutan.
         return DB::transaction(function () use ($unitKerja, $sumber, $actor, $reason, $request): array {
+            $this->configurationLock->acquire();
             $this->lockUnit($unitKerja);
 
             $langkahSumber = $this->langkahSumber($sumber);
@@ -156,7 +161,9 @@ class ApplyChainTemplateToUnitAction
                     }
                 });
 
-            AuditService::logOrFail(
+            AuditService::logAsOrFail(
+                $actor->id,
+                $actor->name,
                 'CONFIG_UPDATE',
                 'RefUnitKerja',
                 $unitKerja->id,
