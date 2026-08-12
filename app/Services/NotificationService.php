@@ -62,6 +62,7 @@ class NotificationService
      * Pengiriman email hanya dilakukan ketika notifikasi pertama kali dibuat.
      *
      * @param  array<string, mixed>  $data
+     * @param  bool  $createIfMissing  Jika false, hanya perbarui notifikasi yang sudah ada.
      */
     public function upsertEwsReminder(
         Employee $employee,
@@ -70,6 +71,7 @@ class NotificationService
         string $title,
         string $body,
         array $data,
+        bool $createIfMissing = true,
     ): ?SimpegNotification {
         // Kebijakan channel dicek per event (fail-closed), bukan hanya channel global,
         // agar operator bisa mematikan reminder untuk satu jenis event EWS tanpa
@@ -119,6 +121,12 @@ class NotificationService
         // Jika tidak ada lagi notifikasi belum dibaca, acknowledgement mencegah
         // notifikasi baru dibuat ulang setelah pegawai membacanya.
         if ($alert->notification_acknowledged_at !== null) {
+            return null;
+        }
+
+        // Pegawai yang tidak memenuhi syarat tidak boleh menerima notifikasi baru,
+        // tetapi notifikasi belum dibaca yang sudah ada telah diselaraskan di atas.
+        if (! $createIfMissing) {
             return null;
         }
 

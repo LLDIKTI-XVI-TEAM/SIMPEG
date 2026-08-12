@@ -19,6 +19,12 @@ Schedule::command('cuti:rollover')
     ->yearlyOn(1, 1, '00:05')
     ->timezone(config('app.timezone'));
 
+// Reconciler bounded memulihkan claim import yang commit tetapi kehilangan publish queue.
+Schedule::command('import:recover-dispatches --limit=50')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(10)
+    ->timezone(config('app.timezone'));
+
 // Setelah jam konfigurasi tercapai, EWS diperiksa ulang setiap lima menit sampai
 // akhir hari. Waktu dibaca saat task dievaluasi agar perubahan konfigurasi
 // langsung berlaku pada scheduler worker yang berjalan terus-menerus.

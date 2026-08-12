@@ -660,6 +660,10 @@ class EmployeeApprovalChainConfigTest extends TestCase
 
     public function test_kegagalan_audit_global_pybmc_dipropagasikan_dan_rollback_seluruh_mutasi(): void
     {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Rollback trigger audit PYBMC global diverifikasi khusus pada PostgreSQL.');
+        }
+
         $actor = User::factory()->superAdmin()->create();
         $kepalaBagian = Employee::factory()->create();
         $pybmcLama = Employee::factory()->create();
@@ -836,6 +840,10 @@ class EmployeeApprovalChainConfigTest extends TestCase
 
     public function test_kegagalan_audit_membatalkan_penyimpanan_chain_pegawai(): void
     {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Rollback trigger audit rantai pegawai diverifikasi khusus pada PostgreSQL.');
+        }
+
         // Konfigurasi persetujuan tidak boleh berpindah tanpa jejak. Penulisan audit berada di dalam
         // transaksi penyimpanan, sehingga kegagalannya wajib menggagalkan penyimpanan rantai juga.
         // Test ini menjaga sifat itu agar penulisan audit tidak dipindahkan ke luar transaksi.

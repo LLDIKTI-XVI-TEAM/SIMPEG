@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\Admin\EmployeeImportController;
 use App\Http\Requests\Cuti\ApprovalChainConfigRequest;
 use App\Http\Requests\Cuti\ApproveLeaveRequest;
 use App\Http\Requests\Cuti\CalculateWorkdaysRequest;
@@ -18,7 +19,9 @@ use App\Http\Requests\History\StoreDisciplineRecordRequest;
 use App\Http\Requests\History\StoreKgbHistoryRequest;
 use App\Http\Requests\History\StorePositionHistoryRequest;
 use App\Http\Requests\History\StoreRankHistoryRequest;
+use App\Http\Requests\Import\ExecuteImportBatchRequest;
 use App\Http\Requests\Import\ImportEmployeesRequest;
+use App\Http\Requests\Import\ValidateImportBatchRequest;
 use Tests\TestCase;
 
 class FormRequestNamespaceTest extends TestCase
@@ -42,7 +45,9 @@ class FormRequestNamespaceTest extends TestCase
             StoreKgbHistoryRequest::class,
             StorePositionHistoryRequest::class,
             StoreRankHistoryRequest::class,
+            ExecuteImportBatchRequest::class,
             ImportEmployeesRequest::class,
+            ValidateImportBatchRequest::class,
         ] as $requestClass) {
             $this->assertTrue(class_exists($requestClass), "{$requestClass} harus berada di namespace domain.");
         }
@@ -53,5 +58,24 @@ class FormRequestNamespaceTest extends TestCase
         $flatRequestFiles = glob(app_path('Http/Requests/*.php')) ?: [];
 
         $this->assertSame([], $flatRequestFiles);
+    }
+
+    public function test_import_batch_mutations_receive_domain_form_requests(): void
+    {
+        $controller = new \ReflectionClass(EmployeeImportController::class);
+        $validateRequestType = $controller->getMethod('validate')->getParameters()[0]->getType();
+        $executeRequestType = $controller->getMethod('execute')->getParameters()[0]->getType();
+
+        $this->assertInstanceOf(\ReflectionNamedType::class, $validateRequestType);
+        $this->assertInstanceOf(\ReflectionNamedType::class, $executeRequestType);
+
+        $this->assertSame(
+            ValidateImportBatchRequest::class,
+            $validateRequestType->getName(),
+        );
+        $this->assertSame(
+            ExecuteImportBatchRequest::class,
+            $executeRequestType->getName(),
+        );
     }
 }
