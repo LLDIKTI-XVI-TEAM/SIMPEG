@@ -146,7 +146,25 @@ class ExecuteImportBatchAction
                                 throw $exception;
                             }
 
-                            $outcome = ['status' => 'skip', 'employee_id' => null];
+                            // PostgreSQL menandai transaksi semula gagal setelah constraint unik.
+                            // Simpan outcome SKIP dalam transaksi baru agar retry selalu memakai
+                            // hasil persisten, bukan menghitung ulang dari keberadaan NIP.
+                            $outcome = DB::transaction(function () use ($batchId, $rowKey): array {
+                                $lockedBatch = ImportBatch::query()->lockForUpdate()->findOrFail($batchId);
+                                $lockedExecutionState = $lockedBatch->execution_state ?? [];
+                                $lockedOutcomes = $lockedExecutionState['outcomes'] ?? [];
+
+                                if (isset($lockedOutcomes[$rowKey])) {
+                                    return $lockedOutcomes[$rowKey];
+                                }
+
+                                $outcome = ['status' => 'skip', 'employee_id' => null];
+                                $lockedOutcomes[$rowKey] = $outcome;
+                                $lockedExecutionState['outcomes'] = $lockedOutcomes;
+                                $this->checkpointRowOutcome($lockedBatch, $lockedExecutionState);
+
+                                return $outcome;
+                            });
                         }
 
                         $outcomes[$rowKey] = $outcome;
@@ -316,7 +334,7 @@ class ExecuteImportBatchAction
     /**
      * @return array{status: 'inserted'|'skip', employee_id: string|null}
      */
-    private function executeValidatedRow(string $type, array $data, array $nipsBeforeExecution): array
+    protected function executeValidatedRow(string $type, array $data, array $nipsBeforeExecution): array
     {
         if ($type === 'utama') {
             if (! empty($data['nip'])) {
@@ -376,7 +394,7 @@ class ExecuteImportBatchAction
     {
         $message = strtolower($exception->getMessage());
 
-        return in_array($exception->getCode(), ['23000', '23505'], true)
+        return in_array((string) $exception->getCode(), ['23000', '23505'], true)
             && (str_contains($message, 'employees.nip') || str_contains($message, 'employees_nip_unique'));
     }
 

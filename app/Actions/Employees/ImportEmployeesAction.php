@@ -22,14 +22,13 @@ class ImportEmployeesAction
     public function __construct(private readonly CsvEmployeeReader $reader) {}
 
     /**
-     * Mengimpor semua baris valid; K-US-02 melewati NIP yang sudah tersimpan,
-     * sedangkan error validasi lain tetap membatalkan import file.
+     * Endpoint kompatibilitas mempertahankan import atomik: setiap error
+     * validasi membatalkan seluruh berkas. Jalur SKIP K-US-02 tersedia pada
+     * wizard yang memiliki kontrak hasil per baris.
      *
      * @return array{
      *     message: string,
      *     inserted: int,
-     *     skipped: int,
-     *     skipped_rows: array<int, array{row: int, errors: array<string, array<int, string>>}>,
      *     failed: int,
      *     errors: array<int, array{row: int, errors: array<string, mixed>}>
      * }
@@ -45,7 +44,6 @@ class ImportEmployeesAction
         }
 
         $validatedRows = [];
-        $skippedRows = [];
         $errors = [];
         /** @var array<string, int> $seenNips */
         $seenNips = [];
@@ -55,7 +53,7 @@ class ImportEmployeesAction
         foreach ($rows as $row) {
             $validator = Validator::make(
                 $row['data'],
-                EmployeeValidationRules::import(allowExistingNip: true),
+                EmployeeValidationRules::import(),
                 [],
                 EmployeeValidationRules::attributes(),
             );
@@ -84,15 +82,6 @@ class ImportEmployeesAction
                 continue;
             }
 
-            if (! empty($data['nip']) && Employee::withTrashed()->where('nip', $data['nip'])->exists()) {
-                $skippedRows[] = [
-                    'row' => $row['row'],
-                    'errors' => ['NIP' => ['NIP sudah terdaftar di database.']],
-                ];
-
-                continue;
-            }
-
             $validatedRows[] = [
                 'row' => $row['row'],
                 'data' => $data,
@@ -103,23 +92,13 @@ class ImportEmployeesAction
             return $this->failedSummary($errors);
         }
 
-        [$insertedCount, $executionSkippedRows] = DB::transaction(function () use ($validatedRows): array {
+        $insertedCount = DB::transaction(function () use ($validatedRows): int {
             $aktifId = RefStatusPegawai::where('nama', 'Aktif')->value('id')
                 ?? RefStatusPegawai::where('is_default', true)->value('id');
             $insertedCount = 0;
-            $skippedRows = [];
 
             foreach ($validatedRows as $row) {
                 $data = $row['data'];
-                if (! empty($data['nip']) && Employee::withTrashed()->where('nip', $data['nip'])->exists()) {
-                    $skippedRows[] = [
-                        'row' => $row['row'],
-                        'errors' => ['NIP' => ['NIP sudah terdaftar di database.']],
-                    ];
-
-                    continue;
-                }
-
                 Employee::create($data + [
                     'status_pegawai_id' => $aktifId,
                     'status_aktif' => 'Aktif',
@@ -129,13 +108,11 @@ class ImportEmployeesAction
                 $insertedCount++;
             }
 
-            return [$insertedCount, $skippedRows];
+            return $insertedCount;
         });
-        $skippedRows = [...$skippedRows, ...$executionSkippedRows];
 
         AuditService::log('IMPORT', 'Employee', null, null, [
             'total_inserted' => $insertedCount,
-            'total_skipped' => count($skippedRows),
             'total_failed' => 0,
             'filename' => $request->file('file')->getClientOriginalName(),
         ], $request);
@@ -143,8 +120,6 @@ class ImportEmployeesAction
         return [
             'message' => 'Import selesai.',
             'inserted' => $insertedCount,
-            'skipped' => count($skippedRows),
-            'skipped_rows' => $skippedRows,
             'failed' => 0,
             'errors' => [],
         ];
@@ -230,8 +205,6 @@ class ImportEmployeesAction
      * @return array{
      *     message: string,
      *     inserted: int,
-     *     skipped: int,
-     *     skipped_rows: array<int, array{row: int, errors: array<string, array<int, string>>}>,
      *     failed: int,
      *     errors: array<int, array{row: int, errors: array<string, mixed>}>
      * }
@@ -241,8 +214,6 @@ class ImportEmployeesAction
         return [
             'message' => 'Import gagal. Perbaiki baris bermasalah lalu unggah ulang.',
             'inserted' => 0,
-            'skipped' => 0,
-            'skipped_rows' => [],
             'failed' => count($errors),
             'errors' => $errors,
         ];
