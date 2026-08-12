@@ -3,6 +3,7 @@
 namespace App\Actions\Employees;
 
 use App\Models\Employee;
+use App\Models\ImportBatch;
 use App\Models\RefJenisPegawai;
 use App\Models\User;
 use App\Support\EmployeeImport\EmployeeRowMapper;
@@ -32,6 +33,13 @@ class ValidateImportBatchAction
 
         if ($batch['user_id'] !== null && ($user === null || $batch['user_id'] !== $user->id)) {
             abort(403, 'Anda tidak memiliki akses ke batch import ini.');
+        }
+
+        $executionState = ImportBatch::find($batchId)?->execution_state;
+        if (is_array($executionState) && ($executionState['outcomes'] ?? []) !== []) {
+            throw ValidationException::withMessages([
+                'message' => ['Batch sudah mulai dieksekusi dan tidak dapat divalidasi ulang. Jalankan eksekusi ulang untuk melanjutkan batch ini.'],
+            ]);
         }
 
         if ($updatedRows !== null) {

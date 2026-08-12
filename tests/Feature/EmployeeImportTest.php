@@ -606,6 +606,36 @@ class EmployeeImportTest extends TestCase
         $this->assertSame(1, AuditLog::where('event', 'IMPORT')->count());
     }
 
+    public function test_import_wizard_rejects_revalidation_after_execution_has_checkpointed_rows(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile([$this->validRows()[0]]),
+        ]);
+        $batchId = $upload->json('batch_id');
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])->assertOk();
+
+        ImportBatch::create([
+            'id' => $batchId,
+            'user_id' => $user->id,
+            'filename' => 'pegawai.xlsx',
+            'type' => 'utama',
+            'status' => 'failed',
+            'execution_state' => [
+                'nips_before_execution' => [],
+                'outcomes' => [
+                    '2' => ['status' => 'inserted', 'employee_id' => 'employee-id'],
+                ],
+            ],
+        ]);
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.message.0', 'Batch sudah mulai dieksekusi dan tidak dapat divalidasi ulang. Jalankan eksekusi ulang untuk melanjutkan batch ini.');
+    }
+
     public function test_import_wizard_applies_saved_column_mapping_end_to_end(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
