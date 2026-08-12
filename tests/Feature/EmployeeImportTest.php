@@ -424,7 +424,6 @@ class EmployeeImportTest extends TestCase
     public function test_import_job_failure_does_not_overwrite_completed_batch(): void
     {
         $batch = ImportBatch::create([
-            'id' => 'completed-import-batch',
             'filename' => 'pegawai.xlsx',
             'type' => 'utama',
             'status' => 'completed',
