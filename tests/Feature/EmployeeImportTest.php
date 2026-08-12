@@ -363,6 +363,40 @@ class EmployeeImportTest extends TestCase
         ]);
     }
 
+    public function test_import_execute_keeps_completed_batch_when_sync_job_fails_after_import(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($this->validRows()),
+        ]);
+        $batchId = $upload->json('batch_id');
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])->assertOk();
+
+        /** @var Expectation $dispatchExpectation */
+        $dispatchExpectation = $this->mock(Dispatcher::class)->shouldReceive('dispatch');
+        $dispatchExpectation
+            ->once()
+            ->andReturnUsing(function () use ($batchId): never {
+                ImportBatch::whereKey($batchId)->update([
+                    'status' => 'completed',
+                    'finished_at' => now(),
+                ]);
+
+                throw new \RuntimeException('Notifikasi import gagal.');
+            });
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", [])
+            ->assertOk()
+            ->assertJsonPath('status', 'completed');
+
+        $this->assertDatabaseHas('import_batches', [
+            'id' => $batchId,
+            'status' => 'completed',
+        ]);
+    }
+
     public function test_import_job_does_not_notify_again_for_completed_batch(): void
     {
         $employee = Employee::factory()->create();

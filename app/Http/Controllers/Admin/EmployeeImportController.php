@@ -164,6 +164,18 @@ class EmployeeImportController extends Controller
                 $request->userAgent()
             );
         } catch (\Throwable $exception) {
+            $currentStatus = ImportBatch::find($batchId)?->status;
+            if ($currentStatus === 'completed') {
+                $completedBatch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId) ?? $batch;
+                $completedBatch['status'] = 'completed';
+                Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $completedBatch, now()->addMinutes(10));
+
+                return response()->json([
+                    'status' => 'completed',
+                    'message' => 'Import telah selesai; kegagalan terjadi setelah proses impor.',
+                ]);
+            }
+
             ImportBatch::whereKey($batchId)->update([
                 'status' => 'failed',
                 'error_message' => $exception->getMessage(),
