@@ -1031,7 +1031,8 @@ class EmployeeImportExecutionRaceTest extends TestCase
             'skipped_count' => 2,
             'failed_count' => 3,
             'processing_token' => $jobToken,
-            'lease_expires_at' => now()->addMinute(),
+            // Callback terminal hanya boleh mengklaim lease worker yang sudah kedaluwarsa.
+            'lease_expires_at' => now()->subSecond(),
         ]);
 
         $logSpy = Log::spy();

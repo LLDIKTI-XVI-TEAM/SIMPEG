@@ -75,7 +75,8 @@ class EmployeeImportReportTest extends TestCase
         $csv = $report->streamedContent();
         $this->assertStringContainsString('Laporan Hasil Import Pegawai', $csv);
         $this->assertStringContainsString('"Berhasil ditambahkan",1', $csv);
-        $this->assertStringContainsString('"Gagal validasi",1', $csv);  // Hanya 1 error
+        // Counter gagal mencakup error validasi maupun error yang baru muncul saat eksekusi.
+        $this->assertStringContainsString('Gagal,1', $csv);  // Hanya 1 error
         $this->assertStringContainsString('"Dilewati (NIP terdaftar)",1', $csv);  // 1 skip
         $this->assertStringContainsString('gagal', $csv);
         $this->assertStringContainsString('Joko Tidak Valid', $csv);  // Baris error

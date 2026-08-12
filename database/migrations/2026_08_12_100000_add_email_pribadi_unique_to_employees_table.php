@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\QueryException;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -17,28 +18,54 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Identitas ambigu harus dibersihkan oleh operator; migrasi tidak boleh menebak pemilik email.
-        $duplicates = DB::table('employees')
-            ->whereNotNull('email_pribadi')
-            ->selectRaw('LOWER(email_pribadi) as lower_email, COUNT(*) as duplicate_count')
-            ->groupByRaw('LOWER(email_pribadi)')
-            ->havingRaw('COUNT(*) > 1')
-            ->get();
+        DB::transaction(function (): void {
+            if (DB::connection()->getDriverName() === 'pgsql') {
+                // SHARE memblokir INSERT/UPDATE/DELETE sampai pemeriksaan dan DDL selesai.
+                DB::statement('LOCK TABLE employees IN SHARE MODE');
+            }
 
-        if ($duplicates->isNotEmpty()) {
-            $affectedEmployees = $duplicates->sum(
-                static fn (object $duplicate): int => (int) $duplicate->duplicate_count,
-            );
+            // Identitas ambigu harus dibersihkan oleh operator; migrasi tidak boleh menebak pemilik email.
+            $duplicates = DB::table('employees')
+                ->whereNotNull('email_pribadi')
+                ->selectRaw('LOWER(email_pribadi) as lower_email, COUNT(*) as duplicate_count')
+                ->groupByRaw('LOWER(email_pribadi)')
+                ->havingRaw('COUNT(*) > 1')
+                ->get();
 
-            throw new RuntimeException(
-                "Ditemukan {$duplicates->count()} kelompok email_pribadi duplikat yang mencakup "
-                ."{$affectedEmployees} pegawai. Bersihkan duplikat secara eksplisit sebelum menjalankan migrasi kembali.",
-            );
+            if ($duplicates->isNotEmpty()) {
+                $affectedEmployees = $duplicates->sum(
+                    static fn (object $duplicate): int => (int) $duplicate->duplicate_count,
+                );
+
+                throw new RuntimeException(
+                    "Ditemukan {$duplicates->count()} kelompok email_pribadi duplikat yang mencakup "
+                    ."{$affectedEmployees} pegawai. Bersihkan duplikat secara eksplisit sebelum menjalankan migrasi kembali.",
+                );
+            }
+
+            try {
+                DB::statement(
+                    'CREATE UNIQUE INDEX employees_email_pribadi_unique '
+                    .'ON employees (LOWER(email_pribadi)) WHERE email_pribadi IS NOT NULL',
+                );
+            } catch (QueryException $exception) {
+                $this->rethrowIndexCreationFailure($exception);
+            }
+        });
+    }
+
+    /** Putuskan exception chain hanya untuk pelanggaran unique yang dapat memuat email pegawai. */
+    private function rethrowIndexCreationFailure(QueryException $exception): never
+    {
+        $sqlState = (string) ($exception->errorInfo[0] ?? $exception->getPrevious()?->getCode() ?? '');
+
+        if ($sqlState !== '23505') {
+            throw $exception;
         }
 
-        DB::statement(
-            'CREATE UNIQUE INDEX employees_email_pribadi_unique '
-            .'ON employees (LOWER(email_pribadi)) WHERE email_pribadi IS NOT NULL',
+        throw new RuntimeException(
+            'Indeks email_pribadi tidak dapat dibuat karena masih ada identitas duplikat. '
+            .'Bersihkan duplikat secara eksplisit sebelum menjalankan migrasi kembali.',
         );
     }
 
