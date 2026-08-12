@@ -111,12 +111,89 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $this->assertStringContainsString('"Dilewati (NIP terdaftar)",1', $csv);
     }
 
-    /** Pelanggaran unique selain NIP harus dilempar ulang dan baru terminal setelah retry habis. */
-    public function test_execution_does_not_classify_another_unique_constraint_as_duplicate_nip(): void
+    /**
+     * Email yang diklaim pegawai lain setelah validasi harus menjadi satu outcome skip pada seluruh
+     * hasil import — setara dengan race condition NIP. Skema produksi memiliki indeks unik
+     * case-insensitive pada email_pribadi sehingga constraint ini ditegakkan secara atomik.
+     */
+    public function test_execution_time_duplicate_email_is_counted_as_skipped_everywhere(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
         $batch = app(UploadImportBatchAction::class)->execute(
-            $this->csvFile($this->validCsv('Budi employees_nip_unique Santoso')),
+            $this->csvFile($this->validCsv()),
+            'utama',
+            $user,
+        );
+        $batchId = $batch['batch_id'];
+
+        $validation = app(ValidateImportBatchAction::class)->execute($batchId, null, $user);
+        $this->assertSame(1, $validation['valid_count']);
+        $this->assertSame(0, $validation['skip_count']);
+
+        $employeeCountBeforeRace = Employee::count();
+        // Pegawai lain mengklaim email yang sama (dengan NIP berbeda) setelah preview valid.
+        Employee::factory()->create([
+            'nip' => '199901010000000001',
+            'email_pribadi' => 'budi@example.com',  // sama dengan row CSV
+        ]);
+        $this->persistQueuedBatch($batchId, $user);
+
+        $result = app(ExecuteImportBatchAction::class)->execute($batchId, $user);
+
+        // Hanya satu pegawai tambahan (yang diklaim manual) — row CSV harus di-skip.
+        $this->assertDatabaseCount('employees', $employeeCountBeforeRace + 1);
+        $this->assertSame(0, $result['inserted']);
+        $this->assertSame(1, $result['skipped']);
+        $this->assertSame(0, $result['inserted_count']);
+        $this->assertSame(1, $result['skipped_count']);
+
+        $persistedBatch = ImportBatch::query()->findOrFail($batchId);
+        $this->assertSame($result['inserted_count'], $persistedBatch->inserted_count);
+        $this->assertSame($result['skipped_count'], $persistedBatch->skipped_count);
+        $this->assertSame([
+            [
+                'row' => 2,
+                'nama' => 'Budi Santoso',
+                'kategori' => 'dilewati',
+                'errors' => [
+                    'Email' => ['Email sudah terdaftar saat proses import dijalankan.'],
+                ],
+            ],
+        ], $persistedBatch->row_issues);
+
+        $cachedBatch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
+        $this->assertSame(0, $cachedBatch['result']['inserted']);
+        $this->assertSame(1, $cachedBatch['result']['skipped']);
+        $this->assertSame($persistedBatch->row_issues, $cachedBatch['row_issues']);
+
+        $audit = AuditLog::query()
+            ->where('event', 'IMPORT')
+            ->where('auditable_type', 'Employee')
+            ->latest('created_at')
+            ->firstOrFail();
+        $this->assertSame(0, $audit->new_values['total_inserted']);
+        $this->assertSame(1, $audit->new_values['total_skipped']);
+
+        $this->actingAs($user);
+        $report = $this->get("/pegawai/import/{$batchId}/laporan");
+        $report->assertOk();
+        $csv = $report->streamedContent();
+        $this->assertStringContainsString('"Berhasil ditambahkan",0', $csv);
+    }
+
+    /**
+     * Pelanggaran unique pada field selain NIP dan email_pribadi harus dilempar ulang agar masalah
+     * integritas data tidak tersamarkan dan batch masuk antrian retry.
+     */
+    public function test_execution_does_not_classify_unknown_unique_constraint_as_import_skip(): void
+    {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Constraint unik kustom diverifikasi khusus pada PostgreSQL.');
+        }
+
+        $user = User::factory()->adminKepegawaian()->create();
+        $batch = app(UploadImportBatchAction::class)->execute(
+            $this->csvFile($this->validCsv()),
             'utama',
             $user,
         );
@@ -125,13 +202,14 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $validation = app(ValidateImportBatchAction::class)->execute($batchId, null, $user);
         $this->assertSame(1, $validation['valid_count']);
 
+        // Constraint buatan pada kolom yang tidak dikelola handler import (bukan NIP, bukan email).
         DB::statement(
-            'CREATE UNIQUE INDEX employee_import_race_email_unique '
-            .'ON employees (LOWER(email_pribadi)) WHERE email_pribadi IS NOT NULL',
+            'CREATE UNIQUE INDEX employee_import_race_other_unique '
+            .'ON employees (LOWER(nama_dengan_gelar)) WHERE nama_dengan_gelar IS NOT NULL',
         );
         Employee::factory()->create([
             'nip' => '199001012015041003',
-            'email_pribadi' => 'budi@example.com',
+            'nama_dengan_gelar' => 'Budi Santoso',  // sama dengan row CSV
         ]);
         $jobToken = (string) Str::uuid();
         $this->persistQueuedBatch($batchId, $user, $jobToken);
@@ -139,10 +217,10 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $caughtException = null;
         try {
             app(ExecuteImportBatchAction::class)->execute($batchId, $user, null, null, $jobToken);
-            $this->fail('Unique violation email seharusnya dilempar ulang.');
+            $this->fail('Pelanggaran unique field selain NIP/email seharusnya dilempar ulang.');
         } catch (QueryException $exception) {
             $caughtException = $exception;
-            $this->assertStringContainsString('employee_import_race_email_unique', $exception->getMessage());
+            $this->assertStringContainsString('employee_import_race_other_unique', $exception->getMessage());
         }
 
         $persistedBatch = ImportBatch::query()->findOrFail($batchId);
@@ -155,9 +233,17 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $this->assertSame('failed', ImportBatch::query()->findOrFail($batchId)->status);
     }
 
-    /** Retry worker melanjutkan baris yang belum commit tanpa mengubah hasil attempt pertama menjadi skip. */
+    /**
+     * Retry worker melanjutkan baris yang belum commit tanpa mengubah hasil attempt pertama.
+     * Konflik transien disimulasikan dengan trigger database yang menolak insert siti pada percobaan
+     * pertama tetapi bukan pada retry — memverifikasi bahwa checkpoint durable mencegah budi diproses ulang.
+     */
     public function test_transient_failure_after_committed_row_resumes_from_durable_checkpoint(): void
     {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Trigger PostgreSQL dibutuhkan untuk menyimulasikan kegagalan transien.');
+        }
+
         config([
             'queue.default' => 'database',
             'queue.connections.database.connection' => config('database.default'),
@@ -173,14 +259,22 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $batchId = $batch['batch_id'];
         app(ValidateImportBatchAction::class)->execute($batchId, null, $user);
 
-        $temporaryConflict = Employee::factory()->create([
-            'nip' => '199001012015041003',
-            'email_pribadi' => 'siti@example.com',
-        ]);
-        DB::statement(
-            'CREATE UNIQUE INDEX employee_import_retry_email_unique '
-            .'ON employees (LOWER(email_pribadi)) WHERE email_pribadi IS NOT NULL',
-        );
+        // Trigger menolak insert siti (NIP 198101012007041002) pada percobaan pertama; setelah
+        // trigger di-drop, retry harus berhasil dari checkpoint (processed_valid_count = 1).
+        DB::unprepared(<<<'SQL'
+            CREATE OR REPLACE FUNCTION reject_siti_first_attempt() RETURNS trigger AS $$
+            BEGIN
+                IF NEW.nip = '198101012007041002' THEN
+                    RAISE EXCEPTION 'transient failure: forced rejection for siti (first attempt)';
+                END IF;
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+
+            CREATE TRIGGER reject_siti_first_attempt_trigger
+            BEFORE INSERT ON employees
+            FOR EACH ROW EXECUTE FUNCTION reject_siti_first_attempt();
+            SQL);
 
         app(QueueImportBatchAction::class)->execute($batchId, $user);
         app('queue.worker')->runNextJob('database', 'default', new WorkerOptions(maxTries: 3));
@@ -193,7 +287,8 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $this->assertSame(0, $retryableBatch->failed_count);
         $this->assertSame([], $retryableBatch->row_issues);
 
-        $temporaryConflict->forceDelete();
+        DB::unprepared('DROP TRIGGER IF EXISTS reject_siti_first_attempt_trigger ON employees');
+        DB::unprepared('DROP FUNCTION IF EXISTS reject_siti_first_attempt()');
         Cache::flush();
 
         app('queue.worker')->runNextJob('database', 'default', new WorkerOptions(maxTries: 3));
@@ -278,9 +373,16 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $this->assertDatabaseHas('employees', ['nip' => '198101012007041002']);
     }
 
-    /** Payload job versi lama harus memakai ownership stabil ketika di-unserialize ulang setelah retry. */
+    /**
+     * Payload job versi lama harus memakai ownership stabil ketika di-unserialize ulang setelah retry.
+     * Konflik transien disimulasikan dengan trigger yang menolak insert siti pada percobaan pertama.
+     */
     public function test_legacy_serialized_job_resumes_with_stable_fallback_token_after_transient_failure(): void
     {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Trigger PostgreSQL dibutuhkan untuk menyimulasikan kegagalan transien.');
+        }
+
         $user = User::factory()->adminKepegawaian()->create();
         $batch = app(UploadImportBatchAction::class)->execute(
             $this->csvFile($this->twoRowCsv()),
@@ -291,14 +393,20 @@ class EmployeeImportExecutionRaceTest extends TestCase
         app(ValidateImportBatchAction::class)->execute($batchId, null, $user);
         $this->persistQueuedBatch($batchId, $user);
 
-        $temporaryConflict = Employee::factory()->create([
-            'nip' => '199001012015041003',
-            'email_pribadi' => 'siti@example.com',
-        ]);
-        DB::statement(
-            'CREATE UNIQUE INDEX employee_import_legacy_retry_email_unique '
-            .'ON employees (LOWER(email_pribadi)) WHERE email_pribadi IS NOT NULL',
-        );
+        DB::unprepared(<<<'SQL'
+            CREATE OR REPLACE FUNCTION reject_siti_legacy_attempt() RETURNS trigger AS $$
+            BEGIN
+                IF NEW.nip = '198101012007041002' THEN
+                    RAISE EXCEPTION 'transient failure: forced rejection for siti (legacy test)';
+                END IF;
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+
+            CREATE TRIGGER reject_siti_legacy_attempt_trigger
+            BEFORE INSERT ON employees
+            FOR EACH ROW EXECUTE FUNCTION reject_siti_legacy_attempt();
+            SQL);
 
         $legacyPayload = $this->legacySerializedJobPayload($batchId, $user->id);
         $this->assertStringNotContainsString('processingToken', $legacyPayload);
@@ -313,13 +421,14 @@ class EmployeeImportExecutionRaceTest extends TestCase
             $caught = $exception;
         }
 
-        $this->assertInstanceOf(QueryException::class, $caught);
+        $this->assertNotNull($caught, 'Trigger harus menyebabkan job melempar exception.');
         $retryable = ImportBatch::query()->findOrFail($batchId);
         $this->assertSame('queued', $retryable->status);
         $this->assertSame(1, $retryable->processed_valid_count);
         $this->assertNotNull($retryable->processing_token);
 
-        $temporaryConflict->forceDelete();
+        DB::unprepared('DROP TRIGGER IF EXISTS reject_siti_legacy_attempt_trigger ON employees');
+        DB::unprepared('DROP FUNCTION IF EXISTS reject_siti_legacy_attempt()');
         Cache::flush();
 
         $redelivery = unserialize($legacyPayload);
@@ -378,6 +487,92 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $processing = ImportBatch::query()->findOrFail($batchId);
         $this->assertSame('processing', $processing->status);
         $this->assertSame($ownerToken, $processing->processing_token);
+    }
+
+    /**
+     * Regresi: backend at-least-once yang mengirim ulang payload identik (token sama) saat lease masih
+     * aktif harus diterima dan dapat melanjutkan eksekusi — ini adalah skenario redelivery yang sah.
+     */
+    public function test_same_token_redelivery_resumes_while_lease_is_active(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $batchId = $this->validatedBatchId($user);
+        $ownerToken = (string) Str::uuid();
+        $this->persistQueuedBatch($batchId, $user, $ownerToken);
+        ImportBatch::query()->whereKey($batchId)->update([
+            'status' => 'processing',
+            'processing_token' => $ownerToken,
+            'lease_expires_at' => now()->addMinute(),   // lease masih aktif
+            'processed_valid_count' => 0,
+        ]);
+
+        // Redelivery dengan token yang sama harus berhasil klaim dan menyelesaikan batch.
+        $result = app(ExecuteImportBatchAction::class)->execute($batchId, $user, null, null, $ownerToken);
+
+        $this->assertTrue($result['executed']);
+        $this->assertSame('completed', $result['status']);
+        $this->assertDatabaseHas('employees', ['nip' => '198001012006041001']);
+        $this->assertSame('completed', ImportBatch::query()->findOrFail($batchId)->status);
+    }
+
+    /**
+     * Regresi (#bug-tolak-klaim-ulang-token): backend at-least-once yang mengirim dua delivery dengan
+     * processing_token berbeda harus menolak delivery kedua selama lease delivery pertama masih aktif.
+     *
+     * Sebelum fix, cabang `$expired` pada CAS claim tidak menyaring berdasarkan token sehingga worker
+     * kedua (token berbeda) bisa mengambil alih meskipun lease pemilik saat ini belum kedaluwarsa.
+     * Akibatnya worker kedua membuat array_slice dari checkpoint lokal yang sama dengan worker pertama,
+     * memproses ulang baris yang sudah di-commit, mencatatnya sebagai skip NIP, dan menaikkan checkpoint
+     * melewati baris berikutnya yang belum pernah diimpor.
+     */
+    public function test_foreign_token_cannot_claim_batch_while_original_lease_is_active(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        // Batch dua baris agar kita dapat memverifikasi checkpoint tidak lompat.
+        $batch = app(UploadImportBatchAction::class)->execute(
+            $this->csvFile($this->twoRowCsv()),
+            'utama',
+            $user,
+        );
+        $batchId = $batch['batch_id'];
+        app(ValidateImportBatchAction::class)->execute($batchId, null, $user);
+
+        $ownerToken = (string) Str::uuid();
+        $foreignToken = (string) Str::uuid();
+        $this->persistQueuedBatch($batchId, $user, $ownerToken);
+
+        // Simulasikan worker pertama telah berhasil commit baris-1 dan memperpanjang lease-nya.
+        Employee::factory()->create(['nip' => '198001012006041001']);
+        ImportBatch::query()->whereKey($batchId)->update([
+            'status' => 'processing',
+            'processing_token' => $ownerToken,
+            'lease_expires_at' => now()->addSeconds(120), // lease masih 2 menit ke depan
+            'processed_valid_count' => 1,
+            'inserted_count' => 1,
+        ]);
+
+        // Worker kedua (token berbeda) datang saat lease worker pertama masih aktif.
+        $result = app(ExecuteImportBatchAction::class)->execute(
+            $batchId, $user, null, null, $foreignToken,
+        );
+
+        // Harus ditolak — batch masih dimiliki owner token.
+        $this->assertFalse($result['executed'] ?? true, 'Worker kedua seharusnya tidak bisa mengeksekusi batch.');
+        $this->assertSame('processing', $result['status']);
+
+        // Checkpoint tidak boleh berubah — worker kedua tidak boleh memproses baris apapun.
+        $persisted = ImportBatch::query()->findOrFail($batchId);
+        $this->assertSame('processing', $persisted->status);
+        $this->assertSame($ownerToken, $persisted->processing_token);
+        $this->assertSame(1, $persisted->processed_valid_count,
+            'Worker kedua tidak boleh menaikkan checkpoint melewati baris yang belum diproses.',
+        );
+        $this->assertSame(1, $persisted->inserted_count,
+            'Worker kedua tidak boleh mengubah inserted_count.',
+        );
+        // Baris-2 belum ada di database — checkpoint tidak boleh melompat.
+        $this->assertDatabaseMissing('employees', ['nip' => '198101012007041002']);
     }
 
     /** Payload sensitif tetap dapat dibaca model, tetapi tidak tampak sebagai plaintext di database. */

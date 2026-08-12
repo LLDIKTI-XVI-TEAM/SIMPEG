@@ -18,7 +18,11 @@ use Illuminate\Validation\ValidationException;
 
 class ExecuteImportBatchAction
 {
-    /** Lease berakhir sebelum pesan boleh dikirim ulang oleh semua backend queue yang didukung. */
+    /**
+     * Lease berakhir sebelum pesan boleh dikirim ulang oleh semua backend queue yang didukung.
+     * Nilai ini harus lebih kecil dari `retry_after` koneksi queue agar worker aktif tidak
+     * kehilangan kepemilikan selama eksekusi normal berjalan.
+     */
     private const LEASE_SECONDS = 150;
 
     public function __construct(private readonly TmtCalculatorService $tmtCalculator) {}
@@ -84,8 +88,13 @@ class ExecuteImportBatchAction
                         $owned->where('status', 'processing')
                             ->where('processing_token', $attemptToken);
                     })
-                    ->orWhere(function ($expired): void {
+                    // Worker baru dengan token berbeda hanya boleh mengambil alih jika lease pemilik
+                    // saat ini sudah kedaluwarsa. Tanpa syarat `processing_token != $attemptToken`,
+                    // cabang ini akan mencocokan batch yang sedang dimiliki token asing aktif (race
+                    // condition pada backend at-least-once dengan redelivery payload identik).
+                    ->orWhere(function ($expired) use ($attemptToken): void {
                         $expired->where('status', 'processing')
+                            ->where('processing_token', '!=', $attemptToken)
                             ->whereNotNull('lease_expires_at')
                             ->where('lease_expires_at', '<=', now());
                     });
@@ -380,6 +389,11 @@ class ExecuteImportBatchAction
      *
      * @param  array<string, mixed>  $row
      * @return array{status: 'inserted', employee_id: string}|array{status: 'skipped', issue?: array<string, mixed>}
+     *
+     * Selain NIP, keunikan email_pribadi juga diperiksa secara atomik karena skema produksi
+     * memiliki indeks unik case-insensitive pada kolom tersebut. Race antara validasi dan
+     * eksekusi (pegawai lain mendaftar email yang sama setelah preview valid) diklasifikasikan
+     * sebagai skip agar counter dan laporan tetap konsisten.
      */
     private function executeValidatedRow(string $type, array $row): array
     {
@@ -392,9 +406,17 @@ class ExecuteImportBatchAction
                 $data['nama_lengkap'] = $data['nama_dengan_gelar'];
             }
 
-            // Validasi dan eksekusi terpisah waktu; NIP dapat muncul setelah preview dinyatakan valid.
+            // Validasi dan eksekusi terpisah waktu; NIP dan email dapat diklaim pegawai lain
+            // setelah preview dinyatakan valid. Pre-check atomik mencegah insert yang tidak perlu
+            // sebelum constraint database melempar QueryException.
             if (! empty($data['nip']) && Employee::where('nip', $data['nip'])->exists()) {
                 return $this->duplicateNipOutcome($row);
+            }
+
+            if (! empty($data['email_pribadi'])
+                && Employee::whereRaw('LOWER(email_pribadi) = ?', [strtolower((string) $data['email_pribadi'])])->exists()
+            ) {
+                return $this->duplicateEmailOutcome($row);
             }
 
             $aktifId = RefStatusPegawai::where('nama', 'Aktif')->value('id')
@@ -414,13 +436,18 @@ class ExecuteImportBatchAction
                     $this->tmtCalculator->recordImportedPensionDate($employee);
                 }
             } catch (QueryException $exception) {
-                // Hanya tabrakan constraint NIP yang merupakan outcome skip; pelanggaran lain
-                // harus tetap gagal agar masalah integritas data tidak tersamarkan.
-                if (! $this->isDuplicateNipViolation($exception)) {
-                    throw $exception;
+                // Hanya tabrakan constraint NIP atau email_pribadi yang merupakan outcome skip;
+                // pelanggaran constraint lain harus tetap dilempar agar masalah integritas data
+                // tidak tersamarkan dan batch masuk antrian retry.
+                if ($this->isDuplicateNipViolation($exception)) {
+                    return $this->duplicateNipOutcome($row);
                 }
 
-                return $this->duplicateNipOutcome($row);
+                if ($this->isDuplicateEmailViolation($exception)) {
+                    return $this->duplicateEmailOutcome($row);
+                }
+
+                throw $exception;
             }
 
             return ['status' => 'inserted', 'employee_id' => $employee->id];
@@ -462,6 +489,44 @@ class ExecuteImportBatchAction
 
         return $sqlState === '23000'
             && preg_match('/unique constraint failed:\s*employees\.nip\b/i', $driverDiagnostic) === 1;
+    }
+
+    /**
+     * Memastikan unique violation berasal dari constraint email_pribadi (functional index
+     * case-insensitive), bukan dari constraint lain yang mungkin ada di tabel pegawai.
+     */
+    private function isDuplicateEmailViolation(QueryException $exception): bool
+    {
+        $sqlState = (string) ($exception->errorInfo[0] ?? $exception->getCode());
+        $driverDiagnostic = (string) ($exception->errorInfo[2] ?? '');
+
+        if ($sqlState === '23505') {
+            preg_match('/unique constraint ["\']([^"\']+)["\']/i', $driverDiagnostic, $matches);
+
+            return ($matches[1] ?? null) === 'employees_email_pribadi_unique';
+        }
+
+        return $sqlState === '23000'
+            && preg_match('/unique constraint failed:\s*employees\.email_pribadi\b/i', $driverDiagnostic) === 1;
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return array{status: 'skipped', issue: array<string, mixed>}
+     */
+    private function duplicateEmailOutcome(array $row): array
+    {
+        return [
+            'status' => 'skipped',
+            'issue' => [
+                'row' => $row['row'] ?? null,
+                'nama' => $row['nama'] ?? '-',
+                'kategori' => 'dilewati',
+                'errors' => [
+                    'Email' => ['Email sudah terdaftar saat proses import dijalankan.'],
+                ],
+            ],
+        ];
     }
 
     private function cleanupBatch(string $batchId, string $filename): void
