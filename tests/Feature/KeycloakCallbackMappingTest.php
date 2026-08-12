@@ -466,6 +466,121 @@ class KeycloakCallbackMappingTest extends TestCase
         User::factory()->create(['employee_id' => $employee->id]);
     }
 
+    // ─── Email Pribadi Sync Tests ─────────────────────────────────────────────
+
+    public function test_login_keycloak_syncs_verified_email_to_employee_email_pribadi(): void
+    {
+        $employee = Employee::factory()->create([
+            'email_pribadi' => 'lama@example.com',
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-sync-email',
+            'nickname' => 'budi-sync',
+            'name' => 'Budi Sync',
+            'email' => 'baru@example.com',
+            'raw' => ['email' => 'baru@example.com', 'email_verified' => true, 'preferred_username' => 'budi-sync'],
+        ]);
+
+        // Buat user yang sudah terhubung ke employee via keycloak_id
+        User::factory()->create([
+            'email' => 'lama@example.com',
+            'keycloak_id' => 'kc-sync-email',
+            'employee_id' => $employee->id,
+        ]);
+
+        $this->get('/auth/keycloak/callback')->assertRedirect(route('dashboard'));
+
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'email_pribadi' => 'baru@example.com',
+        ]);
+    }
+
+    public function test_first_time_login_also_syncs_verified_email_to_employee_email_pribadi(): void
+    {
+        $employee = Employee::factory()->create([
+            'email_pribadi' => 'siti@example.com',
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-siti-sync',
+            'nickname' => 'siti-sync',
+            'name' => 'Siti Sync',
+            'email' => 'siti@example.com',
+            'raw' => ['email' => 'siti@example.com', 'email_verified' => true, 'preferred_username' => 'siti-sync'],
+        ]);
+
+        $this->get('/auth/keycloak/callback')->assertRedirect(route('dashboard'));
+
+        // email_pribadi tidak berubah karena sudah sama
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'email_pribadi' => 'siti@example.com',
+        ]);
+    }
+
+    public function test_email_pribadi_is_not_updated_when_keycloak_email_matches_existing(): void
+    {
+        $employee = Employee::factory()->create([
+            'email_pribadi' => 'sama@example.com',
+        ]);
+
+        $user = User::factory()->create([
+            'email' => 'sama@example.com',
+            'keycloak_id' => 'kc-sama',
+            'employee_id' => $employee->id,
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-sama',
+            'nickname' => 'sama',
+            'name' => 'Sama',
+            'email' => 'sama@example.com',
+            'raw' => ['email' => 'sama@example.com', 'email_verified' => true, 'preferred_username' => 'sama'],
+        ]);
+
+        $before = $employee->fresh()->updated_at;
+
+        $this->get('/auth/keycloak/callback')->assertRedirect(route('dashboard'));
+
+        // updated_at employees tidak berubah karena saveQuietly tidak dipanggil
+        $this->assertEquals($before, $employee->fresh()->updated_at);
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'email_pribadi' => 'sama@example.com',
+        ]);
+    }
+
+    public function test_unverified_keycloak_email_does_not_update_employee_email_pribadi(): void
+    {
+        $employee = Employee::factory()->create([
+            'email_pribadi' => 'asli@example.com',
+        ]);
+
+        $user = User::factory()->create([
+            'email' => 'asli@example.com',
+            'keycloak_id' => 'kc-unverified-sync',
+            'employee_id' => $employee->id,
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-unverified-sync',
+            'nickname' => 'unverified-sync',
+            'name' => 'Unverified',
+            'email' => 'palsu@example.com',
+            'raw' => ['email' => 'palsu@example.com', 'email_verified' => false, 'preferred_username' => 'unverified-sync'],
+        ]);
+
+        $this->get('/auth/keycloak/callback')->assertRedirect(route('dashboard'));
+
+        // email_pribadi tidak berubah karena email tidak terverifikasi
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'email_pribadi' => 'asli@example.com',
+        ]);
+    }
+
     /**
      * Stub Socialite supaya test fokus ke keputusan mapping SIMPEG, bukan jaringan Keycloak.
      */

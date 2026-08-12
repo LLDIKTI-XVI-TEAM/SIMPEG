@@ -46,7 +46,9 @@ class HandleKeycloakCallbackAction
         $existingUser = User::where('keycloak_id', $keycloakId)->first();
 
         if ($existingUser) {
-            return $this->loginMappedUser($existingUser, $keycloakId, $username, $keycloakUser->getName(), $request);
+            $verifiedEmailForExisting = $this->verifiedEmailClaim($keycloakUser);
+
+            return $this->loginMappedUser($existingUser, $keycloakId, $username, $keycloakUser->getName(), $request, $verifiedEmailForExisting);
         }
 
         // Pegawai asli wajib cocok ke data employees; akun tanpa email hanya boleh lewat whitelist user lokal.
@@ -105,7 +107,7 @@ class HandleKeycloakCallbackAction
                 $user->password = Str::random(48);
             }
 
-            return $this->loginMappedUser($user, $keycloakId, $username, $keycloakUser->getName(), $request);
+            return $this->loginMappedUser($user, $keycloakId, $username, $keycloakUser->getName(), $request, $matchedEmail);
         }
 
         // Akun development seperti demo-klabat harus sudah dibuat di SIMPEG, tidak dibuat otomatis dari Keycloak.
@@ -122,7 +124,7 @@ class HandleKeycloakCallbackAction
         return $this->loginMappedUser($devUser, $keycloakId, $username, $keycloakUser->getName(), $request);
     }
 
-    private function loginMappedUser(User $user, string $keycloakId, ?string $username, ?string $name, Request $request): RedirectResponse
+    private function loginMappedUser(User $user, string $keycloakId, ?string $username, ?string $name, Request $request, ?string $verifiedEmail = null): RedirectResponse
     {
         $user->fill([
             'name' => $name ?: $user->name,
@@ -132,6 +134,17 @@ class HandleKeycloakCallbackAction
         ]);
 
         $user->save();
+
+        // Sync email Keycloak yang sudah diverifikasi ke kolom email_pribadi pegawai,
+        // agar email yang dipakai SSO selalu konsisten dengan data kepegawaian.
+        if ($verifiedEmail && $user->employee_id) {
+            $employee = Employee::find($user->employee_id);
+
+            if ($employee && strtolower(trim((string) $employee->getRawOriginal('email_pribadi'))) !== $verifiedEmail) {
+                $employee->email_pribadi = $verifiedEmail;
+                $employee->saveQuietly();
+            }
+        }
 
         Auth::login($user);
         $request->session()->regenerate();
