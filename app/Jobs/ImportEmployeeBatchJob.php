@@ -37,6 +37,9 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue, ShouldQueue
     /** Token ini ikut diserialisasi bersama job agar seluruh redelivery memiliki ownership yang sama. */
     protected ?string $processingToken = null;
 
+    /** Fallback per instance membedakan job hasil publish ulang saat backend tidak memberi id pesan. */
+    protected ?string $deliveryInstanceId = null;
+
     /**
      * Create a new job instance.
      */
@@ -46,8 +49,10 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue, ShouldQueue
         protected ?string $ipAddress = null,
         protected ?string $userAgent = null,
         ?string $processingToken = null,
+        ?string $deliveryInstanceId = null,
     ) {
         $this->processingToken = $processingToken ?? (string) Str::uuid();
+        $this->deliveryInstanceId = $deliveryInstanceId ?? (string) Str::uuid();
     }
 
     /**
@@ -62,6 +67,8 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue, ShouldQueue
             $this->ipAddress,
             $this->userAgent,
             $this->processingToken(),
+            $this->deliveryAttempt(),
+            $this->deliveryId(),
         );
 
         if (($result['executed'] ?? false) !== true && in_array($result['status'] ?? null, ['queued', 'processing'], true)) {
@@ -89,12 +96,30 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue, ShouldQueue
         $user = $this->userId ? User::find($this->userId) : null;
         $isLegacyPayload = ! isset($this->processingToken);
         $processingToken = $this->processingToken();
-        $transitioned = DB::transaction(function () use ($user, $isLegacyPayload, $processingToken): bool {
+        $processingDeliveryId = $this->deliveryId();
+        $processingAttempt = $this->deliveryAttempt();
+        $transitioned = DB::transaction(function () use (
+            $user,
+            $isLegacyPayload,
+            $processingToken,
+            $processingDeliveryId,
+            $processingAttempt,
+        ): bool {
             // CAS ini memastikan callback gagal yang kalah race dari completion tidak memiliki side effect.
             $updated = ImportBatch::query()
                 ->whereKey($this->batchId)
-                ->where(function ($claimable) use ($isLegacyPayload, $processingToken): void {
-                    $claimable->where(function ($queued) use ($isLegacyPayload, $processingToken): void {
+                ->where(function ($claimable) use (
+                    $isLegacyPayload,
+                    $processingToken,
+                    $processingDeliveryId,
+                    $processingAttempt,
+                ): void {
+                    $claimable->where(function ($queued) use (
+                        $isLegacyPayload,
+                        $processingToken,
+                        $processingDeliveryId,
+                        $processingAttempt,
+                    ): void {
                         $queued->where('status', 'queued')
                             ->where(function ($owner) use ($isLegacyPayload, $processingToken): void {
                                 $owner->where('processing_token', $processingToken);
@@ -103,18 +128,35 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue, ShouldQueue
                                 if ($isLegacyPayload) {
                                     $owner->orWhereNull('processing_token');
                                 }
+                            })
+                            ->where(function ($delivery) use ($processingDeliveryId): void {
+                                // Null mencakup callback sebelum claim pertama dan row dari skema lama.
+                                $delivery->where('processing_delivery_id', $processingDeliveryId)
+                                    ->orWhereNull('processing_delivery_id');
+                            })
+                            ->where(function ($delivery) use ($processingAttempt): void {
+                                // Attempt delivery fisik bersifat monoton; callback lebih rendah selalu stale.
+                                $delivery->where('processing_attempt', '<=', $processingAttempt)
+                                    ->orWhereNull('processing_attempt');
                             });
-                    })->orWhere(function ($expired) use ($processingToken): void {
-                        // Delivery duplikat tidak boleh menutup worker aktif hanya karena token payload sama.
-                        $expired->where('status', 'processing')
+                    })->orWhere(function ($processing) use (
+                        $processingToken,
+                        $processingDeliveryId,
+                        $processingAttempt,
+                    ): void {
+                        // Reservation lebih baru dari pesan fisik yang sama boleh menutup owner lama;
+                        // arah monoton menolak callback attempt lama tanpa menunggu lease kedaluwarsa.
+                        $processing->where('status', 'processing')
                             ->where('processing_token', $processingToken)
-                            ->whereNotNull('lease_expires_at')
-                            ->where('lease_expires_at', '<=', now());
+                            ->where('processing_delivery_id', $processingDeliveryId)
+                            ->where('processing_attempt', '<=', $processingAttempt);
                     });
                 })
                 ->update([
                     'status' => 'failed',
                     'processing_token' => null,
+                    'processing_delivery_id' => null,
+                    'processing_attempt' => null,
                     'lease_expires_at' => null,
                     'error_message' => self::FAILURE_MESSAGE,
                     'finished_at' => now(),
@@ -170,6 +212,44 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue, ShouldQueue
         }
 
         return $this->processingToken;
+    }
+
+    /** Nomor delivery queue membedakan callback lama dari worker aktif dengan token job yang sama. */
+    private function deliveryAttempt(): int
+    {
+        return max(1, $this->attempts());
+    }
+
+    /** Fingerprint backend queue membedakan pesan fisik tanpa menyimpan identifier broker mentah. */
+    private function deliveryId(): string
+    {
+        if ($this->job !== null) {
+            $jobId = trim((string) $this->job->getJobId());
+
+            if ($jobId !== '') {
+                return hash('sha256', implode("\0", [
+                    (string) $this->job->getConnectionName(),
+                    (string) $this->job->getQueue(),
+                    $jobId,
+                ]));
+            }
+        }
+
+        return hash('sha256', "fallback\0".$this->deliveryInstanceId());
+    }
+
+    /** Payload lama mendapat fallback deterministik agar fresh unserialize tetap merujuk delivery yang sama. */
+    private function deliveryInstanceId(): string
+    {
+        if (! isset($this->deliveryInstanceId)) {
+            $this->deliveryInstanceId = hash('sha256', implode("\0", [
+                'legacy',
+                $this->batchId,
+                $this->processingToken(),
+            ]));
+        }
+
+        return $this->deliveryInstanceId;
     }
 
     /** Marker dan record notifikasi completion commit bersama agar redelivery tidak menggandakan notifikasi. */

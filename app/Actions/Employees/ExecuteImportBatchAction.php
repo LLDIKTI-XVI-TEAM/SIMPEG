@@ -40,6 +40,8 @@ class ExecuteImportBatchAction
         ?string $ipAddress = null,
         ?string $userAgent = null,
         ?string $processingToken = null,
+        ?int $processingAttempt = null,
+        ?string $processingDeliveryId = null,
     ): array {
         $executionBatch = ImportBatch::query()->find($batchId);
 
@@ -72,8 +74,11 @@ class ExecuteImportBatchAction
         ));
         $totalRows = count($validRows);
         $attemptToken = $processingToken ?? (string) Str::uuid();
+        $attemptNumber = max(1, $processingAttempt ?? 1);
+        $attemptDeliveryId = $processingDeliveryId
+            ?? hash('sha256', "direct\0".$attemptToken);
 
-        // Token attempt dan lease membuat worker baru dapat memulihkan hard crash tanpa mengambil alih worker aktif.
+        // Token job, identitas pesan, nomor attempt, dan lease memulihkan crash tanpa klaim paralel.
         $claimed = ImportBatch::query()
             ->whereKey($batchId)
             ->where(function ($query) use ($attemptToken): void {
@@ -95,6 +100,8 @@ class ExecuteImportBatchAction
             ->update([
                 'status' => 'processing',
                 'processing_token' => $attemptToken,
+                'processing_delivery_id' => $attemptDeliveryId,
+                'processing_attempt' => $attemptNumber,
                 'lease_expires_at' => now()->addSeconds(self::LEASE_SECONDS),
                 'valid_count' => $validation['valid_count'] ?? $totalRows,
                 'error_message' => null,
@@ -122,6 +129,8 @@ class ExecuteImportBatchAction
                 $checkpoint = $this->executeAndCheckpointRow(
                     $batchId,
                     $attemptToken,
+                    $attemptDeliveryId,
+                    $attemptNumber,
                     $type,
                     $result,
                     $user,
@@ -149,11 +158,18 @@ class ExecuteImportBatchAction
                 $finalCounts,
                 $processedCount,
                 $attemptToken,
+                $attemptDeliveryId,
+                $attemptNumber,
                 $ipAddress,
                 $userAgent,
             ): void {
                 $batch = ImportBatch::query()->lockForUpdate()->findOrFail($batchId);
-                if ($batch->status !== 'processing' || $batch->processing_token !== $attemptToken) {
+                if (
+                    $batch->status !== 'processing'
+                    || $batch->processing_token !== $attemptToken
+                    || $batch->processing_delivery_id !== $attemptDeliveryId
+                    || $batch->processing_attempt !== $attemptNumber
+                ) {
                     throw new \RuntimeException('Attempt import kehilangan kepemilikan sebelum penyelesaian.');
                 }
 
@@ -183,6 +199,8 @@ class ExecuteImportBatchAction
                 $batch->forceFill([
                     'status' => 'completed',
                     'processing_token' => null,
+                    'processing_delivery_id' => null,
+                    'processing_attempt' => null,
                     'lease_expires_at' => null,
                     'execution_payload' => null,
                     'finished_at' => now(),
@@ -198,6 +216,8 @@ class ExecuteImportBatchAction
                 ->whereKey($batchId)
                 ->where('status', 'processing')
                 ->where('processing_token', $attemptToken)
+                ->where('processing_delivery_id', $attemptDeliveryId)
+                ->where('processing_attempt', $attemptNumber)
                 ->update([
                     'status' => 'queued',
                     'lease_expires_at' => null,
@@ -240,6 +260,8 @@ class ExecuteImportBatchAction
     private function executeAndCheckpointRow(
         string $batchId,
         string $attemptToken,
+        string $attemptDeliveryId,
+        int $attemptNumber,
         string $type,
         array $row,
         ?User $user,
@@ -249,6 +271,8 @@ class ExecuteImportBatchAction
         return DB::transaction(function () use (
             $batchId,
             $attemptToken,
+            $attemptDeliveryId,
+            $attemptNumber,
             $type,
             $row,
             $user,
@@ -256,7 +280,12 @@ class ExecuteImportBatchAction
             $userAgent,
         ): array {
             $batch = ImportBatch::query()->lockForUpdate()->findOrFail($batchId);
-            if ($batch->status !== 'processing' || $batch->processing_token !== $attemptToken) {
+            if (
+                $batch->status !== 'processing'
+                || $batch->processing_token !== $attemptToken
+                || $batch->processing_delivery_id !== $attemptDeliveryId
+                || $batch->processing_attempt !== $attemptNumber
+            ) {
                 throw new \RuntimeException('Attempt import tidak lagi memiliki batch ini.');
             }
 

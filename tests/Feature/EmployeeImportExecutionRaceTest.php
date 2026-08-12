@@ -305,11 +305,12 @@ class EmployeeImportExecutionRaceTest extends TestCase
             'nama_dengan_gelar' => 'Budi Santoso',  // sama dengan row CSV
         ]);
         $jobToken = (string) Str::uuid();
+        $deliveryId = $this->physicalDeliveryId('unknown-constraint-delivery');
         $this->persistQueuedBatch($batchId, $user, $jobToken);
 
         $caughtException = null;
         try {
-            app(ExecuteImportBatchAction::class)->execute($batchId, $user, null, null, $jobToken);
+            app(ExecuteImportBatchAction::class)->execute($batchId, $user, null, null, $jobToken, 1, $deliveryId);
             $this->fail('Pelanggaran unique field selain NIP/email seharusnya dilempar ulang.');
         } catch (QueryException $exception) {
             $caughtException = $exception;
@@ -321,7 +322,15 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $this->assertSame(0, $persistedBatch->inserted_count);
         $this->assertSame(0, $persistedBatch->skipped_count);
 
-        (new ImportEmployeeBatchJob($batchId, $user->id, null, null, $jobToken))->failed($caughtException);
+        $queueJob = $this->createMock(QueueJobContract::class);
+        $queueJob->method('attempts')->willReturn(1);
+        $queueJob->method('getJobId')->willReturn('unknown-constraint-delivery');
+        $queueJob->method('getConnectionName')->willReturn('database');
+        $queueJob->method('getQueue')->willReturn('default');
+
+        (new ImportEmployeeBatchJob($batchId, $user->id, null, null, $jobToken))
+            ->setJob($queueJob)
+            ->failed($caughtException);
 
         $this->assertSame('failed', ImportBatch::query()->findOrFail($batchId)->status);
     }
@@ -370,6 +379,7 @@ class EmployeeImportExecutionRaceTest extends TestCase
             SQL);
 
         app(QueueImportBatchAction::class)->execute($batchId, $user);
+        $physicalJobId = (string) DB::table('jobs')->value('id');
         app('queue.worker')->runNextJob('database', 'default', new WorkerOptions(maxTries: 3));
 
         $this->assertDatabaseHas('employees', ['nip' => '198001012006041001']);
@@ -379,6 +389,8 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $this->assertSame(0, $retryableBatch->skipped_count);
         $this->assertSame(0, $retryableBatch->failed_count);
         $this->assertSame([], $retryableBatch->row_issues);
+        $this->assertSame($this->physicalDeliveryId($physicalJobId), $retryableBatch->processing_delivery_id);
+        $this->assertSame(1, $retryableBatch->processing_attempt);
 
         DB::unprepared('DROP TRIGGER IF EXISTS reject_siti_first_attempt_trigger ON employees');
         DB::unprepared('DROP FUNCTION IF EXISTS reject_siti_first_attempt()');
@@ -391,6 +403,8 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $this->assertSame(2, $persistedBatch->inserted_count);
         $this->assertSame(0, $persistedBatch->skipped_count);
         $this->assertSame(0, $persistedBatch->failed_count);
+        $this->assertNull($persistedBatch->processing_delivery_id);
+        $this->assertNull($persistedBatch->processing_attempt);
         $this->assertSame(1, Employee::query()->where('nip', '198001012006041001')->count());
         $this->assertSame(1, Employee::query()->where('nip', '198101012007041002')->count());
         $this->assertSame(1, AuditLog::query()->where('event', 'IMPORT')->count());
@@ -406,7 +420,15 @@ class EmployeeImportExecutionRaceTest extends TestCase
         );
         $this->assertTrue(
             Schema::hasColumn('import_batches', 'processing_token'),
-            'Batch import belum memiliki token attempt untuk compare-and-swap.',
+            'Batch import belum memiliki token job stabil untuk compare-and-swap.',
+        );
+        $this->assertTrue(
+            Schema::hasColumn('import_batches', 'processing_attempt'),
+            'Batch import belum menyimpan generasi delivery queue untuk ownership terminal.',
+        );
+        $this->assertTrue(
+            Schema::hasColumn('import_batches', 'processing_delivery_id'),
+            'Batch import belum membedakan identitas fisik delivery queue.',
         );
 
         $user = User::factory()->adminKepegawaian()->create();
@@ -446,6 +468,8 @@ class EmployeeImportExecutionRaceTest extends TestCase
             'processed_valid_count' => 1,
             'inserted_count' => 1,
             'processing_token' => $jobToken,
+            'processing_delivery_id' => $this->physicalDeliveryId('delivery-a'),
+            'processing_attempt' => 1,
             // Checkpoint terjadi pada detik ke-119 dan memperpanjang lease hingga detik ke-269.
             'lease_expires_at' => now()->addSeconds(150),
         ]);
@@ -457,6 +481,10 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $this->assertTrue($leaseExpiresAt->isFuture());
 
         $queueJob = $this->createMock(QueueJobContract::class);
+        $queueJob->method('attempts')->willReturn(2);
+        $queueJob->method('getJobId')->willReturn('delivery-a');
+        $queueJob->method('getConnectionName')->willReturn('database');
+        $queueJob->method('getQueue')->willReturn('default');
         $queueJob->expects($this->once())
             ->method('release')
             ->with($this->callback(
@@ -511,6 +539,7 @@ class EmployeeImportExecutionRaceTest extends TestCase
 
         $legacyPayload = $this->legacySerializedJobPayload($batchId, $user->id);
         $this->assertStringNotContainsString('processingToken', $legacyPayload);
+        $this->assertStringNotContainsString('deliveryInstanceId', $legacyPayload);
 
         $firstDelivery = unserialize($legacyPayload);
         $this->assertInstanceOf(ImportEmployeeBatchJob::class, $firstDelivery);
@@ -573,10 +602,16 @@ class EmployeeImportExecutionRaceTest extends TestCase
         ImportBatch::query()->whereKey($batchId)->update([
             'status' => 'processing',
             'processing_token' => $ownerToken,
+            'processing_delivery_id' => $this->physicalDeliveryId('delivery-a'),
+            'processing_attempt' => 1,
             'lease_expires_at' => now()->addMinute(),
         ]);
 
         $queueJob = $this->createMock(QueueJobContract::class);
+        $queueJob->method('attempts')->willReturn(2);
+        $queueJob->method('getJobId')->willReturn('delivery-b');
+        $queueJob->method('getConnectionName')->willReturn('database');
+        $queueJob->method('getQueue')->willReturn('default');
         $queueJob->expects($this->once())
             ->method('release')
             ->with($this->callback(
@@ -604,16 +639,27 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $user = User::factory()->adminKepegawaian()->create();
         $batchId = $this->validatedBatchId($user);
         $ownerToken = (string) Str::uuid();
+        $ownerDeliveryId = $this->physicalDeliveryId('delivery-a');
         $this->persistQueuedBatch($batchId, $user, $ownerToken);
         ImportBatch::query()->whereKey($batchId)->update([
             'status' => 'processing',
             'processing_token' => $ownerToken,
+            'processing_delivery_id' => $ownerDeliveryId,
+            'processing_attempt' => 2,
             'lease_expires_at' => now()->addMinute(),   // lease masih aktif
             'processed_valid_count' => 0,
         ]);
 
-        // Delivery identik tidak boleh berjalan paralel sebelum lease pemilik kedaluwarsa.
-        $result = app(ExecuteImportBatchAction::class)->execute($batchId, $user, null, null, $ownerToken);
+        // Pesan fisik lain dengan token sama tidak boleh berjalan paralel sebelum lease kedaluwarsa.
+        $result = app(ExecuteImportBatchAction::class)->execute(
+            $batchId,
+            $user,
+            null,
+            null,
+            $ownerToken,
+            3,
+            $this->physicalDeliveryId('delivery-b'),
+        );
 
         $this->assertFalse($result['executed']);
         $this->assertSame('processing', $result['status']);
@@ -622,6 +668,8 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $persisted = ImportBatch::query()->findOrFail($batchId);
         $this->assertSame('processing', $persisted->status);
         $this->assertSame($ownerToken, $persisted->processing_token);
+        $this->assertSame($ownerDeliveryId, $persisted->processing_delivery_id);
+        $this->assertSame(2, $persisted->processing_attempt);
         $this->assertSame(0, $persisted->processed_valid_count);
     }
 
@@ -631,41 +679,133 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $user = User::factory()->adminKepegawaian()->create();
         $batchId = $this->validatedBatchId($user);
         $ownerToken = (string) Str::uuid();
+        $ownerDeliveryId = $this->physicalDeliveryId('delivery-a');
         $this->persistQueuedBatch($batchId, $user, $ownerToken);
         ImportBatch::query()->whereKey($batchId)->update([
             'status' => 'processing',
             'processing_token' => $ownerToken,
+            'processing_delivery_id' => $ownerDeliveryId,
+            'processing_attempt' => 2,
             'lease_expires_at' => now()->subSecond(),
         ]);
 
-        $result = app(ExecuteImportBatchAction::class)->execute($batchId, $user, null, null, $ownerToken);
+        $result = app(ExecuteImportBatchAction::class)->execute(
+            $batchId,
+            $user,
+            null,
+            null,
+            $ownerToken,
+            3,
+            $this->physicalDeliveryId('delivery-b'),
+        );
 
         $this->assertTrue($result['executed']);
         $this->assertSame('completed', $result['status']);
         $this->assertDatabaseHas('employees', ['nip' => '198001012006041001']);
+        $completed = ImportBatch::query()->findOrFail($batchId);
+        $this->assertNull($completed->processing_delivery_id);
+        $this->assertNull($completed->processing_attempt);
     }
 
-    /** Callback gagal dari delivery duplikat tidak boleh menutup worker dengan lease yang masih aktif. */
-    public function test_failure_callback_same_token_does_not_fail_active_processing_lease(): void
+    /** Callback delivery lama tidak boleh menutup generasi baru walaupun token job tetap sama. */
+    public function test_failure_callback_old_attempt_does_not_fail_active_current_attempt(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
         $batchId = $this->validatedBatchId($user);
         $ownerToken = (string) Str::uuid();
+        $ownerDeliveryId = $this->physicalDeliveryId('delivery-a');
         $this->persistQueuedBatch($batchId, $user, $ownerToken);
         ImportBatch::query()->whereKey($batchId)->update([
             'status' => 'processing',
             'processing_token' => $ownerToken,
+            'processing_delivery_id' => $ownerDeliveryId,
+            'processing_attempt' => 3,
             'lease_expires_at' => now()->addMinute(),
         ]);
 
+        $queueJob = $this->createMock(QueueJobContract::class);
+        $queueJob->method('attempts')->willReturn(2);
+        $queueJob->method('getJobId')->willReturn('delivery-a');
+        $queueJob->method('getConnectionName')->willReturn('database');
+        $queueJob->method('getQueue')->willReturn('default');
+
         (new ImportEmployeeBatchJob($batchId, $user->id, null, null, $ownerToken))
-            ->failed(new \RuntimeException('Delivery duplikat kehabisan attempt.'));
+            ->setJob($queueJob)
+            ->failed(new \RuntimeException('Delivery lama kehabisan attempt.'));
 
         $processing = ImportBatch::query()->findOrFail($batchId);
         $this->assertSame('processing', $processing->status);
         $this->assertSame($ownerToken, $processing->processing_token);
+        $this->assertSame($ownerDeliveryId, $processing->processing_delivery_id);
+        $this->assertSame(3, $processing->processing_attempt);
         $this->assertNull($processing->error_message);
         $this->assertNull($processing->finished_at);
+    }
+
+    /** Pesan fisik lain tidak boleh menutup owner walaupun token dan nomor attempt kebetulan sama. */
+    public function test_failure_callback_other_delivery_same_attempt_does_not_fail_owner(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $batchId = $this->validatedBatchId($user);
+        $ownerToken = (string) Str::uuid();
+        $ownerDeliveryId = $this->physicalDeliveryId('delivery-a');
+        $this->persistQueuedBatch($batchId, $user, $ownerToken);
+        ImportBatch::query()->whereKey($batchId)->update([
+            'status' => 'processing',
+            'processing_token' => $ownerToken,
+            'processing_delivery_id' => $ownerDeliveryId,
+            'processing_attempt' => 3,
+            'lease_expires_at' => now()->addMinute(),
+        ]);
+
+        $queueJob = $this->createMock(QueueJobContract::class);
+        $queueJob->method('attempts')->willReturn(3);
+        $queueJob->method('getJobId')->willReturn('delivery-b');
+        $queueJob->method('getConnectionName')->willReturn('database');
+        $queueJob->method('getQueue')->willReturn('default');
+
+        (new ImportEmployeeBatchJob($batchId, $user->id, null, null, $ownerToken))
+            ->setJob($queueJob)
+            ->failed(new \RuntimeException('Pesan recovery lain gagal.'));
+
+        $processing = ImportBatch::query()->findOrFail($batchId);
+        $this->assertSame('processing', $processing->status);
+        $this->assertSame($ownerDeliveryId, $processing->processing_delivery_id);
+        $this->assertSame(3, $processing->processing_attempt);
+        $this->assertNull($processing->error_message);
+    }
+
+    /** Reservation terminal berikutnya dari pesan fisik yang sama boleh menutup owner sebelumnya. */
+    public function test_failure_callback_next_attempt_same_delivery_fails_previous_reservation(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $batchId = $this->validatedBatchId($user);
+        $ownerToken = (string) Str::uuid();
+        $ownerDeliveryId = $this->physicalDeliveryId('delivery-a');
+        $this->persistQueuedBatch($batchId, $user, $ownerToken);
+        ImportBatch::query()->whereKey($batchId)->update([
+            'status' => 'processing',
+            'processing_token' => $ownerToken,
+            'processing_delivery_id' => $ownerDeliveryId,
+            'processing_attempt' => 3,
+            'lease_expires_at' => now()->addMinute(),
+        ]);
+
+        $queueJob = $this->createMock(QueueJobContract::class);
+        $queueJob->method('attempts')->willReturn(4);
+        $queueJob->method('getJobId')->willReturn('delivery-a');
+        $queueJob->method('getConnectionName')->willReturn('database');
+        $queueJob->method('getQueue')->willReturn('default');
+
+        (new ImportEmployeeBatchJob($batchId, $user->id, null, null, $ownerToken))
+            ->setJob($queueJob)
+            ->failed(new \RuntimeException('Reservation terminal gagal sebelum handle.'));
+
+        $failed = ImportBatch::query()->findOrFail($batchId);
+        $this->assertSame('failed', $failed->status);
+        $this->assertNull($failed->processing_token);
+        $this->assertNull($failed->processing_delivery_id);
+        $this->assertNull($failed->processing_attempt);
     }
 
     /**
@@ -968,10 +1108,22 @@ class EmployeeImportExecutionRaceTest extends TestCase
     {
         $user = $this->notifiableAdmin();
         $batchId = $this->validatedBatchId($user);
-        $this->persistQueuedBatch($batchId, $user);
-        app(ExecuteImportBatchAction::class)->execute($batchId, $user);
+        $jobToken = (string) Str::uuid();
+        $deliveryId = $this->physicalDeliveryId('delivery-b');
+        $this->persistQueuedBatch($batchId, $user, $jobToken);
+        ImportBatch::query()->whereKey($batchId)->update([
+            'processing_delivery_id' => $this->physicalDeliveryId('delivery-a'),
+            'processing_attempt' => 2,
+        ]);
+        app(ExecuteImportBatchAction::class)->execute($batchId, $user, null, null, $jobToken, 3, $deliveryId);
 
-        $job = new ImportEmployeeBatchJob($batchId, $user->id);
+        $queueJob = $this->createMock(QueueJobContract::class);
+        $queueJob->method('attempts')->willReturn(3);
+        $queueJob->method('getJobId')->willReturn('delivery-b');
+        $queueJob->method('getConnectionName')->willReturn('database');
+        $queueJob->method('getQueue')->willReturn('default');
+        $job = (new ImportEmployeeBatchJob($batchId, $user->id, null, null, $jobToken))
+            ->setJob($queueJob);
         $job->handle(app(ExecuteImportBatchAction::class), app(NotificationService::class));
 
         $completedCache = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
@@ -983,6 +1135,8 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $currentCache = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
 
         $this->assertSame('completed', $persistedBatch->status);
+        $this->assertNull($persistedBatch->processing_delivery_id);
+        $this->assertNull($persistedBatch->processing_attempt);
         $this->assertNull($persistedBatch->error_message);
         $this->assertSame('completed', $currentCache['status']);
         $this->assertSame($completedCache['result'], $currentCache['result']);
@@ -1004,11 +1158,45 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $cachedBatch['status'] = 'queued';
         Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $cachedBatch, now()->addMinutes(10));
 
-        $job = new ImportEmployeeBatchJob($batchId, $user->id, null, null, $jobToken);
+        $queueJob = $this->createMock(QueueJobContract::class);
+        $queueJob->method('attempts')->willReturn(3);
+        $job = (new ImportEmployeeBatchJob($batchId, $user->id, null, null, $jobToken))
+            ->setJob($queueJob);
         $job->failed(new \RuntimeException('Worker gagal sebelum claim'));
 
-        $this->assertSame('failed', ImportBatch::query()->findOrFail($batchId)->status);
+        $failed = ImportBatch::query()->findOrFail($batchId);
+        $this->assertSame('failed', $failed->status);
+        $this->assertNull($failed->processing_attempt);
         $this->assertSame('failed', Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId)['status']);
+    }
+
+    /** Callback queued sesudah retryable catch hanya boleh menutup delivery yang sama. */
+    public function test_failure_after_processing_claim_matches_current_attempt(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $batchId = $this->validatedBatchId($user);
+        $jobToken = (string) Str::uuid();
+        $deliveryId = $this->physicalDeliveryId('delivery-a');
+        $this->persistQueuedBatch($batchId, $user, $jobToken);
+        ImportBatch::query()->whereKey($batchId)->update([
+            'processing_delivery_id' => $deliveryId,
+            'processing_attempt' => 3,
+        ]);
+
+        $queueJob = $this->createMock(QueueJobContract::class);
+        $queueJob->method('attempts')->willReturn(3);
+        $queueJob->method('getJobId')->willReturn('delivery-a');
+        $queueJob->method('getConnectionName')->willReturn('database');
+        $queueJob->method('getQueue')->willReturn('default');
+        (new ImportEmployeeBatchJob($batchId, $user->id, null, null, $jobToken))
+            ->setJob($queueJob)
+            ->failed(new \RuntimeException('Worker gagal setelah retryable catch'));
+
+        $failed = ImportBatch::query()->findOrFail($batchId);
+        $this->assertSame('failed', $failed->status);
+        $this->assertNull($failed->processing_token);
+        $this->assertNull($failed->processing_delivery_id);
+        $this->assertNull($failed->processing_attempt);
     }
 
     /** Callback terminal menyimpan counter parsial dan tidak membocorkan exception ke notifikasi pengguna. */
@@ -1023,6 +1211,7 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $batchId = $batch['batch_id'];
         app(ValidateImportBatchAction::class)->execute($batchId, null, $user);
         $jobToken = (string) Str::uuid();
+        $deliveryId = $this->physicalDeliveryId('delivery-a');
         $this->persistQueuedBatch($batchId, $user, $jobToken);
         ImportBatch::query()->whereKey($batchId)->update([
             'status' => 'processing',
@@ -1031,12 +1220,20 @@ class EmployeeImportExecutionRaceTest extends TestCase
             'skipped_count' => 2,
             'failed_count' => 3,
             'processing_token' => $jobToken,
-            // Callback terminal hanya boleh mengklaim lease worker yang sudah kedaluwarsa.
-            'lease_expires_at' => now()->subSecond(),
+            'processing_delivery_id' => $deliveryId,
+            'processing_attempt' => 3,
+            // Callback terminal delivery pemilik boleh menutup state meski lease masih aktif.
+            'lease_expires_at' => now()->addMinute(),
         ]);
 
         $logSpy = Log::spy();
+        $queueJob = $this->createMock(QueueJobContract::class);
+        $queueJob->method('attempts')->willReturn(3);
+        $queueJob->method('getJobId')->willReturn('delivery-a');
+        $queueJob->method('getConnectionName')->willReturn('database');
+        $queueJob->method('getQueue')->willReturn('default');
         (new ImportEmployeeBatchJob($batchId, $user->id, null, null, $jobToken))
+            ->setJob($queueJob)
             ->failed(new \RuntimeException('detail internal sangat rahasia'));
 
         $terminal = ImportBatch::query()->findOrFail($batchId);
@@ -1045,6 +1242,9 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $this->assertSame(1, $terminal->inserted_count);
         $this->assertSame(2, $terminal->skipped_count);
         $this->assertSame(3, $terminal->failed_count);
+        $this->assertNull($terminal->processing_token);
+        $this->assertNull($terminal->processing_delivery_id);
+        $this->assertNull($terminal->processing_attempt);
         $this->assertSame(
             'Proses import pegawai gagal. Silakan coba kembali atau hubungi administrator.',
             $terminal->error_message,
@@ -1127,6 +1327,15 @@ class EmployeeImportExecutionRaceTest extends TestCase
             ->values();
     }
 
+    /** Menyamakan fingerprint pesan fisik dengan kontrak ownership job produksi. */
+    private function physicalDeliveryId(
+        string $jobId,
+        string $connection = 'database',
+        string $queue = 'default',
+    ): string {
+        return hash('sha256', implode("\0", [$connection, $queue, $jobId]));
+    }
+
     private function persistQueuedBatch(string $batchId, User $user, ?string $processingToken = null): void
     {
         $batch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
@@ -1156,23 +1365,32 @@ class EmployeeImportExecutionRaceTest extends TestCase
     private function legacySerializedJobPayload(string $batchId, string $userId): string
     {
         $processingToken = 'legacy-payload-processing-token';
+        $deliveryInstanceId = 'legacy-payload-delivery-instance';
         $payload = serialize(new ImportEmployeeBatchJob(
             $batchId,
             $userId,
             processingToken: $processingToken,
+            deliveryInstanceId: $deliveryInstanceId,
         ));
-        $propertyFragment = serialize("\0*\0processingToken").serialize($processingToken);
-        $legacyPayload = str_replace($propertyFragment, '', $payload, $propertyReplacementCount);
+        $legacyPayload = str_replace(
+            [
+                serialize("\0*\0processingToken").serialize($processingToken),
+                serialize("\0*\0deliveryInstanceId").serialize($deliveryInstanceId),
+            ],
+            '',
+            $payload,
+            $propertyReplacementCount,
+        );
         $legacyPayload = preg_replace_callback(
             '/^(O:\d+:"[^"]+":)(\d+)(:\{)/',
             /** @param array<int, string> $matches */
-            static fn (array $matches): string => $matches[1].((int) $matches[2] - 1).$matches[3],
+            static fn (array $matches): string => $matches[1].((int) $matches[2] - 2).$matches[3],
             $legacyPayload,
             1,
             $headerReplacementCount,
         );
 
-        if ($propertyReplacementCount !== 1 || $headerReplacementCount !== 1 || $legacyPayload === null) {
+        if ($propertyReplacementCount !== 2 || $headerReplacementCount !== 1 || $legacyPayload === null) {
             throw new \LogicException('Fixture payload job legacy gagal dibentuk.');
         }
 
