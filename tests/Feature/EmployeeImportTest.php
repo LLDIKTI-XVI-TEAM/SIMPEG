@@ -329,7 +329,7 @@ class EmployeeImportTest extends TestCase
         $validation->assertJsonPath('results.1.status', 'valid');
     }
 
-    public function test_import_wizard_rejects_email_even_when_nip_belongs_to_same_employee(): void
+    public function test_import_wizard_skips_email_when_nip_belongs_to_same_employee(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
         Employee::factory()->create(['nip' => '198001012006041001', 'email_pribadi' => 'budi@example.com']);
@@ -342,8 +342,9 @@ class EmployeeImportTest extends TestCase
         $validation = $this->postJsonWithCsrf("/api/pegawai/import/{$upload->json('batch_id')}/validate", []);
 
         $validation->assertOk()
-            ->assertJsonPath('results.0.status', 'error')
-            ->assertJsonPath('results.0.errors.Email Pegawai.0', 'Email pegawai sudah terdaftar di database.');
+            ->assertJsonPath('results.0.status', 'skip')
+            ->assertJsonMissingPath('results.0.errors.Email Pegawai')
+            ->assertJsonPath('results.0.errors.NIP.0', 'NIP sudah terdaftar di database.');
     }
 
     public function test_import_wizard_rejects_email_owned_by_employee_without_nip(): void
