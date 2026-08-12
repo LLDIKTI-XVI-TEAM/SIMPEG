@@ -16,6 +16,8 @@ use App\Actions\Employees\UpdateEmployeePerformanceFlagAction;
 use App\Actions\Employees\UpdateEmployeeSatyalancanaEligibilityAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Employee\AssignSupervisorRequest;
+use App\Http\Requests\Employee\BulkDeactivateEmployeesRequest;
+use App\Http\Requests\Employee\BulkRestoreEmployeesRequest;
 use App\Http\Requests\Employee\DeactivateEmployeeRequest;
 use App\Http\Requests\Employee\RestoreEmployeeRequest;
 use App\Http\Requests\Employee\StoreEmployeeRequest;
@@ -508,16 +510,9 @@ class PegawaiController extends Controller
         ]);
     }
 
-    public function bulkDestroy(Request $request)
+    public function bulkDestroy(BulkDeactivateEmployeesRequest $request)
     {
-        $ids = array_values(array_filter(
-            (array) $request->input('ids', []),
-            fn ($id) => is_string($id) && $id !== ''
-        ));
-
-        if (empty($ids)) {
-            return back()->with('error', 'Tidak ada data pegawai yang dipilih.');
-        }
+        $ids = $request->validated('ids');
 
         $employees = Employee::whereIn('id', $ids)->get(['id', 'nama_lengkap', 'nip']);
 
@@ -578,17 +573,9 @@ class PegawaiController extends Controller
             ->with('backup_data_changed', true);
     }
 
-    public function bulkRestore(Request $request)
+    public function bulkRestore(BulkRestoreEmployeesRequest $request)
     {
-        $ids = array_values(array_filter(
-            (array) $request->input('ids', []),
-            fn ($id) => is_string($id) && $id !== ''
-        ));
-
-        if (empty($ids)) {
-            return redirect()->route('data-backup')
-                ->with('error', 'Tidak ada pegawai yang dipilih.');
-        }
+        $ids = $request->validated('ids');
 
         // Ambil hanya yang memang ada di trash — validasi sekaligus
         $employees = Employee::onlyTrashed()

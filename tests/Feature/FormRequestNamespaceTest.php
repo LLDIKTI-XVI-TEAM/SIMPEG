@@ -10,6 +10,8 @@ use App\Http\Requests\Cuti\ApproveLeaveRequest;
 use App\Http\Requests\Cuti\CalculateWorkdaysRequest;
 use App\Http\Requests\Cuti\PostponeLeaveRequest;
 use App\Http\Requests\Cuti\StoreLeaveRequestRequest;
+use App\Http\Requests\Employee\BulkDeactivateEmployeesRequest;
+use App\Http\Requests\Employee\BulkRestoreEmployeesRequest;
 use App\Http\Requests\Employee\DeactivateEmployeeRequest;
 use App\Http\Requests\Employee\ListEmployeesRequest;
 use App\Http\Requests\Employee\RestoreEmployeeRequest;
@@ -38,6 +40,8 @@ class FormRequestNamespaceTest extends TestCase
             CalculateWorkdaysRequest::class,
             PostponeLeaveRequest::class,
             StoreLeaveRequestRequest::class,
+            BulkDeactivateEmployeesRequest::class,
+            BulkRestoreEmployeesRequest::class,
             DeactivateEmployeeRequest::class,
             ListEmployeesRequest::class,
             RestoreEmployeeRequest::class,
@@ -64,6 +68,8 @@ class FormRequestNamespaceTest extends TestCase
         $mutations = [
             [PegawaiController::class, 'destroy', 1, DeactivateEmployeeRequest::class],
             [PegawaiController::class, 'restore', 1, RestoreEmployeeRequest::class],
+            [PegawaiController::class, 'bulkDestroy', 0, BulkDeactivateEmployeesRequest::class],
+            [PegawaiController::class, 'bulkRestore', 0, BulkRestoreEmployeesRequest::class],
             [ApiEmployeeController::class, 'destroy', 1, DeactivateEmployeeRequest::class],
             [ApiEmployeeController::class, 'restore', 1, RestoreEmployeeRequest::class],
         ];

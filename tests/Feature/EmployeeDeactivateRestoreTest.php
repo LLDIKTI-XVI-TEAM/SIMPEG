@@ -362,6 +362,20 @@ class EmployeeDeactivateRestoreTest extends TestCase
         $this->postJsonWithCsrf("/api/v1/pegawai/{$trashed->id}/restore")->assertForbidden();
     }
 
+    public function test_bulk_mutations_validate_selected_ids_as_uuid_array(): void
+    {
+        $admin = User::factory()->adminKepegawaian()->create();
+        $superAdmin = User::factory()->superAdmin()->create();
+
+        $this->actingAs($admin)
+            ->postWithCsrf(route('pegawai.bulkDestroy'), ['ids' => ['not-a-uuid']])
+            ->assertSessionHasErrors('ids.0');
+
+        $this->actingAs($superAdmin)
+            ->postWithCsrf(route('pegawai.bulkRestore'), ['ids' => ['not-a-uuid']])
+            ->assertSessionHasErrors('ids.0');
+    }
+
     private function postJsonWithCsrf(string $uri): TestResponse
     {
         return $this
@@ -369,11 +383,11 @@ class EmployeeDeactivateRestoreTest extends TestCase
             ->postJson($uri, ['_token' => 'test-token']);
     }
 
-    private function postWithCsrf(string $uri): TestResponse
+    private function postWithCsrf(string $uri, array $data = []): TestResponse
     {
         return $this
             ->withSession(['_token' => 'test-token'])
-            ->post($uri, ['_token' => 'test-token']);
+            ->post($uri, array_merge(['_token' => 'test-token'], $data));
     }
 
     private function deleteJsonWithCsrf(string $uri): TestResponse
