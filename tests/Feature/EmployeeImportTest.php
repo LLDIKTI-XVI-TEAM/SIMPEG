@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Actions\Employees\ExecuteImportBatchAction;
+use App\Actions\Employees\UploadImportBatchAction;
 use App\Jobs\ImportEmployeeBatchJob;
 use App\Models\AuditLog;
 use App\Models\Employee;
@@ -546,9 +547,9 @@ class EmployeeImportTest extends TestCase
         $batchId = $upload->json('batch_id');
         $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])->assertOk();
 
-        $batch = Cache::get('employee-import-batch:'.$batchId);
+        $batch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
         $batch['nips_before_execution'] = [];
-        Cache::put('employee-import-batch:'.$batchId, $batch, now()->addMinutes(10));
+        Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $batch, now()->addMinutes(10));
         Employee::factory()->create(['nip' => '198001012006041001']);
 
         $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", [])->assertOk();
