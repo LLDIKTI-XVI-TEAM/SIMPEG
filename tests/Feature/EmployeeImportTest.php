@@ -474,10 +474,18 @@ class EmployeeImportTest extends TestCase
         ]);
     }
 
-    public function test_import_job_does_not_notify_again_for_completed_batch(): void
+    public function test_import_job_retries_success_notification_for_completed_batch_until_delivered(): void
     {
         $employee = Employee::factory()->create();
         $user = User::factory()->adminKepegawaian()->create(['employee_id' => $employee->id]);
+        $batch = ImportBatch::create([
+            'id' => 'completed-batch',
+            'filename' => 'pegawai.xlsx',
+            'type' => 'utama',
+            'status' => 'completed',
+            'inserted_count' => 1,
+            'finished_at' => now(),
+        ]);
         /** @var MockInterface&ExecuteImportBatchAction $action */
         $action = $this->mock(ExecuteImportBatchAction::class);
         $notifications = $this->mock(NotificationService::class);
@@ -485,16 +493,53 @@ class EmployeeImportTest extends TestCase
         /** @var Expectation $executeExpectation */
         $executeExpectation = $action->shouldReceive('execute');
         $executeExpectation
-            ->once()
+            ->times(3)
             ->andReturn([
                 'already_completed' => true,
                 'inserted' => 1,
                 'skipped' => 0,
                 'failed' => 0,
             ]);
-        $notifications->shouldNotReceive('createForEmployee');
+        $notificationAttempts = 0;
+        /** @var Expectation $notificationExpectation */
+        $notificationExpectation = $notifications->shouldReceive('createForEmployee');
+        $notificationExpectation
+            ->twice()
+            ->andReturnUsing(function () use (&$notificationAttempts): null {
+                $notificationAttempts++;
 
-        (new ImportEmployeeBatchJob('completed-batch', $user->id))->handle($action, $notifications);
+                if ($notificationAttempts === 1) {
+                    throw new \RuntimeException('Notifikasi sementara gagal.');
+                }
+
+                return null;
+            });
+
+        $firstException = null;
+        try {
+            (new ImportEmployeeBatchJob($batch->id, $user->id))->handle($action, $notifications);
+        } catch (\RuntimeException $exception) {
+            $firstException = $exception;
+        }
+
+        $this->assertSame('Notifikasi sementara gagal.', $firstException?->getMessage());
+
+        $this->assertArrayNotHasKey(
+            'success_notification_completed_at',
+            ImportBatch::findOrFail($batch->id)->execution_state ?? [],
+        );
+
+        (new ImportEmployeeBatchJob($batch->id, $user->id))->handle($action, $notifications);
+
+        $this->assertSame(2, $notificationAttempts);
+        $this->assertArrayHasKey(
+            'success_notification_completed_at',
+            ImportBatch::findOrFail($batch->id)->execution_state ?? [],
+        );
+
+        (new ImportEmployeeBatchJob($batch->id, $user->id))->handle($action, $notifications);
+
+        $this->assertSame(2, $notificationAttempts);
     }
 
     public function test_import_job_failure_does_not_overwrite_completed_batch(): void

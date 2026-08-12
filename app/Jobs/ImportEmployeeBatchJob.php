@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Actions\Employees\ExecuteImportBatchAction;
 use App\Actions\Employees\UploadImportBatchAction;
+use App\Models\Employee;
 use App\Models\ImportBatch;
 use App\Models\User;
 use App\Services\NotificationService;
@@ -13,6 +14,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class ImportEmployeeBatchJob implements ShouldQueue
 {
@@ -36,13 +38,32 @@ class ImportEmployeeBatchJob implements ShouldQueue
         $user = $this->userId ? User::find($this->userId) : null;
         $result = $action->execute($this->batchId, $user, $this->ipAddress, $this->userAgent);
 
-        if ($result['already_completed'] ?? false) {
-            return;
-        }
-
         // Kirim notifikasi in-app melalui NotificationService jika user memiliki employee record
         $employee = $user?->employee;
         if ($employee) {
+            $this->sendSuccessNotification($notificationService, $employee, $result);
+        }
+    }
+
+    /**
+     * Rekam notifikasi sukses bersama marker batch agar retry setelah notifikasi
+     * gagal tidak mengulang impor, tetapi tetap mencoba mengirim notifikasi.
+     *
+     * @param  array{inserted?: int, skipped?: int, failed?: int}  $result
+     */
+    private function sendSuccessNotification(NotificationService $notificationService, Employee $employee, array $result): void
+    {
+        DB::transaction(function () use ($notificationService, $employee, $result): void {
+            $batch = ImportBatch::query()->lockForUpdate()->find($this->batchId);
+            if ($batch === null) {
+                return;
+            }
+
+            $executionState = $batch->execution_state ?? [];
+            if (isset($executionState['success_notification_completed_at'])) {
+                return;
+            }
+
             $inserted = $result['inserted'] ?? 0;
             $skipped = $result['skipped'] ?? 0;
             $failed = $result['failed'] ?? 0;
@@ -60,7 +81,11 @@ class ImportEmployeeBatchJob implements ShouldQueue
                     'url' => route('data-pegawai'),
                 ]
             );
-        }
+
+            $executionState['success_notification_completed_at'] = now()->toISOString();
+            $batch->execution_state = $executionState;
+            $batch->save();
+        });
     }
 
     /**
