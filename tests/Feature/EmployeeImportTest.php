@@ -22,6 +22,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
+use Mockery\Expectation;
+use Mockery\MockInterface;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -344,8 +346,9 @@ class EmployeeImportTest extends TestCase
         $batchId = $upload->json('batch_id');
         $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])->assertOk();
 
-        $this->mock(Dispatcher::class)
-            ->shouldReceive('dispatch')
+        /** @var Expectation $dispatchExpectation */
+        $dispatchExpectation = $this->mock(Dispatcher::class)->shouldReceive('dispatch');
+        $dispatchExpectation
             ->once()
             ->andThrow(new \RuntimeException('Antrean tidak tersedia.'));
 
@@ -364,10 +367,13 @@ class EmployeeImportTest extends TestCase
     {
         $employee = Employee::factory()->create();
         $user = User::factory()->adminKepegawaian()->create(['employee_id' => $employee->id]);
+        /** @var MockInterface&ExecuteImportBatchAction $action */
         $action = $this->mock(ExecuteImportBatchAction::class);
         $notifications = $this->mock(NotificationService::class);
 
-        $action->shouldReceive('execute')
+        /** @var Expectation $executeExpectation */
+        $executeExpectation = $action->shouldReceive('execute');
+        $executeExpectation
             ->once()
             ->andReturn([
                 'already_completed' => true,

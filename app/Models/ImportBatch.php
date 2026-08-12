@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * Id memakai batch id dari wizard import sehingga laporan dapat diunduh
  * dengan tautan yang sama walaupun cache wizard sudah kedaluwarsa.
+ *
+ * @property array<string, mixed>|null $execution_state
  */
 class ImportBatch extends Model
 {
