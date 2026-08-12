@@ -71,7 +71,16 @@ class EmployeeValidationRules
             'alamat' => ['nullable', 'string'],
             'no_hp' => ['nullable', 'string', 'max:20'],
             'email' => ['nullable', 'email', 'max:255', 'unique:employees,email'],
-            'email_pribadi' => ['nullable', 'email', 'max:255', 'unique:employees,email_pribadi'],
+            'email_pribadi' => [
+                'nullable',
+                'email',
+                'max:255',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (Employee::whereRaw('LOWER(email_pribadi) = ?', [strtolower(trim((string) $value))])->exists()) {
+                        $fail('Email sudah terdaftar pada pegawai lain.');
+                    }
+                },
+            ],
             'no_telepon_rumah' => ['nullable', 'string', 'max:20'],
         ];
     }
@@ -99,7 +108,14 @@ class EmployeeValidationRules
             'nullable',
             'email',
             'max:255',
-            Rule::unique('employees', 'email_pribadi')->ignore($employee->id),
+            function (string $attribute, mixed $value, \Closure $fail) use ($employee): void {
+                if (Employee::whereRaw('LOWER(email_pribadi) = ?', [strtolower(trim((string) $value))])
+                    ->where('id', '!=', $employee->id)
+                    ->exists()
+                ) {
+                    $fail('Email sudah terdaftar pada pegawai lain.');
+                }
+            },
         ];
 
         $rules['nik'] = [

@@ -817,4 +817,43 @@ class EmployeeUpdateTest extends TestCase
         $response->assertDontSee('kgb_history_id');
         $response->assertSee('append-only');
     }
+
+    public function test_update_rejects_duplicate_email_case_insensitively(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $employee1 = Employee::factory()->create([
+            'email_pribadi' => 'Andi.Saputra@example.com',
+            'nip' => '198501012010121001',
+        ]);
+
+        $employee2 = Employee::factory()->create([
+            'email_pribadi' => 'budi.santoso@example.com',
+            'nip' => '199001012020121002',
+        ]);
+
+        $this->actingAs($user);
+
+        // Attempt to update employee2 with employee1's email but different case
+        $payload = $this->validPayload($employee2, [
+            'email_pribadi' => 'andi.saputra@EXAMPLE.COM',
+        ]);
+
+        $response = $this->putJsonWithCsrf($this->endpoint($employee2), $payload);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors('email_pribadi');
+        $this->assertEquals(
+            'Email sudah terdaftar pada pegawai lain.',
+            $response->json('errors.email_pribadi.0')
+        );
+
+        // Attempt to update employee1 with their own email but different case should succeed
+        $payloadOwn = $this->validPayload($employee1, [
+            'email_pribadi' => 'andi.saputra@EXAMPLE.COM',
+        ]);
+
+        $responseOwn = $this->putJsonWithCsrf($this->endpoint($employee1), $payloadOwn);
+        $responseOwn->assertOk();
+    }
 }
