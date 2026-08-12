@@ -76,6 +76,11 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue
      */
     public function failed(\Throwable $exception): void
     {
+        $importBatch = ImportBatch::find($this->batchId);
+        if ($importBatch?->status === 'completed') {
+            return;
+        }
+
         // Pastikan laporan permanen ikut menandai kegagalan (no-op bila record belum ada).
         ImportBatch::whereKey($this->batchId)->update([
             'status' => 'failed',

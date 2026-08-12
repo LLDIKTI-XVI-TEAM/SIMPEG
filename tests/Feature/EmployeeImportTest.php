@@ -421,6 +421,31 @@ class EmployeeImportTest extends TestCase
         (new ImportEmployeeBatchJob('completed-batch', $user->id))->handle($action, $notifications);
     }
 
+    public function test_import_job_failure_does_not_overwrite_completed_batch(): void
+    {
+        $batch = ImportBatch::create([
+            'id' => 'completed-import-batch',
+            'filename' => 'pegawai.xlsx',
+            'type' => 'utama',
+            'status' => 'completed',
+            'inserted_count' => 1,
+            'finished_at' => now(),
+        ]);
+        Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batch->id, [
+            'status' => 'completed',
+            'result' => ['inserted' => 1, 'skipped' => 0, 'failed' => 0],
+        ], now()->addMinutes(10));
+
+        (new ImportEmployeeBatchJob($batch->id, null))->failed(new \RuntimeException('Notifikasi import gagal.'));
+
+        $this->assertDatabaseHas('import_batches', [
+            'id' => $batch->id,
+            'status' => 'completed',
+            'inserted_count' => 1,
+        ]);
+        $this->assertSame('completed', Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batch->id)['status']);
+    }
+
     public function test_import_wizard_rejects_email_belonging_to_different_employee(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
