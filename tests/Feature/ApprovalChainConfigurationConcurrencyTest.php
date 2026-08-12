@@ -25,13 +25,13 @@ class ApprovalChainConfigurationConcurrencyTest extends TestCase
 
     protected function setUp(): void
     {
+        parent::setUp();
+
         $driver = $_SERVER['DB_CONNECTION'] ?? $_ENV['DB_CONNECTION'] ?? getenv('DB_CONNECTION');
 
         if ($driver !== 'pgsql') {
             $this->markTestSkipped('Serialisasi konfigurasi rantai approval wajib diuji pada PostgreSQL.');
         }
-
-        parent::setUp();
         $this->seed(ReferenceSeeder::class);
     }
 
