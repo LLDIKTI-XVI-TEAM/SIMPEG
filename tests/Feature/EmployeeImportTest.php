@@ -23,6 +23,7 @@ use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Mockery\Expectation;
 use Mockery\MockInterface;
@@ -120,7 +121,7 @@ class EmployeeImportTest extends TestCase
         $this->assertDatabaseCount('employees', 0);
     }
 
-    public function test_import_rejects_row_errors_without_creating_any_rows(): void
+    public function test_import_skips_existing_nip_tanpa_memblokir_baris_valid_lainnya(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
         Employee::factory()->create(['nip' => '198001012006041001']);
@@ -130,11 +131,56 @@ class EmployeeImportTest extends TestCase
             'file' => $this->csvFile($this->validCsv()),
         ]);
 
-        $response->assertUnprocessable();
-        $response->assertJsonPath('inserted', 0);
-        $response->assertJsonPath('failed', 1);
-        $response->assertJsonPath('errors.0.row', 2);
-        $this->assertDatabaseMissing('employees', ['nama_lengkap' => 'Siti', 'nama_dengan_gelar' => 'Siti Aminah']);
+        $response->assertOk();
+        $response->assertJsonPath('inserted', 1);
+        $response->assertJsonPath('skipped', 1);
+        $response->assertJsonPath('failed', 0);
+        $response->assertJsonPath('skipped_rows.0.row', 2);
+        $this->assertDatabaseHas('employees', ['nama_lengkap' => 'Siti', 'nama_dengan_gelar' => 'Siti Aminah']);
+    }
+
+    public function test_legacy_import_skips_nip_yang_sudah_ada_dan_mengimpor_baris_valid_lainnya(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        Employee::factory()->create([
+            'nip' => '198001012006041001',
+            'email_pribadi' => 'budi-lama@example.com',
+        ]);
+
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf(self::EMPLOYEE_IMPORT_ENDPOINT, [
+            'file' => $this->csvFile($this->validCsv()),
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('inserted', 1)
+            ->assertJsonPath('skipped', 1)
+            ->assertJsonPath('failed', 0)
+            ->assertJsonPath('skipped_rows.0.row', 2)
+            ->assertJsonPath('skipped_rows.0.errors.NIP.0', 'NIP sudah terdaftar di database.');
+        $this->assertDatabaseHas('employees', ['nip' => '198502122010042002']);
+        $this->assertSame(1, Employee::withTrashed()->where('nip', '198001012006041001')->count());
+    }
+
+    public function test_legacy_import_rejects_email_yang_sudah_ada_meski_nip_baru(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        Employee::factory()->create([
+            'nip' => '197001012000031001',
+            'email_pribadi' => 'budi@example.com',
+        ]);
+
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf(self::EMPLOYEE_IMPORT_ENDPOINT, [
+            'file' => $this->csvFile($this->validCsv()),
+        ]);
+
+        $response->assertUnprocessable()
+            ->assertJsonPath('inserted', 0)
+            ->assertJsonPath('skipped', 0)
+            ->assertJsonPath('failed', 1)
+            ->assertJsonPath('errors.0.row', 2)
+            ->assertJsonPath('errors.0.errors.email_pribadi.0', 'Email pegawai sudah terdaftar di database.');
     }
 
     public function test_import_rejects_duplicate_rows_without_creating_any_rows(): void
@@ -381,7 +427,7 @@ class EmployeeImportTest extends TestCase
         $this->assertDatabaseHas('import_batches', [
             'id' => $batchId,
             'status' => 'failed',
-            'error_message' => 'Antrean tidak tersedia.',
+            'error_message' => 'Proses import pegawai gagal. Silakan coba lagi atau hubungi administrator.',
         ]);
     }
 
@@ -436,7 +482,7 @@ class EmployeeImportTest extends TestCase
         $this->assertDatabaseHas('import_batches', [
             'id' => $batchId,
             'status' => 'failed',
-            'error_message' => 'Antrean tidak tersedia.',
+            'error_message' => 'Proses import pegawai gagal. Silakan coba lagi atau hubungi administrator.',
         ]);
     }
 
@@ -479,7 +525,6 @@ class EmployeeImportTest extends TestCase
         $employee = Employee::factory()->create();
         $user = User::factory()->adminKepegawaian()->create(['employee_id' => $employee->id]);
         $batch = ImportBatch::create([
-            'id' => 'completed-batch',
             'filename' => 'pegawai.xlsx',
             'type' => 'utama',
             'status' => 'completed',
@@ -564,6 +609,23 @@ class EmployeeImportTest extends TestCase
             'inserted_count' => 1,
         ]);
         $this->assertSame('completed', Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batch->id)['status']);
+    }
+
+    public function test_import_job_failure_hanya_menyimpan_pesan_generik_untuk_pengguna(): void
+    {
+        $batch = ImportBatch::create([
+            'filename' => 'pegawai.xlsx',
+            'type' => 'utama',
+            'status' => 'processing',
+        ]);
+        $sensitiveMessage = 'SQLSTATE[23505]: email rahasia@example.com dan NIP 198001012006041001.';
+
+        (new ImportEmployeeBatchJob($batch->id, null))->failed(new \RuntimeException($sensitiveMessage));
+
+        $storedMessage = ImportBatch::findOrFail($batch->id)->error_message;
+        $this->assertSame('Proses import pegawai gagal. Silakan coba lagi atau hubungi administrator.', $storedMessage);
+        $this->assertStringNotContainsString('rahasia@example.com', $storedMessage);
+        $this->assertStringNotContainsString('198001012006041001', $storedMessage);
     }
 
     public function test_import_wizard_rejects_email_belonging_to_different_employee(): void
@@ -751,6 +813,41 @@ class EmployeeImportTest extends TestCase
         $this->assertSame(1, AuditLog::where('event', 'IMPORT')->count());
     }
 
+    public function test_import_retry_menulis_tepat_satu_audit_setelah_finalisasi_pertama_gagal(): void
+    {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Constraint transaksi audit import diverifikasi pada PostgreSQL.');
+        }
+
+        $user = User::factory()->adminKepegawaian()->create();
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile([$this->validRows()[0]]),
+        ]);
+        $batchId = $upload->json('batch_id');
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])->assertOk();
+
+        DB::statement("ALTER TABLE import_batches ADD CONSTRAINT test_import_terminal_failure CHECK (status <> 'completed')");
+
+        try {
+            app(ExecuteImportBatchAction::class)->execute($batchId, $user);
+            $this->fail('Finalisasi batch seharusnya gagal pada constraint PostgreSQL.');
+        } catch (\Throwable $exception) {
+            $this->assertStringContainsString('test_import_terminal_failure', $exception->getMessage());
+        } finally {
+            DB::statement('ALTER TABLE import_batches DROP CONSTRAINT IF EXISTS test_import_terminal_failure');
+        }
+
+        app(ExecuteImportBatchAction::class)->execute($batchId, $user);
+
+        $this->assertSame(1, AuditLog::query()
+            ->where('event', 'IMPORT')
+            ->where('auditable_id', $batchId)
+            ->count());
+        $this->assertDatabaseHas('import_batches', ['id' => $batchId, 'status' => 'completed']);
+    }
+
     public function test_import_wizard_rejects_revalidation_after_execution_has_checkpointed_rows(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -779,6 +876,24 @@ class EmployeeImportTest extends TestCase
         $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])
             ->assertUnprocessable()
             ->assertJsonPath('errors.message.0', 'Batch sudah mulai dieksekusi dan tidak dapat divalidasi ulang. Jalankan eksekusi ulang untuk melanjutkan batch ini.');
+    }
+
+    public function test_import_wizard_validate_rejects_payload_baris_yang_tidak_lengkap(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile([$this->validRows()[0]]),
+        ]);
+        $batchId = $upload->json('batch_id');
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [
+            'rows' => [
+                ['row' => 2],
+            ],
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('rows.0.data');
     }
 
     public function test_import_wizard_applies_saved_column_mapping_end_to_end(): void

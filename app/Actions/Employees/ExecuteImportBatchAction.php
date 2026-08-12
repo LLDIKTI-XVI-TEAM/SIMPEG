@@ -7,6 +7,7 @@ use App\Models\ImportBatch;
 use App\Models\RefStatusPegawai;
 use App\Models\User;
 use App\Services\AuditService;
+use App\Support\EmployeeImport\ImportFailureMessage;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -171,36 +172,21 @@ class ExecuteImportBatchAction
                 }
             }
 
-            AuditService::logAs(
-                $user?->id ?? 'system',
-                $user?->name ?? 'System Queue',
-                'IMPORT',
-                'Employee',
-                null,
-                null,
-                [
-                    'template_type' => $type,
-                    'template_label' => UploadImportBatchAction::TEMPLATE_LABELS[$type] ?? UploadImportBatchAction::TEMPLATE_LABELS['utama'],
-                    'total_inserted' => $insertedCount,
-                    'total_processed' => $processedCount,
-                    'total_skipped' => $skippedCount,
-                    'total_failed' => $batch['validation']['error_count'] ?? 0,
-                    'filename' => $batch['filename'],
-                ],
-                null,
+            $failedCount = $batch['validation']['error_count'] ?? 0;
+            $this->finalizeBatchWithAudit(
+                $batchId,
+                $user,
+                $type,
+                $batch['filename'],
+                $batch['validation']['valid_count'] ?? $totalRows,
+                $insertedCount,
+                $processedCount,
+                $skippedCount,
+                $failedCount,
+                $this->collectRowIssues($batch['validation']['results']),
                 $ipAddress,
-                $userAgent
+                $userAgent,
             );
-
-            // Persist hasil akhir sebelum file sumber dihapus supaya laporan tidak pernah hilang.
-            ImportBatch::whereKey($batchId)->update([
-                'status' => 'completed',
-                'valid_count' => $batch['validation']['valid_count'] ?? $totalRows,
-                'inserted_count' => $insertedCount,
-                'skipped_count' => $skippedCount,
-                'row_issues' => $this->collectRowIssues($batch['validation']['results']),
-                'finished_at' => now(),
-            ]);
 
             $this->cleanupBatch($batchId, $batch['filename']);
 
@@ -214,27 +200,30 @@ class ExecuteImportBatchAction
                 $finalBatch['result'] = [
                     'inserted' => $insertedCount,
                     'skipped' => $skippedCount,
-                    'failed' => $batch['validation']['error_count'] ?? 0,
+                    'failed' => $failedCount,
                 ];
                 // Keep completed state for 10 minutes so user has time to view the result screen
                 Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $finalBatch, now()->addMinutes(10));
             }
 
         } catch (\Throwable $exception) {
+            ImportFailureMessage::report($batchId, $exception);
+            $userMessage = ImportFailureMessage::USER_MESSAGE;
+
             ImportBatch::whereKey($batchId)->update([
                 'status' => 'failed',
                 'valid_count' => $batch['validation']['valid_count'] ?? $totalRows,
                 'inserted_count' => $insertedCount,
                 'skipped_count' => $skippedCount,
                 'row_issues' => $this->collectRowIssues($batch['validation']['results']),
-                'error_message' => $exception->getMessage(),
+                'error_message' => $userMessage,
                 'finished_at' => now(),
             ]);
 
             $failedBatch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
             if ($failedBatch) {
                 $failedBatch['status'] = 'failed';
-                $failedBatch['error_message'] = $exception->getMessage();
+                $failedBatch['error_message'] = $userMessage;
                 Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $failedBatch, now()->addMinutes(10));
             }
             throw $exception;
@@ -248,6 +237,80 @@ class ExecuteImportBatchAction
             'skipped' => $skippedCount,
             'failed' => $batch['validation']['error_count'] ?? 0,
         ];
+    }
+
+    /**
+     * Terminal batch state dan audit wajib berada dalam satu transaksi agar audit
+     * tidak bisa tertinggal atau tercatat dua kali saat worker mencoba ulang.
+     *
+     * @param  array<int, array<string, mixed>>  $rowIssues
+     */
+    private function finalizeBatchWithAudit(
+        string $batchId,
+        ?User $user,
+        string $type,
+        string $filename,
+        int $validCount,
+        int $insertedCount,
+        int $processedCount,
+        int $skippedCount,
+        int $failedCount,
+        array $rowIssues,
+        ?string $ipAddress,
+        ?string $userAgent,
+    ): void {
+        DB::transaction(function () use (
+            $batchId,
+            $user,
+            $type,
+            $filename,
+            $validCount,
+            $insertedCount,
+            $processedCount,
+            $skippedCount,
+            $failedCount,
+            $rowIssues,
+            $ipAddress,
+            $userAgent,
+        ): void {
+            $batch = ImportBatch::query()->lockForUpdate()->findOrFail($batchId);
+            $executionState = $batch->execution_state ?? [];
+
+            if (! isset($executionState['final_audit_completed_at'])) {
+                AuditService::logAsOrFail(
+                    $user?->id ?? 'system',
+                    $user?->name ?? 'System Queue',
+                    'IMPORT',
+                    'Employee',
+                    $batchId,
+                    null,
+                    [
+                        'batch_id' => $batchId,
+                        'template_type' => $type,
+                        'template_label' => UploadImportBatchAction::TEMPLATE_LABELS[$type] ?? UploadImportBatchAction::TEMPLATE_LABELS['utama'],
+                        'total_inserted' => $insertedCount,
+                        'total_processed' => $processedCount,
+                        'total_skipped' => $skippedCount,
+                        'total_failed' => $failedCount,
+                        'filename' => $filename,
+                    ],
+                    null,
+                    $ipAddress,
+                    $userAgent,
+                );
+                $executionState['final_audit_completed_at'] = now()->toISOString();
+            }
+
+            $batch->fill([
+                'status' => 'completed',
+                'valid_count' => $validCount,
+                'inserted_count' => $insertedCount,
+                'skipped_count' => $skippedCount,
+                'row_issues' => $rowIssues,
+                'finished_at' => now(),
+                'execution_state' => $executionState,
+            ])->save();
+        });
     }
 
     /**

@@ -12,6 +12,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Import\ImportEmployeesRequest;
 use App\Http\Requests\Import\QueueImportBatchRequest;
 use App\Http\Requests\Import\SaveImportMappingRequest;
+use App\Http\Requests\Import\ValidateImportBatchRequest;
 use App\Models\ImportBatch;
 use App\Support\EmployeeImport\ImportColumnMapping;
 use App\Support\EmployeeImport\ImportTemplateWriter;
@@ -87,13 +88,9 @@ class EmployeeImportController extends Controller
     /**
      * Menangani langkah validasi pada wizard impor pegawai.
      */
-    public function validate(Request $request, string $batchId, ValidateImportBatchAction $action): JsonResponse
+    public function validate(ValidateImportBatchRequest $request, string $batchId, ValidateImportBatchAction $action): JsonResponse
     {
-        $updatedRows = $request->has('rows') ? $request->validate([
-            'rows' => ['required', 'array'],
-            'rows.*.row' => ['required', 'integer', 'min:2'],
-            'rows.*.data' => ['required', 'array'],
-        ])['rows'] : null;
+        $updatedRows = $request->validated('rows');
 
         $result = $action->execute($batchId, $updatedRows, $request->user());
 

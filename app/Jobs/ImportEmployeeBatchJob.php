@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Models\ImportBatch;
 use App\Models\User;
 use App\Services\NotificationService;
+use App\Support\EmployeeImport\ImportFailureMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -93,15 +94,17 @@ class ImportEmployeeBatchJob implements ShouldQueue
      */
     public function failed(\Throwable $exception): void
     {
+        ImportFailureMessage::report($this->batchId, $exception);
         $importBatch = ImportBatch::find($this->batchId);
         if ($importBatch?->status === 'completed') {
             return;
         }
 
         // Pastikan laporan permanen ikut menandai kegagalan (no-op bila record belum ada).
+        $userMessage = ImportFailureMessage::USER_MESSAGE;
         ImportBatch::whereKey($this->batchId)->update([
             'status' => 'failed',
-            'error_message' => $exception->getMessage(),
+            'error_message' => $userMessage,
             'finished_at' => now(),
         ]);
 
@@ -109,7 +112,7 @@ class ImportEmployeeBatchJob implements ShouldQueue
         $batch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$this->batchId);
         if ($batch) {
             $batch['status'] = 'failed';
-            $batch['error_message'] = $exception->getMessage();
+            $batch['error_message'] = $userMessage;
             Cache::put(UploadImportBatchAction::CACHE_PREFIX.$this->batchId, $batch, now()->addMinutes(10));
         }
 
@@ -122,7 +125,7 @@ class ImportEmployeeBatchJob implements ShouldQueue
                 $employee,
                 'import_pegawai_gagal',
                 'Import Pegawai Gagal',
-                'Proses import pegawai gagal: '.$exception->getMessage(),
+                $userMessage,
                 [
                     'batch_id' => $this->batchId,
                     'url' => route('pegawai.import'),

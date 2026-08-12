@@ -5,6 +5,7 @@ namespace App\Actions\Employees;
 use App\Jobs\ImportEmployeeBatchJob;
 use App\Models\ImportBatch;
 use App\Models\User;
+use App\Support\EmployeeImport\ImportFailureMessage;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -80,6 +81,7 @@ class QueueImportBatchAction
         try {
             ImportEmployeeBatchJob::dispatch($batchId, $user?->id, $ipAddress, $userAgent);
         } catch (\Throwable $exception) {
+            ImportFailureMessage::report($batchId, $exception);
             $currentStatus = ImportBatch::find($batchId)?->status;
             if ($currentStatus === 'completed') {
                 $completedBatch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId) ?? $batch;
@@ -92,14 +94,15 @@ class QueueImportBatchAction
                 ];
             }
 
+            $userMessage = ImportFailureMessage::USER_MESSAGE;
             ImportBatch::whereKey($batchId)->update([
                 'status' => 'failed',
-                'error_message' => $exception->getMessage(),
+                'error_message' => $userMessage,
                 'finished_at' => now(),
             ]);
 
             $batch['status'] = 'failed';
-            $batch['error_message'] = $exception->getMessage();
+            $batch['error_message'] = $userMessage;
             Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $batch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
 
             return [

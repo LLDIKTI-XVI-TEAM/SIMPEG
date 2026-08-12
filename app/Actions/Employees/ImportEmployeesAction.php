@@ -22,9 +22,17 @@ class ImportEmployeesAction
     public function __construct(private readonly CsvEmployeeReader $reader) {}
 
     /**
-     * Mengimpor pegawai secara all-or-nothing agar file bermasalah tidak membuat data parsial.
+     * Mengimpor semua baris valid; K-US-02 melewati NIP yang sudah tersimpan,
+     * sedangkan error validasi lain tetap membatalkan import file.
      *
-     * @return array{message: string, inserted: int, failed: int, errors: array<int, array{row: int, errors: array<string, mixed>}>}
+     * @return array{
+     *     message: string,
+     *     inserted: int,
+     *     skipped: int,
+     *     skipped_rows: array<int, array{row: int, errors: array<string, array<int, string>>}>,
+     *     failed: int,
+     *     errors: array<int, array{row: int, errors: array<string, mixed>}>
+     * }
      */
     public function execute(Request $request): array
     {
@@ -37,6 +45,7 @@ class ImportEmployeesAction
         }
 
         $validatedRows = [];
+        $skippedRows = [];
         $errors = [];
         /** @var array<string, int> $seenNips */
         $seenNips = [];
@@ -46,7 +55,7 @@ class ImportEmployeesAction
         foreach ($rows as $row) {
             $validator = Validator::make(
                 $row['data'],
-                EmployeeValidationRules::import(),
+                EmployeeValidationRules::import(allowExistingNip: true),
                 [],
                 EmployeeValidationRules::attributes(),
             );
@@ -63,7 +72,8 @@ class ImportEmployeesAction
             $data = $validator->validated();
             $referenceErrors = $this->resolveReferences($data);
             $duplicateErrors = $this->duplicateErrors($data, $row['row'], $seenNips, $seenEmails);
-            $rowErrors = array_merge_recursive($referenceErrors, $duplicateErrors);
+            $databaseErrors = $this->existingEmailErrors($data);
+            $rowErrors = array_merge_recursive($referenceErrors, $duplicateErrors, $databaseErrors);
 
             if ($rowErrors !== []) {
                 $errors[] = [
@@ -74,35 +84,67 @@ class ImportEmployeesAction
                 continue;
             }
 
-            $validatedRows[] = $data;
+            if (! empty($data['nip']) && Employee::withTrashed()->where('nip', $data['nip'])->exists()) {
+                $skippedRows[] = [
+                    'row' => $row['row'],
+                    'errors' => ['NIP' => ['NIP sudah terdaftar di database.']],
+                ];
+
+                continue;
+            }
+
+            $validatedRows[] = [
+                'row' => $row['row'],
+                'data' => $data,
+            ];
         }
 
         if ($errors !== []) {
             return $this->failedSummary($errors);
         }
 
-        DB::transaction(function () use ($validatedRows): void {
+        [$insertedCount, $executionSkippedRows] = DB::transaction(function () use ($validatedRows): array {
             $aktifId = RefStatusPegawai::where('nama', 'Aktif')->value('id')
                 ?? RefStatusPegawai::where('is_default', true)->value('id');
+            $insertedCount = 0;
+            $skippedRows = [];
 
-            foreach ($validatedRows as $data) {
+            foreach ($validatedRows as $row) {
+                $data = $row['data'];
+                if (! empty($data['nip']) && Employee::withTrashed()->where('nip', $data['nip'])->exists()) {
+                    $skippedRows[] = [
+                        'row' => $row['row'],
+                        'errors' => ['NIP' => ['NIP sudah terdaftar di database.']],
+                    ];
+
+                    continue;
+                }
+
                 Employee::create($data + [
                     'status_pegawai_id' => $aktifId,
                     'status_aktif' => 'Aktif',
                     'profil_status' => 'belum_lengkap',
                     'is_kinerja_baik' => true,
                 ]);
+                $insertedCount++;
             }
+
+            return [$insertedCount, $skippedRows];
         });
+        $skippedRows = [...$skippedRows, ...$executionSkippedRows];
 
         AuditService::log('IMPORT', 'Employee', null, null, [
-            'total_inserted' => count($validatedRows),
+            'total_inserted' => $insertedCount,
+            'total_skipped' => count($skippedRows),
+            'total_failed' => 0,
             'filename' => $request->file('file')->getClientOriginalName(),
         ], $request);
 
         return [
             'message' => 'Import selesai.',
-            'inserted' => count($validatedRows),
+            'inserted' => $insertedCount,
+            'skipped' => count($skippedRows),
+            'skipped_rows' => $skippedRows,
             'failed' => 0,
             'errors' => [],
         ];
@@ -185,15 +227,48 @@ class ImportEmployeesAction
 
     /**
      * @param  array<int, array{row: int, errors: array<string, mixed>}>  $errors
-     * @return array{message: string, inserted: int, failed: int, errors: array<int, array{row: int, errors: array<string, mixed>}>}
+     * @return array{
+     *     message: string,
+     *     inserted: int,
+     *     skipped: int,
+     *     skipped_rows: array<int, array{row: int, errors: array<string, array<int, string>>}>,
+     *     failed: int,
+     *     errors: array<int, array{row: int, errors: array<string, mixed>}>
+     * }
      */
     private function failedSummary(array $errors): array
     {
         return [
             'message' => 'Import gagal. Perbaiki baris bermasalah lalu unggah ulang.',
             'inserted' => 0,
+            'skipped' => 0,
+            'skipped_rows' => [],
             'failed' => count($errors),
             'errors' => $errors,
         ];
+    }
+
+    /**
+     * K-US-02: NIP existing akan di-skip, tetapi email existing tetap error.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, array<int, string>>
+     */
+    private function existingEmailErrors(array $data): array
+    {
+        $email = $data['email_pribadi'] ?? null;
+        if (! is_string($email) || $email === '') {
+            return [];
+        }
+
+        $email = strtolower($email);
+        $exists = Employee::withTrashed()
+            ->where(function ($query) use ($email): void {
+                $query->whereRaw('LOWER(email_pribadi) = ?', [$email])
+                    ->orWhereRaw('LOWER(email) = ?', [$email]);
+            })
+            ->exists();
+
+        return $exists ? ['email_pribadi' => ['Email pegawai sudah terdaftar di database.']] : [];
     }
 }
