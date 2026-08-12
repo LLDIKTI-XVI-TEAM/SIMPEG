@@ -199,7 +199,10 @@ class ValidateImportBatchAction
                 ->whereRaw('LOWER(email_pribadi) = ?', [strtolower($validated['email_pribadi'])]);
 
             if (! empty($validated['nip'])) {
-                $emailQuery->where('nip', '!=', $validated['nip']);
+                $emailQuery->where(function ($query) use ($validated) {
+                    $query->where('nip', '!=', $validated['nip'])
+                          ->orWhereNull('nip');
+                });
             }
 
             if ($emailQuery->exists()) {
