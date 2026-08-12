@@ -156,12 +156,29 @@ class EmployeeImportController extends Controller
         Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $batch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
 
         // Job menyimpan konteks user/IP untuk audit impor pegawai.
-        ImportEmployeeBatchJob::dispatch(
-            $batchId,
-            $request->user()?->id,
-            $request->ip(),
-            $request->userAgent()
-        );
+        try {
+            ImportEmployeeBatchJob::dispatch(
+                $batchId,
+                $request->user()?->id,
+                $request->ip(),
+                $request->userAgent()
+            );
+        } catch (\Throwable $exception) {
+            ImportBatch::whereKey($batchId)->update([
+                'status' => 'failed',
+                'error_message' => $exception->getMessage(),
+                'finished_at' => now(),
+            ]);
+
+            $batch['status'] = 'failed';
+            $batch['error_message'] = $exception->getMessage();
+            Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $batch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
+
+            return response()->json([
+                'status' => 'failed',
+                'message' => 'Batch import gagal dimasukkan ke antrean. Silakan coba lagi.',
+            ], 503);
+        }
 
         return response()->json([
             'status' => 'queued',

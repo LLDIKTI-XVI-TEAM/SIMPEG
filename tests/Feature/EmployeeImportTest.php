@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Employees\ExecuteImportBatchAction;
 use App\Jobs\ImportEmployeeBatchJob;
+use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\ImportBatch;
 use App\Models\PositionHistory;
@@ -11,9 +13,11 @@ use App\Models\RefJenisPegawai;
 use App\Models\SalaryHistory;
 use App\Models\User;
 use App\Services\Employees\TmtCalculatorService;
+use App\Services\NotificationService;
 use App\Support\EmployeeImport\ImportColumnMapping;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
+use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
@@ -329,6 +333,53 @@ class EmployeeImportTest extends TestCase
         $this->assertDatabaseHas('import_batches', ['id' => $batchId, 'status' => 'queued']);
     }
 
+    public function test_import_execute_marks_batch_failed_when_dispatch_fails(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($this->validRows()),
+        ]);
+        $batchId = $upload->json('batch_id');
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])->assertOk();
+
+        $this->mock(Dispatcher::class)
+            ->shouldReceive('dispatch')
+            ->once()
+            ->andThrow(new \RuntimeException('Antrean tidak tersedia.'));
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", [])
+            ->assertStatus(503)
+            ->assertJsonPath('status', 'failed');
+
+        $this->assertDatabaseHas('import_batches', [
+            'id' => $batchId,
+            'status' => 'failed',
+            'error_message' => 'Antrean tidak tersedia.',
+        ]);
+    }
+
+    public function test_import_job_does_not_notify_again_for_completed_batch(): void
+    {
+        $employee = Employee::factory()->create();
+        $user = User::factory()->adminKepegawaian()->create(['employee_id' => $employee->id]);
+        $action = $this->mock(ExecuteImportBatchAction::class);
+        $notifications = $this->mock(NotificationService::class);
+
+        $action->shouldReceive('execute')
+            ->once()
+            ->andReturn([
+                'already_completed' => true,
+                'inserted' => 1,
+                'skipped' => 0,
+                'failed' => 0,
+            ]);
+        $notifications->shouldNotReceive('createForEmployee');
+
+        (new ImportEmployeeBatchJob('completed-batch', $user->id))->handle($action, $notifications);
+    }
+
     public function test_import_wizard_rejects_email_belonging_to_different_employee(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -466,6 +517,52 @@ class EmployeeImportTest extends TestCase
             ->assertOk()
             ->assertJsonPath('result.inserted', 0)
             ->assertJsonPath('result.skipped', 1);
+    }
+
+    public function test_import_retry_keeps_inserted_result_when_outcome_checkpoint_fails(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile([$this->validRows()[0]]),
+        ]);
+        $batchId = $upload->json('batch_id');
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])->assertOk();
+
+        $action = new class extends ExecuteImportBatchAction
+        {
+            private bool $shouldFailCheckpoint = true;
+
+            /** @param array<string, mixed> $executionState */
+            protected function checkpointRowOutcome(ImportBatch $batch, array $executionState): void
+            {
+                if ($this->shouldFailCheckpoint) {
+                    $this->shouldFailCheckpoint = false;
+
+                    throw new \RuntimeException('Checkpoint outcome gagal disimpan.');
+                }
+
+                parent::checkpointRowOutcome($batch, $executionState);
+            }
+        };
+
+        $didFailAtCheckpoint = false;
+        try {
+            $action->execute($batchId, $user);
+        } catch (\RuntimeException $exception) {
+            $didFailAtCheckpoint = true;
+            $this->assertSame('Checkpoint outcome gagal disimpan.', $exception->getMessage());
+        }
+
+        $this->assertTrue($didFailAtCheckpoint, 'Eksekusi pertama seharusnya gagal pada checkpoint outcome.');
+
+        $result = $action->execute($batchId, $user);
+
+        $this->assertSame(1, $result['inserted']);
+        $this->assertSame(0, $result['skipped']);
+        $this->assertSame(1, Employee::where('nip', '198001012006041001')->count());
+        $this->assertSame(1, AuditLog::where('event', 'IMPORT')->count());
     }
 
     public function test_import_wizard_applies_saved_column_mapping_end_to_end(): void

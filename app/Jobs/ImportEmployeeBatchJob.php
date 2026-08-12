@@ -44,6 +44,10 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue
         $user = $this->userId ? User::find($this->userId) : null;
         $result = $action->execute($this->batchId, $user, $this->ipAddress, $this->userAgent);
 
+        if ($result['already_completed'] ?? false) {
+            return;
+        }
+
         // Kirim notifikasi in-app melalui NotificationService jika user memiliki employee record
         $employee = $user?->employee;
         if ($employee) {

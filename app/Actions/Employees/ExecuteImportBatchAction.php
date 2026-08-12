@@ -37,6 +37,7 @@ class ExecuteImportBatchAction
         if ($existingBatchModel?->status === 'completed' || ($batch['status'] ?? null) === 'completed') {
             return [
                 'message' => 'Import selesai.',
+                'already_completed' => true,
                 'inserted' => $existingBatchModel?->inserted_count ?? $batch['result']['inserted'] ?? 0,
                 'processed' => $existingBatchModel?->valid_count ?? $batch['processed_count'] ?? 0,
                 'skipped' => $existingBatchModel?->skipped_count ?? $batch['result']['skipped'] ?? 0,
@@ -119,11 +120,26 @@ class ExecuteImportBatchAction
                         $inserted = ($outcomes[$rowKey]['status'] ?? null) === 'inserted';
                     } else {
                         try {
-                            $outcome = DB::transaction(fn (): array => $this->executeValidatedRow(
-                                $type,
-                                $result['validated_data'],
-                                $nipsBeforeExecution,
-                            ));
+                            $outcome = DB::transaction(function () use ($batchId, $rowKey, $type, $result, $nipsBeforeExecution): array {
+                                $lockedBatch = ImportBatch::query()->lockForUpdate()->findOrFail($batchId);
+                                $lockedExecutionState = $lockedBatch->execution_state ?? [];
+                                $lockedOutcomes = $lockedExecutionState['outcomes'] ?? [];
+
+                                if (isset($lockedOutcomes[$rowKey])) {
+                                    return $lockedOutcomes[$rowKey];
+                                }
+
+                                $outcome = $this->executeValidatedRow(
+                                    $type,
+                                    $result['validated_data'],
+                                    $nipsBeforeExecution,
+                                );
+                                $lockedOutcomes[$rowKey] = $outcome;
+                                $lockedExecutionState['outcomes'] = $lockedOutcomes;
+                                $this->checkpointRowOutcome($lockedBatch, $lockedExecutionState);
+
+                                return $outcome;
+                            });
                         } catch (QueryException $exception) {
                             if (! $this->isDuplicateNipException($exception)) {
                                 throw $exception;
@@ -133,8 +149,6 @@ class ExecuteImportBatchAction
                         }
 
                         $outcomes[$rowKey] = $outcome;
-                        $executionState['outcomes'] = $outcomes;
-                        ImportBatch::whereKey($batchId)->update(['execution_state' => $executionState]);
                         $inserted = $outcome['status'] === 'inserted';
                     }
 
@@ -228,6 +242,7 @@ class ExecuteImportBatchAction
 
         return [
             'message' => 'Import selesai.',
+            'already_completed' => false,
             'inserted' => $insertedCount,
             'processed' => $processedCount,
             'skipped' => $skippedCount,
@@ -277,6 +292,17 @@ class ExecuteImportBatchAction
         }
 
         return ['status' => 'skip', 'employee_id' => null];
+    }
+
+    /**
+     * Menyimpan outcome bersama insert pegawai dalam transaksi row yang sama.
+     *
+     * @param  array<string, mixed>  $executionState
+     */
+    protected function checkpointRowOutcome(ImportBatch $batch, array $executionState): void
+    {
+        $batch->execution_state = $executionState;
+        $batch->save();
     }
 
     /**
