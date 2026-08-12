@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Actions\Employees\ExecuteImportBatchAction;
+use App\Actions\Employees\QueueImportBatchAction;
 use App\Actions\Employees\UploadImportBatchAction;
 use App\Jobs\ImportEmployeeBatchJob;
 use App\Models\AuditLog;
@@ -334,6 +335,81 @@ class EmployeeImportTest extends TestCase
 
         Queue::assertPushed(ImportEmployeeBatchJob::class, 1);
         $this->assertDatabaseHas('import_batches', ['id' => $batchId, 'status' => 'queued']);
+    }
+
+    public function test_queue_import_action_claims_batch_once(): void
+    {
+        Queue::fake();
+        $user = User::factory()->adminKepegawaian()->create();
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($this->validRows()),
+        ]);
+        $batchId = $upload->json('batch_id');
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])->assertOk();
+
+        $action = app(QueueImportBatchAction::class);
+        $first = $action->execute($batchId, $user, '127.0.0.1', 'PHPUnit');
+        $second = $action->execute($batchId, $user, '127.0.0.1', 'PHPUnit');
+
+        $this->assertSame('queued', $first['status']);
+        $this->assertSame('queued', $second['status']);
+        Queue::assertPushed(ImportEmployeeBatchJob::class, 1);
+    }
+
+    public function test_queue_import_action_marks_batch_failed_when_dispatch_fails(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($this->validRows()),
+        ]);
+        $batchId = $upload->json('batch_id');
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])->assertOk();
+
+        /** @var Expectation $dispatchExpectation */
+        $dispatchExpectation = $this->mock(Dispatcher::class)->shouldReceive('dispatch');
+        $dispatchExpectation
+            ->once()
+            ->andThrow(new \RuntimeException('Antrean tidak tersedia.'));
+
+        $result = app(QueueImportBatchAction::class)->execute($batchId, $user);
+
+        $this->assertSame('failed', $result['status']);
+        $this->assertDatabaseHas('import_batches', [
+            'id' => $batchId,
+            'status' => 'failed',
+            'error_message' => 'Antrean tidak tersedia.',
+        ]);
+    }
+
+    public function test_queue_import_action_keeps_completed_result_when_sync_dispatch_fails(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($this->validRows()),
+        ]);
+        $batchId = $upload->json('batch_id');
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])->assertOk();
+
+        /** @var Expectation $dispatchExpectation */
+        $dispatchExpectation = $this->mock(Dispatcher::class)->shouldReceive('dispatch');
+        $dispatchExpectation
+            ->once()
+            ->andReturnUsing(function () use ($batchId): never {
+                ImportBatch::whereKey($batchId)->update(['status' => 'completed', 'finished_at' => now()]);
+
+                throw new \RuntimeException('Notifikasi import gagal.');
+            });
+
+        $result = app(QueueImportBatchAction::class)->execute($batchId, $user);
+
+        $this->assertSame('completed', $result['status']);
+        $this->assertDatabaseHas('import_batches', ['id' => $batchId, 'status' => 'completed']);
     }
 
     public function test_import_execute_marks_batch_failed_when_dispatch_fails(): void
