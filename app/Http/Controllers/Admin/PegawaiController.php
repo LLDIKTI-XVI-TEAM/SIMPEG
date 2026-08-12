@@ -566,8 +566,14 @@ class PegawaiController extends Controller
 
         $action->execute($employee, $request);
 
-        return redirect()->route('data-backup')
-            ->with('success', 'Data pegawai '.$nama.' berhasil dipulihkan ke daftar pegawai aktif.');
+        // Tujuan redirect dibatasi ke daftar nonaktif karena halaman itu memakai gate yang sama
+        // dengan aksi restore, yaitu role super_admin/admin_kepegawaian beserta permission
+        // employees.restore. Mengarahkan ke halaman khusus Super Admin akan membuat pemulihan
+        // oleh Admin Kepegawaian berakhir pada 403 walaupun mutasinya sudah berhasil.
+        return redirect()->route('data-nonaktif')
+            ->with('success', 'Data pegawai '.$nama.' berhasil dipulihkan ke daftar pegawai aktif.')
+            ->with('employee_data_changed', true)
+            ->with('backup_data_changed', true);
     }
 
     public function bulkRestore(Request $request)

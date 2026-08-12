@@ -203,7 +203,7 @@ class EmployeeDeactivateRestoreTest extends TestCase
         ]);
     }
 
-    public function test_web_restore_redirects_and_writes_restore_audit(): void
+    public function test_web_restore_redirects_admin_kepegawaian_to_an_accessible_page(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Web Restore']);
@@ -212,7 +212,13 @@ class EmployeeDeactivateRestoreTest extends TestCase
         $this->actingAs($user);
         $response = $this->postWithCsrf(route('pegawai.restore', $employee->id));
 
-        $response->assertRedirect(route('data-backup'));
+        // Daftar nonaktif memakai gate yang sama dengan aksi restore, sehingga Admin Kepegawaian
+        // tidak boleh diarahkan ke halaman khusus Super Admin seperti data-backup.
+        $response->assertRedirect(route('data-nonaktif'));
+
+        // Redirect wajib diikuti karena assert 302 saja tidak membuktikan tujuannya dapat diakses.
+        $this->followRedirects($response)->assertOk();
+
         $this->assertDatabaseHas('employees', [
             'id' => $employee->id,
             'deleted_at' => null,
@@ -222,6 +228,83 @@ class EmployeeDeactivateRestoreTest extends TestCase
             'auditable_type' => 'Employee',
             'auditable_id' => $employee->id,
         ]);
+    }
+
+    public function test_web_restore_does_not_redirect_admin_kepegawaian_to_super_admin_page(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $employee->delete();
+
+        $this->actingAs($user);
+
+        // Menegaskan halaman tujuan lama memang tertutup bagi Admin Kepegawaian, sehingga
+        // redirect ke sana akan mengubah restore yang berhasil menjadi dead-end 403.
+        $this->get(route('data-backup'))->assertForbidden();
+
+        $this->postWithCsrf(route('pegawai.restore', $employee->id))
+            ->assertRedirect(route('data-nonaktif'));
+    }
+
+    public function test_web_restore_still_works_for_super_admin(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Web Restore Super']);
+        $employee->delete();
+
+        $this->actingAs($user);
+        $response = $this->postWithCsrf(route('pegawai.restore', $employee->id));
+
+        $response->assertRedirect(route('data-nonaktif'));
+        $this->followRedirects($response)->assertOk();
+
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'deleted_at' => null,
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'event' => 'RESTORE',
+            'auditable_type' => 'Employee',
+            'auditable_id' => $employee->id,
+        ]);
+    }
+
+    public function test_daftar_pegawai_mode_nonaktif_menyediakan_aksi_aktifkan_kembali(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $inactive = Employee::factory()->create(['nama_lengkap' => 'Pegawai Nonaktif Restore UI']);
+        $inactive->delete();
+
+        $this->actingAs($user)
+            ->get(route('data-pegawai', ['show_nonaktif' => 1]))
+            ->assertOk()
+            // Aksi restore harus melekat pada baris hasil filter nonaktif, bukan hanya di halaman terpisah.
+            ->assertSee('x-show="filters.show_nonaktif"', false)
+            ->assertSee('restorePegawai(p.id, p.nama_lengkap)', false)
+            ->assertSee("'Aktifkan kembali pegawai ' + p.nama_lengkap", false)
+            ->assertSee('/api/v1/pegawai/${this.restorePegawaiId}/restore', false)
+            // Halaman kelola nonaktif tetap dapat dicapai tanpa mengetik URL manual.
+            ->assertSee(route('data-nonaktif'), false);
+    }
+
+    public function test_aksi_aktifkan_kembali_tidak_tampil_tanpa_permission_restore(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $role = Role::where('name', 'admin_kepegawaian')->firstOrFail();
+        $permissionId = Permission::where('name', 'employees.restore')->value('id');
+        $role->permissions()->detach($permissionId);
+
+        $trashed = Employee::factory()->create();
+        $trashed->delete();
+
+        $this->actingAs($user)
+            ->get(route('data-pegawai', ['show_nonaktif' => 1]))
+            ->assertOk()
+            ->assertDontSee('restorePegawai(p.id, p.nama_lengkap)', false)
+            ->assertDontSee("'Aktifkan kembali pegawai ' + p.nama_lengkap", false);
+
+        $this->postWithCsrf(route('pegawai.restore', $trashed->id))->assertForbidden();
+        $this->get(route('data-nonaktif'))->assertForbidden();
     }
 
     public function test_inactive_page_renders_database_trashed_employees_not_static_rows(): void
