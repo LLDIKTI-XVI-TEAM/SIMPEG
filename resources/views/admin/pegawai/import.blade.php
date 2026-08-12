@@ -86,12 +86,6 @@
 
             return Object.keys(counts).filter(target => counts[target] > 1);
         },
-        normalizeSourceHeader(header) {
-            return String(header).trim().replace(/\s+/g, ' ').toLowerCase();
-        },
-        isLockedIgnoredHeader(header) {
-            return this.normalizeSourceHeader(header) === 'role';
-        },
         get missingRequiredTargets() {
             const selectedTargets = Object.values(this.columnMapping).filter(target => target && target !== 'tidak_dipakai');
             return this.requiredTargetFields.filter(target => !selectedTargets.includes(target));
@@ -816,26 +810,6 @@
                             adalah kolom yang didukung SIMPEG, tetapi nilainya tidak akan disimpan karena dipilih sebagai <strong class="text-ink">Tidak dipakai</strong>. Kondisi ini tidak memblokir import selama field wajib sudah dipetakan.
                         </p>
                     </div>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    <template x-for="header in mainHeaders" :key="header">
-                        <div class="rounded-lg border border-border p-2.5 bg-soft/30 space-y-1.5">
-                            <div class="flex items-center justify-between text-xs">
-                                <span class="font-semibold text-ink truncate font-sans" :title="header" x-text="header"></span>
-                                <span x-show="columnMapping[header] && columnMapping[header] !== 'tidak_dipakai'" class="text-[10px] font-bold text-success">✓ Matched</span>
-                                <span x-show="!columnMapping[header] || columnMapping[header] === 'tidak_dipakai'" class="text-[10px] font-bold text-warning">! Unmatched</span>
-                            </div>
-                            <template x-if="isLockedIgnoredHeader(header)">
-                                <div class="rounded-md border border-border bg-soft px-3 py-1.5 text-xs text-muted" role="status">Tidak Dipakai</div>
-                            </template>
-                            <x-form.select x-show="!isLockedIgnoredHeader(header)" x-model="columnMapping[header]" class="w-full text-xs py-1">
-                                <option value="tidak_dipakai">-- Tidak Dipakai --</option>
-                                <template x-for="field in simpegTargetFields" :key="field.key">
-                                    <option :value="field.key" x-text="field.label" :selected="columnMapping[header] === field.key"></option>
-                                </template>
-                            </x-form.select>
-                        </div>
-                    </template>
                 </div>
 
                 <div x-show="missingRequiredTargets.length > 0" x-cloak role="alert" aria-live="assertive" dusk="mapping-required-warning"
