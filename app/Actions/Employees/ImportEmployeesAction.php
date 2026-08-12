@@ -196,7 +196,7 @@ class ImportEmployeesAction
                 $seenNips[$nip] = $row;
 
                 // NIP database menjadi skip hanya bila tidak ada duplikasi dalam berkas.
-                if (Employee::where('nip', $nip)->exists()) {
+                if (Employee::withTrashed()->where('nip', $nip)->exists()) {
                     $skip = true;
                 }
             }
@@ -213,7 +213,7 @@ class ImportEmployeesAction
             }
 
             // Email yang telah digunakan tidak boleh dipakai oleh pegawai lain.
-            if (Employee::whereRaw('LOWER(email_pribadi) = ?', [$email])->exists()) {
+            if (Employee::withTrashed()->whereRaw('LOWER(email_pribadi) = ?', [$email])->exists()) {
                 $errors['email_pribadi'][] = 'Email pegawai sudah terdaftar di database.';
             }
         }

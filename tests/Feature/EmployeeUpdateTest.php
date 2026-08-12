@@ -856,4 +856,24 @@ class EmployeeUpdateTest extends TestCase
         $responseOwn = $this->putJsonWithCsrf($this->endpoint($employee1), $payloadOwn);
         $responseOwn->assertOk();
     }
+
+    public function test_update_rejects_email_owned_by_soft_deleted_employee(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create(['email_pribadi' => 'aktif@example.com']);
+        $inactiveEmployee = Employee::factory()->create(['email_pribadi' => 'arsip@example.com']);
+        $inactiveEmployee->delete();
+
+        $this->actingAs($user);
+        $response = $this->putJsonWithCsrf($this->endpoint($employee), $this->validPayload($employee, [
+            'email_pribadi' => 'ARSIP@example.com',
+        ]));
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors('email_pribadi');
+        $this->assertSame(
+            'Email sudah terdaftar pada pegawai lain.',
+            $response->json('errors.email_pribadi.0'),
+        );
+    }
 }

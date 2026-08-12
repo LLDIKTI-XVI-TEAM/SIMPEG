@@ -176,6 +176,54 @@ class EmployeeImportTest extends TestCase
             ->assertJsonPath('results.0.errors.Email Pegawai.0', 'Email pegawai sudah terdaftar di database.');
     }
 
+    /** Email pegawai nonaktif tetap dicadangkan untuk identitas pegawai tersebut. */
+    public function test_wizard_rejects_email_owned_by_soft_deleted_employee(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $inactiveEmployee = Employee::factory()->create([
+            'nip' => '199901010000000001',
+            'email_pribadi' => 'budi@example.com',
+        ]);
+        $inactiveEmployee->delete();
+
+        $this->actingAs($user);
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile([$this->validRows()[0]]),
+        ])->assertOk();
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$upload->json('batch_id')}/validate", [])
+            ->assertOk()
+            ->assertJsonPath('valid_count', 0)
+            ->assertJsonPath('error_count', 1)
+            ->assertJsonPath('skip_count', 0)
+            ->assertJsonPath('results.0.status', 'error')
+            ->assertJsonPath('results.0.errors.Email Pegawai.0', 'Email pegawai sudah terdaftar di database.');
+    }
+
+    /** NIP pegawai nonaktif tetap dikenali sebagai data lama yang harus dilewati. */
+    public function test_wizard_skips_nip_owned_by_soft_deleted_employee(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $inactiveEmployee = Employee::factory()->create([
+            'nip' => '198001012006041001',
+            'email_pribadi' => 'arsip@example.com',
+        ]);
+        $inactiveEmployee->delete();
+
+        $this->actingAs($user);
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile([$this->validRows()[0]]),
+        ])->assertOk();
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$upload->json('batch_id')}/validate", [])
+            ->assertOk()
+            ->assertJsonPath('valid_count', 0)
+            ->assertJsonPath('error_count', 0)
+            ->assertJsonPath('skip_count', 1)
+            ->assertJsonPath('results.0.status', 'skip')
+            ->assertJsonPath('results.0.errors.NIP.0', 'NIP sudah terdaftar di database.');
+    }
+
     public function test_wizard_prioritizes_duplicate_nip_in_file_over_database_skip(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -908,6 +956,50 @@ class EmployeeImportTest extends TestCase
         $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/mapping", [
             'mapping' => ['Pangkat' => 'tidak_dipakai'],
         ])->assertForbidden();
+    }
+
+    public function test_validate_endpoint_rejects_malformed_edited_rows_with_422(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $this->actingAs($user);
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($this->validRows()),
+        ])->assertOk();
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$upload->json('batch_id')}/validate", [
+            'rows' => [
+                ['row' => 1, 'data' => 'bukan-array'],
+            ],
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['rows.0.row', 'rows.0.data']);
+    }
+
+    public function test_import_batch_mutations_preserve_role_authorization_boundary(): void
+    {
+        $owner = User::factory()->adminKepegawaian()->create();
+        $unauthorizedUser = User::factory()->pegawai()->create();
+        $this->actingAs($owner);
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($this->validRows()),
+        ])->assertOk();
+        $batchId = $upload->json('batch_id');
+
+        $this->actingAs($unauthorizedUser);
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])->assertForbidden();
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", [])->assertForbidden();
+    }
+
+    public function test_import_batch_mutations_reject_malformed_uuid_at_route_boundary(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $this->actingAs($user);
+
+        $this->postJsonWithCsrf('/api/pegawai/import/bukan-uuid/validate', [])->assertNotFound();
+        $this->postJsonWithCsrf('/api/pegawai/import/bukan-uuid/mapping', [
+            'mapping' => ['NIP' => 'NIP'],
+        ])->assertNotFound();
+        $this->postJsonWithCsrf('/api/pegawai/import/bukan-uuid/execute', [])->assertNotFound();
     }
 
     public function test_import_wizard_persists_data_utama_snapshots_without_histories_or_tmt_calculation(): void

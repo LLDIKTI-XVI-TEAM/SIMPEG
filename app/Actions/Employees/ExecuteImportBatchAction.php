@@ -8,6 +8,7 @@ use App\Models\RefStatusPegawai;
 use App\Models\User;
 use App\Services\AuditService;
 use App\Services\Employees\TmtCalculatorService;
+use Carbon\CarbonInterface;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -83,18 +84,10 @@ class ExecuteImportBatchAction
                                 ->orWhere('processing_token', $attemptToken);
                         });
                 })
-                    // Redelivery pesan yang sama memakai token persisted dan boleh melanjutkan lease miliknya.
-                    ->orWhere(function ($owned) use ($attemptToken): void {
-                        $owned->where('status', 'processing')
-                            ->where('processing_token', $attemptToken);
-                    })
-                    // Worker baru dengan token berbeda hanya boleh mengambil alih jika lease pemilik
-                    // saat ini sudah kedaluwarsa. Tanpa syarat `processing_token != $attemptToken`,
-                    // cabang ini akan mencocokan batch yang sedang dimiliki token asing aktif (race
-                    // condition pada backend at-least-once dengan redelivery payload identik).
-                    ->orWhere(function ($expired) use ($attemptToken): void {
+                    // Token yang sama hanya mengidentifikasi payload, bukan membuktikan worker lama
+                    // sudah berhenti. Semua redelivery wajib menunggu lease aktif kedaluwarsa.
+                    ->orWhere(function ($expired): void {
                         $expired->where('status', 'processing')
-                            ->where('processing_token', '!=', $attemptToken)
                             ->whereNotNull('lease_expires_at')
                             ->where('lease_expires_at', '<=', now());
                     });
@@ -271,6 +264,7 @@ class ExecuteImportBatchAction
             $processedCount = (int) $batch->processed_valid_count + 1;
             $insertedCount = (int) $batch->inserted_count;
             $skippedCount = (int) $batch->skipped_count;
+            $failedCount = (int) $batch->failed_count;
             $rowIssues = $batch->row_issues ?? [];
 
             if ($outcome['status'] === 'inserted') {
@@ -295,17 +289,21 @@ class ExecuteImportBatchAction
                     $ipAddress,
                     $userAgent,
                 );
-            } else {
+            } elseif ($outcome['status'] === 'skipped') {
                 $skippedCount++;
                 if (isset($outcome['issue'])) {
                     $rowIssues[] = $outcome['issue'];
                 }
+            } else {
+                $failedCount++;
+                $rowIssues[] = $outcome['issue'];
             }
 
             $batch->forceFill([
                 'processed_valid_count' => $processedCount,
                 'inserted_count' => $insertedCount,
                 'skipped_count' => $skippedCount,
+                'failed_count' => $failedCount,
                 'row_issues' => $rowIssues,
                 'lease_expires_at' => now()->addSeconds(self::LEASE_SECONDS),
             ])->save();
@@ -314,7 +312,7 @@ class ExecuteImportBatchAction
                 'processed' => $processedCount,
                 'inserted' => $insertedCount,
                 'skipped' => $skippedCount,
-                'failed' => (int) $batch->failed_count,
+                'failed' => $failedCount,
             ];
         });
     }
@@ -345,6 +343,7 @@ class ExecuteImportBatchAction
             'skipped_count' => $batch->skipped_count,
             'failed' => $batch->failed_count,
             'failed_count' => $batch->failed_count,
+            'retry_after_seconds' => $this->retryAfterSeconds($batch),
         ];
     }
 
@@ -388,12 +387,12 @@ class ExecuteImportBatchAction
      * Menjalankan satu baris tervalidasi dan mengembalikan outcome aktual untuk rekonsiliasi counter.
      *
      * @param  array<string, mixed>  $row
-     * @return array{status: 'inserted', employee_id: string}|array{status: 'skipped', issue?: array<string, mixed>}
+     * @return array{status: 'inserted', employee_id: string}|array{status: 'skipped', issue?: array<string, mixed>}|array{status: 'failed', issue: array<string, mixed>}
      *
      * Selain NIP, keunikan email_pribadi juga diperiksa secara atomik karena skema produksi
      * memiliki indeks unik case-insensitive pada kolom tersebut. Race antara validasi dan
-     * eksekusi (pegawai lain mendaftar email yang sama setelah preview valid) diklasifikasikan
-     * sebagai skip agar counter dan laporan tetap konsisten.
+     * eksekusi (pegawai lain mendaftar email yang sama setelah preview valid) tetap diklasifikasikan
+     * sebagai error sesuai aturan bahwa satu email tidak boleh menunjuk pegawai berbeda.
      */
     private function executeValidatedRow(string $type, array $row): array
     {
@@ -409,12 +408,14 @@ class ExecuteImportBatchAction
             // Validasi dan eksekusi terpisah waktu; NIP dan email dapat diklaim pegawai lain
             // setelah preview dinyatakan valid. Pre-check atomik mencegah insert yang tidak perlu
             // sebelum constraint database melempar QueryException.
-            if (! empty($data['nip']) && Employee::where('nip', $data['nip'])->exists()) {
+            if (! empty($data['nip']) && Employee::withTrashed()->where('nip', $data['nip'])->exists()) {
                 return $this->duplicateNipOutcome($row);
             }
 
             if (! empty($data['email_pribadi'])
-                && Employee::whereRaw('LOWER(email_pribadi) = ?', [strtolower((string) $data['email_pribadi'])])->exists()
+                && Employee::withTrashed()
+                    ->whereRaw('LOWER(email_pribadi) = ?', [strtolower((string) $data['email_pribadi'])])
+                    ->exists()
             ) {
                 return $this->duplicateEmailOutcome($row);
             }
@@ -507,26 +508,41 @@ class ExecuteImportBatchAction
         }
 
         return $sqlState === '23000'
-            && preg_match('/unique constraint failed:\s*employees\.email_pribadi\b/i', $driverDiagnostic) === 1;
+            && preg_match(
+                '/unique constraint failed:\s*(?:employees\.email_pribadi\b|index ["\']employees_email_pribadi_unique["\'])/i',
+                $driverDiagnostic,
+            ) === 1;
     }
 
     /**
      * @param  array<string, mixed>  $row
-     * @return array{status: 'skipped', issue: array<string, mixed>}
+     * @return array{status: 'failed', issue: array<string, mixed>}
      */
     private function duplicateEmailOutcome(array $row): array
     {
         return [
-            'status' => 'skipped',
+            'status' => 'failed',
             'issue' => [
                 'row' => $row['row'] ?? null,
                 'nama' => $row['nama'] ?? '-',
-                'kategori' => 'dilewati',
+                'kategori' => 'gagal',
                 'errors' => [
                     'Email' => ['Email sudah terdaftar saat proses import dijalankan.'],
                 ],
             ],
         ];
+    }
+
+    /** Menghitung jeda minimum sebelum delivery boleh mencoba CAS lease kembali. */
+    private function retryAfterSeconds(ImportBatch $batch): int
+    {
+        $leaseExpiresAt = $batch->lease_expires_at;
+
+        if ($batch->status !== 'processing' || ! $leaseExpiresAt instanceof CarbonInterface) {
+            return 1;
+        }
+
+        return max(1, $leaseExpiresAt->getTimestamp() - now()->getTimestamp());
     }
 
     private function cleanupBatch(string $batchId, string $filename): void

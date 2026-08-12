@@ -195,6 +195,27 @@ class EmployeeCreationTest extends TestCase
         );
     }
 
+    public function test_creation_rejects_email_owned_by_soft_deleted_employee(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $inactiveEmployee = Employee::factory()->create([
+            'email_pribadi' => 'arsip.pegawai@example.com',
+        ]);
+        $inactiveEmployee->delete();
+
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf(self::EMPLOYEES_ENDPOINT, $this->validPayload([
+            'email_pribadi' => 'ARSIP.PEGAWAI@example.com',
+        ]));
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors('email_pribadi');
+        $this->assertSame(
+            'Email sudah terdaftar pada pegawai lain.',
+            $response->json('errors.email_pribadi.0'),
+        );
+    }
+
     private function postJsonWithCsrf(string $uri, array $data)
     {
         return $this->withSession(['_token' => 'test-token'])

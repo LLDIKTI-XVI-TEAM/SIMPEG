@@ -9,6 +9,7 @@ use App\Services\AuditService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Tests\TestCase;
@@ -259,7 +260,12 @@ class UserMappingControllerTest extends TestCase
         $this->assertSame($employee->id, $response->json('data.0.id'));
         $this->assertSame('kc-safe-legacy-user', $response->json('data.0.keycloak_id'));
 
-        Employee::factory()->create(['email' => $legacyEmail]);
+        $ambiguousEmployee = Employee::factory()->create([
+            'email_pribadi' => 'kanonis-lain@example.com',
+        ]);
+        DB::table('employees')->where('id', $ambiguousEmployee->id)->update([
+            'email' => $legacyEmail,
+        ]);
 
         $ambiguousResponse = $this->actingAs($admin)->getJson(route('user-management.data', [
             'status' => 'terhubung',

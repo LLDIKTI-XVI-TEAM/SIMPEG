@@ -65,8 +65,10 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue, ShouldQueue
         );
 
         if (($result['executed'] ?? false) !== true && in_array($result['status'] ?? null, ['queued', 'processing'], true)) {
-            // Jangan ACK pesan ketika batch masih non-terminal dan dimiliki token lain.
-            throw new \RuntimeException('Batch import masih dimiliki worker lain.');
+            // Jangan ACK atau jalankan delivery paralel saat lease worker lain masih aktif.
+            $this->release((int) ($result['retry_after_seconds'] ?? 1));
+
+            return;
         }
 
         // Redelivery completed tetap masuk jalur ini untuk memulihkan crash setelah commit completion.
@@ -91,17 +93,24 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue, ShouldQueue
             // CAS ini memastikan callback gagal yang kalah race dari completion tidak memiliki side effect.
             $updated = ImportBatch::query()
                 ->whereKey($this->batchId)
-                ->whereIn('status', ['queued', 'processing'])
-                ->where(function ($owner) use ($isLegacyPayload, $processingToken): void {
-                    $owner->where('processing_token', $processingToken);
+                ->where(function ($claimable) use ($isLegacyPayload, $processingToken): void {
+                    $claimable->where(function ($queued) use ($isLegacyPayload, $processingToken): void {
+                        $queued->where('status', 'queued')
+                            ->where(function ($owner) use ($isLegacyPayload, $processingToken): void {
+                                $owner->where('processing_token', $processingToken);
 
-                    // Payload lama dapat gagal sebelum claim pertama, saat batch queued belum memiliki token.
-                    if ($isLegacyPayload) {
-                        $owner->orWhere(function ($unowned): void {
-                            $unowned->where('status', 'queued')
-                                ->whereNull('processing_token');
-                        });
-                    }
+                                // Payload lama dapat gagal sebelum claim pertama, saat batch queued belum memiliki token.
+                                if ($isLegacyPayload) {
+                                    $owner->orWhereNull('processing_token');
+                                }
+                            });
+                    })->orWhere(function ($expired) use ($processingToken): void {
+                        // Delivery duplikat tidak boleh menutup worker aktif hanya karena token payload sama.
+                        $expired->where('status', 'processing')
+                            ->where('processing_token', $processingToken)
+                            ->whereNotNull('lease_expires_at')
+                            ->where('lease_expires_at', '<=', now());
+                    });
                 })
                 ->update([
                     'status' => 'failed',

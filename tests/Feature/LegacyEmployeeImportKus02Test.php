@@ -117,6 +117,53 @@ class LegacyEmployeeImportKus02Test extends TestCase
         $this->assertDatabaseCount('employees', 1); // Only the original
     }
 
+    /** Email pegawai nonaktif tetap merupakan identitas yang tidak boleh dipakai ulang. */
+    public function test_legacy_endpoint_rejects_email_owned_by_soft_deleted_employee(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $inactiveEmployee = Employee::factory()->create(['email_pribadi' => 'budi@example.com']);
+        $inactiveEmployee->delete();
+
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf(self::LEGACY_ENDPOINT, [
+            'file' => $this->csvFile($this->buildCsv([
+                ['Budi Santoso', 'BUDI@example.com', '198001012006041001'],
+            ])),
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonPath('failed', 1);
+        $response->assertJsonPath(
+            'errors.0.errors.email_pribadi.0',
+            'Email pegawai sudah terdaftar di database.',
+        );
+        $this->assertSame(1, Employee::withTrashed()->count());
+    }
+
+    /** NIP pegawai nonaktif tetap diperlakukan sebagai baris lama yang dilewati. */
+    public function test_legacy_endpoint_skips_nip_owned_by_soft_deleted_employee(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $inactiveEmployee = Employee::factory()->create([
+            'nip' => '198001012006041001',
+            'email_pribadi' => 'arsip@example.com',
+        ]);
+        $inactiveEmployee->delete();
+
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf(self::LEGACY_ENDPOINT, [
+            'file' => $this->csvFile($this->buildCsv([
+                ['Budi Santoso', 'budi@example.com', '198001012006041001'],
+            ])),
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('inserted', 0);
+        $response->assertJsonPath('skipped', 1);
+        $response->assertJsonPath('failed', 0);
+        $this->assertSame(1, Employee::withTrashed()->count());
+    }
+
     /**
      * Error email tidak boleh tertutup oleh status skip saat NIP pada baris yang sama sudah terdaftar.
      */

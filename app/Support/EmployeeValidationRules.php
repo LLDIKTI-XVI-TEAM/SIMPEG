@@ -76,7 +76,11 @@ class EmployeeValidationRules
                 'email',
                 'max:255',
                 function (string $attribute, mixed $value, \Closure $fail): void {
-                    if (Employee::whereRaw('LOWER(email_pribadi) = ?', [strtolower(trim((string) $value))])->exists()) {
+                    // Identitas email tetap dicadangkan ketika pegawai dinonaktifkan agar restore aman.
+                    if (Employee::withTrashed()
+                        ->whereRaw('LOWER(email_pribadi) = ?', [strtolower(trim((string) $value))])
+                        ->exists()
+                    ) {
                         $fail('Email sudah terdaftar pada pegawai lain.');
                     }
                 },
@@ -109,7 +113,9 @@ class EmployeeValidationRules
             'email',
             'max:255',
             function (string $attribute, mixed $value, \Closure $fail) use ($employee): void {
-                if (Employee::whereRaw('LOWER(email_pribadi) = ?', [strtolower(trim((string) $value))])
+                // Pegawai nonaktif tetap memiliki email kanonisnya; hanya email milik record ini yang dikecualikan.
+                if (Employee::withTrashed()
+                    ->whereRaw('LOWER(email_pribadi) = ?', [strtolower(trim((string) $value))])
                     ->where('id', '!=', $employee->id)
                     ->exists()
                 ) {
