@@ -641,7 +641,7 @@ class EmployeeImportTest extends TestCase
     }
 
     #[DataProvider('reservedRoleHeaderProvider')]
-    public function test_mapping_endpoint_menolak_source_role_setelah_normalisasi(string $sourceHeader): void
+    public function test_mapping_endpoint_menormalisasi_source_role_setelah_normalisasi(string $sourceHeader): void
     {
         $user = User::factory()->adminKepegawaian()->create();
 
@@ -656,17 +656,22 @@ class EmployeeImportTest extends TestCase
         $upload->assertOk();
         $batchId = $upload->json('batch_id');
 
-        // Target asli dilepas lebih dulu agar penolakan membuktikan invariant source reserved,
-        // bukan sekadar terpicu oleh validasi target ganda.
+        $storedHeader = collect(array_keys($upload->json('mapping')))
+            ->first(fn (string $header): bool => mb_strtolower(preg_replace('/\s+/', ' ', trim($header)) ?? $header) === 'role');
+
+        $this->assertNotNull($storedHeader);
+
+        // Target asli dilepas lebih dulu agar normalisasi reserved source diuji
+        // secara independen dari validasi target ganda.
         $response = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/mapping", [
             'mapping' => [
                 'Pangkat' => 'tidak_dipakai',
-                $sourceHeader => 'Pangkat',
+                $storedHeader => 'Pangkat',
             ],
         ]);
 
-        $response->assertUnprocessable();
-        $response->assertJsonValidationErrors('mapping');
+        $response->assertOk();
+        $this->assertSame('tidak_dipakai', $response->json("mapping.{$storedHeader}"));
     }
 
     #[DataProvider('reservedRoleHeaderProvider')]

@@ -17,9 +17,6 @@ class ImportColumnMapping
     /** Penanda kolom sumber yang nilainya tidak dipakai. */
     public const IGNORE = 'tidak_dipakai';
 
-    /** Header sumber yang dikelola oleh domain lain dan tidak boleh masuk import pegawai. */
-    private const RESERVED_SOURCES = ['Role'];
-
     /**
      * Header sumber yang tidak boleh menjadi input data apapun, terlepas dari
      * pilihan admin. Kolom ini selalu dipaksa ke IGNORE sebelum mapping disimpan
