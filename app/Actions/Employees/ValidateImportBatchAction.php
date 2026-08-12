@@ -35,8 +35,15 @@ class ValidateImportBatchAction
             abort(403, 'Anda tidak memiliki akses ke batch import ini.');
         }
 
-        $executionState = ImportBatch::find($batchId)?->execution_state;
-        if (is_array($executionState) && ($executionState['outcomes'] ?? []) !== []) {
+        $persistedBatch = ImportBatch::find($batchId);
+        $executionState = $persistedBatch?->execution_state;
+        $executionStarted = in_array($persistedBatch?->status, ['queued', 'processing', 'completed'], true)
+            || (is_array($executionState) && ($executionState['outcomes'] ?? []) !== []);
+
+        // Status permanen adalah sumber kebenaran lifecycle. Cache wizard hanya
+        // menyimpan payload UI sehingga tidak boleh menimpa batch yang sudah diklaim
+        // worker, bahkan sebelum outcome baris pertama tersimpan.
+        if ($executionStarted) {
             throw ValidationException::withMessages([
                 'message' => ['Batch sudah mulai dieksekusi dan tidak dapat divalidasi ulang. Jalankan eksekusi ulang untuk melanjutkan batch ini.'],
             ]);

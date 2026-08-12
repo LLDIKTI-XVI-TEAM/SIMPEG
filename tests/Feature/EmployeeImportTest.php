@@ -878,6 +878,60 @@ class EmployeeImportTest extends TestCase
             ->assertJsonPath('errors.message.0', 'Batch sudah mulai dieksekusi dan tidak dapat divalidasi ulang. Jalankan eksekusi ulang untuk melanjutkan batch ini.');
     }
 
+    public function test_import_wizard_rejects_revalidation_when_batch_is_queued_before_first_outcome(): void
+    {
+        Queue::fake();
+        $user = User::factory()->adminKepegawaian()->create();
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile([$this->validRows()[0]]),
+        ]);
+        $batchId = $upload->json('batch_id');
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])->assertOk();
+        $before = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", [])
+            ->assertOk()
+            ->assertJsonPath('status', 'queued');
+
+        $editedRows = $before['rows'];
+        $editedRows[0]['data']['Nama Pegawai'] = 'Tidak Boleh Mengubah Batch Queued';
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", ['rows' => $editedRows])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.message.0', 'Batch sudah mulai dieksekusi dan tidak dapat divalidasi ulang. Jalankan eksekusi ulang untuk melanjutkan batch ini.');
+
+        $after = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
+        $this->assertSame($before['rows'], $after['rows']);
+        $this->assertDatabaseHas('import_batches', ['id' => $batchId, 'status' => 'queued']);
+    }
+
+    public function test_import_wizard_rejects_revalidation_for_completed_batch_with_empty_outcomes(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $this->actingAs($user);
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile([$this->validRows()[0]]),
+        ]);
+        $batchId = $upload->json('batch_id');
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])->assertOk();
+
+        ImportBatch::create([
+            'id' => $batchId,
+            'user_id' => $user->id,
+            'filename' => 'pegawai.xlsx',
+            'type' => 'utama',
+            'status' => 'completed',
+            'execution_state' => ['outcomes' => []],
+        ]);
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.message.0', 'Batch sudah mulai dieksekusi dan tidak dapat divalidasi ulang. Jalankan eksekusi ulang untuk melanjutkan batch ini.');
+    }
+
     public function test_import_wizard_validate_rejects_payload_baris_yang_tidak_lengkap(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
