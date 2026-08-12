@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Http\Requests\Employee\DeactivateEmployeeRequest;
+use App\Http\Requests\Employee\RestoreEmployeeRequest;
 use App\Models\Employee;
 use App\Models\Permission;
 use App\Models\Role;
@@ -184,6 +186,83 @@ class EmployeeDeactivateRestoreTest extends TestCase
             ->assertOk()
             ->assertJsonPath('employees.data.0.nama_lengkap', 'Pegawai Nonaktif Filter')
             ->assertJsonMissing(['nama_lengkap' => 'Pegawai Aktif Filter']);
+    }
+
+    public function test_nonaktif_filter_returns_trashed_employees_of_every_lifecycle_status(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        // Pegawai yang dinonaktifkan justru sering berstatus Pensiun atau Mutasi, sehingga filter
+        // daftar nonaktif tidak boleh lagi menerapkan default hanya-Aktif.
+        $names = [
+            'Aktif' => 'Nonaktif Berstatus Aktif',
+            'Pensiun' => 'Nonaktif Berstatus Pensiun',
+            'Mutasi' => 'Nonaktif Berstatus Mutasi',
+            'Non-Aktif' => 'Nonaktif Berstatus Non-Aktif',
+        ];
+
+        foreach ($names as $statusAktif => $nama) {
+            $employee = Employee::factory()->create([
+                'nama_lengkap' => $nama,
+                'status_aktif' => $statusAktif,
+            ]);
+            $employee->delete();
+        }
+
+        Employee::factory()->create(['nama_lengkap' => 'Masih Aktif Tidak Boleh Muncul']);
+
+        $response = $this->actingAs($user)
+            ->getJson('/api/v1/pegawai?show_nonaktif=true&per_page=50')
+            ->assertOk();
+
+        $returned = collect($response->json('employees.data'))->pluck('nama_lengkap');
+
+        foreach ($names as $nama) {
+            $this->assertContains($nama, $returned->all());
+        }
+
+        $this->assertNotContains('Masih Aktif Tidak Boleh Muncul', $returned->all());
+        $this->assertSame(4, $response->json('employees.total'));
+    }
+
+    public function test_nonaktif_filter_still_honours_explicit_status_choice(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $pensiun = Employee::factory()->create([
+            'nama_lengkap' => 'Nonaktif Pensiun Terpilih',
+            'status_aktif' => 'Pensiun',
+        ]);
+        $pensiun->delete();
+
+        $mutasi = Employee::factory()->create([
+            'nama_lengkap' => 'Nonaktif Mutasi Tidak Terpilih',
+            'status_aktif' => 'Mutasi',
+        ]);
+        $mutasi->delete();
+
+        $this->actingAs($user)
+            ->getJson('/api/v1/pegawai?show_nonaktif=true&status_aktif=Pensiun')
+            ->assertOk()
+            ->assertJsonPath('employees.total', 1)
+            ->assertJsonPath('employees.data.0.nama_lengkap', 'Nonaktif Pensiun Terpilih');
+    }
+
+    public function test_active_employee_list_keeps_default_aktif_filter(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        Employee::factory()->create(['nama_lengkap' => 'Aktif Muncul Default']);
+        Employee::factory()->create([
+            'nama_lengkap' => 'Pensiun Tidak Muncul Default',
+            'status_aktif' => 'Pensiun',
+        ]);
+
+        $this->actingAs($user)
+            ->getJson('/api/v1/pegawai')
+            ->assertOk()
+            ->assertJsonPath('employees.total', 1)
+            ->assertJsonPath('employees.data.0.nama_lengkap', 'Aktif Muncul Default');
     }
 
     public function test_web_deactivate_redirects_and_writes_soft_delete_audit(): void
@@ -374,6 +453,78 @@ class EmployeeDeactivateRestoreTest extends TestCase
         $this->actingAs($superAdmin)
             ->postWithCsrf(route('pegawai.bulkRestore'), ['ids' => ['not-a-uuid']])
             ->assertSessionHasErrors('ids.0');
+    }
+
+    public function test_daftar_mode_nonaktif_menutup_selector_dan_aksi_massal(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $trashed = Employee::factory()->create();
+        $trashed->delete();
+
+        $response = $this->actingAs($user)
+            ->get(route('data-pegawai', ['show_nonaktif' => 1]))
+            ->assertOk();
+
+        // Select-all dan checkbox baris harus benar-benar tertutup, bukan hanya tersembunyi,
+        // agar aksi massal pegawai aktif tidak bisa dipicu terhadap data nonaktif.
+        $response->assertSee('x-show="!filters.show_nonaktif" x-bind:disabled="!(!filters.show_nonaktif)"', false);
+        $response->assertSee('x-bind:disabled="filters.show_nonaktif"', false);
+        $response->assertSee('id="bulk-bar" x-show="!filters.show_nonaktif"', false);
+
+        // Seluruh pengumpulan pilihan mengabaikan checkbox yang dinonaktifkan.
+        $response->assertSee('.row-check:not([disabled]):checked', false);
+        $response->assertDontSee("document.querySelectorAll('.row-check:checked')", false);
+    }
+
+    public function test_mutasi_daftar_memuat_ulang_halaman_agar_pagination_sinkron(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $response = $this->actingAs($user)
+            ->get(route('data-pegawai'))
+            ->assertOk();
+
+        // Restore dan nonaktifkan mengubah jumlah data server, sehingga halaman dimuat ulang
+        // dan metadata pagination tidak boleh lagi ditebak di sisi klien.
+        $response->assertSee('async refreshAfterListMembershipChange()', false);
+        $response->assertSee('await this.refreshAfterListMembershipChange();', false);
+        $response->assertSee('if (requestedPage > lastPage)', false);
+        $response->assertDontSee('this.meta.total = Math.max(0, this.meta.total - 1);', false);
+    }
+
+    public function test_local_api_auth_bypass_still_applies_to_deactivate_and_restore_requests(): void
+    {
+        // Route pegawai melepas middleware auth saat flag lokal aktif, sehingga FormRequest
+        // tidak boleh mengubah kontrak itu menjadi 403.
+        $this->app->detectEnvironment(fn () => 'local');
+        config(['services.simpeg.disable_employee_api_auth' => true]);
+
+        $this->assertTrue((new DeactivateEmployeeRequest)->authorize());
+        $this->assertTrue((new RestoreEmployeeRequest)->authorize());
+    }
+
+    public function test_deactivate_and_restore_requests_stay_fail_closed_without_local_bypass(): void
+    {
+        $this->app->detectEnvironment(fn () => 'local');
+        config(['services.simpeg.disable_employee_api_auth' => false]);
+
+        $withoutFlag = [new DeactivateEmployeeRequest, new RestoreEmployeeRequest];
+
+        foreach ($withoutFlag as $request) {
+            $request->setUserResolver(fn () => null);
+            $this->assertFalse($request->authorize());
+        }
+
+        // Flag hanya berlaku di environment local; production tetap menegakkan role dan permission.
+        $this->app->detectEnvironment(fn () => 'production');
+        config(['services.simpeg.disable_employee_api_auth' => true]);
+
+        $inProduction = [new DeactivateEmployeeRequest, new RestoreEmployeeRequest];
+
+        foreach ($inProduction as $request) {
+            $request->setUserResolver(fn () => null);
+            $this->assertFalse($request->authorize());
+        }
     }
 
     private function postJsonWithCsrf(string $uri): TestResponse

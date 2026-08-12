@@ -14,6 +14,13 @@ class RestoreEmployeeRequest extends FormRequest
      */
     public function authorize(): bool
     {
+        // Menjaga kontrak bypass API lokal yang sudah dipakai route pegawai. Flag ini hanya
+        // berlaku di environment local sehingga gate role/permission produksi tetap utuh.
+        if (app()->environment('local')
+            && config('services.simpeg.disable_employee_api_auth')) {
+            return true;
+        }
+
         $user = $this->user();
 
         return $user !== null

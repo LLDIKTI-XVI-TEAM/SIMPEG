@@ -23,7 +23,9 @@ class ListEmployeesAction
 
         $employees = Employee::query();
 
-        if (filter_var($validated['show_nonaktif'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+        $showNonaktif = filter_var($validated['show_nonaktif'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+        if ($showNonaktif) {
             $employees->onlyTrashed();
         }
 
@@ -90,7 +92,24 @@ class ListEmployeesAction
                         $query->where('status_pegawai_id', $statusPegawaiId);
                     }
                 },
-                fn ($query) => $query->where('status_aktif', ($validated['status_aktif'] ?? '') ?: 'Aktif')
+                function ($query) use ($validated, $showNonaktif): void {
+                    $statusAktif = ($validated['status_aktif'] ?? '') ?: null;
+
+                    // Pilihan status eksplisit selalu dihormati pada kedua mode daftar.
+                    if ($statusAktif !== null) {
+                        $query->where('status_aktif', $statusAktif);
+
+                        return;
+                    }
+
+                    // Default hanya-Aktif adalah aturan daftar pegawai aktif. Pada daftar
+                    // pegawai nonaktif, default itu akan menyembunyikan pegawai yang sudah
+                    // dinonaktifkan namun berstatus Pensiun, Mutasi, atau Non-Aktif, sehingga
+                    // data yang justru dicari lewat filter ini menjadi tidak dapat ditemukan.
+                    if (! $showNonaktif) {
+                        $query->where('status_aktif', 'Aktif');
+                    }
+                }
             )
             ->orderBy($sort, $direction)
             ->paginate($perPage)

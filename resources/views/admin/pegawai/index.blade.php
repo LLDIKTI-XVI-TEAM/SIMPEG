@@ -85,6 +85,11 @@
                 const data = JSON.parse(cached);
                 this.pegawaiRows = data.rows;
                 this.meta = data.meta;
+                // Pilihan baris tidak boleh terbawa antar halaman atau antar mode filter.
+                this.$nextTick(() => {
+                    document.querySelectorAll('.row-check').forEach(c => c.checked = false);
+                    updateBulkBar();
+                });
                 return;
             } catch (e) {
                 sessionStorage.removeItem(cKey);
@@ -135,6 +140,21 @@
 
     applyFilter() {
         this.fetchPage(1);
+    },
+
+    /**
+     * Nonaktifkan dan pulihkan memindahkan pegawai antar daftar sehingga jumlah data di server
+     * berubah. Halaman dimuat ulang agar jumlah baris, penomoran, dan rentang data tidak
+     * menyisakan metadata lama, termasuk saat baris terakhir sebuah halaman ikut berpindah.
+     */
+    async refreshAfterListMembershipChange() {
+        const requestedPage = this.meta?.current_page ?? 1;
+        await this.fetchPage(requestedPage);
+
+        const lastPage = this.meta?.last_page ?? 1;
+        if (requestedPage > lastPage) {
+            await this.fetchPage(lastPage);
+        }
     },
 
     setSort(column) {
@@ -202,15 +222,9 @@
             }
             // Cache daftar aktif dan nonaktif harus dimuat ulang agar kedua mode konsisten.
             this.clearCache();
-            
-            // Hapus dari data yang tampil sekarang
-            const idx = this.pegawaiRows.findIndex(r => r.id === this.deletePegawaiId);
-            if (idx !== -1) {
-                this.pegawaiRows.splice(idx, 1);
-                this.meta.total = Math.max(0, this.meta.total - 1);
-            }
-            
+
             this.showDeleteModal = false;
+            await this.refreshAfterListMembershipChange();
         } catch (error) {
             console.error('Error menghapus pegawai:', error);
             alert('Gagal menghapus pegawai: ' + error.message);
@@ -247,13 +261,8 @@
             // Pegawai berpindah dari daftar nonaktif ke daftar aktif, sehingga cache kedua mode harus dibuang.
             this.clearCache();
 
-            const idx = this.pegawaiRows.findIndex(r => r.id === this.restorePegawaiId);
-            if (idx !== -1) {
-                this.pegawaiRows.splice(idx, 1);
-                this.meta.total = Math.max(0, this.meta.total - 1);
-            }
-
             this.showRestoreModal = false;
+            await this.refreshAfterListMembershipChange();
         } catch (error) {
             console.error('Error mengaktifkan kembali pegawai:', error);
             alert('Gagal mengaktifkan kembali pegawai: ' + error.message);
@@ -529,7 +538,7 @@
             isLoading="isLoading" perPage="perPage" setPerPage="setPerPage($event.target.value)" sort="sort"
             direction="direction" setSort="setSort(col)" searchModel="filters.search"
             searchPlaceholder="Cari nama atau NIP" emptyTitle="Tidak ada data pegawai yang sesuai."
-            emptyIcon="search" :colspanCount="count($tableColumns)" :checkAllId="!($isReadOnly ?? false) ? 'check-all' : null" filterClass="lg:grid-cols-6">
+            emptyIcon="search" :colspanCount="count($tableColumns)" :checkAllId="!($isReadOnly ?? false) ? 'check-all' : null" checkAllShow="!filters.show_nonaktif" filterClass="lg:grid-cols-6">
             {{-- ---- Filter Slots ---- --}}
             <x-slot:filters>
                 <label class="flex min-h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-xs font-semibold text-ink cursor-pointer">
@@ -606,7 +615,8 @@
                         {{-- Checkbox --}}
                         @if (! ($isReadOnly ?? false))
                             <td class="px-4 py-3">
-                                <x-form.checkbox x-show="!filters.show_nonaktif" size="sm" class="row-check" />
+                                <x-form.checkbox x-show="!filters.show_nonaktif"
+                                    x-bind:disabled="filters.show_nonaktif" size="sm" class="row-check" />
                             </td>
                         @endif
 
@@ -787,7 +797,9 @@
         {{-- ============================================================ --}}
         {{-- BULK ACTION FLOATING BAR --}}
         {{-- ============================================================ --}}
-        <div id="bulk-bar"
+        {{-- Aksi massal hanya berlaku untuk pegawai aktif; dataset nonaktif hanya mendukung pemulihan
+             satu per satu sehingga selector dan bar aksi massal ditutup pada mode tersebut. --}}
+        <div id="bulk-bar" x-show="!filters.show_nonaktif"
             class="fixed bottom-6 left-1/2 z-40 hidden -translate-x-1/2 items-center gap-3 rounded-lg border border-border bg-surface px-6 py-3.5 shadow-lg">
             <p class="text-sm font-semibold text-ink"><span id="selected-count">0</span> pegawai dipilih</p>
             <div class="h-4 w-px bg-border"></div>
@@ -800,7 +812,7 @@
                 Export Pilihan
             </button>
             <button @click="
-            const count = document.querySelectorAll('.row-check:checked').length;
+            const count = document.querySelectorAll('.row-check:not([disabled]):checked').length;
             if (count === 0) { window.alert('Tidak ada data pegawai yang dipilih.'); return; }
             document.getElementById('modal-title-bulk-delete').innerText = 'Nonaktifkan ' + count + ' Pegawai';
             $dispatch('open-confirm-bulk-delete');
@@ -1066,7 +1078,7 @@
                             isBulkDeleting = true;
                             const form = document.getElementById('bulk-destroy-form');
                             form.querySelectorAll('input[name=\'ids[]\']').forEach(el => el.remove());
-                            document.querySelectorAll('.row-check:checked').forEach(cb => {
+                            document.querySelectorAll('.row-check:not([disabled]):checked').forEach(cb => {
                                 const inp = document.createElement('input');
                                 inp.type = 'hidden'; inp.name = 'ids[]';
                                 inp.value = cb.closest('tr')?.dataset.id ?? cb.value;
@@ -1313,8 +1325,10 @@
 
     <script>
         function updateBulkBar() {
-            const allBoxes = document.querySelectorAll('.row-check');
-            const checked = document.querySelectorAll('.row-check:checked');
+            // Baris yang dinonaktifkan (mode daftar nonaktif) tidak boleh ikut dihitung sebagai
+            // pilihan agar bar aksi massal tidak muncul untuk data yang tidak mendukungnya.
+            const allBoxes = document.querySelectorAll('.row-check:not([disabled])');
+            const checked = document.querySelectorAll('.row-check:not([disabled]):checked');
             const bar = document.getElementById('bulk-bar');
             const count = document.getElementById('selected-count');
             const checkAll = document.getElementById('check-all');
@@ -1412,7 +1426,7 @@
         }
 
         function exportSelectedData() {
-            const checked = document.querySelectorAll('.row-check:checked');
+            const checked = document.querySelectorAll('.row-check:not([disabled]):checked');
             const ids = Array.from(checked).map(c => c.closest('tr')?.dataset.id).filter(Boolean);
             if (!ids.length) { alert('Tidak ada data yang dipilih.'); return; }
             const form = document.createElement('form');
@@ -1437,7 +1451,7 @@
                     const shouldCheck = e.target.indeterminate ? true : e.target.checked;
                     e.target.indeterminate = false;
                     e.target.checked = shouldCheck;
-                    document.querySelectorAll('.row-check').forEach(c => c.checked = shouldCheck);
+                    document.querySelectorAll('.row-check:not([disabled])').forEach(c => c.checked = shouldCheck);
                 }
                 updateBulkBar();
             }
