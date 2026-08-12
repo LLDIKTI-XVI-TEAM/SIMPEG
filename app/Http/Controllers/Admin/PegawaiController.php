@@ -16,6 +16,8 @@ use App\Actions\Employees\UpdateEmployeePerformanceFlagAction;
 use App\Actions\Employees\UpdateEmployeeSatyalancanaEligibilityAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Employee\AssignSupervisorRequest;
+use App\Http\Requests\Employee\DeactivateEmployeeRequest;
+use App\Http\Requests\Employee\RestoreEmployeeRequest;
 use App\Http\Requests\Employee\StoreEmployeeRequest;
 use App\Http\Requests\Employee\UpdateEmployeePerformanceFlagRequest;
 use App\Http\Requests\Employee\UpdateEmployeeRequest;
@@ -447,7 +449,7 @@ class PegawaiController extends Controller
         }
     }
 
-    public function destroy($id, Request $request, DeactivateEmployeeAction $action)
+    public function destroy(string $id, DeactivateEmployeeRequest $request, DeactivateEmployeeAction $action)
     {
         $employee = Employee::findOrFail($id);
         $nama = $employee->nama_lengkap;
@@ -559,7 +561,7 @@ class PegawaiController extends Controller
             ->with('backup_data_changed', true);
     }
 
-    public function restore($id, Request $request, RestoreEmployeeAction $action)
+    public function restore(string $id, RestoreEmployeeRequest $request, RestoreEmployeeAction $action)
     {
         $employee = Employee::onlyTrashed()->findOrFail($id);
         $nama = $employee->nama_lengkap;
