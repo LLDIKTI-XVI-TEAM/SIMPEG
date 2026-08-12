@@ -663,6 +663,10 @@ class ApplyChainTemplateToUnitTest extends TestCase
 
     public function test_kegagalan_audit_membatalkan_seluruh_penerapan(): void
     {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Uji kegagalan audit dengan trigger membutuhkan PostgreSQL.');
+        }
+
         $aktor = User::factory()->superAdmin()->create();
         $unit = $this->unit('Bagian Keuangan');
         $pybmc = Employee::factory()->create();
@@ -743,6 +747,10 @@ class ApplyChainTemplateToUnitTest extends TestCase
 
     public function test_template_sumber_dibaca_setelah_lock_unit_diperoleh(): void
     {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Uji urutan lock advisory membutuhkan PostgreSQL.');
+        }
+
         // Urutan global lalu unit mencegah ApplyGlobal dan penyalinan unit saling melewati, sedangkan
         // pembacaan template setelah keduanya memastikan keputusan memakai snapshot yang terserialkan.
         $aktor = User::factory()->superAdmin()->create();
@@ -803,6 +811,10 @@ class ApplyChainTemplateToUnitTest extends TestCase
 
     public function test_penerapan_mengambil_advisory_lock_per_unit(): void
     {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Uji lock advisory membutuhkan PostgreSQL.');
+        }
+
         // Dua penerapan massal yang berjalan bersamaan tidak boleh menghasilkan unit setengah tersalin.
         $aktor = User::factory()->superAdmin()->create();
         $unit = $this->unit('Bagian Keuangan');
