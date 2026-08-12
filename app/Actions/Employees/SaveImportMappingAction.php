@@ -41,9 +41,21 @@ class SaveImportMappingAction
             ]);
         }
 
+        // Kolom source yang reserved selalu dipaksa ke tidak_dipakai — ini adalah domain
+        // invariant, bukan pilihan UI. Normalisasi dilakukan sebelum merge agar pilihan
+        // admin sebelumnya (bila ada) juga tidak dapat mewariskan mapping terlarang.
         // Header yang tidak dikirim client dipertahankan pada mapping sebelumnya agar
         // penyimpanan parsial (admin baru mengubah sebagian dropdown) tetap aman.
         $merged = array_merge($batch['mapping'] ?? [], $mapping);
+        $merged = ImportColumnMapping::normalizeReservedSources($merged);
+
+        $reservedSources = ImportColumnMapping::reservedSourcesMappedToTargets($merged);
+
+        if ($reservedSources !== []) {
+            throw ValidationException::withMessages([
+                'mapping' => ['Kolom sumber berikut tidak boleh dipetakan ke field SIMPEG: '.implode(', ', $reservedSources).'. Pilih opsi tidak dipakai.'],
+            ]);
+        }
 
         $duplicates = ImportColumnMapping::duplicateTargets($merged);
 

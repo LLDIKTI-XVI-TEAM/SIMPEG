@@ -157,6 +157,7 @@ class KepalaLembagaSupportingDocumentTest extends TestCase
 
     public function test_pdf_response_is_inline_and_missing_file_is_not_found(): void
     {
+        Storage::fake(KepalaLembagaSupportingDocument::STORAGE_DISK);
 
         $employee = Employee::factory()->create(['is_kepala_lembaga' => true]);
         $user = User::factory()->adminKepegawaian()->create();

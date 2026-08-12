@@ -19,8 +19,21 @@ if (-not (Get-Command podman -ErrorAction SilentlyContinue)) {
 }
 
 # Pastikan Podman machine berjalan
-$null = podman ps 2>&1
-if ($LASTEXITCODE -ne 0) {
+$machineRunning = $false
+try {
+    $prevErrorAction = $ErrorActionPreference
+    $ErrorActionPreference = "SilentlyContinue"
+    $null = podman ps 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        $machineRunning = $true
+    }
+} catch {
+    $machineRunning = $false
+} finally {
+    $ErrorActionPreference = $prevErrorAction
+}
+
+if (-not $machineRunning) {
     Write-Host "[INFO] Menyalakan Podman machine..." -ForegroundColor Yellow
     podman machine start
 }

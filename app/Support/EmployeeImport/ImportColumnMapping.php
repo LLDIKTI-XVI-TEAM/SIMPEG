@@ -18,6 +18,37 @@ class ImportColumnMapping
     public const IGNORE = 'tidak_dipakai';
 
     /**
+     * Header sumber yang tidak boleh menjadi input data apapun, terlepas dari
+     * pilihan admin. Kolom ini selalu dipaksa ke IGNORE sebelum mapping disimpan
+     * dan diblokir kembali di apply() sebagai pertahanan berlapis.
+     *
+     * 'Role' dikecualikan karena penetapan role aplikasi berjalan lewat
+     * Kelola Akses User, bukan melalui proses import pegawai.
+     *
+     * @var list<string>
+     */
+    public const RESERVED_SOURCES = ['Role'];
+
+    /**
+     * Paksakan semua source reserved menjadi IGNORE sebelum mapping disimpan.
+     * Ini adalah domain invariant: meski client mengirim {"Role": "Pangkat"},
+     * nilai tersebut direplace menjadi {"Role": "tidak_dipakai"} sebelum cache write.
+     *
+     * @param  array<string, string>  $mapping
+     * @return array<string, string>
+     */
+    public static function normalizeReservedSources(array $mapping): array
+    {
+        foreach ($mapping as $sourceHeader => $target) {
+            if (self::isReservedSource($sourceHeader)) {
+                $mapping[$sourceHeader] = self::IGNORE;
+            }
+        }
+
+        return $mapping;
+    }
+
+    /**
      * Header kanonis yang menjadi target pemetaan valid, yaitu header yang
      * benar-benar dibaca mapper menjadi field model.
      *
@@ -118,6 +149,28 @@ class ImportColumnMapping
     }
 
     /**
+     * Source reserved yang dipetakan ke target aktif.
+     *
+     * Normalisasi disamakan dengan auto-map agar variasi spasi dan kapitalisasi tidak
+     * dapat melewati batas domain, sementara pilihan tidak dipakai tetap diizinkan.
+     *
+     * @param  array<string, string>  $mapping
+     * @return list<string>
+     */
+    public static function reservedSourcesMappedToTargets(array $mapping): array
+    {
+        $invalidSources = [];
+
+        foreach ($mapping as $sourceHeader => $target) {
+            if ($target !== self::IGNORE && self::isReservedSource($sourceHeader)) {
+                $invalidSources[] = $sourceHeader;
+            }
+        }
+
+        return $invalidSources;
+    }
+
+    /**
      * Peringatan non-blocking: kolom sumber yang tidak terpakai (nilainya tidak
      * disimpan) dan header wajib yang belum ditemukan pada file.
      *
@@ -148,6 +201,13 @@ class ImportColumnMapping
         $mapped = [];
 
         foreach ($data as $sourceHeader => $value) {
+            // Fail-closed: source reserved tidak boleh lolos meski mapping cache rusak/stale.
+            // Lapisan kedua setelah normalizeReservedSources() agar invariant ini tidak bergantung
+            // pada siapa yang memanggil, termasuk jalur legacy yang melewati SaveImportMappingAction.
+            if (self::isReservedSource($sourceHeader)) {
+                continue;
+            }
+
             $target = $mapping[$sourceHeader] ?? null;
 
             if ($target === null) {
@@ -163,6 +223,17 @@ class ImportColumnMapping
         }
 
         return $mapped;
+    }
+
+    private static function isReservedSource(string $sourceHeader): bool
+    {
+        foreach (self::RESERVED_SOURCES as $reservedSource) {
+            if (self::normalize($sourceHeader) === self::normalize($reservedSource)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static function normalize(string $value): string
