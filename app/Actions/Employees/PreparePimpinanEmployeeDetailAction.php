@@ -2,6 +2,7 @@
 
 namespace App\Actions\Employees;
 
+use App\Models\Document;
 use App\Models\Employee;
 use App\Models\EmployeeStatusHistory;
 use App\Models\PositionHistory;
@@ -10,7 +11,9 @@ use App\Models\SupervisorAssignment;
 use App\Support\Documents\DocumentCategory;
 use App\Support\Employees\EmployeeProfilePresentation;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 
 class PreparePimpinanEmployeeDetailAction
 {
@@ -134,6 +137,7 @@ class PreparePimpinanEmployeeDetailAction
             ->findOrFail($employeeId);
 
         EmployeeProfilePresentation::prepareStatusHistoryAttachments($employee);
+        $this->prepareAttachmentDownloadUrls($employee);
         $latestStatusHistory = $employee->statusHistories->firstWhere('is_latest', true)
             ?? $employee->statusHistories->first();
         $activePosition = $employee->positionHistories->firstWhere('is_latest', true);
@@ -148,5 +152,110 @@ class PreparePimpinanEmployeeDetailAction
             'activeSupervisorAssignments' => $employee->supervisorAssignments,
             'retirementDate' => EmployeeProfilePresentation::retirementDate($employee),
         ];
+    }
+
+    /**
+     * Menyiapkan URL hanya untuk attachment yang benar-benar tersedia di disk privat.
+     *
+     * Blade hanya membaca atribut presentasi ini sehingga tidak menjalankan pemeriksaan
+     * storage berulang dan tidak menawarkan tautan mati kepada Pimpinan.
+     */
+    private function prepareAttachmentDownloadUrls(Employee $employee): void
+    {
+        foreach ([
+            'rank' => $employee->rankHistories,
+            'position' => $employee->positionHistories,
+            'salary' => $employee->salaryHistories,
+        ] as $type => $histories) {
+            $histories->each(function (Model $history) use ($employee, $type): void {
+                $history->setAttribute(
+                    'pimpinan_attachment_download_url',
+                    $this->availableHistoryUrl($employee, $type, $history, $history->getAttribute('file_sk')),
+                );
+            });
+        }
+
+        if ($employee->appointment !== null) {
+            $employee->appointment->setAttribute(
+                'pimpinan_attachment_download_url',
+                $this->availableHistoryUrl(
+                    $employee,
+                    'appointment',
+                    $employee->appointment,
+                    $employee->appointment->file_sk,
+                ),
+            );
+        }
+
+        $employee->disciplineRecords->each(function (Model $history) use ($employee): void {
+            $history->setAttribute(
+                'pimpinan_attachment_download_url',
+                $this->availableUrl($history->getAttribute('file_sk'), fn (): string => route(
+                    'pimpinan.pegawai.discipline-attachments.download',
+                    ['employee' => $employee, 'history' => $history],
+                )),
+            );
+        });
+
+        $employee->documents->each(function (Document $document) use ($employee): void {
+            $fileAvailable = $this->pathAvailable($document->file_path);
+
+            $document->setAttribute(
+                'pimpinan_download_url',
+                $fileAvailable
+                    ? route('pimpinan.pegawai.documents.download', [
+                        'employee' => $employee,
+                        'document' => $document,
+                    ])
+                    : null,
+            );
+            $document->setAttribute(
+                'pimpinan_file_size_label',
+                $fileAvailable ? $document->fileSizeLabel() : 'File tidak ditemukan',
+            );
+        });
+
+        $employee->statusHistories->each(function (EmployeeStatusHistory $history) use ($employee): void {
+            $pathAvailable = $this->pathAvailable($history->file_sk)
+                || $history->getAttribute('has_legacy_status_document') === true;
+            $history->setAttribute(
+                'pimpinan_attachment_download_url',
+                $pathAvailable
+                    ? route('pimpinan.pegawai.status-attachments.download', [
+                        'employee' => $employee,
+                        'history' => $history,
+                    ])
+                    : null,
+            );
+        });
+
+        $employee->setAttribute(
+            'pimpinan_status_attachment_download_url',
+            $this->availableUrl($employee->status_berkas_path, fn (): string => route(
+                'pimpinan.pegawai.status-attachments.download',
+                ['employee' => $employee, 'history' => $employee],
+            )),
+        );
+    }
+
+    private function availableHistoryUrl(Employee $employee, string $type, Model $history, mixed $path): ?string
+    {
+        return $this->availableUrl($path, fn (): string => route(
+            'pimpinan.pegawai.history-attachments.download',
+            ['employee' => $employee, 'type' => $type, 'history' => $history],
+        ));
+    }
+
+    /** @param \Closure(): string $url */
+    private function availableUrl(mixed $path, \Closure $url): ?string
+    {
+        return $this->pathAvailable($path) ? $url() : null;
+    }
+
+    private function pathAvailable(mixed $path): bool
+    {
+        return is_string($path)
+            && $path !== ''
+            && Storage::disk(Document::STORAGE_DISK)->exists($path);
     }
 }

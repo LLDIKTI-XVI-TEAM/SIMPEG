@@ -107,8 +107,8 @@
                                 <td class="px-4 py-3">@include('pegawai.partials.detail.date', ['value' => $rank->tanggal_sk])</td>
                                 <td class="px-4 py-3">@include('pegawai.partials.detail.date', ['value' => $rank->tmt_pangkat])</td>
                                 <td class="px-4 py-3">
-                                    @if($rank->file_sk)
-                                        <a href="{{ route('pimpinan.pegawai.history-attachments.download', ['employee' => $p, 'type' => 'rank', 'history' => $rank]) }}" class="font-semibold text-primary hover:underline">Unduh SK</a>
+                                    @if($rank->pimpinan_attachment_download_url)
+                                        <a href="{{ $rank->pimpinan_attachment_download_url }}" class="font-semibold text-primary hover:underline">Unduh SK</a>
                                     @else
                                         -
                                     @endif
@@ -137,8 +137,8 @@
                                 <td class="px-4 py-3">@include('pegawai.partials.detail.date', ['value' => $position->tanggal_sk])</td>
                                 <td class="px-4 py-3">@include('pegawai.partials.detail.date', ['value' => $position->tmt_jabatan])</td>
                                 <td class="px-4 py-3">
-                                    @if($position->file_sk)
-                                        <a href="{{ route('pimpinan.pegawai.history-attachments.download', ['employee' => $p, 'type' => 'position', 'history' => $position]) }}" class="font-semibold text-primary hover:underline">Unduh SK</a>
+                                    @if($position->pimpinan_attachment_download_url)
+                                        <a href="{{ $position->pimpinan_attachment_download_url }}" class="font-semibold text-primary hover:underline">Unduh SK</a>
                                     @else
                                         -
                                     @endif
@@ -166,8 +166,8 @@
                                 <td class="px-4 py-3">@include('pegawai.partials.detail.date', ['value' => $salary->tanggal_sk])</td>
                                 <td class="px-4 py-3">@include('pegawai.partials.detail.date', ['value' => $salary->tmt_kgb])</td>
                                 <td class="px-4 py-3">
-                                    @if($salary->file_sk)
-                                        <a href="{{ route('pimpinan.pegawai.history-attachments.download', ['employee' => $p, 'type' => 'salary', 'history' => $salary]) }}" class="font-semibold text-primary hover:underline">Unduh SK</a>
+                                    @if($salary->pimpinan_attachment_download_url)
+                                        <a href="{{ $salary->pimpinan_attachment_download_url }}" class="font-semibold text-primary hover:underline">Unduh SK</a>
                                     @else
                                         -
                                     @endif
@@ -205,9 +205,9 @@
                                     @include('pegawai.partials.detail.date', ['value' => $discipline->tanggal_berakhir, 'fallback' => 'Sekarang'])
                                 </td>
                                 <td class="px-4 py-3">
-                                    @if($discipline->file_sk)
+                                    @if($discipline->pimpinan_attachment_download_url)
                                         <a
-                                            href="{{ route('pimpinan.pegawai.discipline-attachments.download', ['employee' => $p, 'history' => $discipline]) }}"
+                                            href="{{ $discipline->pimpinan_attachment_download_url }}"
                                             class="font-semibold text-primary hover:underline"
                                         >Unduh SK</a>
                                     @else
@@ -249,9 +249,7 @@
                     </div>
                     @include('pegawai.partials.detail.appointment-readonly', [
                         'appointment' => $p->appointment,
-                        'attachmentDownloadUrl' => $p->appointment?->file_sk
-                            ? route('pimpinan.pegawai.history-attachments.download', ['employee' => $p, 'type' => 'appointment', 'history' => $p->appointment])
-                            : null,
+                        'attachmentDownloadUrl' => $p->appointment?->pimpinan_attachment_download_url,
                     ])
                 </x-pegawai.detail.panel>
 
@@ -269,10 +267,14 @@
                         @foreach($p->documents as $document)
                             <tr class="transition-colors hover:bg-soft/30">
                                 <td class="max-w-xs px-4 py-3">
-                                    <a
-                                        href="{{ route('pimpinan.pegawai.documents.download', ['employee' => $p, 'document' => $document]) }}"
-                                        class="font-bold text-primary hover:underline"
-                                    >{{ $document->nama_dokumen }}</a>
+                                    @if($document->pimpinan_download_url)
+                                        <a
+                                            href="{{ $document->pimpinan_download_url }}"
+                                            class="font-bold text-primary hover:underline"
+                                        >{{ $document->nama_dokumen }}</a>
+                                    @else
+                                        <span class="font-bold text-ink">{{ $document->nama_dokumen }}</span>
+                                    @endif
                                     @if($document->keterangan)
                                         <p class="truncate text-[10px] text-muted">{{ $document->keterangan }}</p>
                                     @endif
@@ -280,7 +282,7 @@
                                 <td class="px-4 py-3 text-muted">{{ \App\Support\Documents\DocumentCategory::label($document->jenis_dokumen) }}</td>
                                 <td class="px-4 py-3 font-mono text-muted">{{ $document->nomor_dokumen ?: '-' }}</td>
                                 <td class="px-4 py-3 text-muted">@include('pegawai.partials.detail.date', ['value' => $document->tanggal_dokumen])</td>
-                                <td class="px-4 py-3 text-muted">{{ $document->fileSizeLabel() }}</td>
+                                <td class="px-4 py-3 text-muted">{{ $document->pimpinan_file_size_label }}</td>
                             </tr>
                         @endforeach
                     </x-pegawai.detail.table>

@@ -26,6 +26,7 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -90,6 +91,74 @@ class PimpinanEmployeeDetailTest extends TestCase
             ->assertOk()
             ->assertSee(':href="detailUrl(p)"', false)
             ->assertSee(':aria-label="\'Detail pegawai \' + p.nama_lengkap"', false);
+    }
+
+    public function test_daftar_pimpinan_hanya_menampilkan_status_dokumen_sebagai_informasi_read_only(): void
+    {
+        Employee::factory()->create([
+            'nama_lengkap' => 'Pegawai Status Dokumen Read Only',
+            'nip' => '199901012026011001',
+        ]);
+
+        $response = $this->actingAs(User::factory()->pimpinan()->create())
+            ->get(route('pimpinan.pegawai.index'));
+
+        $response
+            ->assertOk()
+            ->assertSee('title="Status kelengkapan dokumen"', false)
+            ->assertSee("p.is_lengkap === 'lengkap'       ? 'Lengkap'", false)
+            ->assertSee("p.is_lengkap === 'tidak_lengkap' ? 'Tidak Lengkap'", false)
+            ->assertDontSee('openDocumentStatus', false)
+            ->assertDontSee('/status-dokumen', false)
+            ->assertDontSee('Rincian Dokumen Pegawai')
+            ->assertDontSee('showDocumentStatusModal', false)
+            ->assertDontSee('submitRiwayat', false)
+            ->assertDontSee('confirmDeletePegawai', false)
+            ->assertDontSee('confirmRestorePegawai', false);
+    }
+
+    public function test_daftar_admin_tetap_memiliki_interaksi_status_dokumen(): void
+    {
+        Employee::factory()->create();
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('data-pegawai'))
+            ->assertOk()
+            ->assertSee('openDocumentStatus', false)
+            ->assertSee('/status-dokumen', false)
+            ->assertSee('Rincian Dokumen Pegawai')
+            ->assertSee('showDocumentStatusModal', false);
+    }
+
+    public function test_daftar_pimpinan_hanya_menjalankan_satu_query_untuk_setiap_koleksi_opsi_filter(): void
+    {
+        Employee::factory()->create([
+            'golongan_terakhir' => 'III/a',
+            'status_aktif' => 'Aktif',
+        ]);
+        $queries = [];
+        DB::listen(function ($query) use (&$queries): void {
+            $queries[] = strtolower(preg_replace('/\s+/', ' ', $query->sql) ?? $query->sql);
+        });
+
+        $response = $this->actingAs(User::factory()->pimpinan()->create())
+            ->get(route('pimpinan.pegawai.index'));
+
+        $response->assertOk()->assertSee('III');
+
+        foreach ([
+            'golongan' => fn (string $sql): bool => str_contains($sql, 'select distinct "golongan_terakhir"'),
+            'unit kerja' => fn (string $sql): bool => str_contains($sql, 'select "id", "nama" from "ref_unit_kerja" order by "nama" asc'),
+            'jenis pegawai' => fn (string $sql): bool => str_contains($sql, 'select "id", "nama" from "ref_jenis_pegawai" order by "nama" asc'),
+            'status pegawai' => fn (string $sql): bool => str_contains($sql, 'select "id", "nama" from "ref_status_pegawai"')
+                && ! str_contains($sql, ' where '),
+        ] as $label => $matchesFilterOptionQuery) {
+            $this->assertCount(
+                1,
+                array_filter($queries, $matchesFilterOptionQuery),
+                "Koleksi opsi {$label} harus dibaca tepat satu kali.",
+            );
+        }
     }
 
     public function test_pimpinan_sees_read_only_family_and_active_supervisor_without_family_nik(): void
@@ -754,6 +823,10 @@ class PimpinanEmployeeDetailTest extends TestCase
 
         Storage::disk(Document::STORAGE_DISK)->delete($employee->status_berkas_path);
         $this->actingAs($pimpinan)
+            ->get(route('pimpinan.pegawai.show', $employee))
+            ->assertOk()
+            ->assertDontSee($url, false);
+        $this->actingAs($pimpinan)
             ->get($url)
             ->assertNotFound();
     }
@@ -827,6 +900,9 @@ class PimpinanEmployeeDetailTest extends TestCase
             'tmt_pengangkatan' => '2020-01-01',
             'file_sk' => 'pegawai/pimpinan-appointment.pdf',
         ]);
+        foreach ([$rank->file_sk, $position->file_sk, $salary->file_sk, $appointment->file_sk] as $path) {
+            Storage::disk(Document::STORAGE_DISK)->put($path, 'attachment riwayat pimpinan');
+        }
 
         $response = $this->actingAs(User::factory()->pimpinan()->create())
             ->get(route('pimpinan.pegawai.show', $employee))
@@ -856,6 +932,66 @@ class PimpinanEmployeeDetailTest extends TestCase
             ->assertDontSee('>Tambah<', false)
             ->assertDontSee('>Edit<', false)
             ->assertDontSee('>Hapus<', false);
+    }
+
+    public function test_detail_pimpinan_tidak_merender_tautan_attachment_riwayat_yang_file_privatnya_hilang(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = Employee::factory()->create();
+        $golongan = RefGolongan::create(['kode' => 'III/z', 'nama' => 'Golongan File Hilang', 'urutan' => 99]);
+        $rank = RankHistory::create([
+            'employee_id' => $employee->id,
+            'golongan_id' => $golongan->id,
+            'tmt_pangkat' => '2026-01-01',
+            'file_sk' => 'sk/rank-hilang.pdf',
+            'is_latest' => true,
+        ]);
+        $position = PositionHistory::create([
+            'employee_id' => $employee->id,
+            'nama_jabatan' => 'Jabatan File Hilang',
+            'tmt_jabatan' => '2026-01-01',
+            'file_sk' => 'sk/position-hilang.pdf',
+            'is_latest' => true,
+        ]);
+        $salary = SalaryHistory::create([
+            'employee_id' => $employee->id,
+            'gaji_pokok' => 5000000,
+            'tmt_kgb' => '2026-01-01',
+            'file_sk' => 'sk/salary-hilang.pdf',
+            'is_latest' => true,
+        ]);
+        $appointment = Appointment::create([
+            'employee_id' => $employee->id,
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2020-01-01',
+            'file_sk' => 'sk/appointment-hilang.pdf',
+        ]);
+        $discipline = $this->createDisciplineAttachment($employee, 'sk/discipline-hilang.pdf');
+        $status = EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_nama' => 'Status File Hilang',
+            'tanggal_efektif' => '2026-01-01',
+            'nomor_berkas' => 'SK-STATUS-HILANG',
+            'file_sk' => 'sk/status-hilang.pdf',
+            'is_latest' => true,
+        ]);
+        $pimpinan = User::factory()->pimpinan()->create();
+        $urls = [
+            route('pimpinan.pegawai.history-attachments.download', ['employee' => $employee, 'type' => 'rank', 'history' => $rank]),
+            route('pimpinan.pegawai.history-attachments.download', ['employee' => $employee, 'type' => 'position', 'history' => $position]),
+            route('pimpinan.pegawai.history-attachments.download', ['employee' => $employee, 'type' => 'salary', 'history' => $salary]),
+            route('pimpinan.pegawai.history-attachments.download', ['employee' => $employee, 'type' => 'appointment', 'history' => $appointment]),
+            route('pimpinan.pegawai.discipline-attachments.download', ['employee' => $employee, 'history' => $discipline]),
+            route('pimpinan.pegawai.status-attachments.download', ['employee' => $employee, 'history' => $status]),
+        ];
+
+        $response = $this->actingAs($pimpinan)->get(route('pimpinan.pegawai.show', $employee));
+
+        $response->assertOk();
+        foreach ($urls as $url) {
+            $response->assertDontSee($url, false);
+            $this->actingAs($pimpinan)->get($url)->assertNotFound();
+        }
     }
 
     public function test_profil_pimpinan_memakai_fallback_bup_yang_sama_saat_tanggal_pensiun_kosong(): void
@@ -1236,8 +1372,18 @@ class PimpinanEmployeeDetailTest extends TestCase
             'file_path' => 'pegawai/file-hilang.pdf',
         ]);
 
-        $this->actingAs(User::factory()->pimpinan()->create())
-            ->get($this->pimpinanDocumentUrl($employee, $document))
+        $pimpinan = User::factory()->pimpinan()->create();
+        $downloadUrl = $this->pimpinanDocumentUrl($employee, $document);
+
+        $this->actingAs($pimpinan)
+            ->get(route('pimpinan.pegawai.show', $employee))
+            ->assertOk()
+            ->assertSee('Dokumen Hilang')
+            ->assertDontSee($downloadUrl, false)
+            ->assertDontSee($document->file_path, false);
+
+        $this->actingAs($pimpinan)
+            ->get($downloadUrl)
             ->assertNotFound();
     }
 

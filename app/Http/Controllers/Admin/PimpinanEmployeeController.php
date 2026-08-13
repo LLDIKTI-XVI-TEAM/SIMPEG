@@ -42,18 +42,6 @@ class PimpinanEmployeeController extends Controller
             'sort' => $sort,
             'direction' => $direction,
         ]));
-        $unitKerjaOptions = RefUnitKerja::query()->orderBy('nama')->get(['id', 'nama']);
-        $jenisPegawaiOptions = RefJenisPegawai::query()->orderBy('nama')->get(['id', 'nama']);
-        $statusOptions = RefStatusPegawai::query()->orderBy('nama')->get(['id', 'nama']);
-        $golonganOptions = Employee::query()
-            ->whereNotNull('golongan_terakhir')
-            ->distinct()
-            ->orderBy('golongan_terakhir')
-            ->pluck('golongan_terakhir')
-            ->map(fn (string $golongan): string => strtok($golongan, '/'))
-            ->unique()
-            ->values();
-
         $initialRows = $employees->items();
         $initialMeta = [
             'total' => $employees->total(),

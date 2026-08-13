@@ -9,6 +9,7 @@ use App\Models\Employee;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\EmployeeHistoryService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -17,6 +18,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class DisciplineRecordTest extends TestCase
@@ -112,9 +114,131 @@ class DisciplineRecordTest extends TestCase
             'file_sk' => '../secret.txt',
         ]))->assertJsonValidationErrors(['file_sk']);
 
+        Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'sk_hukuman_disiplin',
+            'nama_dokumen' => 'SK Disiplin Path Terkontrol',
+            'file_path' => 'sk/disiplin-aman.pdf',
+        ]);
+
         $this->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/disiplin", $this->validPayload([
             'file_sk' => 'sk/disiplin-aman.pdf',
         ]))->assertCreated();
+    }
+
+    public function test_file_sk_string_rejects_cross_owner_wrong_category_and_unknown_path_before_mutation(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $otherEmployee = Employee::factory()->create();
+        $filesBefore = Storage::disk(Document::STORAGE_DISK)->allFiles();
+        $paths = [
+            'sk/cross-owner.pdf' => [$otherEmployee, 'sk_hukuman_disiplin'],
+            'sk/wrong-category.pdf' => [$employee, 'lainnya'],
+        ];
+        foreach ($paths as $path => [$owner, $category]) {
+            Document::create([
+                'employee_id' => $owner->id,
+                'jenis_dokumen' => $category,
+                'nama_dokumen' => 'Dokumen Uji Scope Path',
+                'file_path' => $path,
+            ]);
+        }
+        $paths['sk/unknown.pdf'] = null;
+
+        foreach (array_keys($paths) as $path) {
+            $this->actingAs($user)
+                ->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/disiplin", $this->validPayload([
+                    'file_sk' => $path,
+                    'no_sk' => 'SK-'.md5($path),
+                ]))
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors(['file_sk']);
+        }
+
+        $this->assertDatabaseCount('discipline_records', 0);
+        $this->assertDatabaseCount('documents', 2);
+        $this->assertSame($filesBefore, Storage::disk(Document::STORAGE_DISK)->allFiles());
+    }
+
+    public function test_dokumen_id_dan_file_sk_string_harus_merujuk_dokumen_yang_sama(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $firstDocument = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'sk_hukuman_disiplin',
+            'nama_dokumen' => 'SK Disiplin Pertama',
+            'file_path' => 'sk/disiplin-pertama.pdf',
+        ]);
+        Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'sk_hukuman_disiplin',
+            'nama_dokumen' => 'SK Disiplin Kedua',
+            'file_path' => 'sk/disiplin-kedua.pdf',
+        ]);
+
+        $this->actingAs($user)
+            ->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/disiplin", $this->validPayload([
+                'dokumen_id' => $firstDocument->id,
+                'file_sk' => 'sk/disiplin-kedua.pdf',
+            ]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['file_sk']);
+
+        $this->assertDatabaseCount('discipline_records', 0);
+        $this->assertDatabaseCount('documents', 2);
+    }
+
+    public function test_upload_baru_tidak_dapat_digabung_dengan_dokumen_arsip(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $document = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'sk_hukuman_disiplin',
+            'nama_dokumen' => 'SK Disiplin Arsip',
+            'file_path' => 'sk/disiplin-arsip.pdf',
+        ]);
+
+        $this->actingAs($user)
+            ->postWithCsrf("/api/v1/pegawai/{$employee->id}/disiplin", $this->validPayload([
+                'dokumen_id' => $document->id,
+                'file_sk' => UploadedFile::fake()->create('sk-baru.pdf', 512, 'application/pdf'),
+            ]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['file_sk']);
+
+        $this->assertDatabaseCount('discipline_records', 0);
+        $this->assertDatabaseCount('documents', 1);
+        Storage::disk(Document::STORAGE_DISK)->assertMissing('sk/disiplin-arsip.pdf');
+    }
+
+    public function test_service_menolak_file_sk_string_di_luar_dokumen_disiplin_milik_pegawai(): void
+    {
+        $employee = Employee::factory()->create();
+        $otherEmployee = Employee::factory()->create();
+        $filesBefore = Storage::disk(Document::STORAGE_DISK)->allFiles();
+        Document::create([
+            'employee_id' => $otherEmployee->id,
+            'jenis_dokumen' => 'sk_hukuman_disiplin',
+            'nama_dokumen' => 'SK Disiplin Pegawai Lain',
+            'file_path' => 'sk/service-cross-owner.pdf',
+        ]);
+
+        try {
+            app(EmployeeHistoryService::class)->createDisciplineRecord($employee, $this->validPayload([
+                'file_sk' => 'sk/service-cross-owner.pdf',
+            ]));
+            $this->fail('Service harus menolak path dokumen di luar scope pegawai.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('file_sk', $exception->errors());
+        }
+
+        $this->assertDatabaseCount('discipline_records', 0);
+        $this->assertDatabaseCount('documents', 1);
+        $this->assertSame($filesBefore, Storage::disk(Document::STORAGE_DISK)->allFiles());
     }
 
     public function test_admin_can_create_discipline_record_with_sk_upload(): void
@@ -413,7 +537,7 @@ class DisciplineRecordTest extends TestCase
             'tanggal_berakhir' => '2026-06-30',
             'no_sk' => 'SK-DIS-001',
             'tanggal_sk' => '2026-05-25',
-            'file_sk' => 'sk/disiplin-001.pdf',
+            'file_sk' => null,
         ], $overrides);
     }
 

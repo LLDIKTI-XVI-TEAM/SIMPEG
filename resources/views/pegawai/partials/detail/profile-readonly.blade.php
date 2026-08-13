@@ -217,11 +217,16 @@
                     @if($history->keterangan)
                         <p class="text-xs text-ink font-sans">{{ $history->keterangan }}</p>
                     @endif
-                    @if($history->file_sk || $history->has_legacy_status_document)
-                        <a
-                            href="{{ $downloadSurface === 'admin'
+                    @php
+                        $statusAttachmentUrl = $downloadSurface === 'admin'
+                            ? (($history->file_sk || $history->has_legacy_status_document)
                                 ? route('pegawai.history-attachments.download', ['employee' => $employee, 'type' => 'status', 'history' => $history])
-                                : route('pimpinan.pegawai.status-attachments.download', ['employee' => $employee, 'history' => $history]) }}"
+                                : null)
+                            : $history->pimpinan_attachment_download_url;
+                    @endphp
+                    @if($statusAttachmentUrl)
+                        <a
+                            href="{{ $statusAttachmentUrl }}"
                             target="_blank"
                             class="inline-flex text-xs font-semibold text-primary hover:underline"
                         >
@@ -230,13 +235,18 @@
                     @endif
                 </article>
             @empty
-                @if($employee->status_berkas_path)
+                @php
+                    $statusSnapshotUrl = $downloadSurface === 'admin'
+                        ? ($employee->status_berkas_path
+                            ? route('pegawai.history-attachments.download', ['employee' => $employee, 'type' => 'status-snapshot', 'history' => $employee])
+                            : null)
+                        : $employee->pimpinan_status_attachment_download_url;
+                @endphp
+                @if($statusSnapshotUrl)
                     <article class="space-y-2 rounded-lg border border-border bg-surface p-4">
                         <p class="text-sm font-bold text-ink font-sans">Snapshot Status Pegawai</p>
                         <a
-                            href="{{ $downloadSurface === 'admin'
-                                ? route('pegawai.history-attachments.download', ['employee' => $employee, 'type' => 'status-snapshot', 'history' => $employee])
-                                : route('pimpinan.pegawai.status-attachments.download', ['employee' => $employee, 'history' => $employee]) }}"
+                            href="{{ $statusSnapshotUrl }}"
                             target="_blank"
                             class="inline-flex text-xs font-semibold text-primary hover:underline"
                         >
