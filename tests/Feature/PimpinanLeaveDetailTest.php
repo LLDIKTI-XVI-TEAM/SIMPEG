@@ -159,6 +159,7 @@ class PimpinanLeaveDetailTest extends TestCase
 
     public function test_detail_only_exposes_attachment_through_an_authorized_route_when_file_exists(): void
     {
+        Storage::fake('public');
 
         $leave = $this->leave(Employee::factory()->create(), $this->leaveType(), '2026-07-06', 'menunggu_approval');
         $leave->forceFill(['lampiran_path' => 'cuti/surat-pendukung.pdf'])->save();

@@ -35,6 +35,8 @@
         $canAssignSupervisor = auth()->check()
             && in_array(auth()->user()->role, ['super_admin', 'admin_kepegawaian'], true)
             && auth()->user()->hasPermission('employees.update');
+        $canDeactivateEmployee = auth()->check()
+            && auth()->user()->hasPermission('employees.deactivate');
 
         $canCreateEmployeeHistory = auth()->check()
             && auth()->user()->hasPermission('employee_histories.create');
@@ -49,6 +51,7 @@
         satyalancanaNote: @js($p->satyalancana_note ?? ''),
         satyalancanaEndpoint: @js(route('pegawai.satyalancana.update', $p->id)),
         isUpdatingSatyalancana: false,
+        showDeactivateModal: false,
         supervisorLookupEndpoint: @js(route('pegawai.supervisor-lookup', $p->id)),
         supervisorQuery: @js($selectedSupervisorName ?? ''),
         supervisorSelectedId: @js($selectedSupervisorId ?? ''),
@@ -803,6 +806,12 @@
                     Edit Pegawai
                 </a>
                 @endif
+                @if($canDeactivateEmployee)
+                <button type="button" @click="showDeactivateModal = true"
+                    class="inline-flex items-center justify-center rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm">
+                    Nonaktifkan
+                </button>
+                @endif
             </div>
         </div>
 
@@ -976,6 +985,10 @@
                                 <span class="text-[9px] font-bold text-muted uppercase tracking-wider font-sans block">Kepala Bagian/Supervisor Aktif</span>
                                 <p class="text-xs font-bold text-ink font-sans">{{ $currentSupervisor?->supervisor?->nama_lengkap ?? '-' }}</p>
                                 <p class="text-xs text-muted">NIP. {{ $currentSupervisor?->supervisor?->nip ?? '-' }} ({{ $currentSupervisorPosition?->nama_jabatan ?? '-' }})</p>
+                                <p class="mt-1 text-xs text-muted">
+                                    <span class="font-semibold text-ink">Mulai Penugasan:</span>
+                                    {{ $currentSupervisor?->tanggal_mulai?->format('d-m-Y') ?? '-' }}
+                                </p>
                             </div>
                     </div>
                     @if ($canAssignSupervisor)
@@ -1053,10 +1066,10 @@
                                 <x-form.input
                                     name="effective_date"
                                     type="date"
-                                    label="Tanggal Efektif"
+                                    label="Tanggal Mulai Penugasan Kepala Bagian"
                                     :value="old('effective_date', now()->toDateString())"
                                     required
-                                    help="Tanggal mulai penugasan."
+                                    help="Tanggal mulai berlakunya penugasan Kepala Bagian untuk pegawai ini."
                                 />
                                 <div class="flex flex-wrap gap-2 md:pt-6">
                                     <x-ui.button type="submit" size="sm">Simpan</x-ui.button>
@@ -1160,8 +1173,8 @@
                                 <p class="text-ink font-sans font-bold">{{ $p->statusPegawai->nama ?? $p->status_aktif ?? '-' }}</p>
                             </div>
                             <div class="space-y-0.5">
-                                <span class="font-semibold text-muted font-sans">Tanggal Efektif</span>
-                                <p class="text-ink font-sans">{{ $p->status_tanggal ? \Carbon\Carbon::parse($p->status_tanggal)->format('d-m-Y') : '-' }}</p>
+                                <span class="font-semibold text-muted font-sans">Tanggal Efektif Status Kepegawaian</span>
+                                <p class="text-ink font-sans">{{ $statusEffectiveDate?->format('d-m-Y') ?? '-' }}</p>
                             </div>
                             @if($p->status_keterangan)
                             <div class="space-y-0.5 sm:col-span-2">
@@ -2461,6 +2474,28 @@
         </div>
     </div>
 
+    @if($canDeactivateEmployee)
+    <x-ui.modal show="showDeactivateModal" title="Nonaktifkan Pegawai" closeAction="showDeactivateModal = false" maxWidth="sm">
+        <div class="space-y-4">
+            <p class="text-sm text-muted font-sans">
+                Apakah Anda yakin ingin menonaktifkan pegawai <strong class="text-ink">{{ $p->nama_lengkap }}</strong>?
+                Data tidak dihapus dan bisa diaktifkan kembali.
+            </p>
+            <div class="flex justify-end gap-3 border-t border-border pt-4">
+                <button type="button" @click="showDeactivateModal = false"
+                    class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft">
+                    Batal
+                </button>
+                <form method="POST" action="{{ route('pegawai.destroy', $p->id) }}">
+                    @csrf
+                    <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90">
+                        Ya, Nonaktifkan
+                    </button>
+                </form>
+            </div>
+        </div>
+    </x-ui.modal>
+    @endif
 </div>{{-- /x-data utama --}}
 
 </div>

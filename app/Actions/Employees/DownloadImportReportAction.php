@@ -27,7 +27,7 @@ class DownloadImportReportAction
             fputcsv($output, ['Total baris', (string) $batch->total_rows]);
             fputcsv($output, ['Berhasil ditambahkan', (string) $batch->inserted_count]);
             fputcsv($output, ['Dilewati (NIP terdaftar)', (string) $batch->skipped_count]);
-            fputcsv($output, ['Gagal validasi', (string) $batch->failed_count]);
+            fputcsv($output, ['Gagal', (string) $batch->failed_count]);
             if ($batch->error_message !== null) {
                 fputcsv($output, ['Pesan kegagalan', $batch->error_message]);
             }

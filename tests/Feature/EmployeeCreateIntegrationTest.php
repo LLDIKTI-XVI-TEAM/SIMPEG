@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Actions\Employees\CreateEmployeeAction;
 use App\Models\Employee;
+use App\Models\EmployeeMilestone;
 use App\Models\RefAgama;
 use App\Models\RefGolongan;
 use App\Models\RefJabatan;
@@ -11,14 +12,12 @@ use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPerkawinan;
 use App\Models\RefUnitKerja;
 use App\Models\User;
-use App\Services\Employees\TmtCalculatorService;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
-use Mockery\MockInterface;
 use Tests\TestCase;
 
 class EmployeeCreateIntegrationTest extends TestCase
@@ -44,18 +43,6 @@ class EmployeeCreateIntegrationTest extends TestCase
         $jenisPegawaiId = RefJenisPegawai::first()->id;
         $statusKawinId = RefStatusPerkawinan::first()->id;
         $golongan = RefGolongan::firstOrFail();
-
-        $realCalculator = new TmtCalculatorService;
-        $this->mock(TmtCalculatorService::class, function (MockInterface $mock) use ($realCalculator): void {
-            $mock->expects('syncForEmployee')
-                ->withArgs(function (Employee $employee): bool {
-                    $this->assertSame(1, $employee->rankHistories()->count());
-                    $this->assertSame(1, $employee->salaryHistories()->count());
-
-                    return true;
-                })
-                ->andReturnUsing(fn (Employee $employee) => $realCalculator->syncForEmployee($employee));
-        });
 
         $postData = [
             'nama_lengkap' => 'Budi Santoso Uji',
@@ -106,6 +93,9 @@ class EmployeeCreateIntegrationTest extends TestCase
         ]);
 
         $employee = Employee::where('nip', '199001012024011001')->first();
+        $this->assertNotNull($employee->status_pegawai_id);
+        $this->assertNull($employee->status_tanggal);
+        $this->assertSame(0, $employee->statusHistories()->count());
 
         $this->assertDatabaseHas('rank_histories', [
             'employee_id' => $employee->id,
@@ -123,6 +113,30 @@ class EmployeeCreateIntegrationTest extends TestCase
             'no_sk' => 'SK-UJI-001',
             'tanggal_sk' => '2023-12-01 00:00:00',
         ]);
+
+        $activeMilestones = EmployeeMilestone::query()
+            ->where('employee_id', $employee->id)
+            ->where('is_active', true)
+            ->get();
+
+        $this->assertSame(
+            ['2028-03-02', '2030-01-02', '2034-01-01', '2044-01-01', '2054-01-01'],
+            $activeMilestones
+                ->sortBy('milestone_date')
+                ->pluck('milestone_date')
+                ->map(fn ($date): string => $date->toDateString())
+                ->values()
+                ->all(),
+        );
+        $this->assertSame(
+            [10, 20, 30],
+            $activeMilestones
+                ->where('type', EmployeeMilestone::TYPE_SATYALANCANA)
+                ->sortBy('milestone_date')
+                ->map(fn (EmployeeMilestone $milestone): int => (int) $milestone->metadata['satyalancana_years'])
+                ->values()
+                ->all(),
+        );
 
         $documentPath = $employee->documents()->where('jenis_dokumen', 'sk_pengangkatan')->value('file_path');
         $this->assertIsString($documentPath);
@@ -147,6 +161,151 @@ class EmployeeCreateIntegrationTest extends TestCase
         $editResponse->assertStatus(200);
         $editResponse->assertSee('Kepala Lembaga');
         $editResponse->assertSee('name="is_kepala_lembaga"', false);
+    }
+
+    /** Pengangkatan pertama pada jalur form publik langsung menghasilkan tiga milestone Satyalancana aktif. */
+    public function test_form_create_with_only_appointment_persists_satyalancana_milestones(): void
+    {
+        $user = User::factory()->create(['role' => 'admin_kepegawaian']);
+
+        $this->actingAs($user)
+            ->post(route('pegawai.store'), [
+                'nama_lengkap' => 'Pegawai Pengangkatan Pertama',
+                'nip' => '199101012024011091',
+                'tanggal_lahir' => '1991-01-01',
+                'pengangkatan_jenis_pengangkatan' => 'PNS',
+                'pengangkatan_tmt_pengangkatan' => '2014-02-03',
+                'pengangkatan_no_sk' => 'SK-PENGANGKATAN-ONLY-001',
+                'pengangkatan_tanggal_sk' => '2014-01-15',
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('data-pegawai'));
+
+        $employee = Employee::query()->where('nip', '199101012024011091')->firstOrFail();
+        $milestones = EmployeeMilestone::query()
+            ->where('employee_id', $employee->id)
+            ->where('type', EmployeeMilestone::TYPE_SATYALANCANA)
+            ->where('is_active', true)
+            ->orderBy('milestone_date')
+            ->get();
+
+        $this->assertSame(['10', '20', '30'], $milestones->pluck('milestone_key')->all());
+        $this->assertSame(
+            ['2024-02-03', '2034-02-03', '2044-02-03'],
+            $milestones->pluck('milestone_date')->map(fn ($date): string => $date->toDateString())->all(),
+        );
+        $this->assertSame(
+            [
+                ['tmt_pengangkatan' => '2014-02-03', 'satyalancana_years' => 10, 'years_of_service' => 10],
+                ['tmt_pengangkatan' => '2014-02-03', 'satyalancana_years' => 20, 'years_of_service' => 20],
+                ['tmt_pengangkatan' => '2014-02-03', 'satyalancana_years' => 30, 'years_of_service' => 30],
+            ],
+            $milestones->pluck('metadata')->all(),
+        );
+    }
+
+    /** Tanpa riwayat pengangkatan, jalur create tidak membuat milestone Satyalancana semu. */
+    public function test_form_create_without_appointment_does_not_persist_satyalancana_milestones(): void
+    {
+        $user = User::factory()->create(['role' => 'admin_kepegawaian']);
+
+        $this->actingAs($user)
+            ->post(route('pegawai.store'), [
+                'nama_lengkap' => 'Pegawai Tanpa Pengangkatan',
+                'nip' => '199101012024011092',
+                'tanggal_lahir' => '1991-01-01',
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('data-pegawai'));
+
+        $employee = Employee::query()->where('nip', '199101012024011092')->firstOrFail();
+
+        $this->assertSame(0, $employee->appointments()->count());
+        $this->assertSame(
+            0,
+            $employee->milestones()
+                ->where('type', EmployeeMilestone::TYPE_SATYALANCANA)
+                ->where('is_active', true)
+                ->count(),
+        );
+    }
+
+    /** Sinkronisasi setelah pengangkatan tetap mempertahankan tanggal pensiun resmi dari form. */
+    public function test_form_create_with_appointment_preserves_authoritative_pension_date(): void
+    {
+        $user = User::factory()->create(['role' => 'admin_kepegawaian']);
+
+        $this->actingAs($user)
+            ->post(route('pegawai.store'), [
+                'nama_lengkap' => 'Pegawai Pensiun Resmi dan Pengangkatan',
+                'nip' => '199101012024011093',
+                'tanggal_lahir' => '1991-01-01',
+                'tanggal_pensiun' => '2049-12-31',
+                'pengangkatan_jenis_pengangkatan' => 'PNS',
+                'pengangkatan_tmt_pengangkatan' => '2014-02-03',
+                'pengangkatan_no_sk' => 'SK-PENGANGKATAN-PENSIUN-001',
+                'pengangkatan_tanggal_sk' => '2014-01-15',
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('data-pegawai'));
+
+        $employee = Employee::query()->where('nip', '199101012024011093')->firstOrFail();
+        $pensionMilestone = EmployeeMilestone::query()
+            ->where('employee_id', $employee->id)
+            ->where('type', EmployeeMilestone::TYPE_PENSIUN)
+            ->where('is_active', true)
+            ->sole();
+
+        $this->assertSame('2049-12-31', $employee->tanggal_pensiun?->toDateString());
+        $this->assertSame('2049-12-31', $pensionMilestone->milestone_date->toDateString());
+        $this->assertSame('employees.tanggal_pensiun', $pensionMilestone->metadata['source']);
+        $this->assertTrue($pensionMilestone->metadata['is_manual']);
+        $this->assertSame(3, $employee->milestones()
+            ->where('type', EmployeeMilestone::TYPE_SATYALANCANA)
+            ->where('is_active', true)
+            ->count());
+    }
+
+    /** Tanggal pensiun dari form adalah data resmi walau pegawai belum memiliki riwayat sumber. */
+    public function test_form_create_preserves_explicit_pension_date_during_legacy_recalculation(): void
+    {
+        $user = User::factory()->create(['role' => 'admin_kepegawaian']);
+
+        $this->actingAs($user)
+            ->post(route('pegawai.store'), [
+                'nama_lengkap' => 'Pegawai Pensiun Resmi Baru',
+                'nip' => '199001012024011099',
+                'tanggal_lahir' => '1990-01-01',
+                'tanggal_pensiun' => '2048-12-31',
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('data-pegawai'));
+
+        $employee = Employee::query()->where('nip', '199001012024011099')->firstOrFail();
+        $this->assertSame(1, $employee->milestones()->count());
+        $milestone = EmployeeMilestone::query()
+            ->where('employee_id', $employee->id)
+            ->where('type', EmployeeMilestone::TYPE_PENSIUN)
+            ->sole();
+
+        $this->assertSame('2048-12-31', $employee->tanggal_pensiun?->toDateString());
+        $this->assertSame('employees.tanggal_pensiun', $milestone->metadata['source']);
+        $this->assertTrue($milestone->metadata['is_manual']);
+        $this->assertSame(1, $employee->milestones()->count());
+
+        $this->artisan('milestone:backfill', [
+            '--recalculate-legacy-pension' => true,
+            '--no-interaction' => true,
+        ])
+            ->expectsQuestion('Do you want to proceed with the backfill?', true)
+            ->assertSuccessful();
+
+        $employee->refresh();
+        $milestone->refresh();
+        $this->assertSame('2048-12-31', $employee->tanggal_pensiun?->toDateString());
+        $this->assertSame('2048-12-31', $milestone->milestone_date->toDateString());
+        $this->assertNotSame('legacy_unverified', $milestone->metadata['source']);
+        $this->assertSame(1, $employee->milestones()->count());
     }
 
     public function test_form_penugasan_baru_tidak_menawarkan_jabatan_nonaktif(): void

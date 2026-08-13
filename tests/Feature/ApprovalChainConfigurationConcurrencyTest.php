@@ -25,13 +25,13 @@ class ApprovalChainConfigurationConcurrencyTest extends TestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
-
         $driver = $_SERVER['DB_CONNECTION'] ?? $_ENV['DB_CONNECTION'] ?? getenv('DB_CONNECTION');
 
         if ($driver !== 'pgsql') {
             $this->markTestSkipped('Serialisasi konfigurasi rantai approval wajib diuji pada PostgreSQL.');
         }
+
+        parent::setUp();
         $this->seed(ReferenceSeeder::class);
     }
 
@@ -41,7 +41,12 @@ class ApprovalChainConfigurationConcurrencyTest extends TestCase
             File::deleteDirectory($this->raceDirectory);
         }
 
-        $this->kosongkanAuditSebelumPenurunanMigrasi();
+        // Skip driver dilakukan sebelum Laravel boot agar SQLite tidak menjalankan migrasi yang sia-sia.
+        // Pembersihan basis data hanya aman bila parent::setUp() sempat membentuk container aplikasi.
+        if ($this->app !== null) {
+            $this->kosongkanAuditSebelumPenurunanMigrasi();
+        }
+
         parent::tearDown();
     }
 

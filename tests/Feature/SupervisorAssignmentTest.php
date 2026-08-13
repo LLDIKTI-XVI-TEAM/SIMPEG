@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Actions\Employees\AssignSupervisorAction;
 use App\Models\AuditLog;
 use App\Models\Employee;
+use App\Models\EmployeeStatusHistory;
 use App\Models\LeaveApprovalChain;
 use App\Models\LeaveApprovalChainStep;
 use App\Models\SupervisorAssignment;
@@ -129,6 +130,34 @@ class SupervisorAssignmentTest extends TestCase
             'event' => 'UPDATE',
             'auditable_type' => 'Employee',
             'auditable_id' => $employee->id,
+        ]);
+    }
+
+    public function test_assigning_supervisor_does_not_change_employee_status_date_or_history(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $employee = Employee::factory()->create([
+            'status_tanggal' => '2026-01-15',
+        ]);
+        $statusId = $employee->status_pegawai_id;
+        $supervisor = Employee::factory()->create();
+
+        $this->actingAs($user)
+            ->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/assign-atasan", [
+                'kepala_bagian_id' => $supervisor->id,
+                'effective_date' => '2026-07-20',
+            ])
+            ->assertOk();
+
+        $employee->refresh();
+
+        $this->assertSame('2026-01-15', $employee->status_tanggal?->toDateString());
+        $this->assertSame($statusId, $employee->status_pegawai_id);
+        $this->assertSame(0, EmployeeStatusHistory::query()->where('employee_id', $employee->id)->count());
+        $this->assertDatabaseHas('supervisor_assignments', [
+            'employee_id' => $employee->id,
+            'kepala_bagian_id' => $supervisor->id,
+            'tanggal_mulai' => '2026-07-20 00:00:00',
         ]);
     }
 
@@ -538,7 +567,7 @@ class SupervisorAssignmentTest extends TestCase
     public function test_assignment_hari_ini_mengambil_lock_global_sebelum_lock_timeline(): void
     {
         if (DB::connection()->getDriverName() !== 'pgsql') {
-            $this->markTestSkipped('Uji lock advisory membutuhkan PostgreSQL.');
+            $this->markTestSkipped('Urutan advisory lock penugasan atasan diverifikasi khusus pada PostgreSQL.');
         }
 
         $employee = Employee::factory()->create();
@@ -569,7 +598,7 @@ class SupervisorAssignmentTest extends TestCase
     public function test_assignment_masa_depan_hanya_mengambil_lock_timeline(): void
     {
         if (DB::connection()->getDriverName() !== 'pgsql') {
-            $this->markTestSkipped('Uji lock advisory membutuhkan PostgreSQL.');
+            $this->markTestSkipped('Advisory lock penugasan masa depan diverifikasi khusus pada PostgreSQL.');
         }
 
         $employee = Employee::factory()->create();

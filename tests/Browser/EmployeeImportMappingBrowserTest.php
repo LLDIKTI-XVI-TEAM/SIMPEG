@@ -179,21 +179,19 @@ class EmployeeImportMappingBrowserTest extends DuskTestCase
                 ->assertDisabled('@mapping-continue')
                 ->select('#mapping-3-nip', 'NIP')
                 ->select('#mapping-5-kolom-cadangan', 'NIP')
-                ->waitFor('@mapping-duplicate-warning')
+                ->waitUntil(<<<'JS'
+                    Alpine.$data(document.querySelector('[x-data*="simpegTargetFields"]')).hasDuplicateMapping === true
+                JS)
                 ->assertDisabled('@mapping-continue')
                 ->select('#mapping-5-kolom-cadangan', 'tidak_dipakai')
                 ->waitUntil(<<<'JS'
-                    ['mapping-duplicate-warning', 'mapping-required-warning'].every((name) => {
-                        const alert = document.querySelector(`[dusk="${name}"]`);
-                        return !alert || getComputedStyle(alert).display === 'none';
-                    })
+                    const component = Alpine.$data(document.querySelector('[x-data*="simpegTargetFields"]'));
+                    return component.hasDuplicateMapping === false && component.missingRequiredTargets.length === 0;
                 JS);
 
             $alertsRemainHidden = $browser->script(<<<'JS'
-                return ['mapping-duplicate-warning', 'mapping-required-warning'].every((name) => {
-                    const alert = document.querySelector(`[dusk="${name}"]`);
-                    return alert !== null && getComputedStyle(alert).display === 'none';
-                });
+                const component = Alpine.$data(document.querySelector('[x-data*="simpegTargetFields"]'));
+                return component.hasDuplicateMapping === false && component.missingRequiredTargets.length === 0;
             JS)[0];
 
             $this->assertTrue($alertsRemainHidden);

@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Models\Employee;
+use App\Models\EmployeeMilestone;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\RefJabatan;
@@ -11,7 +12,6 @@ use App\Models\SalaryHistory;
 use App\Services\Employees\TmtCalculatorService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
-use ReflectionClass;
 use Tests\TestCase;
 
 class TmtCalculatorServiceTest extends TestCase
@@ -28,15 +28,22 @@ class TmtCalculatorServiceTest extends TestCase
         $this->calculator = new TmtCalculatorService;
     }
 
-    public function test_public_api_only_exposes_sync_for_employee(): void
+    /** Pencatatan provenance import hanya boleh membuat milestone pensiun. */
+    public function test_imported_pension_provenance_does_not_calculate_other_milestones(): void
     {
-        $methods = collect((new ReflectionClass(TmtCalculatorService::class))->getMethods())
-            ->filter(fn ($method): bool => $method->isPublic() && $method->getDeclaringClass()->getName() === TmtCalculatorService::class)
-            ->map(fn ($method): string => $method->getName())
-            ->values()
-            ->all();
+        $employee = Employee::factory()->create([
+            'tanggal_lahir' => '1980-01-01',
+            'tanggal_pensiun' => '2038-01-01',
+        ]);
+        $this->rankHistory($employee, '2024-01-15');
 
-        $this->assertSame(['syncForEmployee'], $methods);
+        $this->calculator->recordImportedPensionDate($employee);
+
+        $milestone = $employee->milestones()->sole();
+
+        $this->assertSame(EmployeeMilestone::TYPE_PENSIUN, $milestone->type);
+        $this->assertSame('employee_import', $milestone->metadata['source']);
+        $this->assertTrue($milestone->metadata['is_manual']);
     }
 
     public function test_rank_and_kgb_snapshots_use_latest_dated_sources(): void
