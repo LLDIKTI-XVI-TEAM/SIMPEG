@@ -101,7 +101,11 @@ class EmployeeHistoryAttachmentService
             ? $employee->documents
             : $employee->documents()->where('jenis_dokumen', 'sk_status_pegawai')->orderBy('id')->get();
 
-        return LegacyStatusDocumentResolver::resolve($documents, $history)?->file_path;
+        return $this->availableEmployeePath(
+            $employee,
+            LegacyStatusDocumentResolver::resolve($documents, $history)?->file_path,
+            $this->statusDocumentCategories($history->status_nama),
+        );
     }
 
     /** Snapshot legacy tetap boleh tanpa metadata, tetapi konflik metadata wajib ditolak. */

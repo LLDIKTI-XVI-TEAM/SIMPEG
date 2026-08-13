@@ -19,7 +19,9 @@ use App\Models\SalaryHistory;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -162,6 +164,132 @@ class EmployeeHistoryAttachmentDownloadTest extends TestCase
         $this->actingAs($admin)
             ->get($this->url($employee, 'status', $history->id))
             ->assertNotFound();
+    }
+
+    public function test_attachment_status_legacy_menolak_fallback_dengan_metadata_path_yang_berkonflik(): void
+    {
+        $employee = Employee::factory()->create();
+        $otherEmployee = Employee::factory()->create();
+        $crossOwnerPath = 'pegawai/status-legacy-shared-owner.pdf';
+        $wrongCategoryPath = 'pegawai/status-legacy-shared-category.pdf';
+
+        $crossOwnerHistory = EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_nama' => 'Status Legacy Konflik Pemilik',
+            'tanggal_efektif' => '2026-08-01',
+            'nomor_berkas' => 'SK-STATUS-KONFLIK-PEMILIK',
+            'is_latest' => true,
+        ]);
+        $wrongCategoryHistory = EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_nama' => 'Status Legacy Konflik Kategori',
+            'tanggal_efektif' => '2026-08-02',
+            'nomor_berkas' => 'SK-STATUS-KONFLIK-KATEGORI',
+            'is_latest' => false,
+        ]);
+
+        foreach ([
+            [$crossOwnerHistory, $crossOwnerPath],
+            [$wrongCategoryHistory, $wrongCategoryPath],
+        ] as [$history, $path]) {
+            Document::create([
+                'employee_id' => $employee->id,
+                'jenis_dokumen' => 'sk_status_pegawai',
+                'nama_dokumen' => 'SK Status Legacy Valid',
+                'nomor_dokumen' => $history->nomor_berkas,
+                'file_path' => $path,
+            ]);
+            Storage::disk(Document::STORAGE_DISK)->put($path, 'status legacy privat');
+        }
+
+        Document::create([
+            'employee_id' => $otherEmployee->id,
+            'jenis_dokumen' => 'sk_status_pegawai',
+            'nama_dokumen' => 'Referensi Pegawai Lain',
+            'file_path' => $crossOwnerPath,
+        ]);
+        Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'ktp_kk',
+            'nama_dokumen' => 'Referensi Kategori Sensitif',
+            'file_path' => $wrongCategoryPath,
+        ]);
+
+        $admin = User::factory()->adminKepegawaian()->create();
+        $adminUrls = [];
+        $pimpinanUrls = [];
+        foreach ([$crossOwnerHistory, $wrongCategoryHistory] as $history) {
+            $adminUrl = $this->url($employee, 'status', $history->id);
+            $pimpinanUrl = route('pimpinan.pegawai.status-attachments.download', [
+                'employee' => $employee,
+                'history' => $history,
+            ]);
+            $adminUrls[] = $adminUrl;
+            $pimpinanUrls[] = $pimpinanUrl;
+
+            $this->actingAs($admin)
+                ->get($adminUrl)
+                ->assertNotFound();
+        }
+
+        $adminDetail = $this->actingAs($admin)->get(route('pegawai.show', $employee))->assertOk();
+        foreach ($adminUrls as $url) {
+            $adminDetail->assertDontSee($url, false);
+        }
+
+        $pimpinan = User::factory()->pimpinan()->create();
+        $pimpinanDetail = $this->actingAs($pimpinan)
+            ->get(route('pimpinan.pegawai.show', $employee))
+            ->assertOk();
+        foreach ($pimpinanUrls as $url) {
+            $pimpinanDetail->assertDontSee($url, false);
+            $this->actingAs($pimpinan)->get($url)->assertNotFound();
+        }
+    }
+
+    public function test_detail_admin_dan_pimpinan_membaca_metadata_fallback_status_dalam_satu_query(): void
+    {
+        $employee = Employee::factory()->create();
+
+        foreach (range(1, 3) as $index) {
+            $documentNumber = 'SK-STATUS-BATCH-'.$index;
+            $path = 'pegawai/status-batch-'.$index.'.pdf';
+            EmployeeStatusHistory::create([
+                'employee_id' => $employee->id,
+                'status_nama' => 'Status Legacy Batch '.$index,
+                'tanggal_efektif' => '2026-08-0'.$index,
+                'nomor_berkas' => $documentNumber,
+                'is_latest' => $index === 1,
+            ]);
+            Document::create([
+                'employee_id' => $employee->id,
+                'jenis_dokumen' => 'sk_status_pegawai',
+                'nama_dokumen' => 'SK Status Batch '.$index,
+                'nomor_dokumen' => $documentNumber,
+                'file_path' => $path,
+            ]);
+            Storage::disk(Document::STORAGE_DISK)->put($path, 'status batch '.$index);
+        }
+
+        $surface = 'admin';
+        $metadataQueries = ['admin' => 0, 'pimpinan' => 0];
+        DB::listen(function (QueryExecuted $query) use (&$surface, &$metadataQueries): void {
+            $sql = mb_strtolower($query->sql);
+            if (str_contains($sql, 'from "documents"') && str_contains($sql, '"file_path" in')) {
+                $metadataQueries[$surface]++;
+            }
+        });
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee))
+            ->assertOk();
+
+        $surface = 'pimpinan';
+        $this->actingAs(User::factory()->pimpinan()->create())
+            ->get(route('pimpinan.pegawai.show', $employee))
+            ->assertOk();
+
+        $this->assertSame(['admin' => 1, 'pimpinan' => 1], $metadataQueries);
     }
 
     public function test_attachment_riwayat_memerlukan_permission_employees_read_secara_independen_dari_role(): void

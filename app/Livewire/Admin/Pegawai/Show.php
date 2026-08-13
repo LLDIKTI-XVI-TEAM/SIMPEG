@@ -111,6 +111,7 @@ class Show extends Component
             collect($groups)->flatten()->map(fn (Model $history): mixed => $history->getAttribute(
                 $history instanceof EducationHistory ? 'file_ijazah' : 'file_sk',
             ))->merge($employee->statusHistories->pluck('file_sk'))
+                ->merge($employee->documents->where('jenis_dokumen', 'sk_status_pegawai')->pluck('file_path'))
                 ->push($employee->status_berkas_path),
         );
 

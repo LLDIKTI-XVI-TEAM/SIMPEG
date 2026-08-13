@@ -171,6 +171,7 @@ class PreparePimpinanEmployeeDetailAction
             ...$employee->disciplineRecords->pluck('file_sk'),
             ...$employee->educationHistories->pluck('file_ijazah'),
             ...$employee->statusHistories->pluck('file_sk'),
+            ...$employee->documents->where('jenis_dokumen', 'sk_status_pegawai')->pluck('file_path'),
             $employee->appointment?->file_sk,
             $employee->status_berkas_path,
         ]));
