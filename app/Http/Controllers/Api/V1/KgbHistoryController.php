@@ -7,15 +7,19 @@ use App\Actions\Histories\ListKgbHistoriesAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\History\StoreKgbHistoryRequest;
 use App\Models\Employee;
+use App\Support\Histories\EmployeeHistoryPayload;
 use Illuminate\Http\JsonResponse;
 
 class KgbHistoryController extends Controller
 {
-    public function index(Employee $employee, ListKgbHistoriesAction $action): JsonResponse
-    {
+    public function index(
+        Employee $employee,
+        ListKgbHistoriesAction $action,
+        EmployeeHistoryPayload $payload,
+    ): JsonResponse {
         return response()->json([
             'employee_id' => $employee->id,
-            'histories' => $action->execute($employee),
+            'histories' => $action->execute($employee)->map($payload->kgb(...)),
         ]);
     }
 
@@ -23,12 +27,13 @@ class KgbHistoryController extends Controller
         StoreKgbHistoryRequest $request,
         Employee $employee,
         CreateKgbHistoryAction $action,
+        EmployeeHistoryPayload $payload,
     ): JsonResponse {
         $history = $action->execute($employee, $request->validated(), $request);
 
         return response()->json([
             'message' => 'Riwayat KGB berhasil ditambahkan.',
-            'history' => $history,
+            'history' => $payload->kgb($history),
         ], 201);
     }
 }

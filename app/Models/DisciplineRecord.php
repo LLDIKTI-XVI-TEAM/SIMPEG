@@ -5,7 +5,13 @@ namespace App\Models;
 use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property Carbon $tanggal_mulai
+ * @property Carbon|null $tanggal_berakhir
+ * @property Carbon $tanggal_sk
+ */
 class DisciplineRecord extends Model
 {
     use HasUuid;

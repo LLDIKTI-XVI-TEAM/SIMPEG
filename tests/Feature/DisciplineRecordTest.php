@@ -57,6 +57,7 @@ class DisciplineRecordTest extends TestCase
         $response->assertJsonPath('employee_id', $employee->id);
         $response->assertJsonCount(3, 'records');
         $response->assertJsonPath('records.0.no_sk', 'SK-SAME-NEWER');
+        $response->assertJsonPath('records.0.tanggal_mulai', '2026-05-01');
         $response->assertJsonPath('records.1.no_sk', 'SK-SAME-OLDER');
         $response->assertJsonPath('records.2.no_sk', 'SK-OLD');
         $response->assertJsonMissingPath('records.0.employee');
@@ -77,6 +78,9 @@ class DisciplineRecordTest extends TestCase
         $response->assertCreated();
         $response->assertJsonPath('message', 'Riwayat disiplin berhasil ditambahkan.');
         $response->assertJsonPath('record.is_active', true);
+        $response->assertJsonPath('record.tanggal_mulai', '2026-06-01');
+        $response->assertJsonPath('record.tanggal_berakhir', null);
+        $response->assertJsonPath('record.tanggal_sk', '2026-05-25');
         $this->assertDatabaseHas('discipline_records', [
             'employee_id' => $employee->id,
             'no_sk' => 'SK-DIS-001',
