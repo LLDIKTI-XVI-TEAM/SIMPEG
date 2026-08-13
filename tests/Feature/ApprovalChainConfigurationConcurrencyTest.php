@@ -41,7 +41,12 @@ class ApprovalChainConfigurationConcurrencyTest extends TestCase
             File::deleteDirectory($this->raceDirectory);
         }
 
-        $this->kosongkanAuditSebelumPenurunanMigrasi();
+        // Skip driver dilakukan sebelum Laravel boot agar SQLite tidak menjalankan migrasi yang sia-sia.
+        // Pembersihan basis data hanya aman bila parent::setUp() sempat membentuk container aplikasi.
+        if ($this->app !== null) {
+            $this->kosongkanAuditSebelumPenurunanMigrasi();
+        }
+
         parent::tearDown();
     }
 

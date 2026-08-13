@@ -686,7 +686,7 @@
                                 <span x-show="downloadingType === 'utama'">Menyiapkan Template...</span>
                                 <span x-show="downloadingType !== 'utama'">Unduh Template Utama Pegawai</span>
                             </span>
-                            <span class="text-xs text-muted block mt-0.5 font-sans">Berisi kolom NIP, NIK, No KK, Golongan, Jabatan, dan data kepegawaian lainnya.</span>
+                            <span class="text-xs text-muted block mt-0.5 font-sans">Berisi data pegawai seperti NIP, NIK, No. KK, golongan, dan jabatan. Role tidak diimpor; kelola Role melalui menu Kelola Akses User.</span>
                         </div>
                     </button>
                 </div>
@@ -808,39 +808,6 @@
                                 <strong class="text-ink" x-text="header + (index < intentionallySkippedSourceHeaders.length - 1 ? ', ' : '')"></strong>
                             </template>
                             adalah kolom yang didukung SIMPEG, tetapi nilainya tidak akan disimpan karena dipilih sebagai <strong class="text-ink">Tidak dipakai</strong>. Kondisi ini tidak memblokir import selama field wajib sudah dipetakan.
-                        </p>
-                    </div>
-                </div>
-
-                {{-- Canonical display/alias columns intentionally ignored by the import contract. --}}
-                <div x-show="knownIgnoredSourceHeaders.length > 0" x-cloak role="note"
-                    class="flex items-start gap-3 rounded-lg border border-border bg-soft/60 p-4 text-ink">
-                    <svg class="mt-0.5 h-5 w-5 shrink-0 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                    </svg>
-                    <div class="space-y-1 text-sm">
-                        <p class="font-semibold">Kolom bawaan yang tidak diimpor</p>
-                        <p class="leading-relaxed text-muted">
-                            <template x-for="(header, index) in knownIgnoredSourceHeaders" :key="header">
-                                <strong class="text-ink" x-text="header + (index < knownIgnoredSourceHeaders.length - 1 ? ', ' : '')"></strong>
-                            </template>
-                            diperlakukan sebagai kolom tampilan, alias, atau pengaturan akses. Khusus <strong class="text-ink">Role</strong>, penetapan akses tetap dilakukan melalui Kelola Akses User (US-1.4).
-                        </p>
-                    </div>
-                </div>
-
-                <div x-show="duplicateMappedFields.length > 0" x-cloak role="alert" aria-live="assertive" dusk="mapping-duplicate-warning"
-                    class="flex items-start gap-3 rounded-lg border border-danger/20 bg-danger/10 p-4 text-danger" x-transition>
-                    <svg class="mt-0.5 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <div class="text-sm">
-                        <p class="font-semibold">Konflik mapping ganda</p>
-                        <p class="mt-1 leading-relaxed">
-                            Satu field SIMPEG hanya boleh menerima satu kolom sumber. Perbaiki mapping untuk
-                            <template x-for="(target, index) in duplicateMappedFields" :key="target">
-                                <strong x-text="target + (index < duplicateMappedFields.length - 1 ? ', ' : '')"></strong>
-                            </template>.
                         </p>
                     </div>
                 </div>

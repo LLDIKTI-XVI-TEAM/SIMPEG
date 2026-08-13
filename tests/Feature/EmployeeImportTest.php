@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Employees\UploadImportBatchAction;
 use App\Models\Employee;
+use App\Models\EmployeeMilestone;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\RefJenisPegawai;
@@ -14,6 +16,8 @@ use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
+use Mockery\MockInterface;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -62,7 +66,29 @@ class EmployeeImportTest extends TestCase
             'nip' => '198001012006041001',
             'jenis_pegawai_id' => RefJenisPegawai::where('nama', 'PNS')->firstOrFail()->id,
         ]);
-        $this->assertSame('1985-02-12', Employee::where('nama_lengkap', 'Siti')->firstOrFail()->tanggal_lahir->format('Y-m-d'));
+        $budi = Employee::where('nama_lengkap', 'Budi')->firstOrFail();
+        $siti = Employee::where('nama_lengkap', 'Siti')->firstOrFail();
+        $this->assertSame('1985-02-12', $siti->tanggal_lahir->format('Y-m-d'));
+
+        foreach ([$budi, $siti] as $employee) {
+            $this->assertSame(1, $employee->milestones()->count());
+            $milestone = $employee->milestones()->sole();
+            $this->assertSame(EmployeeMilestone::TYPE_PENSIUN, $milestone->type);
+            $this->assertSame('employee_import', $milestone->metadata['source']);
+            $this->assertTrue($milestone->metadata['is_manual']);
+        }
+
+        $this->artisan('milestone:backfill', [
+            '--recalculate-legacy-pension' => true,
+            '--no-interaction' => true,
+        ])
+            ->expectsQuestion('Do you want to proceed with the backfill?', true)
+            ->assertSuccessful();
+
+        $this->assertSame('2038-01-01', $budi->fresh()->tanggal_pensiun?->toDateString());
+        $this->assertSame('2043-02-12', $siti->fresh()->tanggal_pensiun?->toDateString());
+        $this->assertSame(1, $budi->milestones()->count());
+        $this->assertSame(1, $siti->milestones()->count());
     }
 
     public function test_pegawai_cannot_import_employees(): void
@@ -108,7 +134,7 @@ class EmployeeImportTest extends TestCase
         $this->assertDatabaseCount('employees', 0);
     }
 
-    public function test_import_rejects_row_errors_without_creating_any_rows(): void
+    public function test_import_skips_existing_nip_and_inserts_other_valid_rows(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
         Employee::factory()->create(['nip' => '198001012006041001']);
@@ -118,11 +144,114 @@ class EmployeeImportTest extends TestCase
             'file' => $this->csvFile($this->validCsv()),
         ]);
 
-        $response->assertUnprocessable();
-        $response->assertJsonPath('inserted', 0);
-        $response->assertJsonPath('failed', 1);
-        $response->assertJsonPath('errors.0.row', 2);
-        $this->assertDatabaseMissing('employees', ['nama_lengkap' => 'Siti', 'nama_dengan_gelar' => 'Siti Aminah']);
+        $response->assertOk();
+        $response->assertJsonPath('inserted', 1);
+        $response->assertJsonPath('skipped', 1);
+        $response->assertJsonPath('failed', 0);
+        $this->assertDatabaseHas('employees', [
+            'nama_lengkap' => 'Siti',
+            'nama_dengan_gelar' => 'Siti Aminah',
+        ]);
+    }
+
+    public function test_wizard_prioritizes_existing_email_error_over_existing_nip_skip(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        Employee::factory()->create([
+            'nip' => '198001012006041001',
+            'email_pribadi' => 'budi@example.com',
+        ]);
+
+        $this->actingAs($user);
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile([$this->validRows()[0]]),
+        ])->assertOk();
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$upload->json('batch_id')}/validate", [])
+            ->assertOk()
+            ->assertJsonPath('valid_count', 0)
+            ->assertJsonPath('error_count', 1)
+            ->assertJsonPath('skip_count', 0)
+            ->assertJsonPath('results.0.status', 'error')
+            ->assertJsonPath('results.0.errors.Email Pegawai.0', 'Email pegawai sudah terdaftar di database.');
+    }
+
+    /** Email pegawai nonaktif tetap dicadangkan untuk identitas pegawai tersebut. */
+    public function test_wizard_rejects_email_owned_by_soft_deleted_employee(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $inactiveEmployee = Employee::factory()->create([
+            'nip' => '199901010000000001',
+            'email_pribadi' => 'budi@example.com',
+        ]);
+        $inactiveEmployee->delete();
+
+        $this->actingAs($user);
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile([$this->validRows()[0]]),
+        ])->assertOk();
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$upload->json('batch_id')}/validate", [])
+            ->assertOk()
+            ->assertJsonPath('valid_count', 0)
+            ->assertJsonPath('error_count', 1)
+            ->assertJsonPath('skip_count', 0)
+            ->assertJsonPath('results.0.status', 'error')
+            ->assertJsonPath('results.0.errors.Email Pegawai.0', 'Email pegawai sudah terdaftar di database.');
+    }
+
+    /** NIP pegawai nonaktif tetap dikenali sebagai data lama yang harus dilewati. */
+    public function test_wizard_skips_nip_owned_by_soft_deleted_employee(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $inactiveEmployee = Employee::factory()->create([
+            'nip' => '198001012006041001',
+            'email_pribadi' => 'arsip@example.com',
+        ]);
+        $inactiveEmployee->delete();
+
+        $this->actingAs($user);
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile([$this->validRows()[0]]),
+        ])->assertOk();
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$upload->json('batch_id')}/validate", [])
+            ->assertOk()
+            ->assertJsonPath('valid_count', 0)
+            ->assertJsonPath('error_count', 0)
+            ->assertJsonPath('skip_count', 1)
+            ->assertJsonPath('results.0.status', 'skip')
+            ->assertJsonPath('results.0.errors.NIP.0', 'NIP sudah terdaftar di database.');
+    }
+
+    public function test_wizard_prioritizes_duplicate_nip_in_file_over_database_skip(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        Employee::factory()->create(['nip' => '198001012006041001']);
+        $rows = $this->validRows();
+        $rows[1][5] = $rows[0][5];
+
+        $this->actingAs($user);
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($rows),
+        ])->assertOk();
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$upload->json('batch_id')}/validate", [])
+            ->assertOk()
+            ->assertJsonPath('valid_count', 0)
+            // Kedua baris error: baris 1 di-upgrade secara retroactive (tadinya skip DB karena NIP
+            // sudah ada di database, tapi baris 2 menduplikasi NIP yang sama dalam file sehingga
+            // retroactive upgrade mengubah baris 1 menjadi error pula — lihat logika $duplicatedNips).
+            ->assertJsonPath('error_count', 2)
+            ->assertJsonPath('skip_count', 0)
+            ->assertJsonPath('results.0.status', 'error')
+            // Pesan skip database sudah tercatat sebelum validasi baris berikutnya
+            // menemukan duplikasi; upgrade retroaktif menambahkan pesan duplikasi sesudahnya.
+            ->assertJsonPath('results.0.errors.NIP.0', 'NIP sudah terdaftar di database.')
+            ->assertJsonPath('results.0.errors.NIP.1', 'NIP sudah ada pada baris 3.')
+            ->assertJsonPath('results.1.status', 'error')
+            ->assertJsonPath('results.1.errors.NIP.0', 'NIP sudah ada pada baris 2.');
+
     }
 
     public function test_import_rejects_duplicate_rows_without_creating_any_rows(): void
@@ -410,29 +539,157 @@ class EmployeeImportTest extends TestCase
         );
     }
 
-    public function test_upload_memperingatkan_kolom_role_sebagai_kolom_ekstra(): void
+    /**
+     * US-3.2 AC-5: Remapping kolom Role ke field SIMPEG manapun via endpoint harus
+     * dinormalisasi paksa menjadi tidak_dipakai — bukan sekedar tidak tersedia di auto-map.
+     *
+     * Skenario ini membuktikan bahwa request langsung Role → Pangkat ditolak/dinormalisasi
+     * bahkan ketika client mengirim JSON secara manual, tanpa melalui UI.
+     */
+    public function test_save_mapping_normalizes_role_source_ke_tidak_dipakai(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
 
         $this->actingAs($user);
 
-        // File dengan kolom Role warisan: Role tidak boleh menjadi target import dan harus
-        // muncul sebagai peringatan kolom ekstra, bukan field yang dapat dipetakan.
+        // Upload file dengan kolom Role.
         $headers = array_merge($this->headers(), ['Role']);
         $rows = array_map(fn (array $row): array => array_merge($row, ['pegawai']), $this->validRows());
 
         $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
             'file' => $this->xlsxFileWithHeaders($headers, $rows, 'dengan_role.xlsx'),
+        ])->assertOk();
+
+        $batchId = $upload->json('batch_id');
+
+        // Admin mencoba memetakan Role → Pangkat secara langsung melalui endpoint.
+        // Backend harus menormalisasi Role menjadi tidak_dipakai tanpa mengembalikan error,
+        // karena normalisasi adalah pilihan yang lebih UX-friendly dari penolakan keras.
+        $mapping = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/mapping", [
+            'mapping' => [
+                'Pangkat' => 'tidak_dipakai',
+                'Role' => 'Pangkat', // <-- skenario exploit yang harus dinormalisasi
+            ],
         ]);
 
-        $upload->assertOk();
-        $upload->assertJsonPath('mapping.Role', 'tidak_dipakai');
-        $this->assertContains('Role', $upload->json('warnings.unmatched_columns'));
-        $this->assertNotContains('Role', $upload->json('required_targets'));
+        $mapping->assertOk();
+
+        // Role harus dipaksa kembali ke tidak_dipakai — bukan Pangkat.
+        $mapping->assertJsonPath('mapping.Role', 'tidak_dipakai');
+
+        // Pangkat masih tidak_dipakai sebagaimana dikirim admin (duplikasi tidak terjadi).
+        $mapping->assertJsonPath('mapping.Pangkat', 'tidak_dipakai');
+    }
+
+    /**
+     * US-3.2 AC-5: Fail-closed defense di ImportColumnMapping::apply() — nilai kolom Role
+     * tidak boleh lolos ke field SIMPEG manapun meski mapping cache dimanipulasi.
+     *
+     * Membuktikan bahwa lapisan kedua (apply) independen dari SaveImportMappingAction.
+     */
+    public function test_mapping_endpoint_normalizes_role_header_variations(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $this->actingAs($user);
+
+        foreach (['Role', 'ROLE', 'role', '  rOlE  '] as $sourceHeader) {
+            $headers = array_merge($this->headers(), [$sourceHeader]);
+            $rows = array_map(fn (array $row): array => array_merge($row, ['pegawai']), $this->validRows());
+            $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+                'file' => $this->xlsxFileWithHeaders($headers, $rows, 'role_variants.xlsx'),
+            ])->assertOk();
+
+            $storedHeader = collect(array_keys($upload->json('mapping')))
+                ->first(fn (string $header): bool => mb_strtolower(trim($header)) === 'role');
+
+            $this->assertNotNull($storedHeader);
+            $this->postJsonWithCsrf("/api/pegawai/import/{$upload->json('batch_id')}/mapping", [
+                'mapping' => ['Pangkat' => 'tidak_dipakai', $storedHeader => 'Pangkat'],
+            ])
+                ->assertOk()
+                ->assertJsonPath("mapping.{$storedHeader}", 'tidak_dipakai');
+        }
+    }
+
+    public function test_apply_fail_closed_mengabaikan_nilai_kolom_role(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+
+        // Upload file dengan kolom Role.
+        $headers = array_merge($this->headers(), ['Role']);
+        $rows = array_map(fn (array $row): array => array_merge($row, ['pegawai']), $this->validRows());
+
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFileWithHeaders($headers, $rows, 'role_apply_test.xlsx'),
+        ])->assertOk();
+
+        $batchId = $upload->json('batch_id');
+
+        // Simpan mapping lewat endpoint — normalisasi sudah berjalan di sini.
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/mapping", [
+            'mapping' => [
+                'Role' => 'Pangkat', // akan dinormalisasi menjadi tidak_dipakai
+            ],
+        ])->assertOk();
+
+        // Jalankan validasi dan eksekusi — nilai kolom Role ('pegawai') tidak boleh
+        // tersimpan ke field apapun pada pegawai yang diimpor.
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])
+            ->assertOk()
+            ->assertJsonPath('valid_count', 2);
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", [])
+            ->assertOk()
+            ->assertJsonPath('status', 'queued');
+
+        // Semua pegawai berhasil diimpor tanpa data Role masuk ke kolom manapun.
+        $this->assertDatabaseHas('employees', ['nip' => '198001012006041001']);
+        $this->assertDatabaseHas('employees', ['nip' => '198502122010042002']);
+
+        // Field pangkat_terakhir tidak boleh berisi nilai 'pegawai' (nilai kolom Role).
+        $this->assertDatabaseMissing('employees', ['pangkat_terakhir' => 'pegawai']);
+    }
+
+    public function test_partial_mapping_save_cleans_legacy_role_mapping(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $this->actingAs($user);
+
+        $headers = array_merge($this->headers(), ['Role']);
+        $rows = array_map(fn (array $row): array => array_merge($row, ['pegawai']), $this->validRows());
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFileWithHeaders($headers, $rows, 'legacy_role_mapping.xlsx'),
+        ])->assertOk();
+
+        $batchId = $upload->json('batch_id');
+        $cacheKey = UploadImportBatchAction::CACHE_PREFIX.$batchId;
+        $batch = Cache::get($cacheKey);
+        $batch['mapping']['Role'] = 'Pangkat';
+        Cache::put($cacheKey, $batch, now()->addMinutes(30));
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/mapping", [
+            'mapping' => ['Pangkat' => 'tidak_dipakai'],
+        ])
+            ->assertOk()
+            ->assertJsonPath('mapping.Role', 'tidak_dipakai');
+    }
+
+    public function test_apply_ignores_role_header_variations(): void
+    {
+        foreach (['Role', 'ROLE', 'role', '  rOlE  '] as $sourceHeader) {
+            $mapped = ImportColumnMapping::apply(
+                [$sourceHeader => 'pegawai', 'Pangkat' => 'Penata Muda'],
+                [$sourceHeader => 'Pangkat', 'Pangkat' => 'Pangkat'],
+            );
+
+            $this->assertSame(['Pangkat' => 'Penata Muda'], $mapped);
+        }
     }
 
     #[DataProvider('reservedRoleHeaderProvider')]
-    public function test_mapping_endpoint_menolak_source_role_setelah_normalisasi(string $sourceHeader): void
+    public function test_mapping_endpoint_menormalisasi_source_role_setelah_normalisasi(string $sourceHeader): void
     {
         $user = User::factory()->adminKepegawaian()->create();
 
@@ -447,17 +704,22 @@ class EmployeeImportTest extends TestCase
         $upload->assertOk();
         $batchId = $upload->json('batch_id');
 
-        // Target asli dilepas lebih dulu agar penolakan membuktikan invariant source reserved,
-        // bukan sekadar terpicu oleh validasi target ganda.
+        $storedHeader = collect(array_keys($upload->json('mapping')))
+            ->first(fn (string $header): bool => mb_strtolower(preg_replace('/\s+/', ' ', trim($header)) ?? $header) === 'role');
+
+        $this->assertNotNull($storedHeader);
+
+        // Target asli dilepas lebih dulu agar normalisasi reserved source diuji
+        // secara independen dari validasi target ganda.
         $response = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/mapping", [
             'mapping' => [
                 'Pangkat' => 'tidak_dipakai',
-                $sourceHeader => 'Pangkat',
+                $storedHeader => 'Pangkat',
             ],
         ]);
 
-        $response->assertUnprocessable();
-        $response->assertJsonValidationErrors('mapping');
+        $response->assertOk();
+        $this->assertSame('tidak_dipakai', $response->json("mapping.{$storedHeader}"));
     }
 
     #[DataProvider('reservedRoleHeaderProvider')]
@@ -696,6 +958,50 @@ class EmployeeImportTest extends TestCase
         ])->assertForbidden();
     }
 
+    public function test_validate_endpoint_rejects_malformed_edited_rows_with_422(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $this->actingAs($user);
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($this->validRows()),
+        ])->assertOk();
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$upload->json('batch_id')}/validate", [
+            'rows' => [
+                ['row' => 1, 'data' => 'bukan-array'],
+            ],
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['rows.0.row', 'rows.0.data']);
+    }
+
+    public function test_import_batch_mutations_preserve_role_authorization_boundary(): void
+    {
+        $owner = User::factory()->adminKepegawaian()->create();
+        $unauthorizedUser = User::factory()->pegawai()->create();
+        $this->actingAs($owner);
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile($this->validRows()),
+        ])->assertOk();
+        $batchId = $upload->json('batch_id');
+
+        $this->actingAs($unauthorizedUser);
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])->assertForbidden();
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", [])->assertForbidden();
+    }
+
+    public function test_import_batch_mutations_reject_malformed_uuid_at_route_boundary(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $this->actingAs($user);
+
+        $this->postJsonWithCsrf('/api/pegawai/import/bukan-uuid/validate', [])->assertNotFound();
+        $this->postJsonWithCsrf('/api/pegawai/import/bukan-uuid/mapping', [
+            'mapping' => ['NIP' => 'NIP'],
+        ])->assertNotFound();
+        $this->postJsonWithCsrf('/api/pegawai/import/bukan-uuid/execute', [])->assertNotFound();
+    }
+
     public function test_import_wizard_persists_data_utama_snapshots_without_histories_or_tmt_calculation(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -714,8 +1020,27 @@ class EmployeeImportTest extends TestCase
         $validation->assertJsonPath('valid_count', 1);
         $validation->assertJsonPath('error_count', 0);
 
-        $this->mock(TmtCalculatorService::class)
-            ->shouldNotReceive('syncForEmployee');
+        $calculator = new class extends TmtCalculatorService
+        {
+            public int $recordImportedPensionDateCalls = 0;
+
+            public int $syncForEmployeeCalls = 0;
+
+            public function syncForEmployee(
+                Employee $employee,
+                ?bool $pensionDateIsAuthoritative = null,
+                bool $recalculateLegacyPension = false,
+            ): void {
+                $this->syncForEmployeeCalls++;
+            }
+
+            public function recordImportedPensionDate(Employee $employee): void
+            {
+                $this->recordImportedPensionDateCalls++;
+                parent::recordImportedPensionDate($employee);
+            }
+        };
+        $this->app->instance(TmtCalculatorService::class, $calculator);
 
         $execute = $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", []);
         $execute->assertOk();
@@ -726,6 +1051,8 @@ class EmployeeImportTest extends TestCase
         $status->assertJsonPath('status', 'completed');
         $status->assertJsonPath('result.inserted', 1);
         $status->assertJsonPath('result.failed', 0);
+        $this->assertSame(0, $calculator->syncForEmployeeCalls);
+        $this->assertSame(1, $calculator->recordImportedPensionDateCalls);
 
         $employee = Employee::where('nip', '198001012006041001')->firstOrFail();
 
@@ -739,6 +1066,62 @@ class EmployeeImportTest extends TestCase
         $this->assertSame(0, RankHistory::where('employee_id', $employee->id)->count());
         $this->assertSame(0, PositionHistory::where('employee_id', $employee->id)->count());
         $this->assertSame(0, SalaryHistory::where('employee_id', $employee->id)->count());
+
+        $this->assertSame(1, $employee->milestones()->count());
+        $pensionMilestone = $employee->milestones()->sole();
+        $this->assertSame(EmployeeMilestone::TYPE_PENSIUN, $pensionMilestone->type);
+        $this->assertSame('employee_import', $pensionMilestone->metadata['source']);
+        $this->assertTrue($pensionMilestone->metadata['is_manual']);
+
+        // Import telah selesai dan ekspektasi mock melindungi batas import saja;
+        // backfill berikutnya memang harus memakai kalkulator nyata.
+        $this->app->forgetInstance(TmtCalculatorService::class);
+
+        $this->artisan('milestone:backfill', [
+            '--recalculate-legacy-pension' => true,
+            '--no-interaction' => true,
+        ])
+            ->expectsQuestion('Do you want to proceed with the backfill?', true)
+            ->assertSuccessful();
+
+        $employee->refresh();
+        $pensionMilestone->refresh();
+        $this->assertSame('2038-01-01', $employee->tanggal_pensiun?->toDateString());
+        $this->assertSame('2038-01-01', $pensionMilestone->milestone_date->toDateString());
+        $this->assertNotSame('legacy_unverified', $pensionMilestone->metadata['source']);
+        $this->assertSame(1, $employee->milestones()->count());
+    }
+
+    /** Import tanpa tanggal pensiun tidak boleh memanggil kalkulator atau membuat milestone. */
+    public function test_import_without_pension_date_does_not_trigger_tmt_calculation(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $row = $this->validRows()[0];
+        $row[9] = null;
+
+        $this->mock(TmtCalculatorService::class, function (MockInterface $mock): void {
+            $mock->shouldNotReceive('syncForEmployee');
+            $mock->shouldNotReceive('recordImportedPensionDate');
+        });
+
+        $this->actingAs($user);
+        $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
+            'file' => $this->xlsxFile([$row]),
+        ])->assertOk();
+        $batchId = $upload->json('batch_id');
+
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])
+            ->assertOk()
+            ->assertJsonPath('valid_count', 1);
+        $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", [])
+            ->assertOk()
+            ->assertJsonPath('status', 'queued');
+
+        $employee = Employee::query()->where('nip', '198001012006041001')->firstOrFail();
+        $this->assertNull($employee->tanggal_pensiun);
+        $this->assertSame('III/a', $employee->golongan_terakhir);
+        $this->assertSame('Analis Kepegawaian', $employee->jabatan_terakhir);
+        $this->assertSame(0, $employee->milestones()->count());
     }
 
     public function test_import_wizard_realigns_old_template_rows_without_nik_and_no_kk_values(): void

@@ -65,7 +65,7 @@
 
                     {{-- Tanggal --}}
                     <div>
-                        <label for="tanggal" class="mb-1 block text-sm font-semibold text-ink">Tanggal Efektif <span class="text-error">*</span></label>
+                        <label for="tanggal" class="mb-1 block text-sm font-semibold text-ink">Tanggal Efektif Status Kepegawaian <span class="text-error">*</span></label>
                         <input type="date" name="tanggal" id="tanggal" value="{{ old('tanggal') }}" class="mt-1 block w-full rounded-lg border-border bg-page px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary @error('tanggal') border-error @enderror">
                         @error('tanggal') <span class="text-xs text-error mt-1">{{ $message }}</span> @enderror
                     </div>

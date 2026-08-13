@@ -11,6 +11,7 @@ use App\Models\EwsConfig;
 use App\Models\EwsSchedulerRun;
 use App\Models\PositionHistory;
 use App\Models\RefGolongan;
+use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\SimpegNotification;
@@ -387,6 +388,44 @@ class EwsSchedulerTest extends TestCase
             now()->addDays(365)->startOfDay()->toDateString(),
             Carbon::parse($alert->target_date)->toDateString()
         );
+    }
+
+    /** BUP jabatan harus mengalahkan konfigurasi global ketika milestone belum tersedia. */
+    public function test_scheduler_uses_position_bup_before_global_fallback_without_milestone(): void
+    {
+        EwsConfig::setVal('pensiun_required_age_years', '60');
+        EwsConfig::setVal('pensiun_y1', '365');
+        EwsConfig::setVal('pensiun_m6', '180');
+        EwsConfig::setVal('pensiun_m3', '90');
+
+        $jabatan = RefJabatan::create([
+            'nama' => 'Analis BUP Prioritas',
+            'default_bup' => 58,
+        ]);
+        $employee = Employee::factory()->create([
+            'tanggal_lahir' => now()->subYears(58)->addDays(90)->toDateString(),
+            'tanggal_pensiun' => null,
+            'status_aktif' => 'Aktif',
+        ]);
+
+        PositionHistory::create([
+            'id' => Str::uuid(),
+            'employee_id' => $employee->id,
+            'jabatan_id' => $jabatan->id,
+            'nama_jabatan' => $jabatan->nama,
+            'tmt_jabatan' => now()->subYear()->toDateString(),
+            'is_latest' => true,
+        ]);
+
+        $expectedTargetDate = now()->addDays(90)->toDateString();
+        app(EwsEngineService::class)->run();
+
+        $alert = EwsAlert::query()
+            ->where('employee_id', $employee->id)
+            ->where('type', 'PENSIUN')
+            ->firstOrFail();
+        $this->assertSame($expectedTargetDate, $alert->target_date->toDateString());
+        $this->assertSame(90, $alert->interval_days);
     }
 
     public function test_scheduler_checks_pppk_contract_using_tanggal_akhir_kontrak(): void

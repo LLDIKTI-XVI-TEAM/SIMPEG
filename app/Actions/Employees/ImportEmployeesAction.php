@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Services\AuditService;
+use App\Services\Employees\TmtCalculatorService;
 use App\Support\EmployeeImport\CsvEmployeeReader;
 use App\Support\EmployeeValidationRules;
 use Illuminate\Http\Request;
@@ -19,7 +20,10 @@ class ImportEmployeesAction
     /** @var array<string, string>|null */
     private ?array $jenisPegawaiCache = null;
 
-    public function __construct(private readonly CsvEmployeeReader $reader) {}
+    public function __construct(
+        private readonly CsvEmployeeReader $reader,
+        private readonly TmtCalculatorService $tmtCalculator,
+    ) {}
 
     /**
      * Mengimpor pegawai secara all-or-nothing agar file bermasalah tidak membuat data parsial.
@@ -38,6 +42,7 @@ class ImportEmployeesAction
 
         $validatedRows = [];
         $errors = [];
+        $skippedCount = 0;
         /** @var array<string, int> $seenNips */
         $seenNips = [];
         /** @var array<string, int> $seenEmails */
@@ -62,8 +67,9 @@ class ImportEmployeesAction
 
             $data = $validator->validated();
             $referenceErrors = $this->resolveReferences($data);
-            $duplicateErrors = $this->duplicateErrors($data, $row['row'], $seenNips, $seenEmails);
-            $rowErrors = array_merge_recursive($referenceErrors, $duplicateErrors);
+            $duplicateResult = $this->duplicateErrors($data, $row['row'], $seenNips, $seenEmails);
+
+            $rowErrors = array_merge_recursive($referenceErrors, $duplicateResult['errors']);
 
             if ($rowErrors !== []) {
                 $errors[] = [
@@ -74,11 +80,18 @@ class ImportEmployeesAction
                 continue;
             }
 
+            // Skip NIP hanya berlaku bila baris tidak memiliki error yang harus diperbaiki admin.
+            if ($duplicateResult['skip']) {
+                $skippedCount++;
+
+                continue;
+            }
+
             $validatedRows[] = $data;
         }
 
         if ($errors !== []) {
-            return $this->failedSummary($errors);
+            return $this->failedSummary($errors, $skippedCount);
         }
 
         DB::transaction(function () use ($validatedRows): void {
@@ -86,23 +99,31 @@ class ImportEmployeesAction
                 ?? RefStatusPegawai::where('is_default', true)->value('id');
 
             foreach ($validatedRows as $data) {
-                Employee::create($data + [
+                $employee = Employee::create($data + [
                     'status_pegawai_id' => $aktifId,
                     'status_aktif' => 'Aktif',
                     'profil_status' => 'belum_lengkap',
                     'is_kinerja_baik' => true,
                 ]);
+
+                // Endpoint import kompatibilitas mengikuti batas yang sama dengan wizard:
+                // catat provenance pensiun tanpa menghitung milestone lain dari snapshot massal.
+                if ($employee->tanggal_pensiun !== null) {
+                    $this->tmtCalculator->recordImportedPensionDate($employee);
+                }
             }
         });
 
         AuditService::log('IMPORT', 'Employee', null, null, [
             'total_inserted' => count($validatedRows),
+            'total_skipped' => $skippedCount,
             'filename' => $request->file('file')->getClientOriginalName(),
         ], $request);
 
         return [
             'message' => 'Import selesai.',
             'inserted' => count($validatedRows),
+            'skipped' => $skippedCount,
             'failed' => 0,
             'errors' => [],
         ];
@@ -150,48 +171,72 @@ class ImportEmployeesAction
 
     /**
      * Menjaga file import tidak berisi NIP/email ganda sebelum transaksi insert dimulai.
+     * - NIP ganda dalam satu berkas → error dengan prioritas tertinggi
+     * - Email yang telah terdaftar → error
+     * - Email ganda dalam berkas → error
+     * - NIP sudah ada di database → skip bila baris tidak memiliki error lain
      *
      * @param  array<string, mixed>  $data
      * @param  array<string, int>  $seenNips
      * @param  array<string, int>  $seenEmails
-     * @return array<string, array<int, string>>
+     * @return array{errors: array<string, array<int, string>>, skip: bool}
      */
     private function duplicateErrors(array $data, int $row, array &$seenNips, array &$seenEmails): array
     {
         $errors = [];
+        $skip = false;
 
         if (! empty($data['nip'])) {
             $nip = (string) $data['nip'];
 
+            // Duplikasi NIP dalam berkas diprioritaskan agar sumber konflik dapat diperbaiki.
             if (isset($seenNips[$nip])) {
                 $errors['nip'][] = "NIP sudah ada pada baris {$seenNips[$nip]}.";
             } else {
                 $seenNips[$nip] = $row;
+
+                // NIP database menjadi skip hanya bila tidak ada duplikasi dalam berkas.
+                if (Employee::withTrashed()->where('nip', $nip)->exists()) {
+                    $skip = true;
+                }
             }
         }
 
         if (! empty($data['email_pribadi'])) {
             $email = strtolower((string) $data['email_pribadi']);
 
+            // Duplikasi email dalam berkas harus diperbaiki sebelum data disimpan.
             if (isset($seenEmails[$email])) {
                 $errors['email_pribadi'][] = "Email pegawai sudah ada pada baris {$seenEmails[$email]}.";
             } else {
                 $seenEmails[$email] = $row;
             }
+
+            // Email yang telah digunakan tidak boleh dipakai oleh pegawai lain.
+            if (Employee::withTrashed()->whereRaw('LOWER(email_pribadi) = ?', [$email])->exists()) {
+                $errors['email_pribadi'][] = 'Email pegawai sudah terdaftar di database.';
+            }
         }
 
-        return $errors;
+        return ['errors' => $errors, 'skip' => $skip];
     }
 
     /**
      * @param  array<int, array{row: int, errors: array<string, mixed>}>  $errors
-     * @return array{message: string, inserted: int, failed: int, errors: array<int, array{row: int, errors: array<string, mixed>}>}
+     * @return array{message: string, inserted: int, skipped: int, failed: int, errors: array<int, array{row: int, errors: array<string, mixed>}>}
      */
-    private function failedSummary(array $errors): array
+    private function failedSummary(array $errors, int $skippedCount = 0): array
     {
+        $message = 'Import gagal. Perbaiki baris bermasalah lalu unggah ulang.';
+
+        if ($skippedCount > 0) {
+            $message .= " {$skippedCount} baris dilewati karena NIP sudah terdaftar.";
+        }
+
         return [
-            'message' => 'Import gagal. Perbaiki baris bermasalah lalu unggah ulang.',
+            'message' => $message,
             'inserted' => 0,
+            'skipped' => $skippedCount,
             'failed' => count($errors),
             'errors' => $errors,
         ];

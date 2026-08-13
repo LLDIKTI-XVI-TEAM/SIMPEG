@@ -6,7 +6,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * Memvalidasi penetapan Kepala Bagian beserta tanggal efektifnya.
+ * Memvalidasi penetapan Kepala Bagian beserta tanggal mulai penugasannya.
  */
 class AssignSupervisorRequest extends FormRequest
 {
@@ -31,6 +31,16 @@ class AssignSupervisorRequest extends FormRequest
             'effective_date' => ['required', 'date_format:Y-m-d'],
             // Halaman asal non-default harus berasal dari whitelist agar redirect tidak bisa diarahkan ke URL bebas.
             'redirect_to' => ['nullable', 'string', 'in:cuti-config'],
+        ];
+    }
+
+    /** @return array<string, string> */
+    public function attributes(): array
+    {
+        return [
+            'kepala_bagian_id' => 'Kepala Bagian',
+            'supervisor_id' => 'Kepala Bagian',
+            'effective_date' => 'Tanggal Mulai Penugasan Kepala Bagian',
         ];
     }
 }

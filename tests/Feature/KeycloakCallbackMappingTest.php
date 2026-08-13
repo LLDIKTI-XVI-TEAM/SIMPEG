@@ -7,6 +7,7 @@ use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
@@ -306,8 +307,15 @@ class KeycloakCallbackMappingTest extends TestCase
 
     public function test_duplicate_employee_match_is_denied(): void
     {
-        Employee::factory()->create(['email' => 'duplikat@example.com']);
-        Employee::factory()->create(['email' => 'duplikat@example.com']);
+        $this->withoutVite();
+
+        $firstEmployee = Employee::factory()->create(['email_pribadi' => 'kanonis-satu@example.com']);
+        $secondEmployee = Employee::factory()->create(['email_pribadi' => 'kanonis-dua@example.com']);
+
+        // Fixture legacy boleh ambigu di kolom email lama, sedangkan identitas kanonis tetap unik.
+        DB::table('employees')
+            ->whereIn('id', [$firstEmployee->id, $secondEmployee->id])
+            ->update(['email' => 'duplikat@example.com']);
 
         $this->fakeKeycloakUser([
             'id' => 'kc-duplicate',
