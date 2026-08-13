@@ -569,7 +569,7 @@
                                     <x-ui.table-row>
                                         <x-ui.table-td class="font-bold">{{ $e->jenjang->nama ?? '-' }}</x-ui.table-td>
                                         <x-ui.table-td>{{ $e->nama_institusi }}</x-ui.table-td>
-                                        <x-ui.table-td>{{ $e->jurusan }}</x-ui.table-td>
+                                        <x-ui.table-td>{{ $e->programStudi?->nama ?? $e->jurusan ?? '-' }}</x-ui.table-td>
                                         <x-ui.table-td>{{ $e->tahun_lulus }}</x-ui.table-td>
                                         <x-ui.table-td>{{ $e->no_ijazah }}</x-ui.table-td>
                                     </x-ui.table-row>

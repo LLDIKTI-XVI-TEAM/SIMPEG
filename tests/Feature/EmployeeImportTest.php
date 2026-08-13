@@ -1005,11 +1005,13 @@ class EmployeeImportTest extends TestCase
     public function test_import_wizard_persists_data_utama_snapshots_without_histories_or_tmt_calculation(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
+        $row = $this->validRows()[0];
+        $row[12] = 'Program Studi Import Tanpa Referensi';
 
         $this->actingAs($user);
 
         $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
-            'file' => $this->xlsxFile([$this->validRows()[0]]),
+            'file' => $this->xlsxFile([$row]),
         ]);
 
         $upload->assertOk();
@@ -1061,7 +1063,11 @@ class EmployeeImportTest extends TestCase
         $this->assertSame('Analis Kepegawaian', $employee->jabatan_terakhir);
         $this->assertSame('7', $employee->kelas_jabatan_terakhir);
         $this->assertSame('S1', $employee->pendidikan_terakhir);
-        $this->assertSame('Manajemen', $employee->prodi_pendidikan_terakhir);
+        $this->assertSame('Program Studi Import Tanpa Referensi', $employee->prodi_pendidikan_terakhir);
+        $this->assertNull($employee->program_studi_id);
+        $this->assertDatabaseMissing('ref_program_studi', [
+            'nama' => 'Program Studi Import Tanpa Referensi',
+        ]);
         $this->assertSame('2038-01-01', $employee->tanggal_pensiun?->format('Y-m-d'));
         $this->assertSame(0, RankHistory::where('employee_id', $employee->id)->count());
         $this->assertSame(0, PositionHistory::where('employee_id', $employee->id)->count());
