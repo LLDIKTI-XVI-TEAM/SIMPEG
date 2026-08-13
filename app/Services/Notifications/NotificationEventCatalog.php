@@ -114,6 +114,11 @@ final class NotificationEventCatalog
             'group' => 'EWS',
             'allowed_channels' => ['in_app'],
         ],
+        'status_pegawai.diubah' => [
+            'label' => 'Status kepegawaian diperbarui',
+            'group' => 'Pegawai',
+            'allowed_channels' => ['in_app', 'email'],
+        ],
         'import_pegawai' => [
             'label' => 'Impor pegawai selesai',
             'group' => 'Impor Pegawai',
