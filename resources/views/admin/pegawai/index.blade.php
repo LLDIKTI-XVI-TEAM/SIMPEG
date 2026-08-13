@@ -762,7 +762,7 @@
                                 @endif
 
                                 @if(auth()->user()->hasPermission('employees.deactivate'))
-                                    {{-- Nonaktifkan → masuk Backup (Super Admin Only) --}}
+                                    {{-- Nonaktifkan → masuk Backup (berdasarkan permission) --}}
                                     <x-ui.tooltip text="Nonaktifkan Pegawai" position="top-end">
                                         <button type="button" @click="deletePegawai(p.id, p.nama_lengkap)"
                                             :aria-label="'Nonaktifkan pegawai ' + p.nama_lengkap"
@@ -955,7 +955,7 @@
 
 
         {{-- ============================================================ --}}
-        {{-- MODAL NONAKTIFKAN PEGAWAI → BACKUP (Super Admin Only) --}}
+        {{-- MODAL NONAKTIFKAN PEGAWAI → BACKUP (berdasarkan permission) --}}
         {{-- ============================================================ --}}
         <x-ui.modal show="showDeleteModal" title="Nonaktifkan Pegawai" closeAction="showDeleteModal = false"
             maxWidth="sm" dusk="deactivate-employee-modal">
@@ -974,9 +974,8 @@
                         <p class="text-xs text-muted font-sans mt-1">
                             Pegawai <strong x-text="deletePegawaiName" class="text-ink"></strong> akan dinonaktifkan
                             dan dipindahkan dari daftar pegawai aktif ke <strong>Data Backup</strong>. Seluruh data,
-                            riwayat, dan dokumen tetap disimpan. Data tidak dihapus dan bisa diaktifkan kembali.
-                            Pemulihan dilakukan oleh <strong>Super Admin</strong>. Data tidak dihapus permanen secara
-                            otomatis.
+                            riwayat, dan dokumen tetap disimpan dan dapat dipulihkan kembali oleh pengguna yang
+                            memiliki <strong>permission pemulihan</strong>. Data tidak dihapus permanen secara otomatis.
                         </p>
                     </div>
                 </div>
@@ -1054,7 +1053,7 @@
         </x-ui.modal>
 
         {{-- ============================================================ --}}
-        {{-- MODAL BULK NONAKTIFKAN PEGAWAI → BACKUP (Super Admin Only) --}}
+        {{-- MODAL BULK NONAKTIFKAN PEGAWAI → BACKUP (berdasarkan permission) --}}
         {{-- ============================================================ --}}
         <div x-data="{ open: false, isBulkDeleting: false }" @open-confirm-bulk-delete.window="open = true">
             <x-ui.modal show="open" title="" closeAction="open = false" maxWidth="sm"
@@ -1071,8 +1070,9 @@
                         <p class="text-xs text-muted font-sans">
                             Pegawai terpilih akan dinonaktifkan dan dipindahkan dari daftar pegawai aktif ke
                             <strong class="text-ink">Data Backup</strong>. Seluruh data, riwayat, dan dokumen tetap
-                            disimpan. Data tidak dihapus dan bisa diaktifkan kembali. Pemulihan dilakukan oleh
-                            <strong class="text-ink">Super Admin</strong>. Data tidak dihapus permanen secara otomatis.
+                            disimpan dan dapat dipulihkan kembali oleh pengguna yang memiliki
+                            <strong class="text-ink">permission pemulihan</strong>. Data tidak dihapus permanen secara
+                            otomatis.
                         </p>
                     </div>
 

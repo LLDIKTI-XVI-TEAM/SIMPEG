@@ -2479,7 +2479,7 @@
         <div class="space-y-4">
             <p class="text-sm text-muted font-sans">
                 Apakah Anda yakin ingin menonaktifkan pegawai <strong class="text-ink">{{ $p->nama_lengkap }}</strong>?
-                Data tidak dihapus dan bisa diaktifkan kembali.
+                Data tetap disimpan dan dapat dipulihkan kembali oleh pengguna yang memiliki permission pemulihan.
             </p>
             <div class="flex justify-end gap-3 border-t border-border pt-4">
                 <button type="button" @click="showDeactivateModal = false"

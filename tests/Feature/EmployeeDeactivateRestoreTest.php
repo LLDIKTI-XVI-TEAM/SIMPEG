@@ -92,7 +92,9 @@ class EmployeeDeactivateRestoreTest extends TestCase
             ->assertSee('x-show="!filters.show_nonaktif" onclick="exportFilteredDataPdf()"', false)
             ->assertSee('x-show="!filters.show_nonaktif" type="button" @click="openDocumentStatus(p)"', false)
             ->assertSee('aria-label="\'Nonaktifkan pegawai \' + p.nama_lengkap"', false)
-            ->assertSee('Data tidak dihapus dan bisa diaktifkan kembali.', false)
+            ->assertSeeText('riwayat, dan dokumen tetap disimpan dan dapat dipulihkan kembali oleh pengguna yang')
+            ->assertSeeText('permission pemulihan')
+            ->assertDontSee('Pemulihan dilakukan oleh <strong>Super Admin</strong>', false)
             ->assertDontSee('30 hari', false)
             ->assertDontSee('dihapus permanen otomatis', false);
     }
@@ -107,7 +109,7 @@ class EmployeeDeactivateRestoreTest extends TestCase
             ->assertOk()
             ->assertSee('Nonaktifkan', false)
             ->assertSee('Apakah Anda yakin ingin menonaktifkan pegawai', false)
-            ->assertSee('Data tidak dihapus dan bisa diaktifkan kembali.', false);
+            ->assertSee('Data tetap disimpan dan dapat dipulihkan kembali oleh pengguna yang memiliki permission pemulihan.', false);
     }
 
     public function test_tombol_nonaktifkan_tidak_tampil_tanpa_permission(): void
@@ -293,7 +295,11 @@ class EmployeeDeactivateRestoreTest extends TestCase
             ->assertSeeText('Nonaktifkan Pegawai')
             ->assertSeeText('akan dinonaktifkan dan dipindahkan dari daftar pegawai aktif ke')
             ->assertSeeText('Pegawai terpilih akan dinonaktifkan')
+            ->assertSeeText('dapat dipulihkan kembali oleh pengguna yang memiliki')
+            ->assertSeeText('permission pemulihan')
+            ->assertDontSee('Pemulihan dilakukan oleh <strong>Super Admin</strong>', false)
             ->assertSeeText('Data tidak dihapus permanen secara otomatis.')
+            ->assertDontSeeText('Data tidak dihapus dan bisa diaktifkan kembali.')
             ->assertDontSeeText('30 hari')
             ->assertDontSeeText('dihapus permanen otomatis');
     }
