@@ -126,6 +126,21 @@ class EmployeeDeactivateRestoreTest extends TestCase
         ]);
     }
 
+    public function test_deactivation_modals_describe_backup_without_automatic_purge(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+
+        $this->actingAs($user)
+            ->get(route('data-pegawai'))
+            ->assertOk()
+            ->assertSeeText('Nonaktifkan Pegawai')
+            ->assertSeeText('akan dinonaktifkan dan dipindahkan dari daftar pegawai aktif ke')
+            ->assertSeeText('Pegawai terpilih akan dinonaktifkan')
+            ->assertSeeText('Data tidak dihapus permanen secara otomatis.')
+            ->assertDontSeeText('30 hari')
+            ->assertDontSeeText('dihapus permanen otomatis');
+    }
+
     public function test_web_restore_redirects_and_writes_restore_audit(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
