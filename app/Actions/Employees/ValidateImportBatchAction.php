@@ -66,9 +66,13 @@ class ValidateImportBatchAction
         $skipCount = 0;
         $seenNips = [];
         $seenEmails = [];
+        // Tracks NIP/email values that appeared more than once in the file,
+        // keyed by value → row number of the LATER duplicate occurrence.
+        $duplicatedNips = [];
+        $duplicatedEmails = [];
 
         foreach ($batch['rows'] as $row) {
-            $rowResult = $this->validateTemplateRow($type, $row, $seenNips, $seenEmails, $mapping, $allowShiftDetection);
+            $rowResult = $this->validateTemplateRow($type, $row, $seenNips, $seenEmails, $duplicatedNips, $duplicatedEmails, $mapping, $allowShiftDetection);
             $results[] = $rowResult;
 
             match ($rowResult['status']) {
@@ -76,6 +80,45 @@ class ValidateImportBatchAction
                 'error' => $errorCount++,
                 'skip' => $skipCount++,
             };
+        }
+
+        // Retroactive upgrade: the FIRST occurrence of a duplicate NIP/email was already
+        // stored as skip/valid/error before the later row revealed the collision.
+        // Upgrade those first-occurrence rows to error now.
+        if ($duplicatedNips !== [] || $duplicatedEmails !== []) {
+            foreach ($results as &$rowResult) {
+                if ($rowResult['status'] === 'error') {
+                    continue; // already an error — may already have the duplicate message
+                }
+
+                $data = $rowResult['validated_data'] ?? [];
+                $upgrades = [];
+
+                $nip = $data['nip'] ?? null;
+                if ($nip !== null && array_key_exists($nip, $duplicatedNips)) {
+                    $upgrades['NIP'][] = "NIP sudah ada pada baris {$duplicatedNips[$nip]}.";
+                }
+
+                $email = isset($data['email_pribadi']) ? strtolower($data['email_pribadi']) : null;
+                if ($email !== null && array_key_exists($email, $duplicatedEmails)) {
+                    $upgrades['Email Pegawai'][] = "Email pegawai sudah ada pada baris {$duplicatedEmails[$email]}.";
+                }
+
+                if ($upgrades !== []) {
+                    $prevStatus = $rowResult['status'];
+                    $rowResult['status'] = 'error';
+                    $rowResult['errors'] = array_merge_recursive($rowResult['errors'] ?? [], $upgrades);
+                    unset($rowResult['validated_data'], $rowResult['skip_reason']);
+
+                    if ($prevStatus === 'skip') {
+                        $skipCount--;
+                    } elseif ($prevStatus === 'valid') {
+                        $validCount--;
+                    }
+                    $errorCount++;
+                }
+            }
+            unset($rowResult);
         }
 
         $batch['validation'] = [
@@ -131,12 +174,12 @@ class ValidateImportBatchAction
         return $batchRows;
     }
 
-    private function validateTemplateRow(string $type, array $row, array &$seenNips, array &$seenEmails, array $mapping, bool $allowShiftDetection): array
+    private function validateTemplateRow(string $type, array $row, array &$seenNips, array &$seenEmails, array &$duplicatedNips, array &$duplicatedEmails, array $mapping, bool $allowShiftDetection): array
     {
-        return $this->validateRow($row, $seenNips, $seenEmails, $mapping, $allowShiftDetection);
+        return $this->validateRow($row, $seenNips, $seenEmails, $duplicatedNips, $duplicatedEmails, $mapping, $allowShiftDetection);
     }
 
-    private function validateRow(array $row, array &$seenNips, array &$seenEmails, array $mapping, bool $allowShiftDetection): array
+    private function validateRow(array $row, array &$seenNips, array &$seenEmails, array &$duplicatedNips, array &$duplicatedEmails, array $mapping, bool $allowShiftDetection): array
     {
         // Key baris sumber dinormalkan ke header kanonis memakai mapping aktif batch;
         // kolom bertanda tidak dipakai dibuang sebelum mapper membaca nilai apa pun.
@@ -171,21 +214,36 @@ class ValidateImportBatchAction
 
         $validated = $validator->validated();
         $referenceErrors = $this->resolveReferences($validated);
-        $skipErrors = [];
 
-        if (! empty($validated['nip']) && Employee::where('nip', $validated['nip'])->exists()) {
-            $skipErrors['NIP'][] = 'NIP sudah terdaftar di database.';
-        }
+        // Duplikasi dalam file harus dilaporkan sebagai error sebelum pemeriksaan database.
+        // Email yang sudah terdaftar tetap error, sedangkan NIP database menjadi skip
+        // hanya bila baris tidak memiliki error yang lebih kuat.
 
-        $databaseErrors = [];
-        if (! empty($validated['email_pribadi']) && Employee::whereRaw('LOWER(email_pribadi) = ?', [strtolower($validated['email_pribadi'])])->exists()) {
-            $databaseErrors['Email Pegawai'][] = 'Email pegawai sudah terdaftar di database.';
-        }
-
-        $duplicateErrors = $this->mapErrors($this->duplicateErrors($validated, $row['row'], $seenNips, $seenEmails), [
+        $duplicateErrors = $this->mapErrors($this->duplicateErrors($validated, $row['row'], $seenNips, $seenEmails, $duplicatedNips, $duplicatedEmails), [
             'nip' => 'NIP',
             'email_pribadi' => 'Email Pegawai',
         ]);
+
+        $databaseErrors = [];
+        if (! empty($validated['email_pribadi']) && Employee::withTrashed()->whereRaw('LOWER(email_pribadi) = ?', [strtolower($validated['email_pribadi'])])->exists()) {
+            $databaseErrors['Email Pegawai'][] = 'Email pegawai sudah terdaftar di database.';
+        }
+
+        $shouldSkip = $this->shouldSkipNip($validated, $seenNips, $row['row']);
+        $skipErrors = [];
+        if ($shouldSkip) {
+            $skipErrors['NIP'][] = 'NIP sudah terdaftar di database.';
+        }
+
+        $allErrors = array_merge_recursive(
+            $this->mapErrors($referenceErrors, ['jenis_pegawai' => 'Status Kepegawaian']),
+            $duplicateErrors,
+            $databaseErrors,
+        );
+
+        if ($allErrors !== []) {
+            return $this->rowError($row, $nama, $allErrors);
+        }
 
         if ($skipErrors !== []) {
             return [
@@ -193,17 +251,9 @@ class ValidateImportBatchAction
                 'nama' => $nama,
                 'status' => 'skip',
                 'errors' => $skipErrors,
+                'skip_reason' => 'NIP sudah terdaftar di database — baris akan dilewati.',
+                'validated_data' => $validated,
             ];
-        }
-
-        $allErrors = array_merge_recursive(
-            $this->mapErrors($referenceErrors, ['jenis_pegawai' => 'Status Kepegawaian']),
-            $databaseErrors,
-            $duplicateErrors,
-        );
-
-        if ($allErrors !== []) {
-            return $this->rowError($row, $nama, $allErrors);
         }
 
         return $this->rowValid($row, $nama, $validated);
@@ -277,7 +327,7 @@ class ValidateImportBatchAction
         return $errors;
     }
 
-    private function duplicateErrors(array $data, int $row, array &$seenNips, array &$seenEmails): array
+    private function duplicateErrors(array $data, int $row, array &$seenNips, array &$seenEmails, array &$duplicatedNips, array &$duplicatedEmails): array
     {
         $errors = [];
 
@@ -286,6 +336,8 @@ class ValidateImportBatchAction
 
             if (isset($seenNips[$nip])) {
                 $errors['nip'][] = "NIP sudah ada pada baris {$seenNips[$nip]}.";
+                // Record this NIP as duplicated so the retroactive pass can upgrade row 1
+                $duplicatedNips[$nip] = $row;
             } else {
                 $seenNips[$nip] = $row;
             }
@@ -296,12 +348,36 @@ class ValidateImportBatchAction
 
             if (isset($seenEmails[$email])) {
                 $errors['email_pribadi'][] = "Email pegawai sudah ada pada baris {$seenEmails[$email]}.";
+                // Record this email as duplicated so the retroactive pass can upgrade row 1
+                $duplicatedEmails[$email] = $row;
             } else {
                 $seenEmails[$email] = $row;
             }
         }
 
         return $errors;
+    }
+
+    /**
+     * Menentukan apakah NIP database dapat dilewati tanpa menutupi duplikasi dalam file.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array<string, int>  $seenNips
+     */
+    private function shouldSkipNip(array $data, array $seenNips, int $row): bool
+    {
+        if (empty($data['nip'])) {
+            return false;
+        }
+
+        $nip = $data['nip'];
+
+        // Kemunculan berikutnya harus tetap dilaporkan sebagai duplikasi dalam file.
+        if (isset($seenNips[$nip]) && $seenNips[$nip] !== $row) {
+            return false;
+        }
+
+        return Employee::withTrashed()->where('nip', $nip)->exists();
     }
 
     private function mapErrors(array $errors, array $fieldMap): array

@@ -8,6 +8,7 @@ use App\Models\Document;
 use App\Models\EducationHistory;
 use App\Models\Employee;
 use App\Models\EmployeeFamily;
+use App\Models\EmployeeStatusHistory;
 use App\Models\EwsAlert;
 use App\Models\EwsConfig;
 use App\Models\LeaveBalance;
@@ -18,10 +19,12 @@ use App\Models\RankHistory;
 use App\Models\RefAgama;
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
+use App\Models\RefJabatan;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\RefJenjangPendidikan;
+use App\Models\RefStatusPegawai;
 use App\Models\RefStatusPerkawinan;
 use App\Models\RefUnitKerja;
 use App\Models\Role;
@@ -153,6 +156,130 @@ class EmployeeShowTest extends TestCase
             ->assertDontSee('Ubah Kepala Bagian', false);
     }
 
+    public function test_detail_page_membedakan_tanggal_status_dan_tanggal_mulai_penugasan_kepala_bagian(): void
+    {
+        $employee = $this->employeeWithReferences([
+            'status_tanggal' => '2026-01-15',
+        ]);
+        $supervisor = $this->employeeWithReferences([
+            'nama_lengkap' => 'Kepala Bagian Penguji',
+        ]);
+
+        SupervisorAssignment::create([
+            'employee_id' => $employee->id,
+            'kepala_bagian_id' => $supervisor->id,
+            'tanggal_mulai' => '2026-07-20',
+            'tanggal_berakhir' => null,
+        ]);
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSee('Tanggal Mulai Penugasan Kepala Bagian', false)
+            ->assertSee('Mulai Penugasan', false)
+            ->assertSee('20-07-2026', false)
+            ->assertSeeInOrder([
+                'Tanggal Efektif Status Kepegawaian',
+                '15-01-2026',
+            ], false);
+    }
+
+    public function test_detail_page_memakai_history_terbaru_saat_snapshot_tanggal_status_kosong(): void
+    {
+        $employee = $this->employeeWithReferences([
+            'status_tanggal' => null,
+        ]);
+        $status = RefStatusPegawai::query()->where('nama', 'Aktif')->firstOrFail();
+
+        EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_pegawai_id' => $status->id,
+            'status_nama' => $status->nama,
+            'tanggal_efektif' => '2025-02-14',
+            'is_latest' => true,
+        ]);
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSeeInOrder([
+                'Tanggal Efektif Status Kepegawaian',
+                '14-02-2025',
+            ], false);
+    }
+
+    public function test_detail_page_memprioritaskan_history_berflag_latest_sebelum_tanggal_terbaru(): void
+    {
+        $employee = $this->employeeWithReferences([
+            'status_tanggal' => null,
+        ]);
+        $status = RefStatusPegawai::query()->where('nama', 'Aktif')->firstOrFail();
+
+        EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_pegawai_id' => $status->id,
+            'status_nama' => $status->nama,
+            'tanggal_efektif' => '2025-02-14',
+            'is_latest' => true,
+        ]);
+        EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_pegawai_id' => $status->id,
+            'status_nama' => $status->nama,
+            'tanggal_efektif' => '2026-04-21',
+            'is_latest' => false,
+        ]);
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSeeInOrder([
+                'Tanggal Efektif Status Kepegawaian',
+                '14-02-2025',
+            ], false);
+    }
+
+    public function test_detail_page_memakai_tanggal_history_terbaru_untuk_data_legacy_tanpa_flag_latest(): void
+    {
+        $employee = $this->employeeWithReferences([
+            'status_tanggal' => null,
+        ]);
+        $status = RefStatusPegawai::query()->where('nama', 'Aktif')->firstOrFail();
+
+        foreach (['2024-03-12', '2025-11-08'] as $tanggalEfektif) {
+            EmployeeStatusHistory::create([
+                'employee_id' => $employee->id,
+                'status_pegawai_id' => $status->id,
+                'status_nama' => $status->nama,
+                'tanggal_efektif' => $tanggalEfektif,
+                'is_latest' => false,
+            ]);
+        }
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSeeInOrder([
+                'Tanggal Efektif Status Kepegawaian',
+                '08-11-2025',
+            ], false);
+    }
+
+    public function test_detail_page_tidak_mengarang_tanggal_status_tanpa_sumber_resmi(): void
+    {
+        $employee = $this->employeeWithReferences([
+            'status_tanggal' => null,
+        ]);
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSeeInOrder([
+                'Tanggal Efektif Status Kepegawaian',
+                '-',
+            ], false);
+    }
+
     public function test_detail_page_menyediakan_form_penghapusan_kepala_bagian_yang_eksplisit(): void
     {
         $employee = $this->employeeWithReferences();
@@ -243,6 +370,58 @@ class EmployeeShowTest extends TestCase
             ->assertOk()
             ->assertSee('x-text="formatDate(j.tgl_sk)"', false)
             ->assertSee('x-text="formatDate(j.tmt)"', false);
+    }
+
+    public function test_detail_page_serializes_official_history_dates_without_timezone_shift(): void
+    {
+        config(['app.timezone' => 'Asia/Makassar']);
+
+        $employee = $this->employeeWithReferences();
+        $jenisJabatan = RefJenisJabatan::where('nama', 'Struktural')->firstOrFail();
+        $jabatan = RefJabatan::firstOrCreate(
+            ['nama' => 'Analis Payload Date-only'],
+            ['jenis_jabatan_id' => $jenisJabatan->id, 'is_active' => true],
+        );
+        $unitKerja = RefUnitKerja::firstOrFail();
+
+        RankHistory::create([
+            'employee_id' => $employee->id,
+            'golongan_id' => RefGolongan::where('kode', 'III/b')->firstOrFail()->id,
+            'tmt_pangkat' => '2026-09-22',
+            'no_sk' => 'SK-PANGKAT-DATE-ONLY',
+            'tanggal_sk' => '2026-09-22',
+            'is_latest' => true,
+        ]);
+        PositionHistory::create([
+            'employee_id' => $employee->id,
+            'jabatan_id' => $jabatan->id,
+            'nama_jabatan' => $jabatan->nama,
+            'jenis_jabatan_id' => $jenisJabatan->id,
+            'unit_kerja_id' => $unitKerja->id,
+            'tmt_jabatan' => '2026-09-22',
+            'no_sk' => 'SK-JABATAN-DATE-ONLY',
+            'tanggal_sk' => '2026-09-22',
+            'is_latest' => true,
+        ]);
+        SalaryHistory::create([
+            'employee_id' => $employee->id,
+            'tmt_kgb' => '2026-09-22',
+            'gaji_pokok' => 4500000,
+            'no_sk' => 'SK-KGB-DATE-ONLY',
+            'tanggal_sk' => '2026-09-22',
+            'is_latest' => true,
+        ]);
+
+        $response = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk();
+        $content = $response->getContent();
+
+        $this->assertMatchesRegularExpression('/SK-PANGKAT-DATE-ONLY.{0,160}2026-09-22.{0,100}2026-09-22/s', $content);
+        $this->assertMatchesRegularExpression('/SK-JABATAN-DATE-ONLY.{0,160}2026-09-22.{0,100}2026-09-22/s', $content);
+        $this->assertMatchesRegularExpression('/SK-KGB-DATE-ONLY.{0,160}2026-09-22.{0,100}2026-09-22/s', $content);
+        $this->assertStringNotContainsString('2026-09-21T16:00:00', $content);
+        $this->assertStringNotContainsString('2026-09-22T00:00:00', $content);
     }
 
     public function test_detail_page_provides_optional_sk_upload_controls_for_each_history_modal(): void

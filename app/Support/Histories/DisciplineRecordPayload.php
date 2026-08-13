@@ -14,7 +14,7 @@ class DisciplineRecordPayload
      */
     public function response(DisciplineRecord $record): array
     {
-        return Arr::only($record->toArray(), [
+        $payload = Arr::only($record->toArray(), [
             'id',
             'employee_id',
             'jenis_hukuman',
@@ -27,5 +27,13 @@ class DisciplineRecordPayload
             'is_active',
             'created_at',
         ]);
+
+        // Tanggal kalender harus tetap date-only karena serialisasi timestamp UTC
+        // dapat menggeser hari untuk zona waktu di depan UTC.
+        $payload['tanggal_mulai'] = $record->tanggal_mulai?->format('Y-m-d');
+        $payload['tanggal_berakhir'] = $record->tanggal_berakhir?->format('Y-m-d');
+        $payload['tanggal_sk'] = $record->tanggal_sk?->format('Y-m-d');
+
+        return $payload;
     }
 }
