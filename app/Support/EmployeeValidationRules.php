@@ -58,7 +58,7 @@ class EmployeeValidationRules
             // Pendidikan snapshot
             'pendidikan_terakhir' => ['nullable', 'string', 'max:50'],
             'prodi_pendidikan_terakhir' => ['nullable', 'string', 'max:255'],
-            'program_studi_id' => ['nullable', 'uuid', 'exists:ref_program_studi,id'],
+            'program_studi_id' => ['nullable', 'uuid', Rule::exists('ref_program_studi', 'id')->where('is_active', true)],
 
             // Pensiun
             // Jika diisi, ini adalah tanggal pensiun manual yang diprioritaskan EWS.
@@ -102,6 +102,8 @@ class EmployeeValidationRules
             'max:255',
             Rule::unique('employees', 'email_pribadi')->ignore($employee->id),
         ];
+        $rules['program_studi_id'] = ['nullable', 'uuid', Rule::exists('ref_program_studi', 'id')
+            ->where(fn ($query) => self::allowStoredReference($query, $employee->program_studi_id))];
 
         $rules['nik'] = [
             'nullable',
@@ -122,6 +124,15 @@ class EmployeeValidationRules
         ];
 
         return $rules;
+    }
+
+    private static function allowStoredReference(mixed $query, ?string $storedId): void
+    {
+        $query->where('is_active', true);
+
+        if ($storedId !== null) {
+            $query->orWhere('id', $storedId);
+        }
     }
 
     /**

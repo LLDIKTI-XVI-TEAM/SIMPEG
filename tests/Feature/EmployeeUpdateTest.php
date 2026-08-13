@@ -251,6 +251,47 @@ class EmployeeUpdateTest extends TestCase
             ->assertSee($programStudi->nama);
     }
 
+    public function test_admin_can_preserve_current_inactive_program_studi_when_updating_employee(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $programStudi = RefProgramStudi::create([
+            'nama' => 'Program Studi Lama Nonaktif',
+            'is_active' => false,
+        ]);
+        $employee = Employee::factory()->create([
+            'program_studi_id' => $programStudi->id,
+        ]);
+
+        $response = $this->actingAs($user)->putJsonWithCsrf($this->endpoint($employee), $this->validPayload($employee, [
+            'program_studi_id' => $programStudi->id,
+            'nama_lengkap' => 'Nama Diperbarui',
+        ]));
+
+        $response->assertOk();
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'program_studi_id' => $programStudi->id,
+            'nama_lengkap' => 'Nama Diperbarui',
+        ]);
+    }
+
+    public function test_admin_cannot_replace_employee_program_studi_with_inactive_reference(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $inactiveProgramStudi = RefProgramStudi::create([
+            'nama' => 'Program Studi Pengganti Nonaktif',
+            'is_active' => false,
+        ]);
+        $employee = Employee::factory()->create();
+
+        $response = $this->actingAs($user)->putJsonWithCsrf($this->endpoint($employee), $this->validPayload($employee, [
+            'program_studi_id' => $inactiveProgramStudi->id,
+        ]));
+
+        $response->assertUnprocessable()->assertJsonValidationErrors('program_studi_id');
+        $this->assertNull($employee->fresh()->program_studi_id);
+    }
+
     public function test_pppk_contract_dates_are_shown_saved_and_reset_active_contract_alerts(): void
     {
         $user = User::factory()->adminKepegawaian()->create();

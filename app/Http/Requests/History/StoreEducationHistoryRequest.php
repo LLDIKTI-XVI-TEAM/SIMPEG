@@ -3,6 +3,7 @@
 namespace App\Http\Requests\History;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreEducationHistoryRequest extends FormRequest
 {
@@ -26,7 +27,7 @@ class StoreEducationHistoryRequest extends FormRequest
             'jenjang_id' => ['required', 'uuid', 'exists:ref_jenjang_pendidikan,id'],
             'nama_institusi' => ['required', 'string', 'max:255'],
             'jurusan' => ['nullable', 'string', 'max:255'],
-            'program_studi_id' => ['nullable', 'uuid', 'exists:ref_program_studi,id'],
+            'program_studi_id' => ['nullable', 'uuid', Rule::exists('ref_program_studi', 'id')->where('is_active', true)],
             'tahun_lulus' => ['required', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
             'no_ijazah' => ['nullable', 'string', 'max:100'],
         ];

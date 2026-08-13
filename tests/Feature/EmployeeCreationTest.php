@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\RefJenisPegawai;
+use App\Models\RefProgramStudi;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
@@ -159,6 +160,22 @@ class EmployeeCreationTest extends TestCase
 
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors('tanggal_lahir');
+    }
+
+    public function test_authenticated_user_cannot_create_employee_with_inactive_program_studi(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $programStudi = RefProgramStudi::create([
+            'nama' => 'Program Studi Nonaktif',
+            'is_active' => false,
+        ]);
+
+        $response = $this->actingAs($user)->postJsonWithCsrf(self::EMPLOYEES_ENDPOINT, $this->validPayload([
+            'program_studi_id' => $programStudi->id,
+        ]));
+
+        $response->assertUnprocessable()->assertJsonValidationErrors('program_studi_id');
+        $this->assertDatabaseMissing('employees', ['nip' => '198001012006041001']);
     }
 
     public function test_old_employees_store_endpoint_is_not_available(): void
