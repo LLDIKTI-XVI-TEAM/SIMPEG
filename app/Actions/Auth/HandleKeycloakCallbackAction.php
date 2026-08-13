@@ -140,7 +140,9 @@ class HandleKeycloakCallbackAction
         if ($verifiedEmail && $user->employee_id) {
             $employee = Employee::find($user->employee_id);
 
-            if ($employee && strtolower(trim((string) $employee->getRawOriginal('email_pribadi'))) !== $verifiedEmail) {
+            if ($employee
+                && strtolower(trim((string) $employee->getRawOriginal('email_pribadi'))) !== $verifiedEmail
+                && ! $this->emailIsOwnedByAnotherEmployee($employee, $verifiedEmail)) {
                 $employee->email_pribadi = $verifiedEmail;
                 $employee->saveQuietly();
             }
@@ -177,6 +179,18 @@ class HandleKeycloakCallbackAction
         }
 
         return Employee::whereRaw('lower('.$employeeField.') = ?', [$matchedEmail])->limit(2)->get();
+    }
+
+    private function emailIsOwnedByAnotherEmployee(Employee $employee, string $email): bool
+    {
+        return Employee::query()
+            ->whereKeyNot($employee->id)
+            ->where(function ($query) use ($email): void {
+                $query
+                    ->whereRaw('lower(email_pribadi) = ?', [$email])
+                    ->orWhereRaw('lower(email) = ?', [$email]);
+            })
+            ->exists();
     }
 
     /**

@@ -192,6 +192,10 @@ class KeycloakCallbackMappingTest extends TestCase
             'employee_id' => $firstEmployee->id,
             'role' => 'admin_kepegawaian',
         ]);
+        $this->assertDatabaseHas('employees', [
+            'id' => $firstEmployee->id,
+            'email_pribadi' => 'lama@example.com',
+        ]);
         $this->assertDatabaseMissing('users', ['employee_id' => $secondEmployee->id]);
     }
 
