@@ -19,7 +19,7 @@ class RankHistoryController extends Controller
     ): JsonResponse {
         return response()->json([
             'employee_id' => $employee->id,
-            'histories' => $action->execute($employee)->map($payload->rank(...)),
+            'histories' => $action->execute($employee)->map(fn ($history): array => $payload->rank($history)),
         ]);
     }
 
@@ -33,7 +33,7 @@ class RankHistoryController extends Controller
 
         return response()->json([
             'message' => 'Riwayat kepangkatan berhasil ditambahkan.',
-            'history' => $payload->rank($history),
+            'history' => $payload->rank($history, $employee),
         ], 201);
     }
 }

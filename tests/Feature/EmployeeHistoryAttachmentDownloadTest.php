@@ -178,10 +178,11 @@ class EmployeeHistoryAttachmentDownloadTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_pimpinan_dapat_mengunduh_empat_tipe_riwayat_legacy_yang_diizinkan(): void
+    public function test_pimpinan_dapat_mengunduh_lima_tipe_riwayat_legacy_yang_diizinkan(): void
     {
         $employee = Employee::factory()->create();
-        $attachments = array_slice($this->historyAttachments($employee), 0, 4);
+        $allAttachments = $this->historyAttachments($employee);
+        $attachments = [$allAttachments[0], $allAttachments[1], $allAttachments[2], $allAttachments[3], $allAttachments[5]];
 
         foreach ($attachments as [$type, $history, $path]) {
             Storage::disk(Document::STORAGE_DISK)->put($path, 'attachment pimpinan '.$type);
@@ -196,7 +197,7 @@ class EmployeeHistoryAttachmentDownloadTest extends TestCase
     public function test_attachment_riwayat_pimpinan_memerlukan_permission_employees_read(): void
     {
         $employee = Employee::factory()->create();
-        [$type, $history, $path] = $this->historyAttachments($employee)[0];
+        [$type, $history, $path] = $this->historyAttachments($employee)[5];
         Storage::disk(Document::STORAGE_DISK)->put($path, 'attachment pimpinan');
         $role = Role::where('name', 'pimpinan')->firstOrFail();
         $permission = Permission::where('name', 'employees.read')->firstOrFail();
@@ -211,7 +212,7 @@ class EmployeeHistoryAttachmentDownloadTest extends TestCase
     {
         $employee = Employee::factory()->create();
         $otherEmployee = Employee::factory()->create();
-        [$type, $history] = $this->historyAttachments($otherEmployee)[0];
+        [$type, $history] = $this->historyAttachments($otherEmployee)[5];
 
         $this->actingAs(User::factory()->pimpinan()->create())
             ->get($this->pimpinanUrl($employee, $type, $history->id))
@@ -221,7 +222,7 @@ class EmployeeHistoryAttachmentDownloadTest extends TestCase
     public function test_attachment_riwayat_pimpinan_menolak_tipe_uuid_dan_history_yang_tidak_valid(): void
     {
         $employee = Employee::factory()->create();
-        [$type, $history] = $this->historyAttachments($employee)[0];
+        [$type, $history] = $this->historyAttachments($employee)[5];
         $pimpinan = User::factory()->pimpinan()->create();
 
         $this->actingAs($pimpinan)
@@ -238,11 +239,52 @@ class EmployeeHistoryAttachmentDownloadTest extends TestCase
     public function test_attachment_riwayat_pimpinan_menolak_file_privat_yang_hilang(): void
     {
         $employee = Employee::factory()->create();
-        [$type, $history] = $this->historyAttachments($employee)[0];
+        [$type, $history] = $this->historyAttachments($employee)[5];
 
         $this->actingAs(User::factory()->pimpinan()->create())
             ->get($this->pimpinanUrl($employee, $type, $history->id))
             ->assertNotFound();
+    }
+
+    public function test_attachment_riwayat_menolak_path_yang_terdaftar_untuk_pegawai_atau_kategori_lain(): void
+    {
+        $employee = Employee::factory()->create();
+        $otherEmployee = Employee::factory()->create();
+        $golongan = RefGolongan::firstOrFail();
+        $crossOwnerPath = 'sk/rank-cross-owner.pdf';
+        $wrongCategoryPath = 'sk/rank-wrong-category.pdf';
+        $crossOwner = RankHistory::create([
+            'employee_id' => $employee->id,
+            'golongan_id' => $golongan->id,
+            'tmt_pangkat' => '2026-01-01',
+            'file_sk' => $crossOwnerPath,
+            'is_latest' => true,
+        ]);
+        $wrongCategory = RankHistory::create([
+            'employee_id' => $employee->id,
+            'golongan_id' => $golongan->id,
+            'tmt_pangkat' => '2025-01-01',
+            'file_sk' => $wrongCategoryPath,
+            'is_latest' => false,
+        ]);
+        Document::create([
+            'employee_id' => $otherEmployee->id,
+            'jenis_dokumen' => 'sk_pangkat',
+            'nama_dokumen' => 'SK pegawai lain',
+            'file_path' => $crossOwnerPath,
+        ]);
+        Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Kategori salah',
+            'file_path' => $wrongCategoryPath,
+        ]);
+        Storage::disk(Document::STORAGE_DISK)->put($crossOwnerPath, 'pegawai lain');
+        Storage::disk(Document::STORAGE_DISK)->put($wrongCategoryPath, 'kategori lain');
+        $admin = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($admin)->get($this->url($employee, 'rank', $crossOwner->id))->assertNotFound();
+        $this->actingAs($admin)->get($this->url($employee, 'rank', $wrongCategory->id))->assertNotFound();
     }
 
     public function test_show_dan_edit_admin_tidak_mengekspos_url_storage_attachment_riwayat(): void

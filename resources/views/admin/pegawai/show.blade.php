@@ -77,11 +77,11 @@
         keluargaList: {{ ($p->families ?? collect())->map(fn($f) => ['id' => $f->id, 'nama_anggota' => $f->nama_anggota, 'nik' => $f->nik, 'hubungan' => $f->hubungan, 'tempat_lahir' => $f->tempat_lahir, 'tanggal_lahir' => $f->tanggal_lahir, 'jenis_kelamin' => $f->jenis_kelamin === 'P' ? 'Perempuan' : 'Laki-laki', 'pekerjaan' => $f->pekerjaan, 'status' => $f->status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'])->toJson() }},
         keluargaLoading: false,
         isDeletingKeluarga: false,
-        pangkatList: {{ $p->rankHistories->map(fn($r) => ['golongan' => $r->golongan->nama ?? '-', 'no_sk' => $r->no_sk, 'tgl_sk' => $r->tanggal_sk?->format('Y-m-d'), 'tmt' => $r->tmt_pangkat?->format('Y-m-d'), 'download_url' => $r->file_sk ? route('pegawai.history-attachments.download', ['employee' => $p, 'type' => 'rank', 'history' => $r]) : null])->toJson() }},
-        jabatanList: {{ $p->positionHistories->map(fn($j) => ['jabatan' => $j->jabatan?->nama ?? $j->nama_jabatan, 'unit' => $j->unitKerja->nama ?? '-', 'kelas_jabatan' => $j->kelas_jabatan, 'no_sk' => $j->no_sk, 'tgl_sk' => $j->tanggal_sk?->format('Y-m-d'), 'tmt' => $j->tmt_jabatan?->format('Y-m-d'), 'download_url' => $j->file_sk ? route('pegawai.history-attachments.download', ['employee' => $p, 'type' => 'position', 'history' => $j]) : null])->toJson() }},
-        kgbList: {{ $p->salaryHistories->map(fn($s) => ['gaji' => 'Rp ' . number_format($s->gaji_pokok, 0, ',', '.'), 'no_sk' => $s->no_sk, 'tgl_sk' => $s->tanggal_sk?->format('Y-m-d'), 'tmt' => $s->tmt_kgb?->format('Y-m-d'), 'download_url' => $s->file_sk ? route('pegawai.history-attachments.download', ['employee' => $p, 'type' => 'salary', 'history' => $s]) : null])->toJson() }},
-        disiplinList: {{ $p->disciplineRecords->map(fn($d) => ['id' => $d->id, 'jenis' => $d->jenis_hukuman, 'alasan' => $d->deskripsi, 'no_sk' => $d->no_sk, 'tgl_sk' => $d->tanggal_sk?->format('Y-m-d'), 'tgl_mulai' => $d->tanggal_mulai?->format('Y-m-d'), 'tgl_akhir' => $d->tanggal_berakhir?->format('Y-m-d'), 'is_active' => $d->is_active, 'download_url' => $d->file_sk ? route('pegawai.history-attachments.download', ['employee' => $p, 'type' => 'discipline', 'history' => $d]) : null])->toJson() }},
-        pendidikanList: {{ ($p->educationHistories ?? collect())->map(fn($e) => ['id' => $e->id, 'jenjang_id' => $e->jenjang_id, 'tingkat' => $e->jenjang?->urutan ?? $e->tingkat ?? '-', 'institusi' => $e->nama_institusi ?? '-', 'prodi' => $e->jurusan ?? '-', 'lulus' => $e->tahun_lulus ?? '-', 'no_ijazah' => $e->no_ijazah ?? '-'])->toJson() }},
+        pangkatList: {{ $p->rankHistories->map(fn($r) => ['golongan' => $r->golongan->nama ?? '-', 'no_sk' => $r->no_sk, 'tgl_sk' => $r->tanggal_sk?->format('Y-m-d'), 'tmt' => $r->tmt_pangkat?->format('Y-m-d'), 'download_url' => $r->admin_attachment_download_url])->toJson() }},
+        jabatanList: {{ $p->positionHistories->map(fn($j) => ['jabatan' => $j->jabatan?->nama ?? $j->nama_jabatan, 'unit' => $j->unitKerja->nama ?? '-', 'kelas_jabatan' => $j->kelas_jabatan, 'no_sk' => $j->no_sk, 'tgl_sk' => $j->tanggal_sk?->format('Y-m-d'), 'tmt' => $j->tmt_jabatan?->format('Y-m-d'), 'download_url' => $j->admin_attachment_download_url])->toJson() }},
+        kgbList: {{ $p->salaryHistories->map(fn($s) => ['gaji' => 'Rp ' . number_format($s->gaji_pokok, 0, ',', '.'), 'no_sk' => $s->no_sk, 'tgl_sk' => $s->tanggal_sk?->format('Y-m-d'), 'tmt' => $s->tmt_kgb?->format('Y-m-d'), 'download_url' => $s->admin_attachment_download_url])->toJson() }},
+        disiplinList: {{ $p->disciplineRecords->map(fn($d) => ['id' => $d->id, 'jenis' => $d->jenis_hukuman, 'alasan' => $d->deskripsi, 'no_sk' => $d->no_sk, 'tgl_sk' => $d->tanggal_sk?->format('Y-m-d'), 'tgl_mulai' => $d->tanggal_mulai?->format('Y-m-d'), 'tgl_akhir' => $d->tanggal_berakhir?->format('Y-m-d'), 'is_active' => $d->is_active, 'download_url' => $d->admin_attachment_download_url])->toJson() }},
+        pendidikanList: {{ ($p->educationHistories ?? collect())->map(fn($e) => ['id' => $e->id, 'jenjang_id' => $e->jenjang_id, 'tingkat' => $e->jenjang?->urutan ?? $e->tingkat ?? '-', 'institusi' => $e->nama_institusi ?? '-', 'prodi' => $e->jurusan ?? '-', 'lulus' => $e->tahun_lulus ?? '-', 'no_ijazah' => $e->no_ijazah ?? '-', 'download_url' => $e->admin_attachment_download_url])->toJson() }},
         pendidikanLoading: false,
         showEditPendidikan: false,
         editingPendidikan: null,
@@ -698,7 +698,8 @@
                             gaji: 'Rp ' + parseInt(this.newKgb.gaji_pokok).toLocaleString('id-ID'),
                             no_sk: this.newKgb.no_sk,
                             tgl_sk: this.newKgb.tanggal_sk,
-                            tmt: this.newKgb.tmt_kgb
+                            tmt: this.newKgb.tmt_kgb,
+                            download_url: result.history.download_url,
                         });
                         this.newKgb = { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '', file_sk: null };
                         document.getElementById('file_sk_kgb').value = '';
@@ -710,7 +711,8 @@
                             kelas_jabatan: h.kelas_jabatan,
                             no_sk: h.no_sk,
                             tgl_sk: h.tanggal_sk,
-                            tmt: h.tmt_jabatan
+                            tmt: h.tmt_jabatan,
+                            download_url: h.download_url,
                         });
                         this.newJabatan = { jabatan_id: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', kelas_jabatan: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '', file_sk: null };
                         document.getElementById('file_sk_jabatan').value = '';
@@ -720,7 +722,8 @@
                             golongan: h.golongan?.nama ?? '-',
                             no_sk: h.no_sk,
                             tgl_sk: h.tanggal_sk,
-                            tmt: h.tmt_pangkat
+                            tmt: h.tmt_pangkat,
+                            download_url: h.download_url,
                         });
                         this.newPangkat = { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '', file_sk: null };
                         document.getElementById('file_sk_pangkat').value = '';
@@ -1291,7 +1294,7 @@
 
                 <x-pegawai.detail.table
                     name="pendidikan"
-                    :headings="['Jenjang', 'Nama Institusi', 'Program Studi', 'Tahun Lulus', 'Nomor Ijazah']"
+                    :headings="['Jenjang', 'Nama Institusi', 'Program Studi', 'Tahun Lulus', 'Nomor Ijazah', 'Berkas']"
                     :show-actions="auth()->user()->role !== 'pimpinan'"
                     x-show="!pendidikanLoading"
                 >
@@ -1302,6 +1305,10 @@
                                     <td class="px-4 py-3" x-text="edu.prodi ?? edu.jurusan ?? '-'"></td>
                                     <td class="px-4 py-3" x-text="edu.lulus ?? edu.tahun_lulus ?? '-'"></td>
                                     <td class="px-4 py-3" x-text="edu.no_ijazah ?? '-'"></td>
+                                    <td class="px-4 py-3">
+                                        <a x-show="edu.download_url" :href="edu.download_url" class="font-semibold text-primary hover:underline">Unduh Ijazah</a>
+                                        <span x-show="!edu.download_url" class="text-muted">-</span>
+                                    </td>
                                     @if(auth()->user()->role !== 'pimpinan')
                                             <td class="px-4 py-3 text-right">
                                         <div class="inline-flex items-center gap-3">
@@ -1330,7 +1337,7 @@
                                 </tr>
                             </template>
                             <tr x-show="!pendidikanLoading && pendidikanList.length === 0">
-                                <td colspan="6" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
+                                <td colspan="7" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
                                     Pegawai ini belum memiliki riwayat pendidikan formal.
                                 </td>
                             </tr>
@@ -1345,9 +1352,7 @@
                 </div>
                 @include('pegawai.partials.detail.appointment-readonly', [
                     'appointment' => $p->appointment,
-                    'attachmentDownloadUrl' => $p->appointment?->file_sk
-                        ? route('pegawai.history-attachments.download', ['employee' => $p, 'type' => 'appointment', 'history' => $p->appointment])
-                        : null,
+                    'attachmentDownloadUrl' => $p->appointment?->admin_attachment_download_url,
                 ])
             </x-pegawai.detail.panel>
 

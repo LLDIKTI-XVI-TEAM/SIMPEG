@@ -2,24 +2,29 @@
 
 namespace App\Support\Histories;
 
+use App\Models\Employee;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\SalaryHistory;
+use App\Services\Employees\EmployeeHistoryAttachmentService;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Model;
 
 class EmployeeHistoryPayload
 {
+    public function __construct(private readonly EmployeeHistoryAttachmentService $attachments) {}
+
     /**
      * Mempertahankan kontrak riwayat pangkat dengan tanggal kalender yang deterministik.
      *
      * @return array<string, mixed>
      */
-    public function rank(RankHistory $history): array
+    public function rank(RankHistory $history, ?Employee $employee = null): array
     {
-        return $this->withDateOnlyFields($history->toArray(), [
+        return $this->withDownloadUrl($this->withDateOnlyFields($history->toArray(), [
             'tanggal_sk' => $history->tanggal_sk,
             'tmt_pangkat' => $history->tmt_pangkat,
-        ]);
+        ]), $employee, 'rank', $history);
     }
 
     /**
@@ -27,12 +32,12 @@ class EmployeeHistoryPayload
      *
      * @return array<string, mixed>
      */
-    public function position(PositionHistory $history): array
+    public function position(PositionHistory $history, ?Employee $employee = null): array
     {
-        return $this->withDateOnlyFields($history->toArray(), [
+        return $this->withDownloadUrl($this->withDateOnlyFields($history->toArray(), [
             'tanggal_sk' => $history->tanggal_sk,
             'tmt_jabatan' => $history->tmt_jabatan,
-        ]);
+        ]), $employee, 'position', $history);
     }
 
     /**
@@ -40,12 +45,12 @@ class EmployeeHistoryPayload
      *
      * @return array<string, mixed>
      */
-    public function kgb(SalaryHistory $history): array
+    public function kgb(SalaryHistory $history, ?Employee $employee = null): array
     {
-        return $this->withDateOnlyFields($history->toArray(), [
+        return $this->withDownloadUrl($this->withDateOnlyFields($history->toArray(), [
             'tanggal_sk' => $history->tanggal_sk,
             'tmt_kgb' => $history->tmt_kgb,
-        ]);
+        ]), $employee, 'salary', $history);
     }
 
     /**
@@ -60,6 +65,16 @@ class EmployeeHistoryPayload
         foreach ($dates as $field => $date) {
             $payload[$field] = $date?->format('Y-m-d');
         }
+
+        return $payload;
+    }
+
+    /** @param array<string, mixed> $payload @return array<string, mixed> */
+    private function withDownloadUrl(array $payload, ?Employee $employee, string $type, Model $history): array
+    {
+        $payload['download_url'] = $employee === null
+            ? null
+            : $this->attachments->downloadUrl($employee, $type, $history, 'pegawai.history-attachments.download');
 
         return $payload;
     }

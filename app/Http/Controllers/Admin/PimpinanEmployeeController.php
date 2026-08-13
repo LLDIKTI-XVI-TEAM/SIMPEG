@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Storage;
 class PimpinanEmployeeController extends Controller
 {
     /** @var list<string> */
-    private const HISTORY_ATTACHMENT_TYPES = ['rank', 'position', 'salary', 'appointment'];
+    private const HISTORY_ATTACHMENT_TYPES = ['rank', 'position', 'salary', 'appointment', 'education'];
 
     public function index(Request $request, ListEmployeesAction $listEmployees)
     {

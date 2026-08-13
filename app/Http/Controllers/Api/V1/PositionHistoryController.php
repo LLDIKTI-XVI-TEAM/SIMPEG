@@ -19,7 +19,7 @@ class PositionHistoryController extends Controller
     ): JsonResponse {
         return response()->json([
             'employee_id' => $employee->id,
-            'histories' => $action->execute($employee)->map($payload->position(...)),
+            'histories' => $action->execute($employee)->map(fn ($history): array => $payload->position($history)),
         ]);
     }
 
@@ -33,7 +33,7 @@ class PositionHistoryController extends Controller
 
         return response()->json([
             'message' => 'Riwayat jabatan berhasil ditambahkan.',
-            'history' => $payload->position($history),
+            'history' => $payload->position($history, $employee),
         ], 201);
     }
 }

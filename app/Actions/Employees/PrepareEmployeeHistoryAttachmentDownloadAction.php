@@ -11,6 +11,7 @@ use App\Models\EmployeeStatusHistory;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\SalaryHistory;
+use App\Services\Employees\EmployeeHistoryAttachmentService;
 use App\Support\Documents\LegacyStatusDocumentResolver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
@@ -18,6 +19,8 @@ use Illuminate\Support\Str;
 
 class PrepareEmployeeHistoryAttachmentDownloadAction
 {
+    public function __construct(private readonly EmployeeHistoryAttachmentService $attachments) {}
+
     /**
      * Resolve attachment dari type dan UUID record yang diizinkan, bukan dari path request.
      *
@@ -37,7 +40,9 @@ class PrepareEmployeeHistoryAttachmentDownloadAction
             default => abort(404),
         };
 
-        $path = $record->getAttribute($pathColumn);
+        $path = in_array($type, ['rank', 'position', 'salary', 'appointment', 'discipline', 'education'], true)
+            ? $this->attachments->availablePath($employee, $type, $record)
+            : $record->getAttribute($pathColumn);
         if ($type === 'status' && $path === null) {
             $path = $this->legacyStatusDocumentPath($employee, $record);
         }

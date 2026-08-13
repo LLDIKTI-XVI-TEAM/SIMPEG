@@ -226,7 +226,7 @@
                     </div>
                     <x-pegawai.detail.table
                         name="pendidikan"
-                        :headings="['Jenjang', 'Nama Institusi', 'Program Studi', 'Tahun Lulus', 'Nomor Ijazah']"
+                        :headings="['Jenjang', 'Nama Institusi', 'Program Studi', 'Tahun Lulus', 'Nomor Ijazah', 'Berkas']"
                         :empty="$p->educationHistories->isEmpty()"
                         empty-label="Pegawai ini belum memiliki riwayat pendidikan formal."
                     >
@@ -237,6 +237,13 @@
                                 <td class="px-4 py-3">{{ $education->jurusan ?: '-' }}</td>
                                 <td class="px-4 py-3">{{ $education->tahun_lulus ?: '-' }}</td>
                                 <td class="px-4 py-3">{{ $education->no_ijazah ?: '-' }}</td>
+                                <td class="px-4 py-3">
+                                    @if($education->pimpinan_attachment_download_url)
+                                        <a href="{{ $education->pimpinan_attachment_download_url }}" class="font-semibold text-primary hover:underline">Unduh Ijazah</a>
+                                    @else
+                                        -
+                                    @endif
+                                </td>
                             </tr>
                         @endforeach
                     </x-pegawai.detail.table>

@@ -8,6 +8,7 @@ use App\Models\EmployeeStatusHistory;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\SupervisorAssignment;
+use App\Services\Employees\EmployeeHistoryAttachmentService;
 use App\Support\Documents\DocumentCategory;
 use App\Support\Employees\EmployeeProfilePresentation;
 use Illuminate\Database\Eloquent\Collection;
@@ -17,6 +18,8 @@ use Illuminate\Support\Facades\Storage;
 
 class PreparePimpinanEmployeeDetailAction
 {
+    public function __construct(private readonly EmployeeHistoryAttachmentService $attachments) {}
+
     /**
      * Menyiapkan seluruh data detail pegawai yang boleh dibaca Pimpinan tanpa membawa opsi mutasi Admin.
      *
@@ -162,15 +165,25 @@ class PreparePimpinanEmployeeDetailAction
      */
     private function prepareAttachmentDownloadUrls(Employee $employee): void
     {
+        $this->attachments->primeDocumentReferences(collect([
+            ...$employee->rankHistories->pluck('file_sk'),
+            ...$employee->positionHistories->pluck('file_sk'),
+            ...$employee->salaryHistories->pluck('file_sk'),
+            ...$employee->disciplineRecords->pluck('file_sk'),
+            ...$employee->educationHistories->pluck('file_ijazah'),
+            $employee->appointment?->file_sk,
+        ]));
+
         foreach ([
             'rank' => $employee->rankHistories,
             'position' => $employee->positionHistories,
             'salary' => $employee->salaryHistories,
+            'education' => $employee->educationHistories,
         ] as $type => $histories) {
             $histories->each(function (Model $history) use ($employee, $type): void {
                 $history->setAttribute(
                     'pimpinan_attachment_download_url',
-                    $this->availableHistoryUrl($employee, $type, $history, $history->getAttribute('file_sk')),
+                    $this->availableHistoryUrl($employee, $type, $history),
                 );
             });
         }
@@ -182,7 +195,6 @@ class PreparePimpinanEmployeeDetailAction
                     $employee,
                     'appointment',
                     $employee->appointment,
-                    $employee->appointment->file_sk,
                 ),
             );
         }
@@ -190,10 +202,13 @@ class PreparePimpinanEmployeeDetailAction
         $employee->disciplineRecords->each(function (Model $history) use ($employee): void {
             $history->setAttribute(
                 'pimpinan_attachment_download_url',
-                $this->availableUrl($history->getAttribute('file_sk'), fn (): string => route(
+                $this->attachments->downloadUrl(
+                    $employee,
+                    'discipline',
+                    $history,
                     'pimpinan.pegawai.discipline-attachments.download',
-                    ['employee' => $employee, 'history' => $history],
-                )),
+                    false,
+                ),
             );
         });
 
@@ -238,12 +253,14 @@ class PreparePimpinanEmployeeDetailAction
         );
     }
 
-    private function availableHistoryUrl(Employee $employee, string $type, Model $history, mixed $path): ?string
+    private function availableHistoryUrl(Employee $employee, string $type, Model $history): ?string
     {
-        return $this->availableUrl($path, fn (): string => route(
+        return $this->attachments->downloadUrl(
+            $employee,
+            $type,
+            $history,
             'pimpinan.pegawai.history-attachments.download',
-            ['employee' => $employee, 'type' => $type, 'history' => $history],
-        ));
+        );
     }
 
     /** @param \Closure(): string $url */

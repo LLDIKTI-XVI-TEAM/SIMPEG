@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Pegawai;
 
+use App\Models\EducationHistory;
 use App\Models\Employee;
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
@@ -9,7 +10,9 @@ use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenjangPendidikan;
 use App\Models\RefUnitKerja;
+use App\Services\Employees\EmployeeHistoryAttachmentService;
 use App\Support\Employees\EmployeeProfilePresentation;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -26,7 +29,7 @@ class Show extends Component
         $this->pegawaiId = $id;
     }
 
-    public function render()
+    public function render(EmployeeHistoryAttachmentService $attachments)
     {
         $p = Employee::with([
             'families',
@@ -79,6 +82,7 @@ class Show extends Component
         $selectedSupervisorName = $selectedSupervisor?->nama_lengkap ?? $currentSupervisor?->supervisor?->nama_lengkap;
 
         EmployeeProfilePresentation::prepareStatusHistoryAttachments($p);
+        $this->prepareHistoryAttachmentDownloadUrls($p, $attachments);
 
         // Snapshot status adalah sumber utama. Riwayat latest hanya menjadi fallback
         // untuk data lama yang belum memiliki status_tanggal tersinkron.
@@ -87,5 +91,35 @@ class Show extends Component
         $statusPresentation = EmployeeProfilePresentation::status($p, $latestStatusHistory);
 
         return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions', 'estimasiTanggalPensiun', 'currentSupervisor', 'currentSupervisorPosition', 'latestRank', 'latestPosition', 'selectedSupervisorId', 'selectedSupervisorName', 'statusPresentation', 'latestStatusHistory'));
+    }
+
+    /**
+     * Menyiapkan URL unduh admin di server agar Blade tidak memeriksa storage
+     * dan tidak merender tautan untuk file privat yang hilang atau salah scope.
+     */
+    private function prepareHistoryAttachmentDownloadUrls(Employee $employee, EmployeeHistoryAttachmentService $attachments): void
+    {
+        $groups = [
+            'rank' => $employee->rankHistories,
+            'position' => $employee->positionHistories,
+            'salary' => $employee->salaryHistories,
+            'discipline' => $employee->disciplineRecords,
+            'education' => $employee->educationHistories,
+            'appointment' => collect([$employee->appointment])->filter(),
+        ];
+        $attachments->primeDocumentReferences(
+            collect($groups)->flatten()->map(fn (Model $history): mixed => $history->getAttribute(
+                $history instanceof EducationHistory ? 'file_ijazah' : 'file_sk',
+            )),
+        );
+
+        foreach ($groups as $type => $histories) {
+            $histories->each(function (Model $history) use ($employee, $type, $attachments): void {
+                $history->setAttribute(
+                    'admin_attachment_download_url',
+                    $attachments->downloadUrl($employee, $type, $history, 'pegawai.history-attachments.download'),
+                );
+            });
+        }
     }
 }

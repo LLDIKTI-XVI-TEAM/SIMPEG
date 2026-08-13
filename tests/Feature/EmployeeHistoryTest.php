@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Document;
 use App\Models\Employee;
 use App\Models\Permission;
 use App\Models\PositionHistory;
@@ -18,9 +19,11 @@ use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Http\Middleware\TrimStrings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -385,6 +388,52 @@ class EmployeeHistoryTest extends TestCase
             ...$this->validRankHistoryPayload(),
             'file_sk' => 'sk/rank-aman.pdf',
         ])->assertCreated();
+    }
+
+    public function test_create_history_dengan_upload_mengembalikan_url_unduh_terlindungi(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $jenisJabatan = RefJenisJabatan::where('nama', 'Struktural')->firstOrFail();
+        $jabatan = RefJabatan::firstOrCreate(
+            ['nama' => 'Analis URL Unduh'],
+            ['jenis_jabatan_id' => $jenisJabatan->id, 'is_active' => true],
+        );
+        $unitKerja = RefUnitKerja::firstOrFail();
+
+        $responses = [
+            'rank' => $this->actingAs($user)->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/riwayat-kepangkatan", [
+                ...$this->validRankHistoryPayload(),
+                'file_sk' => UploadedFile::fake()->create('sk-pangkat.pdf', 10, 'application/pdf'),
+            ]),
+            'position' => $this->actingAs($user)->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/riwayat-jabatan", [
+                'jabatan_id' => $jabatan->id,
+                'jenis_jabatan_id' => $jenisJabatan->id,
+                'unit_kerja_id' => $unitKerja->id,
+                'tmt_jabatan' => '2026-03-01',
+                'no_sk' => 'SK-POS-URL',
+                'tanggal_sk' => '2026-03-10',
+                'file_sk' => UploadedFile::fake()->create('sk-jabatan.pdf', 10, 'application/pdf'),
+            ]),
+            'salary' => $this->actingAs($user)->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/riwayat-kgb", [
+                'tmt_kgb' => '2026-04-01',
+                'gaji_pokok' => 4500000,
+                'no_sk' => 'SK-KGB-URL',
+                'tanggal_sk' => '2026-04-10',
+                'file_sk' => UploadedFile::fake()->create('sk-kgb.pdf', 10, 'application/pdf'),
+            ]),
+        ];
+
+        foreach ($responses as $type => $response) {
+            $response->assertCreated();
+            $historyId = $response->json('history.id');
+            $response->assertJsonPath('history.download_url', route('pegawai.history-attachments.download', [
+                'employee' => $employee,
+                'type' => $type,
+                'history' => $historyId,
+            ]));
+        }
     }
 
     public function test_unauthenticated_request_cannot_create_rank_history(): void

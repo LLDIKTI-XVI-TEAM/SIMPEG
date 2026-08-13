@@ -19,7 +19,7 @@ class KgbHistoryController extends Controller
     ): JsonResponse {
         return response()->json([
             'employee_id' => $employee->id,
-            'histories' => $action->execute($employee)->map($payload->kgb(...)),
+            'histories' => $action->execute($employee)->map(fn ($history): array => $payload->kgb($history)),
         ]);
     }
 
@@ -33,7 +33,7 @@ class KgbHistoryController extends Controller
 
         return response()->json([
             'message' => 'Riwayat KGB berhasil ditambahkan.',
-            'history' => $payload->kgb($history),
+            'history' => $payload->kgb($history, $employee),
         ], 201);
     }
 }

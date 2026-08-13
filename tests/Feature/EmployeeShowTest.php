@@ -649,6 +649,7 @@ class EmployeeShowTest extends TestCase
 
     public function test_detail_page_disciplines_use_normalized_dates_and_protected_download_url(): void
     {
+        Storage::fake(Document::STORAGE_DISK);
         $employee = $this->employeeWithReferences();
         $record = DisciplineRecord::create([
             'employee_id' => $employee->id,
@@ -660,6 +661,7 @@ class EmployeeShowTest extends TestCase
             'tanggal_sk' => '2026-09-22',
             'file_sk' => 'sk/disiplin-date-only.pdf',
         ]);
+        Storage::disk(Document::STORAGE_DISK)->put($record->file_sk, 'sk disiplin privat');
 
         $response = $this->actingAs(User::factory()->adminKepegawaian()->create())
             ->get(route('pegawai.show', $employee->id))
@@ -679,6 +681,57 @@ class EmployeeShowTest extends TestCase
             'type' => 'discipline',
             'history' => $record,
         ]), $row['download_url']);
+    }
+
+    public function test_detail_admin_tidak_merender_tautan_attachment_yang_file_privatnya_hilang(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = $this->employeeWithReferences();
+        $rank = RankHistory::create([
+            'employee_id' => $employee->id,
+            'golongan_id' => RefGolongan::where('kode', 'III/a')->firstOrFail()->id,
+            'tmt_pangkat' => '2026-01-01',
+            'file_sk' => 'sk/admin-rank-hilang.pdf',
+            'is_latest' => true,
+        ]);
+        $position = PositionHistory::create([
+            'employee_id' => $employee->id,
+            'nama_jabatan' => 'Jabatan File Hilang',
+            'tmt_jabatan' => '2026-01-01',
+            'file_sk' => 'sk/admin-position-hilang.pdf',
+            'is_latest' => true,
+        ]);
+        $salary = SalaryHistory::create([
+            'employee_id' => $employee->id,
+            'gaji_pokok' => 4500000,
+            'tmt_kgb' => '2026-01-01',
+            'file_sk' => 'sk/admin-salary-hilang.pdf',
+            'is_latest' => true,
+        ]);
+        $discipline = DisciplineRecord::create([
+            'employee_id' => $employee->id,
+            'jenis_hukuman' => 'Ringan',
+            'deskripsi' => 'File tidak tersedia',
+            'tanggal_mulai' => '2026-01-01',
+            'no_sk' => 'SK-DIS-HILANG',
+            'tanggal_sk' => '2025-12-31',
+            'file_sk' => 'sk/admin-discipline-hilang.pdf',
+        ]);
+
+        $response = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee))
+            ->assertOk();
+        $content = $response->getContent();
+
+        $rankRow = collect($this->extractAlpineList($content, 'pangkatList', 'jabatanList'))->firstWhere('no_sk', $rank->no_sk);
+        $positionRow = collect($this->extractAlpineList($content, 'jabatanList', 'kgbList'))->firstWhere('no_sk', $position->no_sk);
+        $salaryRow = collect($this->extractAlpineList($content, 'kgbList', 'disiplinList'))->firstWhere('no_sk', $salary->no_sk);
+        $disciplineRow = collect($this->extractAlpineList($content, 'disiplinList', 'pendidikanList'))->firstWhere('no_sk', $discipline->no_sk);
+
+        $this->assertNull($rankRow['download_url']);
+        $this->assertNull($positionRow['download_url']);
+        $this->assertNull($salaryRow['download_url']);
+        $this->assertNull($disciplineRow['download_url']);
     }
 
     public function test_detail_page_provides_optional_sk_upload_controls_for_each_history_modal(): void

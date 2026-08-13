@@ -457,7 +457,7 @@ class PimpinanEmployeeDetailTest extends TestCase
                 'admin_actions' => false,
             ],
             'pendidikan' => [
-                'headings' => ['Jenjang', 'Nama Institusi', 'Program Studi', 'Tahun Lulus', 'Nomor Ijazah'],
+                'headings' => ['Jenjang', 'Nama Institusi', 'Program Studi', 'Tahun Lulus', 'Nomor Ijazah', 'Berkas'],
                 'empty' => 'Pegawai ini belum memiliki riwayat pendidikan formal.',
                 'admin_actions' => true,
             ],
@@ -900,7 +900,19 @@ class PimpinanEmployeeDetailTest extends TestCase
             'tmt_pengangkatan' => '2020-01-01',
             'file_sk' => 'pegawai/pimpinan-appointment.pdf',
         ]);
-        foreach ([$rank->file_sk, $position->file_sk, $salary->file_sk, $appointment->file_sk] as $path) {
+        $educationLevel = RefJenjangPendidikan::create([
+            'nama' => 'S3 Legacy Ijazah',
+            'urutan' => 90,
+        ]);
+        $education = EducationHistory::create([
+            'employee_id' => $employee->id,
+            'jenjang_id' => $educationLevel->id,
+            'nama_institusi' => 'Universitas Ijazah Legacy',
+            'tahun_lulus' => 2020,
+            'no_ijazah' => 'IJAZAH-LEGACY-001',
+            'file_ijazah' => 'pegawai/pimpinan-education.pdf',
+        ]);
+        foreach ([$rank->file_sk, $position->file_sk, $salary->file_sk, $appointment->file_sk, $education->file_ijazah] as $path) {
             Storage::disk(Document::STORAGE_DISK)->put($path, 'attachment riwayat pimpinan');
         }
 
@@ -913,6 +925,7 @@ class PimpinanEmployeeDetailTest extends TestCase
             ['position', $position],
             ['salary', $salary],
             ['appointment', $appointment],
+            ['education', $education],
         ] as [$type, $history]) {
             $response->assertSee(route('pimpinan.pegawai.history-attachments.download', [
                 'employee' => $employee,
@@ -928,6 +941,7 @@ class PimpinanEmployeeDetailTest extends TestCase
             ->assertDontSee($position->file_sk, false)
             ->assertDontSee($salary->file_sk, false)
             ->assertDontSee($appointment->file_sk, false)
+            ->assertDontSee($education->file_ijazah, false)
             ->assertDontSee('>Aksi<', false)
             ->assertDontSee('>Tambah<', false)
             ->assertDontSee('>Edit<', false)
