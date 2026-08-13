@@ -554,7 +554,7 @@ class EmployeeShowTest extends TestCase
             ->assertOk()
             ->assertSee('x-text="formatDate(d.tgl_sk)"', false)
             ->assertSee('x-text="formatDate(d.tgl_mulai) + \' s/d \' + (d.tgl_akhir ? formatDate(d.tgl_akhir) : \'Sekarang\')"', false)
-            ->assertSee('download_url: r.file_sk', false);
+            ->assertSee('download_url: r.download_url', false);
 
         $payload = $this->extractAlpineList($response->getContent(), 'disiplinList', 'pendidikanList');
         $row = collect($payload)->firstWhere('no_sk', 'SK-DISIPLIN-DATE-ONLY');

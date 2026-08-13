@@ -689,9 +689,7 @@
                             tgl_mulai: r.tanggal_mulai,
                             tgl_akhir: r.tanggal_berakhir,
                             is_active: r.is_active,
-                            download_url: r.file_sk
-                                ? '{{ route('pegawai.history-attachments.download', ['employee' => $p, 'type' => 'discipline', 'history' => '00000000-0000-0000-0000-000000000000']) }}'.replace('00000000-0000-0000-0000-000000000000', r.id)
-                                : null,
+                            download_url: r.download_url,
                         });
                         this.newDisiplin = { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '', file_sk: null, dokumen_id: '' };
                         this.disiplinFileMode = 'arsip';

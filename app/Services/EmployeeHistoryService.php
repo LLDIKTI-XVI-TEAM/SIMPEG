@@ -236,20 +236,26 @@ class EmployeeHistoryService
      */
     public function createDisciplineRecord(Employee $employee, array $data, ?Request $request = null): DisciplineRecord
     {
-        // Proses upload file SK terlebih dahulu (jika ada file baru)
-        [$data, $uploadedSkPath] = $this->storeSkUploadWithPath($data);
-
-        // Jika user memilih dari arsip dokumen, gunakan file_path dokumen sebagai file_sk
-        if (empty($data['file_sk']) && ! empty($data['dokumen_id'])) {
-            $doc = $employee->documents()->find($data['dokumen_id']);
+        if (! empty($data['dokumen_id'])) {
+            // Arsip yang dipakai ulang wajib tetap menjadi SK disiplin milik pegawai ini.
+            $doc = $employee->documents()
+                ->whereKey($data['dokumen_id'])
+                ->where('jenis_dokumen', 'sk_hukuman_disiplin')
+                ->first();
             if ($doc === null) {
                 throw ValidationException::withMessages([
-                    'dokumen_id' => 'Dokumen SK harus dimiliki oleh pegawai yang sedang diproses.',
+                    'dokumen_id' => 'Dokumen harus berupa SK Hukuman Disiplin milik pegawai yang sedang diproses.',
                 ]);
             }
 
-            $data['file_sk'] = $doc->file_path;
+            if (empty($data['file_sk'])) {
+                $data['file_sk'] = $doc->file_path;
+            }
         }
+
+        // Proses upload file SK terlebih dahulu (jika ada file baru)
+        [$data, $uploadedSkPath] = $this->storeSkUploadWithPath($data);
+
         unset($data['dokumen_id']);
 
         // Hanya file yang baru diunggah yang boleh dihapus saat rollback; file dari

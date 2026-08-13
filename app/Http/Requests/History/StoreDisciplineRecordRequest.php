@@ -40,7 +40,9 @@ class StoreDisciplineRecordRequest extends FormRequest
             'dokumen_id' => [
                 'nullable',
                 'uuid',
-                Rule::exists('documents', 'id')->where('employee_id', $employeeId),
+                Rule::exists('documents', 'id')
+                    ->where('employee_id', $employeeId)
+                    ->where('jenis_dokumen', 'sk_hukuman_disiplin'),
             ],
         ];
     }
