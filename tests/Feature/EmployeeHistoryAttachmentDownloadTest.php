@@ -287,6 +287,68 @@ class EmployeeHistoryAttachmentDownloadTest extends TestCase
         $this->actingAs($admin)->get($this->url($employee, 'rank', $wrongCategory->id))->assertNotFound();
     }
 
+    public function test_attachment_status_dan_snapshot_menolak_path_dokumen_lintas_pegawai_atau_kategori(): void
+    {
+        $employee = Employee::factory()->create();
+        $otherEmployee = Employee::factory()->create();
+        $statusPath = 'sk/status-cross-owner.pdf';
+        $snapshotPath = 'sk/status-snapshot-wrong-category.pdf';
+        $history = EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_nama' => 'Aktif',
+            'tanggal_efektif' => '2026-08-14',
+            'file_sk' => $statusPath,
+            'is_latest' => true,
+        ]);
+        $employee->update(['status_berkas_path' => $snapshotPath]);
+        Document::create([
+            'employee_id' => $otherEmployee->id,
+            'jenis_dokumen' => 'sk_status_pegawai',
+            'nama_dokumen' => 'SK status pegawai lain',
+            'file_path' => $statusPath,
+        ]);
+        Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'ktp_kk',
+            'nama_dokumen' => 'Identitas bukan SK status',
+            'file_path' => $snapshotPath,
+        ]);
+        Storage::disk(Document::STORAGE_DISK)->put($statusPath, 'status pegawai lain');
+        Storage::disk(Document::STORAGE_DISK)->put($snapshotPath, 'identitas sensitif');
+        $admin = User::factory()->adminKepegawaian()->create();
+        $pimpinan = User::factory()->pimpinan()->create();
+        $adminStatusUrl = $this->url($employee, 'status', $history->id);
+        $adminSnapshotUrl = $this->url($employee, 'status-snapshot', $employee->id);
+        $pimpinanStatusUrl = route('pimpinan.pegawai.status-attachments.download', [
+            'employee' => $employee,
+            'history' => $history,
+        ]);
+
+        $this->actingAs($admin)->get($adminStatusUrl)->assertNotFound();
+        $this->actingAs($admin)->get($adminSnapshotUrl)->assertNotFound();
+        $this->actingAs($pimpinan)->get($pimpinanStatusUrl)->assertNotFound();
+        $this->actingAs($pimpinan)
+            ->get(route('pimpinan.pegawai.show', $employee))
+            ->assertOk()
+            ->assertDontSee($pimpinanStatusUrl, false);
+    }
+
+    public function test_edit_admin_tidak_merender_tautan_attachment_riwayat_yang_file_privatnya_hilang(): void
+    {
+        $employee = Employee::factory()->create();
+        $attachments = $this->historyAttachments($employee);
+
+        $response = $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('pegawai.edit', $employee))
+            ->assertOk();
+
+        foreach ($attachments as [$type, $history]) {
+            if (in_array($type, ['rank', 'position', 'salary', 'appointment'], true)) {
+                $response->assertDontSee($this->url($employee, $type, $history->id), false);
+            }
+        }
+    }
+
     public function test_show_dan_edit_admin_tidak_mengekspos_url_storage_attachment_riwayat(): void
     {
         $employee = Employee::factory()->create();

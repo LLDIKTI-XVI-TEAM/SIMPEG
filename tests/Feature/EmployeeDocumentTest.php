@@ -384,6 +384,55 @@ class EmployeeDocumentTest extends TestCase
             ->assertFailed();
     }
 
+    public function test_command_mendeteksi_dan_mengarantina_orphan_dokumen_legacy_publik_secara_aman(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        Storage::fake('public');
+        $orphanPath = 'ranks/sk/orphan-dokumen.pdf';
+        $quarantinePath = 'quarantine/orphaned-public/'.$orphanPath;
+        $photoPath = 'employees/photos/foto-tetap-publik.jpg';
+        $leavePath = 'cuti/lampiran-tetap-publik.pdf';
+        Storage::disk('public')->put($orphanPath, 'isi orphan');
+        Storage::disk('public')->put($photoPath, 'foto publik');
+        Storage::disk('public')->put($leavePath, 'lampiran cuti');
+
+        $this->artisan('documents:migrate-to-private-storage')
+            ->expectsOutputToContain('yatim=1')
+            ->assertFailed();
+        Storage::disk('public')->assertExists($orphanPath);
+        Storage::disk(Document::STORAGE_DISK)->assertMissing($quarantinePath);
+
+        $this->artisan('documents:migrate-to-private-storage', ['--execute' => true])
+            ->expectsOutputToContain('dikarantina=1')
+            ->assertSuccessful();
+        Storage::disk('public')->assertMissing($orphanPath);
+        Storage::disk(Document::STORAGE_DISK)->assertExists($quarantinePath);
+        $this->assertSame('isi orphan', Storage::disk(Document::STORAGE_DISK)->get($quarantinePath));
+        Storage::disk('public')->assertExists($photoPath);
+        Storage::disk('public')->assertExists($leavePath);
+
+        $this->artisan('documents:migrate-to-private-storage')
+            ->expectsOutputToContain('yatim=0')
+            ->assertSuccessful();
+    }
+
+    public function test_command_tidak_menimpa_file_karantina_orphan_yang_berbeda(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        Storage::fake('public');
+        $orphanPath = 'sk/orphan-konflik.pdf';
+        $quarantinePath = 'quarantine/orphaned-public/'.$orphanPath;
+        Storage::disk('public')->put($orphanPath, 'isi publik');
+        Storage::disk(Document::STORAGE_DISK)->put($quarantinePath, 'isi karantina berbeda');
+
+        $this->artisan('documents:migrate-to-private-storage', ['--execute' => true])
+            ->expectsOutputToContain('konflik')
+            ->assertFailed();
+
+        $this->assertSame('isi publik', Storage::disk('public')->get($orphanPath));
+        $this->assertSame('isi karantina berbeda', Storage::disk(Document::STORAGE_DISK)->get($quarantinePath));
+    }
+
     public function test_admin_can_upload_document_without_optional_number_and_date(): void
     {
         $user = User::factory()->adminKepegawaian()->create();

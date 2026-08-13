@@ -139,7 +139,6 @@ class PreparePimpinanEmployeeDetailAction
             ])
             ->findOrFail($employeeId);
 
-        EmployeeProfilePresentation::prepareStatusHistoryAttachments($employee);
         $this->prepareAttachmentDownloadUrls($employee);
         $latestStatusHistory = $employee->statusHistories->firstWhere('is_latest', true)
             ?? $employee->statusHistories->first();
@@ -171,7 +170,9 @@ class PreparePimpinanEmployeeDetailAction
             ...$employee->salaryHistories->pluck('file_sk'),
             ...$employee->disciplineRecords->pluck('file_sk'),
             ...$employee->educationHistories->pluck('file_ijazah'),
+            ...$employee->statusHistories->pluck('file_sk'),
             $employee->appointment?->file_sk,
+            $employee->status_berkas_path,
         ]));
 
         foreach ([
@@ -231,25 +232,24 @@ class PreparePimpinanEmployeeDetailAction
         });
 
         $employee->statusHistories->each(function (EmployeeStatusHistory $history) use ($employee): void {
-            $pathAvailable = $this->pathAvailable($history->file_sk)
-                || $history->getAttribute('has_legacy_status_document') === true;
             $history->setAttribute(
                 'pimpinan_attachment_download_url',
-                $pathAvailable
-                    ? route('pimpinan.pegawai.status-attachments.download', [
-                        'employee' => $employee,
-                        'history' => $history,
-                    ])
-                    : null,
+                $this->attachments->statusDownloadUrl(
+                    $employee,
+                    $history,
+                    'pimpinan.pegawai.status-attachments.download',
+                    false,
+                ),
             );
         });
 
         $employee->setAttribute(
             'pimpinan_status_attachment_download_url',
-            $this->availableUrl($employee->status_berkas_path, fn (): string => route(
+            $this->attachments->statusSnapshotDownloadUrl(
+                $employee,
                 'pimpinan.pegawai.status-attachments.download',
-                ['employee' => $employee, 'history' => $employee],
-            )),
+                false,
+            ),
         );
     }
 
@@ -261,12 +261,6 @@ class PreparePimpinanEmployeeDetailAction
             $history,
             'pimpinan.pegawai.history-attachments.download',
         );
-    }
-
-    /** @param \Closure(): string $url */
-    private function availableUrl(mixed $path, \Closure $url): ?string
-    {
-        return $this->pathAvailable($path) ? $url() : null;
     }
 
     private function pathAvailable(mixed $path): bool

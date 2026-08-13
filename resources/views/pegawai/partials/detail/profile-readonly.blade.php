@@ -219,9 +219,7 @@
                     @endif
                     @php
                         $statusAttachmentUrl = $downloadSurface === 'admin'
-                            ? (($history->file_sk || $history->has_legacy_status_document)
-                                ? route('pegawai.history-attachments.download', ['employee' => $employee, 'type' => 'status', 'history' => $history])
-                                : null)
+                            ? $history->admin_attachment_download_url
                             : $history->pimpinan_attachment_download_url;
                     @endphp
                     @if($statusAttachmentUrl)
@@ -237,9 +235,7 @@
             @empty
                 @php
                     $statusSnapshotUrl = $downloadSurface === 'admin'
-                        ? ($employee->status_berkas_path
-                            ? route('pegawai.history-attachments.download', ['employee' => $employee, 'type' => 'status-snapshot', 'history' => $employee])
-                            : null)
+                        ? $employee->admin_status_attachment_download_url
                         : $employee->pimpinan_status_attachment_download_url;
                 @endphp
                 @if($statusSnapshotUrl)

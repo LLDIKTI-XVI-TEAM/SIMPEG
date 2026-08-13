@@ -717,6 +717,13 @@ class EmployeeShowTest extends TestCase
             'tanggal_sk' => '2025-12-31',
             'file_sk' => 'sk/admin-discipline-hilang.pdf',
         ]);
+        $status = EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_nama' => 'Status File Hilang',
+            'tanggal_efektif' => '2026-01-01',
+            'file_sk' => 'sk/admin-status-hilang.pdf',
+            'is_latest' => true,
+        ]);
 
         $response = $this->actingAs(User::factory()->adminKepegawaian()->create())
             ->get(route('pegawai.show', $employee))
@@ -732,6 +739,29 @@ class EmployeeShowTest extends TestCase
         $this->assertNull($positionRow['download_url']);
         $this->assertNull($salaryRow['download_url']);
         $this->assertNull($disciplineRow['download_url']);
+        $response->assertDontSee(route('pegawai.history-attachments.download', [
+            'employee' => $employee,
+            'type' => 'status',
+            'history' => $status,
+        ]), false);
+    }
+
+    public function test_detail_admin_tidak_merender_tautan_snapshot_status_yang_file_privatnya_hilang(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = $this->employeeWithReferences([
+            'status_berkas_path' => 'sk/admin-status-snapshot-hilang.pdf',
+            'status_nomor_berkas' => 'SK-SNAPSHOT-HILANG',
+        ]);
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee))
+            ->assertOk()
+            ->assertDontSee(route('pegawai.history-attachments.download', [
+                'employee' => $employee,
+                'type' => 'status-snapshot',
+                'history' => $employee,
+            ]), false);
     }
 
     public function test_detail_page_provides_optional_sk_upload_controls_for_each_history_modal(): void

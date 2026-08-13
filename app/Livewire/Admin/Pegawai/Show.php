@@ -4,6 +4,7 @@ namespace App\Livewire\Admin\Pegawai;
 
 use App\Models\EducationHistory;
 use App\Models\Employee;
+use App\Models\EmployeeStatusHistory;
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
 use App\Models\RefJabatan;
@@ -81,7 +82,6 @@ class Show extends Component
         $selectedSupervisorId = $selectedSupervisor?->id ?? $currentSupervisor?->supervisor?->id;
         $selectedSupervisorName = $selectedSupervisor?->nama_lengkap ?? $currentSupervisor?->supervisor?->nama_lengkap;
 
-        EmployeeProfilePresentation::prepareStatusHistoryAttachments($p);
         $this->prepareHistoryAttachmentDownloadUrls($p, $attachments);
 
         // Snapshot status adalah sumber utama. Riwayat latest hanya menjadi fallback
@@ -110,7 +110,8 @@ class Show extends Component
         $attachments->primeDocumentReferences(
             collect($groups)->flatten()->map(fn (Model $history): mixed => $history->getAttribute(
                 $history instanceof EducationHistory ? 'file_ijazah' : 'file_sk',
-            )),
+            ))->merge($employee->statusHistories->pluck('file_sk'))
+                ->push($employee->status_berkas_path),
         );
 
         foreach ($groups as $type => $histories) {
@@ -121,5 +122,16 @@ class Show extends Component
                 );
             });
         }
+
+        $employee->statusHistories->each(function (EmployeeStatusHistory $history) use ($employee, $attachments): void {
+            $history->setAttribute(
+                'admin_attachment_download_url',
+                $attachments->statusDownloadUrl($employee, $history, 'pegawai.history-attachments.download'),
+            );
+        });
+        $employee->setAttribute(
+            'admin_status_attachment_download_url',
+            $attachments->statusSnapshotDownloadUrl($employee, 'pegawai.history-attachments.download'),
+        );
     }
 }

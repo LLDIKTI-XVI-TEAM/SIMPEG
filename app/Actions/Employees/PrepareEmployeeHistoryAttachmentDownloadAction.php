@@ -12,7 +12,6 @@ use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\SalaryHistory;
 use App\Services\Employees\EmployeeHistoryAttachmentService;
-use App\Support\Documents\LegacyStatusDocumentResolver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -28,24 +27,25 @@ class PrepareEmployeeHistoryAttachmentDownloadAction
      */
     public function execute(Employee $employee, string $type, string $historyId): array
     {
-        [$record, $pathColumn] = match ($type) {
-            'rank' => [$this->ownedRecord(RankHistory::class, $employee, $historyId), 'file_sk'],
-            'position' => [$this->ownedRecord(PositionHistory::class, $employee, $historyId), 'file_sk'],
-            'salary' => [$this->ownedRecord(SalaryHistory::class, $employee, $historyId), 'file_sk'],
-            'appointment' => [$this->ownedRecord(Appointment::class, $employee, $historyId), 'file_sk'],
-            'discipline' => [$this->ownedRecord(DisciplineRecord::class, $employee, $historyId), 'file_sk'],
-            'education' => [$this->ownedRecord(EducationHistory::class, $employee, $historyId), 'file_ijazah'],
-            'status' => [$this->ownedRecord(EmployeeStatusHistory::class, $employee, $historyId), 'file_sk'],
-            'status-snapshot' => [$this->statusSnapshot($employee, $historyId), 'status_berkas_path'],
+        $record = match ($type) {
+            'rank' => $this->ownedRecord(RankHistory::class, $employee, $historyId),
+            'position' => $this->ownedRecord(PositionHistory::class, $employee, $historyId),
+            'salary' => $this->ownedRecord(SalaryHistory::class, $employee, $historyId),
+            'appointment' => $this->ownedRecord(Appointment::class, $employee, $historyId),
+            'discipline' => $this->ownedRecord(DisciplineRecord::class, $employee, $historyId),
+            'education' => $this->ownedRecord(EducationHistory::class, $employee, $historyId),
+            'status' => $this->ownedRecord(EmployeeStatusHistory::class, $employee, $historyId),
+            'status-snapshot' => $this->statusSnapshot($employee, $historyId),
             default => abort(404),
         };
 
-        $path = in_array($type, ['rank', 'position', 'salary', 'appointment', 'discipline', 'education'], true)
-            ? $this->attachments->availablePath($employee, $type, $record)
-            : $record->getAttribute($pathColumn);
-        if ($type === 'status' && $path === null) {
-            $path = $this->legacyStatusDocumentPath($employee, $record);
-        }
+        $path = match ($type) {
+            'status' => $record instanceof EmployeeStatusHistory
+                ? $this->attachments->availableStatusPath($employee, $record)
+                : null,
+            'status-snapshot' => $this->attachments->availableStatusSnapshotPath($employee),
+            default => $this->attachments->availablePath($employee, $type, $record),
+        };
         abort_if(! is_string($path) || $path === '' || ! Storage::disk(Document::STORAGE_DISK)->exists($path), 404);
 
         $extension = pathinfo($path, PATHINFO_EXTENSION);
@@ -67,28 +67,5 @@ class PrepareEmployeeHistoryAttachmentDownloadAction
         abort_unless(hash_equals($employee->id, $historyId), 404);
 
         return $employee;
-    }
-
-    /**
-     * Mengambil fallback SK status lama hanya dari dokumen privat milik pegawai yang sama.
-     *
-     * Nomor SK dan kategori menjadi pengikat agar nomor identik dari pegawai lain tidak pernah
-     * dapat menjadi jalur unduhan status ini.
-     */
-    private function legacyStatusDocumentPath(Employee $employee, EmployeeStatusHistory $history): ?string
-    {
-        if (! is_string($history->nomor_berkas) || $history->nomor_berkas === '') {
-            return null;
-        }
-
-        $documents = Document::query()
-            ->where('employee_id', $employee->id)
-            ->where('jenis_dokumen', 'sk_status_pegawai')
-            ->where('nomor_dokumen', $history->nomor_berkas)
-            ->orderBy('id')
-            ->get();
-        $document = LegacyStatusDocumentResolver::resolve($documents, $history);
-
-        return $document?->file_path;
     }
 }

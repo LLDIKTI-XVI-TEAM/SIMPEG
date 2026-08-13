@@ -8,9 +8,23 @@ use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class MigrateEmployeeDocumentsToPrivateStorage extends Command
 {
+    private const ORPHAN_QUARANTINE_PREFIX = 'quarantine/orphaned-public';
+
+    /** @var list<string> */
+    private const LEGACY_DOCUMENT_PREFIXES = [
+        'appointments/sk/',
+        'berkas/',
+        'pegawai/',
+        'positions/sk/',
+        'ranks/sk/',
+        'salaries/sk/',
+        'sk/',
+    ];
+
     protected $signature = 'documents:migrate-to-private-storage
         {--execute : Salin file terverifikasi ke storage privat lalu hapus salinan publik}';
 
@@ -23,9 +37,18 @@ class MigrateEmployeeDocumentsToPrivateStorage extends Command
 
         $public = Storage::disk('public');
         $private = Storage::disk(Document::STORAGE_DISK);
-        $counts = ['dipindahkan' => 0, 'siap' => 0, 'sudah_privat' => 0, 'hilang' => 0, 'konflik' => 0];
+        $counts = [
+            'dipindahkan' => 0,
+            'dikarantina' => 0,
+            'siap' => 0,
+            'sudah_privat' => 0,
+            'hilang' => 0,
+            'konflik' => 0,
+            'yatim' => 0,
+        ];
+        $referencedPaths = $this->referencedPaths();
 
-        foreach ($this->referencedPaths() as $path) {
+        foreach ($referencedPaths as $path) {
             $publicExists = $public->exists($path);
             $privateExists = $private->exists($path);
 
@@ -69,16 +92,35 @@ class MigrateEmployeeDocumentsToPrivateStorage extends Command
             $counts['dipindahkan']++;
         }
 
+        foreach ($this->orphanedPublicDocumentPaths($public, $referencedPaths) as $path) {
+            if (! $execute) {
+                $counts['yatim']++;
+                $this->warn("yatim: {$path}; file publik tidak memiliki referensi database.");
+
+                continue;
+            }
+
+            if ($this->quarantineOrphan($public, $private, $path)) {
+                $counts['dikarantina']++;
+            } else {
+                $counts['konflik']++;
+            }
+        }
+
         $this->line(sprintf(
-            'Ringkasan: dipindahkan=%d, siap=%d, sudah_privat=%d, hilang=%d, konflik=%d.',
+            'Ringkasan: dipindahkan=%d, dikarantina=%d, siap=%d, sudah_privat=%d, hilang=%d, konflik=%d, yatim=%d.',
             $counts['dipindahkan'],
+            $counts['dikarantina'],
             $counts['siap'],
             $counts['sudah_privat'],
             $counts['hilang'],
             $counts['konflik'],
+            $counts['yatim'],
         ));
 
-        return $counts['konflik'] > 0 || $counts['hilang'] > 0 ? self::FAILURE : self::SUCCESS;
+        return $counts['konflik'] > 0 || $counts['hilang'] > 0 || $counts['yatim'] > 0
+            ? self::FAILURE
+            : self::SUCCESS;
     }
 
     /**
@@ -109,9 +151,77 @@ class MigrateEmployeeDocumentsToPrivateStorage extends Command
 
     private function sameContents(Filesystem $public, Filesystem $private, string $path): bool
     {
+        return $this->sameContentsAt($public, $path, $private, $path);
+    }
+
+    /**
+     * Menginventarisasi hanya namespace dokumen pegawai legacy; foto dan lampiran cuti publik dibiarkan.
+     *
+     * @param  Collection<int, string>  $referencedPaths
+     * @return Collection<int, string>
+     */
+    private function orphanedPublicDocumentPaths(Filesystem $public, Collection $referencedPaths): Collection
+    {
+        return collect($public->allFiles())
+            ->map(fn (string $path): string => str_replace('\\', '/', ltrim($path, '/\\')))
+            ->filter(fn (string $path): bool => $this->isLegacyEmployeeDocumentPath($path))
+            ->diff($referencedPaths)
+            ->values();
+    }
+
+    private function isLegacyEmployeeDocumentPath(string $path): bool
+    {
+        foreach (self::LEGACY_DOCUMENT_PREFIXES as $prefix) {
+            if (str_starts_with($path, $prefix)) {
+                return true;
+            }
+        }
+
+        $firstSegment = explode('/', $path, 2)[0];
+
+        // Upload dokumen lama memakai UUID pegawai sebagai folder paling atas.
+        return Str::isUuid($firstSegment) && str_contains($path, '/');
+    }
+
+    private function quarantineOrphan(Filesystem $public, Filesystem $private, string $path): bool
+    {
+        $quarantinePath = self::ORPHAN_QUARANTINE_PREFIX.'/'.$path;
+        $privateExists = $private->exists($quarantinePath);
+        if ($privateExists && ! $this->sameContentsAt($public, $path, $private, $quarantinePath)) {
+            $this->warn("konflik: karantina {$quarantinePath} memiliki isi berbeda; file publik dipertahankan.");
+
+            return false;
+        }
+
+        if (! $privateExists) {
+            $contents = $public->get($path);
+            if (! $private->put($quarantinePath, $contents)
+                || ! $this->sameContentsAt($public, $path, $private, $quarantinePath)) {
+                $private->delete($quarantinePath);
+                $this->warn("konflik: verifikasi karantina gagal untuk {$path}; file publik dipertahankan.");
+
+                return false;
+            }
+        }
+
+        if (! $public->delete($path) || $public->exists($path)) {
+            $this->warn("konflik: file publik tanpa referensi {$path} gagal dihapus setelah karantina.");
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private function sameContentsAt(
+        Filesystem $source,
+        string $sourcePath,
+        Filesystem $target,
+        string $targetPath,
+    ): bool {
         return hash_equals(
-            hash('sha256', $public->get($path)),
-            hash('sha256', $private->get($path)),
+            hash('sha256', $source->get($sourcePath)),
+            hash('sha256', $target->get($targetPath)),
         );
     }
 }

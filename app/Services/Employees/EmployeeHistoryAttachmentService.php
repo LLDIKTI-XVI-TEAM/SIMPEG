@@ -7,9 +7,11 @@ use App\Models\DisciplineRecord;
 use App\Models\Document;
 use App\Models\EducationHistory;
 use App\Models\Employee;
+use App\Models\EmployeeStatusHistory;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\SalaryHistory;
+use App\Support\Documents\LegacyStatusDocumentResolver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 
@@ -26,6 +28,7 @@ class EmployeeHistoryAttachmentService
         'appointment' => ['model' => Appointment::class, 'path' => 'file_sk', 'category' => 'sk_pengangkatan'],
         'discipline' => ['model' => DisciplineRecord::class, 'path' => 'file_sk', 'category' => 'sk_hukuman_disiplin'],
         'education' => ['model' => EducationHistory::class, 'path' => 'file_ijazah', 'category' => 'ijazah'],
+        'status' => ['model' => EmployeeStatusHistory::class, 'path' => 'file_sk', 'category' => 'sk_status_pegawai'],
     ];
 
     /** @param iterable<int, mixed> $paths */
@@ -70,7 +73,66 @@ class EmployeeHistoryAttachmentService
             return null;
         }
 
-        $path = $history->getAttribute($config['path']);
+        return $this->availableEmployeePath(
+            $employee,
+            $history->getAttribute($config['path']),
+            $config['category'],
+        );
+    }
+
+    /**
+     * Menyelesaikan SK status langsung atau fallback metadata legacy dengan aturan scope yang sama.
+     */
+    public function availableStatusPath(Employee $employee, EmployeeStatusHistory $history): ?string
+    {
+        if (! hash_equals((string) $employee->id, (string) $history->employee_id)) {
+            return null;
+        }
+
+        if ($history->file_sk !== null) {
+            return $this->availablePath($employee, 'status', $history);
+        }
+
+        $documents = $employee->relationLoaded('documents')
+            ? $employee->documents
+            : $employee->documents()->where('jenis_dokumen', 'sk_status_pegawai')->orderBy('id')->get();
+
+        return LegacyStatusDocumentResolver::resolve($documents, $history)?->file_path;
+    }
+
+    /** Snapshot legacy tetap boleh tanpa metadata, tetapi konflik metadata wajib ditolak. */
+    public function availableStatusSnapshotPath(Employee $employee): ?string
+    {
+        return $this->availableEmployeePath($employee, $employee->status_berkas_path, 'sk_status_pegawai');
+    }
+
+    public function statusDownloadUrl(
+        Employee $employee,
+        EmployeeStatusHistory $history,
+        string $routeName,
+        bool $includeType = true,
+    ): ?string {
+        if ($this->availableStatusPath($employee, $history) === null) {
+            return null;
+        }
+
+        return $this->statusRoute($employee, $history, 'status', $routeName, $includeType);
+    }
+
+    public function statusSnapshotDownloadUrl(
+        Employee $employee,
+        string $routeName,
+        bool $includeType = true,
+    ): ?string {
+        if ($this->availableStatusSnapshotPath($employee) === null) {
+            return null;
+        }
+
+        return $this->statusRoute($employee, $employee, 'status-snapshot', $routeName, $includeType);
+    }
+
+    private function availableEmployeePath(Employee $employee, mixed $path, string $category): ?string
+    {
         if (! is_string($path) || $path === '' || ! Storage::disk(Document::STORAGE_DISK)->exists($path)) {
             return null;
         }
@@ -81,7 +143,7 @@ class EmployeeHistoryAttachmentService
 
         $conflictingReferenceExists = collect($this->documentReferences[$path])
             ->contains(fn (array $reference): bool => ! hash_equals((string) $employee->id, $reference['employee_id'])
-                || $reference['jenis_dokumen'] !== $config['category']);
+                || $reference['jenis_dokumen'] !== $category);
 
         return $conflictingReferenceExists ? null : $path;
     }
@@ -101,6 +163,21 @@ class EmployeeHistoryAttachmentService
             'employee' => $employee,
             'history' => $history,
         ];
+        if ($includeType) {
+            $parameters['type'] = $type;
+        }
+
+        return route($routeName, $parameters);
+    }
+
+    private function statusRoute(
+        Employee $employee,
+        Model $history,
+        string $type,
+        string $routeName,
+        bool $includeType,
+    ): string {
+        $parameters = ['employee' => $employee, 'history' => $history];
         if ($includeType) {
             $parameters['type'] = $type;
         }

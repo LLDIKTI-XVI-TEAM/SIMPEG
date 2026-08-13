@@ -123,21 +123,21 @@ Jalankan urutan berikut sebagai **release gate sebelum aplikasi diaktifkan**. Pr
    podman compose exec app php artisan down
    ```
 
-2. Jalankan dry-run tanpa flag dan lanjutkan hanya bila ringkasannya menunjukkan `hilang=0` dan `konflik=0`:
+2. Jalankan dry-run tanpa flag. Lanjutkan hanya bila ringkasannya menunjukkan `hilang=0` dan `konflik=0`. Jika `yatim` lebih dari nol, periksa setiap path yang dilaporkan dan pastikan semuanya memang dokumen pegawai legacy tanpa referensi database; file tersebut akan dipindahkan ke karantina privat saat mode eksekusi:
 
    ```bash
    podman compose exec app php artisan documents:migrate-to-private-storage
    ```
 
-   Perbaiki setiap path yang berstatus `hilang` atau `konflik`; command akan gagal untuk kedua kondisi tersebut.
+   Perbaiki setiap path yang berstatus `hilang` atau `konflik`. Dry-run juga gagal saat menemukan `yatim` agar file publik tanpa referensi tidak terlewat sebagai hasil bersih.
 
-3. Setelah dry-run bersih, lakukan cutover dengan satu-satunya flag eksekusi yang tersedia:
+3. Setelah kondisi `hilang` dan `konflik` bersih serta setiap `yatim` sudah ditinjau, lakukan cutover dengan satu-satunya flag eksekusi yang tersedia:
 
    ```bash
    podman compose exec app php artisan documents:migrate-to-private-storage --execute
    ```
 
-4. Jalankan dry-run kembali untuk verifikasi. Pastikan `siap=0`, `hilang=0`, dan `konflik=0`; baris yang sudah privat akan dihitung sebagai `sudah_privat`.
+4. Jalankan dry-run kembali untuk verifikasi. Pastikan `siap=0`, `hilang=0`, `konflik=0`, dan `yatim=0`; baris yang sudah privat akan dihitung sebagai `sudah_privat`, sedangkan orphan yang berhasil diamankan tercatat sebagai `dikarantina` pada langkah eksekusi.
 
    ```bash
    podman compose exec app php artisan documents:migrate-to-private-storage
