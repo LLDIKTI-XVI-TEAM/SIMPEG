@@ -444,7 +444,7 @@ class EmployeeShowTest extends TestCase
             ->getContent();
 
         $this->assertMatchesRegularExpression(
-            '/SK-DISIPLIN-PERIODE.{0,200}"tgl_mulai":"2026-02-01".{0,80}"tgl_akhir":"2026-03-01"/s',
+            '/SK-DISIPLIN-PERIODE.{0,200}&quot;tgl_mulai&quot;:&quot;2026-02-01&quot;.{0,80}&quot;tgl_akhir&quot;:&quot;2026-03-01&quot;/s',
             $content,
         );
     }
