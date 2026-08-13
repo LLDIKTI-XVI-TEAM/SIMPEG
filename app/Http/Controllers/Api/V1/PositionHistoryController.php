@@ -15,11 +15,10 @@ class PositionHistoryController extends Controller
     public function index(
         Employee $employee,
         ListPositionHistoriesAction $action,
-        EmployeeHistoryPayload $payload,
     ): JsonResponse {
         return response()->json([
             'employee_id' => $employee->id,
-            'histories' => $action->execute($employee)->map(fn ($history): array => $payload->position($history)),
+            'histories' => $action->execute($employee),
         ]);
     }
 

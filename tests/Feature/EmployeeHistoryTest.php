@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Services\EmployeeHistoryService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Http\Middleware\TrimStrings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -297,6 +298,101 @@ class EmployeeHistoryTest extends TestCase
         $response->assertJsonPath('histories.1.golongan.kode', 'III/b');
         $response->assertJsonPath('histories.2.no_sk', 'SK-RANK-OLD');
         $response->assertJsonPath('histories.2.golongan.kode', 'III/a');
+    }
+
+    public function test_list_riwayat_mengembalikan_url_unduh_terlindungi_dengan_lookup_metadata_terbatas(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+
+        $employee = Employee::factory()->create();
+        $golongan = RefGolongan::where('kode', 'III/b')->firstOrFail();
+        $jenisJabatan = RefJenisJabatan::where('nama', 'Struktural')->firstOrFail();
+        $unitKerja = RefUnitKerja::firstOrFail();
+        $metadataQueries = [];
+        $activeType = null;
+
+        DB::listen(function (QueryExecuted $query) use (&$activeType, &$metadataQueries): void {
+            $sql = mb_strtolower($query->sql);
+
+            if ($activeType !== null && str_contains($sql, 'from "documents"') && str_contains($sql, '"file_path" in')) {
+                $metadataQueries[$activeType]++;
+            }
+        });
+
+        foreach ([
+            'rank' => ['uri' => "api/v1/pegawai/{$employee->id}/riwayat-kepangkatan", 'category' => 'sk_pangkat'],
+            'position' => ['uri' => "api/v1/pegawai/{$employee->id}/riwayat-jabatan", 'category' => 'sk_jabatan'],
+            'salary' => ['uri' => "api/v1/pegawai/{$employee->id}/riwayat-kgb", 'category' => 'sk_kgb'],
+        ] as $type => $endpoint) {
+            $createHistory = function (string $path, string $suffix) use ($employee, $golongan, $jenisJabatan, $unitKerja, $type): RankHistory|PositionHistory|SalaryHistory {
+                return match ($type) {
+                    'rank' => RankHistory::create([
+                        'employee_id' => $employee->id,
+                        'golongan_id' => $golongan->id,
+                        'tmt_pangkat' => '2026-08-'.$suffix,
+                        'file_sk' => $path,
+                    ]),
+                    'position' => PositionHistory::create([
+                        'employee_id' => $employee->id,
+                        'nama_jabatan' => 'Jabatan '.$suffix,
+                        'jenis_jabatan_id' => $jenisJabatan->id,
+                        'unit_kerja_id' => $unitKerja->id,
+                        'tmt_jabatan' => '2026-08-'.$suffix,
+                        'file_sk' => $path,
+                    ]),
+                    'salary' => SalaryHistory::create([
+                        'employee_id' => $employee->id,
+                        'gaji_pokok' => 5000000,
+                        'tmt_kgb' => '2026-08-'.$suffix,
+                        'file_sk' => $path,
+                    ]),
+                };
+            };
+            $validPath = "histories/{$type}-valid.pdf";
+            $missingPath = "histories/{$type}-missing.pdf";
+            $conflictingPath = "histories/{$type}-conflicting.pdf";
+            $validHistory = $createHistory($validPath, '03');
+            $missingHistory = $createHistory($missingPath, '02');
+            $conflictingHistory = $createHistory($conflictingPath, '01');
+
+            Document::create([
+                'employee_id' => $employee->id,
+                'jenis_dokumen' => $endpoint['category'],
+                'nama_dokumen' => 'SK valid '.$type,
+                'file_path' => $validPath,
+            ]);
+            Document::create([
+                'employee_id' => $employee->id,
+                'jenis_dokumen' => $endpoint['category'],
+                'nama_dokumen' => 'SK hilang '.$type,
+                'file_path' => $missingPath,
+            ]);
+            Document::create([
+                'employee_id' => $employee->id,
+                'jenis_dokumen' => 'lainnya',
+                'nama_dokumen' => 'SK konflik '.$type,
+                'file_path' => $conflictingPath,
+            ]);
+            Storage::disk(Document::STORAGE_DISK)->put($validPath, 'SK valid '.$type);
+            Storage::disk(Document::STORAGE_DISK)->put($conflictingPath, 'SK konflik '.$type);
+
+            $activeType = $type;
+            $metadataQueries[$type] = 0;
+            $response = $this->actingAs(User::factory()->adminKepegawaian()->create())
+                ->getJson($endpoint['uri'])
+                ->assertOk();
+            $histories = collect($response->json('histories'))->keyBy('id');
+
+            $this->assertSame(route('pegawai.history-attachments.download', [
+                'employee' => $employee,
+                'type' => $type,
+                'history' => $validHistory,
+            ]), $histories->get($validHistory->id)['download_url']);
+            $this->assertNull($histories->get($missingHistory->id)['download_url']);
+            $this->assertNull($histories->get($conflictingHistory->id)['download_url']);
+        }
+
+        $this->assertSame(['rank' => 1, 'position' => 1, 'salary' => 1], $metadataQueries);
     }
 
     public function test_unauthenticated_request_cannot_list_rank_histories(): void

@@ -19,6 +19,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class DisciplineRecordTest extends TestCase
@@ -374,6 +375,57 @@ class DisciplineRecordTest extends TestCase
             ->assertJsonPath('record.download_url', null);
     }
 
+    #[DataProvider('conflictingDocumentReferenceProvider')]
+    public function test_create_disiplin_tidak_mengiklankan_url_yang_ditolak_endpoint_unduh(string $conflictType): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $path = 'sk/disiplin-konflik-'.$conflictType.'.pdf';
+        $disciplineDocument = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'sk_hukuman_disiplin',
+            'nama_dokumen' => 'SK Hukuman Disiplin valid',
+            'file_path' => $path,
+        ]);
+        Document::create([
+            'employee_id' => $conflictType === 'pegawai_lain'
+                ? Employee::factory()->create()->id
+                : $employee->id,
+            'jenis_dokumen' => $conflictType === 'pegawai_lain'
+                ? 'sk_hukuman_disiplin'
+                : 'lainnya',
+            'nama_dokumen' => 'Metadata dokumen konflik',
+            'file_path' => $path,
+        ]);
+        Storage::disk(Document::STORAGE_DISK)->put($path, 'arsip sk disiplin');
+
+        $response = $this->actingAs($user)
+            ->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/disiplin", $this->validPayload([
+                'file_sk' => null,
+                'dokumen_id' => $disciplineDocument->id,
+                'no_sk' => 'SK-KONFLIK-'.strtoupper($conflictType),
+            ]));
+
+        $response->assertCreated()
+            ->assertJsonPath('record.download_url', null);
+        $recordId = $response->json('record.id');
+        $this->assertIsString($recordId);
+        $this->assertDatabaseHas('discipline_records', [
+            'id' => $recordId,
+            'employee_id' => $employee->id,
+            'file_sk' => $path,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('pegawai.history-attachments.download', [
+                'employee' => $employee,
+                'type' => 'discipline',
+                'history' => $recordId,
+            ]))
+            ->assertNotFound();
+    }
+
     public function test_create_discipline_record_returns_protected_download_url_for_uploaded_file(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -547,5 +599,14 @@ class DisciplineRecordTest extends TestCase
             'employee_id' => $employee->id,
             'is_active' => true,
         ], $overrides);
+    }
+
+    /** @return array<string, array{string}> */
+    public static function conflictingDocumentReferenceProvider(): array
+    {
+        return [
+            'path juga direferensikan pegawai lain' => ['pegawai_lain'],
+            'path juga direferensikan kategori lain' => ['kategori_lain'],
+        ];
     }
 }

@@ -14,6 +14,12 @@ class EmployeeHistoryPayload
 {
     public function __construct(private readonly EmployeeHistoryAttachmentService $attachments) {}
 
+    /** @param iterable<int, mixed> $paths */
+    public function primeAttachmentReferences(iterable $paths): void
+    {
+        $this->attachments->primeDocumentReferences($paths);
+    }
+
     /**
      * Mempertahankan kontrak riwayat pangkat dengan tanggal kalender yang deterministik.
      *

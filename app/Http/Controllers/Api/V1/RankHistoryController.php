@@ -15,11 +15,10 @@ class RankHistoryController extends Controller
     public function index(
         Employee $employee,
         ListRankHistoriesAction $action,
-        EmployeeHistoryPayload $payload,
     ): JsonResponse {
         return response()->json([
             'employee_id' => $employee->id,
-            'histories' => $action->execute($employee)->map(fn ($history): array => $payload->rank($history)),
+            'histories' => $action->execute($employee),
         ]);
     }
 
