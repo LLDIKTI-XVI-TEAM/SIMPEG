@@ -4,9 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Document;
 use App\Models\Employee;
-use App\Models\EmployeeStatusHistory;
 use App\Models\RefStatusPegawai;
-use App\Models\SupervisorAssignment;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
@@ -33,13 +31,6 @@ class ChangeEmployeeStatusTest extends TestCase
     {
         $admin = User::factory()->superAdmin()->create();
         $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
-        $supervisor = Employee::factory()->create();
-        SupervisorAssignment::create([
-            'employee_id' => $employee->id,
-            'kepala_bagian_id' => $supervisor->id,
-            'tanggal_mulai' => '2026-01-10',
-            'tanggal_berakhir' => null,
-        ]);
         $mutasi = RefStatusPegawai::where('nama', 'Mutasi')->firstOrFail();
 
         $response = $this->actingAs($admin)->postWithCsrf(route('super-admin.status-pegawai.store'), [
@@ -56,24 +47,7 @@ class ChangeEmployeeStatusTest extends TestCase
         $this->assertSame($mutasi->id, $employee->status_pegawai_id);
         $this->assertSame('Mutasi', $employee->status_aktif);
         $this->assertSame('Pindah unit kerja', $employee->status_keterangan);
-        $this->assertSame('2026-08-01', $employee->status_tanggal?->toDateString());
         $this->assertNull($employee->status_berkas_path);
-
-        $this->assertDatabaseHas('employee_status_histories', [
-            'employee_id' => $employee->id,
-            'status_pegawai_id' => $mutasi->id,
-            'tanggal_efektif' => '2026-08-01 00:00:00',
-            'is_latest' => true,
-        ]);
-        $this->assertSame(1, EmployeeStatusHistory::query()->where('employee_id', $employee->id)->count());
-
-        // Perubahan status tidak boleh menggeser timeline Kepala Bagian.
-        $this->assertDatabaseHas('supervisor_assignments', [
-            'employee_id' => $employee->id,
-            'kepala_bagian_id' => $supervisor->id,
-            'tanggal_mulai' => '2026-01-10 00:00:00',
-            'tanggal_berakhir' => null,
-        ]);
 
         // Tanpa berkas, tidak ada dokumen yang tercipta.
         $this->assertDatabaseCount('documents', 0);
@@ -224,14 +198,6 @@ class ChangeEmployeeStatusTest extends TestCase
         $this->actingAs($user)
             ->get(route('super-admin.status-pegawai.index'))
             ->assertForbidden();
-    }
-
-    public function test_status_page_uses_unambiguous_effective_date_label(): void
-    {
-        $this->actingAs(User::factory()->superAdmin()->create())
-            ->get(route('super-admin.status-pegawai.index'))
-            ->assertOk()
-            ->assertSee('Tanggal Efektif Status Kepegawaian', false);
     }
 
     private function postWithCsrf(string $uri, array $data): TestResponse

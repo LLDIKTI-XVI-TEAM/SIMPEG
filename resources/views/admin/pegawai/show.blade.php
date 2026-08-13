@@ -976,10 +976,6 @@
                                 <span class="text-[9px] font-bold text-muted uppercase tracking-wider font-sans block">Kepala Bagian/Supervisor Aktif</span>
                                 <p class="text-xs font-bold text-ink font-sans">{{ $currentSupervisor?->supervisor?->nama_lengkap ?? '-' }}</p>
                                 <p class="text-xs text-muted">NIP. {{ $currentSupervisor?->supervisor?->nip ?? '-' }} ({{ $currentSupervisorPosition?->nama_jabatan ?? '-' }})</p>
-                                <p class="mt-1 text-xs text-muted">
-                                    <span class="font-semibold text-ink">Mulai Penugasan:</span>
-                                    {{ $currentSupervisor?->tanggal_mulai?->format('d-m-Y') ?? '-' }}
-                                </p>
                             </div>
                     </div>
                     @if ($canAssignSupervisor)
@@ -1057,10 +1053,10 @@
                                 <x-form.input
                                     name="effective_date"
                                     type="date"
-                                    label="Tanggal Mulai Penugasan Kepala Bagian"
+                                    label="Tanggal Efektif"
                                     :value="old('effective_date', now()->toDateString())"
                                     required
-                                    help="Tanggal mulai berlakunya penugasan Kepala Bagian untuk pegawai ini."
+                                    help="Tanggal mulai penugasan."
                                 />
                                 <div class="flex flex-wrap gap-2 md:pt-6">
                                     <x-ui.button type="submit" size="sm">Simpan</x-ui.button>
@@ -1164,8 +1160,8 @@
                                 <p class="text-ink font-sans font-bold">{{ $p->statusPegawai->nama ?? $p->status_aktif ?? '-' }}</p>
                             </div>
                             <div class="space-y-0.5">
-                                <span class="font-semibold text-muted font-sans">Tanggal Efektif Status Kepegawaian</span>
-                                <p class="text-ink font-sans">{{ $statusEffectiveDate?->format('d-m-Y') ?? '-' }}</p>
+                                <span class="font-semibold text-muted font-sans">Tanggal Efektif</span>
+                                <p class="text-ink font-sans">{{ $p->status_tanggal ? \Carbon\Carbon::parse($p->status_tanggal)->format('d-m-Y') : '-' }}</p>
                             </div>
                             @if($p->status_keterangan)
                             <div class="space-y-0.5 sm:col-span-2">
