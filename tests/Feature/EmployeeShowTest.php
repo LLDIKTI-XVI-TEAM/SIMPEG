@@ -19,6 +19,7 @@ use App\Models\RankHistory;
 use App\Models\RefAgama;
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
+use App\Models\RefJabatan;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
@@ -369,6 +370,58 @@ class EmployeeShowTest extends TestCase
             ->assertOk()
             ->assertSee('x-text="formatDate(j.tgl_sk)"', false)
             ->assertSee('x-text="formatDate(j.tmt)"', false);
+    }
+
+    public function test_detail_page_serializes_official_history_dates_without_timezone_shift(): void
+    {
+        config(['app.timezone' => 'Asia/Makassar']);
+
+        $employee = $this->employeeWithReferences();
+        $jenisJabatan = RefJenisJabatan::where('nama', 'Struktural')->firstOrFail();
+        $jabatan = RefJabatan::firstOrCreate(
+            ['nama' => 'Analis Payload Date-only'],
+            ['jenis_jabatan_id' => $jenisJabatan->id, 'is_active' => true],
+        );
+        $unitKerja = RefUnitKerja::firstOrFail();
+
+        RankHistory::create([
+            'employee_id' => $employee->id,
+            'golongan_id' => RefGolongan::where('kode', 'III/b')->firstOrFail()->id,
+            'tmt_pangkat' => '2026-09-22',
+            'no_sk' => 'SK-PANGKAT-DATE-ONLY',
+            'tanggal_sk' => '2026-09-22',
+            'is_latest' => true,
+        ]);
+        PositionHistory::create([
+            'employee_id' => $employee->id,
+            'jabatan_id' => $jabatan->id,
+            'nama_jabatan' => $jabatan->nama,
+            'jenis_jabatan_id' => $jenisJabatan->id,
+            'unit_kerja_id' => $unitKerja->id,
+            'tmt_jabatan' => '2026-09-22',
+            'no_sk' => 'SK-JABATAN-DATE-ONLY',
+            'tanggal_sk' => '2026-09-22',
+            'is_latest' => true,
+        ]);
+        SalaryHistory::create([
+            'employee_id' => $employee->id,
+            'tmt_kgb' => '2026-09-22',
+            'gaji_pokok' => 4500000,
+            'no_sk' => 'SK-KGB-DATE-ONLY',
+            'tanggal_sk' => '2026-09-22',
+            'is_latest' => true,
+        ]);
+
+        $response = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk();
+        $content = $response->getContent();
+
+        $this->assertMatchesRegularExpression('/SK-PANGKAT-DATE-ONLY.{0,160}2026-09-22.{0,100}2026-09-22/s', $content);
+        $this->assertMatchesRegularExpression('/SK-JABATAN-DATE-ONLY.{0,160}2026-09-22.{0,100}2026-09-22/s', $content);
+        $this->assertMatchesRegularExpression('/SK-KGB-DATE-ONLY.{0,160}2026-09-22.{0,100}2026-09-22/s', $content);
+        $this->assertStringNotContainsString('2026-09-21T16:00:00', $content);
+        $this->assertStringNotContainsString('2026-09-22T00:00:00', $content);
     }
 
     public function test_detail_page_provides_optional_sk_upload_controls_for_each_history_modal(): void

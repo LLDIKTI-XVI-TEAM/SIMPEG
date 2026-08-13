@@ -28,9 +28,8 @@ class DisciplineRecordPayload
             'created_at',
         ]);
 
-        // Date-only fields must remain calendar dates in API responses. Eloquent's
-        // default JSON serialization may turn them into UTC timestamps, which can
-        // shift the displayed day for time zones ahead of UTC.
+        // Tanggal kalender harus tetap date-only karena serialisasi timestamp UTC
+        // dapat menggeser hari untuk zona waktu di depan UTC.
         $payload['tanggal_mulai'] = $record->tanggal_mulai?->format('Y-m-d');
         $payload['tanggal_berakhir'] = $record->tanggal_berakhir?->format('Y-m-d');
         $payload['tanggal_sk'] = $record->tanggal_sk?->format('Y-m-d');
