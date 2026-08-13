@@ -683,14 +683,14 @@
                     
                     if (this.modalType === 'disiplin') {
                         const r   = result.record;
-                        const fmt = (d) => d ? d.split('-').reverse().join('-') : '-';
                         this.disiplinList.unshift({
                             id:        r.id,
                             jenis:     r.jenis_hukuman,
                             alasan:    r.deskripsi,
                             no_sk:     r.no_sk,
-                            tgl_sk:    fmt(r.tanggal_sk),
-                            masa:      fmt(r.tanggal_mulai) + ' s/d ' + (r.tanggal_berakhir ? fmt(r.tanggal_berakhir) : 'Sekarang'),
+                            tgl_sk:    r.tanggal_sk,
+                            tgl_mulai: r.tanggal_mulai,
+                            tgl_akhir: r.tanggal_berakhir,
                             is_active: r.is_active,
                         });
                         this.newDisiplin = { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '', file_sk: null, dokumen_id: '' };
@@ -1459,8 +1459,8 @@
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
                                     <td class="px-4 py-3 font-bold" x-text="k.gaji"></td>
                                     <td class="px-4 py-3" x-text="k.no_sk"></td>
-                                    <td class="px-4 py-3" x-text="k.tgl_sk"></td>
-                                    <td class="px-4 py-3" x-text="k.tmt"></td>
+                                    <td class="px-4 py-3" x-text="formatDate(k.tgl_sk)"></td>
+                                    <td class="px-4 py-3" x-text="formatDate(k.tmt)"></td>
                                 </tr>
                             </template>
                         </tbody>
@@ -1506,8 +1506,8 @@
                                     </td>
                                     <td class="px-4 py-3" x-text="d.alasan"></td>
                                     <td class="px-4 py-3" x-text="d.no_sk"></td>
-                                    <td class="px-4 py-3" x-text="d.tgl_sk"></td>
-                                    <td class="px-4 py-3" x-text="d.masa"></td>
+                                    <td class="px-4 py-3" x-text="formatDate(d.tgl_sk)"></td>
+                                    <td class="px-4 py-3" x-text="formatDate(d.tgl_mulai) + ' s/d ' + (d.tgl_akhir ? formatDate(d.tgl_akhir) : 'Sekarang')"></td>
                                 </tr>
                             </template>
                             <tr x-show="disiplinList.length === 0">
