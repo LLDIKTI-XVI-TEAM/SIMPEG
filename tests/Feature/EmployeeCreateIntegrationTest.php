@@ -93,6 +93,9 @@ class EmployeeCreateIntegrationTest extends TestCase
         ]);
 
         $employee = Employee::where('nip', '199001012024011001')->first();
+        $this->assertNotNull($employee->status_pegawai_id);
+        $this->assertNull($employee->status_tanggal);
+        $this->assertSame(0, $employee->statusHistories()->count());
 
         $this->assertDatabaseHas('rank_histories', [
             'employee_id' => $employee->id,
