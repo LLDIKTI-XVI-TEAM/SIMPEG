@@ -26,8 +26,10 @@ class UpdateEducationHistoryAction
 
         // Coerce null ke string kosong sebagai safety net sebelum migration dijalankan.
         $data['no_ijazah'] = $data['no_ijazah'] ?? '';
-        if (! empty($data['program_studi_id'])) {
-            $data['jurusan'] = RefProgramStudi::find($data['program_studi_id'])?->nama;
+        if (array_key_exists('program_studi_id', $data)) {
+            $data['jurusan'] = $data['program_studi_id']
+                ? RefProgramStudi::find($data['program_studi_id'])?->nama
+                : null;
         }
 
         $history->update($data);

@@ -146,6 +146,53 @@ class EducationHistoryTest extends TestCase
         $this->assertSame($currentProgramStudi->id, $history->fresh()->program_studi_id);
     }
 
+    public function test_admin_can_clear_program_studi_from_education_history(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $programStudi = RefProgramStudi::create(['nama' => 'Program Studi Untuk Dihapus']);
+        $history = EducationHistory::create(array_merge($this->educationPayload($employee), [
+            'program_studi_id' => $programStudi->id,
+            'jurusan' => $programStudi->nama,
+        ]));
+
+        $response = $this->actingAs($user)->putJsonWithCsrf(
+            $this->endpoint($employee)."/{$history->id}",
+            $this->validPayload(['program_studi_id' => null]),
+        );
+
+        $response->assertOk()
+            ->assertJsonPath('history.program_studi_id', null)
+            ->assertJsonPath('history.program_studi', null)
+            ->assertJsonPath('history.jurusan', null);
+        $this->assertDatabaseHas('education_histories', [
+            'id' => $history->id,
+            'program_studi_id' => null,
+            'jurusan' => null,
+        ]);
+        $this->assertNull($employee->fresh()->program_studi_id);
+        $this->assertNull($employee->fresh()->prodi_pendidikan_terakhir);
+    }
+
+    public function test_admin_can_update_education_history_without_changing_free_text_jurusan(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $history = EducationHistory::create(array_merge($this->educationPayload($employee), [
+            'jurusan' => 'Jurusan Manual',
+        ]));
+        $payload = $this->validPayload(['nama_institusi' => 'Universitas Diperbarui']);
+        unset($payload['jurusan'], $payload['program_studi_id']);
+
+        $response = $this->actingAs($user)->putJsonWithCsrf(
+            $this->endpoint($employee)."/{$history->id}",
+            $payload,
+        );
+
+        $response->assertOk()->assertJsonPath('history.jurusan', 'Jurusan Manual');
+        $this->assertSame('Jurusan Manual', $history->fresh()->jurusan);
+    }
+
     public function test_admin_can_update_employee_education_history(): void
     {
         $user = User::factory()->adminKepegawaian()->create();

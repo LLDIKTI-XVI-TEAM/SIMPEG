@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasUuid;
+use App\Observers\RefProgramStudiObserver;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -11,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *
  * @property bool $is_active
  */
+#[ObservedBy(RefProgramStudiObserver::class)]
 class RefProgramStudi extends Model
 {
     use HasUuid;

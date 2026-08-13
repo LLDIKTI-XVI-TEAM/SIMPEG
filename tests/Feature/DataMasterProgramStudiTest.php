@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\EducationHistory;
 use App\Models\Employee;
+use App\Models\RefJenjangPendidikan;
 use App\Models\RefProgramStudi;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -52,6 +54,39 @@ class DataMasterProgramStudiTest extends TestCase
             ->assertSessionHasErrors('referensi');
 
         $this->assertDatabaseHas('ref_program_studi', ['id' => $programStudi->id]);
+    }
+
+    public function test_renaming_program_studi_syncs_education_and_employee_snapshots(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $programStudi = RefProgramStudi::create(['nama' => 'Nama Lama']);
+        $employee = Employee::factory()->create([
+            'program_studi_id' => $programStudi->id,
+            'prodi_pendidikan_terakhir' => 'Nama Lama',
+        ]);
+        $history = EducationHistory::create([
+            'employee_id' => $employee->id,
+            'jenjang_id' => RefJenjangPendidikan::create([
+                'nama' => 'D4 / S1',
+                'urutan' => 6,
+            ])->id,
+            'program_studi_id' => $programStudi->id,
+            'nama_institusi' => 'Universitas Contoh',
+            'jurusan' => 'Nama Lama',
+            'tahun_lulus' => 2010,
+            'no_ijazah' => 'IJZ-RENAME-001',
+        ]);
+
+        $this->actingAs($user)->postWithCsrf(route('data-master.program-studi.update', $programStudi), [
+            'nama' => 'Nama Baru',
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('ref_program_studi', ['id' => $programStudi->id, 'nama' => 'Nama Baru']);
+        $this->assertDatabaseHas('education_histories', ['id' => $history->id, 'jurusan' => 'Nama Baru']);
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'prodi_pendidikan_terakhir' => 'Nama Baru',
+        ]);
     }
 
     private function postWithCsrf(string $uri, array $data): TestResponse
