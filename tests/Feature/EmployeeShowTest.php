@@ -424,6 +424,31 @@ class EmployeeShowTest extends TestCase
         $this->assertStringNotContainsString('2026-09-22T00:00:00', $content);
     }
 
+    public function test_detail_page_preserves_initial_discipline_period_fields_for_table(): void
+    {
+        $employee = $this->employeeWithReferences();
+        DisciplineRecord::create([
+            'employee_id' => $employee->id,
+            'jenis_hukuman' => 'Sedang',
+            'deskripsi' => 'Pelanggaran uji periode',
+            'tanggal_mulai' => '2026-02-01',
+            'tanggal_berakhir' => '2026-03-01',
+            'no_sk' => 'SK-DISIPLIN-PERIODE',
+            'tanggal_sk' => '2026-01-20',
+            'is_active' => false,
+        ]);
+
+        $content = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertMatchesRegularExpression(
+            '/SK-DISIPLIN-PERIODE.{0,200}"tgl_mulai":"2026-02-01".{0,80}"tgl_akhir":"2026-03-01"/s',
+            $content,
+        );
+    }
+
     public function test_detail_page_provides_optional_sk_upload_controls_for_each_history_modal(): void
     {
         $employee = $this->employeeWithReferences();

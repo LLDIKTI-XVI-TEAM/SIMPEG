@@ -323,8 +323,10 @@ class EmployeeUpdateTest extends TestCase
         ]);
 
         $response = $this->actingAs($user)->putJsonWithCsrf($this->endpoint($employee), $this->validPayload($employee, [
-            'program_studi_id' => null,
-            'clear_program_studi' => true,
+            // Browser form tetap mengirim nilai select yang aktif dan checkbox
+            // HTML sebagai string; flag clear harus tetap menang.
+            'program_studi_id' => $programStudi->id,
+            'clear_program_studi' => '1',
         ]));
 
         $response->assertOk();

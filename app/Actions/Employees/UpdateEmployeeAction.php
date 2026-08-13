@@ -362,11 +362,13 @@ class UpdateEmployeeAction
             $data['status_pegawai_id'] = RefStatusPegawai::where('nama', $data['status_aktif'])->value('id');
         }
 
-        if (! empty($data['program_studi_id'])) {
-            $data['prodi_pendidikan_terakhir'] = RefProgramStudi::find($data['program_studi_id'])?->nama;
-        } elseif (($data['clear_program_studi'] ?? false) === true) {
+        $clearProgramStudi = filter_var($data['clear_program_studi'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+        if ($clearProgramStudi) {
             $data['program_studi_id'] = null;
             $data['prodi_pendidikan_terakhir'] = null;
+        } elseif (! empty($data['program_studi_id'])) {
+            $data['prodi_pendidikan_terakhir'] = RefProgramStudi::find($data['program_studi_id'])?->nama;
         } elseif ($employee !== null) {
             // Form edit selalu mengirim select kosong. Itu bukan intent untuk
             // menghapus snapshot import yang belum memiliki relasi referensi.
