@@ -91,6 +91,7 @@ class EmployeeDeactivateRestoreTest extends TestCase
             ->assertSee('x-show="!filters.show_nonaktif" onclick="exportFilteredData()"', false)
             ->assertSee('x-show="!filters.show_nonaktif" onclick="exportFilteredDataPdf()"', false)
             ->assertSee('x-show="!filters.show_nonaktif" type="button" @click="openDocumentStatus(p)"', false)
+            ->assertSee('aria-label="\'Nonaktifkan pegawai \' + p.nama_lengkap"', false)
             ->assertSee('Data tidak dihapus dan bisa diaktifkan kembali.', false)
             ->assertDontSee('30 hari', false)
             ->assertDontSee('dihapus permanen otomatis', false);
@@ -376,6 +377,8 @@ class EmployeeDeactivateRestoreTest extends TestCase
             ->assertSee('x-show="filters.show_nonaktif"', false)
             ->assertSee('restorePegawai(p.id, p.nama_lengkap)', false)
             ->assertSee("'Aktifkan kembali pegawai ' + p.nama_lengkap", false)
+            ->assertSee('show="showRestoreModal"', false)
+            ->assertSee('confirmRestorePegawai()', false)
             ->assertSee('/api/v1/pegawai/${this.restorePegawaiId}/restore', false)
             // Halaman kelola nonaktif tetap dapat dicapai tanpa mengetik URL manual.
             ->assertSee(route('data-nonaktif'), false);
