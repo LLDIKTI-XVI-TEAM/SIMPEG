@@ -1003,7 +1003,7 @@
                                         </template>
                                         @if($latestRank && $latestRank->file_sk)
                                             <div class="mt-2 text-xs text-muted" x-show="!skPangkatSize">
-                                                Berkas saat ini: <a href="{{ asset('storage/' . $latestRank->file_sk) }}"
+                                                Berkas saat ini: <a href="{{ route('pegawai.history-attachments.download', ['employee' => $p, 'type' => 'rank', 'history' => $latestRank]) }}"
                                                     target="_blank"
                                                     class="text-primary hover:underline font-semibold">{{ basename($latestRank->file_sk) }}</a>
                                             </div>
@@ -1257,7 +1257,7 @@
                                         @if($latestPosition && $latestPosition->file_sk)
                                             <div class="mt-2 text-xs text-muted" x-show="!skJabatanSize">
                                                 Berkas saat ini: <a
-                                                    href="{{ asset('storage/' . $latestPosition->file_sk) }}"
+                                                    href="{{ route('pegawai.history-attachments.download', ['employee' => $p, 'type' => 'position', 'history' => $latestPosition]) }}"
                                                     target="_blank"
                                                     class="text-primary hover:underline font-semibold">{{ basename($latestPosition->file_sk) }}</a>
                                             </div>
@@ -1405,7 +1405,7 @@
                                         </template>
                                         @if($latestSalary && $latestSalary->file_sk)
                                             <div class="mt-2 text-xs text-muted" x-show="!skKgbSize">
-                                                Berkas saat ini: <a href="{{ asset('storage/' . $latestSalary->file_sk) }}"
+                                                Berkas saat ini: <a href="{{ route('pegawai.history-attachments.download', ['employee' => $p, 'type' => 'salary', 'history' => $latestSalary]) }}"
                                                     target="_blank"
                                                     class="text-primary hover:underline font-semibold">{{ basename($latestSalary->file_sk) }}</a>
                                             </div>
@@ -1581,7 +1581,7 @@
                                         @if($p->appointment && $p->appointment->file_sk)
                                             <div class="mt-2 text-xs text-muted" x-show="!skPengangkatanSize">
                                                 Berkas saat ini: <a
-                                                    href="{{ asset('storage/' . $p->appointment->file_sk) }}"
+                                                    href="{{ route('pegawai.history-attachments.download', ['employee' => $p, 'type' => 'appointment', 'history' => $p->appointment]) }}"
                                                     target="_blank"
                                                     class="text-primary hover:underline font-semibold">{{ basename($p->appointment->file_sk) }}</a>
                                             </div>

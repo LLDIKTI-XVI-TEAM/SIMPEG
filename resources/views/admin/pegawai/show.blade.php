@@ -40,10 +40,37 @@
 
         $canCreateEmployeeHistory = auth()->check()
             && auth()->user()->hasPermission('employee_histories.create');
+
+        $detailTabs = [
+            'profile' => 'Profil',
+            'keluarga' => 'Keluarga',
+            'kepangkatan' => 'Kepangkatan',
+            'jabatan' => 'Jabatan',
+            'kgb' => 'KGB',
+            'disiplin' => 'Hukuman Disiplin',
+            'pendidikan' => 'Pendidikan',
+            'pengangkatan' => 'Pengangkatan',
+            'docs' => 'Dokumen SK',
+        ];
+        $requestedDetailTab = request()->query('tab');
+
+        // Query lama atau tidak dikenal harus kembali ke tab pertama agar navigasi tetap dapat difokuskan.
+        $initialDetailTab = is_string($requestedDetailTab) && array_key_exists($requestedDetailTab, $detailTabs)
+            ? $requestedDetailTab
+            : array_key_first($detailTabs);
     @endphp
 
     <div x-data="{
-        activeTab: new URLSearchParams(window.location.search).get('tab') || 'profile',
+        activeTab: @js($initialDetailTab),
+        tabs: {{ \Illuminate\Support\Js::from(array_keys($detailTabs)) }},
+        selectTab(tab) {
+            this.activeTab = tab;
+            this.$nextTick(() => document.getElementById(`admin-tab-${tab}`)?.focus());
+        },
+        moveTab(offset) {
+            const current = this.tabs.indexOf(this.activeTab);
+            this.selectTab(this.tabs[(current + offset + this.tabs.length) % this.tabs.length]);
+        },
         kinerjaBaik: {{ $p->is_kinerja_baik ? 'true' : 'false' }},
         kinerjaEndpoint: @js(route('pegawai.kinerja.update', $p->id)),
         isUpdatingKinerja: false,
@@ -75,13 +102,13 @@
         loadingArsip: false,
         disiplinFileMode: 'arsip',
 
-        keluargaList: {{ ($p->families ?? collect())->map(fn($f) => ['id' => $f->id, 'nama_anggota' => $f->nama_anggota, 'hubungan' => $f->hubungan, 'nik' => auth()->user()->role === 'pimpinan' ? null : $f->nik, 'tempat_lahir' => $f->tempat_lahir, 'tanggal_lahir' => $f->tanggal_lahir, 'jenis_kelamin' => $f->jenis_kelamin === 'P' ? 'Perempuan' : 'Laki-laki', 'pekerjaan' => $f->pekerjaan, 'status' => $f->status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'])->toJson() }},
+        keluargaList: {{ ($p->families ?? collect())->map(fn($f) => ['id' => $f->id, 'nama_anggota' => $f->nama_anggota, 'nik' => $f->nik, 'hubungan' => $f->hubungan, 'tempat_lahir' => $f->tempat_lahir, 'tanggal_lahir' => $f->tanggal_lahir, 'jenis_kelamin' => $f->jenis_kelamin === 'P' ? 'Perempuan' : 'Laki-laki', 'pekerjaan' => $f->pekerjaan, 'status' => $f->status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'])->toJson() }},
         keluargaLoading: false,
         isDeletingKeluarga: false,
         pangkatList: {{ $p->rankHistories->map(fn($r) => ['golongan' => $r->golongan->nama ?? '-', 'no_sk' => $r->no_sk, 'tgl_sk' => $r->tanggal_sk, 'tmt' => $r->tmt_pangkat])->toJson() }},
         jabatanList: {{ $p->positionHistories->map(fn($j) => ['jabatan' => $j->jabatan?->nama ?? $j->nama_jabatan, 'unit' => $j->unitKerja->nama ?? '-', 'kelas_jabatan' => $j->kelas_jabatan, 'no_sk' => $j->no_sk, 'tgl_sk' => $j->tanggal_sk, 'tmt' => $j->tmt_jabatan])->toJson() }},
-        kgbList: {{ $p->salaryHistories->map(fn($s) => ['gaji' => 'Rp ' . number_format($s->gaji_pokok, 0, ',', '.'), 'no_sk' => $s->no_sk, 'tgl_sk' => $s->tanggal_sk, 'tmt' => $s->tmt_kgb])->toJson() }},
-        disiplinList: {{ $p->disciplineRecords->map(fn($d) => ['id' => $d->id, 'jenis' => $d->jenis_hukuman, 'alasan' => $d->deskripsi, 'no_sk' => $d->no_sk, 'tgl_sk' => $d->tanggal_sk ? \Carbon\Carbon::parse($d->tanggal_sk)->format('d-m-Y') : '-', 'masa' => ($d->tanggal_mulai ? \Carbon\Carbon::parse($d->tanggal_mulai)->format('d-m-Y') : '-') . ' s/d ' . ($d->tanggal_berakhir ? \Carbon\Carbon::parse($d->tanggal_berakhir)->format('d-m-Y') : 'Sekarang'), 'is_active' => $d->is_active])->toJson() }},
+        kgbList: {{ $p->salaryHistories->map(fn($s) => ['gaji' => 'Rp ' . number_format($s->gaji_pokok, 0, ',', '.'), 'no_sk' => $s->no_sk, 'tgl_sk' => $s->tanggal_sk?->format('Y-m-d'), 'tmt' => $s->tmt_kgb?->format('Y-m-d')])->toJson() }},
+        disiplinList: {{ $p->disciplineRecords->map(fn($d) => ['id' => $d->id, 'jenis' => $d->jenis_hukuman, 'alasan' => $d->deskripsi, 'no_sk' => $d->no_sk, 'tgl_sk' => $d->tanggal_sk ? \Carbon\Carbon::parse($d->tanggal_sk)->format('d-m-Y') : '-', 'masa' => ($d->tanggal_mulai ? \Carbon\Carbon::parse($d->tanggal_mulai)->format('d-m-Y') : '-') . ' s/d ' . ($d->tanggal_berakhir ? \Carbon\Carbon::parse($d->tanggal_berakhir)->format('d-m-Y') : 'Sekarang'), 'is_active' => $d->is_active, 'download_url' => $d->file_sk ? route('pegawai.history-attachments.download', ['employee' => $p, 'type' => 'discipline', 'history' => $d]) : null])->toJson() }},
         pendidikanList: {{ ($p->educationHistories ?? collect())->map(fn($e) => ['id' => $e->id, 'jenjang_id' => $e->jenjang_id, 'tingkat' => $e->jenjang?->urutan ?? $e->tingkat ?? '-', 'institusi' => $e->nama_institusi ?? '-', 'prodi' => $e->jurusan ?? '-', 'lulus' => $e->tahun_lulus ?? '-', 'no_ijazah' => $e->no_ijazah ?? '-'])->toJson() }},
         pendidikanLoading: false,
         showEditPendidikan: false,
@@ -446,8 +473,8 @@
                 this.keluargaList = (json.families ?? []).map(f => ({
                     id:            f.id,
                     nama_anggota:  f.nama_anggota,
-                    hubungan:      f.hubungan,
                     nik:           f.nik,
+                    hubungan:      f.hubungan,
                     tempat_lahir:  f.tempat_lahir,
                     tanggal_lahir: f.tanggal_lahir,
                     jenis_kelamin: f.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan',
@@ -730,8 +757,8 @@
                         this.keluargaList.unshift({
                             id: f.id,
                             nama_anggota: f.nama_anggota,
-                            hubungan: f.hubungan,
                             nik: f.nik,
+                            hubungan: f.hubungan,
                             tempat_lahir: f.tempat_lahir,
                             tanggal_lahir: f.tanggal_lahir,
                             jenis_kelamin: f.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan',
@@ -778,26 +805,10 @@
         }
     }" class="mx-auto max-w-5xl space-y-6">
         
-        {{-- BREADCRUMBS & DYNAMIC ALERT --}}
-        {{-- BREADCRUMBS & TOP HEADER ACTIONS --}}
-        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-2">
-            <div>
-                <h2 class="mb-1 text-2xl font-extrabold text-ink tracking-tight font-sans">Detail Pegawai</h2>
-                <nav class="flex items-center gap-1.5 text-xs text-muted mb-4">
-                    <a href="{{ auth()->user()->role === 'pimpinan' ? route('pimpinan.dashboard') : route('dashboard') }}" wire:navigate class="transition-colors hover:text-ink">Dashboard</a>
-                    <span>/</span>
-                    <a href="{{ auth()->user()->role === 'pimpinan' ? route('pimpinan.pegawai.index') : route('data-pegawai') }}" wire:navigate class="transition-colors hover:text-ink">Data Pegawai</a>
-                    <span>/</span>
-                    <span class="font-medium text-ink">Detail Pegawai</span>
-                </nav>
-            </div>
-            <div class="flex items-center gap-3 shrink-0">
-                <a href="javascript:void(0)" onclick="if(document.referrer.includes(window.location.hostname)) { history.back(); } else { window.location.href = '{{ auth()->user()->role === 'pimpinan' ? route('pimpinan.pegawai.index') : route('data-pegawai') }}'; }" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-soft shadow-sm">
-                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
-                    </svg>
-                    Kembali
-                </a>
+        <x-pegawai.detail.page-header
+            :dashboard-url="route('dashboard')"
+            :employees-url="route('data-pegawai')"
+        >
                 @if(auth()->user()->role !== 'pimpinan')
                 <a href="{{ route('pegawai.edit', $p->id) }}" wire:navigate class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm">
                     <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -812,8 +823,7 @@
                     Nonaktifkan
                 </button>
                 @endif
-            </div>
-        </div>
+        </x-pegawai.detail.page-header>
 
         @if (session('success'))
             <x-ui.alert variant="success" class="mb-4">{{ session('success') }}</x-ui.alert>
@@ -838,71 +848,38 @@
         </div>
 
         {{-- MAIN DETAIL CARD --}}
-        <div class="rounded-lg border border-border bg-surface p-6 shadow-sm space-y-6">
+        <x-pegawai.detail.shell>
             @php
                 $fotoUrl = $p->foto_url;
             @endphp
-            
+
             {{-- Header info --}}
-            <div class="border-b border-border pb-6 flex items-center justify-between gap-4">
-                <div class="flex items-center gap-4">
-                    <div class="h-16 w-16 rounded-full border border-border bg-soft flex items-center justify-center overflow-hidden shrink-0">
-                        @if($fotoUrl)
-                            <img
-                                src="{{ $fotoUrl }}"
-                                alt="Foto {{ $p->nama_dengan_gelar ?? $p->nama_lengkap }}"
-                                class="h-full w-full object-cover object-[center_25%]"
-                            >
-                        @else
-                            <div class="flex h-full w-full items-center justify-center bg-primary/10 text-xl font-bold text-primary font-sans uppercase">
-                                {{ strtoupper(substr($p->nama_dengan_gelar ?? $p->nama_lengkap, 0, 1)) }}
-                            </div>
-                        @endif
-                    </div>
-                    <div class="min-w-0">
-                        <div class="flex flex-wrap items-center gap-2">
-                            <h2 class="text-xl font-bold text-ink font-sans leading-tight">{{ $p->nama_dengan_gelar ?? $p->nama_lengkap }}</h2>
-                        </div>
-                        @if($p->nama_dengan_gelar)
-                            <p class="text-xs text-muted font-sans mt-0.5">{{ $p->nama_lengkap }}</p>
-                        @endif
-                        <p class="text-xs text-muted">NIP. {{ $p->nip }}</p>
-                        <div class="flex items-center gap-2 mt-1.5">
-                            <x-ui.badge variant="primary" size="md" class="!font-bold">
-                                {{ $p->jenisPegawai->nama ?? '-' }}
-                            </x-ui.badge>
-                            <template x-if="kinerjaBaik">
-                                <x-ui.badge variant="success" size="md" class="!font-bold">
-                                    Kinerja Baik
-                                </x-ui.badge>
-                            </template>
-                            @if($p->is_kepala_lembaga)
-                                <x-ui.badge variant="primary" size="md" class="!font-bold">
-                                    Kepala Lembaga
-                                </x-ui.badge>
-                            @endif
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <x-pegawai.detail.identity-header
+                :employee="$p"
+                :photo-url="$fotoUrl"
+                :primary-badge-label="$p->jenisPegawai->nama ?? '-'"
+            >
+                <x-slot:badges>
+                    <template x-if="kinerjaBaik">
+                        <x-ui.badge variant="success" size="md" class="!font-bold">
+                            Kinerja Baik
+                        </x-ui.badge>
+                    </template>
+                    @if($p->is_kepala_lembaga)
+                        <x-ui.badge variant="primary" size="md" class="!font-bold">
+                            Kepala Lembaga
+                        </x-ui.badge>
+                    @endif
+                </x-slot:badges>
+            </x-pegawai.detail.identity-header>
 
             {{-- TAB NAVIGATION --}}
-            <div class="border-b border-border flex gap-4 md:gap-6 overflow-x-auto pb-1 select-none" aria-label="Navigasi detail pegawai" aria-orientation="vertical">
-                <button @click="activeTab = 'profile'" :class="activeTab === 'profile' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Profil</button>
-                <button @click="activeTab = 'keluarga'" :class="activeTab === 'keluarga' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Keluarga</button>
-                <button @click="activeTab = 'kepangkatan'" :class="activeTab === 'kepangkatan' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Kepangkatan</button>
-                <button @click="activeTab = 'jabatan'" :class="activeTab === 'jabatan' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Jabatan</button>
-                <button @click="activeTab = 'kgb'" :class="activeTab === 'kgb' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">KGB</button>
-                <button @click="activeTab = 'disiplin'" :class="activeTab === 'disiplin' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Hukuman Disiplin</button>
-                <button @click="activeTab = 'pendidikan'" :class="activeTab === 'pendidikan' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Pendidikan</button>
-                <button @click="activeTab = 'pengangkatan'" :class="activeTab === 'pengangkatan' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Pengangkatan</button>
-                <button @click="activeTab = 'docs'" :class="activeTab === 'docs' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Dokumen SK</button>
-            </div>
+            <x-pegawai.detail.tabs :tabs="$detailTabs" id-prefix="admin" />
 
             <p class="history-export-unavailable hidden">Ekspor riwayat tidak tersedia</p>
 
             {{-- TAB 1: PROFIL LENGKAP --}}
-            <div id="pimpinan-panel-info" aria-controls="pimpinan-panel-info" x-show="activeTab === 'profile'" class="space-y-6" x-transition>
+            <x-pegawai.detail.panel tab="profile" id-prefix="admin">
                 
                 {{-- Toggle Flag Kinerja & Kepala Bagian --}}
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-soft/40 rounded-lg p-4 border border-border">
@@ -1186,7 +1163,7 @@
                                 <span class="font-semibold text-muted font-sans">Berkas SK Status</span>
                                 @if($p->status_berkas_path)
                                     <p class="text-ink font-sans">
-                                        <a href="{{ asset('storage/'.$p->status_berkas_path) }}" target="_blank" class="text-primary hover:underline font-semibold">
+                                        <a href="{{ route('pegawai.history-attachments.download', ['employee' => $p, 'type' => $latestStatusHistory?->file_sk ? 'status' : 'status-snapshot', 'history' => $latestStatusHistory?->file_sk ? $latestStatusHistory : $p]) }}" target="_blank" class="text-primary hover:underline font-semibold">
                                             {{ $p->status_nomor_berkas ?? 'Lihat Berkas' }}
                                         </a>
                                     </p>
@@ -1230,19 +1207,19 @@
                     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-xs">
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">Jabatan Sekarang</span>
-                            <p class="text-ink font-sans font-bold">{{ $p->latestPosition()?->jabatan?->nama ?? $p->latestPosition()?->nama_jabatan ?? $p->jabatan_terakhir ?? '-' }}</p>
+                            <p class="text-ink font-sans font-bold">{{ $latestPosition?->jabatan?->nama ?? $latestPosition?->nama_jabatan ?? $p->jabatan_terakhir ?? '-' }}</p>
                         </div>
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">Unit Kerja</span>
-                            <p class="text-ink font-sans">{{ $p->latestPosition()->unitKerja->nama ?? '-' }}</p>
+                            <p class="text-ink font-sans">{{ $latestPosition?->unitKerja?->nama ?? '-' }}</p>
                         </div>
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">Pangkat</span>
-                            <p class="text-ink font-sans font-bold">{{ $p->latestRank()->golongan->nama ?? $p->pangkat_terakhir ?? '-' }}</p>
+                            <p class="text-ink font-sans font-bold">{{ $latestRank?->golongan?->nama ?? $p->pangkat_terakhir ?? '-' }}</p>
                         </div>
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">Golongan Saat Ini</span>
-                            <p class="text-ink font-sans font-bold">{{ $p->latestRank()->golongan->kode ?? $p->golongan_terakhir ?? '-' }}</p>
+                            <p class="text-ink font-sans font-bold">{{ $latestRank?->golongan?->kode ?? $p->golongan_terakhir ?? '-' }}</p>
                         </div>
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">Kelas Jabatan</span>
@@ -1250,14 +1227,14 @@
                         </div>
                         <div class="space-y-0.5">
                             <span class="font-semibold text-muted font-sans">TMT Golongan</span>
-                            <p class="text-ink">{{ $p->latestRank()?->tmt_pangkat ? \Carbon\Carbon::parse($p->latestRank()->tmt_pangkat)->format('d-m-Y') : '-' }}</p>
+                            <p class="text-ink">{{ $latestRank?->tmt_pangkat ? \Carbon\Carbon::parse($latestRank->tmt_pangkat)->format('d-m-Y') : '-' }}</p>
                         </div>
                     </div>
                 </div>
-            </div>
+            </x-pegawai.detail.panel>
 
             {{-- TAB 2: DATA KELUARGA --}}
-            <div x-show="activeTab === 'keluarga'" class="space-y-4" style="display: none;" x-transition>
+            <x-pegawai.detail.panel tab="keluarga" id-prefix="admin">
                 <div class="flex items-center justify-between">
                     <div>
                         <h3 class="text-sm font-bold text-ink font-sans">Data Keluarga</h3>
@@ -1282,41 +1259,15 @@
                     Memuat data keluarga...
                 </div>
 
-                <div x-show="!keluargaLoading" class="overflow-x-auto rounded-lg border border-border">
-                    <table class="w-full">
-                        <thead class="bg-soft border-b border-border">
-                            <tr class="text-left text-xs font-semibold text-muted uppercase tracking-wide font-sans">
-                                <th class="px-4 py-3">Nama Lengkap & NIK</th>
-                                <th class="px-4 py-3">Hubungan</th>
-                                <th class="px-4 py-3">TTL</th>
-                                <th class="px-4 py-3">Pekerjaan</th>
-                                <th class="px-4 py-3">Status</th>
-                                @if(auth()->user()->role !== 'pimpinan')
-                                        <th class="px-4 py-3 text-right">Aksi</th>
-                                        @endif
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border text-xs font-sans">
+                <x-pegawai.detail.table
+                    name="keluarga"
+                    :headings="['Nama Lengkap & NIK', 'Hubungan', 'TTL', 'Pekerjaan', 'Status']"
+                    :show-actions="auth()->user()->role !== 'pimpinan'"
+                    x-show="!keluargaLoading"
+                >
                             <template x-for="(fam, index) in keluargaList" :key="fam.id">
-                                <tr class="transition-colors hover:bg-soft/30 text-ink">
-                                    <td class="px-4 py-3">
-                                        <p class="font-bold font-sans" x-text="fam.nama_anggota"></p>
-                                        <p class="text-[10px] text-muted" x-text="fam.nik ? 'NIK. ' + fam.nik : 'NIK. -'"></p>
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <p class="font-sans" x-text="fam.hubungan"></p>
-                                        <p class="text-[10px] text-muted font-sans" x-text="fam.jenis_kelamin"></p>
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <p class="font-sans" x-text="fam.tempat_lahir || '-'"></p>
-                                        <p class="text-[10px] text-muted" x-text="formatDate(fam.tanggal_lahir)"></p>
-                                    </td>
-                                    <td class="px-4 py-3 font-sans" x-text="fam.pekerjaan || '-'"></td>
-                                    <td class="px-4 py-3">
-                                        <span class="inline-flex items-center gap-1 text-[10px] font-bold"
-                                              :class="fam.status === 'Ditanggung' ? 'text-success' : 'text-muted'"
-                                              x-text="fam.status"></span>
-                                    </td>
+                                <tr class="transition-colors hover:bg-soft/30 text-ink" data-family-readonly-row>
+                                    @include('pegawai.partials.detail.family-readonly-cells', ['mode' => 'alpine'])
                                     @if(auth()->user()->role !== 'pimpinan')
                                             <td class="px-4 py-3 text-right">
                                         <button
@@ -1340,13 +1291,11 @@
                                     Pegawai ini belum memiliki data anggota keluarga.
                                 </td>
                             </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                </x-pegawai.detail.table>
+            </x-pegawai.detail.panel>
 
             {{-- TAB 3: RIWAYAT KEPANGKATAN --}}
-            <div x-show="activeTab === 'kepangkatan'" class="space-y-4" style="display: none;" x-transition>
+            <x-pegawai.detail.panel tab="kepangkatan" id-prefix="admin">
                 <div class="flex items-center justify-between">
                     <div>
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Kepangkatan & Golongan</h3>
@@ -1361,17 +1310,10 @@
                         </button>
                     @endif
                 </div>
-                <div class="overflow-x-auto rounded-lg border border-border">
-                    <table class="w-full">
-                        <thead class="bg-soft border-b border-border">
-                            <tr class="text-left text-xs font-semibold text-muted uppercase tracking-wide font-sans">
-                                <th class="px-4 py-3">Golongan</th>
-                                <th class="px-4 py-3">Nomor SK Pangkat</th>
-                                <th class="px-4 py-3">Tanggal SK</th>
-                                <th class="px-4 py-3">TMT Pangkat</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border text-xs font-sans">
+                <x-pegawai.detail.table
+                    name="kepangkatan"
+                    :headings="['Golongan', 'Nomor SK Pangkat', 'Tanggal SK', 'TMT Pangkat']"
+                >
                             <template x-for="p in pangkatList" :key="p.no_sk">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
                                     <td class="px-4 py-3 font-bold" x-text="p.golongan"></td>
@@ -1380,13 +1322,16 @@
                                     <td class="px-4 py-3" x-text="formatDate(p.tmt)"></td>
                                 </tr>
                             </template>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                            <tr x-show="pangkatList.length === 0">
+                                <td colspan="4" class="px-4 py-6 text-center font-semibold text-muted">
+                                    Pegawai ini belum memiliki riwayat kepangkatan.
+                                </td>
+                            </tr>
+                </x-pegawai.detail.table>
+            </x-pegawai.detail.panel>
 
             {{-- TAB 4: RIWAYAT JABATAN --}}
-            <div x-show="activeTab === 'jabatan'" class="space-y-4" style="display: none;" x-transition>
+            <x-pegawai.detail.panel tab="jabatan" id-prefix="admin">
                 <div class="flex items-center justify-between">
                     <div>
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Jabatan & Struktural</h3>
@@ -1401,18 +1346,10 @@
                         </button>
                     @endif
                 </div>
-                <div class="overflow-x-auto rounded-lg border border-border">
-                    <table class="w-full">
-                        <thead class="bg-soft border-b border-border">
-                            <tr class="text-left text-xs font-semibold text-muted uppercase tracking-wide font-sans">
-                                <th class="px-4 py-3">Nama Jabatan</th>
-                                <th class="px-4 py-3">Unit Kerja</th>
-                                <th class="px-4 py-3">Nomor SK Jabatan</th>
-                                <th class="px-4 py-3">Tanggal SK</th>
-                                <th class="px-4 py-3">TMT Jabatan</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border text-xs font-sans">
+                <x-pegawai.detail.table
+                    name="jabatan"
+                    :headings="['Nama Jabatan', 'Unit Kerja', 'Nomor SK Jabatan', 'Tanggal SK', 'TMT Jabatan']"
+                >
                             <template x-for="j in jabatanList" :key="j.no_sk">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
                                     <td class="px-4 py-3 font-bold" x-text="j.jabatan"></td>
@@ -1422,13 +1359,16 @@
                                     <td class="px-4 py-3" x-text="formatDate(j.tmt)"></td>
                                 </tr>
                             </template>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                            <tr x-show="jabatanList.length === 0">
+                                <td colspan="5" class="px-4 py-6 text-center font-semibold text-muted">
+                                    Pegawai ini belum memiliki riwayat jabatan.
+                                </td>
+                            </tr>
+                </x-pegawai.detail.table>
+            </x-pegawai.detail.panel>
 
             {{-- TAB 5: RIWAYAT KGB --}}
-            <div x-show="activeTab === 'kgb'" class="space-y-4" style="display: none;" x-transition>
+            <x-pegawai.detail.panel tab="kgb" id-prefix="admin">
                 <div class="flex items-center justify-between">
                     <div>
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Kenaikan Gaji Berkala (KGB)</h3>
@@ -1443,32 +1383,28 @@
                         </button>
                     @endif
                 </div>
-                <div class="overflow-x-auto rounded-lg border border-border">
-                    <table class="w-full">
-                        <thead class="bg-soft border-b border-border">
-                            <tr class="text-left text-xs font-semibold text-muted uppercase tracking-wide font-sans">
-                                <th class="px-4 py-3">Gaji Pokok Baru</th>
-                                <th class="px-4 py-3">Nomor Surat KGB</th>
-                                <th class="px-4 py-3">Tanggal Surat</th>
-                                <th class="px-4 py-3">TMT KGB</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border text-xs font-sans">
+                <x-pegawai.detail.table
+                    name="kgb"
+                    :headings="['Gaji Pokok Baru', 'Nomor Surat KGB', 'Tanggal Surat', 'TMT KGB']"
+                >
                             <template x-for="k in kgbList" :key="k.no_sk">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
                                     <td class="px-4 py-3 font-bold" x-text="k.gaji"></td>
                                     <td class="px-4 py-3" x-text="k.no_sk"></td>
-                                    <td class="px-4 py-3" x-text="k.tgl_sk"></td>
-                                    <td class="px-4 py-3" x-text="k.tmt"></td>
+                                    <td class="px-4 py-3" x-text="formatDate(k.tgl_sk)"></td>
+                                    <td class="px-4 py-3" x-text="formatDate(k.tmt)"></td>
                                 </tr>
                             </template>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                            <tr x-show="kgbList.length === 0">
+                                <td colspan="4" class="px-4 py-6 text-center font-semibold text-muted">
+                                    Pegawai ini belum memiliki riwayat KGB.
+                                </td>
+                            </tr>
+                </x-pegawai.detail.table>
+            </x-pegawai.detail.panel>
 
             {{-- TAB 6: HUKUMAN DISIPLIN --}}
-            <div x-show="activeTab === 'disiplin'" class="space-y-4" style="display: none;" x-transition>
+            <x-pegawai.detail.panel tab="disiplin" id-prefix="admin">
                 <div class="flex items-center justify-between">
                     <div>
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Hukuman Disiplin</h3>
@@ -1483,18 +1419,10 @@
                     </button>
                             @endif
                 </div>
-                <div class="overflow-x-auto rounded-lg border border-border">
-                    <table class="w-full">
-                        <thead class="bg-soft border-b border-border">
-                            <tr class="text-left text-xs font-semibold text-muted uppercase tracking-wide font-sans">
-                                <th class="px-4 py-3">Jenis Hukuman</th>
-                                <th class="px-4 py-3">Alasan / Pelanggaran</th>
-                                <th class="px-4 py-3">Nomor SK</th>
-                                <th class="px-4 py-3">Tanggal SK</th>
-                                <th class="px-4 py-3">Masa Berlaku</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border text-xs font-sans">
+                <x-pegawai.detail.table
+                    name="disiplin"
+                    :headings="['Jenis Hukuman', 'Alasan / Pelanggaran', 'Nomor SK', 'Tanggal SK', 'Masa Berlaku', 'Berkas']"
+                >
                             <template x-for="d in disiplinList" :key="d.id">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
                                     <td class="px-4 py-3">
@@ -1507,20 +1435,22 @@
                                     <td class="px-4 py-3" x-text="d.no_sk"></td>
                                     <td class="px-4 py-3" x-text="d.tgl_sk"></td>
                                     <td class="px-4 py-3" x-text="d.masa"></td>
+                                    <td class="px-4 py-3">
+                                        <a x-show="d.download_url" :href="d.download_url" class="font-semibold text-primary hover:underline">Unduh SK</a>
+                                        <span x-show="!d.download_url" class="text-muted">-</span>
+                                    </td>
                                 </tr>
                             </template>
                             <tr x-show="disiplinList.length === 0">
-                                <td colspan="5" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
+                                <td colspan="6" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
                                     Pegawai ini tidak memiliki riwayat hukuman disiplin.
                                 </td>
                             </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                </x-pegawai.detail.table>
+            </x-pegawai.detail.panel>
 
             {{-- TAB 7: RIWAYAT PENDIDIKAN --}}
-            <div x-show="activeTab === 'pendidikan'" class="space-y-4" style="display: none;" x-transition>
+            <x-pegawai.detail.panel tab="pendidikan" id-prefix="admin">
                 <div class="flex items-center justify-between">
                     <div>
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Pendidikan Formal</h3>
@@ -1544,21 +1474,12 @@
                     Memuat riwayat pendidikan...
                 </div>
 
-                <div x-show="!pendidikanLoading" class="overflow-x-auto rounded-lg border border-border">
-                    <table class="w-full">
-                        <thead class="bg-soft border-b border-border">
-                            <tr class="text-left text-xs font-semibold text-muted uppercase tracking-wide font-sans">
-                                <th class="px-4 py-3">Jenjang</th>
-                                <th class="px-4 py-3">Nama Institusi</th>
-                                <th class="px-4 py-3">Program Studi</th>
-                                <th class="px-4 py-3">Tahun Lulus</th>
-                                <th class="px-4 py-3">Nomor Ijazah</th>
-                                @if(auth()->user()->role !== 'pimpinan')
-                                        <th class="px-4 py-3 text-right">Aksi</th>
-                                        @endif
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border text-xs font-sans">
+                <x-pegawai.detail.table
+                    name="pendidikan"
+                    :headings="['Jenjang', 'Nama Institusi', 'Program Studi', 'Tahun Lulus', 'Nomor Ijazah']"
+                    :show-actions="auth()->user()->role !== 'pimpinan'"
+                    x-show="!pendidikanLoading"
+                >
                             <template x-for="(edu, index) in pendidikanList" :key="edu.id ?? edu.no_ijazah">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
                                     <td class="px-4 py-3 font-bold" x-text="edu.tingkat ?? edu.jenjang?.nama ?? '-'"></td>
@@ -1598,53 +1519,20 @@
                                     Pegawai ini belum memiliki riwayat pendidikan formal.
                                 </td>
                             </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                </x-pegawai.detail.table>
+            </x-pegawai.detail.panel>
 
             {{-- TAB 8: DATA PENGANGKATAN --}}
-            <div x-show="activeTab === 'pengangkatan'" class="space-y-4" style="display: none;" x-transition>
+            <x-pegawai.detail.panel tab="pengangkatan" id-prefix="admin">
                 <div>
                     <h3 class="text-sm font-bold text-ink font-sans">Data & SK Pengangkatan Pertama</h3>
                     <p class="text-xs text-muted font-sans mt-0.5">Berkas dasar penerimaan kepegawaian sebagai CPNS/PNS/PPPK.</p>
                 </div>
-                <div class="rounded-lg border border-border bg-soft/30 p-4">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs font-sans">
-                        <div class="space-y-2">
-                            <div class="flex justify-between border-b border-border pb-1">
-                                <span class="font-semibold text-muted">Jenis Pengangkatan:</span>
-                                <span class="text-ink font-bold">{{ $p->appointment->jenis_pengangkatan ?? '-' }}</span>
-                            </div>
-                            <div class="flex justify-between border-b border-border pb-1">
-                                <span class="font-semibold text-muted">Nomor SK Pengangkatan:</span>
-                                <span class="text-ink font-bold">{{ $p->appointment->no_sk ?? '-' }}</span>
-                            </div>
-                            <div class="flex justify-between border-b border-border pb-1">
-                                <span class="font-semibold text-muted">Tanggal SK Terbit:</span>
-                                <span class="text-ink">{{ $p->appointment?->tanggal_sk ? \Carbon\Carbon::parse($p->appointment->tanggal_sk)->format('d-m-Y') : '-' }}</span>
-                            </div>
-                        </div>
-                        <div class="space-y-2">
-                            <div class="flex justify-between border-b border-border pb-1">
-                                <span class="font-semibold text-muted">TMT Pengangkatan:</span>
-                                <span class="text-ink font-bold">{{ $p->appointment?->tmt_pengangkatan ? \Carbon\Carbon::parse($p->appointment->tmt_pengangkatan)->format('d-m-Y') : '-' }}</span>
-                            </div>
-                            <div class="flex justify-between border-b border-border pb-1">
-                                <span class="font-semibold text-muted">Pejabat yang Menetapkan:</span>
-                                <span class="text-ink font-semibold">Kepala LLDIKTI Wilayah XVI</span>
-                            </div>
-                            <div class="flex justify-between border-b border-border pb-1">
-                                <span class="font-semibold text-muted">Status Dokumen:</span>
-                                <x-ui.badge variant="success" size="md" class="!font-bold">Verified</x-ui.badge>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+                @include('pegawai.partials.detail.appointment-readonly', ['appointment' => $p->appointment])
+            </x-pegawai.detail.panel>
 
             {{-- TAB 9: DOKUMEN & SK --}}
-            <div x-show="activeTab === 'docs'" style="display: none;" class="space-y-4" x-transition>
+            <x-pegawai.detail.panel tab="docs" id-prefix="admin">
                 <div class="flex items-start justify-between gap-3">
                     <div>
                         <h3 class="text-sm font-bold text-ink font-sans">Daftar Dokumen & Berkas Pegawai</h3>
@@ -1777,19 +1665,11 @@
                 @endcan
 
                 {{-- Tabel Dokumen (Alpine reactive) --}}
-                <div class="overflow-x-auto rounded-lg border border-border">
-                    <table class="w-full">
-                        <thead class="bg-soft border-b border-border">
-                            <tr class="text-left text-xs font-semibold text-muted uppercase tracking-wide font-sans">
-                                <th class="px-4 py-3">Nama Dokumen</th>
-                                <th class="px-4 py-3">Kategori</th>
-                                <th class="px-4 py-3">Nomor Dokumen</th>
-                                <th class="px-4 py-3">Tanggal Terbit</th>
-                                <th class="px-4 py-3">Ukuran</th>
-                                <th class="px-4 py-3">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-border text-xs font-sans text-ink">
+                <x-pegawai.detail.table
+                    name="docs"
+                    :headings="['Nama Dokumen', 'Kategori', 'Nomor Dokumen', 'Tanggal Terbit', 'Ukuran']"
+                    :show-actions="true"
+                >
                             <template x-if="dokumenList.length === 0">
                                 <tr>
                                     <td colspan="6" class="px-4 py-6 text-center text-muted font-sans">
@@ -1836,12 +1716,10 @@
                                     </td>
                                 </tr>
                             </template>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                </x-pegawai.detail.table>
+            </x-pegawai.detail.panel>
 
-        </div>
+        </x-pegawai.detail.shell>
 
         {{-- MODAL DYNAMIC FORM --}}
         <div x-show="showModal" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;" x-transition>
@@ -2439,12 +2317,9 @@
                                     {{ Str::limit($history->keterangan, 100) }}
                                 </p>
                                 @endif
-                                @php
-                                    $currentFile = $history->document?->file_path ?? $history->file_sk;
-                                @endphp
-                                @if($currentFile)
+                                @if($history->file_sk)
                                 <p class="pt-1">
-                                    <a href="{{ asset('storage/'.$currentFile) }}" target="_blank" class="inline-flex items-center gap-1 text-primary hover:underline font-semibold text-[11px]">
+                                    <a href="{{ route('pegawai.history-attachments.download', ['employee' => $p, 'type' => 'status', 'history' => $history]) }}" target="_blank" class="inline-flex items-center gap-1 text-primary hover:underline font-semibold text-[11px]">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                                         </svg>

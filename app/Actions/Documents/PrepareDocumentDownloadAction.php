@@ -8,9 +8,19 @@ use Illuminate\Support\Str;
 
 class PrepareDocumentDownloadAction
 {
-    public function execute(string $id): array
+    /**
+     * Menyiapkan file unduhan dengan pembatas pegawai dan kategori sesuai surface pemanggil.
+     *
+     * @param  list<string>|null  $allowedCategories
+     * @return array{path: string, filename: string}
+     */
+    public function execute(string $id, ?string $employeeId = null, ?array $allowedCategories = null): array
     {
-        $document = Document::with('employee')->findOrFail($id);
+        $document = Document::query()
+            ->with('employee:id,nama_lengkap')
+            ->when($employeeId, fn ($query) => $query->where('employee_id', $employeeId))
+            ->when($allowedCategories !== null, fn ($query) => $query->whereIn('jenis_dokumen', $allowedCategories))
+            ->findOrFail($id);
 
         if (! Storage::disk(Document::STORAGE_DISK)->exists($document->file_path)) {
             abort(404);

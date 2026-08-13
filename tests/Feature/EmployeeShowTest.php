@@ -77,6 +77,29 @@ class EmployeeShowTest extends TestCase
             ->assertJsonPath('employee.id', $employee->id);
     }
 
+    public function test_detail_admin_fallback_ke_profil_saat_query_tab_legacy_atau_tidak_valid(): void
+    {
+        $employee = $this->employeeWithReferences();
+        $admin = User::factory()->adminKepegawaian()->create();
+
+        foreach (['info', 'tab-tidak-valid'] as $invalidTab) {
+            $this->actingAs($admin)
+                ->get(route('pegawai.show', $employee).'?tab='.$invalidTab)
+                ->assertOk()
+                ->assertSee("activeTab: 'profile'", false);
+        }
+    }
+
+    public function test_detail_admin_mempertahankan_query_tab_yang_valid(): void
+    {
+        $employee = $this->employeeWithReferences();
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee).'?tab=keluarga')
+            ->assertOk()
+            ->assertSee("activeTab: 'keluarga'", false);
+    }
+
     public function test_employee_detail_page_prioritizes_manual_retirement_date_and_falls_back_to_bup(): void
     {
         EwsConfig::setVal('pensiun_required_age_years', '60');
@@ -133,6 +156,54 @@ class EmployeeShowTest extends TestCase
             ->assertSee('15-06-2035', false)
             ->assertDontSee('01-04-2024', false)
             ->assertDontSee('01-01-2022', false);
+    }
+
+    public function test_detail_admin_tidak_memakai_riwayat_non_latest_sebagai_snapshot_pekerjaan(): void
+    {
+        $employee = $this->employeeWithReferences([
+            'pangkat_terakhir' => 'Pangkat Snapshot Marker',
+            'golongan_terakhir' => 'GOL-SNAPSHOT',
+            'jabatan_terakhir' => 'Jabatan Snapshot Marker',
+        ]);
+        $historicalRank = RefGolongan::create([
+            'kode' => 'HIST/Z',
+            'nama' => 'Pangkat Historis Nonlatest Marker',
+            'urutan' => 999,
+        ]);
+        RankHistory::create([
+            'employee_id' => $employee->id,
+            'golongan_id' => $historicalRank->id,
+            'tmt_pangkat' => '2099-01-01',
+            'no_sk' => 'SK-HIST-RANK-NONLATEST',
+            'tanggal_sk' => '2098-12-01',
+            'is_latest' => false,
+        ]);
+        PositionHistory::create([
+            'employee_id' => $employee->id,
+            'nama_jabatan' => 'Jabatan Historis Nonlatest Marker',
+            'jenis_jabatan_id' => RefJenisJabatan::where('nama', 'Struktural')->firstOrFail()->id,
+            'unit_kerja_id' => RefUnitKerja::where('nama', 'Kepala Bagian Umum')->firstOrFail()->id,
+            'tmt_jabatan' => '2099-01-01',
+            'no_sk' => 'SK-HIST-POSITION-NONLATEST',
+            'tanggal_sk' => '2098-12-01',
+            'is_latest' => false,
+        ]);
+
+        $html = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee))
+            ->assertOk()
+            ->getContent();
+        $profileStart = strpos($html, 'data-employee-detail-panel="profile"');
+        $familyStart = strpos($html, 'data-employee-detail-panel="keluarga"', $profileStart ?: 0);
+        $this->assertNotFalse($profileStart);
+        $this->assertNotFalse($familyStart);
+        $profileHtml = substr($html, $profileStart, $familyStart - $profileStart);
+
+        $this->assertStringContainsString('Pangkat Snapshot Marker', $profileHtml);
+        $this->assertStringContainsString('GOL-SNAPSHOT', $profileHtml);
+        $this->assertStringContainsString('Jabatan Snapshot Marker', $profileHtml);
+        $this->assertStringNotContainsString('Pangkat Historis Nonlatest Marker', $profileHtml);
+        $this->assertStringNotContainsString('Jabatan Historis Nonlatest Marker', $profileHtml);
     }
 
     public function test_detail_page_menampilkan_kontrol_kepala_bagian_hanya_bila_role_dan_permission_memenuhi_syarat(): void
@@ -371,6 +442,46 @@ class EmployeeShowTest extends TestCase
             ->assertSee('x-text="formatDate(j.tmt)"', false);
     }
 
+    public function test_detail_page_formats_kgb_history_dates_in_table(): void
+    {
+        $employee = $this->employeeWithReferences();
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSee('x-text="formatDate(k.tgl_sk)"', false)
+            ->assertSee('x-text="formatDate(k.tmt)"', false);
+    }
+
+    public function test_detail_page_mempertahankan_tanggal_kalender_kgb_pada_payload_awal_dan_baris_baru(): void
+    {
+        $employee = $this->employeeWithReferences();
+        SalaryHistory::create([
+            'employee_id' => $employee->id,
+            'gaji_pokok' => 5000000,
+            'no_sk' => 'SK-KGB-KALENDER',
+            'tanggal_sk' => '2026-01-10',
+            'tmt_kgb' => '2026-01-15',
+            'is_latest' => true,
+        ]);
+
+        $response = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk();
+
+        $payload = $this->extractAlpineList($response->getContent(), 'kgbList', 'disiplinList');
+        $row = collect($payload)->firstWhere('no_sk', 'SK-KGB-KALENDER');
+        $this->assertIsArray($row);
+        // Payload awal harus mempertahankan date-only DB tanpa konversi UTC yang menggeser hari.
+        $this->assertSame('2026-01-10', $row['tgl_sk']);
+        $this->assertSame('2026-01-15', $row['tmt']);
+
+        $response
+            // Baris hasil create tetap memakai tanggal date-only dari input/API yang sama.
+            ->assertSee('tgl_sk: this.newKgb.tanggal_sk,', false)
+            ->assertSee('tmt: this.newKgb.tmt_kgb', false);
+    }
+
     public function test_detail_page_provides_optional_sk_upload_controls_for_each_history_modal(): void
     {
         $employee = $this->employeeWithReferences();
@@ -510,6 +621,20 @@ class EmployeeShowTest extends TestCase
             'jenis_pegawai_id' => RefJenisPegawai::where('nama', 'PNS')->firstOrFail()->id,
             'email' => fake()->unique()->safeEmail(),
         ], $attributes));
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function extractAlpineList(string $html, string $listName, string $nextListName): array
+    {
+        $startMarker = $listName.': ';
+        $endMarker = "\n        ".$nextListName.': ';
+        $start = strpos($html, $startMarker);
+        $this->assertNotFalse($start);
+        $end = strpos($html, $endMarker, $start);
+        $this->assertNotFalse($end);
+        $json = rtrim(trim(substr($html, $start + strlen($startMarker), $end - $start - strlen($startMarker))), ',');
+
+        return json_decode(html_entity_decode($json, ENT_QUOTES | ENT_HTML5), true, flags: JSON_THROW_ON_ERROR);
     }
 
     private function seedEmployeeDetail(Employee $employee, Employee $supervisor): void

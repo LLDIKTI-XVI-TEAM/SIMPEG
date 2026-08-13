@@ -2,18 +2,19 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\Documents\PrepareDocumentDownloadAction;
 use App\Actions\Employees\ListEmployeesAction;
+use App\Actions\Employees\PrepareEmployeeHistoryAttachmentDownloadAction;
+use App\Actions\Employees\PreparePimpinanEmployeeDetailAction;
 use App\Http\Controllers\Controller;
+use App\Models\Document;
 use App\Models\Employee;
-use App\Models\RefEselon;
-use App\Models\RefGolongan;
-use App\Models\RefJabatan;
-use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
-use App\Models\RefJenjangPendidikan;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
+use App\Support\Documents\DocumentCategory;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class PimpinanEmployeeController extends Controller
 {
@@ -100,62 +101,29 @@ class PimpinanEmployeeController extends Controller
         ));
     }
 
-    public function show(Employee $employee)
+    public function show(Employee $employee, PreparePimpinanEmployeeDetailAction $action)
     {
-        $employee->load([
-            'agama',
-            'jenisPegawai',
-            'statusPegawai',
-            'appointment',
-            'rankHistories' => fn ($query) => $query->with('golongan')->orderByDesc('tmt_pangkat'),
-            'positionHistories' => fn ($query) => $query->with(['jabatan', 'unitKerja'])->orderByDesc('tmt_jabatan'),
-            'salaryHistories' => fn ($query) => $query->orderByDesc('tmt_kgb'),
-            'disciplineRecords' => fn ($query) => $query->orderByDesc('tanggal_mulai'),
-            'educationHistories' => fn ($query) => $query->with('jenjang')->orderByDesc('tahun_lulus'),
-            'documents' => fn ($query) => $query->orderByDesc('tanggal_dokumen'),
-            'families' => fn ($query) => $query
-                ->select([
-                    'id',
-                    'employee_id',
-                    'nama_anggota',
-                    'hubungan',
-                    'tempat_lahir',
-                    'tanggal_lahir',
-                    'jenis_kelamin',
-                    'status_tunjangan',
-                    'pekerjaan',
-                ])
-                ->orderBy('hubungan')
-                ->orderBy('nama_anggota'),
-            'supervisorAssignments' => fn ($query) => $query
-                ->select(['id', 'employee_id', 'supervisor_id', 'kepala_bagian_id', 'tanggal_mulai', 'tanggal_berakhir'])
-                // Hanya assignment yang efektif terhadap hari ini: sudah dimulai dan belum berakhir.
-                // Future assignment (tanggal_mulai > hari ini) tidak boleh dianggap current;
-                // tanggal_berakhir = hari ini bersifat inklusif.
-                ->whereDate('tanggal_mulai', '<=', today())
-                ->where(function ($q) {
-                    $q->whereNull('tanggal_berakhir')
-                        ->orWhereDate('tanggal_berakhir', '>=', today());
-                })
-                ->with([
-                    'supervisor:id,nama_lengkap,jabatan_terakhir',
-                    'supervisor.positionHistories' => fn ($positions) => $positions
-                        ->select(['id', 'employee_id', 'unit_kerja_id', 'nama_jabatan', 'is_latest'])
-                        ->where('is_latest', true)
-                        ->with('unitKerja:id,nama'),
-                ]),
-        ]);
+        return view('pimpinan.pegawai.show', $action->execute($employee->id));
+    }
 
-        $golonganOptions = RefGolongan::all();
-        $jabatanOptions = RefJabatan::with('jenisJabatan')->orderBy('nama')->get();
-        $jenisJabatanOptions = RefJenisJabatan::all();
-        $unitKerjaOptions = RefUnitKerja::all();
-        $eselonOptions = RefEselon::all();
-        $jenjangOptions = RefJenjangPendidikan::orderBy('urutan')->get();
-        $p = $employee;
+    public function downloadDocument(
+        Employee $employee,
+        string $document,
+        PrepareDocumentDownloadAction $action,
+    ) {
+        $download = $action->execute($document, $employee->id, DocumentCategory::visibleToPimpinanKeys());
 
-        return view('pimpinan.pegawai.show', compact(
-            'p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions'
-        ));
+        return Storage::disk(Document::STORAGE_DISK)->download($download['path'], $download['filename']);
+    }
+
+    public function downloadDisciplineAttachment(
+        Employee $employee,
+        string $history,
+        PrepareEmployeeHistoryAttachmentDownloadAction $action,
+    ) {
+        // Surface Pimpinan hanya membuka berkas hukuman disiplin; tipe riwayat lain tetap tidak dirutekan.
+        $download = $action->execute($employee, 'discipline', $history);
+
+        return Storage::disk(Document::STORAGE_DISK)->download($download['path'], $download['filename']);
     }
 }

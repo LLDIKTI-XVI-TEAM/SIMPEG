@@ -332,7 +332,7 @@ class EmployeeHistoryService
         try {
             return DB::transaction($callback);
         } catch (\Throwable $exception) {
-            $this->files->deletePublicFile($uploadedSkPath);
+            $this->files->deleteEmployeeDocumentFile($uploadedSkPath);
 
             throw $exception;
         }

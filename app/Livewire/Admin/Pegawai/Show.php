@@ -30,13 +30,14 @@ class Show extends Component
     {
         $p = Employee::with([
             'families',
-            'rankHistories',
+            'rankHistories.golongan',
             'positionHistories.jabatan',
             'positionHistories.unitKerja',
             'salaryHistories',
             'disciplineRecords',
-            'educationHistories',
+            'educationHistories.jenjang',
             'documents',
+            'appointment',
             'agama',
             'statusKawin',
             'jenisPegawai',
@@ -70,6 +71,9 @@ class Show extends Component
             ->where('is_latest', true)
             ->sortByDesc('tmt_jabatan')
             ->first();
+        // Gunakan relasi yang sudah dimuat agar Blade tidak menjalankan query berulang saat merender profil.
+        $latestRank = $p->rankHistories->firstWhere('is_latest', true);
+        $latestPosition = $p->positionHistories->firstWhere('is_latest', true);
         $oldSupervisorId = old('kepala_bagian_id');
         $selectedSupervisor = is_string($oldSupervisorId) && Str::isUuid($oldSupervisorId)
             ? Employee::query()->select(['id', 'nama_lengkap', 'nip'])->find($oldSupervisorId)
@@ -83,6 +87,6 @@ class Show extends Component
             ?? $p->statusHistories->sortByDesc('tanggal_efektif')->first();
         $statusEffectiveDate = $p->status_tanggal ?? $latestStatusHistory?->tanggal_efektif;
 
-        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions', 'estimasiTanggalPensiun', 'currentSupervisor', 'currentSupervisorPosition', 'selectedSupervisorId', 'selectedSupervisorName', 'statusEffectiveDate'));
+        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions', 'estimasiTanggalPensiun', 'currentSupervisor', 'currentSupervisorPosition', 'latestRank', 'latestPosition', 'selectedSupervisorId', 'selectedSupervisorName', 'statusEffectiveDate', 'latestStatusHistory'));
     }
 }

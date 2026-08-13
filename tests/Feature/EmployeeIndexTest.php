@@ -337,7 +337,7 @@ class EmployeeIndexTest extends TestCase
         Storage::disk(Document::STORAGE_DISK)->put($filePath, 'SK pangkat');
         $archiveFilePath = 'berkas/'.$employee->id.'/ktp.pdf';
         Storage::disk(Document::STORAGE_DISK)->put($archiveFilePath, 'KTP');
-        Document::create([
+        $archiveDocument = Document::create([
             'employee_id' => $employee->id,
             'jenis_dokumen' => 'ktp_kk',
             'nama_dokumen' => 'KTP',
@@ -367,12 +367,14 @@ class EmployeeIndexTest extends TestCase
                 'kategori' => 'KTP & KK',
                 'nama' => 'KTP',
                 'file_tersedia' => true,
+                'file_url' => route('dokumen.download', $archiveDocument),
             ])
             ->assertJsonFragment([
                 'kategori' => 'Lainnya',
                 'nama' => 'Berkas Lainnya',
                 'status_label' => 'File tidak ditemukan',
             ]);
+        $this->assertStringNotContainsString('/storage/', $response->getContent());
         $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
 
         Storage::disk(Document::STORAGE_DISK)->delete($filePath);

@@ -137,7 +137,7 @@ class ShowEmployeeDocumentStatusAction
             'tanggal' => $document->tanggal_dokumen?->format('d/m/Y') ?: '-',
             'keterangan' => $document->keterangan ?: '-',
             'file_path' => $document->file_path,
-            'file_url' => $fileTersedia ? asset('storage/'.$document->file_path) : null,
+            'file_url' => $fileTersedia ? route('dokumen.download', $document) : null,
             'file_tersedia' => $fileTersedia,
             'status_label' => $fileTersedia ? 'File tersedia' : 'File tidak ditemukan',
         ];
@@ -187,7 +187,8 @@ class ShowEmployeeDocumentStatusAction
             'nomor_sk' => $nomorSk ?: '-',
             'tanggal_sk' => $tanggalSk ?: '-',
             'file_path' => $filePath,
-            'file_url' => $fileTersedia ? asset('storage/'.$filePath) : null,
+            // Riwayat tanpa arsip Document tidak memiliki identifier untuk route unduhan berotorisasi.
+            'file_url' => null,
             'file_tersedia' => $fileTersedia,
             'status_label' => $fileTersedia ? 'File tersedia' : (blank($filePath) ? 'File belum diunggah' : 'File tidak ditemukan'),
         ];

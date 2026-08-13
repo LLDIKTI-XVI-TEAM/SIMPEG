@@ -22,7 +22,7 @@ class Document extends Model
 {
     use HasUuid;
 
-    public const STORAGE_DISK = 'public';
+    public const STORAGE_DISK = 'employee_documents';
 
     protected $fillable = [
         'employee_id',

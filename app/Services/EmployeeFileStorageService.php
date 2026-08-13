@@ -17,7 +17,7 @@ class EmployeeFileStorageService
 
     public function storeSk(UploadedFile $file): string
     {
-        return $this->storePrivate($file, 'sk');
+        return $this->storeEmployeeDocument($file, 'sk');
     }
 
     /**
@@ -30,12 +30,19 @@ class EmployeeFileStorageService
     }
 
     /**
-     * Menyimpan berkas lainnya (KTP, KK, SK Mutasi, SK Pensiun, dsb.)
-     * ke disk publik per folder employee agar bisa diakses via URL /storage.
+     * Menyimpan berkas lainnya tanpa URL publik; akses file wajib melalui route berotorisasi.
      */
     public function storeBerkasLainnya(UploadedFile $file, string $employeeId): string
     {
-        return $this->store($file, "berkas/{$employeeId}");
+        return $this->storeEmployeeDocument($file, "berkas/{$employeeId}");
+    }
+
+    /**
+     * Menyimpan dokumen pegawai ke disk khusus privat agar tidak dapat dilewati melalui symlink publik.
+     */
+    public function storeEmployeeDocument(UploadedFile $file, string $directory): string
+    {
+        return $this->storeOnDisk($file, $directory, Document::STORAGE_DISK);
     }
 
     public function deletePublicFile(?string $path): void
@@ -57,14 +64,27 @@ class EmployeeFileStorageService
         }
     }
 
+    public function deleteEmployeeDocumentFile(?string $path): void
+    {
+        if ($path === null || $path === '') {
+            return;
+        }
+
+        try {
+            if (! Storage::disk(Document::STORAGE_DISK)->delete($path)) {
+                Log::warning('Gagal menghapus dokumen privat pegawai.', ['path' => $path]);
+            }
+        } catch (\Throwable $exception) {
+            Log::warning('Gagal menghapus dokumen privat pegawai.', [
+                'path' => $path,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
     private function store(UploadedFile $file, string $directory): string
     {
         return $this->storeOnDisk($file, $directory, 'public');
-    }
-
-    private function storePrivate(UploadedFile $file, string $directory): string
-    {
-        return $this->storeOnDisk($file, $directory, Document::STORAGE_DISK);
     }
 
     private function storeOnDisk(UploadedFile $file, string $directory, string $disk): string

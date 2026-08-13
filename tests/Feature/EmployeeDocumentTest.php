@@ -280,6 +280,8 @@ class EmployeeDocumentTest extends TestCase
 
     public function test_admin_can_upload_document_via_controller(): void
     {
+        Storage::fake('employee_documents');
+        Storage::fake('public');
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create();
 
@@ -307,7 +309,79 @@ class EmployeeDocumentTest extends TestCase
 
         $document = Document::where('employee_id', $employee->id)->where('jenis_dokumen', 'ijazah')->firstOrFail();
         $this->assertMatchesRegularExpression('/^'.preg_quote($employee->id, '/').'\/ijazah\/'.preg_quote($employee->id, '/').'_ijazah_[0-9a-f-]{36}\.pdf$/', $document->file_path);
-        Storage::disk(Document::STORAGE_DISK)->assertExists($document->file_path);
+        Storage::disk('employee_documents')->assertExists($document->file_path);
+        Storage::disk('public')->assertMissing($document->file_path);
+    }
+
+    public function test_command_memindahkan_dokumen_legacy_publik_ke_storage_privat_secara_aman(): void
+    {
+        Storage::fake('employee_documents');
+        Storage::fake('public');
+        $employee = Employee::factory()->create();
+        $path = 'pegawai/'.$employee->id.'/legacy.pdf';
+        Storage::disk('public')->put($path, 'isi legacy');
+        Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Dokumen Legacy',
+            'file_path' => $path,
+        ]);
+
+        $this->artisan('documents:migrate-to-private-storage')
+            ->expectsOutputToContain('dry-run')
+            ->assertSuccessful();
+        Storage::disk('public')->assertExists($path);
+        Storage::disk('employee_documents')->assertMissing($path);
+
+        $this->artisan('documents:migrate-to-private-storage', ['--execute' => true])
+            ->assertSuccessful();
+        Storage::disk('employee_documents')->assertExists($path);
+        Storage::disk('public')->assertMissing($path);
+        $this->assertSame('isi legacy', Storage::disk('employee_documents')->get($path));
+    }
+
+    public function test_command_tidak_menimpa_file_privat_yang_berbeda_dengan_legacy_publik(): void
+    {
+        Storage::fake('employee_documents');
+        Storage::fake('public');
+        $employee = Employee::factory()->create();
+        $path = 'pegawai/'.$employee->id.'/konflik.pdf';
+        Storage::disk('public')->put($path, 'isi publik');
+        Storage::disk('employee_documents')->put($path, 'isi privat berbeda');
+        Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Dokumen Konflik',
+            'file_path' => $path,
+        ]);
+
+        $this->artisan('documents:migrate-to-private-storage', ['--execute' => true])
+            ->expectsOutputToContain('konflik')
+            ->assertFailed();
+
+        $this->assertSame('isi privat berbeda', Storage::disk('employee_documents')->get($path));
+        Storage::disk('public')->assertExists($path);
+    }
+
+    public function test_command_gagal_bila_path_referensi_tidak_ada_di_public_maupun_privat(): void
+    {
+        Storage::fake('employee_documents');
+        Storage::fake('public');
+        $employee = Employee::factory()->create();
+        Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Dokumen Hilang Migrasi',
+            'file_path' => 'pegawai/hilang-migrasi.pdf',
+        ]);
+
+        $this->artisan('documents:migrate-to-private-storage')
+            ->expectsOutputToContain('hilang')
+            ->assertFailed();
+
+        $this->artisan('documents:migrate-to-private-storage', ['--execute' => true])
+            ->expectsOutputToContain('hilang')
+            ->assertFailed();
     }
 
     public function test_admin_can_upload_document_without_optional_number_and_date(): void
@@ -338,6 +412,7 @@ class EmployeeDocumentTest extends TestCase
     {
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create();
+        $filesBeforeRequest = Storage::disk(Document::STORAGE_DISK)->allFiles();
 
         $this->actingAs($user);
         $response = $this->from('/dashboard/dokumen')->post('/dashboard/dokumen/upload', [
@@ -353,13 +428,14 @@ class EmployeeDocumentTest extends TestCase
             'employee_id' => $employee->id,
             'nama_dokumen' => 'Script Berbahaya',
         ]);
-        $this->assertSame([], Storage::disk(Document::STORAGE_DISK)->allFiles());
+        $this->assertSame($filesBeforeRequest, Storage::disk(Document::STORAGE_DISK)->allFiles());
     }
 
     public function test_admin_cannot_upload_document_larger_than_size_limit_without_creating_file(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create();
+        $filesBeforeRequest = Storage::disk(Document::STORAGE_DISK)->allFiles();
 
         $this->actingAs($user);
         $response = $this->from('/dashboard/dokumen')->post('/dashboard/dokumen/upload', [
@@ -375,7 +451,7 @@ class EmployeeDocumentTest extends TestCase
             'employee_id' => $employee->id,
             'nama_dokumen' => 'Dokumen Terlalu Besar',
         ]);
-        $this->assertSame([], Storage::disk(Document::STORAGE_DISK)->allFiles());
+        $this->assertSame($filesBeforeRequest, Storage::disk(Document::STORAGE_DISK)->allFiles());
     }
 
     public function test_admin_can_download_document(): void

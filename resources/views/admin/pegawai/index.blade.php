@@ -1342,6 +1342,8 @@
             const count = document.getElementById('selected-count');
             const checkAll = document.getElementById('check-all');
 
+            if (!bar || !count || !checkAll) return;
+
             // Bulk bar visibility
             if (checked.length > 0) {
                 bar.classList.remove('hidden');
