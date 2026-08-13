@@ -1,6 +1,8 @@
 @push('head')
     @vite('resources/js/pages/employee-import.js')
-    <script>
+    {{-- Komponen Alpine dipindahkan ke resources/js/pages/employee-import.js.
+         Blok legacy di bawah tidak lengkap dan tidak boleh dirender. --}}
+    {{--
     if (!this.canProceedToValidation) {
                 this.apiError = 'Selesaikan konflik pemetaan dan petakan seluruh field wajib sebelum melanjutkan.';
                 return;
@@ -205,7 +207,7 @@
             this.serverWarnings = { unmatched_columns: [], missing_required: [] };
         }
     }">
-    </script>
+    --}}
 @endpush
 
             
