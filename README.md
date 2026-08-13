@@ -87,7 +87,8 @@ podman compose exec app php artisan key:generate
 # Jalankan database migration
 podman compose exec app php artisan migrate
 
-# Buat symbolic link storage
+# Buat symbolic link hanya untuk aset yang memang bersifat publik
+# (bukan untuk dokumen pegawai)
 podman compose exec app php artisan storage:link
 ```
 
@@ -107,6 +108,48 @@ Buka browser dan akses:
 ```
 http://localhost:8000
 ```
+
+---
+
+## Runbook Cutover Dokumen ke Storage Privat
+
+Dokumen pegawai sengaja disimpan di storage privat dan diunduh melalui akses backend yang berotorisasi. Arah ini mengutamakan standar keamanan saat ini, meskipun PRD versi lama masih mencantumkan path `storage/app/public` untuk dokumen. Jangan mengalihkan dokumen pegawai kembali ke disk `public` atau mengeksposnya melalui `storage:link`, karena hal tersebut membuka kembali risiko bypass authorization melalui symlink.
+
+Jalankan urutan berikut sebagai **release gate sebelum aplikasi diaktifkan**. Proyek belum aktif, sehingga runbook ini adalah gerbang pra-aktivasi dan bukan klaim bahwa data produksi sudah dimigrasikan.
+
+1. Jadwalkan downtime, pastikan backup database dan storage dokumen lama sudah tersedia sesuai prosedur infrastruktur LLDIKTI, lalu aktifkan maintenance mode:
+
+   ```bash
+   podman compose exec app php artisan down
+   ```
+
+2. Jalankan dry-run tanpa flag dan lanjutkan hanya bila ringkasannya menunjukkan `hilang=0` dan `konflik=0`:
+
+   ```bash
+   podman compose exec app php artisan documents:migrate-to-private-storage
+   ```
+
+   Perbaiki setiap path yang berstatus `hilang` atau `konflik`; command akan gagal untuk kedua kondisi tersebut.
+
+3. Setelah dry-run bersih, lakukan cutover dengan satu-satunya flag eksekusi yang tersedia:
+
+   ```bash
+   podman compose exec app php artisan documents:migrate-to-private-storage --execute
+   ```
+
+4. Jalankan dry-run kembali untuk verifikasi. Pastikan `siap=0`, `hilang=0`, dan `konflik=0`; baris yang sudah privat akan dihitung sebagai `sudah_privat`.
+
+   ```bash
+   podman compose exec app php artisan documents:migrate-to-private-storage
+   ```
+
+5. Aktifkan aplikasi hanya setelah verifikasi lulus:
+
+   ```bash
+   podman compose exec app php artisan up
+   ```
+
+Tidak ada fallback ke disk publik pada proses ini. Jika verifikasi gagal, tetap pertahankan maintenance mode dan selesaikan penyebabnya sebelum aktivasi.
 
 ---
 
