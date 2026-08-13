@@ -34,6 +34,8 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -334,6 +336,116 @@ class EmployeeShowTest extends TestCase
                 'Tanggal Efektif Status Kepegawaian',
                 '08-11-2025',
             ], false);
+    }
+
+    public function test_detail_admin_merender_riwayat_status_dengan_urutan_deterministik(): void
+    {
+        $employee = $this->employeeWithReferences();
+
+        // Urutan insert sengaja kebalikan dari aturan tampilan agar query, bukan urutan fisik DB, yang menentukan hasil.
+        $this->createStatusHistory($employee, 'Status Tie Rendah Admin', false, '2026-06-01', '2026-06-10 08:00:00', '10000000-0000-4000-8000-000000000002');
+        $this->createStatusHistory($employee, 'Status Tie Tinggi Admin', false, '2026-06-01', '2026-06-10 08:00:00', '10000000-0000-4000-8000-000000000003');
+        $this->createStatusHistory($employee, 'Status Dibuat Terbaru Admin', false, '2026-06-01', '2026-06-10 09:00:00', '10000000-0000-4000-8000-000000000001');
+        $this->createStatusHistory($employee, 'Status Tanggal Terbaru Admin', false, '2026-08-01', '2026-06-10 07:00:00', '10000000-0000-4000-8000-000000000004');
+        $this->createStatusHistory($employee, 'Status Flag Latest Admin', true, '2025-01-01', '2026-06-10 06:00:00', '10000000-0000-4000-8000-000000000005');
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('pegawai.show', $employee))
+            ->assertOk()
+            ->assertSeeInOrder([
+                'Status Flag Latest Admin',
+                'Status Tanggal Terbaru Admin',
+                'Status Dibuat Terbaru Admin',
+                'Status Tie Rendah Admin',
+                'Status Tie Tinggi Admin',
+            ], false);
+    }
+
+    public function test_detail_admin_merender_dan_mengunduh_dokumen_status_legacy_milik_pegawai(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = $this->employeeWithReferences();
+        $history = EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_nama' => 'Status Legacy Dengan Dokumen',
+            'tanggal_efektif' => '2026-08-01',
+            'nomor_berkas' => 'SK-STATUS-LEGACY-ADMIN',
+            'is_latest' => true,
+        ]);
+        $document = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'sk_status_pegawai',
+            'nama_dokumen' => 'SK Status Legacy',
+            'nomor_dokumen' => 'SK-STATUS-LEGACY-ADMIN',
+            'file_path' => 'pegawai/status-legacy-admin.pdf',
+        ]);
+        Storage::disk(Document::STORAGE_DISK)->put($document->file_path, 'status legacy privat');
+        $url = route('pegawai.history-attachments.download', [
+            'employee' => $employee,
+            'type' => 'status',
+            'history' => $history,
+        ]);
+        $admin = User::factory()->superAdmin()->create();
+
+        $this->actingAs($admin)
+            ->get(route('pegawai.show', $employee))
+            ->assertOk()
+            ->assertSee($url, false)
+            ->assertDontSee($document->file_path, false)
+            ->assertDontSee('/storage/', false);
+
+        $this->actingAs($admin)
+            ->get($url)
+            ->assertOk()
+            ->assertDownload();
+    }
+
+    public function test_detail_admin_memilih_kandidat_dokumen_status_legacy_tersedia_pertama_secara_konsisten(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = $this->employeeWithReferences();
+        $history = EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_nama' => 'Status Legacy Duplikat',
+            'tanggal_efektif' => '2026-08-01',
+            'nomor_berkas' => 'SK-STATUS-LEGACY-DUPLIKAT',
+            'is_latest' => true,
+        ]);
+        $missingDocument = new Document;
+        $missingDocument->id = '30000000-0000-4000-8000-000000000001';
+        $missingDocument->forceFill([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'sk_status_pegawai',
+            'nama_dokumen' => 'SK Status Lama Hilang',
+            'nomor_dokumen' => 'SK-STATUS-LEGACY-DUPLIKAT',
+            'file_path' => 'pegawai/status-legacy-hilang.pdf',
+        ])->save();
+        $availableDocument = new Document;
+        $availableDocument->id = '30000000-0000-4000-8000-000000000002';
+        $availableDocument->forceFill([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'sk_status_pegawai',
+            'nama_dokumen' => 'SK Status Lama Tersedia',
+            'nomor_dokumen' => 'SK-STATUS-LEGACY-DUPLIKAT',
+            'file_path' => 'pegawai/status-legacy-tersedia.pdf',
+        ])->save();
+        Storage::disk(Document::STORAGE_DISK)->put($availableDocument->file_path, 'status legacy tersedia');
+        $url = route('pegawai.history-attachments.download', [
+            'employee' => $employee,
+            'type' => 'status',
+            'history' => $history,
+        ]);
+        $admin = User::factory()->superAdmin()->create();
+
+        $this->actingAs($admin)
+            ->get(route('pegawai.show', $employee))
+            ->assertOk()
+            ->assertSee($url, false);
+
+        $this->actingAs($admin)
+            ->get($url)
+            ->assertOk()
+            ->assertDownload();
     }
 
     public function test_detail_page_tidak_mengarang_tanggal_status_tanpa_sumber_resmi(): void
@@ -708,6 +820,28 @@ class EmployeeShowTest extends TestCase
             'jenis_pegawai_id' => RefJenisPegawai::where('nama', 'PNS')->firstOrFail()->id,
             'email' => fake()->unique()->safeEmail(),
         ], $attributes));
+    }
+
+    private function createStatusHistory(
+        Employee $employee,
+        string $name,
+        bool $isLatest,
+        string $effectiveDate,
+        string $createdAt,
+        string $id,
+    ): EmployeeStatusHistory {
+        $history = new EmployeeStatusHistory;
+        $history->id = $id;
+        $history->forceFill([
+            'employee_id' => $employee->id,
+            'status_nama' => $name,
+            'tanggal_efektif' => $effectiveDate,
+            'is_latest' => $isLatest,
+            'created_at' => Carbon::parse($createdAt),
+            'updated_at' => Carbon::parse($createdAt),
+        ])->save();
+
+        return $history;
     }
 
     /** @return list<array<string, mixed>> */

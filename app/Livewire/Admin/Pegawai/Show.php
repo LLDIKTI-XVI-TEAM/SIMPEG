@@ -42,7 +42,11 @@ class Show extends Component
             'statusKawin',
             'jenisPegawai',
             'statusPegawai',
-            'statusHistories.document',
+            'statusHistories' => fn ($query) => $query
+                ->orderByDesc('is_latest')
+                ->orderByDesc('tanggal_efektif')
+                ->orderByDesc('created_at')
+                ->orderBy('id'),
             'supervisorAssignments.supervisor.positionHistories' => fn ($query) => $query->where('is_latest', true),
         ])->findOrFail($this->pegawaiId);
 
@@ -73,6 +77,8 @@ class Show extends Component
             : null;
         $selectedSupervisorId = $selectedSupervisor?->id ?? $currentSupervisor?->supervisor?->id;
         $selectedSupervisorName = $selectedSupervisor?->nama_lengkap ?? $currentSupervisor?->supervisor?->nama_lengkap;
+
+        EmployeeProfilePresentation::prepareStatusHistoryAttachments($p);
 
         // Snapshot status adalah sumber utama. Riwayat latest hanya menjadi fallback
         // untuk data lama yang belum memiliki status_tanggal tersinkron.

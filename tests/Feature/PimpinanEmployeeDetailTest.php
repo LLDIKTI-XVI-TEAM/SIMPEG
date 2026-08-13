@@ -602,6 +602,29 @@ class PimpinanEmployeeDetailTest extends TestCase
             });
     }
 
+    public function test_pimpinan_merender_riwayat_status_dengan_urutan_deterministik(): void
+    {
+        $employee = Employee::factory()->create();
+
+        // Urutan insert sengaja kebalikan dari urutan resmi tampilan detail bersama.
+        $this->createStatusHistory($employee, 'Status Tie Rendah Pimpinan', false, '2026-06-01', '2026-06-10 08:00:00', '20000000-0000-4000-8000-000000000002');
+        $this->createStatusHistory($employee, 'Status Tie Tinggi Pimpinan', false, '2026-06-01', '2026-06-10 08:00:00', '20000000-0000-4000-8000-000000000003');
+        $this->createStatusHistory($employee, 'Status Dibuat Terbaru Pimpinan', false, '2026-06-01', '2026-06-10 09:00:00', '20000000-0000-4000-8000-000000000001');
+        $this->createStatusHistory($employee, 'Status Tanggal Terbaru Pimpinan', false, '2026-08-01', '2026-06-10 07:00:00', '20000000-0000-4000-8000-000000000004');
+        $this->createStatusHistory($employee, 'Status Flag Latest Pimpinan', true, '2025-01-01', '2026-06-10 06:00:00', '20000000-0000-4000-8000-000000000005');
+
+        $this->actingAs(User::factory()->pimpinan()->create())
+            ->get(route('pimpinan.pegawai.show', $employee))
+            ->assertOk()
+            ->assertSeeInOrder([
+                'Status Flag Latest Pimpinan',
+                'Status Tanggal Terbaru Pimpinan',
+                'Status Dibuat Terbaru Pimpinan',
+                'Status Tie Rendah Pimpinan',
+                'Status Tie Tinggi Pimpinan',
+            ], false);
+    }
+
     public function test_pimpinan_detail_menampilkan_field_profil_dan_pekerjaan_aktif_setara_admin(): void
     {
         $statusKawin = RefStatusPerkawinan::create(['nama' => 'Status Kawin Marker']);
@@ -733,6 +756,43 @@ class PimpinanEmployeeDetailTest extends TestCase
         $this->actingAs($pimpinan)
             ->get($url)
             ->assertNotFound();
+    }
+
+    public function test_pimpinan_menampilkan_dan_mengunduh_dokumen_riwayat_status_legacy_privat(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = Employee::factory()->create();
+        $history = EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_nama' => 'Status Legacy Pimpinan',
+            'tanggal_efektif' => '2026-08-01',
+            'nomor_berkas' => 'SK-STATUS-LEGACY-PIMPINAN',
+            'is_latest' => true,
+        ]);
+        $document = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'sk_status_pegawai',
+            'nama_dokumen' => 'SK Status Legacy Pimpinan',
+            'nomor_dokumen' => 'SK-STATUS-LEGACY-PIMPINAN',
+            'file_path' => 'pegawai/status-legacy-pimpinan.pdf',
+        ]);
+        Storage::disk(Document::STORAGE_DISK)->put($document->file_path, 'status legacy pimpinan');
+        $pimpinan = User::factory()->pimpinan()->create();
+        $url = route('pimpinan.pegawai.status-attachments.download', [
+            'employee' => $employee,
+            'history' => $history,
+        ]);
+
+        $this->actingAs($pimpinan)
+            ->get(route('pimpinan.pegawai.show', $employee))
+            ->assertOk()
+            ->assertSee($url, false)
+            ->assertDontSee($document->file_path, false);
+
+        $this->actingAs($pimpinan)
+            ->get($url)
+            ->assertOk()
+            ->assertDownload();
     }
 
     public function test_profil_pimpinan_memakai_fallback_bup_yang_sama_saat_tanggal_pensiun_kosong(): void
@@ -1343,6 +1403,28 @@ class PimpinanEmployeeDetailTest extends TestCase
             'tanggal_sk' => '2025-12-31',
             'file_sk' => $path,
         ]);
+    }
+
+    private function createStatusHistory(
+        Employee $employee,
+        string $name,
+        bool $isLatest,
+        string $effectiveDate,
+        string $createdAt,
+        string $id,
+    ): EmployeeStatusHistory {
+        $history = new EmployeeStatusHistory;
+        $history->id = $id;
+        $history->forceFill([
+            'employee_id' => $employee->id,
+            'status_nama' => $name,
+            'tanggal_efektif' => $effectiveDate,
+            'is_latest' => $isLatest,
+            'created_at' => Carbon::parse($createdAt),
+            'updated_at' => Carbon::parse($createdAt),
+        ])->save();
+
+        return $history;
     }
 
     private function pimpinanDisciplineUrl(Employee $employee, DisciplineRecord $discipline): string

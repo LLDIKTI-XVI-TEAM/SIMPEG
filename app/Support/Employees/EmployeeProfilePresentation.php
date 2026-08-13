@@ -5,10 +5,31 @@ namespace App\Support\Employees;
 use App\Models\Employee;
 use App\Models\EmployeeStatusHistory;
 use App\Models\EwsConfig;
+use App\Support\Documents\LegacyStatusDocumentResolver;
 use Illuminate\Support\Carbon;
 
 final class EmployeeProfilePresentation
 {
+    /**
+     * Menandai riwayat status legacy yang boleh menampilkan tautan unduhan privat.
+     *
+     * Dokumen wajib tetap milik pegawai pada detail ini, berkategori SK status, bernomor sama,
+     * dan benar-benar tersedia di disk privat agar Blade tidak membangun fallback yang bocor.
+     */
+    public static function prepareStatusHistoryAttachments(Employee $employee): void
+    {
+        if (! $employee->relationLoaded('statusHistories') || ! $employee->relationLoaded('documents')) {
+            return;
+        }
+
+        $employee->statusHistories->each(function (EmployeeStatusHistory $history) use ($employee): void {
+            $canUseLegacyDocument = $history->file_sk === null
+                && LegacyStatusDocumentResolver::resolve($employee->documents, $history) !== null;
+
+            $history->setAttribute('has_legacy_status_document', $canUseLegacyDocument);
+        });
+    }
+
     /**
      * Menyusun status untuk kedua surface detail agar label dan warna tidak kembali berbeda.
      *

@@ -217,7 +217,7 @@
                     @if($history->keterangan)
                         <p class="text-xs text-ink font-sans">{{ $history->keterangan }}</p>
                     @endif
-                    @if($history->file_sk)
+                    @if($history->file_sk || $history->has_legacy_status_document)
                         <a
                             href="{{ $downloadSurface === 'admin'
                                 ? route('pegawai.history-attachments.download', ['employee' => $employee, 'type' => 'status', 'history' => $history])

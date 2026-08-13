@@ -78,6 +78,91 @@ class EmployeeHistoryAttachmentDownloadTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_attachment_status_legacy_hanya_memakai_dokumen_privat_milik_pegawai_dengan_nomor_dan_kategori_tepat(): void
+    {
+        $employee = Employee::factory()->create();
+        $history = EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_nama' => 'Status Legacy',
+            'tanggal_efektif' => '2026-08-01',
+            'nomor_berkas' => 'SK-STATUS-LEGACY-DL',
+            'is_latest' => true,
+        ]);
+        $document = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'sk_status_pegawai',
+            'nama_dokumen' => 'SK Status Legacy',
+            'nomor_dokumen' => 'SK-STATUS-LEGACY-DL',
+            'file_path' => 'pegawai/status-legacy-download.pdf',
+        ]);
+        Storage::disk(Document::STORAGE_DISK)->put($document->file_path, 'status legacy privat');
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get($this->url($employee, 'status', $history->id))
+            ->assertOk()
+            ->assertDownload();
+    }
+
+    public function test_attachment_status_legacy_menolak_dokumen_lintas_pegawai_dan_file_privat_yang_hilang(): void
+    {
+        $employee = Employee::factory()->create();
+        $history = EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_nama' => 'Status Legacy Tertutup',
+            'tanggal_efektif' => '2026-08-01',
+            'nomor_berkas' => 'SK-STATUS-LEGACY-TERTUTUP',
+            'is_latest' => true,
+        ]);
+        $otherEmployee = Employee::factory()->create();
+        $crossOwnerDocument = Document::create([
+            'employee_id' => $otherEmployee->id,
+            'jenis_dokumen' => 'sk_status_pegawai',
+            'nama_dokumen' => 'SK Milik Pegawai Lain',
+            'nomor_dokumen' => 'SK-STATUS-LEGACY-TERTUTUP',
+            'file_path' => 'pegawai/status-cross-owner.pdf',
+        ]);
+        Storage::disk(Document::STORAGE_DISK)->put($crossOwnerDocument->file_path, 'dokumen pegawai lain');
+
+        $admin = User::factory()->adminKepegawaian()->create();
+        $this->actingAs($admin)
+            ->get($this->url($employee, 'status', $history->id))
+            ->assertNotFound();
+
+        $wrongCategoryDocument = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Kategori Tidak Cocok',
+            'nomor_dokumen' => 'SK-STATUS-LEGACY-TERTUTUP',
+            'file_path' => 'pegawai/status-wrong-category.pdf',
+        ]);
+        $wrongNumberDocument = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'sk_status_pegawai',
+            'nama_dokumen' => 'Nomor Tidak Cocok',
+            'nomor_dokumen' => 'SK-STATUS-NOMOR-LAIN',
+            'file_path' => 'pegawai/status-wrong-number.pdf',
+        ]);
+        Storage::disk(Document::STORAGE_DISK)->put($wrongCategoryDocument->file_path, 'kategori salah');
+        Storage::disk(Document::STORAGE_DISK)->put($wrongNumberDocument->file_path, 'nomor salah');
+
+        $this->actingAs($admin)
+            ->get($this->url($employee, 'status', $history->id))
+            ->assertNotFound();
+
+        $missingFileDocument = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'sk_status_pegawai',
+            'nama_dokumen' => 'SK Tanpa File',
+            'nomor_dokumen' => 'SK-STATUS-LEGACY-TERTUTUP',
+            'file_path' => 'pegawai/status-missing.pdf',
+        ]);
+
+        $this->assertFalse(Storage::disk(Document::STORAGE_DISK)->exists($missingFileDocument->file_path));
+        $this->actingAs($admin)
+            ->get($this->url($employee, 'status', $history->id))
+            ->assertNotFound();
+    }
+
     public function test_attachment_riwayat_memerlukan_permission_employees_read_secara_independen_dari_role(): void
     {
         $employee = Employee::factory()->create();

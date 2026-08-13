@@ -77,9 +77,12 @@ class PreparePimpinanEmployeeDetailAction
                         'nomor_berkas',
                         'file_sk',
                         'is_latest',
+                        'created_at',
                     ])
                     ->orderByDesc('is_latest')
-                    ->orderByDesc('tanggal_efektif'),
+                    ->orderByDesc('tanggal_efektif')
+                    ->orderByDesc('created_at')
+                    ->orderBy('id'),
                 'appointment',
                 'rankHistories' => fn ($query) => $query
                     ->with('golongan:id,kode,nama')
@@ -130,6 +133,7 @@ class PreparePimpinanEmployeeDetailAction
             ])
             ->findOrFail($employeeId);
 
+        EmployeeProfilePresentation::prepareStatusHistoryAttachments($employee);
         $latestStatusHistory = $employee->statusHistories->firstWhere('is_latest', true)
             ?? $employee->statusHistories->first();
         $activePosition = $employee->positionHistories->firstWhere('is_latest', true);
