@@ -7,34 +7,51 @@ return new class extends Migration
 {
     public function up(): void
     {
-        $canonicalIds = [];
-        $canonicalNames = [];
+        DB::transaction(function (): void {
+            /** @var array<string, array{canonical: object, nama: string, duplicates: array<int, object>}> $groups */
+            $groups = [];
 
-        foreach (DB::table('ref_program_studi')->orderBy('created_at')->orderBy('id')->get() as $programStudi) {
-            $nama = preg_replace('/\s+/u', ' ', trim((string) $programStudi->nama)) ?? trim((string) $programStudi->nama);
-            $key = mb_strtolower($nama);
+            foreach (DB::table('ref_program_studi')->orderBy('created_at')->orderBy('id')->get() as $programStudi) {
+                $nama = preg_replace('/\s+/u', ' ', trim((string) $programStudi->nama)) ?? trim((string) $programStudi->nama);
+                $key = mb_strtolower($nama);
 
-            if (isset($canonicalIds[$key])) {
-                DB::table('employees')->where('program_studi_id', $programStudi->id)
-                    ->update(['program_studi_id' => $canonicalIds[$key]]);
-                DB::table('education_histories')->where('program_studi_id', $programStudi->id)
-                    ->update(['program_studi_id' => $canonicalIds[$key]]);
-                DB::table('ref_program_studi')->where('id', $programStudi->id)->delete();
+                if (! isset($groups[$key])) {
+                    $groups[$key] = [
+                        'canonical' => $programStudi,
+                        'nama' => $nama,
+                        'duplicates' => [],
+                    ];
 
-                continue;
+                    continue;
+                }
+
+                $groups[$key]['duplicates'][] = $programStudi;
             }
 
-            $canonicalIds[$key] = $programStudi->id;
-            $canonicalNames[$programStudi->id] = $nama;
-            DB::table('ref_program_studi')->where('id', $programStudi->id)->update(['nama' => $nama]);
-        }
+            // Relasikan dan hapus seluruh duplikat lebih dahulu. Dengan begitu,
+            // penggantian nama kanonis tidak dapat bertabrakan dengan nama duplikat
+            // yang masih dilindungi constraint unik lama.
+            foreach ($groups as $group) {
+                foreach ($group['duplicates'] as $duplicate) {
+                    DB::table('employees')->where('program_studi_id', $duplicate->id)
+                        ->update(['program_studi_id' => $group['canonical']->id]);
+                    DB::table('education_histories')->where('program_studi_id', $duplicate->id)
+                        ->update(['program_studi_id' => $group['canonical']->id]);
+                    DB::table('ref_program_studi')->where('id', $duplicate->id)->delete();
+                }
+            }
 
-        foreach ($canonicalNames as $id => $nama) {
-            DB::table('employees')->where('program_studi_id', $id)
-                ->update(['prodi_pendidikan_terakhir' => $nama]);
-            DB::table('education_histories')->where('program_studi_id', $id)
-                ->update(['jurusan' => $nama]);
-        }
+            foreach ($groups as $group) {
+                $id = $group['canonical']->id;
+                $nama = $group['nama'];
+
+                DB::table('ref_program_studi')->where('id', $id)->update(['nama' => $nama]);
+                DB::table('employees')->where('program_studi_id', $id)
+                    ->update(['prodi_pendidikan_terakhir' => $nama]);
+                DB::table('education_histories')->where('program_studi_id', $id)
+                    ->update(['jurusan' => $nama]);
+            }
+        });
 
         if (DB::connection()->getDriverName() === 'pgsql') {
             DB::statement("CREATE UNIQUE INDEX ref_program_studi_normalized_name_unique ON ref_program_studi (LOWER(REGEXP_REPLACE(TRIM(nama), '\\s+', ' ', 'g')))");

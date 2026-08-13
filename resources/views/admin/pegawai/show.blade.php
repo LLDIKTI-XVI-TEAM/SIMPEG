@@ -390,7 +390,7 @@
         },
         // ===== LAZY FETCH & CACHING KELUARGA + PENDIDIKAN =====
         _keluargaCacheKey:  'keluarga_{{ $p->id }}',
-        _pendidikanCacheKey: 'pendidikan_{{ $p->id }}',
+        _pendidikanCacheKey: 'pendidikan_v2_{{ $p->id }}',
 
         formatDate(dateString) {
             if (!dateString || dateString === '-') return '-';

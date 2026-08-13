@@ -449,6 +449,17 @@ class EmployeeShowTest extends TestCase
         );
     }
 
+    public function test_detail_page_versions_education_cache_after_program_studi_relation_is_added(): void
+    {
+        $employee = $this->employeeWithReferences();
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSee("pendidikan_v2_{$employee->id}", false)
+            ->assertDontSee("pendidikan_{$employee->id}", false);
+    }
+
     public function test_detail_page_provides_optional_sk_upload_controls_for_each_history_modal(): void
     {
         $employee = $this->employeeWithReferences();
