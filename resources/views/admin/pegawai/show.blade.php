@@ -77,9 +77,9 @@
         keluargaList: {{ ($p->families ?? collect())->map(fn($f) => ['id' => $f->id, 'nama_anggota' => $f->nama_anggota, 'nik' => $f->nik, 'hubungan' => $f->hubungan, 'tempat_lahir' => $f->tempat_lahir, 'tanggal_lahir' => $f->tanggal_lahir, 'jenis_kelamin' => $f->jenis_kelamin === 'P' ? 'Perempuan' : 'Laki-laki', 'pekerjaan' => $f->pekerjaan, 'status' => $f->status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'])->toJson() }},
         keluargaLoading: false,
         isDeletingKeluarga: false,
-        pangkatList: {{ $p->rankHistories->map(fn($r) => ['golongan' => $r->golongan->nama ?? '-', 'no_sk' => $r->no_sk, 'tgl_sk' => $r->tanggal_sk?->format('Y-m-d'), 'tmt' => $r->tmt_pangkat?->format('Y-m-d')])->toJson() }},
-        jabatanList: {{ $p->positionHistories->map(fn($j) => ['jabatan' => $j->jabatan?->nama ?? $j->nama_jabatan, 'unit' => $j->unitKerja->nama ?? '-', 'kelas_jabatan' => $j->kelas_jabatan, 'no_sk' => $j->no_sk, 'tgl_sk' => $j->tanggal_sk?->format('Y-m-d'), 'tmt' => $j->tmt_jabatan?->format('Y-m-d')])->toJson() }},
-        kgbList: {{ $p->salaryHistories->map(fn($s) => ['gaji' => 'Rp ' . number_format($s->gaji_pokok, 0, ',', '.'), 'no_sk' => $s->no_sk, 'tgl_sk' => $s->tanggal_sk?->format('Y-m-d'), 'tmt' => $s->tmt_kgb?->format('Y-m-d')])->toJson() }},
+        pangkatList: {{ $p->rankHistories->map(fn($r) => ['golongan' => $r->golongan->nama ?? '-', 'no_sk' => $r->no_sk, 'tgl_sk' => $r->tanggal_sk?->format('Y-m-d'), 'tmt' => $r->tmt_pangkat?->format('Y-m-d'), 'download_url' => $r->file_sk ? route('pegawai.history-attachments.download', ['employee' => $p, 'type' => 'rank', 'history' => $r]) : null])->toJson() }},
+        jabatanList: {{ $p->positionHistories->map(fn($j) => ['jabatan' => $j->jabatan?->nama ?? $j->nama_jabatan, 'unit' => $j->unitKerja->nama ?? '-', 'kelas_jabatan' => $j->kelas_jabatan, 'no_sk' => $j->no_sk, 'tgl_sk' => $j->tanggal_sk?->format('Y-m-d'), 'tmt' => $j->tmt_jabatan?->format('Y-m-d'), 'download_url' => $j->file_sk ? route('pegawai.history-attachments.download', ['employee' => $p, 'type' => 'position', 'history' => $j]) : null])->toJson() }},
+        kgbList: {{ $p->salaryHistories->map(fn($s) => ['gaji' => 'Rp ' . number_format($s->gaji_pokok, 0, ',', '.'), 'no_sk' => $s->no_sk, 'tgl_sk' => $s->tanggal_sk?->format('Y-m-d'), 'tmt' => $s->tmt_kgb?->format('Y-m-d'), 'download_url' => $s->file_sk ? route('pegawai.history-attachments.download', ['employee' => $p, 'type' => 'salary', 'history' => $s]) : null])->toJson() }},
         disiplinList: {{ $p->disciplineRecords->map(fn($d) => ['id' => $d->id, 'jenis' => $d->jenis_hukuman, 'alasan' => $d->deskripsi, 'no_sk' => $d->no_sk, 'tgl_sk' => $d->tanggal_sk?->format('Y-m-d'), 'tgl_mulai' => $d->tanggal_mulai?->format('Y-m-d'), 'tgl_akhir' => $d->tanggal_berakhir?->format('Y-m-d'), 'is_active' => $d->is_active, 'download_url' => $d->file_sk ? route('pegawai.history-attachments.download', ['employee' => $p, 'type' => 'discipline', 'history' => $d]) : null])->toJson() }},
         pendidikanList: {{ ($p->educationHistories ?? collect())->map(fn($e) => ['id' => $e->id, 'jenjang_id' => $e->jenjang_id, 'tingkat' => $e->jenjang?->urutan ?? $e->tingkat ?? '-', 'institusi' => $e->nama_institusi ?? '-', 'prodi' => $e->jurusan ?? '-', 'lulus' => $e->tahun_lulus ?? '-', 'no_ijazah' => $e->no_ijazah ?? '-'])->toJson() }},
         pendidikanLoading: false,
@@ -1124,7 +1124,7 @@
                 </div>
                 <x-pegawai.detail.table
                     name="kepangkatan"
-                    :headings="['Golongan', 'Nomor SK Pangkat', 'Tanggal SK', 'TMT Pangkat']"
+                    :headings="['Golongan', 'Nomor SK Pangkat', 'Tanggal SK', 'TMT Pangkat', 'Berkas']"
                 >
                             <template x-for="p in pangkatList" :key="p.no_sk">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
@@ -1132,10 +1132,11 @@
                                     <td class="px-4 py-3" x-text="p.no_sk"></td>
                                     <td class="px-4 py-3" x-text="formatDate(p.tgl_sk)"></td>
                                     <td class="px-4 py-3" x-text="formatDate(p.tmt)"></td>
+                                    <td class="px-4 py-3"><a x-show="p.download_url" :href="p.download_url" class="font-semibold text-primary hover:underline">Unduh SK</a><span x-show="!p.download_url" class="text-muted">-</span></td>
                                 </tr>
                             </template>
                             <tr x-show="pangkatList.length === 0">
-                                <td colspan="4" class="px-4 py-6 text-center font-semibold text-muted">
+                                <td colspan="5" class="px-4 py-6 text-center font-semibold text-muted">
                                     Pegawai ini belum memiliki riwayat kepangkatan.
                                 </td>
                             </tr>
@@ -1160,7 +1161,7 @@
                 </div>
                 <x-pegawai.detail.table
                     name="jabatan"
-                    :headings="['Nama Jabatan', 'Unit Kerja', 'Nomor SK Jabatan', 'Tanggal SK', 'TMT Jabatan']"
+                    :headings="['Nama Jabatan', 'Unit Kerja', 'Nomor SK Jabatan', 'Tanggal SK', 'TMT Jabatan', 'Berkas']"
                 >
                             <template x-for="j in jabatanList" :key="j.no_sk">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
@@ -1169,10 +1170,11 @@
                                     <td class="px-4 py-3" x-text="j.no_sk"></td>
                                     <td class="px-4 py-3" x-text="formatDate(j.tgl_sk)"></td>
                                     <td class="px-4 py-3" x-text="formatDate(j.tmt)"></td>
+                                    <td class="px-4 py-3"><a x-show="j.download_url" :href="j.download_url" class="font-semibold text-primary hover:underline">Unduh SK</a><span x-show="!j.download_url" class="text-muted">-</span></td>
                                 </tr>
                             </template>
                             <tr x-show="jabatanList.length === 0">
-                                <td colspan="5" class="px-4 py-6 text-center font-semibold text-muted">
+                                <td colspan="6" class="px-4 py-6 text-center font-semibold text-muted">
                                     Pegawai ini belum memiliki riwayat jabatan.
                                 </td>
                             </tr>
@@ -1197,7 +1199,7 @@
                 </div>
                 <x-pegawai.detail.table
                     name="kgb"
-                    :headings="['Gaji Pokok Baru', 'Nomor Surat KGB', 'Tanggal Surat', 'TMT KGB']"
+                    :headings="['Gaji Pokok Baru', 'Nomor Surat KGB', 'Tanggal Surat', 'TMT KGB', 'Berkas']"
                 >
                             <template x-for="k in kgbList" :key="k.no_sk">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
@@ -1205,10 +1207,11 @@
                                     <td class="px-4 py-3" x-text="k.no_sk"></td>
                                     <td class="px-4 py-3" x-text="formatDate(k.tgl_sk)"></td>
                                     <td class="px-4 py-3" x-text="formatDate(k.tmt)"></td>
+                                    <td class="px-4 py-3"><a x-show="k.download_url" :href="k.download_url" class="font-semibold text-primary hover:underline">Unduh SK</a><span x-show="!k.download_url" class="text-muted">-</span></td>
                                 </tr>
                             </template>
                             <tr x-show="kgbList.length === 0">
-                                <td colspan="4" class="px-4 py-6 text-center font-semibold text-muted">
+                                <td colspan="5" class="px-4 py-6 text-center font-semibold text-muted">
                                     Pegawai ini belum memiliki riwayat KGB.
                                 </td>
                             </tr>
@@ -1340,7 +1343,12 @@
                     <h3 class="text-sm font-bold text-ink font-sans">Data & SK Pengangkatan Pertama</h3>
                     <p class="text-xs text-muted font-sans mt-0.5">Berkas dasar penerimaan kepegawaian sebagai CPNS/PNS/PPPK.</p>
                 </div>
-                @include('pegawai.partials.detail.appointment-readonly', ['appointment' => $p->appointment])
+                @include('pegawai.partials.detail.appointment-readonly', [
+                    'appointment' => $p->appointment,
+                    'attachmentDownloadUrl' => $p->appointment?->file_sk
+                        ? route('pegawai.history-attachments.download', ['employee' => $p, 'type' => 'appointment', 'history' => $p->appointment])
+                        : null,
+                ])
             </x-pegawai.detail.panel>
 
             {{-- TAB 9: DOKUMEN & SK --}}

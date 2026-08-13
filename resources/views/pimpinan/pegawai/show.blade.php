@@ -96,7 +96,7 @@
                     </div>
                     <x-pegawai.detail.table
                         name="kepangkatan"
-                        :headings="['Golongan', 'Nomor SK Pangkat', 'Tanggal SK', 'TMT Pangkat']"
+                        :headings="['Golongan', 'Nomor SK Pangkat', 'Tanggal SK', 'TMT Pangkat', 'Berkas']"
                         :empty="$p->rankHistories->isEmpty()"
                         empty-label="Pegawai ini belum memiliki riwayat kepangkatan."
                     >
@@ -106,6 +106,13 @@
                                 <td class="px-4 py-3">{{ $rank->no_sk ?: '-' }}</td>
                                 <td class="px-4 py-3">@include('pegawai.partials.detail.date', ['value' => $rank->tanggal_sk])</td>
                                 <td class="px-4 py-3">@include('pegawai.partials.detail.date', ['value' => $rank->tmt_pangkat])</td>
+                                <td class="px-4 py-3">
+                                    @if($rank->file_sk)
+                                        <a href="{{ route('pimpinan.pegawai.history-attachments.download', ['employee' => $p, 'type' => 'rank', 'history' => $rank]) }}" class="font-semibold text-primary hover:underline">Unduh SK</a>
+                                    @else
+                                        -
+                                    @endif
+                                </td>
                             </tr>
                         @endforeach
                     </x-pegawai.detail.table>
@@ -118,7 +125,7 @@
                     </div>
                     <x-pegawai.detail.table
                         name="jabatan"
-                        :headings="['Nama Jabatan', 'Unit Kerja', 'Nomor SK Jabatan', 'Tanggal SK', 'TMT Jabatan']"
+                        :headings="['Nama Jabatan', 'Unit Kerja', 'Nomor SK Jabatan', 'Tanggal SK', 'TMT Jabatan', 'Berkas']"
                         :empty="$p->positionHistories->isEmpty()"
                         empty-label="Pegawai ini belum memiliki riwayat jabatan."
                     >
@@ -129,6 +136,13 @@
                                 <td class="px-4 py-3">{{ $position->no_sk ?: '-' }}</td>
                                 <td class="px-4 py-3">@include('pegawai.partials.detail.date', ['value' => $position->tanggal_sk])</td>
                                 <td class="px-4 py-3">@include('pegawai.partials.detail.date', ['value' => $position->tmt_jabatan])</td>
+                                <td class="px-4 py-3">
+                                    @if($position->file_sk)
+                                        <a href="{{ route('pimpinan.pegawai.history-attachments.download', ['employee' => $p, 'type' => 'position', 'history' => $position]) }}" class="font-semibold text-primary hover:underline">Unduh SK</a>
+                                    @else
+                                        -
+                                    @endif
+                                </td>
                             </tr>
                         @endforeach
                     </x-pegawai.detail.table>
@@ -141,7 +155,7 @@
                     </div>
                     <x-pegawai.detail.table
                         name="kgb"
-                        :headings="['Gaji Pokok Baru', 'Nomor Surat KGB', 'Tanggal Surat', 'TMT KGB']"
+                        :headings="['Gaji Pokok Baru', 'Nomor Surat KGB', 'Tanggal Surat', 'TMT KGB', 'Berkas']"
                         :empty="$p->salaryHistories->isEmpty()"
                         empty-label="Pegawai ini belum memiliki riwayat KGB."
                     >
@@ -151,6 +165,13 @@
                                 <td class="px-4 py-3">{{ $salary->no_sk ?: '-' }}</td>
                                 <td class="px-4 py-3">@include('pegawai.partials.detail.date', ['value' => $salary->tanggal_sk])</td>
                                 <td class="px-4 py-3">@include('pegawai.partials.detail.date', ['value' => $salary->tmt_kgb])</td>
+                                <td class="px-4 py-3">
+                                    @if($salary->file_sk)
+                                        <a href="{{ route('pimpinan.pegawai.history-attachments.download', ['employee' => $p, 'type' => 'salary', 'history' => $salary]) }}" class="font-semibold text-primary hover:underline">Unduh SK</a>
+                                    @else
+                                        -
+                                    @endif
+                                </td>
                             </tr>
                         @endforeach
                     </x-pegawai.detail.table>
@@ -226,7 +247,12 @@
                         <h3 class="text-sm font-bold text-ink font-sans">Data &amp; SK Pengangkatan Pertama</h3>
                         <p class="mt-0.5 text-xs text-muted font-sans">Berkas dasar penerimaan kepegawaian sebagai CPNS/PNS/PPPK.</p>
                     </div>
-                    @include('pegawai.partials.detail.appointment-readonly', ['appointment' => $p->appointment])
+                    @include('pegawai.partials.detail.appointment-readonly', [
+                        'appointment' => $p->appointment,
+                        'attachmentDownloadUrl' => $p->appointment?->file_sk
+                            ? route('pimpinan.pegawai.history-attachments.download', ['employee' => $p, 'type' => 'appointment', 'history' => $p->appointment])
+                            : null,
+                    ])
                 </x-pegawai.detail.panel>
 
                 <x-pegawai.detail.panel tab="docs" id-prefix="pimpinan">

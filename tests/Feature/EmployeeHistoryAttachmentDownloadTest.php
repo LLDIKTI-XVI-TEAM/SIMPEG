@@ -21,6 +21,7 @@ use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class EmployeeHistoryAttachmentDownloadTest extends TestCase
@@ -177,6 +178,73 @@ class EmployeeHistoryAttachmentDownloadTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_pimpinan_dapat_mengunduh_empat_tipe_riwayat_legacy_yang_diizinkan(): void
+    {
+        $employee = Employee::factory()->create();
+        $attachments = array_slice($this->historyAttachments($employee), 0, 4);
+
+        foreach ($attachments as [$type, $history, $path]) {
+            Storage::disk(Document::STORAGE_DISK)->put($path, 'attachment pimpinan '.$type);
+
+            $this->actingAs(User::factory()->pimpinan()->create())
+                ->get($this->pimpinanUrl($employee, $type, $history->id))
+                ->assertOk()
+                ->assertDownload();
+        }
+    }
+
+    public function test_attachment_riwayat_pimpinan_memerlukan_permission_employees_read(): void
+    {
+        $employee = Employee::factory()->create();
+        [$type, $history, $path] = $this->historyAttachments($employee)[0];
+        Storage::disk(Document::STORAGE_DISK)->put($path, 'attachment pimpinan');
+        $role = Role::where('name', 'pimpinan')->firstOrFail();
+        $permission = Permission::where('name', 'employees.read')->firstOrFail();
+        $role->permissions()->detach($permission->id);
+
+        $this->actingAs(User::factory()->pimpinan()->create())
+            ->get($this->pimpinanUrl($employee, $type, $history->id))
+            ->assertForbidden();
+    }
+
+    public function test_attachment_riwayat_pimpinan_menolak_history_milik_pegawai_lain(): void
+    {
+        $employee = Employee::factory()->create();
+        $otherEmployee = Employee::factory()->create();
+        [$type, $history] = $this->historyAttachments($otherEmployee)[0];
+
+        $this->actingAs(User::factory()->pimpinan()->create())
+            ->get($this->pimpinanUrl($employee, $type, $history->id))
+            ->assertNotFound();
+    }
+
+    public function test_attachment_riwayat_pimpinan_menolak_tipe_uuid_dan_history_yang_tidak_valid(): void
+    {
+        $employee = Employee::factory()->create();
+        [$type, $history] = $this->historyAttachments($employee)[0];
+        $pimpinan = User::factory()->pimpinan()->create();
+
+        $this->actingAs($pimpinan)
+            ->get($this->pimpinanUrl($employee, 'unknown', $history->id))
+            ->assertNotFound();
+        $this->actingAs($pimpinan)
+            ->get($this->pimpinanUrl($employee, $type, 'not-a-uuid'))
+            ->assertNotFound();
+        $this->actingAs($pimpinan)
+            ->get($this->pimpinanUrl($employee, $type, (string) Str::uuid()))
+            ->assertNotFound();
+    }
+
+    public function test_attachment_riwayat_pimpinan_menolak_file_privat_yang_hilang(): void
+    {
+        $employee = Employee::factory()->create();
+        [$type, $history] = $this->historyAttachments($employee)[0];
+
+        $this->actingAs(User::factory()->pimpinan()->create())
+            ->get($this->pimpinanUrl($employee, $type, $history->id))
+            ->assertNotFound();
+    }
+
     public function test_show_dan_edit_admin_tidak_mengekspos_url_storage_attachment_riwayat(): void
     {
         $employee = Employee::factory()->create();
@@ -224,5 +292,10 @@ class EmployeeHistoryAttachmentDownloadTest extends TestCase
     private function url(Employee $employee, string $type, string $history): string
     {
         return '/pegawai/'.$employee->id.'/attachment-riwayat/'.$type.'/'.$history.'/unduh';
+    }
+
+    private function pimpinanUrl(Employee $employee, string $type, string $history): string
+    {
+        return '/pimpinan/pegawai/'.$employee->id.'/attachment-riwayat/'.$type.'/'.$history.'/unduh';
     }
 }

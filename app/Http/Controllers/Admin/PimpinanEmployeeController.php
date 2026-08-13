@@ -18,6 +18,9 @@ use Illuminate\Support\Facades\Storage;
 
 class PimpinanEmployeeController extends Controller
 {
+    /** @var list<string> */
+    private const HISTORY_ATTACHMENT_TYPES = ['rank', 'position', 'salary', 'appointment'];
+
     public function index(Request $request, ListEmployeesAction $listEmployees)
     {
         $filters = [
@@ -140,6 +143,27 @@ class PimpinanEmployeeController extends Controller
     ) {
         // UUID pegawai sendiri menandai snapshot legacy; UUID lain wajib record status milik pegawai target.
         $type = hash_equals($employee->id, $history) ? 'status-snapshot' : 'status';
+        $download = $action->execute($employee, $type, $history);
+
+        return Storage::disk(Document::STORAGE_DISK)->download($download['path'], $download['filename'], [
+            'Cache-Control' => 'private, no-store, max-age=0',
+            'Pragma' => 'no-cache',
+        ]);
+    }
+
+    /**
+     * Mengunduh SK riwayat legacy yang memang dibutuhkan Pimpinan secara read-only.
+     *
+     * Allowlist ini mencegah route Pimpinan menjadi pintu akses ke tipe riwayat yang
+     * belum disetujui untuk permukaan kepemimpinan.
+     */
+    public function downloadHistoryAttachment(
+        Employee $employee,
+        string $type,
+        string $history,
+        PrepareEmployeeHistoryAttachmentDownloadAction $action,
+    ) {
+        abort_unless(in_array($type, self::HISTORY_ATTACHMENT_TYPES, true), 404);
         $download = $action->execute($employee, $type, $history);
 
         return Storage::disk(Document::STORAGE_DISK)->download($download['path'], $download['filename'], [

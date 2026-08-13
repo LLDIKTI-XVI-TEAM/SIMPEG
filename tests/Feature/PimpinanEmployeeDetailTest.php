@@ -368,17 +368,17 @@ class PimpinanEmployeeDetailTest extends TestCase
                 'admin_actions' => true,
             ],
             'kepangkatan' => [
-                'headings' => ['Golongan', 'Nomor SK Pangkat', 'Tanggal SK', 'TMT Pangkat'],
+                'headings' => ['Golongan', 'Nomor SK Pangkat', 'Tanggal SK', 'TMT Pangkat', 'Berkas'],
                 'empty' => 'Pegawai ini belum memiliki riwayat kepangkatan.',
                 'admin_actions' => false,
             ],
             'jabatan' => [
-                'headings' => ['Nama Jabatan', 'Unit Kerja', 'Nomor SK Jabatan', 'Tanggal SK', 'TMT Jabatan'],
+                'headings' => ['Nama Jabatan', 'Unit Kerja', 'Nomor SK Jabatan', 'Tanggal SK', 'TMT Jabatan', 'Berkas'],
                 'empty' => 'Pegawai ini belum memiliki riwayat jabatan.',
                 'admin_actions' => false,
             ],
             'kgb' => [
-                'headings' => ['Gaji Pokok Baru', 'Nomor Surat KGB', 'Tanggal Surat', 'TMT KGB'],
+                'headings' => ['Gaji Pokok Baru', 'Nomor Surat KGB', 'Tanggal Surat', 'TMT KGB', 'Berkas'],
                 'empty' => 'Pegawai ini belum memiliki riwayat KGB.',
                 'admin_actions' => false,
             ],
@@ -393,7 +393,7 @@ class PimpinanEmployeeDetailTest extends TestCase
                 'admin_actions' => true,
             ],
             'pengangkatan' => [
-                'headings' => ['Jenis Pengangkatan', 'Nomor SK Pengangkatan', 'Tanggal SK', 'TMT Pengangkatan'],
+                'headings' => ['Jenis Pengangkatan', 'Nomor SK Pengangkatan', 'Tanggal SK', 'TMT Pengangkatan', 'Berkas'],
                 'empty' => 'Belum ada data pengangkatan.',
                 'admin_actions' => false,
             ],
@@ -793,6 +793,69 @@ class PimpinanEmployeeDetailTest extends TestCase
             ->get($url)
             ->assertOk()
             ->assertDownload();
+    }
+
+    public function test_pimpinan_menampilkan_tautan_berkas_riwayat_legacy_tanpa_kontrol_mutasi(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = Employee::factory()->create();
+        $golongan = RefGolongan::create(['kode' => 'III/a', 'nama' => 'Penata Muda', 'urutan' => 9]);
+        $rank = RankHistory::create([
+            'employee_id' => $employee->id,
+            'golongan_id' => $golongan->id,
+            'tmt_pangkat' => '2026-01-01',
+            'file_sk' => 'pegawai/pimpinan-rank.pdf',
+            'is_latest' => true,
+        ]);
+        $position = PositionHistory::create([
+            'employee_id' => $employee->id,
+            'nama_jabatan' => 'Analis Pimpinan',
+            'tmt_jabatan' => '2026-01-01',
+            'file_sk' => 'pegawai/pimpinan-position.pdf',
+            'is_latest' => true,
+        ]);
+        $salary = SalaryHistory::create([
+            'employee_id' => $employee->id,
+            'gaji_pokok' => 5000000,
+            'tmt_kgb' => '2026-01-01',
+            'file_sk' => 'pegawai/pimpinan-salary.pdf',
+            'is_latest' => true,
+        ]);
+        $appointment = Appointment::create([
+            'employee_id' => $employee->id,
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2020-01-01',
+            'file_sk' => 'pegawai/pimpinan-appointment.pdf',
+        ]);
+
+        $response = $this->actingAs(User::factory()->pimpinan()->create())
+            ->get(route('pimpinan.pegawai.show', $employee))
+            ->assertOk();
+
+        foreach ([
+            ['rank', $rank],
+            ['position', $position],
+            ['salary', $salary],
+            ['appointment', $appointment],
+        ] as [$type, $history]) {
+            $response->assertSee(route('pimpinan.pegawai.history-attachments.download', [
+                'employee' => $employee,
+                'type' => $type,
+                'history' => $history,
+            ]), false);
+        }
+
+        $response
+            ->assertSee('>Berkas<', false)
+            ->assertSee('>Unduh SK<', false)
+            ->assertDontSee($rank->file_sk, false)
+            ->assertDontSee($position->file_sk, false)
+            ->assertDontSee($salary->file_sk, false)
+            ->assertDontSee($appointment->file_sk, false)
+            ->assertDontSee('>Aksi<', false)
+            ->assertDontSee('>Tambah<', false)
+            ->assertDontSee('>Edit<', false)
+            ->assertDontSee('>Hapus<', false);
     }
 
     public function test_profil_pimpinan_memakai_fallback_bup_yang_sama_saat_tanggal_pensiun_kosong(): void

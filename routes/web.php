@@ -649,6 +649,12 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
                 ->whereUuid('employee')
                 ->whereUuid('history')
                 ->name('pegawai.status-attachments.download');
+            Route::get('/pegawai/{employee}/attachment-riwayat/{type}/{history}/unduh', [PimpinanEmployeeController::class, 'downloadHistoryAttachment'])
+                ->middleware('permission:employees.read')
+                ->whereUuid('employee')
+                ->whereUuid('history')
+                ->whereIn('type', ['rank', 'position', 'salary', 'appointment'])
+                ->name('pegawai.history-attachments.download');
 
             Route::get('/cuti', [PimpinanLeaveController::class, 'index'])->name('cuti.index');
             Route::get('/cuti/{leave}', [PimpinanLeaveController::class, 'show'])
