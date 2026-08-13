@@ -67,7 +67,6 @@ class Index extends Component
             'jenis_pegawai_id' => trim((string) $request->query('jenis_pegawai_id', '')),
             'status_pegawai_id' => trim((string) $request->query('status_pegawai_id', 'all')),
             'status_aktif' => trim((string) $request->query('status_aktif', '')),
-            'show_nonaktif' => $request->boolean('show_nonaktif'),
         ];
 
         // Backward-compatible query params from the pagination branch.

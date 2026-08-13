@@ -236,14 +236,14 @@
     <x-ui.data-table
         rows="rows"
         meta="meta"
-        :columns="[
-            ['key' => 'check',            'label' => '', 'width' => 'w-10'],
+        :columns="array_values(array_filter([
+            $canBulkRestore ? ['key' => 'check', 'label' => '', 'width' => 'w-10'] : null,
             ['key' => 'nama_lengkap',     'label' => 'Pegawai'],
             ['key' => 'jabatan',          'label' => 'Jabatan & Unit Terakhir'],
             ['key' => 'golongan_terakhir','label' => 'Gol. / Jenis'],
             ['key' => 'deleted_at_human', 'label' => 'Dinonaktifkan Pada'],
             ['key' => 'aksi',             'label' => 'Aksi', 'align' => 'right'],
-        ]"
+        ]))"
         fetchPage="fetchPage(page)"
         isLoading="isLoading"
         perPage="perPage"
@@ -252,8 +252,8 @@
         searchPlaceholder="Cari nama atau NIP"
         emptyTitle="Tidak ada data backup."
         emptyIcon="document"
-        :colspanCount="6"
-        checkAllId="backup-check-all"
+        :colspanCount="$canBulkRestore ? 6 : 5"
+        :checkAllId="$canBulkRestore ? 'backup-check-all' : null"
         checkAllAction="toggleAll($event.target.checked)"
     >
         {{-- override select-all header dikerjakan manual via Alpine karena event @change tidak bisa di-bind di komponen --}}
@@ -263,11 +263,13 @@
             <template x-for="(p, index) in rows" :key="p.id">
                 <tr class="border-b border-border last:border-0 transition-colors hover:bg-soft/40">
 
-                    {{-- Checkbox --}}
-                    <td class="px-4 py-3.5">
-                        <input type="checkbox" class="backup-check h-4 w-4 rounded border-border text-primary focus:ring-primary/20 cursor-pointer"
-                            :value="p.id" @change="_syncSelected()">
-                    </td>
+                    {{-- Checkbox seleksi hanya untuk role yang boleh memulihkan secara massal --}}
+                    @if ($canBulkRestore)
+                        <td class="px-4 py-3.5">
+                            <input type="checkbox" class="backup-check h-4 w-4 rounded border-border text-primary focus:ring-primary/20 cursor-pointer"
+                                :value="p.id" @change="_syncSelected()">
+                        </td>
+                    @endif
 
                     {{-- Pegawai --}}
                     <td class="px-4 py-3.5">
@@ -326,7 +328,7 @@
         {{-- Error state --}}
         <template x-if="!isLoading && fetchError">
             <tr>
-                <td colspan="7" class="px-4 py-10 text-center">
+                <td colspan="{{ $canBulkRestore ? 6 : 5 }}" class="px-4 py-10 text-center">
                     <div class="flex flex-col items-center gap-2">
                         <svg class="w-8 h-8 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
@@ -346,6 +348,9 @@
     {{-- ============================================================ --}}
     {{-- FLOATING BULK ACTION BAR --}}
     {{-- ============================================================ --}}
+    {{-- Endpoint pulihkan massal masih terbatas Super Admin, sehingga bar ini tidak
+         ditampilkan kepada role lain agar tidak menawarkan aksi yang pasti ditolak. --}}
+    @if ($canBulkRestore)
     <div x-show="selectedCount > 0"
         x-transition:enter="transition ease-out duration-200"
         x-transition:enter-start="opacity-0 translate-y-4"
@@ -374,6 +379,7 @@
             Batal Pilih
         </button>
     </div>
+    @endif
 
     {{-- ============================================================ --}}
     {{-- MODAL RESTORE SINGLE (via API) --}}
@@ -413,6 +419,7 @@
     {{-- ============================================================ --}}
     {{-- MODAL BULK RESTORE (form POST) --}}
     {{-- ============================================================ --}}
+    @if ($canBulkRestore)
     <x-ui.modal
         show="showBulkRestoreModal"
         title="Pulihkan Pegawai Terpilih"
@@ -462,6 +469,7 @@
             </div>
         </div>
     </x-ui.modal>
+    @endif
 
 </div>{{-- end x-data --}}
 

@@ -81,16 +81,13 @@ class EmployeeDeactivateRestoreTest extends TestCase
         $user = User::factory()->adminKepegawaian()->create();
 
         $this->actingAs($user)
-            ->get(route('data-pegawai', ['show_nonaktif' => 1]))
+            ->get(route('data-pegawai'))
             ->assertOk()
             ->assertSee('Nonaktifkan', false)
-            ->assertSee('Tampilkan Pegawai Non-Aktif', false)
-            ->assertSee('show_nonaktif: true', false)
-            ->assertSee("show_nonaktif: this.filters.show_nonaktif ? '1' : '0'", false)
-            ->assertSee('filters.show_nonaktif ? null : `/pegawai/${p.id}`', false)
-            ->assertSee('x-show="!filters.show_nonaktif" onclick="exportFilteredData()"', false)
-            ->assertSee('x-show="!filters.show_nonaktif" onclick="exportFilteredDataPdf()"', false)
-            ->assertSee('x-show="!filters.show_nonaktif" type="button" @click="openDocumentStatus(p)"', false)
+            // Mode nonaktif di dalam daftar sudah dicabut; pemulihan dipusatkan di Data Backup.
+            ->assertDontSee('Tampilkan Pegawai Non-Aktif', false)
+            ->assertDontSee('show_nonaktif', false)
+            ->assertSee('href="'.route('data-backup').'"', false)
             ->assertSee('Data tidak dihapus dan bisa diaktifkan kembali.', false)
             ->assertDontSee('30 hari', false)
             ->assertDontSee('dihapus permanen otomatis', false);
@@ -174,7 +171,7 @@ class EmployeeDeactivateRestoreTest extends TestCase
         $response->assertJsonMissing(['nama_lengkap' => 'Pegawai Aktif']);
     }
 
-    public function test_api_employee_list_can_filter_nonaktif_employees(): void
+    public function test_api_endpoint_nonaktif_mengembalikan_pegawai_terhapus(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
         Employee::factory()->create(['nama_lengkap' => 'Pegawai Aktif Filter']);
@@ -182,18 +179,37 @@ class EmployeeDeactivateRestoreTest extends TestCase
         $inactive->delete();
 
         $this->actingAs($user)
-            ->getJson('/api/v1/pegawai?show_nonaktif=true')
+            ->getJson('/api/v1/pegawai/nonaktif')
             ->assertOk()
             ->assertJsonPath('employees.data.0.nama_lengkap', 'Pegawai Nonaktif Filter')
             ->assertJsonMissing(['nama_lengkap' => 'Pegawai Aktif Filter']);
     }
 
-    public function test_nonaktif_filter_returns_trashed_employees_of_every_lifecycle_status(): void
+    /**
+     * Daftar pegawai aktif tidak boleh lagi memiliki jalur tersembunyi ke record terhapus.
+     * Parameter lama yang masih dikirim manual harus diabaikan, bukan membuka dataset trashed.
+     */
+    public function test_daftar_pegawai_aktif_mengabaikan_parameter_show_nonaktif_lama(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        Employee::factory()->create(['nama_lengkap' => 'Pegawai Aktif Tetap Tampil']);
+        $inactive = Employee::factory()->create(['nama_lengkap' => 'Pegawai Terhapus Tidak Boleh Tampil']);
+        $inactive->delete();
+
+        $this->actingAs($user)
+            ->getJson('/api/v1/pegawai?show_nonaktif=true')
+            ->assertOk()
+            ->assertJsonMissing(['nama_lengkap' => 'Pegawai Terhapus Tidak Boleh Tampil'])
+            ->assertJsonPath('employees.total', 1)
+            ->assertJsonPath('employees.data.0.nama_lengkap', 'Pegawai Aktif Tetap Tampil');
+    }
+
+    public function test_endpoint_nonaktif_mengembalikan_pegawai_terhapus_dari_semua_status(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
 
-        // Pegawai yang dinonaktifkan justru sering berstatus Pensiun atau Mutasi, sehingga filter
-        // daftar nonaktif tidak boleh lagi menerapkan default hanya-Aktif.
+        // Pegawai yang dinonaktifkan justru sering berstatus Pensiun atau Mutasi, sehingga daftar
+        // nonaktif tidak boleh menerapkan default hanya-Aktif.
         $names = [
             'Aktif' => 'Nonaktif Berstatus Aktif',
             'Pensiun' => 'Nonaktif Berstatus Pensiun',
@@ -212,7 +228,7 @@ class EmployeeDeactivateRestoreTest extends TestCase
         Employee::factory()->create(['nama_lengkap' => 'Masih Aktif Tidak Boleh Muncul']);
 
         $response = $this->actingAs($user)
-            ->getJson('/api/v1/pegawai?show_nonaktif=true&per_page=50')
+            ->getJson('/api/v1/pegawai/nonaktif?per_page=50')
             ->assertOk();
 
         $returned = collect($response->json('employees.data'))->pluck('nama_lengkap');
@@ -225,27 +241,24 @@ class EmployeeDeactivateRestoreTest extends TestCase
         $this->assertSame(4, $response->json('employees.total'));
     }
 
-    public function test_nonaktif_filter_still_honours_explicit_status_choice(): void
+    public function test_daftar_pegawai_aktif_tetap_menghormati_pilihan_status_eksplisit(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
 
-        $pensiun = Employee::factory()->create([
-            'nama_lengkap' => 'Nonaktif Pensiun Terpilih',
+        Employee::factory()->create([
+            'nama_lengkap' => 'Pensiun Terpilih',
             'status_aktif' => 'Pensiun',
         ]);
-        $pensiun->delete();
-
-        $mutasi = Employee::factory()->create([
-            'nama_lengkap' => 'Nonaktif Mutasi Tidak Terpilih',
+        Employee::factory()->create([
+            'nama_lengkap' => 'Mutasi Tidak Terpilih',
             'status_aktif' => 'Mutasi',
         ]);
-        $mutasi->delete();
 
         $this->actingAs($user)
-            ->getJson('/api/v1/pegawai?show_nonaktif=true&status_aktif=Pensiun')
+            ->getJson('/api/v1/pegawai?status_aktif=Pensiun')
             ->assertOk()
             ->assertJsonPath('employees.total', 1)
-            ->assertJsonPath('employees.data.0.nama_lengkap', 'Nonaktif Pensiun Terpilih');
+            ->assertJsonPath('employees.data.0.nama_lengkap', 'Pensiun Terpilih');
     }
 
     public function test_active_employee_list_keeps_default_aktif_filter(): void
@@ -291,9 +304,9 @@ class EmployeeDeactivateRestoreTest extends TestCase
         $this->actingAs($user);
         $response = $this->postWithCsrf(route('pegawai.restore', $employee->id));
 
-        // Daftar nonaktif memakai gate yang sama dengan aksi restore, sehingga Admin Kepegawaian
-        // tidak boleh diarahkan ke halaman khusus Super Admin seperti data-backup.
-        $response->assertRedirect(route('data-nonaktif'));
+        // Data Backup memakai gate yang sama dengan aksi restore, sehingga Admin Kepegawaian
+        // dapat mengikuti redirect tanpa berakhir 403.
+        $response->assertRedirect(route('data-backup'));
 
         // Redirect wajib diikuti karena assert 302 saja tidak membuktikan tujuannya dapat diakses.
         $this->followRedirects($response)->assertOk();
@@ -309,7 +322,7 @@ class EmployeeDeactivateRestoreTest extends TestCase
         ]);
     }
 
-    public function test_web_restore_does_not_redirect_admin_kepegawaian_to_super_admin_page(): void
+    public function test_web_restore_mengarahkan_admin_kepegawaian_ke_halaman_yang_dapat_diakses(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create();
@@ -317,12 +330,12 @@ class EmployeeDeactivateRestoreTest extends TestCase
 
         $this->actingAs($user);
 
-        // Menegaskan halaman tujuan lama memang tertutup bagi Admin Kepegawaian, sehingga
-        // redirect ke sana akan mengubah restore yang berhasil menjadi dead-end 403.
-        $this->get(route('data-backup'))->assertForbidden();
+        // Data Backup kini menjadi satu-satunya halaman pemulihan dan harus terbuka bagi
+        // Admin Kepegawaian, agar restore yang berhasil tidak berakhir pada dead-end 403.
+        $this->get(route('data-backup'))->assertOk();
 
         $this->postWithCsrf(route('pegawai.restore', $employee->id))
-            ->assertRedirect(route('data-nonaktif'));
+            ->assertRedirect(route('data-backup'));
     }
 
     public function test_web_restore_still_works_for_super_admin(): void
@@ -334,7 +347,7 @@ class EmployeeDeactivateRestoreTest extends TestCase
         $this->actingAs($user);
         $response = $this->postWithCsrf(route('pegawai.restore', $employee->id));
 
-        $response->assertRedirect(route('data-nonaktif'));
+        $response->assertRedirect(route('data-backup'));
         $this->followRedirects($response)->assertOk();
 
         $this->assertDatabaseHas('employees', [
@@ -348,25 +361,24 @@ class EmployeeDeactivateRestoreTest extends TestCase
         ]);
     }
 
-    public function test_daftar_pegawai_mode_nonaktif_menyediakan_aksi_aktifkan_kembali(): void
+    public function test_daftar_pegawai_menautkan_pemulihan_ke_data_backup(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
         $inactive = Employee::factory()->create(['nama_lengkap' => 'Pegawai Nonaktif Restore UI']);
         $inactive->delete();
 
         $this->actingAs($user)
-            ->get(route('data-pegawai', ['show_nonaktif' => 1]))
+            ->get(route('data-pegawai'))
             ->assertOk()
-            // Aksi restore harus melekat pada baris hasil filter nonaktif, bukan hanya di halaman terpisah.
-            ->assertSee('x-show="filters.show_nonaktif"', false)
-            ->assertSee('restorePegawai(p.id, p.nama_lengkap)', false)
-            ->assertSee("'Aktifkan kembali pegawai ' + p.nama_lengkap", false)
-            ->assertSee('/api/v1/pegawai/${this.restorePegawaiId}/restore', false)
-            // Halaman kelola nonaktif tetap dapat dicapai tanpa mengetik URL manual.
-            ->assertSee(route('data-nonaktif'), false);
+            // Pemulihan dipusatkan di Data Backup, sehingga daftar hanya menautkannya.
+            ->assertSee('href="'.route('data-backup').'"', false)
+            ->assertDontSee('restorePegawai(p.id, p.nama_lengkap)', false)
+            ->assertDontSee("'Aktifkan kembali pegawai ' + p.nama_lengkap", false)
+            // Record terhapus tidak boleh ikut dirender pada daftar pegawai aktif.
+            ->assertDontSeeText('Pegawai Nonaktif Restore UI');
     }
 
-    public function test_aksi_aktifkan_kembali_tidak_tampil_tanpa_permission_restore(): void
+    public function test_tautan_data_backup_tidak_tampil_tanpa_permission_restore(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
         $role = Role::where('name', 'admin_kepegawaian')->firstOrFail();
@@ -377,16 +389,15 @@ class EmployeeDeactivateRestoreTest extends TestCase
         $trashed->delete();
 
         $this->actingAs($user)
-            ->get(route('data-pegawai', ['show_nonaktif' => 1]))
+            ->get(route('data-pegawai'))
             ->assertOk()
-            ->assertDontSee('restorePegawai(p.id, p.nama_lengkap)', false)
-            ->assertDontSee("'Aktifkan kembali pegawai ' + p.nama_lengkap", false);
+            ->assertDontSee('href="'.route('data-backup').'"', false);
 
         $this->postWithCsrf(route('pegawai.restore', $trashed->id))->assertForbidden();
-        $this->get(route('data-nonaktif'))->assertForbidden();
+        $this->get(route('data-backup'))->assertForbidden();
     }
 
-    public function test_inactive_page_renders_database_trashed_employees_not_static_rows(): void
+    public function test_halaman_data_backup_merender_pegawai_terhapus_dari_database(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
         Employee::factory()->create(['nama_lengkap' => 'Pegawai Aktif Tidak Muncul']);
@@ -399,14 +410,33 @@ class EmployeeDeactivateRestoreTest extends TestCase
         $inactive->delete();
 
         $this->actingAs($user);
-        $response = $this->get(route('data-nonaktif'));
+        $response = $this->get(route('data-backup'));
 
         $response->assertOk();
-        $response->assertSeeText('Pegawai Nonaktif Database');
-        $response->assertSeeText('198001012006041001');
-        $response->assertDontSeeText('Pegawai Aktif Tidak Muncul');
-        $response->assertDontSeeText('Yucna Dara');
-        $response->assertSee(route('pegawai.restore', $inactive->id), false);
+        $response->assertSee('Pegawai Nonaktif Database', false);
+        $response->assertSee('198001012006041001', false);
+        $response->assertDontSee('Pegawai Aktif Tidak Muncul', false);
+    }
+
+    /** Pemulihan massal masih terbatas Super Admin, sehingga kontrolnya tidak boleh muncul bagi Admin Kepegawaian. */
+    public function test_kontrol_pulihkan_massal_hanya_untuk_super_admin(): void
+    {
+        $trashed = Employee::factory()->create();
+        $trashed->delete();
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('data-backup'))
+            ->assertOk()
+            ->assertDontSee('bulk-restore-form', false)
+            ->assertDontSee('Pulihkan Pilihan', false);
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('data-backup'))
+            ->assertOk()
+            ->assertSee('bulk-restore-form', false)
+            ->assertSee('Pulihkan Pilihan', false);
+
+        $this->postWithCsrf(route('pegawai.bulkRestore'), ['ids' => [$trashed->id]])->assertRedirect();
     }
 
     public function test_pegawai_cannot_deactivate_or_restore_employee(): void
@@ -455,23 +485,21 @@ class EmployeeDeactivateRestoreTest extends TestCase
             ->assertSessionHasErrors('ids.0');
     }
 
-    public function test_daftar_mode_nonaktif_menutup_selector_dan_aksi_massal(): void
+    public function test_daftar_pegawai_aktif_menyediakan_selector_aksi_massal(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
-        $trashed = Employee::factory()->create();
-        $trashed->delete();
+        Employee::factory()->create(['nama_lengkap' => 'Pegawai Aktif Untuk Seleksi']);
 
         $response = $this->actingAs($user)
-            ->get(route('data-pegawai', ['show_nonaktif' => 1]))
+            ->get(route('data-pegawai'))
             ->assertOk();
 
-        // Select-all dan checkbox baris harus benar-benar tertutup, bukan hanya tersembunyi,
-        // agar aksi massal pegawai aktif tidak bisa dipicu terhadap data nonaktif.
-        $response->assertSee('x-show="!filters.show_nonaktif" x-bind:disabled="!(!filters.show_nonaktif)"', false);
-        $response->assertSee('x-bind:disabled="filters.show_nonaktif"', false);
-        $response->assertSee('id="bulk-bar" x-show="!filters.show_nonaktif"', false);
+        // Daftar ini kini hanya memuat pegawai aktif, sehingga selector dan bar aksi massal
+        // tidak lagi perlu dikondisikan terhadap mode nonaktif.
+        $response->assertSee('id="bulk-bar"', false);
+        $response->assertDontSee('filters.show_nonaktif', false);
 
-        // Seluruh pengumpulan pilihan mengabaikan checkbox yang dinonaktifkan.
+        // Seluruh pengumpulan pilihan tetap mengabaikan checkbox yang dinonaktifkan.
         $response->assertSee('.row-check:not([disabled]):checked', false);
         $response->assertDontSee("document.querySelectorAll('.row-check:checked')", false);
     }
@@ -491,7 +519,9 @@ class EmployeeDeactivateRestoreTest extends TestCase
         $response->assertSee('if (requestedPage > lastPage)', false);
         $response->assertSee("this.clearCacheByPrefixes(['pegawai_']);", false);
         $response->assertSee("this.clearCacheByPrefixes(['pegawai_', 'backup_']);", false);
-        $this->assertSame(2, substr_count($response->getContent(), 'this.clearEmployeeLifecycleCache();'));
+        // Tinggal satu pemanggil setelah pemulihan dipindahkan sepenuhnya ke Data Backup:
+        // aksi nonaktifkan tetap memindahkan pegawai keluar dari daftar aktif.
+        $this->assertSame(1, substr_count($response->getContent(), 'this.clearEmployeeLifecycleCache();'));
         $response->assertDontSee('this.meta.total = Math.max(0, this.meta.total - 1);', false);
     }
 

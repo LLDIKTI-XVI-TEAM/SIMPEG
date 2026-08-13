@@ -285,12 +285,11 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
             ->whereUuid('statusPegawai')->name('status-pegawai.destroy');
     });
 
-    Route::get('/pegawai/nonaktif-list', [PegawaiController::class, 'inactive'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.restore'])
-        ->name('data-nonaktif');
-
+    // Data Backup menjadi satu-satunya halaman pemulihan pegawai soft delete.
+    // Gate-nya disamakan dengan aksi restore agar Admin Kepegawaian tidak berakhir 403
+    // setelah pemulihan berhasil.
     Route::get('/pegawai/data-backup', [PegawaiController::class, 'backup'])
-        ->middleware(['role:super_admin'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.restore'])
         ->name('data-backup');
 
     Route::get('/cuti/rekap', [CutiController::class, 'rekap'])
