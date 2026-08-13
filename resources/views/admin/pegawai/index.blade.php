@@ -68,13 +68,22 @@
         return `pegawai_pp${this.perPage}_s${f.search}_g${f.golongan}_u${f.unit_kerja_id}_j${f.jenis_pegawai_id}_st${f.status_pegawai_id}_na${f.show_nonaktif}_sort${this.sort}_dir${this.direction}`;
     },
 
-    clearCache() {
+    clearCacheByPrefixes(prefixes) {
         const toDelete = [];
         for (let i = 0; i < sessionStorage.length; i++) {
             const key = sessionStorage.key(i);
-            if (key && key.startsWith('pegawai_')) toDelete.push(key);
+            if (key && prefixes.some((prefix) => key.startsWith(prefix))) toDelete.push(key);
         }
         toDelete.forEach(k => sessionStorage.removeItem(k));
+    },
+
+    clearCache() {
+        this.clearCacheByPrefixes(['pegawai_']);
+    },
+
+    clearEmployeeLifecycleCache() {
+        // Perubahan status aktif/nonaktif memengaruhi daftar pegawai dan Data Backup.
+        this.clearCacheByPrefixes(['pegawai_', 'backup_']);
     },
 
     async fetchPage(page) {
@@ -221,7 +230,7 @@
                 throw new Error(data.message || `HTTP ${res.status}`);
             }
             // Cache daftar aktif dan nonaktif harus dimuat ulang agar kedua mode konsisten.
-            this.clearCache();
+            this.clearEmployeeLifecycleCache();
 
             this.showDeleteModal = false;
             await this.refreshAfterListMembershipChange();
@@ -259,7 +268,7 @@
                 throw new Error(data.message || `HTTP ${res.status}`);
             }
             // Pegawai berpindah dari daftar nonaktif ke daftar aktif, sehingga cache kedua mode harus dibuang.
-            this.clearCache();
+            this.clearEmployeeLifecycleCache();
 
             this.showRestoreModal = false;
             await this.refreshAfterListMembershipChange();

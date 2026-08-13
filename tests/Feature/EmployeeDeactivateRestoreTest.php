@@ -489,6 +489,9 @@ class EmployeeDeactivateRestoreTest extends TestCase
         $response->assertSee('async refreshAfterListMembershipChange()', false);
         $response->assertSee('await this.refreshAfterListMembershipChange();', false);
         $response->assertSee('if (requestedPage > lastPage)', false);
+        $response->assertSee("this.clearCacheByPrefixes(['pegawai_']);", false);
+        $response->assertSee("this.clearCacheByPrefixes(['pegawai_', 'backup_']);", false);
+        $this->assertSame(2, substr_count($response->getContent(), 'this.clearEmployeeLifecycleCache();'));
         $response->assertDontSee('this.meta.total = Math.max(0, this.meta.total - 1);', false);
     }
 
