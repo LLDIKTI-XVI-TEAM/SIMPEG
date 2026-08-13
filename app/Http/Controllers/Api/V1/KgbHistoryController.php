@@ -16,8 +16,7 @@ class KgbHistoryController extends Controller
         Employee $employee,
         ListKgbHistoriesAction $action,
         EmployeeHistoryPayload $payload,
-    ): JsonResponse
-    {
+    ): JsonResponse {
         return response()->json([
             'employee_id' => $employee->id,
             'histories' => $action->execute($employee)->map($payload->kgb(...)),

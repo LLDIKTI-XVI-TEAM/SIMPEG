@@ -16,8 +16,7 @@ class PositionHistoryController extends Controller
         Employee $employee,
         ListPositionHistoriesAction $action,
         EmployeeHistoryPayload $payload,
-    ): JsonResponse
-    {
+    ): JsonResponse {
         return response()->json([
             'employee_id' => $employee->id,
             'histories' => $action->execute($employee)->map($payload->position(...)),
