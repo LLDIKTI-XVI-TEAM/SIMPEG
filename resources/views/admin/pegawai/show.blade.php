@@ -35,6 +35,8 @@
         $canAssignSupervisor = auth()->check()
             && in_array(auth()->user()->role, ['super_admin', 'admin_kepegawaian'], true)
             && auth()->user()->hasPermission('employees.update');
+        $canDeactivateEmployee = auth()->check()
+            && auth()->user()->hasPermission('employees.deactivate');
 
         $canCreateEmployeeHistory = auth()->check()
             && auth()->user()->hasPermission('employee_histories.create');
@@ -49,6 +51,7 @@
         satyalancanaNote: @js($p->satyalancana_note ?? ''),
         satyalancanaEndpoint: @js(route('pegawai.satyalancana.update', $p->id)),
         isUpdatingSatyalancana: false,
+        showDeactivateModal: false,
         supervisorLookupEndpoint: @js(route('pegawai.supervisor-lookup', $p->id)),
         supervisorQuery: @js($selectedSupervisorName ?? ''),
         supervisorSelectedId: @js($selectedSupervisorId ?? ''),
@@ -802,6 +805,12 @@
                     </svg>
                     Edit Pegawai
                 </a>
+                @endif
+                @if($canDeactivateEmployee)
+                <button type="button" @click="showDeactivateModal = true"
+                    class="inline-flex items-center justify-center rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm">
+                    Nonaktifkan
+                </button>
                 @endif
             </div>
         </div>
@@ -2465,6 +2474,28 @@
         </div>
     </div>
 
+    @if($canDeactivateEmployee)
+    <x-ui.modal show="showDeactivateModal" title="Nonaktifkan Pegawai" closeAction="showDeactivateModal = false" maxWidth="sm">
+        <div class="space-y-4">
+            <p class="text-sm text-muted font-sans">
+                Apakah Anda yakin ingin menonaktifkan pegawai <strong class="text-ink">{{ $p->nama_lengkap }}</strong>?
+                Data tidak dihapus dan bisa diaktifkan kembali.
+            </p>
+            <div class="flex justify-end gap-3 border-t border-border pt-4">
+                <button type="button" @click="showDeactivateModal = false"
+                    class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft">
+                    Batal
+                </button>
+                <form method="POST" action="{{ route('pegawai.destroy', $p->id) }}">
+                    @csrf
+                    <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90">
+                        Ya, Nonaktifkan
+                    </button>
+                </form>
+            </div>
+        </div>
+    </x-ui.modal>
+    @endif
 </div>{{-- /x-data utama --}}
 
 </div>

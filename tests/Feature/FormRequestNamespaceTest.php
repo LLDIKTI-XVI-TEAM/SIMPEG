@@ -3,12 +3,18 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\Admin\EmployeeImportController;
+use App\Http\Controllers\Admin\PegawaiController;
+use App\Http\Controllers\Api\V1\EmployeeController as ApiEmployeeController;
 use App\Http\Requests\Cuti\ApprovalChainConfigRequest;
 use App\Http\Requests\Cuti\ApproveLeaveRequest;
 use App\Http\Requests\Cuti\CalculateWorkdaysRequest;
 use App\Http\Requests\Cuti\PostponeLeaveRequest;
 use App\Http\Requests\Cuti\StoreLeaveRequestRequest;
+use App\Http\Requests\Employee\BulkDeactivateEmployeesRequest;
+use App\Http\Requests\Employee\BulkRestoreEmployeesRequest;
+use App\Http\Requests\Employee\DeactivateEmployeeRequest;
 use App\Http\Requests\Employee\ListEmployeesRequest;
+use App\Http\Requests\Employee\RestoreEmployeeRequest;
 use App\Http\Requests\Employee\StoreEmployeeFamilyRequest;
 use App\Http\Requests\Employee\StoreEmployeeRequest;
 use App\Http\Requests\Employee\UpdateEmployeeFamilyRequest;
@@ -34,7 +40,11 @@ class FormRequestNamespaceTest extends TestCase
             CalculateWorkdaysRequest::class,
             PostponeLeaveRequest::class,
             StoreLeaveRequestRequest::class,
+            BulkDeactivateEmployeesRequest::class,
+            BulkRestoreEmployeesRequest::class,
+            DeactivateEmployeeRequest::class,
             ListEmployeesRequest::class,
+            RestoreEmployeeRequest::class,
             StoreEmployeeFamilyRequest::class,
             StoreEmployeeRequest::class,
             UpdateEmployeeFamilyRequest::class,
@@ -50,6 +60,32 @@ class FormRequestNamespaceTest extends TestCase
             ValidateImportBatchRequest::class,
         ] as $requestClass) {
             $this->assertTrue(class_exists($requestClass), "{$requestClass} harus berada di namespace domain.");
+        }
+    }
+
+    public function test_employee_deactivate_and_restore_mutations_receive_domain_form_requests(): void
+    {
+        $mutations = [
+            [PegawaiController::class, 'destroy', 1, DeactivateEmployeeRequest::class],
+            [PegawaiController::class, 'restore', 1, RestoreEmployeeRequest::class],
+            [PegawaiController::class, 'bulkDestroy', 0, BulkDeactivateEmployeesRequest::class],
+            [PegawaiController::class, 'bulkRestore', 0, BulkRestoreEmployeesRequest::class],
+            [ApiEmployeeController::class, 'destroy', 1, DeactivateEmployeeRequest::class],
+            [ApiEmployeeController::class, 'restore', 1, RestoreEmployeeRequest::class],
+        ];
+
+        foreach ($mutations as [$controllerClass, $method, $parameterIndex, $requestClass]) {
+            $type = (new \ReflectionClass($controllerClass))
+                ->getMethod($method)
+                ->getParameters()[$parameterIndex]
+                ->getType();
+
+            $this->assertInstanceOf(\ReflectionNamedType::class, $type);
+            $this->assertSame(
+                $requestClass,
+                $type->getName(),
+                "{$controllerClass}::{$method} harus menerima FormRequest domain.",
+            );
         }
     }
 
