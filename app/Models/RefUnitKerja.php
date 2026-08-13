@@ -6,7 +6,19 @@ use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property string $id
+ * @property int|null $parent_id
+ * @property int $level
+ * @property string $nama
+ * @property string $jenis_unit
+ * @property bool $is_active
+ * @property string|null $keterangan
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
+ */
 class RefUnitKerja extends Model
 {
     use HasUuid;

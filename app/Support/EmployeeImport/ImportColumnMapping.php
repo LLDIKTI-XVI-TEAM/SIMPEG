@@ -17,8 +17,36 @@ class ImportColumnMapping
     /** Penanda kolom sumber yang nilainya tidak dipakai. */
     public const IGNORE = 'tidak_dipakai';
 
-    /** Header sumber yang dikelola oleh domain lain dan tidak boleh masuk import pegawai. */
-    private const RESERVED_SOURCES = ['Role'];
+    /**
+     * Header sumber yang tidak boleh menjadi input data apapun, terlepas dari
+     * pilihan admin. Kolom ini selalu dipaksa ke IGNORE sebelum mapping disimpan
+     * dan diblokir kembali di apply() sebagai pertahanan berlapis.
+     *
+     * 'Role' dikecualikan karena penetapan role aplikasi berjalan lewat
+     * Kelola Akses User, bukan melalui proses import pegawai.
+     *
+     * @var list<string>
+     */
+    public const RESERVED_SOURCES = ['Role'];
+
+    /**
+     * Paksakan semua source reserved menjadi IGNORE sebelum mapping disimpan.
+     * Ini adalah domain invariant: meski client mengirim {"Role": "Pangkat"},
+     * nilai tersebut direplace menjadi {"Role": "tidak_dipakai"} sebelum cache write.
+     *
+     * @param  array<string, string>  $mapping
+     * @return array<string, string>
+     */
+    public static function normalizeReservedSources(array $mapping): array
+    {
+        foreach ($mapping as $sourceHeader => $target) {
+            if (self::isReservedSource($sourceHeader)) {
+                $mapping[$sourceHeader] = self::IGNORE;
+            }
+        }
+
+        return $mapping;
+    }
 
     /**
      * Header kanonis yang menjadi target pemetaan valid, yaitu header yang
@@ -173,8 +201,9 @@ class ImportColumnMapping
         $mapped = [];
 
         foreach ($data as $sourceHeader => $value) {
-            // Pertahanan terakhir: source reserved tidak boleh masuk pipeline walaupun
-            // mapping berbahaya melewati endpoint atau state batch rusak.
+            // Fail-closed: source reserved tidak boleh lolos meski mapping cache rusak/stale.
+            // Lapisan kedua setelah normalizeReservedSources() agar invariant ini tidak bergantung
+            // pada siapa yang memanggil, termasuk jalur legacy yang melewati SaveImportMappingAction.
             if (self::isReservedSource($sourceHeader)) {
                 continue;
             }

@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 return new class extends Migration
@@ -38,6 +39,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (! Schema::hasTable('notification_event_channels') || ! Schema::hasTable('ref_notification_channels')) {
+            return;
+        }
+
         DB::table('notification_event_channels')
             ->where('event_key', 'status_pegawai.diubah')
             ->delete();
