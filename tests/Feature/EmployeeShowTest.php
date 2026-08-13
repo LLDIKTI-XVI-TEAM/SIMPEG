@@ -782,6 +782,34 @@ class EmployeeShowTest extends TestCase
             ]), false);
     }
 
+    public function test_detail_admin_memakai_snapshot_status_saat_semua_riwayat_tidak_memiliki_lampiran(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = $this->employeeWithReferences([
+            'status_berkas_path' => 'sk/admin-status-snapshot-fallback.pdf',
+            'status_nomor_berkas' => 'SK-SNAPSHOT-FALLBACK',
+        ]);
+        EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_nama' => 'Aktif tanpa lampiran',
+            'tanggal_efektif' => '2026-08-01',
+            'is_latest' => true,
+        ]);
+        Storage::disk(Document::STORAGE_DISK)->put($employee->status_berkas_path, 'snapshot status privat');
+        $url = route('pegawai.history-attachments.download', [
+            'employee' => $employee,
+            'type' => 'status-snapshot',
+            'history' => $employee,
+        ]);
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee))
+            ->assertOk()
+            ->assertSee('Aktif tanpa lampiran')
+            ->assertSee('SK-SNAPSHOT-FALLBACK')
+            ->assertSee($url, false);
+    }
+
     public function test_detail_page_provides_optional_sk_upload_controls_for_each_history_modal(): void
     {
         $employee = $this->employeeWithReferences();

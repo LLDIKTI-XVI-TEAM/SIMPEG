@@ -791,6 +791,12 @@ class PimpinanEmployeeDetailTest extends TestCase
             'status_berkas_path' => 'pegawai/status-snapshot-legacy.pdf',
             'status_nomor_berkas' => 'SK-STATUS-SNAPSHOT',
         ]);
+        EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_nama' => 'Aktif tanpa lampiran',
+            'tanggal_efektif' => '2026-08-01',
+            'is_latest' => true,
+        ]);
         Storage::disk(Document::STORAGE_DISK)->put($employee->status_berkas_path, 'snapshot status privat');
         $pimpinan = User::factory()->pimpinan()->create();
         $url = route('pimpinan.pegawai.status-attachments.download', [

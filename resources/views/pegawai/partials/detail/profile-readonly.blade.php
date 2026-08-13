@@ -9,6 +9,17 @@
             $remainingRetirement = 'Memasuki Usia Pensiun';
         }
     }
+
+    $isAdminSurface = $downloadSurface === 'admin';
+    $statusAttachmentAttribute = $isAdminSurface
+        ? 'admin_attachment_download_url'
+        : 'pimpinan_attachment_download_url';
+    $statusSnapshotUrl = $isAdminSurface
+        ? $employee->admin_status_attachment_download_url
+        : $employee->pimpinan_status_attachment_download_url;
+    $hasStatusHistoryAttachment = $employee->statusHistories->contains(
+        fn ($history) => filled($history->getAttribute($statusAttachmentAttribute)),
+    );
 @endphp
 
 <div class="space-y-6">
@@ -16,12 +27,21 @@
         <div class="space-y-2">
             <h3 class="text-xs font-bold uppercase tracking-wider text-ink font-sans">Status Kinerja</h3>
             <p class="text-xs text-muted font-sans">Flag kinerja tampil sebagai informasi read-only.</p>
-            <p class="font-bold text-ink font-sans">{{ $employee->is_kinerja_baik ? 'Kinerja Baik' : 'Kinerja Tidak Baik' }}</p>
+            <p
+                class="font-bold text-ink font-sans"
+                @if($isAdminSurface) x-text="kinerjaBaik ? 'Kinerja Baik' : 'Kinerja Tidak Baik'" @endif
+            >{{ $employee->is_kinerja_baik ? 'Kinerja Baik' : 'Kinerja Tidak Baik' }}</p>
         </div>
         <div class="space-y-2 border-border md:border-l md:pl-4">
             <h3 class="text-xs font-bold uppercase tracking-wider text-ink font-sans">Kelayakan Satyalancana</h3>
-            <p class="font-bold text-ink font-sans">{{ $employee->is_satyalancana_eligible ? 'Layak' : 'Tidak Layak' }}</p>
-            <p class="text-xs text-muted font-sans">{{ $employee->satyalancana_note ?: 'Tidak ada catatan manual.' }}</p>
+            <p
+                class="font-bold text-ink font-sans"
+                @if($isAdminSurface) x-text="satyalancanaEligible ? 'Layak' : 'Tidak Layak'" @endif
+            >{{ $employee->is_satyalancana_eligible ? 'Layak' : 'Tidak Layak' }}</p>
+            <p
+                class="text-xs text-muted font-sans"
+                @if($isAdminSurface) x-text="satyalancanaNote || 'Tidak ada catatan manual.'" @endif
+            >{{ $employee->satyalancana_note ?: 'Tidak ada catatan manual.' }}</p>
         </div>
     </div>
 
@@ -217,11 +237,7 @@
                     @if($history->keterangan)
                         <p class="text-xs text-ink font-sans">{{ $history->keterangan }}</p>
                     @endif
-                    @php
-                        $statusAttachmentUrl = $downloadSurface === 'admin'
-                            ? $history->admin_attachment_download_url
-                            : $history->pimpinan_attachment_download_url;
-                    @endphp
+                    @php($statusAttachmentUrl = $history->getAttribute($statusAttachmentAttribute))
                     @if($statusAttachmentUrl)
                         <a
                             href="{{ $statusAttachmentUrl }}"
@@ -233,26 +249,23 @@
                     @endif
                 </article>
             @empty
-                @php
-                    $statusSnapshotUrl = $downloadSurface === 'admin'
-                        ? $employee->admin_status_attachment_download_url
-                        : $employee->pimpinan_status_attachment_download_url;
-                @endphp
-                @if($statusSnapshotUrl)
-                    <article class="space-y-2 rounded-lg border border-border bg-surface p-4">
-                        <p class="text-sm font-bold text-ink font-sans">Snapshot Status Pegawai</p>
-                        <a
-                            href="{{ $statusSnapshotUrl }}"
-                            target="_blank"
-                            class="inline-flex text-xs font-semibold text-primary hover:underline"
-                        >
-                            {{ $employee->status_nomor_berkas ?: 'Lihat SK' }}
-                        </a>
-                    </article>
-                @else
+                @if(! $statusSnapshotUrl)
                     <p class="text-xs font-semibold text-muted font-sans">Belum ada riwayat perubahan status kepegawaian.</p>
                 @endif
             @endforelse
+
+            @if(! $hasStatusHistoryAttachment && $statusSnapshotUrl)
+                <article class="space-y-2 rounded-lg border border-border bg-surface p-4">
+                    <p class="text-sm font-bold text-ink font-sans">Snapshot Status Pegawai</p>
+                    <a
+                        href="{{ $statusSnapshotUrl }}"
+                        target="_blank"
+                        class="inline-flex text-xs font-semibold text-primary hover:underline"
+                    >
+                        {{ $employee->status_nomor_berkas ?: 'Lihat SK' }}
+                    </a>
+                </article>
+            @endif
         </div>
     </div>
 </div>
