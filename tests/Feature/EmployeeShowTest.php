@@ -207,6 +207,78 @@ class EmployeeShowTest extends TestCase
             ], false);
     }
 
+    public function test_detail_page_memprioritaskan_history_berflag_latest_sebelum_tanggal_terbaru(): void
+    {
+        $employee = $this->employeeWithReferences([
+            'status_tanggal' => null,
+        ]);
+        $status = RefStatusPegawai::query()->where('nama', 'Aktif')->firstOrFail();
+
+        EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_pegawai_id' => $status->id,
+            'status_nama' => $status->nama,
+            'tanggal_efektif' => '2025-02-14',
+            'is_latest' => true,
+        ]);
+        EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_pegawai_id' => $status->id,
+            'status_nama' => $status->nama,
+            'tanggal_efektif' => '2026-04-21',
+            'is_latest' => false,
+        ]);
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSeeInOrder([
+                'Tanggal Efektif Status Kepegawaian',
+                '14-02-2025',
+            ], false);
+    }
+
+    public function test_detail_page_memakai_tanggal_history_terbaru_untuk_data_legacy_tanpa_flag_latest(): void
+    {
+        $employee = $this->employeeWithReferences([
+            'status_tanggal' => null,
+        ]);
+        $status = RefStatusPegawai::query()->where('nama', 'Aktif')->firstOrFail();
+
+        foreach (['2024-03-12', '2025-11-08'] as $tanggalEfektif) {
+            EmployeeStatusHistory::create([
+                'employee_id' => $employee->id,
+                'status_pegawai_id' => $status->id,
+                'status_nama' => $status->nama,
+                'tanggal_efektif' => $tanggalEfektif,
+                'is_latest' => false,
+            ]);
+        }
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSeeInOrder([
+                'Tanggal Efektif Status Kepegawaian',
+                '08-11-2025',
+            ], false);
+    }
+
+    public function test_detail_page_tidak_mengarang_tanggal_status_tanpa_sumber_resmi(): void
+    {
+        $employee = $this->employeeWithReferences([
+            'status_tanggal' => null,
+        ]);
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSeeInOrder([
+                'Tanggal Efektif Status Kepegawaian',
+                '-',
+            ], false);
+    }
+
     public function test_detail_page_menyediakan_form_penghapusan_kepala_bagian_yang_eksplisit(): void
     {
         $employee = $this->employeeWithReferences();
