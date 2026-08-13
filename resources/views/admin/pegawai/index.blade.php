@@ -973,8 +973,9 @@
                         <p class="text-xs text-muted font-sans mt-1">
                             Pegawai <strong x-text="deletePegawaiName" class="text-ink"></strong> akan dinonaktifkan
                             dan dipindahkan dari daftar pegawai aktif ke <strong>Data Backup</strong>. Seluruh data,
-                            riwayat, dan dokumen tetap disimpan dan dapat dipulihkan kembali oleh
-                            <strong>Super Admin</strong>. Data tidak dihapus permanen secara otomatis.
+                            riwayat, dan dokumen tetap disimpan. Data tidak dihapus dan bisa diaktifkan kembali.
+                            Pemulihan dilakukan oleh <strong>Super Admin</strong>. Data tidak dihapus permanen secara
+                            otomatis.
                         </p>
                     </div>
                 </div>
@@ -1022,8 +1023,8 @@
                         <p class="text-xs text-muted font-sans">
                             Pegawai terpilih akan dinonaktifkan dan dipindahkan dari daftar pegawai aktif ke
                             <strong class="text-ink">Data Backup</strong>. Seluruh data, riwayat, dan dokumen tetap
-                            disimpan dan dapat dipulihkan kembali oleh <strong class="text-ink">Super Admin</strong>.
-                            Data tidak dihapus permanen secara otomatis.
+                            disimpan. Data tidak dihapus dan bisa diaktifkan kembali. Pemulihan dilakukan oleh
+                            <strong class="text-ink">Super Admin</strong>. Data tidak dihapus permanen secara otomatis.
                         </p>
                     </div>
 
