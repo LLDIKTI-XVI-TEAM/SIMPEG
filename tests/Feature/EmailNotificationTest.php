@@ -115,6 +115,27 @@ class EmailNotificationTest extends TestCase
         Queue::assertNotPushed(SendSimpegNotificationEmailJob::class);
     }
 
+    public function test_event_tanpa_dukungan_email_tidak_mengantrikan_job_meski_kebijakan_stale_aktif(): void
+    {
+        Queue::fake();
+        $this->setEventChannelPolicy('import_pegawai', 'email', true);
+        $this->setEventChannelPolicy('import_pegawai', 'in_app', true);
+        $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+
+        app(NotificationService::class)->createForEmployee(
+            employee: $employee,
+            type: 'import_pegawai',
+            title: 'Impor Pegawai Selesai',
+            body: 'Proses impor pegawai telah selesai.',
+        );
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $employee->id,
+            'type' => 'import_pegawai',
+        ]);
+        Queue::assertNotPushed(SendSimpegNotificationEmailJob::class);
+    }
+
     public function test_kebijakan_in_app_yang_tidak_ada_memblokir_persist_tetapi_email_tetap_diantrekan(): void
     {
         Queue::fake();

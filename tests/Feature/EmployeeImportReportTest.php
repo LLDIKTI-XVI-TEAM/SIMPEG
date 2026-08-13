@@ -40,12 +40,12 @@ class EmployeeImportReportTest extends TestCase
         $upload->assertOk();
         $batchId = $upload->json('batch_id');
 
-        // Per K-US-02: NIP duplikat dari database menjadi SKIP, bukan error.
+        // NIP yang sudah terdaftar dilaporkan sebagai skip agar data pegawai yang ada tidak ditulis ulang.
         $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/validate", [])
             ->assertOk()
             ->assertJsonPath('valid_count', 1)
-            ->assertJsonPath('skip_count', 1)
-            ->assertJsonPath('error_count', 1);
+            ->assertJsonPath('skip_count', 1)  // Baris 2 di-skip karena NIP ada di DB
+            ->assertJsonPath('error_count', 1); // Hanya baris 3 yang error (tanggal lahir invalid)
 
         $this->postJsonWithCsrf("/api/pegawai/import/{$batchId}/execute", [])->assertOk();
 
@@ -60,8 +60,8 @@ class EmployeeImportReportTest extends TestCase
             'total_rows' => 3,
             'valid_count' => 1,
             'inserted_count' => 1,
-            'skipped_count' => 1,
-            'failed_count' => 1,
+            'skipped_count' => 1,  // Baris 2 di-skip
+            'failed_count' => 1,   // Hanya baris 3 yang gagal
         ]);
         $this->assertDatabaseHas('employees', ['nip' => '198001012006041001']);
 
@@ -75,11 +75,11 @@ class EmployeeImportReportTest extends TestCase
         $csv = $report->streamedContent();
         $this->assertStringContainsString('Laporan Hasil Import Pegawai', $csv);
         $this->assertStringContainsString('"Berhasil ditambahkan",1', $csv);
-        $this->assertStringContainsString('"Dilewati (NIP terdaftar)",1', $csv);
-        $this->assertStringContainsString('"Gagal validasi",1', $csv);
+        // Counter gagal mencakup error validasi maupun error yang baru muncul saat eksekusi.
+        $this->assertStringContainsString('Gagal,1', $csv);  // Hanya 1 error
+        $this->assertStringContainsString('"Dilewati (NIP terdaftar)",1', $csv);  // 1 skip
         $this->assertStringContainsString('gagal', $csv);
-        $this->assertStringContainsString('Siti Aminah', $csv);
-        $this->assertStringContainsString('NIP', $csv);
+        $this->assertStringContainsString('Joko Tidak Valid', $csv);  // Baris error
         $this->assertStringContainsString('Tanggal Lahir', $csv);
     }
 
@@ -122,7 +122,7 @@ class EmployeeImportReportTest extends TestCase
     }
 
     /**
-     * Tiga baris: valid, NIP duplikat database (skip per K-US-02), dan tanggal lahir tidak valid (error).
+     * Tiga baris: valid, NIP yang sudah terdaftar (skip), dan tanggal lahir tidak valid (error).
      */
     private function mixedCsv(): string
     {

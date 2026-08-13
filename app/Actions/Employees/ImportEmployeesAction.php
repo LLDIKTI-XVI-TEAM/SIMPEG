@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Services\AuditService;
+use App\Services\Employees\TmtCalculatorService;
 use App\Support\EmployeeImport\CsvEmployeeReader;
 use App\Support\EmployeeValidationRules;
 use Illuminate\Http\Request;
@@ -19,19 +20,15 @@ class ImportEmployeesAction
     /** @var array<string, string>|null */
     private ?array $jenisPegawaiCache = null;
 
-    public function __construct(private readonly CsvEmployeeReader $reader) {}
+    public function __construct(
+        private readonly CsvEmployeeReader $reader,
+        private readonly TmtCalculatorService $tmtCalculator,
+    ) {}
 
     /**
-     * Endpoint kompatibilitas mempertahankan import atomik: setiap error
-     * validasi membatalkan seluruh berkas. Jalur SKIP K-US-02 tersedia pada
-     * wizard yang memiliki kontrak hasil per baris.
+     * Mengimpor pegawai secara all-or-nothing agar file bermasalah tidak membuat data parsial.
      *
-     * @return array{
-     *     message: string,
-     *     inserted: int,
-     *     failed: int,
-     *     errors: array<int, array{row: int, errors: array<string, mixed>}>
-     * }
+     * @return array{message: string, inserted: int, failed: int, errors: array<int, array{row: int, errors: array<string, mixed>}>}
      */
     public function execute(Request $request): array
     {
@@ -45,6 +42,7 @@ class ImportEmployeesAction
 
         $validatedRows = [];
         $errors = [];
+        $skippedCount = 0;
         /** @var array<string, int> $seenNips */
         $seenNips = [];
         /** @var array<string, int> $seenEmails */
@@ -69,9 +67,9 @@ class ImportEmployeesAction
 
             $data = $validator->validated();
             $referenceErrors = $this->resolveReferences($data);
-            $duplicateErrors = $this->duplicateErrors($data, $row['row'], $seenNips, $seenEmails);
-            $databaseErrors = $this->existingEmailErrors($data);
-            $rowErrors = array_merge_recursive($referenceErrors, $duplicateErrors, $databaseErrors);
+            $duplicateResult = $this->duplicateErrors($data, $row['row'], $seenNips, $seenEmails);
+
+            $rowErrors = array_merge_recursive($referenceErrors, $duplicateResult['errors']);
 
             if ($rowErrors !== []) {
                 $errors[] = [
@@ -82,44 +80,50 @@ class ImportEmployeesAction
                 continue;
             }
 
-            $validatedRows[] = [
-                'row' => $row['row'],
-                'data' => $data,
-            ];
+            // Skip NIP hanya berlaku bila baris tidak memiliki error yang harus diperbaiki admin.
+            if ($duplicateResult['skip']) {
+                $skippedCount++;
+
+                continue;
+            }
+
+            $validatedRows[] = $data;
         }
 
         if ($errors !== []) {
-            return $this->failedSummary($errors);
+            return $this->failedSummary($errors, $skippedCount);
         }
 
-        $insertedCount = DB::transaction(function () use ($validatedRows): int {
+        DB::transaction(function () use ($validatedRows): void {
             $aktifId = RefStatusPegawai::where('nama', 'Aktif')->value('id')
                 ?? RefStatusPegawai::where('is_default', true)->value('id');
-            $insertedCount = 0;
 
-            foreach ($validatedRows as $row) {
-                $data = $row['data'];
-                Employee::create($data + [
+            foreach ($validatedRows as $data) {
+                $employee = Employee::create($data + [
                     'status_pegawai_id' => $aktifId,
                     'status_aktif' => 'Aktif',
                     'profil_status' => 'belum_lengkap',
                     'is_kinerja_baik' => true,
                 ]);
-                $insertedCount++;
-            }
 
-            return $insertedCount;
+                // Endpoint import kompatibilitas mengikuti batas yang sama dengan wizard:
+                // catat provenance pensiun tanpa menghitung milestone lain dari snapshot massal.
+                if ($employee->tanggal_pensiun !== null) {
+                    $this->tmtCalculator->recordImportedPensionDate($employee);
+                }
+            }
         });
 
         AuditService::log('IMPORT', 'Employee', null, null, [
-            'total_inserted' => $insertedCount,
-            'total_failed' => 0,
+            'total_inserted' => count($validatedRows),
+            'total_skipped' => $skippedCount,
             'filename' => $request->file('file')->getClientOriginalName(),
         ], $request);
 
         return [
             'message' => 'Import selesai.',
-            'inserted' => $insertedCount,
+            'inserted' => count($validatedRows),
+            'skipped' => $skippedCount,
             'failed' => 0,
             'errors' => [],
         ];
@@ -167,79 +171,74 @@ class ImportEmployeesAction
 
     /**
      * Menjaga file import tidak berisi NIP/email ganda sebelum transaksi insert dimulai.
+     * - NIP ganda dalam satu berkas → error dengan prioritas tertinggi
+     * - Email yang telah terdaftar → error
+     * - Email ganda dalam berkas → error
+     * - NIP sudah ada di database → skip bila baris tidak memiliki error lain
      *
      * @param  array<string, mixed>  $data
      * @param  array<string, int>  $seenNips
      * @param  array<string, int>  $seenEmails
-     * @return array<string, array<int, string>>
+     * @return array{errors: array<string, array<int, string>>, skip: bool}
      */
     private function duplicateErrors(array $data, int $row, array &$seenNips, array &$seenEmails): array
     {
         $errors = [];
+        $skip = false;
 
         if (! empty($data['nip'])) {
             $nip = (string) $data['nip'];
 
+            // Duplikasi NIP dalam berkas diprioritaskan agar sumber konflik dapat diperbaiki.
             if (isset($seenNips[$nip])) {
                 $errors['nip'][] = "NIP sudah ada pada baris {$seenNips[$nip]}.";
             } else {
                 $seenNips[$nip] = $row;
+
+                // NIP database menjadi skip hanya bila tidak ada duplikasi dalam berkas.
+                if (Employee::withTrashed()->where('nip', $nip)->exists()) {
+                    $skip = true;
+                }
             }
         }
 
         if (! empty($data['email_pribadi'])) {
             $email = strtolower((string) $data['email_pribadi']);
 
+            // Duplikasi email dalam berkas harus diperbaiki sebelum data disimpan.
             if (isset($seenEmails[$email])) {
                 $errors['email_pribadi'][] = "Email pegawai sudah ada pada baris {$seenEmails[$email]}.";
             } else {
                 $seenEmails[$email] = $row;
             }
+
+            // Email yang telah digunakan tidak boleh dipakai oleh pegawai lain.
+            if (Employee::withTrashed()->whereRaw('LOWER(email_pribadi) = ?', [$email])->exists()) {
+                $errors['email_pribadi'][] = 'Email pegawai sudah terdaftar di database.';
+            }
         }
 
-        return $errors;
+        return ['errors' => $errors, 'skip' => $skip];
     }
 
     /**
      * @param  array<int, array{row: int, errors: array<string, mixed>}>  $errors
-     * @return array{
-     *     message: string,
-     *     inserted: int,
-     *     failed: int,
-     *     errors: array<int, array{row: int, errors: array<string, mixed>}>
-     * }
+     * @return array{message: string, inserted: int, skipped: int, failed: int, errors: array<int, array{row: int, errors: array<string, mixed>}>}
      */
-    private function failedSummary(array $errors): array
+    private function failedSummary(array $errors, int $skippedCount = 0): array
     {
+        $message = 'Import gagal. Perbaiki baris bermasalah lalu unggah ulang.';
+
+        if ($skippedCount > 0) {
+            $message .= " {$skippedCount} baris dilewati karena NIP sudah terdaftar.";
+        }
+
         return [
-            'message' => 'Import gagal. Perbaiki baris bermasalah lalu unggah ulang.',
+            'message' => $message,
             'inserted' => 0,
+            'skipped' => $skippedCount,
             'failed' => count($errors),
             'errors' => $errors,
         ];
-    }
-
-    /**
-     * K-US-02: NIP existing akan di-skip, tetapi email existing tetap error.
-     *
-     * @param  array<string, mixed>  $data
-     * @return array<string, array<int, string>>
-     */
-    private function existingEmailErrors(array $data): array
-    {
-        $email = $data['email_pribadi'] ?? null;
-        if (! is_string($email) || $email === '') {
-            return [];
-        }
-
-        $email = strtolower($email);
-        $exists = Employee::withTrashed()
-            ->where(function ($query) use ($email): void {
-                $query->whereRaw('LOWER(email_pribadi) = ?', [$email])
-                    ->orWhereRaw('LOWER(email) = ?', [$email]);
-            })
-            ->exists();
-
-        return $exists ? ['email_pribadi' => ['Email pegawai sudah terdaftar di database.']] : [];
     }
 }

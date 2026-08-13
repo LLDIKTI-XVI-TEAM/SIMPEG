@@ -9,8 +9,8 @@ use App\Actions\Employees\SaveImportMappingAction;
 use App\Actions\Employees\UploadImportBatchAction;
 use App\Actions\Employees\ValidateImportBatchAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Import\ExecuteImportBatchRequest;
 use App\Http\Requests\Import\ImportEmployeesRequest;
-use App\Http\Requests\Import\QueueImportBatchRequest;
 use App\Http\Requests\Import\SaveImportMappingRequest;
 use App\Http\Requests\Import\ValidateImportBatchRequest;
 use App\Models\ImportBatch;
@@ -90,7 +90,7 @@ class EmployeeImportController extends Controller
      */
     public function validate(ValidateImportBatchRequest $request, string $batchId, ValidateImportBatchAction $action): JsonResponse
     {
-        $updatedRows = $request->validated('rows');
+        $updatedRows = $request->validated()['rows'] ?? null;
 
         $result = $action->execute($batchId, $updatedRows, $request->user());
 
@@ -100,11 +100,14 @@ class EmployeeImportController extends Controller
     /**
      * Menangani eksekusi impor dengan memasukkan job ke antrean.
      */
-    public function execute(QueueImportBatchRequest $request, string $batchId, QueueImportBatchAction $action): JsonResponse
+    public function execute(ExecuteImportBatchRequest $request, string $batchId, QueueImportBatchAction $action): JsonResponse
     {
-        $result = $action->execute($batchId, $request->user(), $request->ip(), $request->userAgent());
-
-        return response()->json($result, $result['status'] === 'failed' ? 503 : 200);
+        return response()->json($action->execute(
+            $batchId,
+            $request->user(),
+            $request->ip(),
+            $request->userAgent(),
+        ));
     }
 
     /**
